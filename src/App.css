@@ -1,0 +1,40 @@
+/* src/App.css */
+.App {
+  min-height: 100vh;
+  background-color: transparent;
+}
+
+body, #root {
+  background-color: #e0f6ff !important;
+}
+
+.dashboard {
+  flex: 1;
+  padding: 0; /* Removed padding to prevent overlap */
+  background-color: #f5f7fa;
+  box-shadow: 0 0 5px rgba(74, 144, 226, 0.5);
+}
+  .card-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+  }
+
+
+  .title {
+    font-size: 1.5rem;
+    color: #333;
+    margin-bottom: 1.5rem;
+    text-align: center;
+  }
+
+  .section {
+    margin-bottom: 2rem;
+  }
+
+  .subtitle {
+    font-size: 1.1rem;
+    color: #666;
+    margin-bottom: 1rem;
+  }

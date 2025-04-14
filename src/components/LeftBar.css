@@ -1,0 +1,46 @@
+.left-bar {
+    position: fixed;
+    top: 80px; /* Start below top bar */
+    left: 0;
+    width: 80px;
+    height: calc(100vh - 80px); /* Account for top bar */
+    background-color: #f8f9fa;
+    border-right: 1px solid #e0e0e0;
+    z-index: 100;
+}
+
+.icon-container {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  width: 100%;
+  align-items: center;
+}
+
+.icon-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  padding: 10px 0;
+  transition: background-color 0.2s;
+}
+
+.icon-button:hover {
+  background-color: #e9ecef;
+}
+
+.icon {
+  width: 40px; /* Increased size */
+  height: 40px; /* Increased size */
+  fill: #495057;
+}
+
+.icon-button span {
+  font-size: 14px;
+  margin-top: 8px;
+  color: #495057;
+}

@@ -1,40 +1,37 @@
-/* src/App.css */
 .App {
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
-  background-color: transparent;
+  width: 100vw;
+  background: linear-gradient(135deg, #1e1e2f 0%, #2a2a4a 100%);
+  color: #e0e0ff;
+  overflow: hidden;
 }
 
 body, #root {
-  background-color: #e0f6ff !important;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  width: 100vw;
+  background: transparent !important;
 }
 
-.dashboard {
+.main-content {
+  display: flex;
   flex: 1;
-  padding: 0; /* Removed padding to prevent overlap */
-  background-color: #f5f7fa;
-  box-shadow: 0 0 5px rgba(74, 144, 226, 0.5);
+  min-height: calc(100vh - 80px); /* Account for TopBar height */
+  width: 100%;
 }
-  .card-wrapper {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 100%;
-  }
 
-
-  .title {
-    font-size: 1.5rem;
-    color: #333;
-    margin-bottom: 1.5rem;
-    text-align: center;
-  }
-
-  .section {
-    margin-bottom: 2rem;
-  }
-
-  .subtitle {
-    font-size: 1.1rem;
-    color: #666;
-    margin-bottom: 1rem;
-  }
+.content-area {
+  flex: 1;
+  padding: 10px; /* Reduce padding to maximize content area */
+  margin-left: 80px; /* Account for LeftBar width */
+  background: transparent;
+  min-height: 100%;
+  width: calc(100% - 80px); /* Ensure it takes remaining width */
+  display: flex;
+  justify-content: center; /* Center horizontally */
+  align-items: flex-start; /* Align to top */
+  box-sizing: border-box;
+}

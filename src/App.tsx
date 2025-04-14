@@ -1,26 +1,24 @@
-// src/App.tsx
-import React, { useState } from 'react';
+import React from 'react';
+import { Routes, Route } from 'react-router-dom';
 import './App.css';
-import UsernameEntry from './components/IG_EntryUsernames';
+import LeftBar from './components/common/LeftBar';
+import TopBar from './components/common/TopBar';
+import Instagram from './pages/Instagram';
+
 
 const App: React.FC = () => {
-  const [showUsernameEntry, setShowUsernameEntry] = useState(true);
-
-  const handleSubmitSuccess = () => {
-    setShowUsernameEntry(false);
-    // Add your dashboard logic here
-  };
-
   return (
     <div className="App">
-      {showUsernameEntry ? (
-        <UsernameEntry onSubmitSuccess={handleSubmitSuccess} />
-      ) : (
-        <div className="dashboard">
-          {/* Your main dashboard content goes here */}
-          <h1>Welcome to Dashboard</h1>
+      <TopBar />
+      <div className="main-content">
+        <LeftBar />
+        <div className="content-area">
+          <Routes>
+            <Route path="/" element={<Instagram />} />
+            <Route path="/instagram" element={<Instagram />} />
+          </Routes>
         </div>
-      )}
+      </div>
     </div>
   );
 };

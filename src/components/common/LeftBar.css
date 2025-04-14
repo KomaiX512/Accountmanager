@@ -1,12 +1,12 @@
 .left-bar {
-    position: fixed;
-    top: 80px; /* Start below top bar */
-    left: 0;
-    width: 80px;
-    height: calc(100vh - 80px); /* Account for top bar */
-    background-color: #f8f9fa;
-    border-right: 1px solid #e0e0e0;
-    z-index: 100;
+  position: fixed;
+  top: 80px;
+  left: 0;
+  width: 80px;
+  height: calc(100vh - 80px);
+  background: linear-gradient(to bottom, #2a2a4a, #1e1e2f);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  z-index: 100;
 }
 
 .icon-container {
@@ -15,6 +15,7 @@
   gap: 30px;
   width: 100%;
   align-items: center;
+  padding-top: 20px;
 }
 
 .icon-button {
@@ -30,17 +31,17 @@
 }
 
 .icon-button:hover {
-  background-color: #e9ecef;
+  background: rgba(0, 255, 204, 0.1);
 }
 
 .icon {
-  width: 40px; /* Increased size */
-  height: 40px; /* Increased size */
-  fill: #495057;
+  width: 40px;
+  height: 40px;
+  fill: #00ffcc;
 }
 
 .icon-button span {
   font-size: 14px;
   margin-top: 8px;
-  color: #495057;
+  color: #e0e0ff;
 }

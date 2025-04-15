@@ -5,7 +5,6 @@ import LeftBar from './components/common/LeftBar';
 import TopBar from './components/common/TopBar';
 import Instagram from './pages/Instagram';
 
-
 const App: React.FC = () => {
   return (
     <div className="App">

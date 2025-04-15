@@ -3,8 +3,9 @@
     min-height: 100%;
     background: transparent;
     display: flex;
-    justify-content: center; /* Center the grid */
-    align-items: center; /* Ensure vertical centering if needed */
+    justify-content: center;
+    align-items: center;
+    position: relative; /* For toast positioning */
   }
   
   .dashboard-grid {
@@ -14,14 +15,14 @@
       "notifications post-cooked strategies"
       "notifications post-cooked competitor-analysis"
       "chatbot chatbot chatbot";
-    grid-template-columns: 1fr 1fr 1fr; /* Equal columns */
+    grid-template-columns: 1fr 1fr 1fr;
     grid-template-rows: auto 1fr 1fr auto;
     gap: 20px;
-    min-height: calc(100vh - 120px); /* Account for TopBar and padding */
+    min-height: calc(100vh - 120px);
     width: 100%;
-    max-width: 1200px; /* Limit max width for better centering */
-    margin: 0 auto; /* Center the grid within the wrapper */
-    padding: 0; /* Remove padding to avoid extra space */
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0;
   }
   
   .profile-metadata {
@@ -120,22 +121,60 @@
     padding: 10px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
     display: flex;
-    justify-content: flex-end;
+    align-items: center;
   }
   
-  .chatbot-btn {
+  .chatbot-input-container {
+    display: flex;
+    width: 100%;
+    gap: 10px;
+    align-items: center;
+  }
+  
+  .chatbot-input {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(0, 255, 204, 0.3);
+    border-radius: 6px;
+    padding: 10px;
+    color: #e0e0ff;
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  
+  .chatbot-input::placeholder {
+    color: #a0a0cc;
+  }
+  
+  .chatbot-input:focus {
+    border-color: #00ffcc;
+    box-shadow: 0 0 8px rgba(0, 255, 204, 0.4);
+  }
+  
+  .chatbot-send-btn {
     background: linear-gradient(90deg, #007bff, #00ffcc);
-    color: white;
     border: none;
     border-radius: 6px;
-    padding: 10px 20px;
+    padding: 10px;
     cursor: pointer;
-    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     transition: box-shadow 0.2s;
   }
   
-  .chatbot-btn:hover {
+  .chatbot-send-btn:hover {
     box-shadow: 0 0 15px rgba(0, 255, 204, 0.5);
+  }
+  
+  .chatbot-send-btn:disabled {
+    background: #4a4a6a;
+    cursor: not-allowed;
+  }
+  
+  .chatbot-send-btn:disabled svg {
+    stroke: #a0a0cc;
   }
   
   h2 {
@@ -155,17 +194,53 @@
     font-size: 0.8rem;
   }
   
-  .notification-list, .post-list, .strategy-list {
+  .notification-list,
+  .post-list,
+  .strategy-list {
     display: flex;
     flex-direction: column;
     gap: 10px;
   }
   
-  .notification-item, .post-item, .strategy-item {
+  .notification-item,
+  .post-item,
+  .strategy-item {
     background: rgba(255, 255, 255, 0.1);
     border-radius: 8px;
     padding: 15px;
     color: #e0e0ff;
+  }
+  
+  .toast-notification {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
+    border-radius: 8px;
+    padding: 10px 20px;
+    color: #e0e0ff;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 4px 15px rgba(0, 255, 204, 0.4);
+    border: 1px solid rgba(0, 255, 204, 0.3);
+    z-index: 1000;
+    animation: slide-in-toast 0.3s ease-out, pulse-glow 1.5s infinite;
+  }
+  
+  .toast-icon {
+    flex-shrink: 0;
+  }
+  
+  @keyframes slide-in-toast {
+    from { opacity: 0; transform: translateX(100px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 8px rgba(0, 255, 204, 0.3); }
+    50% { box-shadow: 0 0 15px rgba(0, 255, 204, 0.6); }
   }
   
   .action {

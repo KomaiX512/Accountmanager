@@ -1,15 +1,26 @@
-import React from 'react';
+import React, { useState } from 'react';
 import './LeftBar.css';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import ProfilePopup from './ProfilePopup';
+import MessagesPopup from './MessagesPopup';
 
 const LeftBar: React.FC = () => {
   const navigate = useNavigate();
+  const [showProfilePopup, setShowProfilePopup] = useState(false);
+  const [showMessagesPopup, setShowMessagesPopup] = useState(false);
+  const [hasNewMessages, setHasNewMessages] = useState(false);
 
   const menuItems = [
     { icon: 'settings', path: '/settings', label: 'Settings' },
     { icon: 'edit', path: '/edit', label: 'Edit' },
-    { icon: 'profile', path: '/profile', label: 'Profile' },
+    { icon: 'profile', label: 'Profile', action: () => setShowProfilePopup(true) },
+    { 
+      icon: 'messages', 
+      label: 'Messages', 
+      action: () => setShowMessagesPopup(true),
+      hasNotification: hasNewMessages,
+    },
   ];
 
   return (
@@ -29,7 +40,7 @@ const LeftBar: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            onClick={() => navigate(item.path)} // Placeholder navigation
+            onClick={item.action || (() => navigate(item.path))}
           >
             {item.icon === 'settings' && (
               <svg className="icon" viewBox="0 0 24 24">
@@ -46,10 +57,28 @@ const LeftBar: React.FC = () => {
                 <path d="M12,4A4,4 0 0,1 16,8A4,4 0 0,1 12,12A4,4 0 0,1 8,8A4,4 0 0,1 12,4M12,14C16.42,14 20,15.79 20,18V20H4V18C4,15.79 7.58,14 12,14Z" />
               </svg>
             )}
+            {item.icon === 'messages' && (
+              <div className="icon-wrapper">
+                <svg className="icon" viewBox="0 0 24 24">
+                  <path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2ZM20 16H6L4 18V4H20V16Z" />
+                </svg>
+                {item.hasNotification && <span className="notification-dot"></span>}
+              </div>
+            )}
             <span>{item.label}</span>
           </motion.button>
         ))}
       </div>
+      {showProfilePopup && (
+        <ProfilePopup username="maccosmetics" onClose={() => setShowProfilePopup(false)} />
+      )}
+      {showMessagesPopup && (
+        <MessagesPopup
+          username="maccosmetics"
+          onClose={() => setShowMessagesPopup(false)}
+          setHasNewMessages={setHasNewMessages}
+        />
+      )}
     </motion.div>
   );
 };

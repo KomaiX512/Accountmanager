@@ -1,11 +1,12 @@
 .dashboard-wrapper {
     width: 100%;
-    min-height: 100%;
+    min-height: 100vh;
     background: transparent;
     display: flex;
     justify-content: center;
-    align-items: center;
-    position: relative; /* For toast positioning */
+    align-items: flex-start;
+    margin: 0 auto;
+    padding: 0;
   }
   
   .dashboard-grid {
@@ -15,25 +16,27 @@
       "notifications post-cooked strategies"
       "notifications post-cooked competitor-analysis"
       "chatbot chatbot chatbot";
-    grid-template-columns: 1fr 1fr 1fr;
-    grid-template-rows: auto 1fr 1fr auto;
-    gap: 20px;
-    min-height: calc(100vh - 120px);
-    width: 100%;
-    max-width: 1200px;
+    grid-template-columns: 400px 600px 350px;
+    grid-template-rows: auto auto auto auto;
+    gap: 60px;
+    width: 200%;
+    max-width: 1400px;
     margin: 0 auto;
-    padding: 0;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 16px;
+    padding: 20px;
   }
   
   .profile-metadata {
     grid-area: profile;
     background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
-    border-radius: 12px;
+    border-radius: 16px;
     padding: 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(0, 255, 204, 0.4);
   }
   
   .profile-header {
@@ -57,18 +60,34 @@
   
   .stat {
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    transition: transform 0.2s, box-shadow 0.3s;
+  }
+  
+  .stat:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 10px rgba(0, 255, 204, 0.4);
+  }
+  
+  .stat svg {
+    width: 20px;
+    height: 20px;
+    stroke: #00ffcc;
   }
   
   .label {
     font-size: 0.9rem;
     color: #e0e0ff;
+    margin-right: 5px;
   }
   
   .value {
     font-size: 1.2rem;
-    color: #00ffcc;
     font-weight: bold;
+    background: linear-gradient(90deg, #00ffcc, #007bff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
   }
   
   .chart-placeholder {
@@ -81,47 +100,56 @@
   .notifications {
     grid-area: notifications;
     background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
-    border-radius: 12px;
+    border-radius: 16px;
     padding: 20px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
     overflow-y: auto;
+    width: 400px;
+    border: 1px solid rgba(0, 255, 204, 0.4);
   }
   
   .post-cooked {
     grid-area: post-cooked;
     background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
-    border-radius: 12px;
+    border-radius: 16px;
     padding: 20px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-    overflow-y: auto;
+    width: 600px;
+    height: auto;
+    border: 1px solid rgba(0, 255, 204, 0.4);
   }
   
   .strategies {
     grid-area: strategies;
     background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
-    border-radius: 12px;
+    border-radius: 16px;
     padding: 20px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
     overflow-y: auto;
+    width: 350px;
+    border: 1px solid rgba(0, 255, 204, 0.4);
   }
   
   .competitor-analysis {
     grid-area: competitor-analysis;
     background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
-    border-radius: 12px;
+    border-radius: 16px;
     padding: 20px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
     overflow-y: auto;
+    width: 350px;
+    border: 1px solid rgba(0, 255, 204, 0.4);
   }
   
   .chatbot {
     grid-area: chatbot;
     background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
-    border-radius: 12px;
+    border-radius: 16px;
     padding: 10px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
     display: flex;
     align-items: center;
+    border: 1px solid rgba(0, 255, 204, 0.4);
   }
   
   .chatbot-input-container {
@@ -184,14 +212,16 @@
     display: flex;
     align-items: center;
     gap: 10px;
+    text-shadow: 0 0 6px rgba(0, 255, 204, 0.3);
   }
   
   .badge {
     background: #ff4444;
     color: white;
-    padding: 5px 10px;
+    padding: 6px 12px;
     border-radius: 12px;
     font-size: 0.8rem;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
   }
   
   .notification-list,

@@ -170,7 +170,7 @@
     padding: 15px;
     margin-bottom: 10px;
     border: 1px solid rgba(0, 255, 204, 0.2);
-    transition: all 0.2s;
+    transition: all 0.05s;
   }
   
   .analysis-card:hover {

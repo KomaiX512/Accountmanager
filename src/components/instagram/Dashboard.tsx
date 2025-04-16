@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './Dashboard.css';
 import Cs_Analysis from './Cs_Analysis';
 import OurStrategies from './OurStrategies';
+import PostCooked from './PostCooked';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 
@@ -13,6 +14,9 @@ interface DashboardProps {
 const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => {
   const [query, setQuery] = useState('');
   const [toast, setToast] = useState<string | null>(null);
+  const [responses, setResponses] = useState<{ key: string; data: any }[]>([]);
+  const [posts, setPosts] = useState<{ key: string; data: any }[]>([]);
+  const [viewedResponseKeys, setViewedResponseKeys] = useState<string[]>([]);
 
   const handleSendQuery = async () => {
     if (!query.trim()) return;
@@ -36,6 +40,67 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
       return () => clearTimeout(timer);
     }
   }, [toast]);
+
+  // Poll responses and posts every 10 seconds
+  useEffect(() => {
+    const fetchResponses = async () => {
+      try {
+        const response = await axios.get(`http://localhost:3000/responses/${accountHolder}`);
+        const newResponses = response.data;
+
+        // Check for new responses
+        const currentKeys = responses.map(r => r.key);
+        const newKeys = newResponses.map((r: any) => r.key);
+        const addedResponses = newResponses.filter((r: any) => !currentKeys.includes(r.key));
+
+        if (addedResponses.length > 0) {
+          setToast(`New response${addedResponses.length > 1 ? 's' : ''} received!`);
+        }
+
+        // Update status to processed for new responses
+        for (const res of newResponses) {
+          if (!res.data.status || res.data.status !== 'processed') {
+            const responseId = res.key.match(/response_(\d+)\.json$/)?.[1];
+            if (responseId) {
+              await axios.post(`http://localhost:3000/responses/${accountHolder}/${responseId}`);
+            }
+          }
+        }
+
+        setResponses(newResponses);
+      } catch (error) {
+        console.error('Error fetching responses:', error);
+      }
+    };
+
+    const fetchPosts = async () => {
+      try {
+        const response = await axios.get(`http://localhost:3000/posts/${accountHolder}`);
+        const newPosts = response.data;
+
+        // Check for new posts
+        const currentKeys = posts.map(p => p.key);
+        const newKeys = newPosts.map((p: any) => p.key);
+        const addedPosts = newPosts.filter((p: any) => !currentKeys.includes(p.key));
+
+        if (addedPosts.length > 0) {
+          setToast(`New post${addedPosts.length > 1 ? 's' : ''} cooked!`);
+        }
+
+        setPosts(newPosts);
+      } catch (error) {
+        console.error('Error fetching posts:', error);
+      }
+    };
+
+    fetchResponses();
+    fetchPosts();
+    const interval = setInterval(() => {
+      fetchResponses();
+      fetchPosts();
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [accountHolder, responses, posts]);
 
   return (
     <motion.div
@@ -77,15 +142,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
 
         {/* Post Cooked */}
         <div className="post-cooked">
-          <h2>Post Cooked! <span className="badge">2 unseen!!!</span></h2>
-          <div className="post-list">
-            {[...Array(5)].map((_, index) => (
-              <div key={index} className="post-item">
-                Post {index + 1}
-                {index === 0 && <span className="action">Apply BrandKit on this</span>}
-              </div>
-            ))}
-          </div>
+          <PostCooked />
         </div>
 
         {/* Our Strategies */}

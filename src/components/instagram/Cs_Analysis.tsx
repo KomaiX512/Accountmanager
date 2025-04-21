@@ -10,6 +10,13 @@ interface ProfileInfo {
   followsCount: number;
 }
 
+interface AccountInfo {
+  username: string;
+  accountType: string;
+  postingStyle: string;
+  competitors: string[];
+}
+
 interface Cs_AnalysisProps {
   accountHolder: string;
   competitors: string[];

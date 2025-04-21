@@ -76,7 +76,7 @@ app.post('/webhook/r2', async (req, res) => {
     const { event, key } = req.body;
     console.log(`Received R2 event: ${event} for key: ${key}`);
 
-    if (event === 'ObjectCreated:Put' || event === 'ObjectCreated:Post') {
+    if (event === 'ObjectCreated:Put' || event === 'ObjectCreated:Post' || event === 'ObjectRemoved:Delete') {
       const match = key.match(/^(.*?)\/(.*?)\/(.*)$/);
       if (match) {
         const [, prefix, username] = match;
@@ -137,7 +137,7 @@ app.get('/events/:username', (req, res) => {
   });
 });
 
-async function fetchDataForModule(username, prefixTemplate) {
+async function fetchDataForModule(username, prefixTemplate, forceRefresh = false) {
   if (!username) {
     console.error('No username provided, cannot fetch data');
     return [];
@@ -147,12 +147,12 @@ async function fetchDataForModule(username, prefixTemplate) {
   const now = Date.now();
   const lastFetch = cacheTimestamps.get(prefix) || 0;
 
-  if (cache.has(prefix)) {
+  if (!forceRefresh && cache.has(prefix)) {
     console.log(`Cache hit for prefix: ${prefix}`);
     return cache.get(prefix);
   }
 
-  if (now - lastFetch < THROTTLE_INTERVAL) {
+  if (!forceRefresh && now - lastFetch < THROTTLE_INTERVAL) {
     console.log(`Throttled fetch for prefix: ${prefix}`);
     return cache.has(prefix) ? cache.get(prefix) : [];
   }
@@ -394,9 +394,10 @@ app.post('/scrape', async (req, res) => {
 
 app.get('/retrieve/:accountHolder/:competitor', async (req, res) => {
   const { accountHolder, competitor } = req.params;
+  const forceRefresh = req.query.forceRefresh === 'true';
 
   try {
-    const data = await fetchDataForModule(accountHolder, `competitor_analysis/{username}/${competitor}`);
+    const data = await fetchDataForModule(accountHolder, `competitor_analysis/{username}/${competitor}`, forceRefresh);
     if (data.length === 0) {
       res.status(404).json({ error: 'No analysis files found' });
     } else {
@@ -414,9 +415,10 @@ app.get('/retrieve/:accountHolder/:competitor', async (req, res) => {
 
 app.get('/retrieve-strategies/:accountHolder', async (req, res) => {
   const { accountHolder } = req.params;
+  const forceRefresh = req.query.forceRefresh === 'true';
 
   try {
-    const data = await fetchDataForModule(accountHolder, 'recommendations/{username}');
+    const data = await fetchDataForModule(accountHolder, 'recommendations/{username}', forceRefresh);
     if (data.length === 0) {
       res.status(404).json({ error: 'No recommendation files found' });
     } else {
@@ -434,9 +436,10 @@ app.get('/retrieve-strategies/:accountHolder', async (req, res) => {
 
 app.get('/retrieve-engagement-strategies/:accountHolder', async (req, res) => {
   const { accountHolder } = req.params;
+  const forceRefresh = req.query.forceRefresh === 'true';
 
   try {
-    const data = await fetchDataForModule(accountHolder, 'engagement_strategies/{username}');
+    const data = await fetchDataForModule(accountHolder, 'engagement_strategies/{username}', forceRefresh);
     if (data.length === 0) {
       res.status(404).json({ error: 'No engagement strategy files found' });
     } else {
@@ -454,9 +457,10 @@ app.get('/retrieve-engagement-strategies/:accountHolder', async (req, res) => {
 
 app.get('/news-for-you/:accountHolder', async (req, res) => {
   const { accountHolder } = req.params;
+  const forceRefresh = req.query.forceRefresh === 'true';
 
   try {
-    const data = await fetchDataForModule(accountHolder, 'NewForYou/{username}');
+    const data = await fetchDataForModule(accountHolder, 'NewForYou/{username}', forceRefresh);
     if (data.length === 0) {
       res.status(404).json({ error: 'No news files found' });
     } else {
@@ -600,9 +604,10 @@ app.post('/rules/:username', async (req, res) => {
 
 app.get('/responses/:username', async (req, res) => {
   const { username } = req.params;
+  const forceRefresh = req.query.forceRefresh === 'true';
 
   try {
-    const data = await fetchDataForModule(username, 'queries/{username}');
+    const data = await fetchDataForModule(username, 'queries/{username}', forceRefresh);
     res.json(data);
   } catch (error) {
     console.error(`Retrieve responses error for ${username}:`, error);
@@ -655,9 +660,10 @@ app.post('/responses/:username/:responseId', async (req, res) => {
 
 app.get('/posts/:username', async (req, res) => {
   const { username } = req.params;
+  const forceRefresh = req.query.forceRefresh === 'true';
 
   try {
-    const data = await fetchDataForModule(username, 'ready_post/{username}');
+    const data = await fetchDataForModule(username, 'ready_post/{username}', forceRefresh);
     console.log(`Fetched posts for ${username}:`, JSON.stringify(data, null, 2));
 
     const updatedData = await Promise.all(

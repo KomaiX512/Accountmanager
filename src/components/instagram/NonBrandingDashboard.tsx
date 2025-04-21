@@ -74,19 +74,19 @@ const NonBrandingDashboard: React.FC<NonBrandingDashboardProps> = ({ accountHold
     }
     try {
       const [responsesData, postsData, newsData, strategiesData] = await Promise.all([
-        axios.get(`http://localhost:3000/responses/${accountHolder}`).catch(err => {
+        axios.get(`http://localhost:3000/responses/${accountHolder}?forceRefresh=true`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        axios.get(`http://localhost:3000/posts/${accountHolder}`).catch(err => {
+        axios.get(`http://localhost:3000/posts/${accountHolder}?forceRefresh=true`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        axios.get(`http://localhost:3000/news-for-you/${accountHolder}`).catch(err => {
+        axios.get(`http://localhost:3000/news-for-you/${accountHolder}?forceRefresh=true`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        axios.get(`http://localhost:3000/retrieve-engagement-strategies/${accountHolder}`).catch(err => {
+        axios.get(`http://localhost:3000/retrieve-engagement-strategies/${accountHolder}?forceRefresh=true`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),

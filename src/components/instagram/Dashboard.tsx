@@ -75,21 +75,21 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     }
     try {
       const [responsesData, strategiesData, postsData, competitorDataResponses] = await Promise.all([
-        axios.get(`http://localhost:3000/responses/${accountHolder}`).catch(err => {
+        axios.get(`http://localhost:3000/responses/${accountHolder}?forceRefresh=true`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        axios.get(`http://localhost:3000/retrieve-strategies/${accountHolder}`).catch(err => {
+        axios.get(`http://localhost:3000/retrieve-strategies/${accountHolder}?forceRefresh=true`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        axios.get(`http://localhost:3000/posts/${accountHolder}`).catch(err => { // Added posts fetch
+        axios.get(`http://localhost:3000/posts/${accountHolder}?forceRefresh=true`).catch(err => { // Added posts fetch
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
         Promise.all(
           competitors.map(comp =>
-            axios.get(`http://localhost:3000/retrieve/${accountHolder}/${comp}`).catch(err => {
+            axios.get(`http://localhost:3000/retrieve/${accountHolder}/${comp}?forceRefresh=true`).catch(err => {
               if (err.response?.status === 404) {
                 console.warn(`No competitor data found for ${comp}`);
                 return { data: [] };

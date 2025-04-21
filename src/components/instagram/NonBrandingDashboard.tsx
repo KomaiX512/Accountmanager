@@ -28,6 +28,7 @@ const NonBrandingDashboard: React.FC<NonBrandingDashboardProps> = ({ accountHold
   const [profileInfo, setProfileInfo] = useState<ProfileInfo | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
@@ -40,6 +41,7 @@ const NonBrandingDashboard: React.FC<NonBrandingDashboardProps> = ({ accountHold
     try {
       const response = await axios.get(`http://localhost:3000/profile-info/${accountHolder}`);
       setProfileInfo(response.data);
+      console.log('Profile Info Fetched:', response.data);
     } catch (err: any) {
       if (err.response?.status === 404) {
         setProfileInfo(null);
@@ -243,6 +245,10 @@ const NonBrandingDashboard: React.FC<NonBrandingDashboardProps> = ({ accountHold
     return count.toString();
   };
 
+  const getProxiedImageUrl = (url: string | null) => {
+    return url ? `http://localhost:3000/proxy-image?url=${encodeURIComponent(url)}` : '';
+  };
+
   return (
     <motion.div
       className="dashboard-wrapper"
@@ -264,16 +270,18 @@ const NonBrandingDashboard: React.FC<NonBrandingDashboardProps> = ({ accountHold
             {profileLoading ? (
               <div className="profile-loading">Loading...</div>
             ) : (
-              <>
-                <div
-                  className="profile-pic"
-                  style={{
-                    backgroundImage: profileInfo?.profilePicUrlHD
-                      ? `url(${profileInfo.profilePicUrlHD})`
-                      : 'none',
-                    backgroundColor: profileInfo?.profilePicUrlHD ? 'transparent' : '#4a4a6a',
-                  }}
-                />
+              <div className="profile-bar">
+                  {profileInfo?.profilePicUrlHD && !imageError ? (
+                    <img
+                      src={profileInfo.profilePicUrlHD}
+                      alt={`${accountHolder}'s profile picture`}
+                      className="profile-pic-bar"
+                      onError={() => setImageError(true)}
+                      onLoad={() => setImageError(false)}
+                    />
+                  ) : (
+                    <div className="profile-pic-bar" />
+                  )}
                 <div className="stats">
                   <div className="stat">
                     <span className="label">Followers</span>
@@ -288,7 +296,7 @@ const NonBrandingDashboard: React.FC<NonBrandingDashboardProps> = ({ accountHold
                     </span>
                   </div>
                 </div>
-              </>
+              </div>
             )}
             <div className="chart-placeholder"></div>
           </div>
@@ -306,7 +314,11 @@ const NonBrandingDashboard: React.FC<NonBrandingDashboardProps> = ({ accountHold
         </div>
 
         <div className="post-cooked">
-          <PostCooked username={accountHolder} posts={posts} />
+        <PostCooked
+          username={accountHolder}
+          posts={posts}
+          profilePicUrl={profileInfo?.profilePicUrlHD || ''}
+        />
         </div>
 
         <div className="strategies">

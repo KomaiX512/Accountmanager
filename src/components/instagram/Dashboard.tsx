@@ -23,11 +23,13 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const [toast, setToast] = useState<string | null>(null);
   const [responses, setResponses] = useState<{ key: string; data: any }[]>([]);
   const [strategies, setStrategies] = useState<{ key: string; data: any }[]>([]);
+  const [posts, setPosts] = useState<{ key: string; data: any }[]>([]); // Added state for posts
   const [competitorData, setCompetitorData] = useState<{ key: string; data: any }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [profileInfo, setProfileInfo] = useState<ProfileInfo | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
@@ -40,6 +42,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     try {
       const response = await axios.get(`http://localhost:3000/profile-info/${accountHolder}`);
       setProfileInfo(response.data);
+      console.log('Profile Info Fetched:', response.data);
     } catch (err: any) {
       if (err.response?.status === 404) {
         setProfileInfo(null);
@@ -71,12 +74,16 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
       return;
     }
     try {
-      const [responsesData, strategiesData, competitorDataResponses] = await Promise.all([
+      const [responsesData, strategiesData, postsData, competitorDataResponses] = await Promise.all([
         axios.get(`http://localhost:3000/responses/${accountHolder}`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
         axios.get(`http://localhost:3000/retrieve-strategies/${accountHolder}`).catch(err => {
+          if (err.response?.status === 404) return { data: [] };
+          throw err;
+        }),
+        axios.get(`http://localhost:3000/posts/${accountHolder}`).catch(err => { // Added posts fetch
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
@@ -94,6 +101,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
       ]);
       setResponses(responsesData.data);
       setStrategies(strategiesData.data);
+      setPosts(postsData.data); // Set posts state
       setCompetitorData(competitorDataResponses.flatMap(res => res.data));
       setError(null);
     } catch (error: any) {
@@ -168,6 +176,15 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
           }).catch(err => {
             console.error('Error fetching strategies:', err);
             setError(err.response?.data?.error || 'Failed to fetch strategies.');
+          });
+        }
+        if (prefix.startsWith(`ready_post/${accountHolder}/`)) { // Added SSE handler for posts
+          axios.get(`http://localhost:3000/posts/${accountHolder}`).then(res => {
+            setPosts(res.data);
+            setToast('New post cooked!');
+          }).catch(err => {
+            console.error('Error fetching posts:', err);
+            setError(err.response?.data?.error || 'Failed to fetch posts.');
           });
         }
         if (prefix.startsWith(`competitor_analysis/${accountHolder}/`)) {
@@ -264,16 +281,20 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
             {profileLoading ? (
               <div className="profile-loading">Loading...</div>
             ) : (
-              <>
-                <div
-                  className="profile-pic"
-                  style={{
-                    backgroundImage: profileInfo?.profilePicUrlHD
-                      ? `url(${profileInfo.profilePicUrlHD})`
-                      : 'none',
-                    backgroundColor: profileInfo?.profilePicUrlHD ? 'transparent' : '#4a4a6a',
-                  }}
-                />
+              <div className="profile-bar">
+                {profileInfo?.profilePicUrlHD && !imageError ? (
+                  <img
+                    src={`http://localhost:3000/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}`}
+                    alt={`${accountHolder}'s profile picture`}
+                    className="profile-pic-bar"
+                    onError={() => {
+                      console.error(`Failed to load profile picture for ${accountHolder}`);
+                      setImageError(true);
+                    }}
+                  />
+                ) : (
+                  <div className="profile-pic-bar" />
+                )}
                 <div className="stats">
                   <div className="stat">
                     <span className="label">Followers</span>
@@ -288,7 +309,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
                     </span>
                   </div>
                 </div>
-              </>
+              </div>
             )}
             <div className="chart-placeholder"></div>
           </div>
@@ -306,7 +327,11 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
         </div>
 
         <div className="post-cooked">
-          <PostCooked username={accountHolder} />
+          <PostCooked
+            username={accountHolder}
+            profilePicUrl={profileInfo?.profilePicUrlHD || null}
+            posts={posts} // Pass posts to PostCooked
+          />
         </div>
 
         <div className="strategies">

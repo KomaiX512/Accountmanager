@@ -6,11 +6,13 @@ import ErrorBoundary from '../ErrorBoundary';
 
 interface PostCookedProps {
   username: string;
-  posts: { key: string; data: { post: any; status: string; image_url: string | null }; imageFailed?: boolean }[];
+  profilePicUrl: string;
+  posts?: { key: string; data: { post: any; status: string; image_url: string | null }; imageFailed?: boolean }[];
 }
 
-const PostCooked: React.FC<PostCookedProps> = ({ username, posts }) => {
+const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts = [] }) => {
   const [imageErrors, setImageErrors] = useState<{ [key: string]: boolean }>({});
+  const [profileImageError, setProfileImageError] = useState(false); // Track profile image failure
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState<string | null>(null);
   const [feedbackText, setFeedbackText] = useState('');
@@ -44,7 +46,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, posts }) => {
 
   const handleFeedbackSubmit = async (key: string) => {
     if (!feedbackText.trim() || !username) return;
-    const result = await saveFeedback(username, key, feedbackText, 'post');
+    const result = await saveFeedback(username, key, feedbackText);
     setFeedbackText('');
     setIsFeedbackOpen(null);
     setToastMessage(
@@ -88,7 +90,22 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, posts }) => {
               >
                 <div className="post-content">
                   <div className="post-header">
-                    <div className="profile-pic"></div>
+{profilePicUrl !== '' && !profileImageError ? (
+  <>
+    {console.log('Rendering profilePicUrl in post:', profilePicUrl)}
+    <img
+      src={`http://localhost:3000/proxy-image?url=${encodeURIComponent(profilePicUrl)}`}
+      alt={`${username}'s profile picture`}
+      className="profile-pic"
+      onError={() => {
+        console.error(`Failed to load profile picture for ${username} in post`);
+        setProfileImageError(true);
+      }}
+    />
+  </>
+) : (
+  <div className="profile-pic" />
+)}
                     <span className="username">{username}</span>
                   </div>
                   {imageErrors[post.key] || !post.data.image_url ? (
@@ -97,10 +114,10 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, posts }) => {
                     </div>
                   ) : (
                     <img
-                      src={post.data.image_url}
+                      src={post.data.image_url || ''}
                       alt="Post visual"
                       className="post-image"
-                      onError={() => handleImageError(post.key, post.data.image_url)}
+                      onError={() => handleImageError(post.key, post.data.image_url || '')}
                     />
                   )}
                   <div className="post-actions">

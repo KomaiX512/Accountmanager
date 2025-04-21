@@ -1,7 +1,9 @@
 const express = require('express');
 const { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+const axios = require('axios');
 const cors = require('cors');
+const puppeteer = require('puppeteer');
 const app = express();
 const port = 3000;
 
@@ -197,6 +199,57 @@ async function fetchDataForModule(username, prefixTemplate) {
     return [];
   }
 }
+
+app.get('/proxy-image', async (req, res) => {
+  let { url } = req.query;
+  if (!url) {
+    return res.status(400).send('Image URL is required');
+  }
+
+  try {
+    if (Array.isArray(url)) {
+      url = url[0];
+    }
+    const decodedUrl = decodeURIComponent(url);
+
+    const browser = await puppeteer.launch({
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+    const page = await browser.newPage();
+
+    await page.setRequestInterception(true);
+    page.on('request', (request) => {
+      if (request.resourceType() === 'image' || request.url() === decodedUrl) {
+        request.continue();
+      } else {
+        request.abort();
+      }
+    });
+
+    await page.goto(decodedUrl, { waitUntil: 'networkidle2' });
+
+    const imageBuffer = await page.evaluate(async (url) => {
+      const response = await fetch(url);
+      const buffer = await response.arrayBuffer();
+      return Array.from(new Uint8Array(buffer));
+    }, decodedUrl);
+
+    await browser.close();
+
+    const buffer = Buffer.from(imageBuffer);
+
+    res.set('Content-Type', 'image/jpeg');
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Headers', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+
+    res.send(buffer);
+  } catch (error) {
+    console.error(`Failed to proxy image with Puppeteer: ${url}`, error);
+    res.status(500).send('Failed to fetch image');
+  }
+});
 
 app.get('/profile-info/:username', async (req, res) => {
   const { username } = req.params;
@@ -619,8 +672,8 @@ app.get('/posts/:username', async (req, res) => {
                 Key: imageKey,
               });
               const signedUrl = await getSignedUrl(s3Client, getCommand, { expiresIn: 3600 });
-              postData.image_url = signedUrl; // Ensure the field is renamed to image_url
-              delete postData.image; // Remove the original image field
+              postData.image_url = signedUrl;
+              delete postData.image;
             } else {
               postData.image_url = null;
             }

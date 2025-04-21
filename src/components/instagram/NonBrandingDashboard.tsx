@@ -1,23 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './Dashboard.css';
-import Cs_Analysis from './Cs_Analysis';
+import NewsForYou from './NewsForYou';
 import OurStrategies from './OurStrategies';
 import PostCooked from './PostCooked';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 
-interface DashboardProps {
+interface NonBrandingDashboardProps {
   accountHolder: string;
-  competitors: string[];
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => {
+const NonBrandingDashboard: React.FC<NonBrandingDashboardProps> = ({ accountHolder }) => {
   const [query, setQuery] = useState('');
   const [toast, setToast] = useState<string | null>(null);
   const [responses, setResponses] = useState<{ key: string; data: any }[]>([]);
   const [posts, setPosts] = useState<{ key: string; data: any }[]>([]);
+  const [news, setNews] = useState<{ key: string; data: any }[]>([]);
   const [strategies, setStrategies] = useState<{ key: string; data: any }[]>([]);
-  const [competitorData, setCompetitorData] = useState<{ key: string; data: any }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectAttempts = useRef(0);
@@ -43,7 +42,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
       return;
     }
     try {
-      const [responsesData, postsData, strategiesData, competitorDataResponses] = await Promise.all([
+      const [responsesData, postsData, newsData, strategiesData] = await Promise.all([
         axios.get(`http://localhost:3000/responses/${accountHolder}`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
@@ -52,26 +51,19 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        axios.get(`http://localhost:3000/retrieve-strategies/${accountHolder}`).catch(err => {
+        axios.get(`http://localhost:3000/news-for-you/${accountHolder}`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        Promise.all(
-          competitors.map(comp =>
-            axios.get(`http://localhost:3000/retrieve/${accountHolder}/${comp}`).catch(err => {
-              if (err.response?.status === 404) {
-                console.warn(`No competitor data found for ${comp}`);
-                return { data: [] };
-              }
-              throw err;
-            })
-          )
-        ),
+        axios.get(`http://localhost:3000/retrieve-engagement-strategies/${accountHolder}`).catch(err => {
+          if (err.response?.status === 404) return { data: [] };
+          throw err;
+        }),
       ]);
       setResponses(responsesData.data);
       setPosts(postsData.data);
+      setNews(newsData.data);
       setStrategies(strategiesData.data);
-      setCompetitorData(competitorDataResponses.flatMap(res => res.data));
       setError(null);
     } catch (error: any) {
       console.error('Error refreshing data:', error);
@@ -147,32 +139,23 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
             setError(err.response?.data?.error || 'Failed to fetch posts.');
           });
         }
-        if (prefix.startsWith(`recommendations/${accountHolder}/`)) {
-          axios.get(`http://localhost:3000/retrieve-strategies/${accountHolder}`).then(res => {
+        if (prefix.startsWith(`NewForYou/${accountHolder}/`)) {
+          axios.get(`http://localhost:3000/news-for-you/${accountHolder}`).then(res => {
+            setNews(res.data);
+            setToast('New news article available!');
+          }).catch(err => {
+            console.error('Error fetching news:', err);
+            setError(err.response?.data?.error || 'Failed to fetch news articles.');
+          });
+        }
+        if (prefix.startsWith(`engagement_strategies/${accountHolder}/`)) {
+          axios.get(`http://localhost:3000/retrieve-engagement-strategies/${accountHolder}`).then(res => {
             setStrategies(res.data);
             setToast('New strategies available!');
           }).catch(err => {
             console.error('Error fetching strategies:', err);
             setError(err.response?.data?.error || 'Failed to fetch strategies.');
           });
-        }
-        if (prefix.startsWith(`competitor_analysis/${accountHolder}/`)) {
-          Promise.all(
-            competitors.map(comp =>
-              axios.get(`http://localhost:3000/retrieve/${accountHolder}/${comp}`).catch(err => {
-                if (err.response?.status === 404) return { data: [] };
-                throw err;
-              })
-            )
-          )
-            .then(res => {
-              setCompetitorData(res.flatMap(r => r.data));
-              setToast('New competitor analysis available!');
-            })
-            .catch(err => {
-              console.error('Error fetching competitor data:', err);
-              setError(err.response?.data?.error || 'Failed to fetch competitor analysis.');
-            });
         }
       }
     };
@@ -184,6 +167,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
 
       if (reconnectAttempts.current < maxReconnectAttempts) {
         reconnectAttempts.current += 1;
+        // Exponential backoff: delay increases with each attempt
         const delay = baseReconnectDelay * Math.pow(2, reconnectAttempts.current);
         console.log(`Reconnection attempt ${reconnectAttempts.current}/${maxReconnectAttempts} after ${delay/1000}s`);
         setError(`Lost connection to server updates. Reconnecting... (Attempt ${reconnectAttempts.current}/${maxReconnectAttempts})`);
@@ -205,7 +189,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     if (accountHolder) {
       refreshAllData();
     }
-  }, [accountHolder, competitors]);
+  }, [accountHolder]);
 
   useEffect(() => {
     setupSSE();
@@ -215,7 +199,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
         eventSourceRef.current = null;
       }
     };
-  }, [accountHolder, competitors]);
+  }, [accountHolder]);
 
   if (!accountHolder) {
     return <div className="error-message">Please specify an account holder to load the dashboard.</div>;
@@ -268,12 +252,12 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
 
         <div className="strategies">
           <h2>Our Strategies <span className="badge">{strategies.length || 3} unseen!!!</span></h2>
-          <OurStrategies accountHolder={accountHolder} accountType="branding" />
+          <OurStrategies accountHolder={accountHolder} accountType="non-branding" />
         </div>
 
         <div className="competitor-analysis">
-          <h2>Competitor Analysis <span className="badge">{competitorData.length || 5} unseen!!!</span></h2>
-          <Cs_Analysis accountHolder={accountHolder} competitors={competitors} />
+          <h2>News For You <span className="badge">{news.length || 5} new articles!!!</span></h2>
+          <NewsForYou accountHolder={accountHolder} />
         </div>
 
         <div className="chatbot">
@@ -335,4 +319,4 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   );
 };
 
-export default Dashboard;
+export default NonBrandingDashboard;

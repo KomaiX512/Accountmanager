@@ -1,42 +1,45 @@
-import React, { useState, useRef, ChangeEvent, KeyboardEvent } from 'react';
+import React, { useState, ChangeEvent } from 'react';
 import axios from 'axios';
 import './IG_EntryUsernames.css';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 
 interface IG_EntryUsernamesProps {
-  onSubmitSuccess: (accountHolder: string, competitors: string[]) => void;
+  onSubmitSuccess: (username: string) => void;
 }
 
 const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({ onSubmitSuccess }) => {
-  const [accountHolder, setAccountHolder] = useState<string>('');
-  const [competitors, setCompetitors] = useState<string[]>(['']);
+  const [username, setUsername] = useState<string>('');
+  const [accountType, setAccountType] = useState<'branding' | 'non-branding' | ''>('');
+  const [postingStyle, setPostingStyle] = useState<string>('');
+  const [competitors, setCompetitors] = useState<string[]>(['', '', '']);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<string>('');
   const [messageType, setMessageType] = useState<'info' | 'success' | 'error'>('info');
-  const competitorRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const navigate = useNavigate();
 
-  const apiUrl = 'http://localhost:3000/scrape';
+  const apiUrl = 'http://localhost:3000/save-account-info';
 
   const isValidForSubmission = (): boolean => {
-    return (
-      accountHolder.trim() !== '' &&
-      competitors.length === 5 &&
-      competitors.every(comp => comp.trim() !== '')
-    );
+    if (!username.trim() || !accountType || !postingStyle.trim()) return false;
+    if (accountType === 'branding') {
+      return competitors.length >= 3 && competitors.every(comp => comp.trim() !== '');
+    }
+    return true;
   };
 
   const validationErrors = (): string[] => {
     const errors: string[] = [];
-    if (!accountHolder.trim()) errors.push('Account holder username is required');
-    if (competitors.length < 5) errors.push('5 competitors are required');
-    competitors.forEach((comp, index) => {
-      if (!comp.trim()) errors.push(`Competitor ${index + 1} username is required`);
-    });
+    if (!username.trim()) errors.push('Username is required');
+    if (!accountType) errors.push('Account type is required');
+    if (!postingStyle.trim()) errors.push('Posting style is required');
+    if (accountType === 'branding') {
+      if (competitors.length < 3) errors.push('At least 3 competitors are required for branding');
+      competitors.forEach((comp, index) => {
+        if (!comp.trim()) errors.push(`Competitor ${index + 1} username is required`);
+      });
+    }
     return errors;
-  };
-
-  const handleAccountHolderChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setAccountHolder(e.target.value);
   };
 
   const handleCompetitorChange = (index: number, value: string) => {
@@ -46,38 +49,20 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({ onSubmitSuccess }
   };
 
   const addCompetitor = () => {
-    if (competitors.length < 5) {
-      setCompetitors([...competitors, '']);
-    }
+    setCompetitors([...competitors, '']);
   };
 
   const removeCompetitor = (index: number) => {
-    setCompetitors(competitors.filter((_, i) => i !== index));
-  };
-
-  const focusCompetitorInput = () => {
-    competitorRefs.current[0]?.focus();
-  };
-
-  const focusNextInput = (currentIndex: number) => {
-    if (currentIndex < 4) {
-      competitorRefs.current[currentIndex + 1]?.focus();
-    }
-  };
-
-  const handleKeyUp = (e: KeyboardEvent<HTMLInputElement>, index?: number) => {
-    if (e.key === 'Enter') {
-      if (index === undefined) {
-        focusCompetitorInput();
-      } else {
-        focusNextInput(index);
-      }
+    if (competitors.length > 3) {
+      setCompetitors(competitors.filter((_, i) => i !== index));
     }
   };
 
   const resetForm = () => {
-    setAccountHolder('');
-    setCompetitors(['']);
+    setUsername('');
+    setAccountType('');
+    setPostingStyle('');
+    setCompetitors(['', '', '']);
   };
 
   const showMessage = (msg: string, type: 'info' | 'success' | 'error' = 'info') => {
@@ -96,8 +81,10 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({ onSubmitSuccess }
 
     try {
       const payload = {
-        parent: { username: accountHolder.trim() },
-        children: competitors.map(username => ({ username: username.trim() })),
+        username: username.trim(),
+        accountType,
+        postingStyle: postingStyle.trim(),
+        competitors: accountType === 'branding' ? competitors.map(comp => comp.trim()) : [],
       };
 
       const response = await axios.post(apiUrl, payload, {
@@ -108,7 +95,14 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({ onSubmitSuccess }
       if (response.status === 200) {
         showMessage('Submission successful', 'success');
         resetForm();
-        setTimeout(() => onSubmitSuccess(accountHolder, competitors), 1000);
+        setTimeout(() => {
+          onSubmitSuccess(username);
+          if (accountType === 'branding') {
+            navigate('/dashboard', { state: { accountHolder: username, competitors: payload.competitors } });
+          } else {
+            navigate('/non-branding-dashboard', { state: { accountHolder: username } });
+          }
+        }, 1000);
       }
     } catch (error: any) {
       console.error('Error submitting data:', error);
@@ -123,9 +117,9 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({ onSubmitSuccess }
   return (
     <motion.div
       className="dashboard-container"
-      initial={{ opacity: 0, y: 50 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -50 }}
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.8 }}
       transition={{ duration: 0.6, ease: 'easeOut' }}
     >
       <motion.div
@@ -136,49 +130,82 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({ onSubmitSuccess }
         <h1 className="title">Instagram Setup</h1>
 
         <div className="section">
-          <h2 className="subtitle">Account Holder</h2>
+          <h2 className="subtitle">Username</h2>
           <motion.div className="input-group" whileHover={{ x: 5 }}>
             <input
-              value={accountHolder}
-              onChange={handleAccountHolderChange}
+              value={username}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setUsername(e.target.value)}
               type="text"
-              placeholder="Enter Instagram account holder username"
-              onKeyUp={handleKeyUp}
+              placeholder="Enter your Instagram username"
             />
           </motion.div>
         </div>
 
         <div className="section">
-          <h2 className="subtitle">Competitors (5 required)</h2>
-          {competitors.map((competitor, index) => (
-            <motion.div
-              key={index}
-              className="input-group competitor-input"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: index * 0.1 }}
-            >
+          <h2 className="subtitle">Account Type</h2>
+          <div className="radio-group">
+            <label className="radio-label">
               <input
-                value={competitor}
-                onChange={(e) => handleCompetitorChange(index, e.target.value)}
-                type="text"
-                placeholder={`Enter competitor ${index + 1}`}
-                onKeyUp={(e) => handleKeyUp(e, index)}
-                ref={(el) => (competitorRefs.current[index] = el)}
+                type="radio"
+                value="branding"
+                checked={accountType === 'branding'}
+                onChange={() => setAccountType('branding')}
               />
-              {competitors.length > 1 && (
-                <motion.button
-                  className="remove-btn"
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => removeCompetitor(index)}
-                >
-                  ×
-                </motion.button>
-              )}
-            </motion.div>
-          ))}
-          {competitors.length < 5 && (
+              Branding
+            </label>
+            <label className="radio-label">
+              <input
+                type="radio"
+                value="non-branding"
+                checked={accountType === 'non-branding'}
+                onChange={() => setAccountType('non-branding')}
+              />
+              Non-Branding
+            </label>
+          </div>
+        </div>
+
+        <div className="section">
+          <h2 className="subtitle">Posting Style</h2>
+          <motion.div className="input-group" whileHover={{ x: 5 }}>
+            <input
+              value={postingStyle}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setPostingStyle(e.target.value)}
+              type="text"
+              placeholder="e.g., mood-based or event-based"
+            />
+          </motion.div>
+        </div>
+
+        {accountType === 'branding' && (
+          <div className="section">
+            <h2 className="subtitle">Competitors (at least 3 required)</h2>
+            {competitors.map((competitor, index) => (
+              <motion.div
+                key={index}
+                className="input-group competitor-input"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                <input
+                  value={competitor}
+                  onChange={(e) => handleCompetitorChange(index, e.target.value)}
+                  type="text"
+                  placeholder={`Enter competitor ${index + 1}`}
+                />
+                {competitors.length > 3 && (
+                  <motion.button
+                    className="remove-btn"
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => removeCompetitor(index)}
+                  >
+                    ×
+                  </motion.button>
+                )}
+              </motion.div>
+            ))}
             <motion.button
               className="add-btn"
               whileHover={{ scale: 1.05 }}
@@ -187,8 +214,8 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({ onSubmitSuccess }
             >
               Add Competitor
             </motion.button>
-          )}
-        </div>
+          </div>
+        )}
 
         {validationErrors().length > 0 && (
           <motion.div

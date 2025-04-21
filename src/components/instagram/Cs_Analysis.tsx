@@ -9,29 +9,23 @@ interface Cs_AnalysisProps {
   competitors: string[];
 }
 
-const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ competitors }) => {
+const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors }) => {
   const [selectedCompetitor, setSelectedCompetitor] = useState<string | null>(null);
 
-  // Hardcode accountHolder
-  const normalizedAccountHolder = 'maccosmetics';
+  const normalizedAccountHolder = accountHolder;
 
-  // Fixed Hooks for up to 5 competitors
-  const fetch1 = useR2Fetch<any[]>(competitors[0] ? `http://localhost:3000/retrieve/${normalizedAccountHolder}/${competitors[0]}` : '');
-  const fetch2 = useR2Fetch<any[]>(competitors[1] ? `http://localhost:3000/retrieve/${normalizedAccountHolder}/${competitors[1]}` : '');
-  const fetch3 = useR2Fetch<any[]>(competitors[2] ? `http://localhost:3000/retrieve/${normalizedAccountHolder}/${competitors[2]}` : '');
-  const fetch4 = useR2Fetch<any[]>(competitors[3] ? `http://localhost:3000/retrieve/${normalizedAccountHolder}/${competitors[3]}` : '');
-  const fetch5 = useR2Fetch<any[]>(competitors[4] ? `http://localhost:3000/retrieve/${normalizedAccountHolder}/${competitors[4]}` : '');
+  // Dynamic fetch hooks for competitors
+  const fetches = competitors.map(competitor =>
+    useR2Fetch<any[]>(competitor ? `http://localhost:3000/retrieve/${normalizedAccountHolder}/${competitor}` : '')
+  );
 
-  // Map competitors to fetch results
-  const competitorData = [
-    { competitor: competitors[0], fetch: fetch1 },
-    { competitor: competitors[1], fetch: fetch2 },
-    { competitor: competitors[2], fetch: fetch3 },
-    { competitor: competitors[3], fetch: fetch4 },
-    { competitor: competitors[4], fetch: fetch5 },
-  ].filter(data => data.competitor); // Remove undefined competitors
+  const competitorData = competitors
+    .map((competitor, index) => ({
+      competitor,
+      fetch: fetches[index],
+    }))
+    .filter(data => data.competitor);
 
-  // Find selected competitor's data
   const selectedData = selectedCompetitor
     ? competitorData.find(data => data.competitor === selectedCompetitor)?.fetch.data
     : null;
@@ -47,12 +41,12 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ competitors }) => {
         {competitorData.map(({ competitor, fetch }, index) => (
           <motion.div
             key={competitor}
-            className={`competitor-sub-container ${fetch.data ? 'loaded' : ''}`}
+            className={`competitor-sub-container ${fetch.data !== undefined ? 'loaded' : ''} ${fetch.data?.length === 0 ? 'no-data' : ''}`}
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: index * 0.2, duration: 0.4 }}
             whileHover={{ scale: 1.05, boxShadow: '0 0 20px rgba(0, 255, 204, 0.6)' }}
-            onClick={() => fetch.data && setSelectedCompetitor(competitor)}
+            onClick={() => fetch.data !== undefined && setSelectedCompetitor(competitor)}
           >
             <span className="overlay-text">{competitor}</span>
             {fetch.loading && (
@@ -60,6 +54,9 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ competitors }) => {
                 <span className="loading-text">Analyzing {competitor}...</span>
                 <div className="particle-effect" />
               </div>
+            )}
+            {fetch.data?.length === 0 && !fetch.loading && (
+              <span className="no-data-text">No data available</span>
             )}
           </motion.div>
         ))}

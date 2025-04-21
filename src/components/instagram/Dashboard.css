@@ -1,280 +1,305 @@
 .dashboard-wrapper {
-    width: 100%;
-    min-height: 100vh;
-    background: transparent;
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    margin: 0 auto;
-    padding: 0;
-  }
-  
-  .dashboard-grid {
-    display: grid;
-    grid-template-areas:
-      "profile profile profile"
-      "notifications post-cooked strategies"
-      "notifications post-cooked competitor-analysis"
-      "chatbot chatbot chatbot";
-    grid-template-columns: 400px 600px 350px;
-    grid-template-rows: auto auto auto auto;
-    gap: 60px;
-    width: 200%;
-    max-width: 1400px;
-    margin: 0 auto;
-    background: rgba(0, 0, 0, 0.05);
-    border-radius: 16px;
-    padding: 20px;
-  }
-  
-  .profile-metadata {
-    grid-area: profile;
-    background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
-    border-radius: 16px;
-    padding: 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-    border: 1px solid rgba(0, 255, 204, 0.4);
-  }
-  
-  .profile-header {
-    display: flex;
-    width: 100%;
-    gap: 20px;
-    align-items: center;
-  }
-  
-  .profile-pic {
-    width: 80px;
-    height: 80px;
-    background: #4a4a6a;
-    border-radius: 50%;
-  }
-  
-  .stats {
-    display: flex;
-    gap: 20px;
-  }
-  
-  .stat {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    transition: transform 0.2s, box-shadow 0.3s;
-  }
-  
-  .stat:hover {
-    transform: scale(1.05);
-    box-shadow: 0 0 10px rgba(0, 255, 204, 0.4);
-  }
-  
-  .stat svg {
-    width: 20px;
-    height: 20px;
-    stroke: #00ffcc;
-  }
-  
-  .label {
-    font-size: 0.9rem;
-    color: #e0e0ff;
-    margin-right: 5px;
-  }
-  
-  .value {
-    font-size: 1.2rem;
-    font-weight: bold;
-    background: linear-gradient(90deg, #00ffcc, #007bff);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-  
-  .chart-placeholder {
-    flex: 1;
-    height: 60px;
-    background: #4a4a6a;
-    border-radius: 8px;
-  }
-  
-  .notifications {
-    grid-area: notifications;
-    background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
-    border-radius: 16px;
-    padding: 20px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-    overflow-y: auto;
-    width: 400px;
-    border: 1px solid rgba(0, 255, 204, 0.4);
-  }
-  
-  .post-cooked {
-    grid-area: post-cooked;
-    background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
-    border-radius: 16px;
-    padding: 20px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-    width: 600px;
-    height: auto;
-    border: 1px solid rgba(0, 255, 204, 0.4);
-  }
-  
-  .strategies {
-    grid-area: strategies;
-    background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
-    border-radius: 16px;
-    padding: 20px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-    overflow-y: auto;
-    width: 350px;
-    border: 1px solid rgba(0, 255, 204, 0.4);
-  }
-  
-  .competitor-analysis {
-    grid-area: competitor-analysis;
-    background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
-    border-radius: 16px;
-    padding: 20px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-    overflow-y: auto;
-    width: 350px;
-    border: 1px solid rgba(0, 255, 204, 0.4);
-  }
-  
-  .chatbot {
-    grid-area: chatbot;
-    background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
-    border-radius: 16px;
-    padding: 10px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-    display: flex;
-    align-items: center;
-    border: 1px solid rgba(0, 255, 204, 0.4);
-  }
-  
-  .chatbot-input-container {
-    display: flex;
-    width: 100%;
-    gap: 10px;
-    align-items: center;
-  }
-  
-  .chatbot-input {
-    flex: 1;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(0, 255, 204, 0.3);
-    border-radius: 6px;
-    padding: 10px;
-    color: #e0e0ff;
-    font-size: 1rem;
-    outline: none;
-    transition: border-color 0.2s;
-  }
-  
-  .chatbot-input::placeholder {
-    color: #a0a0cc;
-  }
-  
-  .chatbot-input:focus {
-    border-color: #00ffcc;
-    box-shadow: 0 0 8px rgba(0, 255, 204, 0.4);
-  }
-  
-  .chatbot-send-btn {
-    background: linear-gradient(90deg, #007bff, #00ffcc);
-    border: none;
-    border-radius: 6px;
-    padding: 10px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: box-shadow 0.2s;
-  }
-  
-  .chatbot-send-btn:hover {
-    box-shadow: 0 0 15px rgba(0, 255, 204, 0.5);
-  }
-  
-  .chatbot-send-btn:disabled {
-    background: #4a4a6a;
-    cursor: not-allowed;
-  }
-  
-  .chatbot-send-btn:disabled svg {
-    stroke: #a0a0cc;
-  }
-  
-  h2 {
-    font-size: 1.5rem;
-    color: #e0e0ff;
-    margin-bottom: 15px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    text-shadow: 0 0 6px rgba(0, 255, 204, 0.3);
-  }
-  
-  .badge {
-    background: #ff4444;
-    color: white;
-    padding: 6px 12px;
-    border-radius: 12px;
-    font-size: 0.8rem;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-  }
-  
-  .notification-list,
-  .post-list,
-  .strategy-list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-  
-  .notification-item,
-  .post-item,
-  .strategy-item {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    padding: 15px;
-    color: #e0e0ff;
-  }
-  
-  .toast-notification {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
-    border-radius: 8px;
-    padding: 10px 20px;
-    color: #e0e0ff;
-    font-size: 0.9rem;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    box-shadow: 0 4px 15px rgba(0, 255, 204, 0.4);
-    border: 1px solid rgba(0, 255, 204, 0.3);
-    z-index: 1000;
-    animation: slide-in-toast 0.3s ease-out, pulse-glow 1.5s infinite;
-  }
-  
-  .toast-icon {
-    flex-shrink: 0;
-  }
-  
-  @keyframes slide-in-toast {
-    from { opacity: 0; transform: translateX(100px); }
-    to { opacity: 1; transform: translateX(0); }
-  }
-  
-  @keyframes pulse-glow {
-    0%, 100% { box-shadow: 0 0 8px rgba(0, 255, 204, 0.3); }
-    50% { box-shadow: 0 0 15px rgba(0, 255, 204, 0.6); }
-  }
-  
-  .action {
-    margin-left: 10px;
-    color: #00ffcc;
-    cursor: pointer;
-  }
+  width: 100%;
+  min-height: 100vh;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 0;
+}
+
+.welcome-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.welcome-text {
+  font-size: 2.5rem;
+  font-weight: 700;
+  background: linear-gradient(90deg, #00ffcc, #007bff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 15px rgba(0, 255, 204, 0.7), 0 0 30px rgba(0, 255, 204, 0.4);
+  animation: glow 2s infinite alternate;
+}
+
+.welcome-subtext {
+  font-size: 1.2rem;
+  color: #e0e0ff;
+  text-shadow: 0 0 10px rgba(0, 255, 204, 0.5);
+  margin-top: 5px;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-areas:
+    "profile profile profile"
+    "notifications post-cooked strategies"
+    "notifications post-cooked competitor-analysis"
+    "chatbot chatbot chatbot";
+  grid-template-columns: 400px 600px 350px;
+  grid-template-rows: auto auto auto auto;
+  gap: 60px;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.profile-metadata {
+  grid-area: profile;
+  background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(0, 255, 204, 0.4);
+}
+
+.profile-header {
+  display: flex;
+  width: 100%;
+  gap: 20px;
+  align-items: center;
+}
+
+.profile-pic {
+  width: 80px;
+  height: 80px;
+  background: #4a4a6a;
+  border-radius: 50%;
+}
+
+.stats {
+  display: flex;
+  gap: 20px;
+}
+
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: transform 0.2s, box-shadow 0.3s;
+}
+
+.stat:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 10px rgba(0, 255, 204, 0.4);
+}
+
+.stat svg {
+  width: 20px;
+  height: 20px;
+  stroke: #00ffcc;
+}
+
+.label {
+  font-size: 0.9rem;
+  color: #e0e0ff;
+  margin-right: 5px;
+}
+
+.value {
+  font-size: 1.2rem;
+  font-weight: bold;
+  background: linear-gradient(90deg, #00ffcc, #007bff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.chart-placeholder {
+  flex: 1;
+  height: 60px;
+  background: #4a4a6a;
+  border-radius: 8px;
+}
+
+.notifications {
+  grid-area: notifications;
+  background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  overflow-y: auto;
+  width: 400px;
+  border: 1px solid rgba(0, 255, 204, 0.4);
+}
+
+.post-cooked {
+  grid-area: post-cooked;
+  background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  width: 600px;
+  height: auto;
+  border: 1px solid rgba(0, 255, 204, 0.4);
+}
+
+.strategies {
+  grid-area: strategies;
+  background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  overflow-y: auto;
+  width: 350px;
+  border: 1px solid rgba(0, 255, 204, 0.4);
+}
+
+.competitor-analysis {
+  grid-area: competitor-analysis;
+  background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  overflow-y: auto;
+  width: 350px;
+  border: 1px solid rgba(0, 255, 204, 0.4);
+}
+
+.chatbot {
+  grid-area: chatbot;
+  background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
+  border-radius: 16px;
+  padding: 10px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  border: 1px solid rgba(0, 255, 204, 0.4);
+}
+
+.chatbot-input-container {
+  display: flex;
+  width: 100%;
+  gap: 10px;
+  align-items: center;
+}
+
+.chatbot-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(0, 255, 204, 0.3);
+  border-radius: 6px;
+  padding: 10px;
+  color: #e0e0ff;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.chatbot-input::placeholder {
+  color: #a0a0cc;
+}
+
+.chatbot-input:focus {
+  border-color: #00ffcc;
+  box-shadow: 0 0 8px rgba(0, 255, 204, 0.4);
+}
+
+.chatbot-send-btn {
+  background: linear-gradient(90deg, #007bff, #00ffcc);
+  border: none;
+  border-radius: 6px;
+  padding: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: box-shadow 0.2s;
+}
+
+.chatbot-send-btn:hover {
+  box-shadow: 0 0 15px rgba(0, 255, 204, 0.5);
+}
+
+.chatbot-send-btn:disabled {
+  background: #4a4a6a;
+  cursor: not-allowed;
+}
+
+.chatbot-send-btn:disabled svg {
+  stroke: #a0a0cc;
+}
+
+h2 {
+  font-size: 1.5rem;
+  color: #e0e0ff;
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-shadow: 0 0 6px rgba(0, 255, 204, 0.3);
+}
+
+.badge {
+  background: #ff4444;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.notification-list,
+.post-list,
+.strategy-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.notification-item,
+.post-item,
+.strategy-item {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 15px;
+  color: #e0e0ff;
+}
+
+.toast-notification {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
+  border-radius: 8px;
+  padding: 10px 20px;
+  color: #e0e0ff;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 4px 15px rgba(0, 255, 204, 0.4);
+  border: 1px solid rgba(0, 255, 204, 0.3);
+  z-index: 1000;
+  animation: slide-in-toast 0.3s ease-out, pulse-glow 1.5s infinite;
+}
+
+.toast-icon {
+  flex-shrink: 0;
+}
+
+@keyframes slide-in-toast {
+  from { opacity: 0; transform: translateX(100px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(0, 255, 204, 0.3); }
+  50% { box-shadow: 0 0 15px rgba(0, 255, 204, 0.6); }
+}
+
+@keyframes glow {
+  0% { text-shadow: 0 0 15px rgba(0, 255, 204, 0.7), 0 0 30px rgba(0, 255, 204, 0.4); }
+  100% { text-shadow: 0 0 25px rgba(0, 255, 204, 1), 0 0 40px rgba(0, 255, 204, 0.6); }
+}
+
+.action {
+  margin-left: 10px;
+  color: #00ffcc;
+  cursor: pointer;
+}

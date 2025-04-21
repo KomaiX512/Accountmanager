@@ -6,18 +6,32 @@ import ErrorBoundary from '../ErrorBoundary';
 
 interface OurStrategiesProps {
   accountHolder: string;
+  accountType: 'branding' | 'non-branding';
 }
 
-const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder }) => {
+const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountType }) => {
   const [showPopup, setShowPopup] = useState(false);
 
-  // Normalize accountHolder
-  const normalizedAccountHolder = 'maccosmetics';
+  // Use the accountHolder prop dynamically
+  const normalizedAccountHolder = accountHolder;
+
+  // Determine the endpoint based on accountType
+  const endpoint = accountType === 'branding'
+    ? `http://localhost:3000/retrieve-strategies/${normalizedAccountHolder}`
+    : `http://localhost:3000/retrieve-engagement-strategies/${normalizedAccountHolder}`;
 
   // Fetch strategies
-  const { data, loading } = useR2Fetch<any[]>(
-    `http://localhost:3000/retrieve-strategies/${normalizedAccountHolder}`
-  );
+  const { data, loading, error } = useR2Fetch<any[]>(endpoint);
+
+  if (!accountHolder) {
+    return (
+      <ErrorBoundary>
+        <div className="strategies-container">
+          <p>No account holder provided.</p>
+        </div>
+      </ErrorBoundary>
+    );
+  }
 
   return (
     <ErrorBoundary>
@@ -40,6 +54,11 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder }) => {
             <div className="futuristic-loading">
               <span className="loading-text">Analyzing Strategies...</span>
               <div className="particle-effect" />
+            </div>
+          )}
+          {error && (
+            <div className="error-text">
+              Failed to load strategies: {error}
             </div>
           )}
         </motion.div>
@@ -78,7 +97,7 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder }) => {
                       transition={{ delay: index * 0.1 }}
                     >
                       <h5>Strategy {index + 1}</h5>
-                      <pre>{JSON.stringify(strategy, null, 2)}</pre>
+                      <pre>{JSON.stringify(strategy.data, null, 2)}</pre>
                     </motion.div>
                   ))
                 ) : (

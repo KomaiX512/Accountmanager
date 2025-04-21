@@ -5,19 +5,32 @@ import axios from 'axios';
 import { saveFeedback } from '../../utils/FeedbackHandler';
 import ErrorBoundary from '../ErrorBoundary';
 
-const PostCooked: React.FC = () => {
+interface PostCookedProps {
+  username: string;
+}
+
+const PostCooked: React.FC<PostCookedProps> = ({ username }) => {
   const [posts, setPosts] = useState<{ key: string; data: any; imageFailed?: boolean }[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState<string | null>(null);
   const [feedbackText, setFeedbackText] = useState('');
 
-  // Fetch top 3 posts
   useEffect(() => {
     const fetchPosts = async () => {
+      if (!username) {
+        console.warn('Username is not provided, skipping fetchPosts');
+        setPosts([]);
+        setIsLoading(false);
+        setError('No username provided');
+        return;
+      }
+
       setIsLoading(true);
+      setError(null);
       try {
-        const response = await axios.get('http://localhost:3000/posts/maccosmetics');
+        const response = await axios.get(`http://localhost:3000/posts/${username}`);
         const sorted = response.data
           .sort((a: any, b: any) => {
             const aId = parseInt(a.key.match(/ready_post_(\d+)\.json$/)?.[1] || '0');
@@ -27,16 +40,17 @@ const PostCooked: React.FC = () => {
           .slice(0, 3)
           .map((post: any) => ({ ...post, imageFailed: false }));
         setPosts(sorted);
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching posts:', error);
+        setPosts([]);
+        setError(error.response?.data?.error || 'Failed to fetch posts');
       } finally {
         setIsLoading(false);
       }
     };
     fetchPosts();
-  }, []);
+  }, [username]);
 
-  // Clear toast after 3 seconds
   useEffect(() => {
     if (toastMessage) {
       const timer = setTimeout(() => setToastMessage(null), 3000);
@@ -44,30 +58,25 @@ const PostCooked: React.FC = () => {
     }
   }, [toastMessage]);
 
-  // Handle like
   const handleLike = (key: string) => {
     setToastMessage('Liked! Thanks for the love! ❤️');
   };
 
-  // Handle dislike (feedback)
   const handleDislike = (key: string) => {
     setIsFeedbackOpen(key);
   };
 
-  // Handle comment (placeholder for future functionality)
   const handleComment = (key: string) => {
     setToastMessage('Comment feature coming soon! 📝');
   };
 
-  // Handle share (placeholder for future functionality)
   const handleShare = (key: string) => {
     setToastMessage('Share feature coming soon! 📲');
   };
 
-  // Handle feedback submission
   const handleFeedbackSubmit = async (key: string) => {
-    if (!feedbackText.trim()) return;
-    const result = await saveFeedback('maccosmetics', key, feedbackText, 'post');
+    if (!feedbackText.trim() || !username) return;
+    const result = await saveFeedback(username, key, feedbackText, 'post');
     setFeedbackText('');
     setIsFeedbackOpen(null);
     setToastMessage(
@@ -77,7 +86,6 @@ const PostCooked: React.FC = () => {
     );
   };
 
-  // Handle image load error
   const handleImageError = (key: string, url: string) => {
     console.error(`Failed to load image for ${key}: ${url}`);
     setPosts((prev) =>
@@ -87,12 +95,25 @@ const PostCooked: React.FC = () => {
     );
   };
 
+  if (!username) {
+    return (
+      <ErrorBoundary>
+        <div className="post-cooked-container">
+          <h2>Cooked Posts</h2>
+          <p className="no-posts">No username provided. Please specify a username.</p>
+        </div>
+      </ErrorBoundary>
+    );
+  }
+
   return (
     <ErrorBoundary>
       <div className="post-cooked-container">
         <h2>Cooked Posts</h2>
         {isLoading ? (
           <div className="loading">Loading posts...</div>
+        ) : error ? (
+          <p className="error-text">{error}</p>
         ) : posts.length === 0 ? (
           <p className="no-posts">No posts ready yet. Stay tuned!</p>
         ) : (
@@ -108,18 +129,18 @@ const PostCooked: React.FC = () => {
                 <div className="post-content">
                   <div className="post-header">
                     <div className="profile-pic"></div>
-                    <span className="username">maccosmetics</span>
+                    <span className="username">{username}</span>
                   </div>
-                  {post.imageFailed ? (
+                  {post.imageFailed || !post.data.image_url ? (
                     <div className="post-image-placeholder">
                       Image unavailable
                     </div>
                   ) : (
                     <img
-                      src={post.data.post.image_url}
+                      src={post.data.image_url}
                       alt="Post visual"
                       className="post-image"
-                      onError={() => handleImageError(post.key, post.data.post.image_url)}
+                      onError={() => handleImageError(post.key, post.data.image_url)}
                     />
                   )}
                   <div className="post-actions">
@@ -205,22 +226,26 @@ const PostCooked: React.FC = () => {
                     </motion.button>
                   </div>
                   <p className="post-caption">
-                    <span className="username">maccosmetics</span> {post.data.post.caption}
+                    <span className="username">{username}</span> {post.data.caption || 'No caption available'}
                   </p>
                   <div className="post-hashtags">
-                    {post.data.post.hashtags.map((tag: string, index: number) => (
-                      <a
-                        key={index}
-                        href={`https://www.instagram.com/explore/tags/${tag.slice(1)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hashtag"
-                      >
-                        {tag}
-                      </a>
-                    ))}
+                    {post.data.hashtags?.length ? (
+                      post.data.hashtags.map((tag: string, index: number) => (
+                        <a
+                          key={index}
+                          href={`https://www.instagram.com/explore/tags/${tag.slice(1)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hashtag"
+                        >
+                          {tag}
+                        </a>
+                      ))
+                    ) : (
+                      <span>No hashtags available</span>
+                    )}
                   </div>
-                  <p className="post-cta">{post.data.post.call_to_action}</p>
+                  <p className="post-cta">{post.data.call_to_action || 'No call to action'}</p>
                 </div>
               </motion.div>
             ))}

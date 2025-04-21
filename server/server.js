@@ -22,14 +22,24 @@ const s3Client = new S3Client({
 });
 
 app.use(cors({
-  origin: 'http://localhost:5173',
+  origin: '*',
   methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type'],
+  allowedHeaders: '*',
   exposedHeaders: ['Content-Type'],
 }));
+
 app.use(express.json());
 
-app.options('*', cors());
+app.options('*', (req, res) => {
+  console.log(`[${new Date().toISOString()}] OPTIONS request received for ${req.url}`);
+  res.set({
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': '*',
+    'Access-Control-Expose-Headers': 'Content-Type',
+  });
+  res.status(204).send();
+});
 
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
@@ -101,15 +111,21 @@ app.post('/webhook/r2', async (req, res) => {
 app.get('/events/:username', (req, res) => {
   const { username } = req.params;
 
+  console.log(`[${new Date().toISOString()}] Handling SSE request for /events/${username}`);
+
   res.set({
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     'Connection': 'keep-alive',
-    'Access-Control-Allow-Origin': 'http://localhost:5173',
-    'Access-Control-Allow-Methods': 'GET',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': '*',
     'Access-Control-Expose-Headers': 'Content-Type',
+    'X-Accel-Buffering': 'no',
+    'Keep-Alive': 'timeout=15, max=100',
   });
+
+  res.flushHeaders();
 
   if (!sseClients.has(username)) {
     sseClients.set(username, []);
@@ -193,6 +209,7 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
     const validData = data.filter(item => item !== null);
     cache.set(prefix, validData);
     cacheTimestamps.set(prefix, now);
+    console.log(`Fetched data for prefix ${prefix}:`, JSON.stringify(validData, null, 2));
     return validData;
   } catch (error) {
     console.error(`Error fetching data for prefix ${prefix}:`, error);
@@ -398,18 +415,36 @@ app.get('/retrieve/:accountHolder/:competitor', async (req, res) => {
 
   try {
     const data = await fetchDataForModule(accountHolder, `competitor_analysis/{username}/${competitor}`, forceRefresh);
-    if (data.length === 0) {
-      res.status(404).json({ error: 'No analysis files found' });
-    } else {
-      res.json(data);
-    }
+    console.log(`Returning data for ${accountHolder}/${competitor}:`, JSON.stringify(data, null, 2));
+    res.json(data);
   } catch (error) {
     console.error(`Retrieve endpoint error for ${accountHolder}/${competitor}:`, error);
-    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
-      res.status(404).json({ error: 'Data not ready yet' });
-    } else {
-      res.status(500).json({ error: 'Error retrieving data', details: error.message });
-    }
+    res.status(500).json({ error: 'Error retrieving data', details: error.message });
+  }
+});
+
+app.get('/retrieve-multiple/:accountHolder', async (req, res) => {
+  const { accountHolder } = req.params;
+  const competitorsParam = req.query.competitors;
+  const forceRefresh = req.query.forceRefresh === 'true';
+
+  if (!competitorsParam || typeof competitorsParam !== 'string') {
+    return res.status(400).json({ error: 'Competitors query parameter is required and must be a string' });
+  }
+
+  const competitors = competitorsParam.split(',').map(c => c.trim()).filter(c => c.length > 0);
+
+  try {
+    const results = await Promise.all(
+      competitors.map(async (competitor) => {
+        const data = await fetchDataForModule(accountHolder, `competitor_analysis/{username}/${competitor}`, forceRefresh);
+        return { competitor, data };
+      })
+    );
+    res.json(results);
+  } catch (error) {
+    console.error(`Retrieve multiple endpoint error for ${accountHolder}:`, error);
+    res.status(500).json({ error: 'Error retrieving data for multiple competitors', details: error.message });
   }
 });
 
@@ -655,6 +690,61 @@ app.post('/responses/:username/:responseId', async (req, res) => {
     } else {
       res.status(500).json({ error: 'Error updating response', details: error.message });
     }
+  }
+});
+
+app.get('/retrieve-account-info/:username', async (req, res) => {
+  const { username } = req.params;
+  const key = `AccountInfo/${username}/info.json`;
+  const prefix = `AccountInfo/${username}`;
+
+  try {
+    let data;
+    if (cache.has(prefix)) {
+      console.log(`Cache hit for account info: ${prefix}`);
+      const cachedData = cache.get(prefix);
+      data = cachedData.find(item => item.key === key)?.data;
+    }
+
+    if (!data) {
+      try {
+        const getCommand = new GetObjectCommand({
+          Bucket: 'tasks',
+          Key: key,
+        });
+        const response = await s3Client.send(getCommand);
+        const body = await streamToString(response.Body);
+
+        if (!body || body.trim() === '') {
+          console.warn(`Empty file detected at ${key}, returning default account info`);
+          data = { username, accountType: '', postingStyle: '', competitors: [], timestamp: new Date().toISOString() };
+        } else {
+          data = JSON.parse(body);
+          if (!data.competitors || !Array.isArray(data.competitors)) {
+            console.warn(`Invalid competitors array in ${key}, setting to empty array`);
+            data.competitors = [];
+          }
+        }
+
+        cache.set(prefix, [{ key, data }]);
+        cacheTimestamps.set(prefix, Date.now());
+      } catch (error) {
+        if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+          console.log(`Account info not found for ${key}, returning default account info`);
+          data = { username, accountType: '', postingStyle: '', competitors: [], timestamp: new Date().toISOString() };
+          cache.set(prefix, [{ key, data }]);
+          cacheTimestamps.set(prefix, Date.now());
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    console.log(`Returning account info for ${username}:`, JSON.stringify(data, null, 2));
+    res.json(data);
+  } catch (error) {
+    console.error(`Error retrieving account info for ${key}:`, error.message);
+    res.status(500).json({ error: 'Failed to retrieve account info', details: error.message });
   }
 });
 

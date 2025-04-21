@@ -34,14 +34,24 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
   const baseReconnectDelay = 5000;
+  const firstLoadRef = useRef(true);
+  const lastProfilePicRenderTimeRef = useRef<number>(0);
 
   const fetchProfileInfo = async () => {
     if (!accountHolder) return;
     setProfileLoading(true);
     setProfileError(null);
     try {
+      const now = Date.now();
+      // Throttle profile pic rendering to once every 30 minutes (1800000 ms)
+      if (now - lastProfilePicRenderTimeRef.current < 1800000 && profileInfo) {
+        console.log('Skipping profile pic fetch due to throttle');
+        setProfileLoading(false);
+        return;
+      }
       const response = await axios.get(`http://localhost:3000/profile-info/${accountHolder}`);
       setProfileInfo(response.data);
+      lastProfilePicRenderTimeRef.current = now;
       console.log('Profile Info Fetched:', response.data);
     } catch (err: any) {
       if (err.response?.status === 404) {
@@ -74,22 +84,23 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
       return;
     }
     try {
+      const forceRefresh = firstLoadRef.current;
       const [responsesData, strategiesData, postsData, competitorDataResponses] = await Promise.all([
-        axios.get(`http://localhost:3000/responses/${accountHolder}?forceRefresh=true`).catch(err => {
+        axios.get(`http://localhost:3000/responses/${accountHolder}${forceRefresh ? '?forceRefresh=true' : ''}`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        axios.get(`http://localhost:3000/retrieve-strategies/${accountHolder}?forceRefresh=true`).catch(err => {
+        axios.get(`http://localhost:3000/retrieve-strategies/${accountHolder}${forceRefresh ? '?forceRefresh=true' : ''}`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        axios.get(`http://localhost:3000/posts/${accountHolder}?forceRefresh=true`).catch(err => { // Added posts fetch
+        axios.get(`http://localhost:3000/posts/${accountHolder}${forceRefresh ? '?forceRefresh=true' : ''}`).catch(err => { // Added posts fetch
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
         Promise.all(
           competitors.map(comp =>
-            axios.get(`http://localhost:3000/retrieve/${accountHolder}/${comp}?forceRefresh=true`).catch(err => {
+            axios.get(`http://localhost:3000/retrieve/${accountHolder}/${comp}${forceRefresh ? '?forceRefresh=true' : ''}`).catch(err => {
               if (err.response?.status === 404) {
                 console.warn(`No competitor data found for ${comp}`);
                 return { data: [] };
@@ -104,6 +115,9 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
       setPosts(postsData.data); // Set posts state
       setCompetitorData(competitorDataResponses.flatMap(res => res.data));
       setError(null);
+      if (firstLoadRef.current) {
+        firstLoadRef.current = false;
+      }
     } catch (error: any) {
       console.error('Error refreshing data:', error);
       setError(error.response?.data?.error || 'Failed to load dashboard data.');
@@ -129,6 +143,8 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
       reconnectAttempts.current = 0;
       setError(null);
       console.log('Initial connection established');
+      // On SSE reconnection, fetch profile info with throttle
+      fetchProfileInfo();
     };
 
     eventSource.onmessage = (event) => {

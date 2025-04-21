@@ -33,6 +33,7 @@ const NonBrandingDashboard: React.FC<NonBrandingDashboardProps> = ({ accountHold
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
   const baseReconnectDelay = 5000;
+  const firstLoadRef = useRef(true);
 
   const fetchProfileInfo = async () => {
     if (!accountHolder) return;
@@ -73,20 +74,21 @@ const NonBrandingDashboard: React.FC<NonBrandingDashboardProps> = ({ accountHold
       return;
     }
     try {
+      const forceRefresh = firstLoadRef.current;
       const [responsesData, postsData, newsData, strategiesData] = await Promise.all([
-        axios.get(`http://localhost:3000/responses/${accountHolder}?forceRefresh=true`).catch(err => {
+        axios.get(`http://localhost:3000/responses/${accountHolder}${forceRefresh ? '?forceRefresh=true' : ''}`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        axios.get(`http://localhost:3000/posts/${accountHolder}?forceRefresh=true`).catch(err => {
+        axios.get(`http://localhost:3000/posts/${accountHolder}${forceRefresh ? '?forceRefresh=true' : ''}`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        axios.get(`http://localhost:3000/news-for-you/${accountHolder}?forceRefresh=true`).catch(err => {
+        axios.get(`http://localhost:3000/news-for-you/${accountHolder}${forceRefresh ? '?forceRefresh=true' : ''}`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        axios.get(`http://localhost:3000/retrieve-engagement-strategies/${accountHolder}?forceRefresh=true`).catch(err => {
+        axios.get(`http://localhost:3000/retrieve-engagement-strategies/${accountHolder}${forceRefresh ? '?forceRefresh=true' : ''}`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
@@ -97,6 +99,9 @@ const NonBrandingDashboard: React.FC<NonBrandingDashboardProps> = ({ accountHold
       setNews(newsData.data);
       setStrategies(strategiesData.data);
       setError(null);
+      if (firstLoadRef.current) {
+        firstLoadRef.current = false;
+      }
     } catch (error: any) {
       console.error('Error refreshing data:', error);
       setError(error.response?.data?.error || 'Failed to load dashboard data.');

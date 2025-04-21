@@ -11,27 +11,37 @@ interface ProfilePopupProps {
 
 const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose }) => {
   const [activeTab, setActiveTab] = useState<'Rules' | 'Billing Method' | 'Name'>('Rules');
-  const [rules, setRules] = useState('');
-  const [savedRules, setSavedRules] = useState('');
+  const [rules, setRules] = useState<string | null>(null);
+  const [savedRules, setSavedRules] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isEditingRules, setIsEditingRules] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const maxRulesLength = 1000;
 
-  // Fetch rules on Rules tab activation
   useEffect(() => {
     if (activeTab === 'Rules') {
       const fetchRules = async () => {
         setIsLoading(true);
+        setError(null);
         try {
           const response = await axios.get(`http://localhost:3000/rules/${username}`);
           setRules(response.data.rules || '');
           setSavedRules(response.data.rules || '');
+          setIsEditingRules(false);
+          setShowPreview(false);
         } catch (err) {
           if (axios.isAxiosError(err) && err.response?.status === 404) {
             setRules('');
             setSavedRules('');
+            setIsEditingRules(true);
+            setShowPreview(false);
           } else {
             setError('Failed to load rules.');
+            setRules('');
+            setSavedRules('');
+            setIsEditingRules(false);
           }
         } finally {
           setIsLoading(false);
@@ -41,33 +51,49 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose }) => {
     }
   }, [activeTab, username]);
 
-  // Clear toast after 3 seconds
   useEffect(() => {
     if (toastMessage) {
-      const timer = setTimeout(() => {
-        setToastMessage(null);
-      }, 3000);
+      const timer = setTimeout(() => setToastMessage(null), 3000);
       return () => clearTimeout(timer);
     }
   }, [toastMessage]);
 
   const handleSubmitRules = async () => {
-    if (!rules.trim()) {
+    if (!rules?.trim()) {
       setError('Rules cannot be empty.');
       return;
     }
 
     setIsLoading(true);
+    setError(null);
     try {
       await axios.post(`http://localhost:3000/rules/${username}`, { rules });
       setSavedRules(rules);
-      setError(null);
-      setToastMessage('Your rules are saved with us!');
+      setIsEditingRules(false);
+      setShowPreview(true);
+      setToastMessage('Rules saved successfully!');
     } catch (err) {
       setError('Failed to save rules.');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleCancelEdit = () => {
+    setRules(savedRules);
+    setIsEditingRules(false);
+    setShowPreview(!!savedRules);
+    setError(null);
+  };
+
+  const handleClearRules = () => {
+    setRules('');
+    setError(null);
+  };
+
+  const handleAddOrEditRules = () => {
+    setIsEditingRules(true);
+    setShowPreview(false);
   };
 
   const isDirty = rules !== savedRules;
@@ -119,28 +145,132 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose }) => {
           <div className="popup-main">
             {activeTab === 'Rules' ? (
               <div className="rules-section">
-                <h3>Manager Rules</h3>
-                {isLoading ? (
-                  <div className="loading">Loading...</div>
-                ) : (
-                  <>
-                    <textarea
-                      value={rules}
-                      onChange={(e) => setRules(e.target.value)}
-                      placeholder="Enter rules for manager behavior..."
-                      className="rules-textarea"
-                    />
-                    {error && <p className="error">{error}</p>}
+                <motion.div
+                  className="rules-header"
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4 }}
+                >
+                  <h3>Manager Rules for {username}</h3>
+                  {rules && rules.trim() && !isEditingRules && (
                     <motion.button
-                      className="submit-button"
+                      className="edit-rules-button"
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
-                      onClick={handleSubmitRules}
-                      disabled={isLoading || !rules.trim() || !isDirty}
+                      onClick={handleAddOrEditRules}
                     >
-                      Submit Rules
+                      Edit Rules
                     </motion.button>
-                  </>
+                  )}
+                </motion.div>
+                {isLoading ? (
+                  <div className="loading">Loading...</div>
+                ) : !rules && !isEditingRules ? (
+                  <motion.div
+                    className="no-rules-container"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.5 }}
+                  >
+                    <p className="no-rules-text">
+                      No rules set yet. Define how your manager should operate!
+                    </p>
+                    <motion.button
+                      className="add-rules-button"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={handleAddOrEditRules}
+                    >
+                      Add Rules
+                    </motion.button>
+                  </motion.div>
+                ) : isEditingRules ? (
+                  <motion.div
+                    className="rules-edit-container"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <div className="textarea-wrapper">
+                      <textarea
+                        value={rules || ''}
+                        onChange={(e) => setRules(e.target.value)}
+                        placeholder="Enter rules for manager behavior (e.g., What things should not discussed in DM with anyone and tone etc.)..."
+                        className="rules-textarea"
+                        maxLength={maxRulesLength}
+                      />
+                      <div className="char-counter">
+                        {rules?.length || 0}/{maxRulesLength}
+                      </div>
+                    </div>
+                    {error && <p className="error">{error}</p>}
+                    <div className="rules-action-buttons">
+                      <motion.button
+                        className="submit-button"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleSubmitRules}
+                        disabled={isLoading || !rules?.trim() || !isDirty}
+                      >
+                        {isLoading ? 'Saving...' : 'Save Rules'}
+                      </motion.button>
+                      <motion.button
+                        className="clear-button"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleClearRules}
+                        disabled={isLoading || !rules?.trim()}
+                      >
+                        Clear Rules
+                      </motion.button>
+                      <motion.button
+                        className="cancel-button"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleCancelEdit}
+                        disabled={isLoading}
+                      >
+                        Cancel
+                      </motion.button>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    className="rules-display-container"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <div className="rules-toggle">
+                      <motion.button
+                        className={`toggle-button ${showPreview ? 'active' : ''}`}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setShowPreview(true)}
+                      >
+                        Preview
+                      </motion.button>
+                      <motion.button
+                        className={`toggle-button ${!showPreview ? 'active' : ''}`}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setShowPreview(false)}
+                      >
+                        Raw
+                      </motion.button>
+                    </div>
+                    <div className="rules-content">
+                      {showPreview ? (
+                        rules?.split('\n').map((line, index) => (
+                          <p key={index} className="rule-line">
+                            {line}
+                          </p>
+                        ))
+                      ) : (
+                        <pre className="rules-raw">{rules}</pre>
+                      )}
+                    </div>
+                  </motion.div>
                 )}
               </div>
             ) : (

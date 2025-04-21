@@ -12,25 +12,22 @@ const s3Client = new S3Client({
     accessKeyId: 'b94be077bc48dcc2aec3e4331233327e',
     secretAccessKey: '791d5eeddcd8ed5bf3f41bfaebbd37e58af7dcb12275b1422747605d7dc75bc4',
   },
+  maxAttempt: 3,
+  httpOptions: {
+    connectTimeout: 50000,
+    timeout: 100000,
+  },
 });
 
-app.use(express.json());
 app.use(cors({
   origin: 'http://localhost:5173',
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type'],
   exposedHeaders: ['Content-Type'],
 }));
+app.use(express.json());
 
-app.options('*', (req, res) => {
-  res.set({
-    'Access-Control-Allow-Origin': 'http://localhost:5173',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Expose-Headers': 'Content-Type',
-  });
-  res.sendStatus(204);
-});
+app.options('*', cors());
 
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
@@ -54,7 +51,23 @@ const MODULE_PREFIXES = [
   'rules',
   'feedbacks',
   'NewForYou',
+  'ProfileInfo',
 ];
+
+async function initializeCurrentUsername() {
+  try {
+    const existingData = await getExistingData();
+    if (existingData.length > 0) {
+      const latestEntry = existingData.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+      currentUsername = latestEntry.username;
+      console.log(`Initialized currentUsername to ${currentUsername} on server startup`);
+    }
+  } catch (error) {
+    console.error('Error initializing currentUsername:', error);
+  }
+}
+
+initializeCurrentUsername();
 
 app.post('/webhook/r2', async (req, res) => {
   try {
@@ -94,48 +107,37 @@ app.get('/events/:username', (req, res) => {
     'Access-Control-Allow-Methods': 'GET',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Expose-Headers': 'Content-Type',
-    'X-Accel-Buffering': 'no',
-    'Keep-Alive': 'timeout=60', // Extend keep-alive timeout
   });
-
-  res.flushHeaders();
 
   if (!sseClients.has(username)) {
     sseClients.set(username, []);
   }
-  const clientId = Date.now(); // Unique ID for logging
-  sseClients.get(username).push(res);
-  console.log(`[${clientId}] SSE client connected for ${username}. Total clients: ${sseClients.get(username).length}`);
+  const clients = sseClients.get(username);
+  clients.push(res);
 
-  res.write(`data: ${JSON.stringify({ type: 'connection', message: 'SSE connection established' })}\n\n`);
+  console.log(`[${Date.now()}] SSE client connected for ${username}. Total clients: ${clients.length}`);
+
+  res.write(`data: ${JSON.stringify({ type: 'connection', message: `Connected to events for ${username}` })}\n\n`);
 
   const heartbeat = setInterval(() => {
-    if (!res.writableEnded) {
-      res.write(`data: ${JSON.stringify({ type: 'heartbeat' })}\n\n`);
-    }
-  }, 10000); // Reduced to 10 seconds
+    res.write(`data: ${JSON.stringify({ type: 'heartbeat' })}\n\n`);
+  }, 15000);
 
   req.on('close', () => {
-    console.log(`[${clientId}] SSE client disconnected for ${username}`);
     clearInterval(heartbeat);
-    const clients = sseClients.get(username).filter(client => client !== res);
-    sseClients.set(username, clients);
-    if (clients.length === 0) {
+    const updatedClients = sseClients.get(username).filter(client => client !== res);
+    sseClients.set(username, updatedClients);
+    console.log(`[${Date.now()}] SSE client disconnected for ${username}`);
+    if (updatedClients.length === 0) {
       sseClients.delete(username);
     }
-    if (!res.writableEnded) {
-      res.end();
-    }
+    res.end();
   });
-
-  // Prevent Express from timing out the connection
-  req.socket.setTimeout(0);
 });
 
-// Rest of the server.js code remains unchanged for brevity
 async function fetchDataForModule(username, prefixTemplate) {
   if (!username) {
-    console.warn('No username provided, cannot fetch data');
+    console.error('No username provided, cannot fetch data');
     return [];
   }
 
@@ -196,6 +198,48 @@ async function fetchDataForModule(username, prefixTemplate) {
   }
 }
 
+app.get('/profile-info/:username', async (req, res) => {
+  const { username } = req.params;
+  const key = `ProfileInfo/${username}.json`;
+  const prefix = `ProfileInfo/${username}`;
+
+  try {
+    let data;
+    if (cache.has(prefix)) {
+      console.log(`Cache hit for profile info: ${prefix}`);
+      const cachedData = cache.get(prefix);
+      data = cachedData.find(item => item.key === key)?.data;
+    }
+
+    if (!data) {
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: key,
+      });
+      const response = await s3Client.send(getCommand);
+      const body = await streamToString(response.Body);
+
+      if (!body || body.trim() === '') {
+        console.warn(`Empty file detected at ${key}`);
+        return res.status(404).json({ error: 'Profile info is empty' });
+      }
+
+      data = JSON.parse(body);
+      cache.set(prefix, [{ key, data }]);
+      cacheTimestamps.set(prefix, Date.now());
+    }
+
+    res.json(data);
+  } catch (error) {
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+      console.log(`Profile info not found for ${key}`);
+      return res.status(404).json({ error: 'Profile info not found' });
+    }
+    console.error(`Error fetching profile info for ${key}:`, error.message);
+    res.status(500).json({ error: 'Error retrieving profile info', details: error.message });
+  }
+});
+
 app.post('/save-account-info', async (req, res) => {
   try {
     const { username, accountType, postingStyle, competitors } = req.body;
@@ -228,7 +272,7 @@ app.post('/save-account-info', async (req, res) => {
     res.json({ success: true, message: 'Account info saved successfully' });
   } catch (error) {
     console.error('Save account info error:', error);
-    res.status(500).json({ error: 'Error saving account info', details: error.message });
+    handleErrorResponse(res, error);
   }
 });
 
@@ -250,7 +294,7 @@ app.post('/scrape', async (req, res) => {
     });
 
     if (currentUsername !== newUsername) {
-      console.log(`Username changed from ${currentUsername} to ${newUsername}, resetting caches...`);
+      console.log(`Username changed from ${currentUsername || 'none'} to ${newUsername}, resetting caches...`);
       currentUsername = newUsername;
 
       MODULE_PREFIXES.forEach((prefixTemplate) => {
@@ -291,16 +335,12 @@ app.post('/scrape', async (req, res) => {
     });
   } catch (error) {
     console.error('Scrape endpoint error:', error);
-    res.status(500).json({ error: 'Error processing scrape', details: error.message });
+    handleErrorResponse(res, error);
   }
 });
 
 app.get('/retrieve/:accountHolder/:competitor', async (req, res) => {
   const { accountHolder, competitor } = req.params;
-
-  if (!currentUsername) {
-    console.warn('currentUsername is not set. Proceeding with accountHolder:', accountHolder);
-  }
 
   try {
     const data = await fetchDataForModule(accountHolder, `competitor_analysis/{username}/${competitor}`);
@@ -311,16 +351,16 @@ app.get('/retrieve/:accountHolder/:competitor', async (req, res) => {
     }
   } catch (error) {
     console.error(`Retrieve endpoint error for ${accountHolder}/${competitor}:`, error);
-    res.status(error.$metadata?.httpStatusCode || 500).json({ error: 'Error retrieving data', details: error.message });
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+      res.status(404).json({ error: 'Data not ready yet' });
+    } else {
+      res.status(500).json({ error: 'Error retrieving data', details: error.message });
+    }
   }
 });
 
 app.get('/retrieve-strategies/:accountHolder', async (req, res) => {
   const { accountHolder } = req.params;
-
-  if (!currentUsername) {
-    console.warn('currentUsername is not set. Proceeding with accountHolder:', accountHolder);
-  }
 
   try {
     const data = await fetchDataForModule(accountHolder, 'recommendations/{username}');
@@ -331,16 +371,16 @@ app.get('/retrieve-strategies/:accountHolder', async (req, res) => {
     }
   } catch (error) {
     console.error(`Retrieve strategies endpoint error for ${accountHolder}:`, error);
-    res.status(error.$metadata?.httpStatusCode || 500).json({ error: 'Error retrieving data', details: error.message });
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+      res.status(404).json({ error: 'Data not ready yet' });
+    } else {
+      res.status(500).json({ error: 'Error retrieving data', details: error.message });
+    }
   }
 });
 
 app.get('/retrieve-engagement-strategies/:accountHolder', async (req, res) => {
   const { accountHolder } = req.params;
-
-  if (!currentUsername) {
-    console.warn('currentUsername is not set. Proceeding with accountHolder:', accountHolder);
-  }
 
   try {
     const data = await fetchDataForModule(accountHolder, 'engagement_strategies/{username}');
@@ -351,16 +391,16 @@ app.get('/retrieve-engagement-strategies/:accountHolder', async (req, res) => {
     }
   } catch (error) {
     console.error(`Retrieve engagement strategies endpoint error for ${accountHolder}:`, error);
-    res.status(error.$metadata?.httpStatusCode || 500).json({ error: 'Error retrieving data', details: error.message });
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+      res.status(404).json({ error: 'Data not ready yet' });
+    } else {
+      res.status(500).json({ error: 'Error retrieving data', details: error.message });
+    }
   }
 });
 
 app.get('/news-for-you/:accountHolder', async (req, res) => {
   const { accountHolder } = req.params;
-
-  if (!currentUsername) {
-    console.warn('currentUsername is not set. Proceeding with accountHolder:', accountHolder);
-  }
 
   try {
     const data = await fetchDataForModule(accountHolder, 'NewForYou/{username}');
@@ -371,17 +411,17 @@ app.get('/news-for-you/:accountHolder', async (req, res) => {
     }
   } catch (error) {
     console.error(`Retrieve news endpoint error for ${accountHolder}:`, error);
-    res.status(error.$metadata?.httpStatusCode || 500).json({ error: 'Error retrieving data', details: error.message });
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+      res.status(404).json({ error: 'Data not ready yet' });
+    } else {
+      res.status(500).json({ error: 'Error retrieving data', details: error.message });
+    }
   }
 });
 
 app.post('/save-query/:accountHolder', async (req, res) => {
   const { accountHolder } = req.params;
   const { query } = req.body;
-
-  if (!currentUsername) {
-    console.warn('currentUsername is not set. Proceeding with accountHolder:', accountHolder);
-  }
 
   const prefix = `queries/${accountHolder}/`;
 
@@ -428,10 +468,6 @@ app.post('/save-query/:accountHolder', async (req, res) => {
 app.get('/rules/:username', async (req, res) => {
   const { username } = req.params;
 
-  if (!currentUsername) {
-    console.warn('currentUsername is not set. Proceeding with username:', username);
-  }
-
   const key = `rules/${username}/rules.json`;
   const prefix = `rules/${username}/`;
 
@@ -463,17 +499,17 @@ app.get('/rules/:username', async (req, res) => {
     res.json(data);
   } catch (error) {
     console.error(`Error fetching rules for ${key}:`, error);
-    res.status(error.$metadata?.httpStatusCode || 404).json({ error: 'Rules not found', details: error.message });
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+      res.status(404).json({ error: 'Rules not found' });
+    } else {
+      res.status(500).json({ error: 'Error retrieving rules', details: error.message });
+    }
   }
 });
 
 app.post('/rules/:username', async (req, res) => {
   const { username } = req.params;
   const { rules } = req.body;
-
-  if (!currentUsername) {
-    console.warn('currentUsername is not set. Proceeding with username:', username);
-  }
 
   const key = `rules/${username}/rules.json`;
   const prefix = `rules/${username}/`;
@@ -497,6 +533,11 @@ app.post('/rules/:username', async (req, res) => {
 
     cache.delete(prefix);
 
+    const clients = sseClients.get(username) || [];
+    for (const client of clients) {
+      client.write(`data: ${JSON.stringify({ type: 'update', prefix })}\n\n`);
+    }
+
     res.json({ success: true, message: 'Rules saved successfully' });
   } catch (error) {
     console.error(`Save rules error for ${key}:`, error);
@@ -506,10 +547,6 @@ app.post('/rules/:username', async (req, res) => {
 
 app.get('/responses/:username', async (req, res) => {
   const { username } = req.params;
-
-  if (!currentUsername) {
-    console.warn('currentUsername is not set. Proceeding with username:', username);
-  }
 
   try {
     const data = await fetchDataForModule(username, 'queries/{username}');
@@ -522,10 +559,6 @@ app.get('/responses/:username', async (req, res) => {
 
 app.post('/responses/:username/:responseId', async (req, res) => {
   const { username, responseId } = req.params;
-
-  if (!currentUsername) {
-    console.warn('currentUsername is not set. Proceeding with username:', username);
-  }
 
   const key = `queries/${username}/response_${responseId}.json`;
   const prefix = `queries/${username}/`;
@@ -559,48 +592,52 @@ app.post('/responses/:username/:responseId', async (req, res) => {
     res.json({ success: true, message: 'Response status updated' });
   } catch (error) {
     console.error(`Update response error for ${key}:`, error);
-    res.status(error.$metadata?.httpStatusCode || 404).json({ error: 'Response not found', details: error.message });
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+      res.status(404).json({ error: 'Response not found' });
+    } else {
+      res.status(500).json({ error: 'Error updating response', details: error.message });
+    }
   }
 });
 
 app.get('/posts/:username', async (req, res) => {
   const { username } = req.params;
 
-  if (!currentUsername) {
-    console.warn('currentUsername is not set. Proceeding with username:', username);
-  }
-
   try {
     const data = await fetchDataForModule(username, 'ready_post/{username}');
+    console.log(`Fetched posts for ${username}:`, JSON.stringify(data, null, 2));
 
     const updatedData = await Promise.all(
       data.map(async (item) => {
-        const postData = item.data.post || item.data;
-        if (postData.image_url) {
+        const postData = { ...item.data };
+        if (postData.image) {
           try {
-            const imageKey = postData.image_url.split('.com/')[1]?.split('?')[0];
+            const imageKey = postData.image.split('.com/')[1]?.split('?')[0];
             if (imageKey) {
               const getCommand = new GetObjectCommand({
                 Bucket: 'stable-horde',
                 Key: imageKey,
               });
               const signedUrl = await getSignedUrl(s3Client, getCommand, { expiresIn: 3600 });
-              postData.image_url = signedUrl;
+              postData.image_url = signedUrl; // Ensure the field is renamed to image_url
+              delete postData.image; // Remove the original image field
+            } else {
+              postData.image_url = null;
             }
           } catch (error) {
-            console.error(`Error generating pre-signed URL for ${postData.image_url}:`, error);
+            console.error(`Error generating pre-signed URL for ${postData.image}:`, error);
             postData.image_url = null;
+            delete postData.image;
           }
+        } else {
+          postData.image_url = postData.image_url || null;
         }
         return { key: item.key, data: postData };
       })
     );
 
-    if (updatedData.length === 0) {
-      res.status(404).json({ error: 'No posts found' });
-    } else {
-      res.json(updatedData);
-    }
+    console.log(`Returning updated posts for ${username}:`, JSON.stringify(updatedData, null, 2));
+    res.json(updatedData);
   } catch (error) {
     console.error(`Retrieve posts error for ${username}:`, error);
     res.status(500).json({ error: 'Error retrieving posts', details: error.message });
@@ -610,10 +647,6 @@ app.get('/posts/:username', async (req, res) => {
 app.post('/feedback/:username', async (req, res) => {
   const { username } = req.params;
   const { responseKey, feedback, type } = req.body;
-
-  if (!currentUsername) {
-    console.warn('currentUsername is not set. Proceeding with username:', username);
-  }
 
   const prefix = `feedbacks/${username}/`;
 
@@ -714,6 +747,28 @@ async function saveToR2(data) {
   cache.delete(prefix);
 }
 
+function handleErrorResponse(res, error) {
+  const statusCode = error.name === 'TimeoutError' ? 504 : 500;
+  res.status(statusCode).json({
+    error: error.name || 'Internal server error',
+    message: error.message || 'An unexpected error occurred',
+  });
+}
+
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
+  console.log('Ready to receive account info at POST /save-account-info');
+  console.log('Ready to handle R2 webhooks at POST /webhook/r2');
+  console.log('Ready to stream events at GET /events/:username');
+  console.log('Ready to receive hierarchical data at POST /scrape');
+  console.log('Ready to retrieve data at GET /retrieve/:accountHolder/:competitor');
+  console.log('Ready to retrieve strategies at GET /retrieve-strategies/:accountHolder');
+  console.log('Ready to retrieve engagement strategies at GET /retrieve-engagement-strategies/:accountHolder');
+  console.log('Ready to retrieve news at GET /news-for-you/:accountHolder');
+  console.log('Ready to save queries at POST /save-query/:accountHolder');
+  console.log('Ready to handle rules at GET/POST /rules/:username');
+  console.log('Ready to handle responses at GET/POST /responses/:username');
+  console.log('Ready to handle posts at GET /posts/:username');
+  console.log('Ready to handle feedback at POST /feedback/:username');
+  console.log('Ready to retrieve profile info at GET /profile-info/:username');
 });

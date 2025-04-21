@@ -4,8 +4,8 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(6px);
   z-index: 2000;
   display: flex;
   justify-content: center;
@@ -14,128 +14,238 @@
 
 .profile-popup-content {
   background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
-  border-radius: 12px;
-  width: 800px;
-  height: 600px;
+  border-radius: 16px;
+  width: 900px;
+  height: 650px;
   display: flex;
-  box-shadow: 0 8px 30px rgba(0, 255, 204, 0.4);
-  border: 2px solid rgba(0, 255, 204, 0.3);
+  box-shadow: 0 10px 40px rgba(0, 255, 204, 0.5);
+  border: 2px solid rgba(0, 255, 204, 0.4);
   position: relative;
   overflow: hidden;
 }
 
 .popup-sidebar {
-  width: 200px;
+  width: 220px;
   background: #1e1e2f;
-  padding: 20px;
+  padding: 30px 20px;
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 20px;
   border-right: 1px solid rgba(0, 255, 204, 0.2);
 }
 
 .sidebar-button {
   background: none;
   border: none;
-  padding: 10px;
+  padding: 12px 20px;
   color: #e0e0ff;
-  font-size: 1rem;
+  font-size: 1.1rem;
+  font-weight: 500;
   cursor: pointer;
   text-align: left;
-  border-radius: 6px;
-  transition: background 0.2s;
+  border-radius: 8px;
+  transition: background 0.3s, color 0.3s;
 }
 
 .sidebar-button:hover {
-  background: rgba(0, 255, 204, 0.1);
+  background: rgba(0, 255, 204, 0.15);
 }
 
 .sidebar-button.active {
-  background: rgba(0, 255, 204, 0.3);
+  background: rgba(0, 255, 204, 0.4);
   color: #00ffcc;
+  font-weight: 600;
 }
 
 .sidebar-button:disabled {
   color: #a0a0cc;
   cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .popup-main {
   flex: 1;
-  padding: 20px;
+  padding: 30px;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
   align-items: center;
   overflow-y: auto;
+  gap: 20px;
 }
 
 .logo-placeholder {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 15px;
 }
 
 .placeholder-logo {
-  width: 400px;
-  height: 400px;
-  opacity: 0.7;
+  width: 350px;
+  height: 350px;
+  opacity: 0.8;
+  transition: opacity 0.3s;
+}
+
+.placeholder-logo:hover {
+  opacity: 1;
 }
 
 .logo-placeholder p {
   color: #e0e0ff;
-  font-size: 1.2rem;
+  font-size: 1.3rem;
+  font-weight: 500;
 }
 
 .rules-section {
   width: 100%;
-  max-width: 500px;
+  max-width: 550px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: center;
+  animation: glow-border 2s infinite ease-in-out;
+}
+
+.rules-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.rules-section h3 {
+  color: #00ffcc;
+  font-size: 1.8rem;
+  font-weight: 600;
+  text-align: left;
+  margin: 0;
+}
+
+.edit-rules-button {
+  background: linear-gradient(90deg, #007bff, #00ffcc);
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  color: #e0e0ff;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: box-shadow 0.3s;
+}
+
+.edit-rules-button:hover {
+  box-shadow: 0 0 12px rgba(0, 255, 204, 0.6);
+}
+
+.no-rules-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 30px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(0, 255, 204, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 255, 204, 0.1);
+  width: 100%;
+}
+
+.no-rules-text {
+  color: #e0e0ff;
+  font-size: 1.2rem;
+  font-weight: 400;
+  text-align: center;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.add-rules-button {
+  background: linear-gradient(90deg, #007bff, #00ffcc);
+  border: none;
+  border-radius: 8px;
+  padding: 10px 24px;
+  color: #e0e0ff;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: box-shadow 0.3s;
+}
+
+.add-rules-button:hover {
+  box-shadow: 0 0 15px rgba(0, 255, 204, 0.6);
+}
+
+.rules-edit-container {
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 15px;
 }
 
-.rules-section h3 {
-  color: #00ffcc;
-  font-size: 1.5rem;
-  text-align: center;
+.textarea-wrapper {
+  position: relative;
+  width: 100%;
 }
 
 .rules-textarea {
   width: 100%;
-  height: 300px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(0, 255, 204, 0.3);
-  border-radius: 6px;
-  padding: 10px;
+  height: 350px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(0, 255, 204, 0.4);
+  border-radius: 10px;
+  padding: 15px;
   color: #e0e0ff;
   font-size: 1rem;
+  font-family: 'Inter', sans-serif;
+  line-height: 1.6;
   resize: none;
   outline: none;
+  transition: border-color 0.3s, box-shadow 0.3s;
 }
 
 .rules-textarea:focus {
   border-color: #00ffcc;
-  box-shadow: 0 0 8px rgba(0, 255, 204, 0.4);
+  box-shadow: 0 0 10px rgba(0, 255, 204, 0.5);
 }
 
 .rules-textarea::placeholder {
   color: #a0a0cc;
+  font-style: italic;
 }
 
+.char-counter {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  color: #a0a0cc;
+  font-size: 0.85rem;
+  font-weight: 400;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.rules-action-buttons {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
 .submit-button {
-  background: linear-gradient(90deg, #007bff, #00ffcc);
+  background: rgba(0, 255, 204, 0.4);
   border: none;
-  border-radius: 6px;
-  padding: 10px;
-  color: #e0e0ff;
+  border-radius: 8px;
+  padding: 10px 24px;
+  color: #00ffcc;
   font-size: 1rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: box-shadow 0.2s;
+  transition: box-shadow 0.3s;
 }
 
 .submit-button:hover {
-  box-shadow: 0 0 15px rgba(0, 255, 204, 0.5);
+  box-shadow: 0 0 15px rgba(0, 255, 204, 0.6);
 }
 
 .submit-button:disabled {
@@ -145,49 +255,168 @@
   box-shadow: none;
 }
 
+.clear-button {
+  background: rgba(0, 255, 204, 0.4);
+  border: none;
+  border-radius: 8px;
+  padding: 10px 24px;
+  color: #e0e0ff;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: box-shadow 0.3s;
+}
+
+.clear-button:hover {
+  box-shadow: 0 0 15px rgba(255, 204, 51, 0.6);
+}
+
+.clear-button:disabled {
+  background: linear-gradient(90deg, #4a4a6a, #3e3e6e);
+  color: #a0a0cc;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.cancel-button {
+  background: linear-gradient(90deg, #ff4444, #cc0000);
+  border: none;
+  border-radius: 8px;
+  padding: 10px 24px;
+  color: white;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: box-shadow 0.3s;
+}
+
+.cancel-button:hover {
+  box-shadow: 0 0 15px rgba(255, 68, 68, 0.6);
+}
+
+.cancel-button:disabled {
+  background: linear-gradient(90deg, #4a4a6a, #3e3e6e);
+  color: #a0a0cc;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.rules-display-container {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid rgba(0, 255, 204, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 255, 204, 0.1);
+  max-height: 400px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.rules-toggle {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.toggle-button {
+  background: none;
+  border: 1px solid rgba(0, 255, 204, 0.4);
+  border-radius: 8px;
+  padding: 6px 12px;
+  color: #e0e0ff;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.3s, color 0.3s;
+}
+
+.toggle-button:hover {
+  background: rgba(0, 255, 204, 0.15);
+}
+
+.toggle-button.active {
+  background: rgba(0, 255, 204, 0.4);
+  color: #00ffcc;
+}
+
+.rules-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.rules-raw {
+  color: #e0e0ff;
+  font-size: 1rem;
+  line-height: 1.6;
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: 'Inter', sans-serif;
+}
+
+.rule-line {
+  color: #e0e0ff;
+  font-size: 1rem;
+  line-height: 1.6;
+  margin: 0;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(0, 255, 204, 0.1);
+}
+
+.rule-line:last-child {
+  border-bottom: none;
+}
+
 .error {
   color: #ff4444;
   font-size: 0.9rem;
   text-align: center;
+  margin: 0;
 }
 
 .loading {
   color: #00ffcc;
-  font-size: 1rem;
+  font-size: 1.1rem;
+  font-weight: 500;
   text-align: center;
 }
 
 .close-button {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 15px;
+  right: 15px;
   background: linear-gradient(90deg, #ff4444, #cc0000);
   border: none;
-  border-radius: 6px;
-  padding: 8px 16px;
+  border-radius: 8px;
+  padding: 10px 20px;
   color: white;
+  font-size: 0.95rem;
+  font-weight: 500;
   cursor: pointer;
-  font-size: 0.9rem;
+  transition: box-shadow 0.3s;
 }
 
 .close-button:hover {
-  box-shadow: 0 0 15px rgba(255, 68, 68, 0.5);
+  box-shadow: 0 0 15px rgba(255, 68, 68, 0.6);
 }
 
 .rules-toast {
   position: absolute;
-  bottom: 20px;
-  right: 20px;
+  bottom: 30px;
+  right: 30px;
   background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
-  border-radius: 8px;
-  padding: 10px 20px;
+  border-radius: 10px;
+  padding: 12px 24px;
   color: #e0e0ff;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
+  font-weight: 500;
   display: flex;
   align-items: center;
-  gap: 10px;
-  box-shadow: 0 4px 15px rgba(0, 255, 204, 0.4);
-  border: 1px solid rgba(0, 255, 204, 0.3);
+  gap: 12px;
+  box-shadow: 0 4px 20px rgba(0, 255, 204, 0.5);
+  border: 1px solid rgba(0, 255, 204, 0.4);
   z-index: 2100;
   animation: slide-in-toast 0.3s ease-out, pulse-glow 1.5s infinite;
 }
@@ -204,4 +433,32 @@
 @keyframes pulse-glow {
   0%, 100% { box-shadow: 0 0 8px rgba(0, 255, 204, 0.3); }
   50% { box-shadow: 0 0 15px rgba(0, 255, 204, 0.6); }
+}
+
+@keyframes glow-border {
+  0%, 100% { border-color: #00ffcc66; }
+  50% { border-color: rgba(0, 255, 204, 0.8); }
+}
+
+/* Custom scrollbar for rules display */
+.rules-display-container::-webkit-scrollbar,
+.popup-main::-webkit-scrollbar {
+  width: 8px;
+}
+
+.rules-display-container::-webkit-scrollbar-track,
+.popup-main::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.rules-display-container::-webkit-scrollbar-thumb,
+.popup-main::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 204, 0.4);
+  border-radius: 4px;
+}
+
+.rules-display-container::-webkit-scrollbar-thumb:hover,
+.popup-main::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 204, 0.6);
 }

@@ -5,7 +5,11 @@ import { useNavigate } from 'react-router-dom';
 import ProfilePopup from './ProfilePopup';
 import MessagesPopup from './MessagesPopup';
 
-const LeftBar: React.FC = () => {
+interface LeftBarProps {
+  accountHolder: string;
+}
+
+const LeftBar: React.FC<LeftBarProps> = ({ accountHolder }) => {
   const navigate = useNavigate();
   const [showProfilePopup, setShowProfilePopup] = useState(false);
   const [showMessagesPopup, setShowMessagesPopup] = useState(false);
@@ -70,11 +74,11 @@ const LeftBar: React.FC = () => {
         ))}
       </div>
       {showProfilePopup && (
-        <ProfilePopup username="maccosmetics" onClose={() => setShowProfilePopup(false)} />
+        <ProfilePopup username={accountHolder} onClose={() => setShowProfilePopup(false)} />
       )}
       {showMessagesPopup && (
         <MessagesPopup
-          username="maccosmetics"
+          username={accountHolder}
           onClose={() => setShowMessagesPopup(false)}
           setHasNewMessages={setHasNewMessages}
         />

@@ -6,6 +6,13 @@ import PostCooked from './PostCooked';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 
+interface ProfileInfo {
+  fullName: string;
+  followersCount: number;
+  followsCount: number;
+  profilePicUrlHD: string;
+}
+
 interface DashboardProps {
   accountHolder: string;
   competitors: string[];
@@ -15,14 +22,35 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const [query, setQuery] = useState('');
   const [toast, setToast] = useState<string | null>(null);
   const [responses, setResponses] = useState<{ key: string; data: any }[]>([]);
-  const [posts, setPosts] = useState<{ key: string; data: any }[]>([]);
   const [strategies, setStrategies] = useState<{ key: string; data: any }[]>([]);
   const [competitorData, setCompetitorData] = useState<{ key: string; data: any }[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [profileInfo, setProfileInfo] = useState<ProfileInfo | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
   const baseReconnectDelay = 5000;
+
+  const fetchProfileInfo = async () => {
+    if (!accountHolder) return;
+    setProfileLoading(true);
+    setProfileError(null);
+    try {
+      const response = await axios.get(`http://localhost:3000/profile-info/${accountHolder}`);
+      setProfileInfo(response.data);
+    } catch (err: any) {
+      if (err.response?.status === 404) {
+        setProfileInfo(null);
+        setProfileError('Profile info not available.');
+      } else {
+        setProfileError('Failed to load profile info.');
+      }
+    } finally {
+      setProfileLoading(false);
+    }
+  };
 
   const handleSendQuery = async () => {
     if (!query.trim() || !accountHolder) return;
@@ -43,12 +71,8 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
       return;
     }
     try {
-      const [responsesData, postsData, strategiesData, competitorDataResponses] = await Promise.all([
+      const [responsesData, strategiesData, competitorDataResponses] = await Promise.all([
         axios.get(`http://localhost:3000/responses/${accountHolder}`).catch(err => {
-          if (err.response?.status === 404) return { data: [] };
-          throw err;
-        }),
-        axios.get(`http://localhost:3000/posts/${accountHolder}`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
@@ -69,7 +93,6 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
         ),
       ]);
       setResponses(responsesData.data);
-      setPosts(postsData.data);
       setStrategies(strategiesData.data);
       setCompetitorData(competitorDataResponses.flatMap(res => res.data));
       setError(null);
@@ -138,15 +161,6 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
             setError(err.response?.data?.error || 'Failed to fetch responses.');
           });
         }
-        if (prefix.startsWith(`ready_post/${accountHolder}/`)) {
-          axios.get(`http://localhost:3000/posts/${accountHolder}`).then(res => {
-            setPosts(res.data);
-            setToast('New post cooked!');
-          }).catch(err => {
-            console.error('Error fetching posts:', err);
-            setError(err.response?.data?.error || 'Failed to fetch posts.');
-          });
-        }
         if (prefix.startsWith(`recommendations/${accountHolder}/`)) {
           axios.get(`http://localhost:3000/retrieve-strategies/${accountHolder}`).then(res => {
             setStrategies(res.data);
@@ -204,6 +218,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   useEffect(() => {
     if (accountHolder) {
       refreshAllData();
+      fetchProfileInfo();
     }
   }, [accountHolder, competitors]);
 
@@ -221,6 +236,13 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     return <div className="error-message">Please specify an account holder to load the dashboard.</div>;
   }
 
+  const formatCount = (count: number | undefined) => {
+    if (count === undefined) return 'N/A';
+    if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
+    if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K`;
+    return count.toString();
+  };
+
   return (
     <motion.div
       className="dashboard-wrapper"
@@ -229,24 +251,45 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
       transition={{ duration: 0.5 }}
     >
       <div className="welcome-header">
-        <h1 className="welcome-text">Welcome {accountHolder}!</h1>
+        <h1 className="welcome-text">
+          Welcome {profileInfo?.fullName || accountHolder}!
+        </h1>
         <p className="welcome-subtext">You are listed in Smart People!</p>
       </div>
       {error && <div className="error-message">{error}</div>}
+      {profileError && <div className="error-message">{profileError}</div>}
       <div className="dashboard-grid">
         <div className="profile-metadata">
           <div className="profile-header">
-            <div className="profile-pic"></div>
-            <div className="stats">
-              <div className="stat">
-                <span className="label">Followers</span>
-                <span className="value">10.3K</span>
-              </div>
-              <div className="stat">
-                <span className="label">Following</span>
-                <span className="value">304</span>
-              </div>
-            </div>
+            {profileLoading ? (
+              <div className="profile-loading">Loading...</div>
+            ) : (
+              <>
+                <div
+                  className="profile-pic"
+                  style={{
+                    backgroundImage: profileInfo?.profilePicUrlHD
+                      ? `url(${profileInfo.profilePicUrlHD})`
+                      : 'none',
+                    backgroundColor: profileInfo?.profilePicUrlHD ? 'transparent' : '#4a4a6a',
+                  }}
+                />
+                <div className="stats">
+                  <div className="stat">
+                    <span className="label">Followers</span>
+                    <span className="value">
+                      {formatCount(profileInfo?.followersCount)}
+                    </span>
+                  </div>
+                  <div className="stat">
+                    <span className="label">Following</span>
+                    <span className="value">
+                      {formatCount(profileInfo?.followsCount)}
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
             <div className="chart-placeholder"></div>
           </div>
         </div>

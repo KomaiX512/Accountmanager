@@ -15,19 +15,19 @@ const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHas
   const [recentResponses, setRecentResponses] = useState<{ key: string; data: any }[]>([]);
   const [viewedKeys, setViewedKeys] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState<string | null>(null);
   const [feedbackText, setFeedbackText] = useState('');
 
-  // Fetch top 3 recent responses
   useEffect(() => {
     const fetchResponses = async () => {
       setIsLoading(true);
+      setError(null);
       try {
         const response = await axios.get(`http://localhost:3000/responses/${username}`);
         const responses = response.data;
         if (responses.length > 0) {
-          // Sort by response ID descending, take top 3
           const sorted = responses
             .sort((a: any, b: any) => {
               const aId = parseInt(a.key.match(/response_(\d+)\.json$/)?.[1] || '0');
@@ -36,15 +36,21 @@ const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHas
             })
             .slice(0, 3);
           setRecentResponses(sorted);
-          // Update notification dot
           const unviewed = sorted.some((r: any) => !viewedKeys.includes(r.key));
           setHasNewMessages(unviewed);
         } else {
           setRecentResponses([]);
           setHasNewMessages(false);
         }
-      } catch (error) {
-        console.error('Error fetching responses:', error);
+      } catch (err) {
+        if (axios.isAxiosError(err) && err.response?.status === 404) {
+          setRecentResponses([]);
+          setHasNewMessages(false);
+        } else {
+          setError('Failed to fetch responses.');
+          setRecentResponses([]);
+          setHasNewMessages(false);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -52,17 +58,13 @@ const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHas
     fetchResponses();
   }, [username, viewedKeys, setHasNewMessages]);
 
-  // Clear toast after 3 seconds
   useEffect(() => {
     if (toastMessage) {
-      const timer = setTimeout(() => {
-        setToastMessage(null);
-      }, 3000);
+      const timer = setTimeout(() => setToastMessage(null), 3000);
       return () => clearTimeout(timer);
     }
   }, [toastMessage]);
 
-  // Mark response as viewed
   const handleViewResponse = (key: string) => {
     if (!viewedKeys.includes(key)) {
       const newViewedKeys = [...viewedKeys, key];
@@ -72,13 +74,11 @@ const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHas
     }
   };
 
-  // Handle like
   const handleLike = (key: string) => {
     handleViewResponse(key);
     setToastMessage('Your enthusiasm lights up our path—thank you for the love!');
   };
 
-  // Handle dislike and feedback submission
   const handleDislike = (key: string) => {
     handleViewResponse(key);
     setIsFeedbackOpen(key);
@@ -96,7 +96,6 @@ const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHas
     );
   };
 
-  // Format timestamp
   const formatTimestamp = (timestamp: string | undefined): string => {
     if (!timestamp || isNaN(new Date(timestamp).getTime())) {
       return new Date().toLocaleString();
@@ -122,12 +121,14 @@ const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHas
           transition={{ duration: 0.3 }}
           onClick={(e) => e.stopPropagation()}
         >
-          <h2>Manager’s Insights</h2>
+          <h2>Manager’s Insights for {username}</h2>
           <div className="messages-list">
             {isLoading ? (
               <div className="loading">Loading messages...</div>
+            ) : error ? (
+              <p className="error">{error}</p>
             ) : recentResponses.length === 0 ? (
-              <p className="no-messages">No new insights yet. Your manager’s wisdom is on the way!</p>
+              <p className="no-messages">No new insights yet for {username}. Your manager’s wisdom is on the way!</p>
             ) : (
               recentResponses.map((res) => (
                 <motion.div

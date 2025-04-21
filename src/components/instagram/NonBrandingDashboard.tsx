@@ -6,6 +6,13 @@ import PostCooked from './PostCooked';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 
+interface ProfileInfo {
+  fullName: string;
+  followersCount: number;
+  followsCount: number;
+  profilePicUrlHD: string;
+}
+
 interface NonBrandingDashboardProps {
   accountHolder: string;
 }
@@ -18,10 +25,32 @@ const NonBrandingDashboard: React.FC<NonBrandingDashboardProps> = ({ accountHold
   const [news, setNews] = useState<{ key: string; data: any }[]>([]);
   const [strategies, setStrategies] = useState<{ key: string; data: any }[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [profileInfo, setProfileInfo] = useState<ProfileInfo | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
   const baseReconnectDelay = 5000;
+
+  const fetchProfileInfo = async () => {
+    if (!accountHolder) return;
+    setProfileLoading(true);
+    setProfileError(null);
+    try {
+      const response = await axios.get(`http://localhost:3000/profile-info/${accountHolder}`);
+      setProfileInfo(response.data);
+    } catch (err: any) {
+      if (err.response?.status === 404) {
+        setProfileInfo(null);
+        setProfileError('Profile info not available.');
+      } else {
+        setProfileError('Failed to load profile info.');
+      }
+    } finally {
+      setProfileLoading(false);
+    }
+  };
 
   const handleSendQuery = async () => {
     if (!query.trim() || !accountHolder) return;
@@ -62,6 +91,7 @@ const NonBrandingDashboard: React.FC<NonBrandingDashboardProps> = ({ accountHold
       ]);
       setResponses(responsesData.data);
       setPosts(postsData.data);
+      console.log('Posts data fetched:', postsData.data);
       setNews(newsData.data);
       setStrategies(strategiesData.data);
       setError(null);
@@ -133,6 +163,7 @@ const NonBrandingDashboard: React.FC<NonBrandingDashboardProps> = ({ accountHold
         if (prefix.startsWith(`ready_post/${accountHolder}/`)) {
           axios.get(`http://localhost:3000/posts/${accountHolder}`).then(res => {
             setPosts(res.data);
+            console.log('Updated posts via SSE:', res.data);
             setToast('New post cooked!');
           }).catch(err => {
             console.error('Error fetching posts:', err);
@@ -167,7 +198,6 @@ const NonBrandingDashboard: React.FC<NonBrandingDashboardProps> = ({ accountHold
 
       if (reconnectAttempts.current < maxReconnectAttempts) {
         reconnectAttempts.current += 1;
-        // Exponential backoff: delay increases with each attempt
         const delay = baseReconnectDelay * Math.pow(2, reconnectAttempts.current);
         console.log(`Reconnection attempt ${reconnectAttempts.current}/${maxReconnectAttempts} after ${delay/1000}s`);
         setError(`Lost connection to server updates. Reconnecting... (Attempt ${reconnectAttempts.current}/${maxReconnectAttempts})`);
@@ -188,6 +218,7 @@ const NonBrandingDashboard: React.FC<NonBrandingDashboardProps> = ({ accountHold
   useEffect(() => {
     if (accountHolder) {
       refreshAllData();
+      fetchProfileInfo();
     }
   }, [accountHolder]);
 
@@ -205,6 +236,13 @@ const NonBrandingDashboard: React.FC<NonBrandingDashboardProps> = ({ accountHold
     return <div className="error-message">Please specify an account holder to load the dashboard.</div>;
   }
 
+  const formatCount = (count: number | undefined) => {
+    if (count === undefined) return 'N/A';
+    if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
+    if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K`;
+    return count.toString();
+  };
+
   return (
     <motion.div
       className="dashboard-wrapper"
@@ -213,24 +251,45 @@ const NonBrandingDashboard: React.FC<NonBrandingDashboardProps> = ({ accountHold
       transition={{ duration: 0.5 }}
     >
       <div className="welcome-header">
-        <h1 className="welcome-text">Welcome {accountHolder}!</h1>
+        <h1 className="welcome-text">
+          Welcome {profileInfo?.fullName || accountHolder}!
+        </h1>
         <p className="welcome-subtext">You are listed in Smart People!</p>
       </div>
       {error && <div className="error-message">{error}</div>}
+      {profileError && <div className="error-message">{profileError}</div>}
       <div className="dashboard-grid">
         <div className="profile-metadata">
           <div className="profile-header">
-            <div className="profile-pic"></div>
-            <div className="stats">
-              <div className="stat">
-                <span className="label">Followers</span>
-                <span className="value">10.3K</span>
-              </div>
-              <div className="stat">
-                <span className="label">Following</span>
-                <span className="value">304</span>
-              </div>
-            </div>
+            {profileLoading ? (
+              <div className="profile-loading">Loading...</div>
+            ) : (
+              <>
+                <div
+                  className="profile-pic"
+                  style={{
+                    backgroundImage: profileInfo?.profilePicUrlHD
+                      ? `url(${profileInfo.profilePicUrlHD})`
+                      : 'none',
+                    backgroundColor: profileInfo?.profilePicUrlHD ? 'transparent' : '#4a4a6a',
+                  }}
+                />
+                <div className="stats">
+                  <div className="stat">
+                    <span className="label">Followers</span>
+                    <span className="value">
+                      {formatCount(profileInfo?.followersCount)}
+                    </span>
+                  </div>
+                  <div className="stat">
+                    <span className="label">Following</span>
+                    <span className="value">
+                      {formatCount(profileInfo?.followsCount)}
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
             <div className="chart-placeholder"></div>
           </div>
         </div>
@@ -247,7 +306,7 @@ const NonBrandingDashboard: React.FC<NonBrandingDashboardProps> = ({ accountHold
         </div>
 
         <div className="post-cooked">
-          <PostCooked username={accountHolder} />
+          <PostCooked username={accountHolder} posts={posts} />
         </div>
 
         <div className="strategies">

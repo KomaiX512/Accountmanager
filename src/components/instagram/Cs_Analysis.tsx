@@ -1,8 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './Cs_Analysis.css';
 import useR2Fetch from '../../hooks/useR2Fetch';
 import { motion } from 'framer-motion';
 import ErrorBoundary from '../ErrorBoundary';
+import axios from 'axios';
+
+interface ProfileInfo {
+  followersCount: number;
+  followsCount: number;
+}
 
 interface Cs_AnalysisProps {
   accountHolder: string;
@@ -11,6 +17,8 @@ interface Cs_AnalysisProps {
 
 const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors }) => {
   const [selectedCompetitor, setSelectedCompetitor] = useState<string | null>(null);
+  const [competitorProfiles, setCompetitorProfiles] = useState<Record<string, ProfileInfo>>({});
+  const [profileErrors, setProfileErrors] = useState<Record<string, string>>({});
 
   const normalizedAccountHolder = accountHolder;
 
@@ -29,6 +37,35 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors })
   const selectedData = selectedCompetitor
     ? competitorData.find(data => data.competitor === selectedCompetitor)?.fetch.data
     : null;
+
+  const fetchCompetitorProfile = async (competitor: string) => {
+    try {
+      const response = await axios.get(`http://localhost:3000/profile-info/${competitor}`);
+      setCompetitorProfiles(prev => ({
+        ...prev,
+        [competitor]: response.data,
+      }));
+    } catch (err: any) {
+      setProfileErrors(prev => ({
+        ...prev,
+        [competitor]: 'Failed to load profile info.',
+      }));
+    }
+  };
+
+  useEffect(() => {
+    competitors.forEach(competitor => {
+      if (!competitorProfiles[competitor] && !profileErrors[competitor]) {
+        fetchCompetitorProfile(competitor);
+      }
+    });
+  }, [competitors]);
+
+  const formatCount = (count: number) => {
+    if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
+    if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K`;
+    return count.toString();
+  };
 
   return (
     <ErrorBoundary>
@@ -78,10 +115,22 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors })
             >
               <div className="profile-section">
                 <h3>{selectedCompetitor}</h3>
-                <div className="stats">
-                  <span>Followers: TBD</span>
-                  <span>Following: TBD</span>
-                </div>
+                {profileErrors[selectedCompetitor] ? (
+                  <p className="error-text">{profileErrors[selectedCompetitor]}</p>
+                ) : (
+                  <div className="stats">
+                    <span>
+                      Followers: {competitorProfiles[selectedCompetitor]
+                        ? formatCount(competitorProfiles[selectedCompetitor].followersCount)
+                        : 'Loading...'}
+                    </span>
+                    <span>
+                      Following: {competitorProfiles[selectedCompetitor]
+                        ? formatCount(competitorProfiles[selectedCompetitor].followsCount)
+                        : 'Loading...'}
+                    </span>
+                  </div>
+                )}
               </div>
               <div className="analysis-section">
                 <h4>Competitor Analysis</h4>

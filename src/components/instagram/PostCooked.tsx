@@ -1,55 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import './PostCooked.css';
 import { motion } from 'framer-motion';
-import axios from 'axios';
 import { saveFeedback } from '../../utils/FeedbackHandler';
 import ErrorBoundary from '../ErrorBoundary';
 
 interface PostCookedProps {
   username: string;
+  posts: { key: string; data: { post: any; status: string; image_url: string | null }; imageFailed?: boolean }[];
 }
 
-const PostCooked: React.FC<PostCookedProps> = ({ username }) => {
-  const [posts, setPosts] = useState<{ key: string; data: any; imageFailed?: boolean }[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+const PostCooked: React.FC<PostCookedProps> = ({ username, posts }) => {
+  const [imageErrors, setImageErrors] = useState<{ [key: string]: boolean }>({});
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState<string | null>(null);
   const [feedbackText, setFeedbackText] = useState('');
 
   useEffect(() => {
-    const fetchPosts = async () => {
-      if (!username) {
-        console.warn('Username is not provided, skipping fetchPosts');
-        setPosts([]);
-        setIsLoading(false);
-        setError('No username provided');
-        return;
-      }
-
-      setIsLoading(true);
-      setError(null);
-      try {
-        const response = await axios.get(`http://localhost:3000/posts/${username}`);
-        const sorted = response.data
-          .sort((a: any, b: any) => {
-            const aId = parseInt(a.key.match(/ready_post_(\d+)\.json$/)?.[1] || '0');
-            const bId = parseInt(b.key.match(/ready_post_(\d+)\.json$/)?.[1] || '0');
-            return bId - aId;
-          })
-          .slice(0, 3)
-          .map((post: any) => ({ ...post, imageFailed: false }));
-        setPosts(sorted);
-      } catch (error: any) {
-        console.error('Error fetching posts:', error);
-        setPosts([]);
-        setError(error.response?.data?.error || 'Failed to fetch posts');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchPosts();
-  }, [username]);
+    console.log('Posts prop in PostCooked:', posts);
+  }, [posts]);
 
   useEffect(() => {
     if (toastMessage) {
@@ -88,11 +56,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username }) => {
 
   const handleImageError = (key: string, url: string) => {
     console.error(`Failed to load image for ${key}: ${url}`);
-    setPosts((prev) =>
-      prev.map((post) =>
-        post.key === key ? { ...post, imageFailed: true } : post
-      )
-    );
+    setImageErrors(prev => ({ ...prev, [key]: true }));
   };
 
   if (!username) {
@@ -110,11 +74,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username }) => {
     <ErrorBoundary>
       <div className="post-cooked-container">
         <h2>Cooked Posts</h2>
-        {isLoading ? (
-          <div className="loading">Loading posts...</div>
-        ) : error ? (
-          <p className="error-text">{error}</p>
-        ) : posts.length === 0 ? (
+        {posts.length === 0 ? (
           <p className="no-posts">No posts ready yet. Stay tuned!</p>
         ) : (
           <div className="post-list">
@@ -131,7 +91,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username }) => {
                     <div className="profile-pic"></div>
                     <span className="username">{username}</span>
                   </div>
-                  {post.imageFailed || !post.data.image_url ? (
+                  {imageErrors[post.key] || !post.data.image_url ? (
                     <div className="post-image-placeholder">
                       Image unavailable
                     </div>
@@ -226,11 +186,11 @@ const PostCooked: React.FC<PostCookedProps> = ({ username }) => {
                     </motion.button>
                   </div>
                   <p className="post-caption">
-                    <span className="username">{username}</span> {post.data.caption || 'No caption available'}
+                    <span className="username">{username}</span> {post.data.post?.caption || 'No caption available'}
                   </p>
                   <div className="post-hashtags">
-                    {post.data.hashtags?.length ? (
-                      post.data.hashtags.map((tag: string, index: number) => (
+                    {post.data.post?.hashtags?.length ? (
+                      post.data.post.hashtags.map((tag: string, index: number) => (
                         <a
                           key={index}
                           href={`https://www.instagram.com/explore/tags/${tag.slice(1)}`}
@@ -245,7 +205,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username }) => {
                       <span>No hashtags available</span>
                     )}
                   </div>
-                  <p className="post-cta">{post.data.call_to_action || 'No call to action'}</p>
+                  <p className="post-cta">{post.data.post?.call_to_action || 'No call to action'}</p>
                 </div>
               </motion.div>
             ))}

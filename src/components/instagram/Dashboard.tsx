@@ -327,11 +327,11 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
         </div>
 
         <div className="post-cooked">
-          <PostCooked
-            username={accountHolder}
-            profilePicUrl={profileInfo?.profilePicUrlHD || null}
-            posts={posts} // Pass posts to PostCooked
-          />
+<PostCooked
+  username={accountHolder}
+  profilePicUrl={profileInfo?.profilePicUrlHD ? `http://localhost:3000/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}` : ''}
+  posts={posts} // Pass posts to PostCooked
+/>
         </div>
 
         <div className="strategies">

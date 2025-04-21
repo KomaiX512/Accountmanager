@@ -94,7 +94,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   <>
     {console.log('Rendering profilePicUrl in post:', profilePicUrl)}
     <img
-      src={`http://localhost:3000/proxy-image?url=${encodeURIComponent(profilePicUrl)}`}
+      src={profilePicUrl}
       alt={`${username}'s profile picture`}
       className="profile-pic"
       onError={() => {
@@ -108,18 +108,18 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
 )}
                     <span className="username">{username}</span>
                   </div>
-                  {imageErrors[post.key] || !post.data.image_url ? (
-                    <div className="post-image-placeholder">
-                      Image unavailable
-                    </div>
-                  ) : (
-                    <img
-                      src={post.data.image_url || ''}
-                      alt="Post visual"
-                      className="post-image"
-                      onError={() => handleImageError(post.key, post.data.image_url || '')}
-                    />
-                  )}
+{imageErrors[post.key] || !post.data.image_url ? (
+  <div className="post-image-placeholder">
+    Image unavailable
+  </div>
+) : (
+  <img
+    src={post.data.image_url ? `http://localhost:3000/proxy-image?url=${encodeURIComponent(post.data.image_url)}` : ''}
+    alt="Post visual"
+    className="post-image"
+    onError={() => handleImageError(post.key, post.data.image_url || '')}
+  />
+)}
                   <div className="post-actions">
                     <motion.button
                       className="like-button"

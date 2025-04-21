@@ -271,17 +271,17 @@ const NonBrandingDashboard: React.FC<NonBrandingDashboardProps> = ({ accountHold
               <div className="profile-loading">Loading...</div>
             ) : (
               <div className="profile-bar">
-                  {profileInfo?.profilePicUrlHD && !imageError ? (
-                    <img
-                      src={profileInfo.profilePicUrlHD}
-                      alt={`${accountHolder}'s profile picture`}
-                      className="profile-pic-bar"
-                      onError={() => setImageError(true)}
-                      onLoad={() => setImageError(false)}
-                    />
-                  ) : (
-                    <div className="profile-pic-bar" />
-                  )}
+{profileInfo?.profilePicUrlHD && !imageError ? (
+  <img
+    src={getProxiedImageUrl(profileInfo.profilePicUrlHD)}
+    alt={`${accountHolder}'s profile picture`}
+    className="profile-pic-bar"
+    onError={() => setImageError(true)}
+    onLoad={() => setImageError(false)}
+  />
+) : (
+  <div className="profile-pic-bar" />
+)}
                 <div className="stats">
                   <div className="stat">
                     <span className="label">Followers</span>
@@ -314,11 +314,11 @@ const NonBrandingDashboard: React.FC<NonBrandingDashboardProps> = ({ accountHold
         </div>
 
         <div className="post-cooked">
-        <PostCooked
-          username={accountHolder}
-          posts={posts}
-          profilePicUrl={profileInfo?.profilePicUrlHD || ''}
-        />
+<PostCooked
+  username={accountHolder}
+  posts={posts}
+  profilePicUrl={getProxiedImageUrl(profileInfo?.profilePicUrlHD || '')}
+/>
         </div>
 
         <div className="strategies">

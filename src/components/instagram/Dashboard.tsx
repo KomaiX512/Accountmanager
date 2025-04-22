@@ -23,7 +23,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const [toast, setToast] = useState<string | null>(null);
   const [responses, setResponses] = useState<{ key: string; data: any }[]>([]);
   const [strategies, setStrategies] = useState<{ key: string; data: any }[]>([]);
-  const [posts, setPosts] = useState<{ key: string; data: any }[]>([]); // Added state for posts
+  const [posts, setPosts] = useState<{ key: string; data: any }[]>([]);
   const [competitorData, setCompetitorData] = useState<{ key: string; data: any }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [profileInfo, setProfileInfo] = useState<ProfileInfo | null>(null);
@@ -43,7 +43,6 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     setProfileError(null);
     try {
       const now = Date.now();
-      // Throttle profile pic rendering to once every 30 minutes (1800000 ms)
       if (now - lastProfilePicRenderTimeRef.current < 1800000 && profileInfo) {
         console.log('Skipping profile pic fetch due to throttle');
         setProfileLoading(false);
@@ -94,7 +93,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        axios.get(`http://localhost:3000/posts/${accountHolder}${forceRefresh ? '?forceRefresh=true' : ''}`).catch(err => { // Added posts fetch
+        axios.get(`http://localhost:3000/posts/${accountHolder}${forceRefresh ? '?forceRefresh=true' : ''}`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
@@ -112,7 +111,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
       ]);
       setResponses(responsesData.data);
       setStrategies(strategiesData.data);
-      setPosts(postsData.data); // Set posts state
+      setPosts(postsData.data);
       setCompetitorData(competitorDataResponses.flatMap(res => res.data));
       setError(null);
       if (firstLoadRef.current) {
@@ -142,8 +141,6 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
       console.log('SSE connection established');
       reconnectAttempts.current = 0;
       setError(null);
-      console.log('Initial connection established');
-      // On SSE reconnection, fetch profile info with throttle
       fetchProfileInfo();
     };
 
@@ -157,10 +154,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
         return;
       }
 
-      if (data.type === 'heartbeat') {
-        return;
-      }
-
+      if (data.type === 'heartbeat') return;
       if (data.type === 'connection') {
         console.log(data.message);
         return;
@@ -194,7 +188,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
             setError(err.response?.data?.error || 'Failed to fetch strategies.');
           });
         }
-        if (prefix.startsWith(`ready_post/${accountHolder}/`)) { // Added SSE handler for posts
+        if (prefix.startsWith(`ready_post/${accountHolder}/`)) {
           axios.get(`http://localhost:3000/posts/${accountHolder}`).then(res => {
             setPosts(res.data);
             setToast('New post cooked!');
@@ -291,130 +285,131 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
       </div>
       {error && <div className="error-message">{error}</div>}
       {profileError && <div className="error-message">{profileError}</div>}
-      <div className="dashboard-grid">
-        <div className="profile-metadata">
-          <div className="profile-header">
-            {profileLoading ? (
-              <div className="profile-loading">Loading...</div>
-            ) : (
-              <div className="profile-bar">
-                {profileInfo?.profilePicUrlHD && !imageError ? (
-                  <img
-                    src={`http://localhost:3000/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}`}
-                    alt={`${accountHolder}'s profile picture`}
-                    className="profile-pic-bar"
-                    onError={() => {
-                      console.error(`Failed to load profile picture for ${accountHolder}`);
-                      setImageError(true);
-                    }}
-                  />
-                ) : (
-                  <div className="profile-pic-bar" />
-                )}
-                <div className="stats">
-                  <div className="stat">
-                    <span className="label">Followers</span>
-                    <span className="value">
-                      {formatCount(profileInfo?.followersCount)}
-                    </span>
-                  </div>
-                  <div className="stat">
-                    <span className="label">Following</span>
-                    <span className="value">
-                      {formatCount(profileInfo?.followsCount)}
-                    </span>
+      <div className="modules-container">
+        <div className="dashboard-grid">
+          <div className="profile-metadata">
+            <div className="profile-header">
+              {profileLoading ? (
+                <div className="profile-loading">Loading...</div>
+              ) : (
+                <div className="profile-bar">
+                  {profileInfo?.profilePicUrlHD && !imageError ? (
+                    <img
+                      src={`http://localhost:3000/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}`}
+                      alt={`${accountHolder}'s profile picture`}
+                      className="profile-pic-bar"
+                      onError={() => {
+                        console.error(`Failed to load profile picture for ${accountHolder}`);
+                        setImageError(true);
+                      }}
+                    />
+                  ) : (
+                    <div className="profile-pic-bar" />
+                  )}
+                  <div className="stats">
+                    <div className="stat">
+                      <span className="label">Followers</span>
+                      <span className="value">
+                        {formatCount(profileInfo?.followersCount)}
+                      </span>
+                    </div>
+                    <div className="stat">
+                      <span className="label">Following</span>
+                      <span className="value">
+                        {formatCount(profileInfo?.followsCount)}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-            <div className="chart-placeholder"></div>
+              )}
+              <div className="chart-placeholder"></div>
+            </div>
           </div>
-        </div>
 
-        <div className="notifications">
-          <h2>Notifications <span className="badge">{responses.length || 2} queries answered!!!</span></h2>
-          <div className="notification-list">
-            {[...Array(5)].map((_, index) => (
-              <div key={index} className="notification-item">
-                Notification {index + 1}
-              </div>
-            ))}
+          <div className="notifications">
+            <h2>Notifications <span className="badge">{responses.length || 2} queries answered!!!</span></h2>
+            <div className="notification-list">
+              {[...Array(5)].map((_, index) => (
+                <div key={index} className="notification-item">
+                  Notification {index + 1}
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
 
-        <div className="post-cooked">
-<PostCooked
-  username={accountHolder}
-  profilePicUrl={profileInfo?.profilePicUrlHD ? `http://localhost:3000/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}` : ''}
-  posts={posts} // Pass posts to PostCooked
-/>
-        </div>
-
-        <div className="strategies">
-          <h2>Our Strategies <span className="badge">{strategies.length || 3} unseen!!!</span></h2>
-          <OurStrategies accountHolder={accountHolder} accountType="branding" />
-        </div>
-
-        <div className="competitor-analysis">
-          <h2>Competitor Analysis <span className="badge">{competitorData.length || 5} unseen!!!</span></h2>
-          <Cs_Analysis accountHolder={accountHolder} competitors={competitors} />
-        </div>
-
-        <div className="chatbot">
-          <div className="chatbot-input-container">
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Leave Order/Message/Query to your MANAGER..."
-              className="chatbot-input"
+          <div className="post-cooked">
+            <PostCooked
+              username={accountHolder}
+              profilePicUrl={profileInfo?.profilePicUrlHD ? `http://localhost:3000/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}` : ''}
+              posts={posts}
             />
-            <button className="chatbot-send-btn" onClick={handleSendQuery} disabled={!query.trim()}>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#e0e0ff"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <line x1="22" y1="2" x2="11" y2="13" />
-                <polygon points="22 2 15 22 11 13 2 9 22 2" />
-              </svg>
-            </button>
+          </div>
+
+          <div className="strategies">
+            <h2>Our Strategies <span className="badge">{strategies.length || 3} unseen!!!</span></h2>
+            <OurStrategies accountHolder={accountHolder} accountType="branding" />
+          </div>
+
+          <div className="competitor-analysis">
+            <h2>Competitor Analysis <span className="badge">{competitorData.length || 5} unseen!!!</span></h2>
+            <Cs_Analysis accountHolder={accountHolder} competitors={competitors} />
+          </div>
+
+          <div className="chatbot">
+            <div className="chatbot-input-container">
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Leave Order/Message/Query to your MANAGER..."
+                className="chatbot-input"
+              />
+              <button className="chatbot-send-btn" onClick={handleSendQuery} disabled={!query.trim()}>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#e0e0ff"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="22" y1="2" x2="11" y2="13" />
+                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
-
-        {toast && (
-          <motion.div
-            className="toast-notification"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            transition={{ duration: 0.3 }}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#00ffcc"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="toast-icon"
-            >
-              <line x1="22" y1="2" x2="11" y2="13" />
-              <polygon points="22 2 15 22 11 13 2 9 22 2" />
-            </svg>
-            {toast}
-          </motion.div>
-        )}
       </div>
+      {toast && (
+        <motion.div
+          className="toast-notification"
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: 20 }}
+          transition={{ duration: 0.3 }}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#00ffcc"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="toast-icon"
+          >
+            <line x1="22" y1="2" x2="11" y2="13" />
+            <polygon points="22 2 15 22 11 13 2 9 22 2" />
+          </svg>
+          {toast}
+        </motion.div>
+      )}
     </motion.div>
   );
 };

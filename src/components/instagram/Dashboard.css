@@ -30,6 +30,17 @@
   margin-top: 5px;
 }
 
+.modules-container {
+  background: linear-gradient(135deg, #161625, #2b2b4d);
+  border-radius: 16px;
+  padding: 20px;
+  width: 100%;
+  max-width: 1550px;
+  margin: 0 auto;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(0, 255, 204, 0.4);
+}
+
 .dashboard-grid {
   display: grid;
   grid-template-areas:
@@ -40,11 +51,6 @@
   grid-template-columns: 400px 600px 350px;
   grid-template-rows: auto auto auto auto;
   gap: 60px;
-  width: 100%;
-  max-width: 1400px;
-  margin: 0 auto;
-  border-radius: 16px;
-  padding: 20px;
 }
 
 .profile-metadata {
@@ -86,7 +92,7 @@
   border: 2px solid #00ffcc;
   box-shadow: 0 0 8px rgba(0, 255, 204, 0.5);
   object-fit: cover;
-  background-color: #4a4a6a; /* Fallback for when image fails */
+  background-color: #4a4a6a;
 }
 
 .stats {
@@ -271,7 +277,7 @@ h2 {
 .notification-item,
 .post-item,
 .strategy-item {
-  background: rgba(255, 255, 7255, 0.1);
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   padding: 15px;
   color: #e0e0ff;

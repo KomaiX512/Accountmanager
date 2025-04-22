@@ -24,6 +24,7 @@ interface Cs_AnalysisProps {
 
 const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors }) => {
   const [selectedCompetitor, setSelectedCompetitor] = useState<string | null>(null);
+  const [currentAnalysisIndex, setCurrentAnalysisIndex] = useState(0);
   const [competitorProfiles, setCompetitorProfiles] = useState<Record<string, ProfileInfo>>({});
   const [profileErrors, setProfileErrors] = useState<Record<string, string>>({});
   const [showAddModal, setShowAddModal] = useState(false);
@@ -39,12 +40,9 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors })
 
   const normalizedAccountHolder = accountHolder;
 
-  // Fetch competitor data dynamically
-  // Refactor to avoid calling hooks inside map by using a single hook that fetches all competitors data
   const competitorsQuery = localCompetitors.length > 0 ? localCompetitors.join(',') : '';
   const allCompetitorsFetch = useR2Fetch<any[]>(competitorsQuery ? `http://localhost:3000/retrieve-multiple/${normalizedAccountHolder}?competitors=${competitorsQuery}` : '');
 
-  // Map competitor to their data from the fetched array
   const competitorData = localCompetitors.map(competitor => {
     const dataForCompetitor = allCompetitorsFetch.data?.find(item => item.competitor === competitor) || null;
     return {
@@ -61,20 +59,34 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors })
     ? competitorData.find(data => data.competitor === selectedCompetitor)?.fetch.data
     : null;
 
+  const lastFetchTimeRef = React.useRef<Record<string, number>>({});
+
   const fetchCompetitorProfile = useCallback(async (competitor: string) => {
     try {
+      // Throttle profile pic rendering to once every 30 minutes (1800000 ms)
+      const now = Date.now();
+      const lastFetchTime = lastFetchTimeRef.current[competitor] || 0;
+      if (now - lastFetchTime < 1800000 && competitorProfiles[competitor]) {
+        return;
+      }
       const response = await axios.get(`http://localhost:3000/profile-info/${competitor}`);
+      console.log(`Profile info for competitor ${competitor}:`, response.data);
       setCompetitorProfiles(prev => ({
         ...prev,
         [competitor]: response.data,
       }));
+      setProfileErrors(prev => ({
+        ...prev,
+        [competitor]: '',
+      }));
+      lastFetchTimeRef.current[competitor] = now;
     } catch (err: any) {
       setProfileErrors(prev => ({
         ...prev,
         [competitor]: 'Failed to load profile info.',
       }));
     }
-  }, []);
+  }, [competitorProfiles]);
 
   const fetchAccountInfoWithRetry = useCallback(async (retries = 3, delay = 1000): Promise<string[] | null> => {
     for (let attempt = 1; attempt <= retries; attempt++) {
@@ -113,7 +125,6 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors })
     }
   }, [normalizedAccountHolder]);
 
-  // Initial sync with props
   useEffect(() => {
     const syncInitialState = async () => {
       const serverCompetitors = await fetchAccountInfoWithRetry();
@@ -126,7 +137,6 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors })
     syncInitialState();
   }, [competitors, fetchAccountInfoWithRetry]);
 
-  // Fetch profiles for all competitors
   useEffect(() => {
     localCompetitors.forEach(competitor => {
       if (!competitorProfiles[competitor] && !profileErrors[competitor]) {
@@ -135,7 +145,6 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors })
     });
   }, [localCompetitors, fetchCompetitorProfile]);
 
-  // Toast timing
   useEffect(() => {
     if (toast) {
       const timer = setTimeout(() => setToast(null), 3000);
@@ -156,7 +165,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors })
     setLoading(true);
     const originalCompetitors = [...localCompetitors];
     const updatedCompetitors = [...localCompetitors, newCompetitor];
-    setLocalCompetitors(updatedCompetitors); // Optimistic update
+    setLocalCompetitors(updatedCompetitors);
 
     const success = await updateCompetitors(updatedCompetitors);
     if (success) {
@@ -165,10 +174,10 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors })
         setLocalCompetitors(serverCompetitors);
         setToast('Competitor added successfully!');
       } else {
-        setLocalCompetitors(updatedCompetitors); // Keep optimistic update if fetch fails
+        setLocalCompetitors(updatedCompetitors);
       }
     } else {
-      setLocalCompetitors(originalCompetitors); // Revert on failure
+      setLocalCompetitors(originalCompetitors);
       setToast('Failed to add competitor.');
     }
 
@@ -196,7 +205,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors })
     const updatedCompetitors = localCompetitors.map(comp =>
       comp === currentCompetitor ? editCompetitor : comp
     );
-    setLocalCompetitors(updatedCompetitors); // Optimistic update
+    setLocalCompetitors(updatedCompetitors);
 
     const success = await updateCompetitors(updatedCompetitors);
     if (success) {
@@ -205,10 +214,10 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors })
         setLocalCompetitors(serverCompetitors);
         setToast('Competitor updated successfully!');
       } else {
-        setLocalCompetitors(updatedCompetitors); // Keep optimistic update if fetch fails
+        setLocalCompetitors(updatedCompetitors);
       }
     } else {
-      setLocalCompetitors(originalCompetitors); // Revert on failure
+      setLocalCompetitors(originalCompetitors);
       setToast('Failed to update competitor.');
     }
 
@@ -222,7 +231,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors })
     setLoading(true);
     const originalCompetitors = [...localCompetitors];
     const updatedCompetitors = localCompetitors.filter(comp => comp !== competitor);
-    setLocalCompetitors(updatedCompetitors); // Optimistic update
+    setLocalCompetitors(updatedCompetitors);
 
     const success = await updateCompetitors(updatedCompetitors);
     if (success) {
@@ -231,10 +240,10 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors })
         setLocalCompetitors(serverCompetitors);
         setToast('Competitor deleted successfully!');
       } else {
-        setLocalCompetitors(updatedCompetitors); // Keep optimistic update if fetch fails
+        setLocalCompetitors(updatedCompetitors);
       }
     } else {
-      setLocalCompetitors(originalCompetitors); // Revert on failure
+      setLocalCompetitors(originalCompetitors);
       setToast('Failed to delete competitor.');
     }
 
@@ -244,7 +253,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors })
 
   const handleManualRefresh = async () => {
     setLoading(true);
-    const serverCompetitors = await fetchAccountInfoWithRetry(5, 2000); // More retries, longer delay
+    const serverCompetitors = await fetchAccountInfoWithRetry(5, 2000);
     if (serverCompetitors) {
       setLocalCompetitors(serverCompetitors);
       setToast('Successfully synced with server!');
@@ -256,6 +265,158 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors })
     if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
     if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K`;
     return count.toString();
+  };
+
+  const decodeRawContent = (rawText: string) => {
+    if (!rawText || typeof rawText !== 'string') return [];
+
+    const lines = rawText.split('.').map(line => line.trim()).filter(line => line);
+    const sections: { heading: string; content: JSX.Element[] }[] = [];
+    let currentSection: { heading: string; content: JSX.Element[] } | null = null;
+
+    lines.forEach((line, idx) => {
+      if (line.match(/^[A-Za-z\s]+:$/) || (line.match(/^[A-Za-z\s]+/) && !line.includes(':'))) {
+        if (currentSection) {
+          sections.push(currentSection);
+        }
+        currentSection = { heading: line.replace(':', '').trim(), content: [] };
+      } else if (currentSection) {
+        if (line.startsWith('*')) {
+          const subItems = line.split('*').filter(item => item.trim());
+          subItems.forEach((subItem, subIdx) => {
+            const [label, ...valueParts] = subItem.trim().split(':');
+            const formattedLabel = label.trim().replace(/^\*\s*/, '');
+            const value = valueParts.join(':').trim();
+
+            if (value) {
+              const formattedValue = value.split(/(\*[^*]+\*)/g).map((part, i) => {
+                if (part.startsWith('*') && part.endsWith('*')) {
+                  return <strong key={i}>{part.slice(1, -1)}</strong>;
+                }
+                return part;
+              });
+
+              currentSection.content.push(
+                <p key={`${idx}-${subIdx}`} className="analysis-detail">
+                  <span className="detail-label">{formattedLabel}:</span> {formattedValue}
+                </p>
+              );
+            } else {
+              const formattedItem = subItem.trim().replace(/^\*\s*/, '');
+              const formattedText = formattedItem.split(/(\*[^*]+\*)/g).map((part, i) => {
+                if (part.startsWith('*') && part.endsWith('*')) {
+                  return <strong key={i}>{part.slice(1, -1)}</strong>;
+                }
+                return part;
+              });
+
+              currentSection.content.push(
+                <p key={`${idx}-${subIdx}`} className="analysis-detail">
+                  - {formattedText}
+                </p>
+              );
+            }
+          });
+        } else {
+          const formattedLine = line.split(/(\*[^*]+\*)/g).map((part, i) => {
+            if (part.startsWith('*') && part.endsWith('*')) {
+              return <strong key={i}>{part.slice(1, -1)}</strong>;
+            }
+            return part;
+          });
+          currentSection.content.push(
+            <p key={idx} className="analysis-detail">{formattedLine}</p>
+          );
+        }
+      }
+    });
+
+    if (currentSection) {
+      sections.push(currentSection);
+    }
+
+    return sections;
+  };
+
+  const renderAnalysisContent = (analysisData: any) => {
+    if (!analysisData || typeof analysisData !== 'object') {
+      return <p className="analysis-detail">No details available.</p>;
+    }
+
+    return Object.entries(analysisData).map(([key, value], idx) => {
+      const formattedKey = key
+        .replace(/([A-Z])/g, ' $1')
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, char => char.toUpperCase());
+
+      if (typeof value === 'string' && value.includes(':')) {
+        const decodedSections = decodeRawContent(value);
+        return (
+          <div key={idx} className="analysis-subsection">
+            <h6 className="analysis-subheading">{formattedKey}</h6>
+            {decodedSections.map((section, secIdx) => (
+              <div key={secIdx} className="analysis-subsection">
+                <h6 className="analysis-sub-subheading">{section.heading}</h6>
+                {section.content}
+              </div>
+            ))}
+          </div>
+        );
+      } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+        return (
+          <div key={idx} className="analysis-subsection">
+            <h6 className="analysis-subheading">{formattedKey}</h6>
+            {Object.entries(value).map(([subKey, subValue], subIdx) => {
+              const formattedSubKey = subKey
+                .replace(/([A-Z])/g, ' $1')
+                .replace(/_/g, ' ')
+                .replace(/\b\w/g, char => char.toUpperCase());
+              return (
+                <p key={subIdx} className="analysis-detail">
+                  <span className="detail-label">{formattedSubKey}:</span>{' '}
+                  {typeof subValue === 'string' || typeof subValue === 'number'
+                    ? subValue
+                    : JSON.stringify(subValue)}
+                </p>
+              );
+            })}
+          </div>
+        );
+      } else if (Array.isArray(value)) {
+        return (
+          <div key={idx} className="analysis-subsection">
+            <h6 className="analysis-subheading">{formattedKey}</h6>
+            {value.length > 0 ? (
+              value.map((item, itemIdx) => (
+                <p key={itemIdx} className="analysis-detail">
+                  - {typeof item === 'string' || typeof item === 'number' ? item : JSON.stringify(item)}
+                </p>
+              ))
+            ) : (
+              <p className="analysis-detail">None</p>
+            )}
+          </div>
+        );
+      } else {
+        return (
+          <p key={idx} className="analysis-detail">
+            <span className="detail-label">{formattedKey}:</span> {value ?? 'N/A'}
+          </p>
+        );
+      }
+    });
+  };
+
+  const handleNextAnalysis = () => {
+    if (currentAnalysisIndex < (selectedData?.length || 0) - 1) {
+      setCurrentAnalysisIndex(currentAnalysisIndex + 1);
+    }
+  };
+
+  const handlePrevAnalysis = () => {
+    if (currentAnalysisIndex > 0) {
+      setCurrentAnalysisIndex(currentAnalysisIndex - 1);
+    }
   };
 
   return (
@@ -523,36 +684,78 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors })
                 <h3>{selectedCompetitor}</h3>
                 {profileErrors[selectedCompetitor] ? (
                   <p className="error-text">{profileErrors[selectedCompetitor]}</p>
+                ) : competitorProfiles[selectedCompetitor] ? (
+                  <div className="stats">
+                    {console.log('Rendering competitor profile:', competitorProfiles[selectedCompetitor])}
+                    <span>Followers: {formatCount(competitorProfiles[selectedCompetitor].followersCount)}</span>
+                    <span>Following: {formatCount(competitorProfiles[selectedCompetitor].followsCount)}</span>
+                  </div>
                 ) : (
                   <div className="stats">
-                    <span>
-                      Followers: {competitorProfiles[selectedCompetitor]
-                        ? formatCount(competitorProfiles[selectedCompetitor].followersCount)
-                        : 'Loading...'}
-                    </span>
-                    <span>
-                      Following: {competitorProfiles[selectedCompetitor]
-                        ? formatCount(competitorProfiles[selectedCompetitor].followsCount)
-                        : 'Loading...'}
-                    </span>
+                    <span>Followers: Loading...</span>
+                    <span>Following: Loading...</span>
                   </div>
                 )}
               </div>
               <div className="analysis-section">
-                <h4>Competitor Analysis</h4>
+                <h4>Competitor Analysis Report</h4>
                 {selectedData?.length ? (
-                  selectedData.map((analysis: any, index: number) => (
-                    <motion.div
-                      key={index}
-                      className="analysis-card"
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                    >
-                      <h5>Analysis {index + 1}</h5>
-                      <pre>{JSON.stringify(analysis, null, 2)}</pre>
-                    </motion.div>
-                  ))
+                  <motion.div
+                    key={currentAnalysisIndex}
+                    className="analysis-report"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <h5>Analysis {currentAnalysisIndex + 1}</h5>
+                    {renderAnalysisContent(selectedData[currentAnalysisIndex])}
+                    <div className="navigation-buttons">
+                      <motion.button
+                        className="nav-btn"
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={handlePrevAnalysis}
+                        disabled={currentAnalysisIndex === 0}
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#e0e0ff"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M15 18l-6-6 6-6" />
+                        </svg>
+                        Previous
+                      </motion.button>
+                      <motion.button
+                        className="nav-btn"
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={handleNextAnalysis}
+                        disabled={currentAnalysisIndex === selectedData.length - 1}
+                      >
+                        Next
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#e0e0ff"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M9 18l6-6-6-6" />
+                        </svg>
+                      </motion.button>
+                    </div>
+                  </motion.div>
                 ) : (
                   <p>No analysis available.</p>
                 )}

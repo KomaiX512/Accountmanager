@@ -751,42 +751,85 @@ app.get('/retrieve-account-info/:username', async (req, res) => {
 app.get('/posts/:username', async (req, res) => {
   const { username } = req.params;
   const forceRefresh = req.query.forceRefresh === 'true';
+  const prefix = `ready_post/${username}/`;
 
   try {
-    const data = await fetchDataForModule(username, 'ready_post/{username}', forceRefresh);
-    console.log(`Fetched posts for ${username}:`, JSON.stringify(data, null, 2));
+    const now = Date.now();
+    const lastFetch = cacheTimestamps.get(prefix) || 0;
 
-    const updatedData = await Promise.all(
-      data.map(async (item) => {
-        const postData = { ...item.data };
-        if (postData.image) {
-          try {
-            const imageKey = postData.image.split('.com/')[1]?.split('?')[0];
-            if (imageKey) {
-              const getCommand = new GetObjectCommand({
-                Bucket: 'stable-horde',
-                Key: imageKey,
-              });
-              const signedUrl = await getSignedUrl(s3Client, getCommand, { expiresIn: 3600 });
-              postData.image_url = signedUrl;
-              delete postData.image;
-            } else {
-              postData.image_url = null;
-            }
-          } catch (error) {
-            console.error(`Error generating pre-signed URL for ${postData.image}:`, error);
-            postData.image_url = null;
-            delete postData.image;
+    if (!forceRefresh && cache.has(prefix)) {
+      console.log(`Cache hit for posts: ${prefix}`);
+      return res.json(cache.get(prefix));
+    }
+
+    if (!forceRefresh && now - lastFetch < THROTTLE_INTERVAL) {
+      console.log(`Throttled fetch for posts: ${prefix}`);
+      return res.json(cache.has(prefix) ? cache.get(prefix) : []);
+    }
+
+    console.log(`Fetching posts from R2 for prefix: ${prefix}`);
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: prefix,
+    });
+    const listResponse = await s3Client.send(listCommand);
+
+    const files = listResponse.Contents || [];
+    const postFiles = files.filter(file => file.Key.match(/ready_post_\d+\.json$/));
+    const imageFiles = files.filter(file => file.Key.match(/image_\d+\.jpg$/));
+
+    const posts = await Promise.all(
+      postFiles.map(async (file) => {
+        try {
+          const getCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: file.Key,
+          });
+          const data = await s3Client.send(getCommand);
+          const body = await streamToString(data.Body);
+
+          if (!body || body.trim() === '') {
+            console.warn(`Empty file detected at ${file.Key}, skipping...`);
+            return null;
           }
-        } else {
-          postData.image_url = postData.image_url || null;
+
+          const postData = JSON.parse(body);
+          const postIdMatch = file.Key.match(/ready_post_(\d+)\.json$/);
+          const postId = postIdMatch ? postIdMatch[1] : null;
+
+          if (!postId) return null;
+
+          const imageFile = imageFiles.find(img => img.Key === `${prefix}image_${postId}.jpg`);
+          if (!imageFile) {
+            console.warn(`No matching image found for post ${file.Key}, skipping...`);
+            return null;
+          }
+
+          const imageCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: imageFile.Key,
+          });
+          const signedUrl = await getSignedUrl(s3Client, imageCommand, { expiresIn: 3600 });
+
+          return {
+            key: file.Key,
+            data: {
+              ...postData,
+              image_url: signedUrl,
+            },
+          };
+        } catch (error) {
+          console.error(`Failed to process post ${file.Key}:`, error.message);
+          return null;
         }
-        return { key: item.key, data: postData };
       })
     );
 
-    console.log(`Returning updated posts for ${username}:`, JSON.stringify(updatedData, null, 2));
-    res.json(updatedData);
+    const validPosts = posts.filter(post => post !== null);
+    cache.set(prefix, validPosts);
+    cacheTimestamps.set(prefix, now);
+    console.log(`Returning posts for ${username}:`, JSON.stringify(validPosts, null, 2));
+    res.json(validPosts);
   } catch (error) {
     console.error(`Retrieve posts error for ${username}:`, error);
     res.status(500).json({ error: 'Error retrieving posts', details: error.message });

@@ -35,10 +35,17 @@
     margin-top: 4px;
   }
   
-  .reply-container {
+  .action-container {
     display: flex;
+    align-items: center;
     gap: 8px;
     margin-top: 8px;
+  }
+  
+  .reply-container {
+    display: flex;
+    flex: 1;
+    gap: 8px;
   }
   
   .reply-input {
@@ -65,6 +72,21 @@
   }
   
   .reply-button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+  }
+  
+  .ignore-button {
+    padding: 6px 12px;
+    font-size: 14px;
+    color: #fff;
+    background-color: #dc3545;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  .ignore-button:disabled {
     background-color: #ccc;
     cursor: not-allowed;
   }

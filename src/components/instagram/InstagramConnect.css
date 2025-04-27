@@ -1,0 +1,23 @@
+.instagram-connect-btn {
+    background: linear-gradient(90deg, #405de6, #833ab4, #fd1d1d, #f77737);
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: box-shadow 0.2s, transform 0.2s;
+    box-shadow: 0 0 8px rgba(253, 29, 29, 0.5);
+  }
+  
+  .instagram-connect-btn:hover {
+    box-shadow: 0 0 15px rgba(253, 29, 29, 0.7);
+    transform: scale(1.05);
+  }
+  
+  .instagram-connect-btn:disabled {
+    background: #4a4a6a;
+    cursor: not-allowed;
+    box-shadow: none;
+  }

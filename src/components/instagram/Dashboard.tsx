@@ -3,6 +3,8 @@ import './Dashboard.css';
 import Cs_Analysis from './Cs_Analysis';
 import OurStrategies from './OurStrategies';
 import PostCooked from './PostCooked';
+import InstagramConnect from './InstagramConnect';
+import Dms_Comments from './Dms_Comments';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 
@@ -11,6 +13,18 @@ interface ProfileInfo {
   followersCount: number;
   followsCount: number;
   profilePicUrlHD: string;
+}
+
+interface Notification {
+  type: 'message' | 'comment';
+  instagram_user_id: string;
+  sender_id?: string;
+  message_id?: string;
+  text: string;
+  post_id?: string;
+  comment_id?: string;
+  timestamp: number;
+  received_at: string;
 }
 
 interface DashboardProps {
@@ -25,11 +39,13 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const [strategies, setStrategies] = useState<{ key: string; data: any }[]>([]);
   const [posts, setPosts] = useState<{ key: string; data: any }[]>([]);
   const [competitorData, setCompetitorData] = useState<{ key: string; data: any }[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [profileInfo, setProfileInfo] = useState<ProfileInfo | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [igBusinessId, setIgBusinessId] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
@@ -61,6 +77,17 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
       }
     } finally {
       setProfileLoading(false);
+    }
+  };
+
+  const fetchNotifications = async (userId: string) => {
+    try {
+      const response = await axios.get(`http://localhost:3000/events-list/${userId}`);
+      setNotifications(response.data.sort((a: Notification, b: Notification) => b.timestamp - a.timestamp).slice(0, 10));
+      console.log(`[${new Date().toISOString()}] Fetched notifications:`, response.data);
+    } catch (err) {
+      console.error('Error fetching notifications:', err);
+      setError('Failed to load notifications.');
     }
   };
 
@@ -123,25 +150,19 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     }
   };
 
-  const setupSSE = () => {
-    if (!accountHolder) {
-      setError('Cannot setup SSE: No account holder specified.');
-      return;
-    }
-
+  const setupSSE = (userId: string) => {
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
     }
 
-    const eventSource = new EventSource(`http://localhost:3000/events/${accountHolder}`);
+    const eventSource = new EventSource(`http://localhost:3000/events/${userId}`);
     eventSourceRef.current = eventSource;
 
     eventSource.onopen = () => {
-      console.log('SSE connection established');
+      console.log(`[${new Date().toISOString()}] SSE connection established for ${userId}`);
       reconnectAttempts.current = 0;
       setError(null);
-      fetchProfileInfo();
     };
 
     eventSource.onmessage = (event) => {
@@ -216,6 +237,14 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
             });
         }
       }
+
+      if (data.event === 'message' || data.event === 'comment') {
+        setNotifications(prev => {
+          const updated = [data.data, ...prev.filter(n => n.message_id !== data.data.message_id && n.comment_id !== data.data.comment_id)];
+          return updated.sort((a, b) => b.timestamp - a.timestamp).slice(0, 10);
+        });
+        setToast(data.event === 'message' ? 'New Instagram message received!' : 'New Instagram comment received!');
+      }
     };
 
     eventSource.onerror = (error) => {
@@ -228,7 +257,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
         const delay = baseReconnectDelay * Math.pow(2, reconnectAttempts.current);
         console.log(`Reconnection attempt ${reconnectAttempts.current}/${maxReconnectAttempts} after ${delay/1000}s`);
         setError(`Lost connection to server updates. Reconnecting... (Attempt ${reconnectAttempts.current}/${maxReconnectAttempts})`);
-        setTimeout(setupSSE, delay);
+        setTimeout(() => setupSSE(userId), delay);
       } else {
         setError('Failed to reconnect to server updates after multiple attempts.');
       }
@@ -250,14 +279,17 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   }, [accountHolder, competitors]);
 
   useEffect(() => {
-    setupSSE();
-    return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-      }
-    };
-  }, [accountHolder, competitors]);
+    if (igBusinessId) {
+      fetchNotifications(igBusinessId);
+      setupSSE(igBusinessId);
+    }
+  }, [igBusinessId]);
+
+  const handleInstagramConnected = (userId: string) => {
+    console.log(`[${new Date().toISOString()}] Instagram connected for user ID: ${userId}`);
+    setIgBusinessId(userId);
+    setToast('Instagram account connected successfully!');
+  };
 
   if (!accountHolder) {
     return <div className="error-message">Please specify an account holder to load the dashboard.</div>;
@@ -320,6 +352,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
                       </span>
                     </div>
                   </div>
+                  <InstagramConnect onConnected={handleInstagramConnected} />
                 </div>
               )}
               <div className="chart-placeholder"></div>
@@ -327,14 +360,8 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
           </div>
 
           <div className="notifications">
-            <h2>Notifications <span className="badge">{responses.length || 2} queries answered!!!</span></h2>
-            <div className="notification-list">
-              {[...Array(5)].map((_, index) => (
-                <div key={index} className="notification-item">
-                  Notification {index + 1}
-                </div>
-              ))}
-            </div>
+            <h2>Notifications <span className="badge">{notifications.length || 0} new!!!</span></h2>
+            <Dms_Comments notifications={notifications} />
           </div>
 
           <div className="post-cooked">

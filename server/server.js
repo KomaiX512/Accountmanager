@@ -1,9 +1,9 @@
-const express = require('express');
-const { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
-const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
-const axios = require('axios');
-const cors = require('cors');
-const puppeteer = require('puppeteer');
+import express from 'express';
+import { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import axios from 'axios';
+import cors from 'cors';
+import puppeteer from 'puppeteer';
 const app = express();
 const port = 3000;
 
@@ -891,6 +891,288 @@ async function streamToString(stream) {
   return Buffer.concat(chunks).toString('utf-8');
 }
 
+
+// Instagram App Credentials
+const APP_ID = '576296982152813';
+const APP_SECRET = 'd48ddc9eaf0e5c4969d4ddc4e293178c';
+const REDIRECT_URI = 'https://b8e8-121-52-146-243.ngrok-free.app/instagram/callback';
+const VERIFY_TOKEN = 'myInstagramWebhook2025';
+
+
+app.get('/instagram/callback', async (req, res) => {
+  const code = req.query.code;
+
+  if (!code) {
+    console.log(`[${new Date().toISOString()}] OAuth callback failed: No code provided`);
+    return res.status(400).send('Error: No code provided');
+  }
+
+  console.log(`[${new Date().toISOString()}] OAuth callback: Using redirect_uri=${REDIRECT_URI}`);
+
+  try {
+    // Step 1: Exchange code for short-lived access token
+    const tokenResponse = await axios({
+      method: 'post',
+      url: 'https://api.instagram.com/oauth/access_token',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      data: new URLSearchParams({
+        client_id: APP_ID,
+        client_secret: APP_SECRET,
+        grant_type: 'authorization_code',
+        redirect_uri: REDIRECT_URI,
+        code: code
+      })
+    });
+
+    const shortLivedToken = tokenResponse.data.access_token;
+    const userId = tokenResponse.data.user_id;
+
+    console.log(`[${new Date().toISOString()}] Short-lived token obtained for user ${userId}`);
+
+    // Step 2: Exchange short-lived token for long-lived token
+    const longLivedTokenResponse = await axios.get('https://graph.instagram.com/access_token', {
+      params: {
+        grant_type: 'ig_exchange_token',
+        client_secret: APP_SECRET,
+        access_token: shortLivedToken
+      }
+    });
+
+    const longLivedToken = longLivedTokenResponse.data.access_token;
+    const expiresIn = longLivedTokenResponse.data.expires_in;
+
+    console.log(`[${new Date().toISOString()}] OAuth success: Long-lived token obtained for Instagram user ${userId}`);
+
+    // Step 3: Store token in R2
+    const key = `InstagramTokens/${userId}/token.json`;
+    const tokenData = {
+      instagram_user_id: userId,
+      access_token: longLivedToken,
+      expires_in: expiresIn,
+      timestamp: new Date().toISOString()
+    };
+
+    const putCommand = new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: key,
+      Body: JSON.stringify(tokenData, null, 2),
+      ContentType: 'application/json'
+    });
+    await s3Client.send(putCommand);
+
+    console.log(`[${new Date().toISOString()}] Token stored in R2 at ${key}`);
+
+    // Invalidate cache
+    cache.delete(`InstagramTokens/${userId}`);
+
+    // Send success response
+    res.send(`
+      <html>
+        <body>
+          <h2>Instagram Connected Successfully!</h2>
+          <p>You can now close this window and return to the dashboard.</p>
+          <script>
+            window.opener.postMessage({ type: 'INSTAGRAM_CONNECTED', userId: '${userId}' }, '*');
+            window.close();
+          </script>
+        </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] OAuth callback error:`, error.response?.data || error.message);
+    res.status(500).send('Error connecting Instagram account');
+  }
+});
+
+// Instagram Webhook Verification
+app.get('/webhook/instagram', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+    console.log(`[${new Date().toISOString()}] WEBHOOK_VERIFIED for Instagram`);
+    res.status(200).send(challenge);
+  } else {
+    console.log(`[${new Date().toISOString()}] WEBHOOK_VERIFICATION_FAILED: Invalid token or mode`);
+    res.sendStatus(403);
+  }
+});
+
+// Instagram Webhook Receiver
+app.post('/webhook/instagram', async (req, res) => {
+  const body = req.body;
+
+  if (body.object === 'instagram') {
+    console.log(`[${new Date().toISOString()}] Received Instagram webhook payload:`, JSON.stringify(body, null, 2));
+
+    for (const entry of body.entry) {
+      const instagramUserId = entry.id;
+
+      // Handle messaging events (DMs)
+      if (entry.messaging) {
+        for (const message of entry.messaging) {
+          if (!message.message?.text) continue; // Skip non-text messages
+          const eventData = {
+            type: 'message',
+            instagram_user_id: instagramUserId,
+            sender_id: message.sender.id,
+            message_id: message.message.mid,
+            text: message.message.text,
+            timestamp: message.timestamp,
+            received_at: new Date().toISOString()
+          };
+
+          // Store in R2
+          const key = `InstagramEvents/${instagramUserId}/${eventData.message_id}.json`;
+          const putCommand = new PutObjectCommand({
+            Bucket: 'tasks',
+            Key: key,
+            Body: JSON.stringify(eventData, null, 2),
+            ContentType: 'application/json'
+          });
+          await s3Client.send(putCommand);
+
+          console.log(`[${new Date().toISOString()}] Stored message event in R2 at ${key}`);
+
+          // Broadcast to SSE clients
+          if (sseClients[instagramUserId]) {
+            sseClients[instagramUserId].forEach(client => {
+              client.write(`data: ${JSON.stringify({ event: 'message', data: eventData })}\n\n`);
+            });
+          }
+        }
+      }
+
+      // Handle comments
+      if (entry.changes) {
+        for (const change of entry.changes) {
+          if (change.field === 'comments' && change.value.text) {
+            const eventData = {
+              type: 'comment',
+              instagram_user_id: instagramUserId,
+              comment_id: change.value.id,
+              text: change.value.text,
+              post_id: change.value.media.id,
+              timestamp: change.value.timestamp || Date.now(),
+              received_at: new Date().toISOString()
+            };
+
+            // Store in R2
+            const key = `InstagramEvents/${instagramUserId}/comment_${eventData.comment_id}.json`;
+            const putCommand = new PutObjectCommand({
+              Bucket: 'tasks',
+              Key: key,
+              Body: JSON.stringify(eventData, null, 2),
+              ContentType: 'application/json'
+            });
+            await s3Client.send(putCommand);
+
+            console.log(`[${new Date().toISOString()}] Stored comment event in R2 at ${key}`);
+
+            // Broadcast to SSE clients
+            if (sseClients[instagramUserId]) {
+              sseClients[instagramUserId].forEach(client => {
+                client.write(`data: ${JSON.stringify({ event: 'comment', data: eventData })}\n\n`);
+              });
+            }
+          }
+        }
+      }
+    }
+
+    res.sendStatus(200);
+  } else {
+    console.log(`[${new Date().toISOString()}] Invalid webhook payload: Not an Instagram event`);
+    res.sendStatus(404);
+  }
+});
+
+// Instagram Deauthorize Callback
+app.post('/instagram/deauthorize', (req, res) => {
+  console.log(`[${new Date().toISOString()}] Deauthorize callback received:`, JSON.stringify(req.body, null, 2));
+  res.sendStatus(200);
+});
+
+// Instagram Data Deletion Request
+app.get('/instagram/data-deletion', (req, res) => {
+  const signedRequest = req.query.signed_request;
+  console.log(`[${new Date().toISOString()}] Data deletion request received:`, signedRequest);
+  res.json({
+    url: 'https://b8e8-121-52-146-243.ngrok-free.app/instagram/data-deletion',
+    confirmation_code: `delete_${Date.now()}`
+  });
+});
+
+app.post('/instagram/data-deletion', (req, res) => {
+  console.log(`[${new Date().toISOString()}] Data deletion POST request received:`, JSON.stringify(req.body, null, 2));
+  res.json({
+    url: 'https://b8e8-121-52-146-243.ngrok-free.app/instagram/data-deletion',
+    confirmation_code: `delete_${Date.now()}`
+  });
+});
+
+// New Endpoint: List Stored Events
+app.get('/events-list/:userId', async (req, res) => {
+  const userId = req.params.userId;
+
+  try {
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: `InstagramEvents/${userId}/`
+    });
+    const { Contents } = await s3Client.send(listCommand);
+
+    const events = [];
+    if (Contents) {
+      for (const obj of Contents) {
+        const getCommand = new GetObjectCommand({
+          Bucket: 'tasks',
+          Key: obj.Key
+        });
+        const { Body } = await s3Client.send(getCommand);
+        const data = await Body.transformToString();
+        events.push(JSON.parse(data));
+      }
+    }
+
+    console.log(`[${new Date().toISOString()}] Retrieved ${events.length} events for user ${userId}`);
+    res.json(events);
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error retrieving events for user ${userId}:`, error);
+    res.status(500).send('Error retrieving events');
+  }
+});
+
+// SSE Endpoint
+app.get('/events/:userId', (req, res) => {
+  const userId = req.params.userId;
+  console.log(`[${new Date().toISOString()}] Handling SSE request for /events/${userId}`);
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  if (!sseClients[userId]) {
+    sseClients[userId] = [];
+  }
+
+  sseClients[userId].push(res);
+  console.log(`[${new Date().toISOString()}] SSE client connected for ${userId}. Total clients: ${sseClients[userId].length}`);
+
+  // Send heartbeat every 30 seconds
+  const heartbeatInterval = setInterval(() => {
+    res.write('data: {"type":"heartbeat"}\n\n');
+  }, 30000);
+
+  req.on('close', () => {
+    clearInterval(heartbeatInterval);
+    sseClients[userId] = sseClients[userId].filter(client => client !== res);
+    console.log(`[${new Date().toISOString()}] SSE client disconnected for ${userId}. Total clients: ${sseClients[userId].length}`);
+    res.end();
+  });
+});
 async function getExistingData() {
   const key = 'Usernames/instagram.json';
   const prefix = 'Usernames/';
@@ -963,4 +1245,8 @@ app.listen(port, () => {
   console.log('Ready to handle posts at GET /posts/:username');
   console.log('Ready to handle feedback at POST /feedback/:username');
   console.log('Ready to retrieve profile info at GET /profile-info/:username');
+  console.log('Ready to handle Instagram OAuth at GET /instagram/callback');
+  console.log('Ready to handle Instagram webhooks at GET/POST /webhook/instagram');
+  console.log('Ready to handle Instagram deauthorization at POST /instagram/deauthorize');
+  console.log('Ready to handle Instagram data deletion at GET/POST /instagram/data-deletion');
 });

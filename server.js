@@ -1,6 +1,7 @@
-const express = require('express');
-const AWS = require('aws-sdk');
-const cors = require('cors');
+import express from 'express';
+import AWS from 'aws-sdk';
+import cors from 'cors';
+
 const app = express();
 const port = 3000;
 

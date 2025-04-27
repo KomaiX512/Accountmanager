@@ -4,7 +4,7 @@ import Cs_Analysis from './Cs_Analysis';
 import OurStrategies from './OurStrategies';
 import PostCooked from './PostCooked';
 import InstagramConnect from './InstagramConnect';
-import Dms_Comments from './Dms_Comments';
+import DmsComments from './Dms_Comments';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 
@@ -101,6 +101,22 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
       console.error('Error saving query:', error);
       setToast('Failed to send query.');
       setError(error.response?.data?.error || 'Failed to send query.');
+    }
+  };
+
+  const handleReply = async (messageId: string, replyText: string, senderId: string) => {
+    if (!messageId || !replyText.trim() || !senderId || !igBusinessId) return;
+    try {
+      await axios.post(`http://localhost:3000/send-dm-reply/${igBusinessId}`, {
+        sender_id: senderId,
+        text: replyText,
+        message_id: messageId,
+      });
+      setToast('Reply sent!');
+    } catch (error: any) {
+      console.error('Error sending reply:', error);
+      setToast('Failed to send reply.');
+      setError(error.response?.data?.error || 'Failed to send reply.');
     }
   };
 
@@ -285,8 +301,8 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     }
   }, [igBusinessId]);
 
-  const handleInstagramConnected = (userId: string) => {
-    console.log(`[${new Date().toISOString()}] Instagram connected for user ID: ${userId}`);
+  const handleInstagramConnected = (graphId: string, userId: string) => {
+    console.log(`[${new Date().toISOString()}] Instagram connected for graph ID: ${graphId}, user ID: ${userId}`);
     setIgBusinessId(userId);
     setToast('Instagram account connected successfully!');
   };
@@ -361,7 +377,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
 
           <div className="notifications">
             <h2>Notifications <span className="badge">{notifications.length || 0} new!!!</span></h2>
-            <Dms_Comments notifications={notifications} />
+            <DmsComments notifications={notifications} onReply={handleReply} />
           </div>
 
           <div className="post-cooked">

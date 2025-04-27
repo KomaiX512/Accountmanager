@@ -1026,96 +1026,202 @@ app.get('/webhook/instagram', (req, res) => {
     res.sendStatus(403);
   }
 });
-
 // Instagram Webhook Receiver
 app.post('/webhook/instagram', async (req, res) => {
   const body = req.body;
 
-  if (body.object === 'instagram') {
-    console.log(`[${new Date().toISOString()}] Received Instagram webhook payload:`, JSON.stringify(body, null, 2));
+  if (body.object !== 'instagram') {
+    console.log(`[${new Date().toISOString()}] Invalid payload received, not Instagram object`);
+    return res.sendStatus(404);
+  }
 
+  console.log(`[${new Date().toISOString()}] WEBHOOK ➜ Instagram payload received: ${JSON.stringify(body)}`);
+
+  try {
     for (const entry of body.entry) {
-      const instagramUserId = entry.id;
+      const igGraphId = entry.id;
+      console.log(`[${new Date().toISOString()}] Processing entry for IG Graph ID: ${igGraphId}`);
 
-      // Handle messaging events (DMs)
-      if (entry.messaging) {
-        for (const message of entry.messaging) {
-          if (!message.message?.text) continue; // Skip non-text messages
+      // ————— Handle Direct Messages —————
+      if (Array.isArray(entry.messaging)) {
+        for (const msg of entry.messaging) {
+          // ignore non-text or echo messages
+          if (!msg.message?.text || msg.message.is_echo) {
+            console.log(`[${new Date().toISOString()}] Skipping non-text or echo message: ${JSON.stringify(msg.message)}`);
+            continue;
+          }
+
           const eventData = {
-            type: 'message',
-            instagram_user_id: instagramUserId,
-            sender_id: message.sender.id,
-            message_id: message.message.mid,
-            text: message.message.text,
-            timestamp: message.timestamp,
-            received_at: new Date().toISOString()
+            type:               'message',
+            instagram_graph_id: igGraphId,
+            sender_id:          msg.sender.id,
+            message_id:         msg.message.mid,
+            text:               msg.message.text,
+            timestamp:          msg.timestamp,
+            received_at:        new Date().toISOString()
           };
 
-          // Store in R2
-          const key = `InstagramEvents/${instagramUserId}/${eventData.message_id}.json`;
-          const putCommand = new PutObjectCommand({
-            Bucket: 'tasks',
-            Key: key,
-            Body: JSON.stringify(eventData, null, 2),
+          console.log(`[${new Date().toISOString()}] Storing DM event: ${eventData.message_id}`);
+
+          // write to R2: InstagramEvents/<IG_GRAPH_ID>/<message_id>.json
+          const key = `InstagramEvents/${igGraphId}/${eventData.message_id}.json`;
+          await s3Client.send(new PutObjectCommand({
+            Bucket:      'tasks',
+            Key:         key,
+            Body:        JSON.stringify(eventData, null, 2),
             ContentType: 'application/json'
-          });
-          await s3Client.send(putCommand);
+          }));
 
-          console.log(`[${new Date().toISOString()}] Stored message event in R2 at ${key}`);
+          console.log(`[${new Date().toISOString()}] Stored DM in R2 at ${key}`);
 
-          // Broadcast to SSE clients
-          if (sseClients[instagramUserId]) {
-            sseClients[instagramUserId].forEach(client => {
+          // broadcast via SSE if any clients connected
+          const clients = sseClients[igGraphId] || [];
+          if (clients.length) {
+            console.log(`[${new Date().toISOString()}] Broadcasting to ${clients.length} SSE client(s)`);
+            clients.forEach(client => {
               client.write(`data: ${JSON.stringify({ event: 'message', data: eventData })}\n\n`);
             });
           }
         }
       }
 
-      // Handle comments
-      if (entry.changes) {
+      // ————— Handle Comments —————
+      if (Array.isArray(entry.changes)) {
         for (const change of entry.changes) {
-          if (change.field === 'comments' && change.value.text) {
-            const eventData = {
-              type: 'comment',
-              instagram_user_id: instagramUserId,
-              comment_id: change.value.id,
-              text: change.value.text,
-              post_id: change.value.media.id,
-              timestamp: change.value.timestamp || Date.now(),
-              received_at: new Date().toISOString()
-            };
+          if (change.field !== 'comments' || !change.value?.text) {
+            console.log(`[${new Date().toISOString()}] Skipping non-comment change: ${JSON.stringify(change)}`);
+            continue;
+          }
 
-            // Store in R2
-            const key = `InstagramEvents/${instagramUserId}/comment_${eventData.comment_id}.json`;
-            const putCommand = new PutObjectCommand({
-              Bucket: 'tasks',
-              Key: key,
-              Body: JSON.stringify(eventData, null, 2),
-              ContentType: 'application/json'
+          const eventData = {
+            type:               'comment',
+            instagram_graph_id: igGraphId,
+            comment_id:         change.value.id,
+            text:               change.value.text,
+            post_id:            change.value.media.id,
+            timestamp:          change.value.timestamp || Date.now(),
+            received_at:        new Date().toISOString()
+          };
+
+          console.log(`[${new Date().toISOString()}] Storing comment event: ${eventData.comment_id}`);
+
+          const key = `InstagramEvents/${igGraphId}/comment_${eventData.comment_id}.json`;
+          await s3Client.send(new PutObjectCommand({
+            Bucket:      'tasks',
+            Key:         key,
+            Body:        JSON.stringify(eventData, null, 2),
+            ContentType: 'application/json'
+          }));
+
+          console.log(`[${new Date().toISOString()}] Stored comment in R2 at ${key}`);
+
+          const clients = sseClients[igGraphId] || [];
+          if (clients.length) {
+            console.log(`[${new Date().toISOString()}] Broadcasting comment to ${clients.length} SSE client(s)`);
+            clients.forEach(client => {
+              client.write(`data: ${JSON.stringify({ event: 'comment', data: eventData })}\n\n`);
             });
-            await s3Client.send(putCommand);
-
-            console.log(`[${new Date().toISOString()}] Stored comment event in R2 at ${key}`);
-
-            // Broadcast to SSE clients
-            if (sseClients[instagramUserId]) {
-              sseClients[instagramUserId].forEach(client => {
-                client.write(`data: ${JSON.stringify({ event: 'comment', data: eventData })}\n\n`);
-              });
-            }
           }
         }
       }
     }
 
     res.sendStatus(200);
-  } else {
-    console.log(`[${new Date().toISOString()}] Invalid webhook payload: Not an Instagram event`);
-    res.sendStatus(404);
+  } catch (err) {
+    console.error(`[${new Date().toISOString()}] Error processing webhook:`, err);
+    res.sendStatus(500);
   }
 });
 
+app.post('/send-dm-reply/:userId', async (req, res) => {
+  const { userId } = req.params; // This is instagram_user_id (e.g., 17841471786269325)
+  const { sender_id, text, message_id } = req.body;
+
+  if (!sender_id || !text || !message_id) {
+    console.log(`[${new Date().toISOString()}] Missing required fields for DM reply`);
+    return res.status(400).send('Missing sender_id, text, or message_id');
+  }
+
+  try {
+    // Step 1: Find the instagram_graph_id by searching R2 tokens
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: `InstagramTokens/`,
+    });
+    const { Contents } = await s3Client.send(listCommand);
+
+    let tokenData = null;
+    let tokenKey = null;
+    if (Contents) {
+      for (const obj of Contents) {
+        if (obj.Key.endsWith('/token.json')) {
+          const getCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: obj.Key,
+          });
+          const data = await s3Client.send(getCommand);
+          const json = await data.Body.transformToString();
+          const token = JSON.parse(json);
+          if (token.instagram_user_id === userId) {
+            tokenData = token;
+            tokenKey = obj.Key;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!tokenData || !tokenKey) {
+      console.log(`[${new Date().toISOString()}] No token found for instagram_user_id ${userId}`);
+      return res.status(404).send('No access token found for this Instagram account');
+    }
+
+    const access_token = tokenData.access_token;
+    const instagram_graph_id = tokenData.instagram_graph_id;
+
+    // Step 2: Send reply using Instagram Graph API
+    const response = await axios({
+      method: 'post',
+      url: `https://graph.instagram.com/v21.0/${instagram_graph_id}/messages`,
+      headers: {
+        Authorization: `Bearer ${access_token}`,
+        'Content-Type': 'application/json',
+      },
+      data: {
+        recipient: { id: sender_id },
+        message: { text },
+      },
+    });
+
+    console.log(`[${new Date().toISOString()}] DM reply sent to ${sender_id} for instagram_graph_id ${instagram_graph_id}`);
+
+    // Step 3: Store reply in R2 for record
+    const replyKey = `InstagramEvents/${userId}/reply_${message_id}_${Date.now()}.json`;
+    const replyData = {
+      type: 'reply',
+      instagram_user_id: userId,
+      instagram_graph_id: instagram_graph_id,
+      recipient_id: sender_id,
+      message_id: response.data.id || `reply_${Date.now()}`,
+      text,
+      timestamp: Date.now(),
+      sent_at: new Date().toISOString(),
+    };
+    const putCommand = new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: replyKey,
+      Body: JSON.stringify(replyData, null, 2),
+      ContentType: 'application/json',
+    });
+    await s3Client.send(putCommand);
+
+    console.log(`[${new Date().toISOString()}] Reply stored in R2 at ${replyKey}`);
+    res.json({ success: true, message_id: response.data.id });
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error sending DM reply:`, error.response?.data || error.message);
+    res.status(500).send('Error sending DM reply');
+  }
+});
 // Instagram Deauthorize Callback
 app.post('/instagram/deauthorize', (req, res) => {
   console.log(`[${new Date().toISOString()}] Deauthorize callback received:`, JSON.stringify(req.body, null, 2));

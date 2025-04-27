@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import './Dms_Comments.css';
 
 interface Notification {
@@ -15,9 +15,14 @@ interface Notification {
 
 interface DmsCommentsProps {
   notifications: Notification[];
+  onReply: (messageId: string, replyText: string, senderId: string) => void;
 }
 
-const DmsComments: React.FC<DmsCommentsProps> = ({ notifications }) => {
+const Dms_Comments: React.FC<DmsCommentsProps> = ({ notifications, onReply }) => {
+  const [replyText, setReplyText] = useState<{ [key: string]: string }>({});
+  const [sending, setSending] = useState<{ [key: string]: boolean }>({});
+  const [error, setError] = useState<{ [key: string]: string }>({});
+
   const formatTimestamp = (timestamp: number) => {
     const date = new Date(timestamp);
     return date.toLocaleString('en-US', {
@@ -27,6 +32,20 @@ const DmsComments: React.FC<DmsCommentsProps> = ({ notifications }) => {
       minute: '2-digit',
       hour12: true,
     });
+  };
+
+  const handleReply = (notif: Notification) => {
+    if (notif.type !== 'message' || !notif.sender_id || !notif.message_id) return;
+
+    const text = replyText[notif.message_id] || '';
+    if (!text.trim()) return;
+
+    setSending({ ...sending, [notif.message_id]: true });
+    setError({ ...error, [notif.message_id]: '' });
+
+    onReply(notif.message_id, text, notif.sender_id);
+    setReplyText({ ...replyText, [notif.message_id]: '' });
+    setSending({ ...sending, [notif.message_id]: false });
   };
 
   return (
@@ -44,6 +63,28 @@ const DmsComments: React.FC<DmsCommentsProps> = ({ notifications }) => {
                 <div>
                   <strong>Message</strong> from {notif.sender_id || 'Unknown'}: {notif.text}
                   <span className="timestamp">{formatTimestamp(notif.timestamp)}</span>
+                  <div className="reply-container">
+                    <input
+                      type="text"
+                      value={replyText[notif.message_id || ''] || ''}
+                      onChange={(e) =>
+                        setReplyText({ ...replyText, [notif.message_id || '']: e.target.value })
+                      }
+                      placeholder="Type your reply..."
+                      className="reply-input"
+                      disabled={sending[notif.message_id || '']}
+                    />
+                    <button
+                      onClick={() => handleReply(notif)}
+                      className="reply-button"
+                      disabled={sending[notif.message_id || ''] || !replyText[notif.message_id || '']?.trim()}
+                    >
+                      {sending[notif.message_id || ''] ? 'Sending...' : 'Reply'}
+                    </button>
+                  </div>
+                  {error[notif.message_id || ''] && (
+                    <span className="error-message">{error[notif.message_id || '']}</span>
+                  )}
                 </div>
               ) : (
                 <div>
@@ -59,4 +100,4 @@ const DmsComments: React.FC<DmsCommentsProps> = ({ notifications }) => {
   );
 };
 
-export default DmsComments;
+export default Dms_Comments;

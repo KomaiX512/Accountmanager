@@ -1,36 +1,77 @@
 .dms-comments {
-  margin-top: 10px;
-}
-
-.no-notifications {
-  color: #666;
-  font-style: italic;
-}
-
-.notification-list {
-  list-style: none;
-  padding: 0;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.notification-item {
-  padding: 10px;
-  border-bottom: 1px solid #ddd;
-  font-size: 14px;
-}
-
-.notification-item:last-child {
-  border-bottom: none;
-}
-
-.notification-item strong {
-  color: #333;
-}
-
-.timestamp {
-  display: block;
-  font-size: 12px;
-  color: #999;
-  margin-top: 4px;
-}
+    margin-top: 10px;
+  }
+  
+  .no-notifications {
+    color: #666;
+    font-style: italic;
+  }
+  
+  .notification-list {
+    list-style: none;
+    padding: 0;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  
+  .notification-item {
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+    font-size: 14px;
+  }
+  
+  .notification-item:last-child {
+    border-bottom: none;
+  }
+  
+  .notification-item strong {
+    color: #333;
+  }
+  
+  .timestamp {
+    display: block;
+    font-size: 12px;
+    color: #999;
+    margin-top: 4px;
+  }
+  
+  .reply-container {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  
+  .reply-input {
+    flex: 1;
+    padding: 6px;
+    font-size: 14px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    outline: none;
+  }
+  
+  .reply-input:focus {
+    border-color: #007bff;
+  }
+  
+  .reply-button {
+    padding: 6px 12px;
+    font-size: 14px;
+    color: #fff;
+    background-color: #007bff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  .reply-button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+  }
+  
+  .error-message {
+    display: block;
+    color: #d32f2f;
+    font-size: 12px;
+    margin-top: 4px;
+  }

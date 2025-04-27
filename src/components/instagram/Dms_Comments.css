@@ -1,0 +1,36 @@
+.dms-comments {
+  margin-top: 10px;
+}
+
+.no-notifications {
+  color: #666;
+  font-style: italic;
+}
+
+.notification-list {
+  list-style: none;
+  padding: 0;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.notification-item {
+  padding: 10px;
+  border-bottom: 1px solid #ddd;
+  font-size: 14px;
+}
+
+.notification-item:last-child {
+  border-bottom: none;
+}
+
+.notification-item strong {
+  color: #333;
+}
+
+.timestamp {
+  display: block;
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
+}

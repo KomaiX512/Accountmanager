@@ -325,3 +325,60 @@ h2 {
   color: #00ffcc;
   cursor: pointer;
 }
+.dms-comments {
+  margin-top: 10px;
+}
+
+.no-notifications {
+  color: #666;
+  font-style: italic;
+}
+
+.notification-list {
+  list-style: none;
+  padding: 0;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.notification-item {
+  padding: 10px;
+  border-bottom: 1px solid #ddd;
+  font-size: 14px;
+}
+
+.notification-item:last-child {
+  border-bottom: none;
+}
+
+.notification-item strong {
+  color: #333;
+}
+
+.timestamp {
+  display: block;
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
+}
+.insta-btn {
+  margin-left: 20px;
+  padding: 6px 12px;
+  border: 1px solid #00ffcc;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  color: #00ffcc;
+  transition: background 0.2s;
+}
+.insta-btn.connect:hover {
+  background: rgba(0, 255, 204, 0.1);
+}
+.insta-btn.disconnect {
+  border-color: #ff4444;
+  color: #ff4444;
+}
+.insta-btn.disconnect:hover {
+  background: rgba(255, 68, 68, 0.1);
+}

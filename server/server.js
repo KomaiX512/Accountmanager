@@ -925,9 +925,9 @@ app.get('/instagram/callback', async (req, res) => {
     });
 
     const shortLivedToken = tokenResponse.data.access_token;
-    const userId = tokenResponse.data.user_id;
+    const userIdFromAuth = tokenResponse.data.user_id;
 
-    console.log(`[${new Date().toISOString()}] Short-lived token obtained for user ${userId}`);
+    console.log(`[${new Date().toISOString()}] Short-lived token obtained: user_id=${userIdFromAuth}`);
 
     // Step 2: Exchange short-lived token for long-lived token
     const longLivedTokenResponse = await axios.get('https://graph.instagram.com/access_token', {
@@ -941,14 +941,33 @@ app.get('/instagram/callback', async (req, res) => {
     const longLivedToken = longLivedTokenResponse.data.access_token;
     const expiresIn = longLivedTokenResponse.data.expires_in;
 
-    console.log(`[${new Date().toISOString()}] OAuth success: Long-lived token obtained for Instagram user ${userId}`);
+    console.log(`[${new Date().toISOString()}] Long-lived token obtained`);
 
-    // Step 3: Store token in R2
-    const key = `InstagramTokens/${userId}/token.json`;
+    // Step 3: Fetch profile with BOTH id and user_id from Graph
+    const profileResponse = await axios.get('https://graph.instagram.com/me', {
+      params: {
+        fields: 'id,username,account_type,user_id',   // <--- HERE IS THE IMPORTANT FIX
+        access_token: longLivedToken
+      }
+    });
+
+    const profile = profileResponse.data;
+    const idFromGraph = profile.id;
+    const userIdFromGraph = profile.user_id;
+    const username = profile.username;
+    const accountType = profile.account_type;
+
+    console.log(`[${new Date().toISOString()}] Profile fetched: id=${idFromGraph}, user_id=${userIdFromGraph}, username=${username}, account_type=${accountType}`);
+
+    // Step 4: Store token and both IDs in R2
+    const key = `InstagramTokens/${idFromGraph}/token.json`;
     const tokenData = {
-      instagram_user_id: userId,
+      instagram_graph_id: idFromGraph,
+      instagram_user_id: userIdFromGraph,
       access_token: longLivedToken,
       expires_in: expiresIn,
+      username: username,
+      account_type: accountType,
       timestamp: new Date().toISOString()
     };
 
@@ -960,19 +979,27 @@ app.get('/instagram/callback', async (req, res) => {
     });
     await s3Client.send(putCommand);
 
-    console.log(`[${new Date().toISOString()}] Token stored in R2 at ${key}`);
+    console.log(`[${new Date().toISOString()}] Token and profile stored in R2 at ${key}`);
 
     // Invalidate cache
-    cache.delete(`InstagramTokens/${userId}`);
+    cache.delete(`InstagramTokens/${idFromGraph}`);
 
     // Send success response
     res.send(`
       <html>
         <body>
           <h2>Instagram Connected Successfully!</h2>
+          <p>Username: ${username}</p>
+          <p>Graph ID: ${idFromGraph}</p>
+          <p>User ID: ${userIdFromGraph}</p>
           <p>You can now close this window and return to the dashboard.</p>
           <script>
-            window.opener.postMessage({ type: 'INSTAGRAM_CONNECTED', userId: '${userId}' }, '*');
+            window.opener.postMessage({ 
+              type: 'INSTAGRAM_CONNECTED', 
+              graphId: '${idFromGraph}', 
+              userId: '${userIdFromGraph}',
+              username: '${username}'
+            }, '*');
             window.close();
           </script>
         </body>
@@ -983,6 +1010,7 @@ app.get('/instagram/callback', async (req, res) => {
     res.status(500).send('Error connecting Instagram account');
   }
 });
+
 
 // Instagram Webhook Verification
 app.get('/webhook/instagram', (req, res) => {
@@ -1173,6 +1201,7 @@ app.get('/events/:userId', (req, res) => {
     res.end();
   });
 });
+
 async function getExistingData() {
   const key = 'Usernames/instagram.json';
   const prefix = 'Usernames/';

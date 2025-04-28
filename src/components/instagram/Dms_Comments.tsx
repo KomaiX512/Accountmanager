@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import './Dms_Comments.css';
 
 interface Notification {
-  type: 'message' | 'comment';
+  type: 'message' | 'comment' | 'reply';
   instagram_user_id: string;
   sender_id?: string;
   message_id?: string;
@@ -16,9 +16,10 @@ interface Notification {
 interface DmsCommentsProps {
   notifications: Notification[];
   onReply: (messageId: string, replyText: string, senderId: string) => void;
+  onIgnore: (notification: Notification) => void;
 }
 
-const Dms_Comments: React.FC<DmsCommentsProps> = ({ notifications, onReply }) => {
+const Dms_Comments: React.FC<DmsCommentsProps> = ({ notifications, onReply, onIgnore }) => {
   const [replyText, setReplyText] = useState<{ [key: string]: string }>({});
   const [sending, setSending] = useState<{ [key: string]: boolean }>({});
   const [error, setError] = useState<{ [key: string]: string }>({});
@@ -48,13 +49,25 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({ notifications, onReply }) =>
     setSending({ ...sending, [notif.message_id]: false });
   };
 
+  const handleIgnore = (notif: Notification) => {
+    if (!notif.message_id && !notif.comment_id) return;
+
+    const id = notif.message_id || notif.comment_id || '';
+    setSending({ ...sending, [id]: true });
+    onIgnore(notif);
+    setSending({ ...sending, [id]: false });
+  };
+
+  // Filter out reply notifications
+  const filteredNotifications = notifications.filter(notif => notif.type !== 'reply');
+
   return (
     <div className="dms-comments">
-      {notifications.length === 0 ? (
+      {filteredNotifications.length === 0 ? (
         <p className="no-notifications">No notifications yet.</p>
       ) : (
         <ul className="notification-list">
-          {notifications.map((notif, index) => (
+          {filteredNotifications.map((notif, index) => (
             <li
               key={`${notif.type}-${notif.message_id || notif.comment_id}-${index}`}
               className="notification-item"
@@ -81,6 +94,13 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({ notifications, onReply }) =>
                     >
                       {sending[notif.message_id || ''] ? 'Sending...' : 'Reply'}
                     </button>
+                    <button
+                      onClick={() => handleIgnore(notif)}
+                      className="ignore-button"
+                      disabled={sending[notif.message_id || '']}
+                    >
+                      {sending[notif.message_id || ''] ? 'Ignoring...' : 'Ignore'}
+                    </button>
                   </div>
                   {error[notif.message_id || ''] && (
                     <span className="error-message">{error[notif.message_id || '']}</span>
@@ -90,6 +110,18 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({ notifications, onReply }) =>
                 <div>
                   <strong>Comment</strong> on post {notif.post_id || 'Unknown'}: {notif.text}
                   <span className="timestamp">{formatTimestamp(notif.timestamp)}</span>
+                  <div className="reply-container">
+                    <button
+                      onClick={() => handleIgnore(notif)}
+                      className="ignore-button"
+                      disabled={sending[notif.comment_id || '']}
+                    >
+                      {sending[notif.comment_id || ''] ? 'Ignoring...' : 'Ignore'}
+                    </button>
+                  </div>
+                  {error[notif.comment_id || ''] && (
+                    <span className="error-message">{error[notif.comment_id || '']}</span>
+                  )}
                 </div>
               )}
             </li>

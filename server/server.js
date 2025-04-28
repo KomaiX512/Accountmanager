@@ -1,5 +1,5 @@
 import express from 'express';
-import { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand, DeleteObjectCommand} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import axios from 'axios';
 import cors from 'cors';
@@ -20,6 +20,7 @@ const s3Client = new S3Client({
     timeout: 100000,
   },
 });
+
 
 app.use(cors({
   origin: '*',
@@ -1134,7 +1135,7 @@ app.post('/webhook/instagram', async (req, res) => {
 });
 
 app.post('/send-dm-reply/:userId', async (req, res) => {
-  const { userId } = req.params; // This is instagram_user_id (e.g., 17841471786269325)
+  const { userId } = req.params;
   const { sender_id, text, message_id } = req.body;
 
   if (!sender_id || !text || !message_id) {
@@ -1143,7 +1144,6 @@ app.post('/send-dm-reply/:userId', async (req, res) => {
   }
 
   try {
-    // Step 1: Find the instagram_graph_id by searching R2 tokens
     const listCommand = new ListObjectsV2Command({
       Bucket: 'tasks',
       Prefix: `InstagramTokens/`,
@@ -1179,7 +1179,6 @@ app.post('/send-dm-reply/:userId', async (req, res) => {
     const access_token = tokenData.access_token;
     const instagram_graph_id = tokenData.instagram_graph_id;
 
-    // Step 2: Send reply using Instagram Graph API
     const response = await axios({
       method: 'post',
       url: `https://graph.instagram.com/v21.0/${instagram_graph_id}/messages`,
@@ -1195,7 +1194,6 @@ app.post('/send-dm-reply/:userId', async (req, res) => {
 
     console.log(`[${new Date().toISOString()}] DM reply sent to ${sender_id} for instagram_graph_id ${instagram_graph_id}`);
 
-    // Step 3: Store reply in R2 for record
     const replyKey = `InstagramEvents/${userId}/reply_${message_id}_${Date.now()}.json`;
     const replyData = {
       type: 'reply',
@@ -1216,12 +1214,63 @@ app.post('/send-dm-reply/:userId', async (req, res) => {
     await s3Client.send(putCommand);
 
     console.log(`[${new Date().toISOString()}] Reply stored in R2 at ${replyKey}`);
+
+    const messageKey = `InstagramEvents/${userId}/${message_id}.json`;
+    try {
+      await s3Client.send(new DeleteObjectCommand({
+        Bucket: 'tasks',
+        Key: messageKey,
+      }));
+      console.log(`[${new Date().toISOString()}] Deleted message from R2 at ${messageKey}`);
+      cache.delete(`InstagramEvents/${userId}`);
+    } catch (error) {
+      console.error(`[${new Date().toISOString()}] Error deleting message from R2:`, error);
+    }
+
     res.json({ success: true, message_id: response.data.id });
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Error sending DM reply:`, error.response?.data || error.message);
     res.status(500).send('Error sending DM reply');
   }
 });
+
+app.post('/ignore-notification/:userId', async (req, res) => {
+  const { userId } = req.params;
+  const { message_id, comment_id } = req.body;
+
+  if (!message_id && !comment_id) {
+    console.log(`[${new Date().toISOString()}] Missing message_id or comment_id for ignore action`);
+    return res.status(400).json({ error: 'Missing message_id or comment_id' });
+  }
+
+  try {
+    const fileKey = message_id 
+      ? `InstagramEvents/${userId}/${message_id}.json`
+      : `InstagramEvents/${userId}/comment_${comment_id}.json`;
+
+    try {
+      await s3Client.send(new DeleteObjectCommand({
+        Bucket: 'tasks',
+        Key: fileKey,
+      }));
+      console.log(`[${new Date().toISOString()}] Deleted notification from R2 at ${fileKey}`);
+    } catch (error) {
+      if (error.name === 'NoSuchKey') {
+        console.log(`[${new Date().toISOString()}] Notification file not found at ${fileKey}, proceeding`);
+      } else {
+        throw error;
+      }
+    }
+
+    cache.delete(`InstagramEvents/${userId}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error ignoring notification:`, error.message || error);
+    res.status(500).json({ error: 'Failed to ignore notification', details: error.message || 'Unknown error' });
+  }
+});
+
+
 // Instagram Deauthorize Callback
 app.post('/instagram/deauthorize', (req, res) => {
   console.log(`[${new Date().toISOString()}] Deauthorize callback received:`, JSON.stringify(req.body, null, 2));
@@ -1286,6 +1335,7 @@ app.get('/events/:userId', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Access-Control-Allow-Origin', '*'); // Ensure CORS for SSE
   res.flushHeaders();
 
   if (!sseClients[userId]) {

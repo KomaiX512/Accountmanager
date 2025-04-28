@@ -97,3 +97,29 @@
     font-size: 12px;
     margin-top: 4px;
   }
+  .action-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+  }
+  
+  .ignore-button {
+    background-color: #ff4d4f;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+  }
+  
+  .ignore-button:hover:not(:disabled) {
+    background-color: #d9363e;
+  }
+  
+  .ignore-button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+  }

@@ -112,11 +112,30 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
         text: replyText,
         message_id: messageId,
       });
+      setNotifications(prev => prev.filter(n => n.message_id !== messageId));
       setToast('Reply sent!');
     } catch (error: any) {
       console.error('Error sending reply:', error);
       setToast('Failed to send reply.');
       setError(error.response?.data?.error || 'Failed to send reply.');
+    }
+  };
+
+  const handleIgnore = async (notification: Notification) => {
+    if (!igBusinessId || (!notification.message_id && !notification.comment_id)) return;
+    try {
+      await axios.post(`http://localhost:3000/ignore-notification/${igBusinessId}`, {
+        message_id: notification.message_id,
+        comment_id: notification.comment_id,
+      });
+      setNotifications(prev => prev.filter(n => 
+        n.message_id !== notification.message_id && n.comment_id !== notification.comment_id
+      ));
+      setToast('Notification ignored!');
+    } catch (error: any) {
+      console.error('Error ignoring notification:', error);
+      setToast('Failed to ignore notification.');
+      setError(error.response?.data?.error || 'Failed to ignore notification.');
     }
   };
 
@@ -302,6 +321,11 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   }, [igBusinessId]);
 
   const handleInstagramConnected = (graphId: string, userId: string) => {
+    if (!userId) {
+      console.error(`[${new Date().toISOString()}] Instagram connection failed: userId is undefined`);
+      setToast('Failed to connect Instagram: Missing user ID');
+      return;
+    }
     console.log(`[${new Date().toISOString()}] Instagram connected for graph ID: ${graphId}, user ID: ${userId}`);
     setIgBusinessId(userId);
     setToast('Instagram account connected successfully!');
@@ -377,7 +401,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
 
           <div className="notifications">
             <h2>Notifications <span className="badge">{notifications.length || 0} new!!!</span></h2>
-            <DmsComments notifications={notifications} onReply={handleReply} />
+            <DmsComments notifications={notifications} onReply={handleReply} onIgnore={handleIgnore} />
           </div>
 
           <div className="post-cooked">

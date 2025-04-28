@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './InstagramConnect.css';
 
 interface InstagramConnectProps {
-  onConnected: (userId: string) => void;
+  onConnected: (graphId: string, userId: string) => void;
 }
 
 const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected }) => {
@@ -11,10 +11,12 @@ const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected }) => {
   useEffect(() => {
     // Listen for OAuth redirect message from popup
     const handleMessage = (event: MessageEvent) => {
-      if (event.data && event.data.type === 'INSTAGRAM_CONNECTED' && event.data.userId) {
-        console.log('Received Instagram connection message:', event.data);
-        onConnected(event.data.userId);
+      if (event.data && event.data.type === 'INSTAGRAM_CONNECTED' && event.data.graphId && event.data.userId) {
+        console.log(`[${new Date().toISOString()}] Received Instagram connection message:`, event.data);
+        onConnected(event.data.graphId, event.data.userId);
         setIsConnecting(false);
+      } else {
+        console.error(`[${new Date().toISOString()}] Invalid Instagram connection message:`, event.data);
       }
     };
 

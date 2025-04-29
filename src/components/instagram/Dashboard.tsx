@@ -6,6 +6,7 @@ import PostCooked from './PostCooked';
 import InstagramConnect from './InstagramConnect';
 import DmsComments from './Dms_Comments';
 import PostScheduler from './PostScheduler';
+import InsightsModal from './InsightsModal';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 
@@ -48,6 +49,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const [imageError, setImageError] = useState(false);
   const [igBusinessId, setIgBusinessId] = useState<string | null>(null);
   const [isSchedulerOpen, setIsSchedulerOpen] = useState(false);
+  const [isInsightsOpen, setIsInsightsOpen] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
@@ -326,6 +328,10 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     console.log(`[${new Date().toISOString()}] isSchedulerOpen: ${isSchedulerOpen}`);
   }, [isSchedulerOpen]);
 
+  useEffect(() => {
+    console.log(`[${new Date().toISOString()}] isInsightsOpen: ${isInsightsOpen}`);
+  }, [isInsightsOpen]);
+
   const handleInstagramConnected = (graphId: string, userId: string) => {
     if (!userId) {
       console.error(`[${new Date().toISOString()}] Instagram connection failed: userId is undefined`);
@@ -340,6 +346,11 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const handleOpenScheduler = () => {
     console.log(`[${new Date().toISOString()}] Opening PostScheduler for user ${igBusinessId}`);
     setIsSchedulerOpen(true);
+  };
+
+  const handleOpenInsights = () => {
+    console.log(`[${new Date().toISOString()}] Opening InsightsModal for user ${igBusinessId}`);
+    setIsInsightsOpen(true);
   };
 
   if (!accountHolder) {
@@ -403,8 +414,25 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="profile-actions">
                     <InstagramConnect onConnected={handleInstagramConnected} />
+                    <button
+                      onClick={handleOpenInsights}
+                      className="insta-btn insights"
+                      style={{
+                        background: igBusinessId ? 'linear-gradient(90deg, #ff2e63, #00ffcc)' : '#4a4a6a',
+                        color: igBusinessId ? '#e0e0ff' : '#a0a0cc',
+                        pointerEvents: igBusinessId ? 'auto' : 'none',
+                        cursor: igBusinessId ? 'pointer' : 'not-allowed',
+                        padding: '8px 16px',
+                        borderRadius: '6px',
+                        border: '1px solid #ff2e63',
+                        zIndex: 20,
+                      }}
+                      disabled={!igBusinessId}
+                    >
+                      Insights
+                    </button>
                     <button
                       onClick={handleOpenScheduler}
                       className="insta-btn connect"
@@ -416,7 +444,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
                         padding: '8px 16px',
                         borderRadius: '6px',
                         border: '1px solid #00ffcc',
-                        zIndex: 20, // Increased z-index
+                        zIndex: 20,
                       }}
                       disabled={!igBusinessId}
                     >
@@ -511,6 +539,12 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
         <PostScheduler userId={igBusinessId!} onClose={() => {
           console.log(`[${new Date().toISOString()}] Closing PostScheduler`);
           setIsSchedulerOpen(false);
+        }} />
+      )}
+      {isInsightsOpen && (
+        <InsightsModal userId={igBusinessId!} onClose={() => {
+          console.log(`[${new Date().toISOString()}] Closing InsightsModal`);
+          setIsInsightsOpen(false);
         }} />
       )}
     </motion.div>

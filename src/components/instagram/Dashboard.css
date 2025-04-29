@@ -391,3 +391,9 @@ h2 {
   bottom: 0 !important;
   z-index: 1000 !important;
 }
+.profile-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}

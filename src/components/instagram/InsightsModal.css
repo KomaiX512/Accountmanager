@@ -4,7 +4,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.5);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -12,16 +12,15 @@
   }
   
   .insights-modal {
-    background: #1a1a2e;
-    border-radius: 12px;
+    background: #1a1a1a;
     padding: 20px;
+    border-radius: 10px;
+    width: 80%;
     max-width: 800px;
-    width: 90%;
     max-height: 80vh;
     overflow-y: auto;
     position: relative;
-    border: 1px solid #00ffcc;
-    box-shadow: 0 4px 20px rgba(0, 255, 204, 0.2);
+    color: #fff;
   }
   
   .insights-close-btn {
@@ -30,67 +29,56 @@
     right: 10px;
     background: none;
     border: none;
-    color: #00ffcc;
+    color: #fff;
     font-size: 20px;
     cursor: pointer;
-    z-index: 10;
   }
   
-  .insights-modal h2 {
-    color: #e0e0ff;
-    margin: 0 0 20px;
-    text-align: center;
-    font-size: 24px;
-  }
-  
-  .insights-loading, .insights-error {
-    color: #e0e0ff;
-    text-align: center;
-    padding: 20px;
-  }
-  
-  .insights-error {
-    color: #ff4d4d;
-  }
-  
-  .insights-content {
+  .insights-tabs {
     display: flex;
-    flex-direction: column;
-    gap: 20px;
+    margin-bottom: 20px;
+  }
+  
+  .insights-tabs button {
+    flex: 1;
+    padding: 10px;
+    background: #333;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    font-size: 16px;
+  }
+  
+  .insights-tabs button.active {
+    background: #00ffcc;
+    color: #000;
   }
   
   .insights-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 20px;
   }
   
-  .insight-chart, .insight-metric {
-    background: #2a2a4e;
-    border-radius: 8px;
+  .insight-chart {
+    background: #222;
     padding: 15px;
-    border: 1px solid #00ffcc;
+    border-radius: 5px;
   }
   
-  .insight-chart h3, .insight-metric h3 {
-    color: #e0e0ff;
+  .insight-chart h3 {
     margin: 0 0 10px;
-    font-size: 16px;
+    font-size: 18px;
   }
   
-  .insight-metric p {
-    color: #00ffcc;
-    font-size: 24px;
-    margin: 0;
+  .insights-note {
+    background: #333;
+    padding: 15px;
+    border-radius: 5px;
+    font-size: 14px;
+  }
+  
+  .insights-loading, .insights-error {
     text-align: center;
-  }
-  
-  @media (max-width: 600px) {
-    .insights-modal {
-      width: 95%;
-      padding: 15px;
-    }
-    .insights-grid {
-      grid-template-columns: 1fr;
-    }
+    padding: 20px;
+    color: #fff;
   }

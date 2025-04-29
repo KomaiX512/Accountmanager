@@ -1474,6 +1474,8 @@ app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
     res.status(500).json({ error: 'Failed to schedule post', details: error.response?.data?.error?.message || error.message });
   }
 });
+import { metrics } from './insightConfigs.js';
+
 app.get('/insights/:userId', async (req, res) => {
   const { userId } = req.params;
   console.log(`[${new Date().toISOString()}] Received insights request for user ${userId}`);
@@ -1515,7 +1517,7 @@ app.get('/insights/:userId', async (req, res) => {
     const instagram_graph_id = tokenData.instagram_graph_id;
     console.log(`[${new Date().toISOString()}] Token found: graph_id=${instagram_graph_id}`);
 
-    // Fetch follower_count directly to ensure accuracy
+    // Fetch follower_count directly
     let follower_count = 0;
     try {
       const profileResponse = await axios.get(`https://graph.instagram.com/v22.0/me`, {
@@ -1530,38 +1532,43 @@ app.get('/insights/:userId', async (req, res) => {
       console.error(`[${new Date().toISOString()}] Error fetching follower_count:`, profileError.response?.data || profileError.message);
     }
 
-    // Fetch insights
-    console.log(`[${new Date().toISOString()}] Fetching insights from Instagram Graph API v22.0`);
-    const metrics = ['reach', 'audience_gender_age', 'audience_locale'];
-    let insightsData = {
+    // Initialize insights data
+    const insightsData = {
       follower_count: { lifetime: follower_count },
-      reach: { daily: [], lifetime: null },
-      audience_gender_age: { lifetime: {} },
-      audience_locale: { lifetime: {} },
+      reach: { daily: [] },
+      impressions: { daily: [] },
+      online_followers: { daily: [] },
+      accounts_engaged: { daily: [] },
+      total_interactions: { daily: [] },
+      follower_demographics: { lifetime: {} },
     };
 
+    // Fetch insights
+    console.log(`[${new Date().toISOString()}] Fetching insights from Instagram Graph API v22.0`);
     for (const metric of metrics) {
-      try {
-        const response = await axios.get(`https://graph.instagram.com/v22.0/${instagram_graph_id}/insights`, {
-          params: {
-            metric,
-            period: metric === 'reach' ? 'day' : 'lifetime',
-            access_token,
-          },
-        });
-        response.data.data.forEach((item) => {
-          if (item.name === 'reach' && item.period === 'day') {
-            insightsData.reach.daily = item.values.map(v => ({
-              value: v.value,
-              end_time: v.end_time,
-            }));
-          } else if (item.period === 'lifetime') {
-            insightsData[item.name].lifetime = item.values[0]?.value || {};
-          }
-        });
-        console.log(`[${new Date().toISOString()}] Fetched metric: ${metric}`);
-      } catch (error) {
-        console.error(`[${new Date().toISOString()}] Failed to fetch metric ${metric}:`, error.response?.data || error.message);
+      for (const period of metric.periods) {
+        try {
+          const response = await axios.get(`https://graph.instagram.com/v22.0/${instagram_graph_id}/insights`, {
+            params: {
+              metric: metric.name,
+              period,
+              access_token,
+            },
+          });
+          response.data.data.forEach((item) => {
+            if (item.period === 'day') {
+              insightsData[item.name].daily = item.values.map(v => ({
+                value: v.value,
+                end_time: v.end_time,
+              }));
+            } else if (item.period === 'lifetime') {
+              insightsData[item.name].lifetime = item.values[0]?.value || {};
+            }
+          });
+          console.log(`[${new Date().toISOString()}] Fetched metric: ${metric.name} (${period})`);
+        } catch (error) {
+          console.error(`[${new Date().toISOString()}] Failed to fetch metric ${metric.name} (${period}):`, error.response?.data || error.message);
+        }
       }
     }
 

@@ -14,15 +14,19 @@ interface InsightsModalProps {
 
 interface InsightData {
   follower_count: { lifetime: number };
-  reach: { daily: { value: number; end_time: string }[]; lifetime?: number };
-  audience_gender_age: { lifetime: { [key: string]: number } };
-  audience_locale: { lifetime: { [key: string]: number } };
+  reach: { daily: { value: number; end_time: string }[] };
+  impressions: { daily: { value: number; end_time: string }[] };
+  online_followers: { daily: { value: number; end_time: string }[] };
+  accounts_engaged: { daily: { value: number; end_time: string }[] };
+  total_interactions: { daily: { value: number; end_time: string }[] };
+  follower_demographics: { lifetime: { [key: string]: number } };
 }
 
 const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose }) => {
   const [insights, setInsights] = useState<InsightData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'reach' | 'other'>('reach');
 
   useEffect(() => {
     const fetchInsights = async () => {
@@ -69,14 +73,7 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose }) => {
     );
   };
 
-  const renderMetric = (title: string, value: number) => (
-    <div className="insight-metric">
-      <h3>{title}</h3>
-      <p>{value.toLocaleString()}</p>
-    </div>
-  );
-
-  const renderAudienceChart = (data: { [key: string]: number }, title: string) => {
+  const renderDemographicsChart = (data: { [key: string]: number }, title: string) => {
     const labels = Object.keys(data);
     const values = Object.values(data);
 
@@ -127,17 +124,51 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose }) => {
         {error && <div className="insights-error">{error}</div>}
         {insights && (
           <div className="insights-content">
-            <div className="insights-grid">
-              {renderMetric('Follower Count (Lifetime)', insights.follower_count.lifetime)}
-              {insights.reach.daily.length > 0 && renderChart(insights.reach.daily, 'Reach (Daily)')}
-              {Object.keys(insights.audience_gender_age.lifetime).length > 0 && renderAudienceChart(insights.audience_gender_age.lifetime, 'Audience Gender & Age')}
-              {Object.keys(insights.audience_locale.lifetime).length > 0 && renderAudienceChart(insights.audience_locale.lifetime, 'Audience Locale')}
+            <div className="insights-tabs">
+              <button
+                className={activeTab === 'reach' ? 'active' : ''}
+                onClick={() => setActiveTab('reach')}
+              >
+                Daily Reach
+              </button>
+              <button
+                className={activeTab === 'other' ? 'active' : ''}
+                onClick={() => setActiveTab('other')}
+              >
+                Other Insights
+              </button>
             </div>
-            {insights.reach.daily.length === 0 && (
-              <div className="insights-note">
-                <p>Note: Metrics like Reach may require posting content to generate data.</p>
-              </div>
-            )}
+            <div className="insights-grid">
+              {activeTab === 'reach' && (
+                <>
+                  {renderChart(insights.reach.daily, 'Daily Reach')}
+                  {insights.reach.daily.length === 0 && (
+                    <div className="insights-note">
+                      <p>Your account is new, so reach data may be limited. Continue posting to generate more reach.</p>
+                    </div>
+                  )}
+                </>
+              )}
+              {activeTab === 'other' && (
+                <>
+                  {renderChart(insights.impressions.daily, 'Daily Impressions')}
+                  {renderChart(insights.online_followers.daily, 'Daily Online Followers')}
+                  {renderChart(insights.accounts_engaged.daily, 'Daily Accounts Engaged')}
+                  {renderChart(insights.total_interactions.daily, 'Daily Total Interactions')}
+                  {Object.keys(insights.follower_demographics.lifetime).length > 0 &&
+                    renderDemographicsChart(insights.follower_demographics.lifetime, 'Follower Demographics')}
+                  {insights.impressions.daily.length === 0 &&
+                    insights.online_followers.daily.length === 0 &&
+                    insights.accounts_engaged.daily.length === 0 &&
+                    insights.total_interactions.daily.length === 0 &&
+                    Object.keys(insights.follower_demographics.lifetime).length === 0 && (
+                      <div className="insights-note">
+                        <p>Your account is new, so some insights may be limited. Engage with followers to generate data.</p>
+                      </div>
+                    )}
+                </>
+              )}
+            </div>
           </div>
         )}
       </motion.div>

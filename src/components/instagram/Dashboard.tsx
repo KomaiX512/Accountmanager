@@ -5,6 +5,7 @@ import OurStrategies from './OurStrategies';
 import PostCooked from './PostCooked';
 import InstagramConnect from './InstagramConnect';
 import DmsComments from './Dms_Comments';
+import PostScheduler from './PostScheduler';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 
@@ -46,6 +47,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const [profileLoading, setProfileLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [igBusinessId, setIgBusinessId] = useState<string | null>(null);
+  const [isSchedulerOpen, setIsSchedulerOpen] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
@@ -320,6 +322,10 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     }
   }, [igBusinessId]);
 
+  useEffect(() => {
+    console.log(`[${new Date().toISOString()}] isSchedulerOpen: ${isSchedulerOpen}`);
+  }, [isSchedulerOpen]);
+
   const handleInstagramConnected = (graphId: string, userId: string) => {
     if (!userId) {
       console.error(`[${new Date().toISOString()}] Instagram connection failed: userId is undefined`);
@@ -329,6 +335,11 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     console.log(`[${new Date().toISOString()}] Instagram connected for graph ID: ${graphId}, user ID: ${userId}`);
     setIgBusinessId(userId);
     setToast('Instagram account connected successfully!');
+  };
+
+  const handleOpenScheduler = () => {
+    console.log(`[${new Date().toISOString()}] Opening PostScheduler for user ${igBusinessId}`);
+    setIsSchedulerOpen(true);
   };
 
   if (!accountHolder) {
@@ -392,7 +403,26 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
                       </span>
                     </div>
                   </div>
-                  <InstagramConnect onConnected={handleInstagramConnected} />
+                  <div className="flex items-center gap-4">
+                    <InstagramConnect onConnected={handleInstagramConnected} />
+                    <button
+                      onClick={handleOpenScheduler}
+                      className="insta-btn connect"
+                      style={{
+                        background: igBusinessId ? 'linear-gradient(90deg, #007bff, #00ffcc)' : '#4a4a6a',
+                        color: igBusinessId ? '#e0e0ff' : '#a0a0cc',
+                        pointerEvents: igBusinessId ? 'auto' : 'none',
+                        cursor: igBusinessId ? 'pointer' : 'not-allowed',
+                        padding: '8px 16px',
+                        borderRadius: '6px',
+                        border: '1px solid #00ffcc',
+                        zIndex: 20, // Increased z-index
+                      }}
+                      disabled={!igBusinessId}
+                    >
+                      Schedule Post
+                    </button>
+                  </div>
                 </div>
               )}
               <div className="chart-placeholder"></div>
@@ -476,6 +506,12 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
           </svg>
           {toast}
         </motion.div>
+      )}
+      {isSchedulerOpen && (
+        <PostScheduler userId={igBusinessId!} onClose={() => {
+          console.log(`[${new Date().toISOString()}] Closing PostScheduler`);
+          setIsSchedulerOpen(false);
+        }} />
       )}
     </motion.div>
   );

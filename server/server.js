@@ -1,8 +1,10 @@
 import express from 'express';
-import { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand, DeleteObjectCommand} from '@aws-sdk/client-s3';
+import { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import axios from 'axios';
 import cors from 'cors';
+import multer from 'multer';
+const upload = multer({ storage: multer.memoryStorage() });
 import puppeteer from 'puppeteer';
 const app = express();
 const port = 3000;
@@ -893,13 +895,6 @@ async function streamToString(stream) {
 }
 
 
-// Instagram App Credentials
-const APP_ID = '576296982152813';
-const APP_SECRET = 'd48ddc9eaf0e5c4969d4ddc4e293178c';
-const REDIRECT_URI = 'https://b8e8-121-52-146-243.ngrok-free.app/instagram/callback';
-const VERIFY_TOKEN = 'myInstagramWebhook2025';
-
-
 app.get('/instagram/callback', async (req, res) => {
   const code = req.query.code;
 
@@ -1271,6 +1266,193 @@ app.post('/ignore-notification/:userId', async (req, res) => {
 });
 
 
+// Public R2.dev URL
+const R2_PUBLIC_URL = 'https://pub-ba72672df3c041a3844f278dd3c32b22.r2.dev';
+
+// ... (other endpoints unchanged: /instagram/callback, /webhook/instagram, /instagram/deauthorize, /instagram/data-deletion, /send-dm-reply/:userId, /ignore-notification/:userId, /events-list/:userId, /events/:userId)
+
+app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
+  const { userId } = req.params;
+  const { caption, scheduleDate } = req.body;
+  const file = req.file;
+
+  console.log(`[${new Date().toISOString()}] Received schedule-post request for user ${userId}: image=${!!file}, caption=${!!caption}, scheduleDate=${scheduleDate}`);
+
+  if (!file || !caption || !scheduleDate) {
+    console.log(`[${new Date().toISOString()}] Missing required fields: image=${!!file}, caption=${!!caption}, scheduleDate=${!!scheduleDate}`);
+    return res.status(400).json({ error: 'Missing image, caption, or scheduleDate' });
+  }
+
+  try {
+    // Validate image file type
+    let format;
+    try {
+      const fileInfo = await fileType.fromBuffer(file.buffer);
+      format = fileInfo?.mime.split('/')[1];
+      console.log(`[${new Date().toISOString()}] Image format (file-type): ${format || 'unknown'}, mime: ${file.mimetype}, size: ${file.size} bytes, buffer_length: ${file.buffer.length}`);
+    } catch (fileTypeError) {
+      console.error(`[${new Date().toISOString()}] fileType validation failed:`, fileTypeError.message);
+      format = file.mimetype.split('/')[1]; // Fallback to multer mime
+    }
+    if (!format || !['jpeg', 'png'].includes(format)) {
+      console.log(`[${new Date().toISOString()}] Invalid image format: ${format || 'unknown'}`);
+      return res.status(400).json({ error: 'Image must be JPEG or PNG' });
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      console.log(`[${new Date().toISOString()}] Image size too large: ${file.size} bytes`);
+      return res.status(400).json({ error: 'Image size exceeds 8MB' });
+    }
+
+    // Validate caption
+    if (caption.length > 2200) {
+      console.log(`[${new Date().toISOString()}] Caption too long: ${caption.length} characters`);
+      return res.status(400).json({ error: 'Caption exceeds 2200 characters' });
+    }
+    const hashtags = (caption.match(/#[^\s#]+/g) || []).length;
+    if (hashtags > 30) {
+      console.log(`[${new Date().toISOString()}] Too many hashtags: ${hashtags}`);
+      return res.status(400).json({ error: 'Maximum 30 hashtags allowed' });
+    }
+
+    // Validate schedule date (within 75 days)
+    const scheduleTime = new Date(scheduleDate);
+    const now = new Date();
+    const maxDate = new Date(now.getTime() + 75 * 24 * 60 * 60 * 1000);
+    if (scheduleTime <= now || scheduleTime > maxDate) {
+      console.log(`[${new Date().toISOString()}] Invalid schedule date: ${scheduleDate}`);
+      return res.status(400).json({ error: 'Schedule date must be within 75 days from now' });
+    }
+
+    // Fetch access token
+    console.log(`[${new Date().toISOString()}] Fetching token for user ${userId}`);
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: `InstagramTokens/`,
+    });
+    const { Contents } = await s3Client.send(listCommand);
+
+    let tokenData = null;
+    if (Contents) {
+      for (const key of Contents) {
+        if (key.Key.endsWith('/token.json')) {
+          const getCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: key.Key,
+          });
+          const data = await s3Client.send(getCommand);
+          const json = await data.Body.transformToString();
+          const token = JSON.parse(json);
+          if (token.instagram_user_id === userId) {
+            tokenData = token;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!tokenData) {
+      console.log(`[${new Date().toISOString()}] No token found for instagram_user_id ${userId}`);
+      return res.status(404).json({ error: 'No access token found for this Instagram account' });
+    }
+
+    const access_token = tokenData.access_token;
+    const instagram_graph_id = tokenData.instagram_graph_id;
+    console.log(`[${new Date().toISOString()}] Token found: graph_id=${instagram_graph_id}`);
+
+    // Upload image to R2
+    const imageKey = `InstagramEvents/${userId}/${file.originalname}`;
+    console.log(`[${new Date().toISOString()}] Uploading image to R2: ${imageKey}, ContentType: ${file.mimetype}`);
+    const putCommand = new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: imageKey,
+      Body: file.buffer,
+      ContentType: file.mimetype,
+      ACL: 'public-read',
+    });
+    await s3Client.send(putCommand);
+
+    // Test R2 URL accessibility
+    const imageUrl = `${R2_PUBLIC_URL}/${imageKey}`;
+    console.log(`[${new Date().toISOString()}] Testing R2 image URL: ${imageUrl}`);
+    let urlAccessible = false;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const urlTest = await axios.head(imageUrl, { timeout: 5000 });
+        console.log(`[${new Date().toISOString()}] R2 URL accessible (attempt ${attempt}): ${urlTest.status}`);
+        urlAccessible = true;
+        break;
+      } catch (urlError) {
+        console.error(`[${new Date().toISOString()}] R2 URL inaccessible (attempt ${attempt}):`, urlError.message, urlError.response?.status || '');
+        if (attempt === 3) {
+          throw new Error(`Image URL is not publicly accessible after ${attempt} attempts`);
+        }
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    if (!urlAccessible) {
+      throw new Error('Image URL is not publicly accessible');
+    }
+
+    // Create draft media object
+    console.log(`[${new Date().toISOString()}] Creating draft media object for graph_id ${instagram_graph_id}`);
+    const mediaResponse = await axios.post(
+      `https://graph.instagram.com/v21.0/${instagram_graph_id}/media`,
+      {
+        image_url: imageUrl,
+        caption,
+        is_carousel_item: false,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+        },
+      }
+    );
+
+    const mediaId = mediaResponse.data.id;
+    if (!mediaId) {
+      console.log(`[${new Date().toISOString()}] Failed to create media object: ${JSON.stringify(mediaResponse.data)}`);
+      throw new Error('Failed to create media object');
+    }
+    console.log(`[${new Date().toISOString()}] Draft media object created: media_id=${mediaId}`);
+
+    // Store scheduled post details in R2 (draft)
+    const scheduledPostKey = `InstagramScheduledPosts/${userId}/${mediaId}.json`;
+    const scheduledPostData = {
+      userId,
+      instagram_graph_id,
+      media_id: mediaId,
+      caption,
+      image_key: imageKey,
+      schedule_time: scheduleTime.toISOString(),
+      created_at: new Date().toISOString(),
+      status: 'draft',
+    };
+    console.log(`[${new Date().toISOString()}] Storing draft post: ${scheduledPostKey}`);
+    const putScheduledCommand = new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: scheduledPostKey,
+      Body: JSON.stringify(scheduledPostData, null, 2),
+      ContentType: 'application/json',
+    });
+    await s3Client.send(putScheduledCommand);
+
+    console.log(`[${new Date().toISOString()}] Draft post stored for user ${userId} with media ID ${mediaId}. Ready for manual publishing.`);
+
+    // Clean up image
+    console.log(`[${new Date().toISOString()}] Cleaning up image: ${imageKey}`);
+    await s3Client.send(new DeleteObjectCommand({
+      Bucket: 'tasks',
+      Key: imageKey,
+    }));
+
+    res.json({ success: true, media_id: mediaId, status: 'draft', message: 'Post created as draft. Publish manually via Instagram or integrate a scheduler.' });
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error scheduling post:`, error.response?.data || error.message);
+    res.status(500).json({ error: 'Failed to schedule post', details: error.response?.data?.error?.message || error.message });
+  }
+});
 // Instagram Deauthorize Callback
 app.post('/instagram/deauthorize', (req, res) => {
   console.log(`[${new Date().toISOString()}] Deauthorize callback received:`, JSON.stringify(req.body, null, 2));

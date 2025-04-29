@@ -76,6 +76,7 @@
   display: flex;
   align-items: center;
   gap: 20px;
+  pointer-events: auto !important;
 }
 
 .profile-pic {
@@ -94,7 +95,18 @@
   object-fit: cover;
   background-color: #4a4a6a;
 }
-
+.post-scheduler-modal {
+  z-index: 1000 !important; /* High z-index to appear above other elements */
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+}
+.profile-bar button {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
 .stats {
   display: flex;
   gap: 20px;
@@ -282,7 +294,27 @@ h2 {
   padding: 15px;
   color: #e0e0ff;
 }
-
+.insta-btn {
+  margin-left: 20px;
+  padding: 6px 12px;
+  border: 1px solid #00ffcc;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  color: #00ffcc;
+  transition: background 0.2s;
+}
+.insta-btn.connect:hover {
+  background: rgba(0, 255, 204, 0.1);
+}
+.insta-btn.disconnect {
+  border-color: #ff4444;
+  color: #ff4444;
+}
+.insta-btn.disconnect:hover {
+  background: rgba(255, 68, 68, 0.1);
+}
 .toast-notification {
   position: fixed;
   bottom: 20px;
@@ -325,60 +357,37 @@ h2 {
   color: #00ffcc;
   cursor: pointer;
 }
-.dms-comments {
-  margin-top: 10px;
-}
 
-.no-notifications {
-  color: #666;
-  font-style: italic;
-}
-
-.notification-list {
-  list-style: none;
-  padding: 0;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.notification-item {
-  padding: 10px;
-  border-bottom: 1px solid #ddd;
-  font-size: 14px;
-}
-
-.notification-item:last-child {
-  border-bottom: none;
-}
-
-.notification-item strong {
-  color: #333;
-}
-
-.timestamp {
-  display: block;
-  font-size: 12px;
-  color: #999;
-  margin-top: 4px;
-}
-.insta-btn {
-  margin-left: 20px;
-  padding: 6px 12px;
-  border: 1px solid #00ffcc;
-  background: transparent;
+.theme-btn {
+  padding: 8px 16px;
   border-radius: 6px;
-  cursor: pointer;
+  border: 1px solid #00ffcc;
+  background: linear-gradient(90deg, #007bff, #00ffcc);
+  color: #e0e0ff;
   font-weight: bold;
-  color: #00ffcc;
-  transition: background 0.2s;
+  cursor: pointer;
+  transition: background 0.3s, box-shadow 0.3s;
+  user-select: none;
 }
-.insta-btn.connect:hover {
-  background: rgba(0, 255, 204, 0.1);
+
+.theme-btn:hover:not(:disabled) {
+  background: linear-gradient(90deg, #0056b3, #00cc99);
+  box-shadow: 0 0 10px rgba(0, 255, 204, 0.7);
 }
-.insta-btn.disconnect {
-  border-color: #ff4444;
-  color: #ff4444;
+
+.theme-btn:disabled {
+  background: #4a4a6a;
+  color: #a0a0cc;
+  cursor: not-allowed;
+  box-shadow: none;
+  pointer-events: none;
 }
-.insta-btn.disconnect:hover {
-  background: rgba(255, 68, 68, 0.1);
+
+.post-scheduler-modal {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 1000 !important;
 }

@@ -893,6 +893,11 @@ async function streamToString(stream) {
   }
   return Buffer.concat(chunks).toString('utf-8');
 }
+// Instagram App Credentials
+const APP_ID = '576296982152813';
+const APP_SECRET = 'd48ddc9eaf0e5c4969d4ddc4e293178c';
+const REDIRECT_URI = 'https://b8e8-121-52-146-243.ngrok-free.app/instagram/callback';
+const VERIFY_TOKEN = 'myInstagramWebhook2025';
 
 
 app.get('/instagram/callback', async (req, res) => {
@@ -1269,8 +1274,6 @@ app.post('/ignore-notification/:userId', async (req, res) => {
 // Public R2.dev URL
 const R2_PUBLIC_URL = 'https://pub-ba72672df3c041a3844f278dd3c32b22.r2.dev';
 
-// ... (other endpoints unchanged: /instagram/callback, /webhook/instagram, /instagram/deauthorize, /instagram/data-deletion, /send-dm-reply/:userId, /ignore-notification/:userId, /events-list/:userId, /events/:userId)
-
 app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
   const { userId } = req.params;
   const { caption, scheduleDate } = req.body;
@@ -1394,8 +1397,8 @@ app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
       throw new Error('Image URL is not publicly accessible');
     }
 
-    // Create draft media object
-    console.log(`[${new Date().toISOString()}] Creating draft media object for graph_id ${instagram_graph_id}`);
+    // Create media object
+    console.log(`[${new Date().toISOString()}] Creating media object for graph_id ${instagram_graph_id}`);
     const mediaResponse = await axios.post(
       `https://graph.instagram.com/v21.0/${instagram_graph_id}/media`,
       {
@@ -1415,21 +1418,40 @@ app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
       console.log(`[${new Date().toISOString()}] Failed to create media object: ${JSON.stringify(mediaResponse.data)}`);
       throw new Error('Failed to create media object');
     }
-    console.log(`[${new Date().toISOString()}] Draft media object created: media_id=${mediaId}`);
+    console.log(`[${new Date().toISOString()}] Media object created: media_id=${mediaId}`);
 
-    // Store scheduled post details in R2 (draft)
-    const scheduledPostKey = `InstagramScheduledPosts/${userId}/${mediaId}.json`;
+    // Schedule post
+    console.log(`[${new Date().toISOString()}] Scheduling post for ${scheduleDate}`);
+    const publishResponse = await axios.post(
+      `https://graph.instagram.com/v21.0/${instagram_graph_id}/media_publish`,
+      {
+        creation_id: mediaId,
+        publish_time: Math.floor(scheduleTime.getTime() / 1000), // UNIX timestamp
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+        },
+      }
+    );
+
+    const postId = publishResponse.data.id;
+    console.log(`[${new Date().toISOString()}] Post scheduled: post_id=${postId}`);
+
+    // Store scheduled post details in R2
+    const scheduledPostKey = `InstagramScheduledPosts/${userId}/${postId}.json`;
     const scheduledPostData = {
       userId,
       instagram_graph_id,
       media_id: mediaId,
+      post_id: postId,
       caption,
       image_key: imageKey,
       schedule_time: scheduleTime.toISOString(),
       created_at: new Date().toISOString(),
-      status: 'draft',
+      status: 'scheduled',
     };
-    console.log(`[${new Date().toISOString()}] Storing draft post: ${scheduledPostKey}`);
+    console.log(`[${new Date().toISOString()}] Storing scheduled post: ${scheduledPostKey}`);
     const putScheduledCommand = new PutObjectCommand({
       Bucket: 'tasks',
       Key: scheduledPostKey,
@@ -1438,8 +1460,6 @@ app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
     });
     await s3Client.send(putScheduledCommand);
 
-    console.log(`[${new Date().toISOString()}] Draft post stored for user ${userId} with media ID ${mediaId}. Ready for manual publishing.`);
-
     // Clean up image
     console.log(`[${new Date().toISOString()}] Cleaning up image: ${imageKey}`);
     await s3Client.send(new DeleteObjectCommand({
@@ -1447,10 +1467,135 @@ app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
       Key: imageKey,
     }));
 
-    res.json({ success: true, media_id: mediaId, status: 'draft', message: 'Post created as draft. Publish manually via Instagram or integrate a scheduler.' });
+    console.log(`[${new Date().toISOString()}] Post scheduled for user ${userId} with post ID ${postId}`);
+    res.json({ success: true, post_id: postId, status: 'scheduled', message: 'Post scheduled successfully.' });
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Error scheduling post:`, error.response?.data || error.message);
     res.status(500).json({ error: 'Failed to schedule post', details: error.response?.data?.error?.message || error.message });
+  }
+});
+app.get('/insights/:userId', async (req, res) => {
+  const { userId } = req.params;
+  console.log(`[${new Date().toISOString()}] Received insights request for user ${userId}`);
+
+  try {
+    // Fetch access token
+    console.log(`[${new Date().toISOString()}] Fetching token for user ${userId}`);
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: `InstagramTokens/`,
+    });
+    const { Contents } = await s3Client.send(listCommand);
+
+    let tokenData = null;
+    if (Contents) {
+      for (const key of Contents) {
+        if (key.Key.endsWith('/token.json')) {
+          const getCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: key.Key,
+          });
+          const data = await s3Client.send(getCommand);
+          const json = await data.Body.transformToString();
+          const token = JSON.parse(json);
+          if (token.instagram_user_id === userId) {
+            tokenData = token;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!tokenData) {
+      console.log(`[${new Date().toISOString()}] No token found for instagram_user_id ${userId}`);
+      return res.status(404).json({ error: 'No access token found for this Instagram account' });
+    }
+
+    const access_token = tokenData.access_token;
+    const instagram_graph_id = tokenData.instagram_graph_id;
+    console.log(`[${new Date().toISOString()}] Token found: graph_id=${instagram_graph_id}`);
+
+    // Fetch follower_count directly to ensure accuracy
+    let follower_count = 0;
+    try {
+      const profileResponse = await axios.get(`https://graph.instagram.com/v22.0/me`, {
+        params: {
+          fields: 'followers_count',
+          access_token,
+        },
+      });
+      follower_count = profileResponse.data.followers_count || 0;
+      console.log(`[${new Date().toISOString()}] Fetched follower_count: ${follower_count}`);
+    } catch (profileError) {
+      console.error(`[${new Date().toISOString()}] Error fetching follower_count:`, profileError.response?.data || profileError.message);
+    }
+
+    // Fetch insights
+    console.log(`[${new Date().toISOString()}] Fetching insights from Instagram Graph API v22.0`);
+    const metrics = ['reach', 'audience_gender_age', 'audience_locale'];
+    let insightsData = {
+      follower_count: { lifetime: follower_count },
+      reach: { daily: [], lifetime: null },
+      audience_gender_age: { lifetime: {} },
+      audience_locale: { lifetime: {} },
+    };
+
+    for (const metric of metrics) {
+      try {
+        const response = await axios.get(`https://graph.instagram.com/v22.0/${instagram_graph_id}/insights`, {
+          params: {
+            metric,
+            period: metric === 'reach' ? 'day' : 'lifetime',
+            access_token,
+          },
+        });
+        response.data.data.forEach((item) => {
+          if (item.name === 'reach' && item.period === 'day') {
+            insightsData.reach.daily = item.values.map(v => ({
+              value: v.value,
+              end_time: v.end_time,
+            }));
+          } else if (item.period === 'lifetime') {
+            insightsData[item.name].lifetime = item.values[0]?.value || {};
+          }
+        });
+        console.log(`[${new Date().toISOString()}] Fetched metric: ${metric}`);
+      } catch (error) {
+        console.error(`[${new Date().toISOString()}] Failed to fetch metric ${metric}:`, error.response?.data || error.message);
+      }
+    }
+
+    // Store in R2
+    const insightsKey = `InstagramInsights/${userId}/${Date.now()}.json`;
+    const insightsToStore = {
+      data: insightsData,
+      timestamp: new Date().toISOString(),
+    };
+    console.log(`[${new Date().toISOString()}] Storing insights in R2: ${insightsKey}`);
+    const putCommand = new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: insightsKey,
+      Body: JSON.stringify(insightsToStore, null, 2),
+      ContentType: 'application/json',
+      ACL: 'public-read',
+    });
+    await s3Client.send(putCommand);
+
+    // Update latest cache
+    console.log(`[${new Date().toISOString()}] Updating latest insights cache: InstagramInsights/${userId}/latest.json`);
+    await s3Client.send(new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: `InstagramInsights/${userId}/latest.json`,
+      Body: JSON.stringify(insightsToStore, null, 2),
+      ContentType: 'application/json',
+      ACL: 'public-read',
+    }));
+
+    console.log(`[${new Date().toISOString()}] Insights fetched and stored for user ${userId}`);
+    res.json(insightsData);
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error fetching insights:`, error.response?.data || error.message);
+    res.status(500).json({ error: 'Failed to fetch insights', details: error.response?.data?.error?.message || error.message });
   }
 });
 // Instagram Deauthorize Callback

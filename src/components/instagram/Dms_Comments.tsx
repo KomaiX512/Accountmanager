@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import './Dms_Comments.css';
 
 interface Notification {
-  type: 'message' | 'comment' | 'reply';
+  type: 'message' | 'comment' | 'reply' | 'comment_reply';
   instagram_user_id: string;
   sender_id?: string;
   message_id?: string;
@@ -11,15 +11,18 @@ interface Notification {
   comment_id?: string;
   timestamp: number;
   received_at: string;
+  username?: string;
+  status: 'pending' | 'replied' | 'ignored' | 'sent';
 }
 
 interface DmsCommentsProps {
   notifications: Notification[];
-  onReply: (messageId: string, replyText: string, senderId: string) => void;
+  onReply: (notification: Notification, replyText: string) => void;
   onIgnore: (notification: Notification) => void;
+  onRefresh: () => void;
 }
 
-const Dms_Comments: React.FC<DmsCommentsProps> = ({ notifications, onReply, onIgnore }) => {
+const Dms_Comments: React.FC<DmsCommentsProps> = ({ notifications, onReply, onIgnore, onRefresh }) => {
   const [replyText, setReplyText] = useState<{ [key: string]: string }>({});
   const [sending, setSending] = useState<{ [key: string]: boolean }>({});
   const [error, setError] = useState<{ [key: string]: string }>({});
@@ -36,17 +39,16 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({ notifications, onReply, onIg
   };
 
   const handleReply = (notif: Notification) => {
-    if (notif.type !== 'message' || !notif.sender_id || !notif.message_id) return;
+    const id = notif.message_id || notif.comment_id || '';
+    const text = replyText[id] || '';
+    if (!text.trim() || (!notif.message_id && !notif.comment_id)) return;
 
-    const text = replyText[notif.message_id] || '';
-    if (!text.trim()) return;
+    setSending({ ...sending, [id]: true });
+    setError({ ...error, [id]: '' });
 
-    setSending({ ...sending, [notif.message_id]: true });
-    setError({ ...error, [notif.message_id]: '' });
-
-    onReply(notif.message_id, text, notif.sender_id);
-    setReplyText({ ...replyText, [notif.message_id]: '' });
-    setSending({ ...sending, [notif.message_id]: false });
+    onReply(notif, text);
+    setReplyText({ ...replyText, [id]: '' });
+    setSending({ ...sending, [id]: false });
   };
 
   const handleIgnore = (notif: Notification) => {
@@ -58,13 +60,22 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({ notifications, onReply, onIg
     setSending({ ...sending, [id]: false });
   };
 
-  // Filter out reply notifications
-  const filteredNotifications = notifications.filter(notif => notif.type !== 'reply');
+  // Filter for pending notifications
+  const filteredNotifications = notifications.filter(notif => notif.status === 'pending' && (notif.type === 'message' || notif.type === 'comment'));
 
   return (
     <div className="dms-comments">
+      <button
+        onClick={() => {
+          console.log(`[${new Date().toISOString()}] Manual refresh triggered`);
+          onRefresh();
+        }}
+        className="refresh-button"
+      >
+        Refresh Notifications
+      </button>
       {filteredNotifications.length === 0 ? (
-        <p className="no-notifications">No notifications yet.</p>
+        <p className="no-notifications">No pending notifications.</p>
       ) : (
         <ul className="notification-list">
           {filteredNotifications.map((notif, index) => (
@@ -108,9 +119,26 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({ notifications, onReply, onIg
                 </div>
               ) : (
                 <div>
-                  <strong>Comment</strong> on post {notif.post_id || 'Unknown'}: {notif.text}
+                  <strong>Comment</strong> from @{notif.username || 'Unknown'} on post {notif.post_id || 'Unknown'}: {notif.text}
                   <span className="timestamp">{formatTimestamp(notif.timestamp)}</span>
                   <div className="reply-container">
+                    <input
+                      type="text"
+                      value={replyText[notif.comment_id || ''] || ''}
+                      onChange={(e) =>
+                        setReplyText({ ...replyText, [notif.comment_id || '']: e.target.value })
+                      }
+                      placeholder="Type your reply..."
+                      className="reply-input"
+                      disabled={sending[notif.comment_id || '']}
+                    />
+                    <button
+                      onClick={() => handleReply(notif)}
+                      className="reply-button"
+                      disabled={sending[notif.comment_id || ''] || !replyText[notif.comment_id || '']?.trim()}
+                    >
+                      {sending[notif.comment_id || ''] ? 'Sending...' : 'Reply'}
+                    </button>
                     <button
                       onClick={() => handleIgnore(notif)}
                       className="ignore-button"

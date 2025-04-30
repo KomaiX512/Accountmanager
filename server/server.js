@@ -274,18 +274,19 @@ app.get('/proxy-image', async (req, res) => {
 
 app.get('/profile-info/:username', async (req, res) => {
   const { username } = req.params;
+  const forceRefresh = req.query.forceRefresh === 'true';
   const key = `ProfileInfo/${username}.json`;
   const prefix = `ProfileInfo/${username}`;
 
   try {
     let data;
-    if (cache.has(prefix)) {
+    if (!forceRefresh && cache.has(prefix)) {
       console.log(`Cache hit for profile info: ${prefix}`);
       const cachedData = cache.get(prefix);
       data = cachedData.find(item => item.key === key)?.data;
     }
 
-    if (!data) {
+    if (!data || forceRefresh) {
       const getCommand = new GetObjectCommand({
         Bucket: 'tasks',
         Key: key,

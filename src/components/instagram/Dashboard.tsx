@@ -70,7 +70,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
         setProfileLoading(false);
         return;
       }
-      const response = await axios.get(`http://localhost:3000/profile-info/${accountHolder}`);
+      const response = await axios.get(`http://localhost:3000/profile-info/${accountHolder}?forceRefresh=true`);
       setProfileInfo(response.data);
       lastProfilePicRenderTimeRef.current = now;
       console.log('Profile Info Fetched:', response.data);
@@ -306,7 +306,6 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
             setError(err.response?.data?.error || 'Failed to fetch posts.');
           });
         }
- TROUBLESHOOTING
         if (prefix.startsWith(`competitor_analysis/${accountHolder}/`)) {
           Promise.all(
             competitors.map(comp =>

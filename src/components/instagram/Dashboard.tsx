@@ -18,7 +18,7 @@ interface ProfileInfo {
 }
 
 interface Notification {
-  type: 'message' | 'comment';
+  type: 'message' | 'comment' | 'reply' | 'comment_reply';
   instagram_user_id: string;
   sender_id?: string;
   message_id?: string;
@@ -27,6 +27,8 @@ interface Notification {
   comment_id?: string;
   timestamp: number;
   received_at: string;
+  username?: string;
+  status: 'pending' | 'replied' | 'ignored' | 'sent';
 }
 
 interface DashboardProps {
@@ -84,14 +86,48 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     }
   };
 
-  const fetchNotifications = async (userId: string) => {
+  const fetchIgBusinessId = async (attempt = 1, maxAttempts = 3) => {
+    if (!accountHolder) return;
+    try {
+      const response = await axios.get(`http://localhost:3000/profile-info/${accountHolder}`);
+      const userId = response.data?.id;
+      if (userId) {
+        setIgBusinessId(userId);
+        console.log(`[${new Date().toISOString()}] Set igBusinessId: ${userId}`);
+      } else {
+        console.error(`[${new Date().toISOString()}] No userId found in profile info`);
+        if (attempt < maxAttempts) {
+          console.log(`[${new Date().toISOString()}] Retrying fetchIgBusinessId, attempt ${attempt + 1}/${maxAttempts}`);
+          setTimeout(() => fetchIgBusinessId(attempt + 1, maxAttempts), 2000);
+        } else {
+          setError('Failed to initialize Instagram account after retries.');
+        }
+      }
+    } catch (err) {
+      console.error(`[${new Date().toISOString()}] Error fetching igBusinessId (attempt ${attempt}/${maxAttempts}):`, err);
+      if (attempt < maxAttempts) {
+        console.log(`[${new Date().toISOString()}] Retrying fetchIgBusinessId in 2s...`);
+        setTimeout(() => fetchIgBusinessId(attempt + 1, maxAttempts), 2000);
+      } else {
+        setError('Failed to initialize Instagram account after retries.');
+      }
+    }
+  };
+
+  const fetchNotifications = async (userId: string, attempt = 1, maxAttempts = 3) => {
     try {
       const response = await axios.get(`http://localhost:3000/events-list/${userId}`);
-      setNotifications(response.data.sort((a: Notification, b: Notification) => b.timestamp - a.timestamp).slice(0, 10));
-      console.log(`[${new Date().toISOString()}] Fetched notifications:`, response.data);
+      const fetchedNotifications = response.data.sort((a: Notification, b: Notification) => b.timestamp - a.timestamp).slice(0, 10);
+      setNotifications(fetchedNotifications);
+      console.log(`[${new Date().toISOString()}] Fetched notifications for ${userId}:`, fetchedNotifications.map((n: Notification) => ({ id: n.message_id || n.comment_id, type: n.type, status: n.status })));
     } catch (err) {
-      console.error('Error fetching notifications:', err);
-      setError('Failed to load notifications.');
+      console.error(`[${new Date().toISOString()}] Error fetching notifications (attempt ${attempt}/${maxAttempts}):`, err);
+      if (attempt < maxAttempts) {
+        console.log(`[${new Date().toISOString()}] Retrying fetchNotifications in 2s...`);
+        setTimeout(() => fetchNotifications(userId, attempt + 1, maxAttempts), 2000);
+      } else {
+        setError('Failed to load notifications after retries.');
+      }
     }
   };
 
@@ -108,16 +144,26 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     }
   };
 
-  const handleReply = async (messageId: string, replyText: string, senderId: string) => {
-    if (!messageId || !replyText.trim() || !senderId || !igBusinessId) return;
+  const handleReply = async (notification: Notification, replyText: string) => {
+    if (!igBusinessId || !replyText.trim()) return;
+
     try {
-      await axios.post(`http://localhost:3000/send-dm-reply/${igBusinessId}`, {
-        sender_id: senderId,
-        text: replyText,
-        message_id: messageId,
-      });
-      setNotifications(prev => prev.filter(n => n.message_id !== messageId));
-      setToast('Reply sent!');
+      if (notification.type === 'message' && notification.sender_id && notification.message_id) {
+        await axios.post(`http://localhost:3000/send-dm-reply/${igBusinessId}`, {
+          sender_id: notification.sender_id,
+          text: replyText,
+          message_id: notification.message_id,
+        });
+        setNotifications(prev => prev.filter(n => n.message_id !== notification.message_id));
+        setToast('DM reply sent!');
+      } else if (notification.type === 'comment' && notification.comment_id) {
+        await axios.post(`http://localhost:3000/send-comment-reply/${igBusinessId}`, {
+          comment_id: notification.comment_id,
+          text: replyText,
+        });
+        setNotifications(prev => prev.filter(n => n.comment_id !== notification.comment_id));
+        setToast('Comment reply sent!');
+      }
     } catch (error: any) {
       console.error('Error sending reply:', error);
       setToast('Failed to send reply.');
@@ -189,7 +235,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     }
   };
 
-  const setupSSE = (userId: string) => {
+  const setupSSE = (userId: string, attempt = 1) => {
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
@@ -202,6 +248,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
       console.log(`[${new Date().toISOString()}] SSE connection established for ${userId}`);
       reconnectAttempts.current = 0;
       setError(null);
+      fetchNotifications(userId); // Refresh on connect
     };
 
     eventSource.onmessage = (event) => {
@@ -213,6 +260,8 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
         console.error('Failed to parse SSE message:', event.data, err);
         return;
       }
+
+      console.log(`[${new Date().toISOString()}] SSE message received:`, data);
 
       if (data.type === 'heartbeat') return;
       if (data.type === 'connection') {
@@ -257,6 +306,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
             setError(err.response?.data?.error || 'Failed to fetch posts.');
           });
         }
+ TROUBLESHOOTING
         if (prefix.startsWith(`competitor_analysis/${accountHolder}/`)) {
           Promise.all(
             competitors.map(comp =>
@@ -287,18 +337,19 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     };
 
     eventSource.onerror = (error) => {
-      console.error('SSE error:', error);
+      console.error(`[${new Date().toISOString()}] SSE error (attempt ${attempt}/${maxReconnectAttempts}):`, error);
       eventSource.close();
       eventSourceRef.current = null;
 
       if (reconnectAttempts.current < maxReconnectAttempts) {
         reconnectAttempts.current += 1;
         const delay = baseReconnectDelay * Math.pow(2, reconnectAttempts.current);
-        console.log(`Reconnection attempt ${reconnectAttempts.current}/${maxReconnectAttempts} after ${delay/1000}s`);
+        console.log(`[${new Date().toISOString()}] Reconnection attempt ${reconnectAttempts.current}/${maxReconnectAttempts} after ${delay/1000}s`);
         setError(`Lost connection to server updates. Reconnecting... (Attempt ${reconnectAttempts.current}/${maxReconnectAttempts})`);
-        setTimeout(() => setupSSE(userId), delay);
+        setTimeout(() => setupSSE(userId, attempt + 1), delay);
       } else {
-        setError('Failed to reconnect to server updates after multiple attempts.');
+        setError('Failed to reconnect to server updates. Refreshing notifications...');
+        fetchNotifications(userId);
       }
     };
   };
@@ -314,13 +365,20 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     if (accountHolder) {
       refreshAllData();
       fetchProfileInfo();
+      fetchIgBusinessId();
     }
   }, [accountHolder, competitors]);
 
   useEffect(() => {
     if (igBusinessId) {
+      console.log(`[${new Date().toISOString()}] Initializing notifications for igBusinessId: ${igBusinessId}`);
       fetchNotifications(igBusinessId);
       setupSSE(igBusinessId);
+      const interval = setInterval(() => {
+        console.log(`[${new Date().toISOString()}] Periodic notification refresh for ${igBusinessId}`);
+        fetchNotifications(igBusinessId);
+      }, 30000); // Refresh every 30s
+      return () => clearInterval(interval);
     }
   }, [igBusinessId]);
 
@@ -459,7 +517,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
 
           <div className="notifications">
             <h2>Notifications <span className="badge">{notifications.length || 0} new!!!</span></h2>
-            <DmsComments notifications={notifications} onReply={handleReply} onIgnore={handleIgnore} />
+            <DmsComments notifications={notifications} onReply={handleReply} onIgnore={handleIgnore} onRefresh={() => igBusinessId && fetchNotifications(igBusinessId)} />
           </div>
 
           <div className="post-cooked">

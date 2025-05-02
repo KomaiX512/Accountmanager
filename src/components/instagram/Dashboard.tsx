@@ -586,6 +586,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
               username={accountHolder}
               profilePicUrl={profileInfo?.profilePicUrlHD ? `http://localhost:3000/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}` : ''}
               posts={posts}
+              userId={igBusinessId}
             />
           </div>
 

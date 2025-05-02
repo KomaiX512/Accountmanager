@@ -8,14 +8,17 @@ interface PostCookedProps {
   username: string;
   profilePicUrl: string;
   posts?: { key: string; data: { post: any; status: string; image_url: string }; imageFailed?: boolean }[];
+  userId?: string;
 }
 
-const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts = [] }) => {
+const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts = [], userId }) => {
   const [imageErrors, setImageErrors] = useState<{ [key: string]: boolean }>({});
   const [profileImageError, setProfileImageError] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState<string | null>(null);
   const [feedbackText, setFeedbackText] = useState('');
+  const [autoScheduling, setAutoScheduling] = useState(false);
+  const [autoScheduleProgress, setAutoScheduleProgress] = useState<string | null>(null);
 
   useEffect(() => {
     console.log('Posts prop in PostCooked:', posts);
@@ -61,6 +64,138 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     setImageErrors(prev => ({ ...prev, [key]: true }));
   };
 
+  // Fetch time delay from R2 bucket
+  const fetchTimeDelay = async (): Promise<number> => {
+    try {
+      const res = await fetch(`http://localhost:3000/time-delay/${username}`);
+      if (!res.ok) throw new Error('Not found');
+      const data = await res.json();
+      const delay = parseInt(data?.Posting_Delay_Intervals);
+      return isNaN(delay) ? 12 : delay;
+    } catch (err) {
+      return 12; // fallback
+    }
+  };
+
+  // Auto-schedule logic
+  const handleAutoSchedule = async () => {
+    if (!userId || !posts.length) return;
+    setAutoScheduling(true);
+    setAutoScheduleProgress('Fetching time delay...');
+    try {
+      const delayHours = await fetchTimeDelay();
+      console.log('[AutoSchedule] Using delay (hours):', delayHours);
+      setAutoScheduleProgress(`Scheduling posts every ${delayHours} hours...`);
+      let now = new Date();
+      for (let i = 0; i < posts.length; i++) {
+        const post = posts[i];
+        setAutoScheduleProgress(`Scheduling post ${i + 1} of ${posts.length}...`);
+        console.log(`[AutoSchedule] Preparing post #${i + 1}:`, post);
+        // Always fetch a fresh signed URL for the image
+        let imageKey = '';
+        // Try to extract imageKey from post.data.image_url or post.key
+        if (post.data.image_url && post.data.image_url.includes('/ready_post/')) {
+          // e.g. .../ready_post/narsissist/image_1.jpg?... -> image_1.jpg
+          const match = post.data.image_url.match(/ready_post\/[\w-]+\/(image_\d+\.jpg)/);
+          if (match) imageKey = match[1];
+        }
+        if (!imageKey && post.key && post.key.match(/ready_post_\d+\.json$/)) {
+          // Try to infer from post.key
+          const postIdMatch = post.key.match(/ready_post_(\d+)\.json$/);
+          if (postIdMatch) imageKey = `image_${postIdMatch[1]}.jpg`;
+        }
+        if (!imageKey) {
+          console.error(`[AutoSchedule] Could not determine imageKey for post #${i + 1}`);
+          setToastMessage(`Could not determine image for post ${i + 1}`);
+          continue;
+        }
+        let signedImageUrl = '';
+        try {
+          const signedUrlRes = await fetch(`http://localhost:3000/signed-image-url/${username}/${imageKey}`);
+          const signedUrlData = await signedUrlRes.json();
+          signedImageUrl = signedUrlData.url;
+          if (!signedImageUrl) throw new Error('No signed URL returned');
+          console.log(`[AutoSchedule] Got fresh signed URL for post #${i + 1}:`, signedImageUrl);
+        } catch (err) {
+          console.error(`[AutoSchedule] Failed to get signed URL for post #${i + 1}:`, err);
+          setToastMessage(`Failed to get image for post ${i + 1}`);
+          continue;
+        }
+        // Fetch image as blob via proxy
+        let imageBlob: Blob | null = null;
+        try {
+          const proxyUrl = `http://localhost:3000/proxy-image?url=${encodeURIComponent(signedImageUrl)}`;
+          console.log(`[AutoSchedule] Fetching image for post #${i + 1} via proxy:`, proxyUrl);
+          const imgRes = await fetch(proxyUrl);
+          imageBlob = await imgRes.blob();
+          console.log(`[AutoSchedule] Image fetched for post #${i + 1} via proxy`);
+        } catch (e) {
+          console.error(`[AutoSchedule] Failed to fetch image for post #${i + 1} via proxy:`, e);
+          setToastMessage(`Failed to fetch image for post ${i + 1}`);
+          continue;
+        }
+        // Check image type before scheduling
+        if (!['image/jpeg', 'image/png'].includes(imageBlob.type)) {
+          console.error(`[AutoSchedule] Image for post #${i + 1} is not a valid JPEG/PNG, got: ${imageBlob.type}`);
+          setToastMessage(`Image for post #${i + 1} is not a valid JPEG/PNG, skipping.`);
+          continue;
+        }
+        // Compose caption (truncate to 2200 chars)
+        let caption = post.data.post?.caption || '';
+        if (caption.length > 2200) {
+          console.warn(`[AutoSchedule] Caption too long for post #${i + 1}, truncating to 2200 chars.`);
+          caption = caption.slice(0, 2200);
+        }
+        // Set image filename and type
+        const type = imageBlob.type || 'image/jpeg';
+        const filename = `auto_post_${i + 1}.jpg`;
+        // Schedule date: always at least 1 minute in the future for the first post
+        let scheduleDate;
+        if (i === 0) {
+          const nowPlusBuffer = new Date(Date.now() + 60 * 1000); // 1 min buffer
+          scheduleDate = nowPlusBuffer;
+        } else {
+          const prevDate = new Date(Date.now() + 60 * 1000 + (i * delayHours * 60 * 60 * 1000));
+          scheduleDate = prevDate;
+        }
+        console.log(`[AutoSchedule] Scheduling post #${i + 1} at:`, scheduleDate.toISOString());
+        const formData = new FormData();
+        formData.append('image', imageBlob, filename);
+        formData.append('caption', caption);
+        formData.append('scheduleDate', scheduleDate.toISOString());
+        try {
+          console.log(`[AutoSchedule] Sending schedule request for post #${i + 1} to /schedule-post/${userId}`);
+          const resp = await fetch(`http://localhost:3000/schedule-post/${userId}`, {
+            method: 'POST',
+            body: formData,
+          });
+          if (!resp.ok) {
+            const errData = await resp.json().catch(() => ({}));
+            console.error(`[AutoSchedule] Failed to schedule post #${i + 1}:`, errData.error || resp.statusText);
+            setToastMessage(`Failed to schedule post ${i + 1}: ${errData.error || resp.statusText}`);
+          } else {
+            const respData = await resp.json().catch(() => ({}));
+            console.log(`[AutoSchedule] Scheduled post #${i + 1} successfully:`, respData);
+            setToastMessage(`Scheduled post ${i + 1} successfully!`);
+          }
+        } catch (err) {
+          console.error(`[AutoSchedule] Error scheduling post #${i + 1}:`, err);
+          setToastMessage(`Error scheduling post ${i + 1}`);
+        }
+        // Wait a bit to avoid hammering the server
+        await new Promise(res => setTimeout(res, 500));
+      }
+      setAutoScheduleProgress(null);
+      setToastMessage('All posts scheduled!');
+    } catch (err) {
+      console.error('[AutoSchedule] Auto-scheduling failed:', err);
+      setAutoScheduleProgress(null);
+      setToastMessage('Auto-scheduling failed.');
+    } finally {
+      setAutoScheduling(false);
+    }
+  };
+
   if (!username) {
     return (
       <ErrorBoundary>
@@ -76,6 +211,20 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     <ErrorBoundary>
       <div className="post-cooked-container">
         <h2>Cooked Posts</h2>
+        {/* Auto-Schedule Button */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+          <button
+            className="insta-btn connect"
+            style={{ background: userId && posts.length ? 'linear-gradient(90deg, #007bff, #00ffcc)' : '#4a4a6a', color: '#e0e0ff', cursor: userId && posts.length ? 'pointer' : 'not-allowed', borderRadius: 8, padding: '8px 16px', border: '1px solid #00ffcc' }}
+            disabled={!userId || !posts.length || autoScheduling}
+            onClick={handleAutoSchedule}
+          >
+            {autoScheduling ? 'Auto-Scheduling...' : 'Auto-Schedule All'}
+          </button>
+        </div>
+        {autoScheduleProgress && (
+          <div className="loading">{autoScheduleProgress}</div>
+        )}
         {posts.length === 0 ? (
           <p className="no-posts">No posts ready yet. Stay tuned!</p>
         ) : (
@@ -240,7 +389,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             <textarea
               value={feedbackText}
               onChange={(e) => setFeedbackText(e.target.value)}
-              placeholder="What didn’t vibe with this post?"
+              placeholder="What didn't vibe with this post?"
               className="feedback-textarea"
             />
             <div className="feedback-actions">

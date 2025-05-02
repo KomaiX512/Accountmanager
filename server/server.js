@@ -1600,13 +1600,22 @@ app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
     }
 
     // Validate schedule date (within 75 days)
-    const scheduleTime = new Date(scheduleDate);
+    let scheduleTime = new Date(scheduleDate);
     const now = new Date();
+    const minSchedule = new Date(now.getTime() + 60 * 1000); // at least 1 min in the future
     const maxDate = new Date(now.getTime() + 75 * 24 * 60 * 60 * 1000);
-    if (scheduleTime <= now || scheduleTime > maxDate) {
+    if (isNaN(scheduleTime.getTime()) || scheduleTime > maxDate) {
       console.log(`[${new Date().toISOString()}] Invalid schedule date: ${scheduleDate}`);
       return res.status(400).json({ error: 'Schedule date must be within 75 days from now' });
     }
+    if (scheduleTime <= now) {
+      console.warn(`[${new Date().toISOString()}] scheduleDate is in the past or now; auto-correcting to now + 1 min.`);
+      scheduleTime = minSchedule;
+    } else if (scheduleTime < minSchedule) {
+      console.warn(`[${new Date().toISOString()}] scheduleDate is less than 1 min in the future; auto-correcting to now + 1 min.`);
+      scheduleTime = minSchedule;
+    }
+    console.log(`[${new Date().toISOString()}] Scheduling post with scheduleDate: ${scheduleDate}, corrected scheduleTime: ${scheduleTime.toISOString()}, publish_time: ${Math.floor(scheduleTime.getTime() / 1000)}`);
 
     // Fetch access token
     console.log(`[${new Date().toISOString()}] Fetching token for user ${userId}`);

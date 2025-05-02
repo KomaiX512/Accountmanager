@@ -19,6 +19,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   const [feedbackText, setFeedbackText] = useState('');
   const [autoScheduling, setAutoScheduling] = useState(false);
   const [autoScheduleProgress, setAutoScheduleProgress] = useState<string | null>(null);
+  const [showIntervalModal, setShowIntervalModal] = useState(false);
+  const [intervalInput, setIntervalInput] = useState('');
 
   useEffect(() => {
     console.log('Posts prop in PostCooked:', posts);
@@ -78,12 +80,17 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   };
 
   // Auto-schedule logic
-  const handleAutoSchedule = async () => {
+  const handleAutoSchedule = async (intervalOverride?: number) => {
     if (!userId || !posts.length) return;
     setAutoScheduling(true);
     setAutoScheduleProgress('Fetching time delay...');
     try {
-      const delayHours = await fetchTimeDelay();
+      let delayHours: number;
+      if (typeof intervalOverride === 'number' && !isNaN(intervalOverride) && intervalOverride > 0) {
+        delayHours = intervalOverride;
+      } else {
+        delayHours = await fetchTimeDelay();
+      }
       console.log('[AutoSchedule] Using delay (hours):', delayHours);
       setAutoScheduleProgress(`Scheduling posts every ${delayHours} hours...`);
       let now = new Date();
@@ -217,11 +224,51 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             className="insta-btn connect"
             style={{ background: userId && posts.length ? 'linear-gradient(90deg, #007bff, #00ffcc)' : '#4a4a6a', color: '#e0e0ff', cursor: userId && posts.length ? 'pointer' : 'not-allowed', borderRadius: 8, padding: '8px 16px', border: '1px solid #00ffcc' }}
             disabled={!userId || !posts.length || autoScheduling}
-            onClick={handleAutoSchedule}
+            onClick={() => setShowIntervalModal(true)}
           >
             {autoScheduling ? 'Auto-Scheduling...' : 'Auto-Schedule All'}
           </button>
         </div>
+        {/* Interval Modal */}
+        {showIntervalModal && (
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.4)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <div style={{ background: '#23234a', borderRadius: 12, padding: 24, minWidth: 320, boxShadow: '0 4px 24px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <h3 style={{ color: '#e0e0ff', marginBottom: 8 }}>Set Auto-Schedule Interval</h3>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                value={intervalInput}
+                onChange={e => setIntervalInput(e.target.value)}
+                placeholder="Interval in hours (e.g. 12)"
+                style={{ padding: 8, borderRadius: 6, border: '1px solid #00ffcc', fontSize: 16, marginBottom: 8 }}
+                autoFocus
+              />
+              <div style={{ color: '#a0a0cc', fontSize: 14, marginBottom: 8 }}>
+                Leave blank to let AI decide the interval automatically.
+              </div>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                <button
+                  className="insta-btn disconnect"
+                  onClick={() => { setShowIntervalModal(false); setIntervalInput(''); }}
+                >Cancel</button>
+                <button
+                  className="insta-btn connect"
+                  onClick={() => {
+                    setShowIntervalModal(false);
+                    const interval = intervalInput.trim() ? parseInt(intervalInput, 10) : undefined;
+                    setIntervalInput('');
+                    handleAutoSchedule(interval);
+                  }}
+                  disabled={autoScheduling}
+                >Confirm</button>
+              </div>
+            </div>
+          </div>
+        )}
         {autoScheduleProgress && (
           <div className="loading">{autoScheduleProgress}</div>
         )}

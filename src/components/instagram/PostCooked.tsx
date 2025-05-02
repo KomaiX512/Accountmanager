@@ -75,13 +75,17 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       const delay = parseInt(data?.Posting_Delay_Intervals);
       return isNaN(delay) ? 12 : delay;
     } catch (err) {
+      console.warn(`[AutoSchedule] Failed to fetch time delay, using default 12 hours:`, err);
       return 12; // fallback
     }
   };
 
   // Auto-schedule logic
   const handleAutoSchedule = async (intervalOverride?: number) => {
-    if (!userId || !posts.length) return;
+    if (!userId || !posts.length) {
+      setToastMessage('No user ID or posts to schedule.');
+      return;
+    }
     setAutoScheduling(true);
     setAutoScheduleProgress('Fetching time delay...');
     try {
@@ -100,14 +104,11 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         console.log(`[AutoSchedule] Preparing post #${i + 1}:`, post);
         // Always fetch a fresh signed URL for the image
         let imageKey = '';
-        // Try to extract imageKey from post.data.image_url or post.key
         if (post.data.image_url && post.data.image_url.includes('/ready_post/')) {
-          // e.g. .../ready_post/narsissist/image_1.jpg?... -> image_1.jpg
           const match = post.data.image_url.match(/ready_post\/[\w-]+\/(image_\d+\.jpg)/);
           if (match) imageKey = match[1];
         }
         if (!imageKey && post.key && post.key.match(/ready_post_\d+\.json$/)) {
-          // Try to infer from post.key
           const postIdMatch = post.key.match(/ready_post_(\d+)\.json$/);
           if (postIdMatch) imageKey = `image_${postIdMatch[1]}.jpg`;
         }
@@ -144,15 +145,17 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         // Check image type before scheduling
         if (!['image/jpeg', 'image/png'].includes(imageBlob.type)) {
           console.error(`[AutoSchedule] Image for post #${i + 1} is not a valid JPEG/PNG, got: ${imageBlob.type}`);
-          setToastMessage(`Image for post #${i + 1} is not a valid JPEG/PNG, skipping.`);
+          setToastMessage(`Image for post ${i + 1} is not a valid JPEG/PNG, skipping.`);
           continue;
         }
-        // Compose caption (truncate to 2200 chars)
+        // Compose caption (truncate to 2150 chars to be safe)
         let caption = post.data.post?.caption || '';
-        if (caption.length > 2200) {
-          console.warn(`[AutoSchedule] Caption too long for post #${i + 1}, truncating to 2200 chars.`);
-          caption = caption.slice(0, 2200);
+        console.log(`[AutoSchedule] Original caption length for post #${i + 1}: ${caption.length} chars`);
+        if (caption.length > 2150) {
+          console.warn(`[AutoSchedule] Caption too long for post #${i + 1}, truncating to 2150 chars.`);
+          caption = caption.slice(0, 2150);
         }
+        console.log(`[AutoSchedule] Caption length after truncation for post #${i + 1}: ${caption.length} chars`);
         // Set image filename and type
         const type = imageBlob.type || 'image/jpeg';
         const filename = `auto_post_${i + 1}.jpg`;
@@ -179,15 +182,15 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
           if (!resp.ok) {
             const errData = await resp.json().catch(() => ({}));
             console.error(`[AutoSchedule] Failed to schedule post #${i + 1}:`, errData.error || resp.statusText);
-            setToastMessage(`Failed to schedule post ${i + 1}: ${errData.error || resp.statusText}`);
+            setToastMessage(`Failed to schedule post ${i + 1}: ${errData.error || 'Unknown server error'}`);
           } else {
             const respData = await resp.json().catch(() => ({}));
             console.log(`[AutoSchedule] Scheduled post #${i + 1} successfully:`, respData);
             setToastMessage(`Scheduled post ${i + 1} successfully!`);
           }
         } catch (err) {
-          console.error(`[AutoSchedule] Error scheduling post #${i + 1}:`, err);
-          setToastMessage(`Error scheduling post ${i + 1}`);
+          console.error(`[AutoSchedule] Error scheduling post #${i + 1}:`, err.message);
+          setToastMessage(`Error scheduling post ${i + 1}: ${err.message}`);
         }
         // Wait a bit to avoid hammering the server
         await new Promise(res => setTimeout(res, 500));
@@ -195,9 +198,9 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       setAutoScheduleProgress(null);
       setToastMessage('All posts scheduled!');
     } catch (err) {
-      console.error('[AutoSchedule] Auto-scheduling failed:', err);
+      console.error('[AutoSchedule] Auto-scheduling failed:', err.message);
       setAutoScheduleProgress(null);
-      setToastMessage('Auto-scheduling failed.');
+      setToastMessage(`Auto-scheduling failed: ${err.message}`);
     } finally {
       setAutoScheduling(false);
     }

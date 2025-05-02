@@ -10,6 +10,7 @@ import * as fileType from 'file-type';
 import { fileTypeFromBuffer } from 'file-type';
 import sharp from 'sharp';
 import { randomUUID } from 'crypto';
+import schedule from 'node-schedule';
 const app = express();
 const port = 3000;
 
@@ -1518,7 +1519,7 @@ const R2_PUBLIC_URL = 'https://pub-ba72672df3c041a3844f278dd3c32b22.r2.dev';
 
 app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
   const { userId } = req.params;
-  const { caption, scheduleDate } = req.body;
+  let { caption, scheduleDate } = req.body;
   let file = req.file;
   let baseFilename = file.originalname.replace(/\.[^.]+$/, '');
 
@@ -1542,19 +1543,17 @@ app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
       console.error(`[${new Date().toISOString()}] fileType validation failed:`, fileTypeError.message);
       format = file.mimetype.split('/')[1]; // Fallback to multer mime
     }
-    // If not jpeg/png, convert to jpeg and ensure Instagram-compatible dimensions
+    // Convert to jpeg if not jpeg/png and ensure Instagram-compatible dimensions
     if (!['jpeg', 'png'].includes(format)) {
       console.log(`[${new Date().toISOString()}] Converting image from ${format} to jpeg using sharp...`);
       try {
         let image = sharp(buffer);
         const metadata = await image.metadata();
         let { width, height } = metadata;
-        // Instagram: shortest side >= 320, longest <= 1080, aspect ratio 1.91:1 to 4:5
         const minDim = 320;
         const maxDim = 1080;
         let aspect = width / height;
         if (width < minDim || height < minDim || width > maxDim || height > maxDim || aspect < 0.8 || aspect > 1.91) {
-          // Resize and center-crop to 1080x1080 (safe square)
           console.log(`[${new Date().toISOString()}] Resizing and cropping image to 1080x1080 for Instagram compliance...`);
           image = image.resize(1080, 1080, { fit: 'cover', position: 'center' });
         }
@@ -1566,9 +1565,7 @@ app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
         fileInfo = await fileTypeFromBuffer(buffer);
         format = fileInfo?.mime.split('/')[1];
         file.mimetype = 'image/jpeg';
-        // Always use a unique filename for each upload
         const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-        let baseFilename = file.originalname.replace(/\.[^.]+$/, '');
         let uniqueFilename = `${baseFilename}_${uniqueSuffix}.jpg`;
         file.originalname = uniqueFilename;
         file.size = buffer.length;
@@ -1588,10 +1585,17 @@ app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
       return res.status(400).json({ error: 'Image size exceeds 8MB' });
     }
 
+    // Truncate caption to 2200 characters
+    if (caption.length > 2200) {
+      console.warn(`[${new Date().toISOString()}] Caption too long (${caption.length} chars), truncating to 2200 chars`);
+      caption = caption.slice(0, 2200);
+    }
+    console.log(`[${new Date().toISOString()}] Caption length after truncation: ${caption.length} chars`);
+
     // Validate caption
     if (caption.length > 2200) {
-      console.log(`[${new Date().toISOString()}] Caption too long: ${caption.length} characters`);
-      return res.status(400).json({ error: 'Caption exceeds 2200 characters' });
+      console.log(`[${new Date().toISOString()}] Caption still too long after truncation: ${caption.length} characters`);
+      return res.status(400).json({ error: 'Caption exceeds 2200 characters after truncation' });
     }
     const hashtags = (caption.match(/#[^\s#]+/g) || []).length;
     if (hashtags > 30) {
@@ -1599,10 +1603,10 @@ app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
       return res.status(400).json({ error: 'Maximum 30 hashtags allowed' });
     }
 
-    // Validate schedule date (within 75 days)
+    // Validate schedule date
     let scheduleTime = new Date(scheduleDate);
     const now = new Date();
-    const minSchedule = new Date(now.getTime() + 60 * 1000); // at least 1 min in the future
+    const minSchedule = new Date(now.getTime() + 60 * 1000); // at least 1 min in future
     const maxDate = new Date(now.getTime() + 75 * 24 * 60 * 60 * 1000);
     if (isNaN(scheduleTime.getTime()) || scheduleTime > maxDate) {
       console.log(`[${new Date().toISOString()}] Invalid schedule date: ${scheduleDate}`);
@@ -1615,7 +1619,7 @@ app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
       console.warn(`[${new Date().toISOString()}] scheduleDate is less than 1 min in the future; auto-correcting to now + 1 min.`);
       scheduleTime = minSchedule;
     }
-    console.log(`[${new Date().toISOString()}] Scheduling post with scheduleDate: ${scheduleDate}, corrected scheduleTime: ${scheduleTime.toISOString()}, publish_time: ${Math.floor(scheduleTime.getTime() / 1000)}`);
+    console.log(`[${new Date().toISOString()}] Scheduling post with scheduleDate: ${scheduleDate}, corrected scheduleTime: ${scheduleTime.toISOString()}`);
 
     // Fetch access token
     console.log(`[${new Date().toISOString()}] Fetching token for user ${userId}`);
@@ -1653,7 +1657,7 @@ app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
     const instagram_graph_id = tokenData.instagram_graph_id;
     console.log(`[${new Date().toISOString()}] Token found: graph_id=${instagram_graph_id}`);
 
-    // --- Robust R2 upload and validation loop ---
+    // Robust R2 upload and validation
     let uploadAttempts = 0;
     let imageKey, imageUrl, validUpload = false;
     while (uploadAttempts < 3 && !validUpload) {
@@ -1681,7 +1685,6 @@ app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
           validUpload = true;
         } else {
           console.warn(`[${new Date().toISOString()}] R2 URL not valid JPEG (attempt ${uploadAttempts}): contentType=${contentType}, fileType=${testType?.mime}`);
-          // Re-encode buffer just in case
           file.buffer = await sharp(file.buffer)
             .jpeg({ progressive: false, force: true })
             .toColourspace('srgb')
@@ -1690,7 +1693,6 @@ app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
         }
       } catch (urlError) {
         console.error(`[${new Date().toISOString()}] R2 URL inaccessible (attempt ${uploadAttempts}):`, urlError.message);
-        // Re-encode buffer just in case
         file.buffer = await sharp(file.buffer)
           .jpeg({ progressive: false, force: true })
           .toColourspace('srgb')
@@ -1725,36 +1727,18 @@ app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
     }
     console.log(`[${new Date().toISOString()}] Media object created: media_id=${mediaId}`);
 
-    // Schedule post
-    console.log(`[${new Date().toISOString()}] Scheduling post for ${scheduleDate}`);
-    const publishResponse = await axios.post(
-      `https://graph.instagram.com/v21.0/${instagram_graph_id}/media_publish`,
-      {
-        creation_id: mediaId,
-        publish_time: Math.floor(scheduleTime.getTime() / 1000), // UNIX timestamp
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${access_token}`,
-        },
-      }
-    );
-
-    const postId = publishResponse.data.id;
-    console.log(`[${new Date().toISOString()}] Post scheduled: post_id=${postId}`);
-
-    // Store scheduled post details in R2
-    const scheduledPostKey = `InstagramScheduledPosts/${userId}/${postId}.json`;
+    // Store scheduled post details in R2 (before scheduling, using mediaId)
+    const scheduledPostKey = `InstagramScheduledPosts/${userId}/${mediaId}.json`;
     const scheduledPostData = {
       userId,
       instagram_graph_id,
       media_id: mediaId,
-      post_id: postId,
       caption,
       image_key: imageKey,
       schedule_time: scheduleTime.toISOString(),
       created_at: new Date().toISOString(),
       status: 'scheduled',
+      access_token, // Store for job execution
     };
     console.log(`[${new Date().toISOString()}] Storing scheduled post: ${scheduledPostKey}`);
     const putScheduledCommand = new PutObjectCommand({
@@ -1765,17 +1749,61 @@ app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
     });
     await s3Client.send(putScheduledCommand);
 
-    // Clean up image
-    console.log(`[${new Date().toISOString()}] Cleaning up image: ${imageKey}`);
-    await s3Client.send(new DeleteObjectCommand({
-      Bucket: 'tasks',
-      Key: imageKey,
-    }));
+    // Schedule the publish job
+    console.log(`[${new Date().toISOString()}] Scheduling publish job for media_id=${mediaId} at ${scheduleTime.toISOString()}`);
+    const job = schedule.scheduleJob(scheduleTime, async () => {
+      try {
+        const publishResponse = await axios.post(
+          `https://graph.instagram.com/v21.0/${instagram_graph_id}/media_publish`,
+          {
+            creation_id: mediaId,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${access_token}`,
+            },
+          }
+        );
+        const postId = publishResponse.data.id;
+        console.log(`[${new Date().toISOString()}] Post published successfully: post_id=${postId}, media_id=${mediaId}`);
 
-    console.log(`[${new Date().toISOString()}] Post scheduled for user ${userId} with post ID ${postId}`);
-    res.json({ success: true, post_id: postId, status: 'scheduled', message: 'Post scheduled successfully.' });
+        // Update scheduled post status to 'published'
+        scheduledPostData.status = 'published';
+        scheduledPostData.post_id = postId;
+        scheduledPostData.published_at = new Date().toISOString();
+        const updateCommand = new PutObjectCommand({
+          Bucket: 'tasks',
+          Key: scheduledPostKey,
+          Body: JSON.stringify(scheduledPostData, null, 2),
+          ContentType: 'application/json',
+        });
+        await s3Client.send(updateCommand);
+
+        // Clean up image after successful publish
+        console.log(`[${new Date().toISOString()}] Cleaning up image: ${imageKey}`);
+        await s3Client.send(new DeleteObjectCommand({
+          Bucket: 'tasks',
+          Key: imageKey,
+        }));
+      } catch (error) {
+        console.error(`[${new Date().toISOString()}] Failed to publish post media_id=${mediaId} at ${scheduleTime.toISOString()}:`, error.response?.data || error.message);
+        // Update status to 'failed'
+        scheduledPostData.status = 'failed';
+        scheduledPostData.error = error.response?.data?.error?.message || error.message;
+        const updateCommand = new PutObjectCommand({
+          Bucket: 'tasks',
+          Key: scheduledPostKey,
+          Body: JSON.stringify(scheduledPostData, null, 2),
+          ContentType: 'application/json',
+        });
+        await s3Client.send(updateCommand);
+      }
+    });
+
+    console.log(`[${new Date().toISOString()}] Post scheduled for user ${userId} with media_id=${mediaId} at ${scheduleTime.toISOString()}`);
+    res.json({ success: true, media_id: mediaId, status: 'scheduled', message: 'Post scheduled successfully.' });
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error scheduling post:`, error.response?.data || error.message);
+    console.error(`[${new Date().toISOString()}] Error scheduling post for user ${userId}:`, error.response?.data || error.message);
     res.status(500).json({ error: 'Failed to schedule post', details: error.response?.data?.error?.message || error.message });
   }
 });
@@ -2511,4 +2539,3 @@ app.options('/events/:username', (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });
-

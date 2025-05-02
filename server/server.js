@@ -23,6 +23,13 @@ const s3Client = new S3Client({
   },
 });
 
+// Add this helper after your imports, before routes
+function setCorsHeaders(res, origin = '*') {
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Type');
+}
 
 app.use(cors({
   origin: '*',
@@ -121,14 +128,10 @@ app.get('/events/:username', (req, res) => {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     'Connection': 'keep-alive',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': '*',
-    'Access-Control-Expose-Headers': 'Content-Type',
     'X-Accel-Buffering': 'no',
     'Keep-Alive': 'timeout=15, max=100',
   });
-
+  setCorsHeaders(res);
   res.flushHeaders();
 
   if (!sseClients.has(username)) {
@@ -898,7 +901,7 @@ async function streamToString(stream) {
 // Instagram App Credentials
 const APP_ID = '576296982152813';
 const APP_SECRET = 'd48ddc9eaf0e5c4969d4ddc4e293178c';
-const REDIRECT_URI = 'https://b8e8-121-52-146-243.ngrok-free.app/instagram/callback';
+const REDIRECT_URI = 'https://d1f9-121-52-146-243.ngrok-free.app/instagram/callback';
 const VERIFY_TOKEN = 'myInstagramWebhook2025';
 
 
@@ -1459,6 +1462,7 @@ app.post('/ignore-notification/:userId', async (req, res) => {
 
 // List Stored Events
 app.get('/events-list/:userId', async (req, res) => {
+  setCorsHeaders(res);
   const userId = req.params.userId;
 
   try {
@@ -1493,6 +1497,12 @@ app.get('/events-list/:userId', async (req, res) => {
   }
 });
 
+// Add explicit OPTIONS handler for /events-list/:userId
+app.options('/events-list/:userId', (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+
 // SSE Endpoint
 app.get('/events/:userId', (req, res) => {
   const userId = req.params.userId;
@@ -1501,9 +1511,7 @@ app.get('/events/:userId', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
-  res.setHeader('Access-Control-Allow-Origin', 'http://localhost:5173');
-  res.setHeader('Access-Control-Allow-Methods', 'GET');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  setCorsHeaders(res);
   res.flushHeaders();
 
   if (!sseClients[userId]) {
@@ -1870,7 +1878,7 @@ app.get('/instagram/data-deletion', (req, res) => {
   const signedRequest = req.query.signed_request;
   console.log(`[${new Date().toISOString()}] Data deletion request received:`, signedRequest);
   res.json({
-    url: 'https://b8e8-121-52-146-243.ngrok-free.app/instagram/data-deletion',
+    url: 'https://d1f9-121-52-146-243.ngrok-free.app/instagram/data-deletion',
     confirmation_code: `delete_${Date.now()}`
   });
 });
@@ -1878,7 +1886,7 @@ app.get('/instagram/data-deletion', (req, res) => {
 app.post('/instagram/data-deletion', (req, res) => {
   console.log(`[${new Date().toISOString()}] Data deletion POST request received:`, JSON.stringify(req.body, null, 2));
   res.json({
-    url: 'https://b8e8-121-52-146-243.ngrok-free.app/instagram/data-deletion',
+    url: 'https://d1f9-121-52-146-243.ngrok-free.app/instagram/data-deletion',
     confirmation_code: `delete_${Date.now()}`
   });
 });
@@ -1939,6 +1947,271 @@ function handleErrorResponse(res, error) {
   });
 }
 
+app.post('/save-goal/:username', async (req, res) => {
+  const { username } = req.params;
+  const { persona = '', timeline, goal, instruction } = req.body;
+  const prefix = `goal/${username}/`;
+
+  // Validation
+  if (!timeline || isNaN(Number(timeline))) {
+    return res.status(400).json({ error: 'Timeline (days) is required and must be a number.' });
+  }
+  if (!goal || !goal.trim()) {
+    return res.status(400).json({ error: 'Goal is required.' });
+  }
+  if (!instruction || !instruction.trim()) {
+    return res.status(400).json({ error: 'Instruction is required.' });
+  }
+
+  try {
+    // Generate unique filename
+    const timestamp = Date.now();
+    const key = `${prefix}goal_${timestamp}.json`;
+    const fileContent = JSON.stringify({
+      persona,
+      timeline: Number(timeline),
+      goal,
+      instruction,
+      createdAt: new Date().toISOString(),
+    }, null, 2);
+
+    // Upload to R2
+    const putCommand = new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: key,
+      Body: fileContent,
+      ContentType: 'application/json',
+    });
+    await s3Client.send(putCommand);
+
+    // Invalidate cache for this user's goals
+    cache.delete(prefix);
+
+    res.json({ success: true, message: 'Goal saved successfully.' });
+  } catch (err) {
+    console.error(`[${new Date().toISOString()}] Error saving goal for ${username}:`, err);
+    res.status(500).json({ error: 'Failed to save goal. Please try again later.' });
+  }
+});
+
+
+// AI Reply upload endpoint
+app.post('/ai-reply/:username', async (req, res) => {
+  const { username } = req.params;
+  const notifType = req.body.type;
+  let fileTypePrefix;
+  if (notifType === 'message') {
+    fileTypePrefix = 'ai_dm_';
+  } else if (notifType === 'comment') {
+    fileTypePrefix = 'ai_comment_';
+  } else {
+    return res.status(400).json({ error: 'Invalid notification type for AI reply' });
+  }
+  const prefix = `ai_reply/${username}/`;
+
+  try {
+    // List existing ai_dm_ or ai_comment_ files to determine next number
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: prefix,
+    });
+    const { Contents } = await s3Client.send(listCommand);
+    let nextNumber = 1;
+    if (Contents && Contents.length > 0) {
+      const nums = Contents
+        .map(obj => {
+          const match = obj.Key.match(new RegExp(`${fileTypePrefix}(\\d+)\\.json$`));
+          return match ? parseInt(match[1]) : 0;
+        })
+        .filter(n => n > 0);
+      nextNumber = nums.length > 0 ? Math.max(...nums) + 1 : 1;
+    }
+    const key = `${prefix}${fileTypePrefix}${nextNumber}.json`;
+    const fileContent = JSON.stringify(req.body, null, 2);
+    const putCommand = new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: key,
+      Body: fileContent,
+      ContentType: 'application/json',
+    });
+    await s3Client.send(putCommand);
+    cache.delete(prefix);
+    res.json({ success: true, message: 'AI reply request saved', key });
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error saving AI reply for ${username}:`, error);
+    res.status(500).json({ error: 'Failed to save AI reply request', details: error.message });
+  }
+});
+
+// Fetch all AI replies for a user (DM and comment)
+app.get('/ai-replies/:username', async (req, res) => {
+  let { username } = req.params;
+  // Support both username and userId as input
+  // If the param is a userId, map it to the correct username using InstagramTokens
+  if (/^\d+$/.test(username)) { // If all digits, likely a userId
+    try {
+      const listCommand = new ListObjectsV2Command({
+        Bucket: 'tasks',
+        Prefix: `InstagramTokens/`,
+      });
+      const { Contents } = await s3Client.send(listCommand);
+      if (Contents) {
+        for (const obj of Contents) {
+          if (obj.Key.endsWith('/token.json')) {
+            const getCommand = new GetObjectCommand({
+              Bucket: 'tasks',
+              Key: obj.Key,
+            });
+            const data = await s3Client.send(getCommand);
+            const json = await data.Body.transformToString();
+            const token = JSON.parse(json);
+            if (token.instagram_user_id === username || token.instagram_graph_id === username) {
+              if (token.username) {
+                username = token.username;
+                break;
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error(`[AI-REPLIES] Error mapping userId to username:`, err);
+      // Continue with original username if mapping fails
+    }
+  }
+  const prefix = `ai_reply/${username}/`;
+  try {
+    // List all files in the user's ai_reply directory
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: prefix,
+    });
+    const { Contents } = await s3Client.send(listCommand);
+    if (!Contents || Contents.length === 0) {
+      console.log(`[${new Date().toISOString()}] [AI-REPLIES] No files found for ${username}`);
+      return res.json([]);
+    }
+    const allKeys = Contents.map(f => f.Key);
+    console.log(`[${new Date().toISOString()}] [AI-REPLIES] Files found for ${username}:`, allKeys);
+
+    // Add logging for each file
+    Contents.forEach(obj => {
+      console.log(`[${new Date().toISOString()}] [AI-REPLIES] File: ${obj.Key}`);
+    });
+
+    // Helper to group by type and number
+    const groupFiles = (typePrefix, repliedPrefix) => {
+      const requests = {};
+      const replies = {};
+      for (const obj of Contents) {
+        const reqMatch = obj.Key.match(new RegExp(`${typePrefix}(\\d+)\\.json$`));
+        if (reqMatch) {
+          requests[reqMatch[1]] = obj.Key;
+          console.log(`[${new Date().toISOString()}] [AI-REPLIES] Matched request: ${obj.Key} as number ${reqMatch[1]}`);
+        }
+        const repMatch = obj.Key.match(new RegExp(`${repliedPrefix}(\\d+)\\.json$`));
+        if (repMatch) {
+          replies[repMatch[1]] = obj.Key;
+          console.log(`[${new Date().toISOString()}] [AI-REPLIES] Matched reply: ${obj.Key} as number ${repMatch[1]}`);
+        }
+      }
+      return { requests, replies };
+    };
+
+    // Group DM and comment files
+    const dm = groupFiles('ai_dm_', 'ai_dm_replied_');
+    const comment = groupFiles('ai_comment_', 'ai_comment_replied_');
+    console.log(`[${new Date().toISOString()}] [AI-REPLIES] DM requests:`, dm.requests);
+    console.log(`[${new Date().toISOString()}] [AI-REPLIES] DM replies:`, dm.replies);
+    console.log(`[${new Date().toISOString()}] [AI-REPLIES] Comment requests:`, comment.requests);
+    console.log(`[${new Date().toISOString()}] [AI-REPLIES] Comment replies:`, comment.replies);
+
+    // Helper to fetch file content
+    const fetchFile = async (key) => {
+      const getCommand = new GetObjectCommand({ Bucket: 'tasks', Key: key });
+      const data = await s3Client.send(getCommand);
+      const body = await data.Body.transformToString();
+      return JSON.parse(body);
+    };
+
+    // Merge requests and replies for DM and comment
+    const mergePairs = async (requests, replies, type) => {
+      const pairs = [];
+      for (const num in replies) {
+        const replyKey = replies[num];
+        const reqKey = requests[num];
+        if (!reqKey) {
+          console.warn(`[${new Date().toISOString()}] [AI-REPLIES] No original request for ${type} reply #${num} (${replyKey})`);
+          continue;
+        }
+        try {
+          const [request, reply] = await Promise.all([
+            fetchFile(reqKey),
+            fetchFile(replyKey),
+          ]);
+          pairs.push({
+            type,
+            number: num,
+            request,
+            reply,
+            reqKey,
+            replyKey,
+          });
+        } catch (err) {
+          console.error(`[${new Date().toISOString()}] [AI-REPLIES] Error fetching files for pair #${num}:`, err);
+        }
+      }
+      return pairs;
+    };
+
+    const dmPairs = await mergePairs(dm.requests, dm.replies, 'dm');
+    const commentPairs = await mergePairs(comment.requests, comment.replies, 'comment');
+    const allPairs = [...dmPairs, ...commentPairs];
+    // Sort by number (descending, most recent first)
+    allPairs.sort((a, b) => parseInt(b.number) - parseInt(a.number));
+    console.log(`[${new Date().toISOString()}] [AI-REPLIES] Final pairs returned for ${username}:`, allPairs.map(p => ({ type: p.type, number: p.number, reqKey: p.reqKey, replyKey: p.replyKey })));
+    res.json(allPairs);
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error fetching AI replies for ${username}:`, error);
+    res.status(500).json({ error: 'Failed to fetch AI replies', details: error.message });
+  }
+});
+
+// Ignore (delete) an AI reply pair for a user
+app.post('/ignore-ai-reply/:username', async (req, res) => {
+  const { username } = req.params;
+  const { replyKey, reqKey } = req.body;
+  if (!replyKey) {
+    console.error(`[${new Date().toISOString()}] Ignore AI reply failed: replyKey missing for user ${username}`);
+    return res.status(400).json({ error: 'replyKey is required' });
+  }
+  try {
+    // Delete the reply file
+    const delReply = new DeleteObjectCommand({
+      Bucket: 'tasks',
+      Key: replyKey,
+    });
+    await s3Client.send(delReply);
+    console.log(`[${new Date().toISOString()}] Deleted AI reply file: ${replyKey} for user ${username}`);
+    // Optionally, also delete the original request file
+    if (reqKey) {
+      const delReq = new DeleteObjectCommand({
+        Bucket: 'tasks',
+        Key: reqKey,
+      });
+      await s3Client.send(delReq);
+      console.log(`[${new Date().toISOString()}] Deleted original AI request file: ${reqKey} for user ${username}`);
+    }
+    // Invalidate cache for this user's ai_reply directory
+    const prefix = `ai_reply/${username}/`;
+    cache.delete(prefix);
+    res.json({ success: true });
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error ignoring AI reply for ${username}:`, error);
+    res.status(500).json({ error: 'Failed to ignore AI reply', details: error.message });
+  }
+});
+
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
   console.log('Ready to receive account info at POST /save-account-info');
@@ -1959,4 +2232,5 @@ app.listen(port, () => {
   console.log('Ready to handle Instagram webhooks at GET/POST /webhook/instagram');
   console.log('Ready to handle Instagram deauthorization at POST /instagram/deauthorize');
   console.log('Ready to handle Instagram data deletion at GET/POST /instagram/data-deletion');
+  console.log('Ready to fetch all AI replies for a user at GET /ai-replies/:username');
 });

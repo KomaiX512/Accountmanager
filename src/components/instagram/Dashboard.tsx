@@ -7,6 +7,7 @@ import InstagramConnect from './InstagramConnect';
 import DmsComments from './Dms_Comments';
 import PostScheduler from './PostScheduler';
 import InsightsModal from './InsightsModal';
+import GoalModal from './GoalModal';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 
@@ -52,6 +53,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const [igBusinessId, setIgBusinessId] = useState<string | null>(null);
   const [isSchedulerOpen, setIsSchedulerOpen] = useState(false);
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
+  const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
@@ -178,14 +180,30 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
         message_id: notification.message_id,
         comment_id: notification.comment_id,
       });
-      setNotifications(prev => prev.filter(n => 
-        n.message_id !== notification.message_id && n.comment_id !== notification.comment_id
+      setNotifications(prev => prev.filter(n =>
+        !(
+          (notification.message_id && n.message_id === notification.message_id) ||
+          (notification.comment_id && n.comment_id === notification.comment_id)
+        )
       ));
       setToast('Notification ignored!');
     } catch (error: any) {
       console.error('Error ignoring notification:', error);
       setToast('Failed to ignore notification.');
       setError(error.response?.data?.error || 'Failed to ignore notification.');
+    }
+  };
+
+  const handleReplyWithAI = async (notification: Notification) => {
+    if (!accountHolder) return;
+    try {
+      await axios.post(`http://localhost:3000/ai-reply/${accountHolder}`,
+        notification
+      );
+      setToast('Sent to AI Manager for reply!');
+    } catch (error: any) {
+      console.error('Error sending to AI Manager:', error);
+      setToast('Failed to send to AI Manager.');
     }
   };
 
@@ -343,12 +361,9 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
       if (reconnectAttempts.current < maxReconnectAttempts) {
         reconnectAttempts.current += 1;
         const delay = baseReconnectDelay * Math.pow(2, reconnectAttempts.current);
-        console.log(`[${new Date().toISOString()}] Reconnection attempt ${reconnectAttempts.current}/${maxReconnectAttempts} after ${delay/1000}s`);
-        setError(`Lost connection to server updates. Reconnecting... (Attempt ${reconnectAttempts.current}/${maxReconnectAttempts})`);
         setTimeout(() => setupSSE(userId, attempt + 1), delay);
       } else {
-        setError('Failed to reconnect to server updates. Refreshing notifications...');
-        fetchNotifications(userId);
+        setError('Failed to reconnect to server updates. Will try again in 5 minutes.');
       }
     };
   };
@@ -370,13 +385,14 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
 
   useEffect(() => {
     if (igBusinessId) {
-      console.log(`[${new Date().toISOString()}] Initializing notifications for igBusinessId: ${igBusinessId}`);
-      fetchNotifications(igBusinessId);
-      setupSSE(igBusinessId);
+      fetchNotifications(igBusinessId); // Initial fetch
+      setupSSE(igBusinessId);           // Event-driven updates
+
+      // Fallback polling every 5 minutes (300,000 ms)
       const interval = setInterval(() => {
-        console.log(`[${new Date().toISOString()}] Periodic notification refresh for ${igBusinessId}`);
         fetchNotifications(igBusinessId);
-      }, 30000); // Refresh every 30s
+      }, 300000); // 5 minutes
+
       return () => clearInterval(interval);
     }
   }, [igBusinessId]);
@@ -410,6 +426,10 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     setIsInsightsOpen(true);
   };
 
+  const handleOpenGoalModal = () => {
+    setIsGoalModalOpen(true);
+  };
+
   if (!accountHolder) {
     return <div className="error-message">Please specify an account holder to load the dashboard.</div>;
   }
@@ -421,6 +441,8 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     return count.toString();
   };
 
+  // Add debug log before return
+  console.log('DmsComments username prop:', accountHolder);
   return (
     <motion.div
       className="dashboard-wrapper"
@@ -507,6 +529,24 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
                     >
                       Schedule Post
                     </button>
+                    <button
+                      onClick={handleOpenGoalModal}
+                      className="insta-btn connect"
+                      style={{
+                        background: igBusinessId ? 'linear-gradient(90deg, #00ffcc, #007bff)' : '#4a4a6a',
+                        color: igBusinessId ? '#e0e0ff' : '#a0a0cc',
+                        pointerEvents: igBusinessId ? 'auto' : 'none',
+                        cursor: igBusinessId ? 'pointer' : 'not-allowed',
+                        padding: '8px 16px',
+                        borderRadius: '6px',
+                        border: '1px solid #00ffcc',
+                        zIndex: 20,
+                        marginLeft: '10px',
+                      }}
+                      disabled={!igBusinessId}
+                    >
+                      Goal
+                    </button>
                   </div>
                 </div>
               )}
@@ -516,7 +556,26 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
 
           <div className="notifications">
             <h2>Notifications <span className="badge">{notifications.length || 0} new!!!</span></h2>
-            <DmsComments notifications={notifications} onReply={handleReply} onIgnore={handleIgnore} onRefresh={() => igBusinessId && fetchNotifications(igBusinessId)} />
+            <DmsComments 
+              notifications={notifications} 
+              onReply={handleReply} 
+              onIgnore={handleIgnore} 
+              onRefresh={() => igBusinessId && fetchNotifications(igBusinessId)} 
+              onReplyWithAI={handleReplyWithAI}
+              username={accountHolder}
+              onIgnoreAIReply={async (pair) => {
+                try {
+                  await fetch(`/ignore-ai-reply/${accountHolder}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ replyKey: pair.replyKey, reqKey: pair.reqKey }),
+                  });
+                  // Optionally refresh AI replies or notifications if needed
+                } catch (err) {
+                  setToast('Failed to ignore AI reply.');
+                }
+              }}
+            />
           </div>
 
           <div className="post-cooked">
@@ -603,6 +662,9 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
           console.log(`[${new Date().toISOString()}] Closing InsightsModal`);
           setIsInsightsOpen(false);
         }} />
+      )}
+      {isGoalModalOpen && (
+        <GoalModal username={accountHolder} onClose={() => setIsGoalModalOpen(false)} />
       )}
     </motion.div>
   );

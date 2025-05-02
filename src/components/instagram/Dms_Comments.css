@@ -42,9 +42,16 @@
   
   .reply-container {
     display: flex;
-    flex: 1;
-    gap: 8px;
+    flex-direction: column;
+    gap: 0;
     margin-top: 8px;
+  }
+  
+  .reply-actions {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    margin-top: 6px;
   }
   
   .reply-input {
@@ -60,37 +67,61 @@
     border-color: #007bff;
   }
   
-  .reply-button {
-    padding: 6px 12px;
-    font-size: 14px;
-    color: #fff;
-    background-color: #007bff;
-    border: none;
+  .reply-button,
+  .ignore-button,
+  .ai-reply-button {
+    padding: 4px 10px;
+    font-size: 12px;
     border-radius: 4px;
-    cursor: pointer;
+    border: none;
+    font-weight: 500;
+    transition: background 0.2s, color 0.2s;
+    min-width: 70px;
+  }
+  
+  .reply-button {
+    background: linear-gradient(90deg, #007bff 60%, #00ffcc 100%);
+    color: #fff;
+    border: 1px solid #007bff;
   }
   
   .reply-button:disabled {
-    background-color: #ccc;
+    background: #ccc;
+    color: #fff;
     cursor: not-allowed;
   }
   
   .ignore-button {
-    padding: 6px 12px;
-    font-size: 14px;
+    background: linear-gradient(90deg, #ff4d4f 60%, #ffb199 100%);
     color: #fff;
-    background-color: #ff4d4f;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
+    border: 1px solid #ff4d4f;
   }
   
   .ignore-button:hover:not(:disabled) {
-    background-color: #d9363e;
+    background: #d9363e;
   }
   
   .ignore-button:disabled {
-    background-color: #ccc;
+    background: #ccc;
+    color: #fff;
+    cursor: not-allowed;
+  }
+  
+  .ai-reply-button {
+    background: linear-gradient(90deg, #00ffcc 60%, #007bff 100%);
+    color: #222;
+    border: 1px solid #00ffcc;
+    box-shadow: 0 1px 4px rgba(0,255,204,0.07);
+  }
+  
+  .ai-reply-button:hover:not(:disabled) {
+    background: linear-gradient(90deg, #00e6b2 60%, #005fa3 100%);
+    color: #fff;
+  }
+  
+  .ai-reply-button:disabled {
+    background: #ccc;
+    color: #fff;
     cursor: not-allowed;
   }
   

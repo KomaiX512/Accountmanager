@@ -6,6 +6,10 @@ import cors from 'cors';
 import multer from 'multer';
 const upload = multer({ storage: multer.memoryStorage() });
 import puppeteer from 'puppeteer';
+import * as fileType from 'file-type';
+import { fileTypeFromBuffer } from 'file-type';
+import sharp from 'sharp';
+import { randomUUID } from 'crypto';
 const app = express();
 const port = 3000;
 
@@ -225,51 +229,23 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
 
 app.get('/proxy-image', async (req, res) => {
   let { url } = req.query;
-  if (!url) {
-    return res.status(400).send('Image URL is required');
-  }
-
+  if (!url) return res.status(400).send('Image URL is required');
   try {
-    if (Array.isArray(url)) {
-      url = url[0];
-    }
+    if (Array.isArray(url)) url = url[0];
     const decodedUrl = decodeURIComponent(url);
 
-    const browser = await puppeteer.launch({
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
-    const page = await browser.newPage();
-
-    await page.setRequestInterception(true);
-    page.on('request', (request) => {
-      if (request.resourceType() === 'image' || request.url() === decodedUrl) {
-        request.continue();
-      } else {
-        request.abort();
-      }
-    });
-
-    await page.goto(decodedUrl, { waitUntil: 'networkidle2' });
-
-    const imageBuffer = await page.evaluate(async (url) => {
-      const response = await fetch(url);
-      const buffer = await response.arrayBuffer();
-      return Array.from(new Uint8Array(buffer));
-    }, decodedUrl);
-
-    await browser.close();
-
-    const buffer = Buffer.from(imageBuffer);
-
-    res.set('Content-Type', 'image/jpeg');
-    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    // Fetch the image directly (no puppeteer)
+    const response = await axios.get(decodedUrl, { responseType: 'arraybuffer' });
+    const contentType = response.headers['content-type'];
+    if (!contentType.startsWith('image/')) {
+      console.error(`[proxy-image] URL did not return an image:`, decodedUrl, 'Content-Type:', contentType);
+      return res.status(400).send('URL did not return an image');
+    }
+    res.set('Content-Type', contentType);
     res.set('Access-Control-Allow-Origin', '*');
-    res.set('Access-Control-Allow-Headers', '*');
-    res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
-
-    res.send(buffer);
+    res.send(response.data);
   } catch (error) {
-    console.error(`Failed to proxy image with Puppeteer: ${url}`, error);
+    console.error(`[proxy-image] Failed to proxy image:`, url, error?.response?.status, error?.message);
     res.status(500).send('Failed to fetch image');
   }
 });
@@ -1474,6 +1450,8 @@ app.get('/events-list/:userId', async (req, res) => {
     const events = [];
     if (Contents) {
       for (const obj of Contents) {
+        // Only process .json files and skip replies
+        if (!obj.Key.endsWith('.json')) continue;
         if (obj.Key.includes('reply_') || obj.Key.includes('comment_reply_')) continue;
         const getCommand = new GetObjectCommand({
           Bucket: 'tasks',
@@ -1541,7 +1519,8 @@ const R2_PUBLIC_URL = 'https://pub-ba72672df3c041a3844f278dd3c32b22.r2.dev';
 app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
   const { userId } = req.params;
   const { caption, scheduleDate } = req.body;
-  const file = req.file;
+  let file = req.file;
+  let baseFilename = file.originalname.replace(/\.[^.]+$/, '');
 
   console.log(`[${new Date().toISOString()}] Received schedule-post request for user ${userId}: image=${!!file}, caption=${!!caption}, scheduleDate=${scheduleDate}`);
 
@@ -1553,16 +1532,55 @@ app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
   try {
     // Validate image file type
     let format;
+    let buffer = file.buffer;
+    let fileInfo;
     try {
-      const fileInfo = await fileType.fromBuffer(file.buffer);
+      fileInfo = await fileTypeFromBuffer(buffer);
       format = fileInfo?.mime.split('/')[1];
-      console.log(`[${new Date().toISOString()}] Image format (file-type): ${format || 'unknown'}, mime: ${file.mimetype}, size: ${file.size} bytes, buffer_length: ${file.buffer.length}`);
+      console.log(`[${new Date().toISOString()}] Image format (file-type): ${format || 'unknown'}, mime: ${file.mimetype}, size: ${file.size} bytes, buffer_length: ${buffer.length}`);
     } catch (fileTypeError) {
       console.error(`[${new Date().toISOString()}] fileType validation failed:`, fileTypeError.message);
       format = file.mimetype.split('/')[1]; // Fallback to multer mime
     }
+    // If not jpeg/png, convert to jpeg and ensure Instagram-compatible dimensions
+    if (!['jpeg', 'png'].includes(format)) {
+      console.log(`[${new Date().toISOString()}] Converting image from ${format} to jpeg using sharp...`);
+      try {
+        let image = sharp(buffer);
+        const metadata = await image.metadata();
+        let { width, height } = metadata;
+        // Instagram: shortest side >= 320, longest <= 1080, aspect ratio 1.91:1 to 4:5
+        const minDim = 320;
+        const maxDim = 1080;
+        let aspect = width / height;
+        if (width < minDim || height < minDim || width > maxDim || height > maxDim || aspect < 0.8 || aspect > 1.91) {
+          // Resize and center-crop to 1080x1080 (safe square)
+          console.log(`[${new Date().toISOString()}] Resizing and cropping image to 1080x1080 for Instagram compliance...`);
+          image = image.resize(1080, 1080, { fit: 'cover', position: 'center' });
+        }
+        buffer = await image
+          .jpeg({ progressive: false, force: true })
+          .toColourspace('srgb')
+          .withMetadata({ exif: undefined, icc: undefined })
+          .toBuffer();
+        fileInfo = await fileTypeFromBuffer(buffer);
+        format = fileInfo?.mime.split('/')[1];
+        file.mimetype = 'image/jpeg';
+        // Always use a unique filename for each upload
+        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+        let baseFilename = file.originalname.replace(/\.[^.]+$/, '');
+        let uniqueFilename = `${baseFilename}_${uniqueSuffix}.jpg`;
+        file.originalname = uniqueFilename;
+        file.size = buffer.length;
+        file.buffer = buffer;
+        console.log(`[${new Date().toISOString()}] Conversion and resize successful. New format: ${format}, size: ${buffer.length}`);
+      } catch (convertErr) {
+        console.error(`[${new Date().toISOString()}] Failed to convert/resize image to jpeg:`, convertErr.message);
+        return res.status(400).json({ error: 'Failed to convert/resize image to JPEG' });
+      }
+    }
     if (!format || !['jpeg', 'png'].includes(format)) {
-      console.log(`[${new Date().toISOString()}] Invalid image format: ${format || 'unknown'}`);
+      console.log(`[${new Date().toISOString()}] Invalid image format after conversion: ${format || 'unknown'}`);
       return res.status(400).json({ error: 'Image must be JPEG or PNG' });
     }
     if (file.size > 8 * 1024 * 1024) {
@@ -1626,39 +1644,53 @@ app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
     const instagram_graph_id = tokenData.instagram_graph_id;
     console.log(`[${new Date().toISOString()}] Token found: graph_id=${instagram_graph_id}`);
 
-    // Upload image to R2
-    const imageKey = `InstagramEvents/${userId}/${file.originalname}`;
-    console.log(`[${new Date().toISOString()}] Uploading image to R2: ${imageKey}, ContentType: ${file.mimetype}`);
-    const putCommand = new PutObjectCommand({
-      Bucket: 'tasks',
-      Key: imageKey,
-      Body: file.buffer,
-      ContentType: file.mimetype,
-      ACL: 'public-read',
-    });
-    await s3Client.send(putCommand);
+    // --- Robust R2 upload and validation loop ---
+    let uploadAttempts = 0;
+    let imageKey, imageUrl, validUpload = false;
+    while (uploadAttempts < 3 && !validUpload) {
+      uploadAttempts++;
+      imageKey = `InstagramEvents/${userId}/${baseFilename}_${Date.now()}_${Math.round(Math.random() * 1e9)}.jpg`;
+      console.log(`[${new Date().toISOString()}] Uploading image to R2: ${imageKey}, ContentType: image/jpeg`);
+      const putCommand = new PutObjectCommand({
+        Bucket: 'tasks',
+        Key: imageKey,
+        Body: file.buffer,
+        ContentType: 'image/jpeg',
+        ACL: 'public-read',
+      });
+      await s3Client.send(putCommand);
 
-    // Test R2 URL accessibility
-    const imageUrl = `${R2_PUBLIC_URL}/${imageKey}`;
-    console.log(`[${new Date().toISOString()}] Testing R2 image URL: ${imageUrl}`);
-    let urlAccessible = false;
-    for (let attempt = 1; attempt <= 3; attempt++) {
+      imageUrl = `${R2_PUBLIC_URL}/${imageKey}`;
+      console.log(`[${new Date().toISOString()}] Testing R2 image URL: ${imageUrl}`);
       try {
-        const urlTest = await axios.head(imageUrl, { timeout: 5000 });
-        console.log(`[${new Date().toISOString()}] R2 URL accessible (attempt ${attempt}): ${urlTest.status}`);
-        urlAccessible = true;
-        break;
-      } catch (urlError) {
-        console.error(`[${new Date().toISOString()}] R2 URL inaccessible (attempt ${attempt}):`, urlError.message, urlError.response?.status || '');
-        if (attempt === 3) {
-          throw new Error(`Image URL is not publicly accessible after ${attempt} attempts`);
+        const urlTest = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 10000 });
+        const contentType = urlTest.headers['content-type'];
+        const testBuffer = Buffer.from(urlTest.data);
+        const testType = await fileTypeFromBuffer(testBuffer);
+        if (contentType === 'image/jpeg' && testType?.mime === 'image/jpeg') {
+          console.log(`[${new Date().toISOString()}] R2 URL accessible and valid JPEG (attempt ${uploadAttempts}): 200`);
+          validUpload = true;
+        } else {
+          console.warn(`[${new Date().toISOString()}] R2 URL not valid JPEG (attempt ${uploadAttempts}): contentType=${contentType}, fileType=${testType?.mime}`);
+          // Re-encode buffer just in case
+          file.buffer = await sharp(file.buffer)
+            .jpeg({ progressive: false, force: true })
+            .toColourspace('srgb')
+            .withMetadata({ exif: undefined, icc: undefined })
+            .toBuffer();
         }
-        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (urlError) {
+        console.error(`[${new Date().toISOString()}] R2 URL inaccessible (attempt ${uploadAttempts}):`, urlError.message);
+        // Re-encode buffer just in case
+        file.buffer = await sharp(file.buffer)
+          .jpeg({ progressive: false, force: true })
+          .toColourspace('srgb')
+          .withMetadata({ exif: undefined, icc: undefined })
+          .toBuffer();
       }
     }
-
-    if (!urlAccessible) {
-      throw new Error('Image URL is not publicly accessible');
+    if (!validUpload) {
+      return res.status(500).json({ error: 'Failed to upload a valid JPEG image to R2 after 3 attempts.' });
     }
 
     // Create media object
@@ -2422,6 +2454,22 @@ app.post('/ignore-ai-reply/:username', async (req, res) => {
     res.status(500).json({ error: 'Failed to ignore AI reply', details: error.message });
   }
 });
+// Generate a fresh signed URL for a ready_post image
+app.get('/signed-image-url/:username/:imageKey', async (req, res) => {
+  const { username, imageKey } = req.params;
+  try {
+    const key = `ready_post/${username}/${imageKey}`;
+    const command = new GetObjectCommand({
+      Bucket: 'tasks',
+      Key: key,
+    });
+    const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+    res.json({ url: signedUrl });
+  } catch (error) {
+    console.error(`[signed-image-url] Failed to generate signed URL for`, req.params, error?.message);
+    res.status(500).json({ error: 'Failed to generate signed URL' });
+  }
+});
 
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
@@ -2454,3 +2502,4 @@ app.options('/events/:username', (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });
+

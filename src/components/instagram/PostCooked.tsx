@@ -21,6 +21,10 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   const [autoScheduleProgress, setAutoScheduleProgress] = useState<string | null>(null);
   const [showIntervalModal, setShowIntervalModal] = useState(false);
   const [intervalInput, setIntervalInput] = useState('');
+  const [rejectedPosts, setRejectedPosts] = useState<string[]>([]);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [selectedPostKey, setSelectedPostKey] = useState<string | null>(null);
+  const [scheduleDateTime, setScheduleDateTime] = useState<string>('');
 
   useEffect(() => {
     console.log('Posts prop in PostCooked:', posts);
@@ -64,6 +68,129 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   const handleImageError = (key: string, url: string) => {
     console.error(`Failed to load image for ${key}: ${url}`);
     setImageErrors(prev => ({ ...prev, [key]: true }));
+  };
+
+  const handleScheduleClick = (key: string) => {
+    const now = new Date();
+    const defaultTime = new Date(now.getTime() + 60 * 1000); // 1 min in future
+    setScheduleDateTime(defaultTime.toISOString().slice(0, 16));
+    setSelectedPostKey(key);
+    setShowScheduleModal(true);
+  };
+
+  const handleScheduleSubmit = async () => {
+    if (!selectedPostKey || !userId) {
+      setToastMessage('No post or user ID selected.');
+      return;
+    }
+    const post = posts.find(p => p.key === selectedPostKey);
+    if (!post) {
+      setToastMessage('Selected post not found.');
+      return;
+    }
+    const scheduleTime = new Date(scheduleDateTime);
+    const now = new Date();
+    const minSchedule = new Date(now.getTime() + 60 * 1000);
+    if (scheduleTime < minSchedule) {
+      setToastMessage('Schedule time must be at least 1 minute in the future.');
+      return;
+    }
+    // Fetch image
+    let imageKey = '';
+    if (post.data.image_url && post.data.image_url.includes('/ready_post/')) {
+      const match = post.data.image_url.match(/ready_post\/[\w-]+\/(image_\d+\.jpg)/);
+      if (match) imageKey = match[1];
+    }
+    if (!imageKey && post.key.match(/ready_post_\d+\.json$/)) {
+      const postIdMatch = post.key.match(/ready_post_(\d+)\.json$/);
+      if (postIdMatch) imageKey = `image_${postIdMatch[1]}.jpg`;
+    }
+    if (!imageKey) {
+      setToastMessage('Could not determine image for post.');
+      return;
+    }
+    let signedImageUrl = '';
+    try {
+      const signedUrlRes = await fetch(`http://localhost:3000/signed-image-url/${username}/${imageKey}`);
+      const signedUrlData = await signedUrlRes.json();
+      signedImageUrl = signedUrlData.url;
+      if (!signedImageUrl) throw new Error('No signed URL returned');
+      console.log(`[Schedule] Got signed URL for post ${selectedPostKey}:`, signedImageUrl);
+    } catch (err) {
+      console.error(`[Schedule] Failed to get signed URL for post ${selectedPostKey}:`, err);
+      setToastMessage('Failed to get image for post.');
+      return;
+    }
+    // Fetch image as blob via proxy
+    let imageBlob: Blob | null = null;
+    try {
+      const proxyUrl = `http://localhost:3000/proxy-image?url=${encodeURIComponent(signedImageUrl)}`;
+      const imgRes = await fetch(proxyUrl);
+      imageBlob = await imgRes.blob();
+      console.log(`[Schedule] Image fetched for post ${selectedPostKey} via proxy`);
+    } catch (e) {
+      console.error(`[Schedule] Failed to fetch image for post ${selectedPostKey}:`, e);
+      setToastMessage('Failed to fetch image for post.');
+      return;
+    }
+    if (!['image/jpeg', 'image/png'].includes(imageBlob.type)) {
+      console.error(`[Schedule] Image is not a valid JPEG/PNG, got: ${imageBlob.type}`);
+      setToastMessage('Image is not a valid JPEG/PNG.');
+      return;
+    }
+    // Compose caption
+    let caption = post.data.post?.caption || '';
+    console.log(`[Schedule] Original caption length: ${caption.length} chars`);
+    if (caption.length > 2150) {
+      console.warn(`[Schedule] Caption too long, truncating to 2150 chars.`);
+      caption = caption.slice(0, 2150);
+    }
+    console.log(`[Schedule] Caption length after truncation: ${caption.length} chars`);
+    const filename = `post_${selectedPostKey}.jpg`;
+    const formData = new FormData();
+    formData.append('image', imageBlob, filename);
+    formData.append('caption', caption);
+    formData.append('scheduleDate', scheduleTime.toISOString());
+    try {
+      console.log(`[Schedule] Sending schedule request for post ${selectedPostKey} to /schedule-post/${userId}`);
+      const resp = await fetch(`http://localhost:3000/schedule-post/${userId}`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (!resp.ok) {
+        const errData = await resp.json().catch(() => ({}));
+        console.error(`[Schedule] Failed to schedule post ${selectedPostKey}:`, errData.error || resp.statusText);
+        setToastMessage(`Failed to schedule post: ${errData.error || 'Unknown server error'}`);
+      } else {
+        const respData = await resp.json().catch(() => ({}));
+        console.log(`[Schedule] Scheduled post ${selectedPostKey} successfully:`, respData);
+        setToastMessage('Your post is on schedule!');
+        // Optionally remove post from view after scheduling
+        setRejectedPosts(prev => [...prev, selectedPostKey]);
+      }
+    } catch (err) {
+      console.error(`[Schedule] Error scheduling post ${selectedPostKey}:`, err.message);
+      setToastMessage(`Error scheduling post: ${err.message}`);
+    }
+    setShowScheduleModal(false);
+    setSelectedPostKey(null);
+    setScheduleDateTime('');
+  };
+
+  const handleScheduleCancel = () => {
+    setShowScheduleModal(false);
+    setSelectedPostKey(null);
+    setScheduleDateTime('');
+  };
+
+  const handleEdit = (key: string) => {
+    console.log(`[Edit] Edit clicked for post ${key} (functionality to be implemented)`);
+    setToastMessage('Edit feature coming soon!');
+  };
+
+  const handleReject = (key: string) => {
+    setRejectedPosts(prev => [...prev, key]);
+    setToastMessage('Post rejected and removed.');
   };
 
   // Fetch time delay from R2 bucket
@@ -217,6 +344,9 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     );
   }
 
+  // Filter out rejected posts
+  const filteredPosts = posts.filter(post => !rejectedPosts.includes(post.key));
+
   return (
     <ErrorBoundary>
       <div className="post-cooked-container">
@@ -225,8 +355,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
           <button
             className="insta-btn connect"
-            style={{ background: userId && posts.length ? 'linear-gradient(90deg, #007bff, #00ffcc)' : '#4a4a6a', color: '#e0e0ff', cursor: userId && posts.length ? 'pointer' : 'not-allowed', borderRadius: 8, padding: '8px 16px', border: '1px solid #00ffcc' }}
-            disabled={!userId || !posts.length || autoScheduling}
+            style={{ background: userId && filteredPosts.length ? 'linear-gradient(90deg, #007bff, #00ffcc)' : '#4a4a6a', color: '#e0e0ff', cursor: userId && filteredPosts.length ? 'pointer' : 'not-allowed', borderRadius: 8, padding: '8px 16px', border: '1px solid #00ffcc' }}
+            disabled={!userId || !filteredPosts.length || autoScheduling}
             onClick={() => setShowIntervalModal(true)}
           >
             {autoScheduling ? 'Auto-Scheduling...' : 'Auto-Schedule All'}
@@ -272,14 +402,45 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             </div>
           </div>
         )}
+        {/* Schedule Modal */}
+        {showScheduleModal && (
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.4)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <div className="schedule-modal">
+              <h3>Schedule Post</h3>
+              <label style={{ color: '#e0e0ff', fontSize: '1rem', marginBottom: '8px' }}>
+                Select Date and Time
+              </label>
+              <input
+                type="datetime-local"
+                value={scheduleDateTime}
+                onChange={e => setScheduleDateTime(e.target.value)}
+                style={{ padding: 8, borderRadius: 6, border: '1px solid #00ffcc', fontSize: 16, width: '100%', background: 'rgba(255, 255, 255, 0.05)', color: '#e0e0ff' }}
+              />
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 16 }}>
+                <button
+                  className="schedule-cancel-button"
+                  onClick={handleScheduleCancel}
+                >Cancel</button>
+                <button
+                  className="schedule-submit-button"
+                  onClick={handleScheduleSubmit}
+                  disabled={!scheduleDateTime}
+                >Schedule</button>
+              </div>
+            </div>
+          </div>
+        )}
         {autoScheduleProgress && (
           <div className="loading">{autoScheduleProgress}</div>
         )}
-        {posts.length === 0 ? (
+        {filteredPosts.length === 0 ? (
           <p className="no-posts">No posts ready yet. Stay tuned!</p>
         ) : (
           <div className="post-list">
-            {posts.map((post) => (
+            {filteredPosts.map((post) => (
               <motion.div
                 key={post.key}
                 className="post-card"
@@ -399,6 +560,74 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                       >
                         <path d="M17 2v9h-3v6a3 3 0 0 1-3 3h-2l-3-3v-6h-3l8-8 6 6h-3z" />
                       </svg>
+                    </motion.button>
+                  </div>
+                  <div className="post-control-buttons">
+                    <motion.button
+                      className="schedule-button"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => handleScheduleClick(post.key)}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#e0e0ff"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                      </svg>
+                      Schedule
+                    </motion.button>
+                    <motion.button
+                      className="edit-button"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => handleEdit(post.key)}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#e0e0ff"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                      </svg>
+                      Edit
+                    </motion.button>
+                    <motion.button
+                      className="reject-button"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => handleReject(post.key)}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#ff4444"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M18 6L6 18" />
+                        <path d="M6 6l12 12" />
+                      </svg>
+                      Reject
                     </motion.button>
                   </div>
                   <p className="post-caption">

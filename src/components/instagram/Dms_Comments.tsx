@@ -23,15 +23,19 @@ interface DmsCommentsProps {
   onReplyWithAI: (notification: Notification) => void;
   username: string;
   onIgnoreAIReply: (pair: any) => void;
+  refreshKey: number;
+  igBusinessId: string | null;
 }
 
-const Dms_Comments: React.FC<DmsCommentsProps> = ({ notifications, onReply, onIgnore, onRefresh, onReplyWithAI, username, onIgnoreAIReply }) => {
+const Dms_Comments: React.FC<DmsCommentsProps> = ({ notifications, onReply, onIgnore, onRefresh, onReplyWithAI, username, onIgnoreAIReply, igBusinessId }) => {
   const [replyText, setReplyText] = useState<{ [key: string]: string }>({});
   const [sending, setSending] = useState<{ [key: string]: boolean }>({});
   const [error, setError] = useState<{ [key: string]: string }>({});
   const [aiReplies, setAIReplies] = useState<any[]>([]);
   const [loadingAI, setLoadingAI] = useState(false);
   const [errorAI, setErrorAI] = useState<string | null>(null);
+  const [aiRefreshKey, setAIRefreshKey] = useState(0);
+  const [sentAI, setSentAI] = useState<{ [replyKey: string]: boolean }>({});
 
   console.log('DmsComments username:', username);
 
@@ -68,30 +72,84 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({ notifications, onReply, onIg
     setSending({ ...sending, [id]: false });
   };
 
-  useEffect(() => {
+  // Helper to fetch AI replies
+  const fetchAIReplies = async () => {
     if (!username) {
-      console.warn('Dms_Comments: username prop is empty, skipping AI replies fetch');
+      setErrorAI('No username provided for AI replies.');
       return;
     }
     setLoadingAI(true);
     setErrorAI(null);
-    const url = `http://localhost:3000/ai-replies/${username}`;
-    console.log('Fetching AI replies for username:', username, 'URL:', url);
-    fetch(url)
-      .then(res => {
-        console.log('AI replies fetch status:', res.status);
-        return res.json();
-      })
-      .then(data => {
-        console.log('AI replies response:', data);
-        setAIReplies(data);
-      })
-      .catch(err => {
-        console.error('AI replies fetch error:', err);
-        setErrorAI('Failed to load AI replies.');
-      })
-      .finally(() => setLoadingAI(false));
-  }, [username]);
+    try {
+      const url = `http://localhost:3000/ai-replies/${username}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      setAIReplies(data);
+      // Auto-send logic for AI DM replies
+      for (const pair of data) {
+        if (
+          pair.type === 'dm' &&
+          pair.request &&
+          pair.reply &&
+          pair.request.message_id &&
+          pair.request.sender_id &&
+          pair.reply.reply &&
+          !sentAI[pair.replyKey] &&
+          igBusinessId
+        ) {
+          // Debug log before sending
+          console.log('Auto-sending AI DM:', {
+            igBusinessId,
+            sender_id: pair.request.sender_id,
+            text: pair.reply.reply,
+            message_id: pair.request.message_id,
+            pair
+          });
+          // Send DM reply if not already sent
+          setSentAI(prev => ({ ...prev, [pair.replyKey]: true }));
+          fetch(`http://localhost:3000/send-dm-reply/${igBusinessId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sender_id: pair.request.sender_id,
+              text: pair.reply.reply,
+              message_id: pair.request.message_id,
+            }),
+          })
+            .then(async (res) => {
+              if (res.ok) {
+                // Optionally, remove from list or mark as sent
+                setAIReplies(prev => prev.filter(p => p.replyKey !== pair.replyKey));
+              } else {
+                // If failed, allow retry
+                setSentAI(prev => {
+                  const copy = { ...prev };
+                  delete copy[pair.replyKey];
+                  return copy;
+                });
+              }
+            })
+            .catch(() => {
+              setSentAI(prev => {
+                const copy = { ...prev };
+                delete copy[pair.replyKey];
+                return copy;
+              });
+            });
+        }
+      }
+    } catch (err) {
+      setErrorAI('Failed to load AI replies.');
+    } finally {
+      setLoadingAI(false);
+    }
+  };
+
+  // Fetch AI replies on mount and when username or aiRefreshKey changes
+  useEffect(() => {
+    fetchAIReplies();
+    // eslint-disable-next-line
+  }, [username, aiRefreshKey]);
 
   // Filter for pending notifications
   const filteredNotifications = notifications.filter(notif => notif.status === 'pending' && (notif.type === 'message' || notif.type === 'comment'));
@@ -266,7 +324,18 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({ notifications, onReply, onIg
       )}
       {/* AI Replies Section */}
       <div className="ai-replies-section">
-        <h3 style={{ color: '#00ffcc', marginTop: 20, marginBottom: 10 }}>AI Answered</h3>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
+          <h3 style={{ color: '#00ffcc', margin: 0, marginRight: 10 }}>AI Answered</h3>
+          <button
+            className="ai-refresh-button"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#00ffcc', fontSize: 18 }}
+            title="Refresh AI Replies"
+            onClick={() => setAIRefreshKey(k => k + 1)}
+            disabled={loadingAI}
+          >
+            &#x21bb;
+          </button>
+        </div>
         {loadingAI ? (
           <div className="ai-replies-loading">Loading AI replies...</div>
         ) : errorAI ? (
@@ -290,6 +359,9 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({ notifications, onReply, onIg
                 >
                   Ignore
                 </button>
+                {pair.type === 'dm' && sentAI[pair.replyKey] && (
+                  <span style={{ color: '#00ffcc', marginLeft: 10 }}>Sent as DM</span>
+                )}
               </li>
             ))}
           </ul>

@@ -60,6 +60,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const baseReconnectDelay = 5000;
   const firstLoadRef = useRef(true);
   const lastProfilePicRenderTimeRef = useRef<number>(0);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const fetchProfileInfo = async () => {
     if (!accountHolder) return;
@@ -565,16 +566,18 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
               username={accountHolder}
               onIgnoreAIReply={async (pair) => {
                 try {
-                  await fetch(`/ignore-ai-reply/${accountHolder}`, {
+                  await fetch(`http://localhost:3000/ignore-ai-reply/${accountHolder}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ replyKey: pair.replyKey, reqKey: pair.reqKey }),
                   });
-                  // Optionally refresh AI replies or notifications if needed
+                  setRefreshKey(prev => prev + 1);
                 } catch (err) {
                   setToast('Failed to ignore AI reply.');
                 }
               }}
+              refreshKey={refreshKey}
+              igBusinessId={igBusinessId}
             />
           </div>
 

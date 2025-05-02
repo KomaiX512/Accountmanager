@@ -124,14 +124,13 @@ app.get('/events/:username', (req, res) => {
 
   console.log(`[${new Date().toISOString()}] Handling SSE request for /events/${username}`);
 
-  res.set({
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-    'X-Accel-Buffering': 'no',
-    'Keep-Alive': 'timeout=15, max=100',
-  });
-  setCorsHeaders(res);
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Type');
   res.flushHeaders();
 
   if (!sseClients.has(username)) {
@@ -1511,7 +1510,10 @@ app.get('/events/:userId', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
-  setCorsHeaders(res);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Type');
   res.flushHeaders();
 
   if (!sseClients[userId]) {
@@ -2010,6 +2012,72 @@ app.post('/ai-reply/:username', async (req, res) => {
   const prefix = `ai_reply/${username}/`;
 
   try {
+    // --- Ensure sender_id and message_id are present for DM AI replies ---
+    let patchedBody = { ...req.body };
+    if (notifType === 'message' && (!patchedBody.sender_id || !patchedBody.message_id)) {
+      // Try to find userId for this username
+      let userId = null;
+      try {
+        const listTokens = new ListObjectsV2Command({
+          Bucket: 'tasks',
+          Prefix: `InstagramTokens/`,
+        });
+        const { Contents: tokenContents } = await s3Client.send(listTokens);
+        if (tokenContents) {
+          for (const obj of tokenContents) {
+            if (obj.Key.endsWith('/token.json')) {
+              const getCommand = new GetObjectCommand({
+                Bucket: 'tasks',
+                Key: obj.Key,
+              });
+              const data = await s3Client.send(getCommand);
+              const json = await data.Body.transformToString();
+              const token = JSON.parse(json);
+              if (token.username === username) {
+                userId = token.instagram_user_id;
+                break;
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error(`[AI-REPLY PATCH] Error mapping username to userId:`, err);
+      }
+      if (userId) {
+        try {
+          const listEvents = new ListObjectsV2Command({
+            Bucket: 'tasks',
+            Prefix: `InstagramEvents/${userId}/`,
+          });
+          const { Contents: eventContents } = await s3Client.send(listEvents);
+          if (eventContents) {
+            for (const obj of eventContents) {
+              if (obj.Key.endsWith('.json')) {
+                const getCommand = new GetObjectCommand({
+                  Bucket: 'tasks',
+                  Key: obj.Key,
+                });
+                const data = await s3Client.send(getCommand);
+                const json = await data.Body.transformToString();
+                const event = JSON.parse(json);
+                // Match by text if message_id is missing, or by message_id if present
+                if (
+                  event.type === 'message' &&
+                  ((patchedBody.text && event.text === patchedBody.text) ||
+                   (patchedBody.message_id && event.message_id === patchedBody.message_id))
+                ) {
+                  if (!patchedBody.sender_id && event.sender_id) patchedBody.sender_id = event.sender_id;
+                  if (!patchedBody.message_id && event.message_id) patchedBody.message_id = event.message_id;
+                  break;
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.error(`[AI-REPLY PATCH] Error finding original DM event:`, err);
+        }
+      }
+    }
     // List existing ai_dm_ or ai_comment_ files to determine next number
     const listCommand = new ListObjectsV2Command({
       Bucket: 'tasks',
@@ -2027,7 +2095,7 @@ app.post('/ai-reply/:username', async (req, res) => {
       nextNumber = nums.length > 0 ? Math.max(...nums) + 1 : 1;
     }
     const key = `${prefix}${fileTypePrefix}${nextNumber}.json`;
-    const fileContent = JSON.stringify(req.body, null, 2);
+    const fileContent = JSON.stringify(patchedBody, null, 2);
     const putCommand = new PutObjectCommand({
       Bucket: 'tasks',
       Key: key,
@@ -2036,6 +2104,149 @@ app.post('/ai-reply/:username', async (req, res) => {
     });
     await s3Client.send(putCommand);
     cache.delete(prefix);
+
+    // --- SSE update for AI replies ---
+    const clients = sseClients.get(username) || [];
+    for (const client of clients) {
+      client.write(`data: ${JSON.stringify({ type: 'update', prefix })}\n\n`);
+    }
+
+    // --- Send AI reply as real DM if type is message ---
+    if (notifType === 'message') {
+      // Find the original DM file for this message_id
+      const message_id = patchedBody.message_id;
+      let sender_id = patchedBody.sender_id;
+      let userId = null;
+      // Map username to Instagram userId
+      try {
+        const listTokens = new ListObjectsV2Command({
+          Bucket: 'tasks',
+          Prefix: `InstagramTokens/`,
+        });
+        const { Contents: tokenContents } = await s3Client.send(listTokens);
+        if (tokenContents) {
+          for (const obj of tokenContents) {
+            if (obj.Key.endsWith('/token.json')) {
+              const getCommand = new GetObjectCommand({
+                Bucket: 'tasks',
+                Key: obj.Key,
+              });
+              const data = await s3Client.send(getCommand);
+              const json = await data.Body.transformToString();
+              const token = JSON.parse(json);
+              if (token.username === username) {
+                userId = token.instagram_user_id;
+                break;
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error(`[AI-REPLY] Error mapping username to userId:`, err);
+      }
+      // If sender_id or message_id missing, try to find from InstagramEvents
+      if ((!sender_id || !message_id) && userId) {
+        try {
+          const listEvents = new ListObjectsV2Command({
+            Bucket: 'tasks',
+            Prefix: `InstagramEvents/${userId}/`,
+          });
+          const { Contents: eventContents } = await s3Client.send(listEvents);
+          if (eventContents) {
+            for (const obj of eventContents) {
+              if (obj.Key.endsWith('.json')) {
+                const getCommand = new GetObjectCommand({
+                  Bucket: 'tasks',
+                  Key: obj.Key,
+                });
+                const data = await s3Client.send(getCommand);
+                const json = await data.Body.transformToString();
+                const event = JSON.parse(json);
+                if (event.type === 'message' && event.text === patchedBody.text) {
+                  sender_id = event.sender_id;
+                  // message_id = event.message_id; // already set
+                  break;
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.error(`[AI-REPLY] Error finding original DM event:`, err);
+        }
+      }
+      // Send the reply if all info is available
+      if (userId && sender_id && message_id && patchedBody.reply) {
+        try {
+          // Use the same logic as /send-dm-reply/:userId
+          const axios = require('axios');
+          // Find access token
+          let access_token = null;
+          let instagram_graph_id = null;
+          const listTokens = new ListObjectsV2Command({
+            Bucket: 'tasks',
+            Prefix: `InstagramTokens/`,
+          });
+          const { Contents: tokenContents } = await s3Client.send(listTokens);
+          if (tokenContents) {
+            for (const obj of tokenContents) {
+              if (obj.Key.endsWith('/token.json')) {
+                const getCommand = new GetObjectCommand({
+                  Bucket: 'tasks',
+                  Key: obj.Key,
+                });
+                const data = await s3Client.send(getCommand);
+                const json = await data.Body.transformToString();
+                const token = JSON.parse(json);
+                if (token.instagram_user_id === userId) {
+                  access_token = token.access_token;
+                  instagram_graph_id = token.instagram_graph_id;
+                  break;
+                }
+              }
+            }
+          }
+          if (access_token && instagram_graph_id) {
+            await axios({
+              method: 'post',
+              url: `https://graph.instagram.com/v22.0/${instagram_graph_id}/messages`,
+              headers: {
+                Authorization: `Bearer ${access_token}`,
+                'Content-Type': 'application/json',
+              },
+              data: {
+                recipient: { id: sender_id },
+                message: { text: patchedBody.reply },
+              },
+            });
+            // Update original message status
+            const messageKey = `InstagramEvents/${userId}/${message_id}.json`;
+            try {
+              const getCommand = new GetObjectCommand({
+                Bucket: 'tasks',
+                Key: messageKey,
+              });
+              const data = await s3Client.send(getCommand);
+              const messageData = JSON.parse(await data.Body.transformToString());
+              messageData.status = 'replied';
+              messageData.updated_at = new Date().toISOString();
+              await s3Client.send(new PutObjectCommand({
+                Bucket: 'tasks',
+                Key: messageKey,
+                Body: JSON.stringify(messageData, null, 2),
+                ContentType: 'application/json',
+              }));
+            } catch (error) {
+              console.error(`[AI-REPLY] Error updating DM status:`, error);
+            }
+          }
+        } catch (err) {
+          console.error(`[AI-REPLY] Error sending AI DM reply:`, err);
+        }
+      } else {
+        console.warn(`[AI-REPLY] Missing info to send AI DM reply: userId=${userId}, sender_id=${sender_id}, message_id=${message_id}`);
+      }
+    }
+
     res.json({ success: true, message: 'AI reply request saved', key });
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Error saving AI reply for ${username}:`, error);
@@ -2233,4 +2444,13 @@ app.listen(port, () => {
   console.log('Ready to handle Instagram deauthorization at POST /instagram/deauthorize');
   console.log('Ready to handle Instagram data deletion at GET/POST /instagram/data-deletion');
   console.log('Ready to fetch all AI replies for a user at GET /ai-replies/:username');
+});
+
+app.options('/events/:userId', (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+app.options('/events/:username', (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
 });

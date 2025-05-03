@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import './App.css';
 import LeftBar from './components/common/LeftBar';
@@ -9,13 +9,13 @@ import NonBrandingDashboard from './components/instagram/NonBrandingDashboard';
 
 const App: React.FC = () => {
   const location = useLocation();
-  const { accountHolder, competitors } = location.state || { accountHolder: '', competitors: [] };
+  const { accountHolder, competitors, userId } = location.state || { accountHolder: '', competitors: [], userId: undefined };
 
   return (
     <div className="App">
       <TopBar />
       <div className="main-content">
-        <LeftBar />
+        <LeftBar accountHolder={accountHolder} userId={userId} />
         <div className="content-area">
           <Routes>
             <Route path="/" element={<Instagram />} />

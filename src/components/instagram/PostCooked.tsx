@@ -3,6 +3,7 @@ import './PostCooked.css';
 import { motion } from 'framer-motion';
 import { saveFeedback } from '../../utils/FeedbackHandler';
 import ErrorBoundary from '../ErrorBoundary';
+import CanvasEditor from '../common/CanvasEditor';
 
 interface PostCookedProps {
   username: string;
@@ -25,6 +26,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [selectedPostKey, setSelectedPostKey] = useState<string | null>(null);
   const [scheduleDateTime, setScheduleDateTime] = useState<string>('');
+  const [showCanvasEditor, setShowCanvasEditor] = useState(false);
+  const [editingPost, setEditingPost] = useState<{ key: string; imageUrl: string; caption: string } | null>(null);
 
   useEffect(() => {
     console.log('Posts prop in PostCooked:', posts);
@@ -116,7 +119,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       signedImageUrl = signedUrlData.url;
       if (!signedImageUrl) throw new Error('No signed URL returned');
       console.log(`[Schedule] Got signed URL for post ${selectedPostKey}:`, signedImageUrl);
-    } catch (err) {
+    } catch (err: any) {
       console.error(`[Schedule] Failed to get signed URL for post ${selectedPostKey}:`, err);
       setToastMessage('Failed to get image for post.');
       return;
@@ -128,7 +131,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       const imgRes = await fetch(proxyUrl);
       imageBlob = await imgRes.blob();
       console.log(`[Schedule] Image fetched for post ${selectedPostKey} via proxy`);
-    } catch (e) {
+    } catch (e: any) {
       console.error(`[Schedule] Failed to fetch image for post ${selectedPostKey}:`, e);
       setToastMessage('Failed to fetch image for post.');
       return;
@@ -168,7 +171,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         // Optionally remove post from view after scheduling
         setRejectedPosts(prev => [...prev, selectedPostKey]);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(`[Schedule] Error scheduling post ${selectedPostKey}:`, err.message);
       setToastMessage(`Error scheduling post: ${err.message}`);
     }
@@ -183,9 +186,53 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     setScheduleDateTime('');
   };
 
-  const handleEdit = (key: string) => {
-    console.log(`[Edit] Edit clicked for post ${key} (functionality to be implemented)`);
-    setToastMessage('Edit feature coming soon!');
+  const handleEdit = async (key: string) => {
+    console.log(`[Edit] Edit clicked for post ${key}`);
+    const post = posts.find(p => p.key === key);
+    if (!post) {
+      setToastMessage('Post not found.');
+      return;
+    }
+
+    // Get a fresh signed URL for the image
+    let imageKey = '';
+    if (post.data.image_url && post.data.image_url.includes('/ready_post/')) {
+      const match = post.data.image_url.match(/ready_post\/[\w-]+\/(image_\d+\.jpg)/);
+      if (match) imageKey = match[1];
+    }
+    if (!imageKey && post.key.match(/ready_post_\d+\.json$/)) {
+      const postIdMatch = post.key.match(/ready_post_(\d+)\.json$/);
+      if (postIdMatch) imageKey = `image_${postIdMatch[1]}.jpg`;
+    }
+
+    try {
+      // Get fresh signed URL
+      const signedUrlRes = await fetch(`http://localhost:3000/signed-image-url/${username}/${imageKey}`);
+      const signedUrlData = await signedUrlRes.json();
+      const signedImageUrl = signedUrlData.url;
+      
+      if (!signedImageUrl) {
+        throw new Error('No signed URL returned');
+      }
+
+      // Store post details for editing with proxied URL
+      setEditingPost({
+        key: key,
+        imageUrl: signedImageUrl,
+        caption: post.data.post?.caption || ''
+      });
+      
+      // Show canvas editor
+      setShowCanvasEditor(true);
+    } catch (err) {
+      console.error('[Edit] Failed to get signed URL:', err);
+      setToastMessage('Failed to prepare image for editing.');
+    }
+  };
+
+  const handleCanvasClose = () => {
+    setShowCanvasEditor(false);
+    setEditingPost(null);
   };
 
   const handleReject = (key: string) => {
@@ -315,7 +362,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             console.log(`[AutoSchedule] Scheduled post #${i + 1} successfully:`, respData);
             setToastMessage(`Scheduled post ${i + 1} successfully!`);
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error(`[AutoSchedule] Error scheduling post #${i + 1}:`, err.message);
           setToastMessage(`Error scheduling post ${i + 1}: ${err.message}`);
         }
@@ -324,7 +371,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       }
       setAutoScheduleProgress(null);
       setToastMessage('All posts scheduled!');
-    } catch (err) {
+    } catch (err: any) {
       console.error('[AutoSchedule] Auto-scheduling failed:', err.message);
       setAutoScheduleProgress(null);
       setToastMessage(`Auto-scheduling failed: ${err.message}`);
@@ -433,6 +480,17 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             </div>
           </div>
         )}
+        {/* Canvas Editor for image editing */}
+        {showCanvasEditor && editingPost && (
+          <CanvasEditor
+            username={username}
+            userId={userId}
+            onClose={handleCanvasClose}
+            initialImageUrl={editingPost.imageUrl}
+            postKey={editingPost.key}
+            postCaption={editingPost.caption}
+          />
+        )}
         {autoScheduleProgress && (
           <div className="loading">{autoScheduleProgress}</div>
         )}
@@ -451,18 +509,15 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                 <div className="post-content">
                   <div className="post-header">
                     {profilePicUrl && !profileImageError ? (
-                      <>
-                        {console.log('Rendering profilePicUrl in post:', profilePicUrl)}
-                        <img
-                          src={profilePicUrl}
-                          alt={`${username}'s profile picture`}
-                          className="profile-pic"
-                          onError={() => {
-                            console.error(`Failed to load profile picture for ${username} in post`);
-                            setProfileImageError(true);
-                          }}
-                        />
-                      </>
+                      <img
+                        src={profilePicUrl}
+                        alt={`${username}'s profile picture`}
+                        className="profile-pic"
+                        onError={() => {
+                          console.error(`Failed to load profile picture for ${username} in post`);
+                          setProfileImageError(true);
+                        }}
+                      />
                     ) : (
                       <div className="profile-pic" />
                     )}

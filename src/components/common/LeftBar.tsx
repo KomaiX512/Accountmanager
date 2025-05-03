@@ -1,23 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './LeftBar.css';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import ProfilePopup from './ProfilePopup';
 import MessagesPopup from './MessagesPopup';
+import CanvasEditor from './CanvasEditor';
 
 interface LeftBarProps {
   accountHolder: string;
+  userId?: string;
 }
 
-const LeftBar: React.FC<LeftBarProps> = ({ accountHolder }) => {
+const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId }) => {
   const navigate = useNavigate();
   const [showProfilePopup, setShowProfilePopup] = useState(false);
   const [showMessagesPopup, setShowMessagesPopup] = useState(false);
+  const [showCanvasEditor, setShowCanvasEditor] = useState(false);
   const [hasNewMessages, setHasNewMessages] = useState(false);
+
+  useEffect(() => {
+    // Close any popups on route change
+    return () => {
+      setShowProfilePopup(false);
+      setShowMessagesPopup(false);
+      setShowCanvasEditor(false);
+    };
+  }, [navigate]);
 
   const menuItems = [
     { icon: 'settings', path: '/settings', label: 'Settings' },
-    { icon: 'edit', path: '/edit', label: 'Edit' },
+    { icon: 'edit', label: 'Edit', action: () => setShowCanvasEditor(true) },
     { icon: 'profile', label: 'Profile', action: () => setShowProfilePopup(true) },
     { 
       icon: 'messages', 
@@ -81,6 +93,13 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder }) => {
           username={accountHolder}
           onClose={() => setShowMessagesPopup(false)}
           setHasNewMessages={setHasNewMessages}
+        />
+      )}
+      {showCanvasEditor && (
+        <CanvasEditor 
+          username={accountHolder} 
+          userId={userId}
+          onClose={() => setShowCanvasEditor(false)} 
         />
       )}
     </motion.div>

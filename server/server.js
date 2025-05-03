@@ -2539,3 +2539,104 @@ app.options('/events/:username', (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });
+
+// Schedule a post
+app.post('/schedule-post/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { imageData, scheduledFor, username } = req.body;
+    
+    if (!imageData || !scheduledFor || !username) {
+      return res.status(400).json({ error: 'Missing required data' });
+    }
+    
+    // Convert base64 to buffer
+    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+    
+    // Detect file type
+    const type = await fileTypeFromBuffer(imageBuffer);
+    if (!type || !type.mime.startsWith('image/')) {
+      return res.status(400).json({ error: 'Invalid image data' });
+    }
+    
+    // Generate a unique filename
+    const filename = `${username}_${randomUUID()}.${type.ext}`;
+    const key = `scheduled/${username}/${filename}`;
+    
+    // Upload to S3
+    await s3Client.send(new PutObjectCommand({
+      Bucket: 'instagram-manager',
+      Key: key,
+      Body: imageBuffer,
+      ContentType: type.mime
+    }));
+    
+    // Schedule the post
+    const scheduleTime = new Date(scheduledFor);
+    const jobName = `post_${username}_${randomUUID()}`;
+    
+    // Store job info in memory (in a real app, this would be stored in a database)
+    const jobs = global.scheduledJobs || {};
+    global.scheduledJobs = jobs;
+    
+    jobs[jobName] = {
+      userId,
+      imageKey: key,
+      scheduledFor: scheduleTime,
+      status: 'scheduled'
+    };
+    
+    // Schedule the job
+    schedule.scheduleJob(jobName, scheduleTime, async function() {
+      console.log(`Executing scheduled post: ${jobName}`);
+      try {
+        // In a real implementation, this would post to Instagram
+        // For now, we'll just mark it as posted
+        jobs[jobName].status = 'posted';
+        console.log(`Post ${jobName} marked as posted`);
+        
+        // You would implement actual Instagram posting logic here
+        // For example:
+        // await axios.post('https://graph.instagram.com/v18.0/me/media', {
+        //   image_url: imageUrl,
+        //   caption: caption,
+        //   access_token: accessToken
+        // });
+      } catch (error) {
+        console.error(`Failed to post scheduled image: ${error}`);
+        jobs[jobName].status = 'failed';
+      }
+    });
+    
+    return res.status(200).json({ 
+      message: 'Post scheduled successfully',
+      scheduledFor: scheduleTime,
+      jobId: jobName
+    });
+  } catch (error) {
+    console.error('Error scheduling post:', error);
+    return res.status(500).json({ error: 'Failed to schedule post' });
+  }
+});
+
+// Get scheduled posts for a user
+app.get('/scheduled-posts/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+    const jobs = global.scheduledJobs || {};
+    
+    // Filter jobs for this user
+    const userJobs = Object.entries(jobs)
+      .filter(([key]) => key.includes(`post_${username}_`))
+      .map(([key, value]) => ({
+        jobId: key,
+        ...value
+      }));
+    
+    return res.status(200).json(userJobs);
+  } catch (error) {
+    console.error('Error getting scheduled posts:', error);
+    return res.status(500).json({ error: 'Failed to get scheduled posts' });
+  }
+});

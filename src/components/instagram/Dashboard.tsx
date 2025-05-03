@@ -406,6 +406,27 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     console.log(`[${new Date().toISOString()}] isInsightsOpen: ${isInsightsOpen}`);
   }, [isInsightsOpen]);
 
+  useEffect(() => {
+    if (igBusinessId) {
+      // Update the location state with userId when available
+      const currentState = window.history.state?.usr?.state || {};
+      const newState = { ...currentState, userId: igBusinessId };
+      
+      // Only update if needed to avoid unnecessary history entries
+      if (currentState.userId !== igBusinessId) {
+        window.history.replaceState(
+          { 
+            ...window.history.state,
+            usr: { ...window.history.state?.usr, state: newState }
+          }, 
+          '', 
+          window.location.pathname
+        );
+        console.log(`[${new Date().toISOString()}] Updated location state with userId: ${igBusinessId}`);
+      }
+    }
+  }, [igBusinessId]);
+
   const handleInstagramConnected = (graphId: string, userId: string) => {
     if (!userId) {
       console.error(`[${new Date().toISOString()}] Instagram connection failed: userId is undefined`);
@@ -586,7 +607,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
               username={accountHolder}
               profilePicUrl={profileInfo?.profilePicUrlHD ? `http://localhost:3000/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}` : ''}
               posts={posts}
-              userId={igBusinessId}
+              userId={igBusinessId || undefined}
             />
           </div>
 

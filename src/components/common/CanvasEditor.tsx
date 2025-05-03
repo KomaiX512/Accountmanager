@@ -30,7 +30,6 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
   const [isScheduling, setIsScheduling] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
-  const [colorPickerVisible, setColorPickerVisible] = useState(false);
   const [selectedColor, setSelectedColor] = useState('#ffffff');
 
   // Color palette for quick selection
@@ -61,7 +60,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
                 'common.backgroundColor': '#151521',
                 'common.border': '0px',
                 'downloadButton.backgroundColor': '#007bff',
-                'downloadButton.border': '1px solid #007bff',
+                'downloadButton.border': '1px solidrgb(63, 167, 149)',
                 'downloadButton.color': '#fff',
                 'menu.normalIcon.path': '',
                 'menu.normalIcon.name': '',
@@ -81,10 +80,22 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
                 'submenu.activeLabel.color': '#fff',
                 'checkbox.border': '1px solid #ccc',
                 'checkbox.backgroundColor': '#fff',
+                // Enhanced color picker styling
+                'colorpicker.button.border': '1px solid #ddd',
+                'colorpicker.title.color': '#fff',
+                // Add preset colors to UI theme
+                'colorpicker.transparent.rect1.color': colorPalette[0],
+                'colorpicker.transparent.rect2.color': colorPalette[1],
+                'colorpicker.primary.color': '#00ffcc'
               },
               menu: ['crop', 'flip', 'rotate', 'draw', 'shape', 'icon', 'text', 'mask', 'filter'],
               initMenu: 'filter',
               menuBarPosition: 'bottom',
+              // Configure color picker with preset colors
+              uiSize: {
+                width: '100%',
+                height: '100%'
+              },
             },
             cssMaxWidth: 700,
             cssMaxHeight: 500,
@@ -92,7 +103,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
               cornerSize: 20,
               rotatingPointOffset: 70,
             },
-            usageStatistics: false,
+            usageStatistics: false
           });
           
           // Add custom fonts if needed
@@ -106,6 +117,73 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
           if (initialImageUrl) {
             loadImageFromUrl(initialImageUrl);
           }
+
+          // Enhance color pickers after editor is initialized
+          setTimeout(() => {
+            try {
+              // Find all color pickers in the editor and enhance them
+              const colorButtons = document.querySelectorAll('.tui-colorpicker-palette-button');
+              if (colorButtons.length > 0) {
+                console.log('[Canvas] Found color picker buttons:', colorButtons.length);
+                
+                // Create preset color elements and add them to each color picker
+                colorButtons.forEach(button => {
+                  button.setAttribute('title', 'Click to select colors');
+
+                  // Find the parent color picker container
+                  const container = button.closest('.tui-colorpicker-container');
+                  if (container) {
+                    // Create preset colors container
+                    const presetsContainer = document.createElement('div');
+                    presetsContainer.className = 'tui-custom-preset-colors';
+                    presetsContainer.style.display = 'flex';
+                    presetsContainer.style.flexWrap = 'wrap';
+                    presetsContainer.style.gap = '5px';
+                    presetsContainer.style.margin = '5px 0';
+                    presetsContainer.style.padding = '5px';
+                    presetsContainer.style.background = 'rgba(0,0,0,0.2)';
+                    presetsContainer.style.borderRadius = '4px';
+                    
+                    // Add preset color swatches
+                    colorPalette.forEach(color => {
+                      const swatch = document.createElement('div');
+                      swatch.style.width = '20px';
+                      swatch.style.height = '20px';
+                      swatch.style.backgroundColor = color;
+                      swatch.style.cursor = 'pointer';
+                      swatch.style.borderRadius = '3px';
+                      swatch.style.border = '1px solid rgba(255,255,255,0.2)';
+                      swatch.setAttribute('data-color', color);
+                      swatch.title = color;
+                      
+                      // When clicked, set this color in the color picker
+                      swatch.addEventListener('click', () => {
+                        // Find the input element and set its value
+                        const input = container.querySelector('.tui-colorpicker-palette-hex');
+                        if (input) {
+                          // @ts-ignore
+                          input.value = color;
+                          // Trigger change event
+                          const event = new Event('change', { bubbles: true });
+                          input.dispatchEvent(event);
+                        }
+                      });
+                      
+                      presetsContainer.appendChild(swatch);
+                    });
+                    
+                    // Insert preset colors before the palette
+                    const paletteElement = container.querySelector('.tui-colorpicker-palette');
+                    if (paletteElement) {
+                      paletteElement.parentNode?.insertBefore(presetsContainer, paletteElement);
+                    }
+                  }
+                });
+              }
+            } catch (err) {
+              console.error('[Canvas] Error enhancing color pickers:', err);
+            }
+          }, 1000);
         }
       } catch (error) {
         console.error('Failed to load TUI Image Editor:', error);
@@ -120,7 +198,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
         tuiInstanceRef.current = null;
       }
     };
-  }, [initialImageUrl]);
+  }, [initialImageUrl, colorPalette]);
 
   const loadImageFromUrl = async (url: string) => {
     try {
@@ -237,27 +315,6 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
     reader.readAsDataURL(file);
   };
 
-  const handleColorSelect = (color: string) => {
-    setSelectedColor(color);
-    if (tuiInstanceRef.current) {
-      // Set the color for drawing, text, or shapes based on active tool
-      const activeMode = tuiInstanceRef.current.getDrawingMode();
-      if (activeMode === 'TEXT') {
-        tuiInstanceRef.current.setTextStyle({ fill: color });
-      } else if (activeMode === 'SHAPE') {
-        tuiInstanceRef.current.setShapeProperties({
-          fill: color,
-          stroke: color
-        });
-      } else {
-        tuiInstanceRef.current.setBrush({
-          width: 12,
-          color: color
-        });
-      }
-    }
-  };
-
   return (
     <motion.div
       className="canvas-editor-overlay"
@@ -286,36 +343,6 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
             />
           </div>
           <button className="close-button" onClick={onClose}>×</button>
-        </div>
-        
-        {/* Color Palette */}
-        <div className="color-palette-container">
-          <button 
-            className="color-picker-toggle"
-            onClick={() => setColorPickerVisible(!colorPickerVisible)}
-            style={{ backgroundColor: selectedColor }}
-          >
-            <span>Pick Color</span>
-          </button>
-          
-          {colorPickerVisible && (
-            <div className="color-palette">
-              {colorPalette.map(color => (
-                <div 
-                  key={color}
-                  className="color-swatch"
-                  style={{ backgroundColor: color }}
-                  onClick={() => handleColorSelect(color)}
-                />
-              ))}
-              <input 
-                type="color" 
-                value={selectedColor}
-                onChange={(e) => handleColorSelect(e.target.value)}
-                className="color-input"
-              />
-            </div>
-          )}
         </div>
         
         <div className="tui-image-editor-container" ref={editorRef}></div>

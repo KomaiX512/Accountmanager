@@ -243,70 +243,132 @@
   border-color: #2d2d42 !important;
 }
 
-/* Add new styles for the color palette */
-.color-palette-container {
-  padding: 12px 24px;
-  display: flex;
-  position: relative;
-  z-index: 5;
+/* Enhanced color picker container */
+.tui-colorpicker-container {
+  background-color: #1e1e2d !important;
+  border: 1px solid #3c3c57 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4) !important;
+  padding: 15px !important;
+  width: 280px !important;
+  max-width: 100% !important;
 }
 
-.color-picker-toggle {
-  padding: 8px 16px;
-  border-radius: 6px;
-  border: 2px solid #2d2d42;
-  color: #e0e0ff;
-  display: flex;
-  align-items: center;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s ease;
+/* Custom preset colors container */
+.tui-custom-preset-colors {
+  display: grid !important;
+  grid-template-columns: repeat(5, 1fr) !important;
+  gap: 8px !important;
+  padding: 12px !important;
+  background: rgba(0, 0, 0, 0.2) !important;
+  border-radius: 6px !important;
+  margin: 10px 0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
 
-.color-picker-toggle span {
-  margin-left: 6px;
-  text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+/* Color swatch styles */
+.tui-custom-preset-colors div {
+  width: 100% !important;
+  aspect-ratio: 1 !important;
+  border-radius: 4px !important;
+  cursor: pointer !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+  border: 2px solid rgba(255, 255, 255, 0.1) !important;
 }
 
-.color-picker-toggle:hover {
-  transform: translateY(-2px);
+.tui-custom-preset-colors div:hover {
+  transform: scale(1.1) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
 }
 
+/* Color picker input and preview */
+.tui-colorpicker-palette-hex {
+  background-color: #151521 !important;
+  color: #e0e0ff !important;
+  border: 1px solid #3c3c57 !important;
+  border-radius: 4px !important;
+  padding: 8px !important;
+  width: calc(100% - 40px) !important;
+  margin-right: 8px !important;
+}
+
+.tui-colorpicker-palette-preview {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 4px !important;
+  border: 2px solid #3c3c57 !important;
+  overflow: hidden !important;
+}
+
+/* Slider container styles */
+.tui-colorpicker-slider-container {
+  padding: 15px 10px !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+  margin-top: 12px !important;
+}
+
+.tui-colorpicker-slider-left {
+  padding-right: 12px !important;
+}
+
+/* Slider track and thumb styles */
+.tui-colorpicker-slider {
+  margin: 10px 0 !important;
+  height: 10px !important;
+  border-radius: 5px !important;
+  background: linear-gradient(to right, rgba(0,0,0,0.2), rgba(255,255,255,0.2)) !important;
+}
+
+.tui-colorpicker-slider .tui-colorpicker-slider-handle {
+  width: 16px !important;
+  height: 16px !important;
+  border-radius: 50% !important;
+  background: #fff !important;
+  border: 2px solid #3c3c57 !important;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+  transform: translate(-50%, -3px) !important;
+}
+
+/* Section headers */
+.tui-colorpicker-container .tui-colorpicker-title {
+  color: #e0e0ff !important;
+  font-size: 12px !important;
+  margin-bottom: 8px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+}
+
+/* Remove old styles */
+.color-picker-toggle,
 .color-palette {
-  position: absolute;
-  top: 100%;
-  left: 24px;
-  background-color: #1e1e2d;
-  border-radius: 8px;
-  padding: 10px;
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
-  margin-top: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  z-index: 10;
+  display: none !important;
 }
 
-.color-swatch {
-  width: 30px;
-  height: 30px;
-  border-radius: 4px;
-  cursor: pointer;
-  border: 1px solid #2d2d42;
-  transition: transform 0.2s;
+/* Animation for color picker opening */
+.tui-colorpicker-container {
+  animation: colorPickerFadeIn 0.2s ease-out !important;
 }
 
-.color-swatch:hover {
-  transform: scale(1.15);
-  border-color: #007bff;
+@keyframes colorPickerFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
-.color-input {
-  grid-column: span 5;
-  width: 100%;
-  height: 30px;
-  margin-top: 8px;
-  cursor: pointer;
-  border: none;
-  background: transparent;
+/* Make sure the color pickers are big enough for touch */
+.tui-colorpicker-palette-button {
+  min-width: 24px !important;
+  min-height: 24px !important;
+}
+
+/* Make the color preview more visible */
+.tui-colorpicker-palette-preview {
+  width: 28px !important;
+  height: 28px !important;
 } 

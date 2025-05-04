@@ -10,6 +10,7 @@ import InsightsModal from './InsightsModal';
 import GoalModal from './GoalModal';
 import { motion } from 'framer-motion';
 import axios from 'axios';
+import { useAuth } from '../../context/AuthContext';
 
 interface ProfileInfo {
   fullName: string;
@@ -36,6 +37,10 @@ interface DashboardProps {
   accountHolder: string;
   competitors: string[];
 }
+
+// Local storage keys for Instagram connection data
+const IG_USER_ID_KEY = 'instagram_user_id';
+const IG_GRAPH_ID_KEY = 'instagram_graph_id';
 
 const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => {
   const [query, setQuery] = useState('');
@@ -67,6 +72,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const firstLoadRef = useRef(true);
   const lastProfilePicRenderTimeRef = useRef<number>(0);
   const [refreshKey, setRefreshKey] = useState(0);
+  const { currentUser } = useAuth(); // Get the current user for persistent connection
 
   const fetchProfileInfo = async () => {
     if (!accountHolder) return;
@@ -97,6 +103,15 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
 
   const fetchIgBusinessId = async (attempt = 1, maxAttempts = 3) => {
     if (!accountHolder) return;
+    
+    // First check localStorage for cached connection
+    const cachedUserId = localStorage.getItem(IG_USER_ID_KEY);
+    if (cachedUserId) {
+      setIgBusinessId(cachedUserId);
+      console.log(`[${new Date().toISOString()}] Set igBusinessId from cache: ${cachedUserId}`);
+      return;
+    }
+    
     try {
       const response = await axios.get(`http://localhost:3000/profile-info/${accountHolder}`);
       const userId = response.data?.id;
@@ -506,8 +521,35 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
       setToast('Failed to connect Instagram: Missing user ID');
       return;
     }
+    
+    // Check if we already have this connection
+    if (igBusinessId === userId) {
+      console.log(`[${new Date().toISOString()}] Instagram already connected with the same user ID, skipping...`);
+      return;
+    }
+    
     console.log(`[${new Date().toISOString()}] Instagram connected for graph ID: ${graphId}, user ID: ${userId}`);
     setIgBusinessId(userId);
+    
+    // Store in localStorage for persistence
+    localStorage.setItem(IG_USER_ID_KEY, userId);
+    localStorage.setItem(IG_GRAPH_ID_KEY, graphId);
+    
+    // Store in backend if user is authenticated
+    if (currentUser?.uid) {
+      axios.post(`http://localhost:3000/instagram-connection/${currentUser.uid}`, {
+        instagram_user_id: userId,
+        instagram_graph_id: graphId,
+        username: accountHolder
+      })
+      .then(() => {
+        console.log(`[${new Date().toISOString()}] Successfully stored Instagram connection in backend`);
+      })
+      .catch(error => {
+        console.error(`[${new Date().toISOString()}] Failed to store Instagram connection in backend:`, error);
+      });
+    }
+    
     setToast('Instagram account connected successfully!');
   };
 

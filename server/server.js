@@ -1,5 +1,5 @@
 import express from 'express';
-import { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import axios from 'axios';
 import cors from 'cors';
@@ -2638,5 +2638,265 @@ app.get('/scheduled-posts/:username', async (req, res) => {
   } catch (error) {
     console.error('Error getting scheduled posts:', error);
     return res.status(500).json({ error: 'Failed to get scheduled posts' });
+  }
+});
+
+// This endpoint checks if a user has entered their Instagram username
+app.get('/user-instagram-status/:userId', async (req, res) => {
+  const { userId } = req.params;
+  
+  try {
+    const key = `UserInstagramStatus/${userId}/status.json`;
+    
+    try {
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: key,
+      });
+      const response = await s3Client.send(getCommand);
+      const body = await streamToString(response.Body);
+      
+      if (!body || body.trim() === '') {
+        return res.json({ hasEnteredInstagramUsername: false });
+      }
+      
+      const userData = JSON.parse(body);
+      return res.json(userData);
+    } catch (error) {
+      if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+        return res.json({ hasEnteredInstagramUsername: false });
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error(`Error retrieving user Instagram status for ${userId}:`, error);
+    res.status(500).json({ error: 'Failed to retrieve user Instagram status' });
+  }
+});
+
+// This endpoint updates the user's Instagram username entry state
+app.post('/user-instagram-status/:userId', async (req, res) => {
+  const { userId } = req.params;
+  const { instagram_username } = req.body;
+  
+  if (!instagram_username || !instagram_username.trim()) {
+    return res.status(400).json({ error: 'Instagram username is required' });
+  }
+  
+  try {
+    const key = `UserInstagramStatus/${userId}/status.json`;
+    const userData = {
+      uid: userId,
+      hasEnteredInstagramUsername: true,
+      instagram_username: instagram_username.trim(),
+      lastUpdated: new Date().toISOString()
+    };
+    
+    const putCommand = new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: key,
+      Body: JSON.stringify(userData, null, 2),
+      ContentType: 'application/json',
+    });
+    
+    await s3Client.send(putCommand);
+    res.json({ success: true, message: 'User Instagram status updated successfully' });
+  } catch (error) {
+    console.error(`Error updating user Instagram status for ${userId}:`, error);
+    res.status(500).json({ error: 'Failed to update user Instagram status' });
+  }
+});
+
+// This endpoint retrieves the user's Instagram connection
+app.get('/instagram-connection/:userId', async (req, res) => {
+  // Set CORS headers
+  setCorsHeaders(res);
+  
+  const { userId } = req.params;
+  
+  try {
+    const key = `InstagramConnection/${userId}/connection.json`;
+    
+    try {
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: key,
+      });
+      const response = await s3Client.send(getCommand);
+      const body = await streamToString(response.Body);
+      
+      if (!body || body.trim() === '') {
+        return res.status(404).json({ error: 'No Instagram connection found' });
+      }
+      
+      const connectionData = JSON.parse(body);
+      return res.json(connectionData);
+    } catch (error) {
+      if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+        return res.status(404).json({ error: 'No Instagram connection found' });
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error(`Error retrieving Instagram connection for ${userId}:`, error);
+    res.status(500).json({ error: 'Failed to retrieve Instagram connection' });
+  }
+});
+
+// This endpoint stores the user's Instagram connection
+app.post('/instagram-connection/:userId', async (req, res) => {
+  // Set CORS headers
+  setCorsHeaders(res);
+  
+  const { userId } = req.params;
+  const { instagram_user_id, instagram_graph_id, username } = req.body;
+  
+  if (!instagram_user_id || !instagram_graph_id) {
+    return res.status(400).json({ error: 'Instagram user ID and graph ID are required' });
+  }
+  
+  try {
+    const key = `InstagramConnection/${userId}/connection.json`;
+    const connectionData = {
+      uid: userId,
+      instagram_user_id,
+      instagram_graph_id,
+      username: username || '',
+      lastUpdated: new Date().toISOString()
+    };
+    
+    const putCommand = new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: key,
+      Body: JSON.stringify(connectionData, null, 2),
+      ContentType: 'application/json',
+    });
+    
+    await s3Client.send(putCommand);
+    res.json({ success: true, message: 'Instagram connection stored successfully' });
+  } catch (error) {
+    console.error(`Error storing Instagram connection for ${userId}:`, error);
+    res.status(500).json({ error: 'Failed to store Instagram connection' });
+  }
+});
+
+// This endpoint deletes the user's Instagram connection
+app.delete('/instagram-connection/:userId', async (req, res) => {
+  // Set CORS headers
+  setCorsHeaders(res);
+  
+  const { userId } = req.params;
+  
+  try {
+    const key = `InstagramConnection/${userId}/connection.json`;
+    
+    try {
+      // Check if the file exists first
+      const headCommand = new HeadObjectCommand({
+        Bucket: 'tasks',
+        Key: key,
+      });
+      await s3Client.send(headCommand);
+      
+      // If it exists, delete it
+      const deleteCommand = new DeleteObjectCommand({
+        Bucket: 'tasks',
+        Key: key,
+      });
+      await s3Client.send(deleteCommand);
+      
+      res.json({ success: true, message: 'Instagram connection deleted successfully' });
+    } catch (error) {
+      if (error.name === 'NotFound' || error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+        return res.status(404).json({ error: 'No Instagram connection found to delete' });
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error(`Error deleting Instagram connection for ${userId}:`, error);
+    res.status(500).json({ error: 'Failed to delete Instagram connection' });
+  }
+});
+
+// Add OPTIONS handlers for Instagram connection endpoints
+app.options('/instagram-connection/:userId', (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+
+app.options('/user-instagram-status/:userId', (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+
+// This endpoint checks if a user has entered their Instagram username
+app.get('/user-instagram-status/:userId', async (req, res) => {
+  // Set CORS headers
+  setCorsHeaders(res);
+  
+  const { userId } = req.params;
+  
+  try {
+    const key = `UserInstagramStatus/${userId}/status.json`;
+    
+    try {
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: key,
+      });
+      const response = await s3Client.send(getCommand);
+      const body = await streamToString(response.Body);
+      
+      if (!body || body.trim() === '') {
+        return res.json({ hasEnteredInstagramUsername: false });
+      }
+      
+      const userData = JSON.parse(body);
+      return res.json(userData);
+    } catch (error) {
+      if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+        return res.json({ hasEnteredInstagramUsername: false });
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error(`Error retrieving user Instagram status for ${userId}:`, error);
+    res.status(500).json({ error: 'Failed to retrieve user Instagram status' });
+  }
+});
+
+// This endpoint updates the user's Instagram username entry state
+app.post('/user-instagram-status/:userId', async (req, res) => {
+  // Set CORS headers
+  setCorsHeaders(res);
+  
+  const { userId } = req.params;
+  const { instagram_username } = req.body;
+  
+  if (!instagram_username || !instagram_username.trim()) {
+    return res.status(400).json({ error: 'Instagram username is required' });
+  }
+  
+  try {
+    const key = `UserInstagramStatus/${userId}/status.json`;
+    const userData = {
+      uid: userId,
+      hasEnteredInstagramUsername: true,
+      instagram_username: instagram_username.trim(),
+      lastUpdated: new Date().toISOString()
+    };
+    
+    const putCommand = new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: key,
+      Body: JSON.stringify(userData, null, 2),
+      ContentType: 'application/json',
+    });
+    
+    await s3Client.send(putCommand);
+    res.json({ success: true, message: 'User Instagram status updated successfully' });
+  } catch (error) {
+    console.error(`Error updating user Instagram status for ${userId}:`, error);
+    res.status(500).json({ error: 'Failed to update user Instagram status' });
   }
 });

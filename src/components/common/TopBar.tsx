@@ -2,9 +2,12 @@ import React from 'react';
 import './TopBar.css';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import UserDropdown from '../auth/UserDropdown';
+import { useAuth } from '../../context/AuthContext';
 
 const TopBar: React.FC = () => {
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
 
   const platforms = [
     { icon: 'facebook', path: '/facebook' },
@@ -59,6 +62,22 @@ const TopBar: React.FC = () => {
           </motion.a>
         ))}
       </div>
+      
+      {currentUser ? (
+        <UserDropdown />
+      ) : (
+        <motion.button
+          className="login-button"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => navigate('/login')}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+        >
+          Sign In
+        </motion.button>
+      )}
     </motion.div>
   );
 };

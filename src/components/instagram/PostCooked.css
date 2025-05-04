@@ -77,6 +77,7 @@
   margin-bottom: 8px;
   max-width: 100%;
   overflow-wrap: break-word;
+  position: relative;
 }
 
 .post-hashtags {
@@ -423,4 +424,73 @@
 @keyframes slide-in-toast {
   from { opacity: 0; transform: translateX(100px); }
   to { opacity: 1; transform: translateX(0); }
+}
+
+.caption-edit-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  margin-left: 6px;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+  vertical-align: middle;
+  padding: 2px;
+  border-radius: 4px;
+}
+
+.caption-edit-icon:hover {
+  opacity: 1;
+  background: rgba(0, 255, 204, 0.1);
+}
+
+.caption-edit-container {
+  margin-top: 8px;
+  width: 100%;
+}
+
+.caption-edit-textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #00ffcc;
+  background-color: rgba(0, 0, 0, 0.1);
+  color: #e0e0ff;
+  font-size: 14px;
+  resize: vertical;
+  margin-bottom: 8px;
+}
+
+.caption-edit-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.caption-save-button, .caption-cancel-button {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.caption-save-button {
+  background: linear-gradient(90deg, #007bff, #00ffcc);
+  color: #e0e0ff;
+}
+
+.caption-cancel-button {
+  background: #4a4a6a;
+  color: #e0e0ff;
+}
+
+.caption-save-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 255, 204, 0.3);
+}
+
+.caption-cancel-button:hover {
+  background: #5a5a7a;
 }

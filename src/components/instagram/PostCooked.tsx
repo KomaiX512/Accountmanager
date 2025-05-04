@@ -13,6 +13,7 @@ interface PostCookedProps {
 }
 
 const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts = [], userId }) => {
+  const [localPosts, setLocalPosts] = useState<typeof posts>([]);
   const [imageErrors, setImageErrors] = useState<{ [key: string]: boolean }>({});
   const [profileImageError, setProfileImageError] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -28,9 +29,11 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   const [scheduleDateTime, setScheduleDateTime] = useState<string>('');
   const [showCanvasEditor, setShowCanvasEditor] = useState(false);
   const [editingPost, setEditingPost] = useState<{ key: string; imageUrl: string; caption: string } | null>(null);
+  const [editingCaption, setEditingCaption] = useState<{ key: string; caption: string } | null>(null);
 
   useEffect(() => {
     console.log('Posts prop in PostCooked:', posts);
+    setLocalPosts(posts);
   }, [posts]);
 
   useEffect(() => {
@@ -86,7 +89,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       setToastMessage('No post or user ID selected.');
       return;
     }
-    const post = posts.find(p => p.key === selectedPostKey);
+    const post = localPosts.find(p => p.key === selectedPostKey);
     if (!post) {
       setToastMessage('Selected post not found.');
       return;
@@ -188,7 +191,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
 
   const handleEdit = async (key: string) => {
     console.log(`[Edit] Edit clicked for post ${key}`);
-    const post = posts.find(p => p.key === key);
+    const post = localPosts.find(p => p.key === key);
     if (!post) {
       setToastMessage('Post not found.');
       return;
@@ -256,7 +259,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
 
   // Auto-schedule logic
   const handleAutoSchedule = async (intervalOverride?: number) => {
-    if (!userId || !posts.length) {
+    if (!userId || !localPosts.length) {
       setToastMessage('No user ID or posts to schedule.');
       return;
     }
@@ -272,9 +275,9 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       console.log('[AutoSchedule] Using delay (hours):', delayHours);
       setAutoScheduleProgress(`Scheduling posts every ${delayHours} hours...`);
       let now = new Date();
-      for (let i = 0; i < posts.length; i++) {
-        const post = posts[i];
-        setAutoScheduleProgress(`Scheduling post ${i + 1} of ${posts.length}...`);
+      for (let i = 0; i < localPosts.length; i++) {
+        const post = localPosts[i];
+        setAutoScheduleProgress(`Scheduling post ${i + 1} of ${localPosts.length}...`);
         console.log(`[AutoSchedule] Preparing post #${i + 1}:`, post);
         // Always fetch a fresh signed URL for the image
         let imageKey = '';
@@ -380,6 +383,55 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     }
   };
 
+  const handleCloseEditCaption = () => {
+    setEditingCaption(null);
+  };
+
+  const handleSaveCaption = async (key: string, newCaption: string) => {
+    // Find the post in the posts array
+    const postIndex = localPosts.findIndex(p => p.key === key);
+    if (postIndex === -1) {
+      setToastMessage('Post not found.');
+      return;
+    }
+
+    // Create a shallow copy of the posts array
+    const updatedPosts = [...localPosts];
+    
+    // Create a deep copy of the post object we want to modify
+    const updatedPost = {
+      ...updatedPosts[postIndex],
+      data: {
+        ...updatedPosts[postIndex].data,
+        post: {
+          ...updatedPosts[postIndex].data.post,
+          caption: newCaption
+        }
+      }
+    };
+    
+    // Replace the old post with the updated one
+    updatedPosts[postIndex] = updatedPost;
+    
+    // Update state
+    setLocalPosts(updatedPosts);
+    setEditingCaption(null);
+    setToastMessage('Caption updated successfully!');
+  };
+
+  const handleEditCaption = (key: string) => {
+    const post = localPosts.find(p => p.key === key);
+    if (!post) {
+      setToastMessage('Post not found.');
+      return;
+    }
+    
+    setEditingCaption({
+      key: key,
+      caption: post.data.post?.caption || ''
+    });
+  };
+
   if (!username) {
     return (
       <ErrorBoundary>
@@ -392,7 +444,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   }
 
   // Filter out rejected posts
-  const filteredPosts = posts.filter(post => !rejectedPosts.includes(post.key));
+  const filteredPosts = localPosts.filter(post => !rejectedPosts.includes(post.key));
 
   return (
     <ErrorBoundary>
@@ -685,9 +737,57 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                       Reject
                     </motion.button>
                   </div>
-                  <p className="post-caption">
-                    <span className="username">{username}</span> {post.data.post?.caption || 'No caption available'}
-                  </p>
+                  <div className="post-caption">
+                    <span className="username">{username}</span>{' '}
+                    {editingCaption && editingCaption.key === post.key ? (
+                      <div className="caption-edit-container">
+                        <textarea
+                          value={editingCaption.caption}
+                          onChange={(e) => setEditingCaption({...editingCaption, caption: e.target.value})}
+                          className="caption-edit-textarea"
+                          placeholder="Edit caption..."
+                        />
+                        <div className="caption-edit-actions">
+                          <button 
+                            className="caption-save-button"
+                            onClick={() => handleSaveCaption(post.key, editingCaption.caption)}
+                          >
+                            Save
+                          </button>
+                          <button 
+                            className="caption-cancel-button"
+                            onClick={handleCloseEditCaption}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {post.data.post?.caption || 'No caption available'}
+                        <button 
+                          className="caption-edit-icon" 
+                          onClick={() => handleEditCaption(post.key)}
+                          title="Edit caption"
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="#00ffcc"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                          </svg>
+                        </button>
+                      </>
+                    )}
+                  </div>
                   <div className="post-hashtags">
                     {post.data.post?.hashtags?.length ? (
                       post.data.post.hashtags.map((tag: string, index: number) => (

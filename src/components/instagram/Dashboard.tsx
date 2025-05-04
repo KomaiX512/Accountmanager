@@ -54,6 +54,12 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const [isSchedulerOpen, setIsSchedulerOpen] = useState(false);
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
+  const [replySentTracker, setReplySentTracker] = useState<{
+    text: string;
+    timestamp: number;
+    type: 'dm' | 'comment';
+    id: string;
+  }[]>([]);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
@@ -120,9 +126,35 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const fetchNotifications = async (userId: string, attempt = 1, maxAttempts = 3) => {
     try {
       const response = await axios.get(`http://localhost:3000/events-list/${userId}`);
-      const fetchedNotifications = response.data.sort((a: Notification, b: Notification) => b.timestamp - a.timestamp).slice(0, 10);
-      setNotifications(fetchedNotifications);
-      console.log(`[${new Date().toISOString()}] Fetched notifications for ${userId}:`, fetchedNotifications.map((n: Notification) => ({ id: n.message_id || n.comment_id, type: n.type, status: n.status })));
+      const fetchedNotifications = response.data.sort((a: Notification, b: Notification) => b.timestamp - a.timestamp);
+      
+      // Filter out any notifications that match our recently sent replies
+      const filteredNotifications = fetchedNotifications.filter((notif: Notification) => {
+        const notifType = notif.type === 'message' ? 'dm' : 'comment';
+        const notifId = notif.message_id || notif.comment_id;
+        const notifText = notif.text;
+        
+        // Check if this matches any of our recently sent replies
+        return !replySentTracker.some(reply => {
+          // Check if type matches and text is similar
+          if (reply.type === notifType) {
+            // Compare text (case insensitive, ignoring spaces)
+            const normalizedReply = reply.text.toLowerCase().trim();
+            const normalizedNotif = notifText.toLowerCase().trim();
+            
+            // Check if it's a match
+            return normalizedReply === normalizedNotif || 
+                  normalizedNotif.includes(normalizedReply) ||
+                  reply.id === notifId;
+          }
+          return false;
+        });
+      });
+      
+      // Keep only the top 10 after filtering
+      setNotifications(filteredNotifications.slice(0, 10));
+      console.log(`[${new Date().toISOString()}] Fetched notifications for ${userId}:`, 
+        filteredNotifications.slice(0, 10).map((n: Notification) => ({ id: n.message_id || n.comment_id, type: n.type, status: n.status })));
     } catch (err) {
       console.error(`[${new Date().toISOString()}] Error fetching notifications (attempt ${attempt}/${maxAttempts}):`, err);
       if (attempt < maxAttempts) {
@@ -157,6 +189,15 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
           text: replyText,
           message_id: notification.message_id,
         });
+        setReplySentTracker(prev => [
+          ...prev, 
+          {
+            text: replyText,
+            timestamp: Date.now(),
+            type: 'dm' as const,
+            id: notification.message_id || ''
+          }
+        ].slice(-20));
         setNotifications(prev => prev.filter(n => n.message_id !== notification.message_id));
         setToast('DM reply sent!');
       } else if (notification.type === 'comment' && notification.comment_id) {
@@ -164,6 +205,15 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
           comment_id: notification.comment_id,
           text: replyText,
         });
+        setReplySentTracker(prev => [
+          ...prev, 
+          {
+            text: replyText,
+            timestamp: Date.now(),
+            type: 'comment' as const,
+            id: notification.comment_id || ''
+          }
+        ].slice(-20));
         setNotifications(prev => prev.filter(n => n.comment_id !== notification.comment_id));
         setToast('Comment reply sent!');
       }
@@ -346,11 +396,34 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
       }
 
       if (data.event === 'message' || data.event === 'comment') {
-        setNotifications(prev => {
-          const updated = [data.data, ...prev.filter(n => n.message_id !== data.data.message_id && n.comment_id !== data.data.comment_id)];
-          return updated.sort((a, b) => b.timestamp - a.timestamp).slice(0, 10);
+        const notifType = data.event === 'message' ? 'dm' : 'comment';
+        const notifId = data.data.message_id || data.data.comment_id;
+        const notifText = data.data.text;
+        
+        const isRecentlySent = replySentTracker.some(reply => {
+          if (reply.type === notifType) {
+            const normalizedReply = reply.text.toLowerCase().trim();
+            const normalizedNotif = notifText.toLowerCase().trim();
+            
+            return normalizedReply === normalizedNotif || 
+                  normalizedNotif.includes(normalizedReply) ||
+                  reply.id === notifId;
+          }
+          return false;
         });
-        setToast(data.event === 'message' ? 'New Instagram message received!' : 'New Instagram comment received!');
+        
+        if (!isRecentlySent) {
+          setNotifications(prev => {
+            const updated = [data.data, ...prev.filter(n => 
+              n.message_id !== data.data.message_id && 
+              n.comment_id !== data.data.comment_id
+            )];
+            return updated.sort((a, b) => b.timestamp - a.timestamp).slice(0, 10);
+          });
+          setToast(data.event === 'message' ? 'New Instagram message received!' : 'New Instagram comment received!');
+        } else {
+          console.log(`[${new Date().toISOString()}] Filtered out own reply from notifications:`, data.data);
+        }
       }
     };
 
@@ -451,6 +524,16 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const handleOpenGoalModal = () => {
     setIsGoalModalOpen(true);
   };
+
+  // Clean old entries from reply tracker (older than 10 minutes)
+  useEffect(() => {
+    const cleanInterval = setInterval(() => {
+      const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+      setReplySentTracker(prev => prev.filter(reply => reply.timestamp > tenMinutesAgo));
+    }, 60000); // Check every minute
+    
+    return () => clearInterval(cleanInterval);
+  }, []);
 
   if (!accountHolder) {
     return <div className="error-message">Please specify an account holder to load the dashboard.</div>;

@@ -1,24 +1,73 @@
-import React, { useState, ChangeEvent } from 'react';
+import React, { useState, ChangeEvent, useEffect } from 'react';
 import axios from 'axios';
 import './IG_EntryUsernames.css';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext'; // Fixed import path
 
 interface IG_EntryUsernamesProps {
   onSubmitSuccess: (username: string) => void;
+  redirectIfCompleted?: boolean; // Flag to indicate if we should redirect if user already entered username
 }
 
-const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({ onSubmitSuccess }) => {
+const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({ 
+  onSubmitSuccess, 
+  redirectIfCompleted = true 
+}) => {
   const [username, setUsername] = useState<string>('');
   const [accountType, setAccountType] = useState<'branding' | 'non-branding' | ''>('');
   const [postingStyle, setPostingStyle] = useState<string>('');
   const [competitors, setCompetitors] = useState<string[]>(['', '', '']);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isInitializing, setIsInitializing] = useState<boolean>(true);
   const [message, setMessage] = useState<string>('');
   const [messageType, setMessageType] = useState<'info' | 'success' | 'error'>('info');
   const navigate = useNavigate();
+  const { currentUser } = useAuth(); // Get the current user from auth context
 
   const apiUrl = 'http://localhost:3000/save-account-info';
+  const statusApiUrl = 'http://localhost:3000/user-instagram-status';
+
+  // Check if user has already entered Instagram username
+  useEffect(() => {
+    const checkUserStatus = async () => {
+      if (!currentUser || !currentUser.uid) {
+        console.error('No authenticated user found');
+        setIsInitializing(false);
+        return;
+      }
+      
+      try {
+        const response = await axios.get(`${statusApiUrl}/${currentUser.uid}`);
+        
+        if (response.data.hasEnteredInstagramUsername && redirectIfCompleted) {
+          // User has already entered username, redirect to dashboard
+          const savedUsername = response.data.instagram_username;
+          onSubmitSuccess(savedUsername);
+          
+          if (response.data.accountType === 'branding') {
+            navigate('/dashboard', { 
+              state: { 
+                accountHolder: savedUsername, 
+                competitors: response.data.competitors || [] 
+              } 
+            });
+          } else {
+            navigate('/non-branding-dashboard', { 
+              state: { accountHolder: savedUsername } 
+            });
+          }
+        } else {
+          setIsInitializing(false);
+        }
+      } catch (error) {
+        console.error('Error checking user Instagram status:', error);
+        setIsInitializing(false);
+      }
+    };
+    
+    checkUserStatus();
+  }, [currentUser, navigate, onSubmitSuccess, redirectIfCompleted]);
 
   const isValidForSubmission = (): boolean => {
     if (!username.trim() || !accountType || !postingStyle.trim()) return false;
@@ -77,6 +126,11 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({ onSubmitSuccess }
       return;
     }
 
+    if (!currentUser || !currentUser.uid) {
+      showMessage('You must be logged in to continue', 'error');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -87,12 +141,20 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({ onSubmitSuccess }
         competitors: accountType === 'branding' ? competitors.map(comp => comp.trim()) : [],
       };
 
+      // Save to account info API
       const response = await axios.post(apiUrl, payload, {
         headers: { 'Content-Type': 'application/json' },
         timeout: 30000,
       });
 
       if (response.status === 200) {
+        // Now save the user's Instagram username entry state
+        await axios.post(`${statusApiUrl}/${currentUser.uid}`, {
+          instagram_username: username.trim(),
+          accountType,
+          competitors: accountType === 'branding' ? competitors.map(comp => comp.trim()) : []
+        });
+        
         showMessage('Submission successful', 'success');
         resetForm();
         setTimeout(() => {
@@ -113,6 +175,16 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({ onSubmitSuccess }
       setIsLoading(false);
     }
   };
+
+  if (isInitializing) {
+    return (
+      <div className="dashboard-container">
+        <div className="card loading">
+          <h1 className="title">Loading...</h1>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div

@@ -35,3 +35,26 @@
   padding: 0;
   width: calc(100% - 60px);
 }
+
+.App {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.main-content {
+  display: flex;
+  flex: 1;
+  padding-top: 80px; /* Space for TopBar */
+}
+
+.content-area {
+  flex: 1;
+  position: relative;
+  transition: width 0.3s ease;
+}
+
+.content-area.full-width {
+  margin-left: 0;
+  width: 100%;
+}

@@ -1,0 +1,265 @@
+.auth-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 20px;
+  background: linear-gradient(135deg, #0a0a1a, #252554);
+  overflow: hidden;
+}
+
+.auth-card {
+  background: rgba(26, 27, 50, 0.85);
+  backdrop-filter: blur(8px);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  padding: 40px 30px;
+  width: 100%;
+  max-width: 480px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+}
+
+.auth-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.auth-header h1 {
+  color: #e0e0ff;
+  font-size: 2.2rem;
+  margin-bottom: 8px;
+  font-weight: 600;
+  background: linear-gradient(to right, #e0e0ff, #00ffcc);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.auth-header p {
+  color: #a0a0cc;
+  font-size: 1rem;
+  margin: 0;
+}
+
+.auth-error, .auth-lockout {
+  background: rgba(255, 50, 50, 0.15);
+  border-left: 3px solid #ff5050;
+  color: #ffaaaa;
+  padding: 12px 15px;
+  margin-bottom: 25px;
+  border-radius: 6px;
+  position: relative;
+  font-size: 0.9rem;
+}
+
+.auth-lockout {
+  background: rgba(255, 180, 50, 0.15);
+  border-left: 3px solid #ffb432;
+  color: #ffe0aa;
+}
+
+.error-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  background: none;
+  border: none;
+  color: #ffaaaa;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.google-signin-btn {
+  width: 100%;
+  padding: 14px 20px;
+  background: linear-gradient(90deg, #181828, #252554);
+  color: #e0e0ff;
+  border: 1px solid rgba(224, 224, 255, 0.2);
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.google-signin-btn:hover {
+  background: linear-gradient(90deg, #1a1a32, #2a2a60);
+  border-color: rgba(224, 224, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.google-signin-btn:active {
+  transform: translateY(1px);
+}
+
+.google-signin-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.google-icon {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  background: #fff;
+  border-radius: 50%;
+  padding: 2px;
+}
+
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(224, 224, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #e0e0ff;
+  animation: spinner 0.8s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.auth-footer {
+  margin-top: 30px;
+  text-align: center;
+  color: #a0a0cc;
+  font-size: 0.8rem;
+}
+
+.auth-footer a {
+  color: #00ffcc;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.auth-footer a:hover {
+  color: #66ffe0;
+  text-decoration: underline;
+}
+
+/* Auth loading screen */
+.auth-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: linear-gradient(135deg, #0a0a1a, #252554);
+  color: #e0e0ff;
+}
+
+.auth-loading .spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(224, 224, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #00ffcc;
+  animation: spinner 1s linear infinite;
+  margin-bottom: 15px;
+}
+
+.auth-loading p {
+  font-size: 1.1rem;
+  color: #00ffcc;
+}
+
+/* User dropdown in TopBar */
+.user-profile {
+  position: relative;
+  margin-left: auto;
+  margin-right: 15px;
+}
+
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  background: linear-gradient(135deg, #00ffcc, #007bff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1a1a32;
+  font-weight: 600;
+  border: 2px solid rgba(224, 224, 255, 0.2);
+  transition: all 0.2s ease;
+}
+
+.user-avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.user-avatar:hover {
+  transform: scale(1.05);
+  border-color: rgba(224, 224, 255, 0.4);
+}
+
+.user-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 10px;
+  background: rgba(26, 27, 50, 0.95);
+  backdrop-filter: blur(8px);
+  border-radius: 8px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 12px 0;
+  min-width: 180px;
+  z-index: 1000;
+}
+
+.dropdown-menu-item {
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #e0e0ff;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-size: 0.9rem;
+}
+
+.dropdown-menu-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.dropdown-menu-item.logout {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 5px;
+  padding-top: 12px;
+  color: #ff5050;
+}
+
+.dropdown-menu-item svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+/* Responsive styles */
+@media (max-width: 576px) {
+  .auth-card {
+    padding: 30px 20px;
+  }
+  
+  .auth-header h1 {
+    font-size: 1.8rem;
+  }
+} 

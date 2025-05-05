@@ -8,7 +8,11 @@ import {
   getIdToken,
   User,
   setPersistence,
-  browserLocalPersistence
+  browserLocalPersistence,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  updateProfile
 } from "firebase/auth";
 import { getAnalytics, logEvent } from "firebase/analytics";
 
@@ -51,6 +55,86 @@ export const signInWithGoogle = async (): Promise<User | null> => {
     
     // Log failed login attempt
     logEvent(analytics, 'login_error', {
+      error_code: error.code || 'unknown',
+      error_message: error.message || 'Unknown error'
+    });
+    
+    throw error;
+  }
+};
+
+// Email/Password Authentication functions
+export const registerWithEmailPassword = async (
+  email: string, 
+  password: string, 
+  displayName: string
+): Promise<User | null> => {
+  try {
+    const result = await createUserWithEmailAndPassword(auth, email, password);
+    const user = result.user;
+    
+    // Set user display name
+    await updateProfile(user, { displayName });
+    
+    // Log successful registration event
+    logEvent(analytics, 'sign_up', {
+      method: 'email'
+    });
+    
+    return user;
+  } catch (error: any) {
+    console.error("Error registering with email/password:", error);
+    
+    // Log failed registration attempt
+    logEvent(analytics, 'sign_up_error', {
+      error_code: error.code || 'unknown',
+      error_message: error.message || 'Unknown error'
+    });
+    
+    throw error;
+  }
+};
+
+export const signInWithEmailPassword = async (
+  email: string, 
+  password: string
+): Promise<User | null> => {
+  try {
+    const result = await signInWithEmailAndPassword(auth, email, password);
+    const user = result.user;
+    
+    // Log successful login event
+    logEvent(analytics, 'login', {
+      method: 'email'
+    });
+    
+    return user;
+  } catch (error: any) {
+    console.error("Error signing in with email/password:", error);
+    
+    // Log failed login attempt
+    logEvent(analytics, 'login_error', {
+      error_code: error.code || 'unknown',
+      error_message: error.message || 'Unknown error'
+    });
+    
+    throw error;
+  }
+};
+
+export const resetPassword = async (email: string): Promise<void> => {
+  try {
+    await sendPasswordResetEmail(auth, email);
+    
+    // Log password reset request
+    logEvent(analytics, 'password_reset', {
+      method: 'email'
+    });
+  } catch (error: any) {
+    console.error("Error sending password reset email:", error);
+    
+    // Log failed password reset attempt
+    logEvent(analytics, 'password_reset_error', {
       error_code: error.code || 'unknown',
       error_message: error.message || 'Unknown error'
     });

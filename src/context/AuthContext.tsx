@@ -1,6 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from 'firebase/auth';
-import { auth, onAuthStateChanged, signInWithGoogle, logoutUser } from '../firebase/config';
+import { 
+  auth, 
+  onAuthStateChanged, 
+  signInWithGoogle, 
+  logoutUser,
+  signInWithEmailPassword,
+  registerWithEmailPassword,
+  resetPassword
+} from '../firebase/config';
 import { clearInstagramConnection, disconnectInstagramAccount } from '../utils/instagramSessionManager';
 
 interface AuthContextType {
@@ -9,6 +17,9 @@ interface AuthContextType {
   error: string | null;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
+  signInWithEmail: (email: string, password: string) => Promise<void>;
+  signUpWithEmail: (email: string, password: string, displayName: string) => Promise<void>;
+  sendPasswordReset: (email: string) => Promise<void>;
   clearError: () => void;
 }
 
@@ -45,6 +56,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await signInWithGoogle();
     } catch (error: any) {
       setError(error.message || 'Failed to sign in with Google');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const signInWithEmail = async (email: string, password: string): Promise<void> => {
+    setLoading(true);
+    setError(null);
+    try {
+      await signInWithEmailPassword(email, password);
+    } catch (error: any) {
+      setError(error.message || 'Failed to sign in with email/password');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const signUpWithEmail = async (email: string, password: string, displayName: string): Promise<void> => {
+    setLoading(true);
+    setError(null);
+    try {
+      await registerWithEmailPassword(email, password, displayName);
+    } catch (error: any) {
+      setError(error.message || 'Failed to sign up with email/password');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sendPasswordReset = async (email: string): Promise<void> => {
+    setLoading(true);
+    setError(null);
+    try {
+      await resetPassword(email);
+    } catch (error: any) {
+      setError(error.message || 'Failed to send password reset email');
     } finally {
       setLoading(false);
     }
@@ -88,6 +135,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loading,
     error,
     signIn,
+    signInWithEmail,
+    signUpWithEmail,
+    sendPasswordReset,
     signOut,
     clearError
   };

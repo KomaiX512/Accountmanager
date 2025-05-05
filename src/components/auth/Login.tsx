@@ -10,13 +10,26 @@ interface LocationState {
   };
 }
 
+type AuthMode = 'login' | 'register' | 'reset';
+
 const Login: React.FC = () => {
-  const { currentUser, signIn, error, clearError, loading } = useAuth();
+  const { currentUser, signIn, signInWithEmail, signUpWithEmail, sendPasswordReset, error, clearError, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  
+  // Form state
+  const [email, setEmail] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [confirmPassword, setConfirmPassword] = useState<string>('');
+  const [displayName, setDisplayName] = useState<string>('');
+  const [mode, setMode] = useState<AuthMode>('login');
+  
+  // UI state
   const [loginAttempts, setLoginAttempts] = useState<number>(0);
   const [lockout, setLockout] = useState<boolean>(false);
   const [lockoutTimer, setLockoutTimer] = useState<number>(0);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Get the path the user was trying to access before being redirected to login
   const from = (location.state as LocationState)?.from?.pathname || '/instagram';
@@ -50,7 +63,48 @@ const Login: React.FC = () => {
     }
   }, [loginAttempts, lockout]);
 
-  const handleLogin = async () => {
+  const validateForm = (): boolean => {
+    setFormError(null);
+    
+    if (!email.trim()) {
+      setFormError('Email is required');
+      return false;
+    }
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setFormError('Please enter a valid email address');
+      return false;
+    }
+    
+    if (mode !== 'reset') {
+      if (!password) {
+        setFormError('Password is required');
+        return false;
+      }
+      
+      if (mode === 'register') {
+        if (password.length < 6) {
+          setFormError('Password must be at least 6 characters');
+          return false;
+        }
+        
+        if (password !== confirmPassword) {
+          setFormError('Passwords do not match');
+          return false;
+        }
+        
+        if (!displayName.trim()) {
+          setFormError('Name is required');
+          return false;
+        }
+      }
+    }
+    
+    return true;
+  };
+
+  const handleGoogleLogin = async () => {
     if (lockout) return;
     
     try {
@@ -58,6 +112,201 @@ const Login: React.FC = () => {
       // Note: Successful login will trigger the useEffect to redirect
     } catch (error) {
       setLoginAttempts((prev) => prev + 1);
+    }
+  };
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (lockout) return;
+    
+    if (!validateForm()) return;
+    
+    try {
+      await signInWithEmail(email, password);
+      // Successful login will trigger the useEffect to redirect
+    } catch (error) {
+      setLoginAttempts((prev) => prev + 1);
+    }
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (lockout) return;
+    
+    if (!validateForm()) return;
+    
+    try {
+      await signUpWithEmail(email, password, displayName);
+      // Successful registration will redirect automatically
+    } catch (error) {
+      setLoginAttempts((prev) => prev + 1);
+    }
+  };
+
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (lockout) return;
+    
+    if (!validateForm()) return;
+    
+    try {
+      await sendPasswordReset(email);
+      setSuccessMessage('Password reset email sent. Please check your inbox.');
+      
+      // After 5 seconds, switch back to login mode
+      setTimeout(() => {
+        setSuccessMessage(null);
+        setMode('login');
+      }, 5000);
+    } catch (error) {
+      setLoginAttempts((prev) => prev + 1);
+    }
+  };
+
+  const renderForm = () => {
+    switch (mode) {
+      case 'login':
+        return (
+          <form className="auth-form" onSubmit={handleEmailLogin}>
+            <div className="form-group">
+              <label htmlFor="email">Email</label>
+              <input
+                id="email"
+                type="email"
+                className="form-input"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your@email.com"
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="password">Password</label>
+              <input
+                id="password"
+                type="password"
+                className="form-input"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+              />
+            </div>
+            <div className="forgot-password">
+              <a href="#" onClick={(e) => { e.preventDefault(); setMode('reset'); }}>
+                Forgot password?
+              </a>
+            </div>
+            <button
+              type="submit"
+              className="submit-btn"
+              disabled={loading || lockout}
+            >
+              {loading ? <span className="loading-spinner"></span> : 'Sign In'}
+            </button>
+            
+            <div className="auth-divider">
+              <span>OR</span>
+            </div>
+          </form>
+        );
+      
+      case 'register':
+        return (
+          <form className="auth-form" onSubmit={handleSignUp}>
+            <div className="form-group">
+              <label htmlFor="displayName">Full Name</label>
+              <input
+                id="displayName"
+                type="text"
+                className="form-input"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Your Name"
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="email">Email</label>
+              <input
+                id="email"
+                type="email"
+                className="form-input"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your@email.com"
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="password">Password</label>
+              <input
+                id="password"
+                type="password"
+                className="form-input"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="confirmPassword">Confirm Password</label>
+              <input
+                id="confirmPassword"
+                type="password"
+                className="form-input"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              className="submit-btn"
+              disabled={loading || lockout}
+            >
+              {loading ? <span className="loading-spinner"></span> : 'Create Account'}
+            </button>
+            
+            <div className="auth-divider">
+              <span>OR</span>
+            </div>
+          </form>
+        );
+        
+      case 'reset':
+        return (
+          <form className="auth-form" onSubmit={handlePasswordReset}>
+            <div className="form-group">
+              <label htmlFor="email">Email</label>
+              <input
+                id="email"
+                type="email"
+                className="form-input"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your@email.com"
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              className="submit-btn"
+              disabled={loading || lockout}
+            >
+              {loading ? <span className="loading-spinner"></span> : 'Send Reset Link'}
+            </button>
+            
+            <div className="auth-divider">
+              <span>OR</span>
+            </div>
+          </form>
+        );
+      
+      default:
+        return null;
     }
   };
 
@@ -75,7 +324,11 @@ const Login: React.FC = () => {
       >
         <div className="auth-header">
           <h1>Welcome to KomX</h1>
-          <p>Sign in to access your dashboard</p>
+          <p>
+            {mode === 'login' && 'Sign in to access your dashboard'}
+            {mode === 'register' && 'Create a new account to get started'}
+            {mode === 'reset' && 'Reset your password'}
+          </p>
         </div>
         
         {error && (
@@ -90,6 +343,29 @@ const Login: React.FC = () => {
           </motion.div>
         )}
         
+        {formError && (
+          <motion.div
+            className="auth-error"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <button className="error-close" onClick={() => setFormError(null)}>×</button>
+            {formError}
+          </motion.div>
+        )}
+        
+        {successMessage && (
+          <motion.div
+            className="success-message"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            {successMessage}
+          </motion.div>
+        )}
+        
         {lockout && (
           <motion.div
             className="auth-lockout"
@@ -101,14 +377,16 @@ const Login: React.FC = () => {
           </motion.div>
         )}
         
+        {renderForm()}
+        
         <motion.button
           className="google-signin-btn"
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.98 }}
-          onClick={handleLogin}
+          onClick={handleGoogleLogin}
           disabled={loading || lockout}
         >
-          {loading ? (
+          {loading && mode === 'login' ? (
             <span className="loading-spinner"></span>
           ) : (
             <>
@@ -122,6 +400,28 @@ const Login: React.FC = () => {
             </>
           )}
         </motion.button>
+        
+        <div className="auth-switch">
+          {mode === 'login' ? (
+            <>
+              Don't have an account?
+              <a href="#" onClick={(e) => { e.preventDefault(); setMode('register'); }}>
+                Sign up
+              </a>
+            </>
+          ) : mode === 'register' ? (
+            <>
+              Already have an account?
+              <a href="#" onClick={(e) => { e.preventDefault(); setMode('login'); }}>
+                Sign in
+              </a>
+            </>
+          ) : (
+            <a href="#" onClick={(e) => { e.preventDefault(); setMode('login'); }}>
+              Back to sign in
+            </a>
+          )}
+        </div>
         
         <div className="auth-footer">
           <p>By signing in, you agree to our <a href="/terms">Terms of Service</a> and <a href="/privacy">Privacy Policy</a></p>

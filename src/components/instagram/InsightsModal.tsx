@@ -4,11 +4,12 @@ import axios from 'axios';
 import { motion } from 'framer-motion';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
+import { useInstagram } from '../../context/InstagramContext';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 interface InsightsModalProps {
-  userId: string;
+  userId?: string;
   onClose: () => void;
 }
 
@@ -22,7 +23,11 @@ interface InsightData {
   follower_demographics: { lifetime: { [key: string]: number } };
 }
 
-const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose }) => {
+const InsightsModal: React.FC<InsightsModalProps> = ({ userId: propUserId, onClose }) => {
+  // Get userId from context if not provided as prop
+  const { userId: contextUserId, isConnected } = useInstagram();
+  const userId = propUserId || (isConnected ? contextUserId : null);
+
   const [insights, setInsights] = useState<InsightData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +35,12 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose }) => {
 
   useEffect(() => {
     const fetchInsights = async () => {
+      if (!userId) {
+        setError('No Instagram userId available. Please connect your Instagram account.');
+        setLoading(false);
+        return;
+      }
+
       try {
         console.log(`[${new Date().toISOString()}] Fetching insights for user ${userId}`);
         const response = await axios.get(`http://localhost:3000/insights/${userId}`);

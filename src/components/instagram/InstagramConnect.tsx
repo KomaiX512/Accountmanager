@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import './InstagramConnect.css';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
+import { useInstagram } from '../../context/InstagramContext';
 import {
   getInstagramConnection,
   storeInstagramConnection,
@@ -10,87 +11,17 @@ import {
 } from '../../utils/instagramSessionManager';
 
 interface InstagramConnectProps {
-  onConnected: (graphId: string, userId: string) => void;
+  onConnected?: (graphId: string, userId: string) => void;
   className?: string;
 }
 
 const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected, className = '' }) => {
   const [isConnecting, setIsConnecting] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
   const { currentUser } = useAuth();
+  const { isConnected, connectInstagram, disconnectInstagram } = useInstagram();
   const isStoringConnectionRef = useRef(false);
   const connectionDataRef = useRef<{ instagram_user_id: string; instagram_graph_id: string; username?: string } | null>(null);
   
-  // Check for stored connection on auth change or component mount
-  useEffect(() => {
-    const checkSavedConnection = async () => {
-      // Reset connection state when user changes or logs out
-      if (!currentUser) {
-        setIsConnected(false);
-        connectionDataRef.current = null;
-        return;
-      }
-      
-      try {
-        // Check if the user explicitly disconnected Instagram
-        const userDisconnected = isInstagramDisconnected(currentUser.uid);
-        if (userDisconnected) {
-          console.log(`[${new Date().toISOString()}] User ${currentUser.uid} previously disconnected Instagram, honoring that choice`);
-          setIsConnected(false);
-          connectionDataRef.current = null;
-          return;
-        }
-        
-        // First check local storage for cached connection
-        const connectionData = getInstagramConnection(currentUser.uid);
-        
-        if (connectionData) {
-          console.log(`[${new Date().toISOString()}] Found cached Instagram connection for user ${currentUser.uid}`);
-          setIsConnected(true);
-          // Notify parent component about the connection
-          onConnected(connectionData.instagram_graph_id, connectionData.instagram_user_id);
-          
-          // Store connection data in ref to prevent duplicate requests
-          connectionDataRef.current = connectionData;
-          return;
-        }
-        
-        // If not in local storage, check if we have a backend stored connection
-        if (currentUser?.uid) {
-          try {
-            const response = await axios.get(`http://localhost:3000/instagram-connection/${currentUser.uid}`);
-            if (response.data && response.data.instagram_user_id) {
-              // Store in both storage types for persistence
-              storeInstagramConnection(
-                response.data.instagram_user_id,
-                response.data.instagram_graph_id,
-                response.data.username || '',
-                currentUser.uid
-              );
-              
-              setIsConnected(true);
-              onConnected(response.data.instagram_graph_id, response.data.instagram_user_id);
-              
-              // Store connection data in ref to prevent duplicate requests
-              connectionDataRef.current = {
-                instagram_user_id: response.data.instagram_user_id,
-                instagram_graph_id: response.data.instagram_graph_id,
-                username: response.data.username
-              };
-            }
-          } catch (error) {
-            console.log(`[${new Date().toISOString()}] No stored Instagram connection found in backend for user ${currentUser.uid}`);
-            // No stored connection, that's okay - user will need to connect
-          }
-        }
-      } catch (error) {
-        console.error(`[${new Date().toISOString()}] Error checking Instagram connection:`, error);
-      }
-    };
-    
-    checkSavedConnection();
-  }, [onConnected, currentUser]);
-
   useEffect(() => {
     // Listen for OAuth redirect message from popup
     const handleMessage = (event: MessageEvent) => {
@@ -142,8 +73,14 @@ const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected, classN
             });
         }
         
-        setIsConnected(true);
-        onConnected(event.data.graphId, event.data.userId);
+        // Update global context state
+        connectInstagram(event.data.userId, event.data.graphId);
+        
+        // Also notify parent component if callback provided
+        if (onConnected) {
+          onConnected(event.data.graphId, event.data.userId);
+        }
+        
         setIsConnecting(false);
       } else {
         console.error(`[${new Date().toISOString()}] Invalid Instagram connection message:`, event.data);
@@ -152,7 +89,7 @@ const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected, classN
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [onConnected, currentUser]);
+  }, [onConnected, currentUser, connectInstagram]);
 
   const connectToInstagram = () => {
     if (!currentUser) {
@@ -181,7 +118,7 @@ const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected, classN
     );
   };
 
-  const disconnectInstagram = () => {
+  const handleDisconnect = () => {
     if (!currentUser) {
       console.error(`[${new Date().toISOString()}] Cannot disconnect Instagram: No authenticated user`);
       return;
@@ -209,7 +146,9 @@ const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected, classN
         });
     }
     
-    setIsConnected(false);
+    // Update global context state
+    disconnectInstagram();
+    
     console.log(`[${new Date().toISOString()}] Instagram disconnected for user ${currentUser?.uid}`);
   };
 
@@ -218,7 +157,7 @@ const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected, classN
       {isConnected ? (
         <button 
           className="disconnect-button" 
-          onClick={disconnectInstagram}
+          onClick={handleDisconnect}
         >
           Disconnect Instagram
         </button>

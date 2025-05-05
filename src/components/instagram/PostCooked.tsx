@@ -4,6 +4,8 @@ import { motion } from 'framer-motion';
 import { saveFeedback } from '../../utils/FeedbackHandler';
 import ErrorBoundary from '../ErrorBoundary';
 import CanvasEditor from '../common/CanvasEditor';
+import InstagramRequiredButton from '../common/InstagramRequiredButton';
+import { useInstagram } from '../../context/InstagramContext';
 
 interface PostCookedProps {
   username: string;
@@ -12,7 +14,11 @@ interface PostCookedProps {
   userId?: string;
 }
 
-const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts = [], userId }) => {
+const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts = [], userId: propUserId }) => {
+  const { isConnected, userId: contextUserId } = useInstagram();
+  
+  const userId = isConnected && contextUserId ? contextUserId : propUserId;
+
   const [localPosts, setLocalPosts] = useState<typeof posts>([]);
   const [imageErrors, setImageErrors] = useState<{ [key: string]: boolean }>({});
   const [profileImageError, setProfileImageError] = useState(false);
@@ -452,14 +458,22 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         <h2>Cooked Posts</h2>
         {/* Auto-Schedule Button */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
-          <button
-            className="insta-btn connect"
-            style={{ background: userId && filteredPosts.length ? 'linear-gradient(90deg, #007bff, #00ffcc)' : '#4a4a6a', color: '#e0e0ff', cursor: userId && filteredPosts.length ? 'pointer' : 'not-allowed', borderRadius: 8, padding: '8px 16px', border: '1px solid #00ffcc' }}
-            disabled={!userId || !filteredPosts.length || autoScheduling}
+          <InstagramRequiredButton
             onClick={() => setShowIntervalModal(true)}
+            className="insta-btn connect"
+            disabled={!filteredPosts.length || autoScheduling}
+            style={{ 
+              background: 'linear-gradient(90deg, #007bff, #00ffcc)', 
+              color: '#e0e0ff', 
+              cursor: filteredPosts.length ? 'pointer' : 'not-allowed', 
+              borderRadius: 8, 
+              padding: '8px 16px', 
+              border: '1px solid #00ffcc',
+              opacity: filteredPosts.length ? 1 : 0.5
+            }}
           >
             {autoScheduling ? 'Auto-Scheduling...' : 'Auto-Schedule All'}
-          </button>
+          </InstagramRequiredButton>
         </div>
         {/* Interval Modal */}
         {showIntervalModal && (
@@ -670,11 +684,25 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                     </motion.button>
                   </div>
                   <div className="post-control-buttons">
-                    <motion.button
-                      className="schedule-button"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
+                    <InstagramRequiredButton
+                      isConnected={!!userId}
                       onClick={() => handleScheduleClick(post.key)}
+                      className="schedule-button"
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '5px', 
+                        backgroundColor: '#007bff', 
+                        color: '#e0e0ff',
+                        border: 'none',
+                        padding: '8px 12px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: 'bold',
+                        transition: 'all 0.2s ease'
+                      }}
+                      notificationPosition="bottom"
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -691,7 +719,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                         <polyline points="12 6 12 12 16 14" />
                       </svg>
                       Schedule
-                    </motion.button>
+                    </InstagramRequiredButton>
                     <motion.button
                       className="edit-button"
                       whileHover={{ scale: 1.05 }}

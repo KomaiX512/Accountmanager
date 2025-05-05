@@ -5,6 +5,8 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import 'tui-image-editor/dist/tui-image-editor.css';
 import axios from 'axios';
+import InstagramRequiredButton from './InstagramRequiredButton';
+import { useInstagram } from '../../context/InstagramContext';
 
 interface CanvasEditorProps {
   onClose: () => void;
@@ -18,11 +20,15 @@ interface CanvasEditorProps {
 const CanvasEditor: React.FC<CanvasEditorProps> = ({ 
   onClose, 
   username, 
-  userId, 
+  userId: propUserId, 
   initialImageUrl, 
   postKey, 
   postCaption 
 }) => {
+  // Get userId from context if not provided as prop
+  const { userId: contextUserId, isConnected } = useInstagram();
+  const userId = propUserId || (isConnected ? contextUserId : null);
+
   const editorRef = useRef<HTMLDivElement>(null);
   const tuiInstanceRef = useRef<any>(null);
   const [showScheduler, setShowScheduler] = useState(false);
@@ -426,13 +432,23 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
         
         <div className="canvas-editor-footer">
           <button className="cancel-button" onClick={onClose}>Cancel</button>
-          <button 
-            className="schedule-button" 
+          <InstagramRequiredButton
             onClick={handleSchedule}
+            className="schedule-button"
             disabled={!imageLoaded || isProcessing}
+            style={{ 
+              backgroundColor: '#007bff',
+              color: '#e0e0ff',
+              border: 'none',
+              padding: '8px 16px',
+              borderRadius: '4px',
+              fontWeight: 'bold',
+              cursor: imageLoaded && !isProcessing ? 'pointer' : 'not-allowed',
+              opacity: imageLoaded && !isProcessing ? 1 : 0.5
+            }}
           >
             Schedule
-          </button>
+          </InstagramRequiredButton>
         </div>
         
         {showScheduler && (
@@ -443,7 +459,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
               
               <DatePicker 
                 selected={scheduleDate}
-                onChange={(date) => setScheduleDate(date)}
+                onChange={(date: Date | null) => setScheduleDate(date)}
                 showTimeSelect
                 timeFormat="HH:mm"
                 timeIntervals={15}

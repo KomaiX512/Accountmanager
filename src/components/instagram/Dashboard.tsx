@@ -12,6 +12,8 @@ import NewsForYou from './NewsForYou';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
+import InstagramRequiredButton from '../common/InstagramRequiredButton';
+import { useInstagram } from '../../context/InstagramContext';
 
 interface ProfileInfo {
   fullName: string;
@@ -40,10 +42,6 @@ interface DashboardProps {
   accountType: 'branding' | 'non-branding';
 }
 
-// Local storage keys for Instagram connection data
-const IG_USER_ID_KEY = 'instagram_user_id';
-const IG_GRAPH_ID_KEY = 'instagram_graph_id';
-
 const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accountType }) => {
   const [query, setQuery] = useState('');
   const [toast, setToast] = useState<string | null>(null);
@@ -58,7 +56,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const [igBusinessId, setIgBusinessId] = useState<string | null>(null);
+  const { userId: igBusinessId, isConnected: isInstagramConnected, connectInstagram } = useInstagram();
   const [isSchedulerOpen, setIsSchedulerOpen] = useState(false);
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
@@ -75,7 +73,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
   const firstLoadRef = useRef(true);
   const lastProfilePicRenderTimeRef = useRef<number>(0);
   const [refreshKey, setRefreshKey] = useState(0);
-  const { currentUser } = useAuth(); // Get the current user for persistent connection
+  const { currentUser } = useAuth();
 
   const fetchProfileInfo = async () => {
     if (!accountHolder) return;
@@ -107,21 +105,15 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
   const fetchIgBusinessId = async (attempt = 1, maxAttempts = 3) => {
     if (!accountHolder) return;
     
-    // First check localStorage for cached connection
-    const cachedUserId = localStorage.getItem(IG_USER_ID_KEY);
-    if (cachedUserId) {
-      setIgBusinessId(cachedUserId);
-      console.log(`[${new Date().toISOString()}] Set igBusinessId from cache: ${cachedUserId}`);
-      return;
-    }
-    
     try {
       const response = await axios.get(`http://localhost:3000/profile-info/${accountHolder}`);
       const userId = response.data?.id;
-      if (userId) {
-        setIgBusinessId(userId);
-        console.log(`[${new Date().toISOString()}] Set igBusinessId: ${userId}`);
-      } else {
+      if (userId && !igBusinessId) {
+        if (!isInstagramConnected) {
+          connectInstagram(userId, userId);
+        }
+        console.log(`[${new Date().toISOString()}] Set igBusinessId from profile: ${userId}`);
+      } else if (!userId) {
         console.error(`[${new Date().toISOString()}] No userId found in profile info`);
         if (attempt < maxAttempts) {
           console.log(`[${new Date().toISOString()}] Retrying fetchIgBusinessId, attempt ${attempt + 1}/${maxAttempts}`);
@@ -131,7 +123,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
         }
       }
     } catch (err) {
-      console.error(`[${new Date().toISOString()}] Error fetching igBusinessId (attempt ${attempt}/${maxAttempts}):`, err);
+      console.error(`[${new Date().toISOString()}] Error fetching profile info (attempt ${attempt}/${maxAttempts}):`, err);
       if (attempt < maxAttempts) {
         console.log(`[${new Date().toISOString()}] Retrying fetchIgBusinessId in 2s...`);
         setTimeout(() => fetchIgBusinessId(attempt + 1, maxAttempts), 2000);
@@ -554,33 +546,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
       return;
     }
     
-    // Check if we already have this connection
-    if (igBusinessId === userId) {
-      console.log(`[${new Date().toISOString()}] Instagram already connected with the same user ID, skipping...`);
-      return;
-    }
-    
-    console.log(`[${new Date().toISOString()}] Instagram connected for graph ID: ${graphId}, user ID: ${userId}`);
-    setIgBusinessId(userId);
-    
-    // Store in localStorage for persistence
-    localStorage.setItem(IG_USER_ID_KEY, userId);
-    localStorage.setItem(IG_GRAPH_ID_KEY, graphId);
-    
-    // Store in backend if user is authenticated
-    if (currentUser?.uid) {
-      axios.post(`http://localhost:3000/instagram-connection/${currentUser.uid}`, {
-        instagram_user_id: userId,
-        instagram_graph_id: graphId,
-        username: accountHolder
-      })
-      .then(() => {
-        console.log(`[${new Date().toISOString()}] Successfully stored Instagram connection in backend`);
-      })
-      .catch(error => {
-        console.error(`[${new Date().toISOString()}] Failed to store Instagram connection in backend:`, error);
-      });
-    }
+    console.log(`[${new Date().toISOString()}] Instagram connected via InstagramConnect: graph ID: ${graphId}, user ID: ${userId}`);
     
     setToast('Instagram account connected successfully!');
   };
@@ -674,58 +640,55 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
                   </div>
                   <div className="profile-actions">
                     <InstagramConnect onConnected={handleInstagramConnected} />
-                    <button
+                    
+                    <InstagramRequiredButton
+                      isConnected={!!igBusinessId}
                       onClick={handleOpenInsights}
                       className="insta-btn insights"
                       style={{
-                        background: igBusinessId ? 'linear-gradient(90deg, #ff2e63, #00ffcc)' : '#4a4a6a',
-                        color: igBusinessId ? '#e0e0ff' : '#a0a0cc',
-                        pointerEvents: igBusinessId ? 'auto' : 'none',
-                        cursor: igBusinessId ? 'pointer' : 'not-allowed',
+                        background: 'linear-gradient(90deg, #ff2e63, #00ffcc)',
+                        color: '#e0e0ff',
                         padding: '8px 16px',
                         borderRadius: '6px',
                         border: '1px solid #ff2e63',
                         zIndex: 20,
                       }}
-                      disabled={!igBusinessId}
                     >
                       Insights
-                    </button>
-                    <button
+                    </InstagramRequiredButton>
+                    
+                    <InstagramRequiredButton
+                      isConnected={!!igBusinessId}
                       onClick={handleOpenScheduler}
                       className="insta-btn connect"
                       style={{
-                        background: igBusinessId ? 'linear-gradient(90deg, #007bff, #00ffcc)' : '#4a4a6a',
-                        color: igBusinessId ? '#e0e0ff' : '#a0a0cc',
-                        pointerEvents: igBusinessId ? 'auto' : 'none',
-                        cursor: igBusinessId ? 'pointer' : 'not-allowed',
+                        background: 'linear-gradient(90deg, #007bff, #00ffcc)',
+                        color: '#e0e0ff',
                         padding: '8px 16px',
                         borderRadius: '6px',
                         border: '1px solid #00ffcc',
                         zIndex: 20,
                       }}
-                      disabled={!igBusinessId}
                     >
                       Schedule Post
-                    </button>
-                    <button
+                    </InstagramRequiredButton>
+                    
+                    <InstagramRequiredButton
+                      isConnected={!!igBusinessId}
                       onClick={handleOpenGoalModal}
                       className="insta-btn connect"
                       style={{
-                        background: igBusinessId ? 'linear-gradient(90deg, #00ffcc, #007bff)' : '#4a4a6a',
-                        color: igBusinessId ? '#e0e0ff' : '#a0a0cc',
-                        pointerEvents: igBusinessId ? 'auto' : 'none',
-                        cursor: igBusinessId ? 'pointer' : 'not-allowed',
+                        background: 'linear-gradient(90deg, #00ffcc, #007bff)',
+                        color: '#e0e0ff',
                         padding: '8px 16px',
                         borderRadius: '6px',
                         border: '1px solid #00ffcc',
                         zIndex: 20,
                         marginLeft: '10px',
                       }}
-                      disabled={!igBusinessId}
                     >
                       Goal
-                    </button>
+                    </InstagramRequiredButton>
                   </div>
                 </div>
               )}

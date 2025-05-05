@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './Dms_Comments.css';
+import { useInstagram } from '../../context/InstagramContext';
 
 interface Notification {
   type: 'message' | 'comment' | 'reply' | 'comment_reply';
@@ -24,10 +25,13 @@ interface DmsCommentsProps {
   username: string;
   onIgnoreAIReply: (pair: any) => void;
   refreshKey: number;
-  igBusinessId: string | null;
+  igBusinessId?: string | null;
 }
 
-const Dms_Comments: React.FC<DmsCommentsProps> = ({ notifications, onReply, onIgnore, onRefresh, onReplyWithAI, username, onIgnoreAIReply, igBusinessId }) => {
+const Dms_Comments: React.FC<DmsCommentsProps> = ({ notifications, onReply, onIgnore, onRefresh, onReplyWithAI, username, onIgnoreAIReply, refreshKey, igBusinessId: propIgBusinessId }) => {
+  const { userId: contextUserId, isConnected } = useInstagram();
+  const igBusinessId = propIgBusinessId || (isConnected ? contextUserId : null);
+
   const [replyText, setReplyText] = useState<{ [key: string]: string }>({});
   const [sending, setSending] = useState<{ [key: string]: boolean }>({});
   const [error, setError] = useState<{ [key: string]: string }>({});
@@ -184,6 +188,17 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({ notifications, onReply, onIg
     }
   };
 
+  const renderNotConnectedMessage = () => {
+    if (!igBusinessId) {
+      return (
+        <div className="instagram-not-connected">
+          <p>Connect your Instagram account to manage direct messages and comments.</p>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <div className="dms-comments">
       <button
@@ -192,136 +207,143 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({ notifications, onReply, onIg
           onRefresh();
         }}
         className="refresh-button"
+        disabled={!igBusinessId}
       >
         Refresh Notifications
       </button>
-      {filteredNotifications.length === 0 && aiReplies.length === 0 ? (
-        <p className="no-notifications">No pending notifications.</p>
-      ) : (
-        <ul className="notification-list">
-          {filteredNotifications.map((notif, index) => {
-            const pair = getPairForNotif(notif);
-            if (pair) {
-              // If reply exists, show only the pair with Ignore
-              return (
-                <li key={pair.replyKey} className="ai-reply-item">
-                  <div className="ai-reply-question">
-                    <span className="ai-reply-label">Q:</span> {pair.request.text}
-                  </div>
-                  <div className="ai-reply-answer">
-                    <span className="ai-reply-label">AI:</span> {pair.reply.reply}
-                  </div>
-                  <button
-                    className="ignore-button"
-                    style={{ marginTop: 8, minWidth: 80 }}
-                    onClick={() => handleIgnoreAIReply(pair)}
+      
+      {renderNotConnectedMessage()}
+      
+      {!igBusinessId ? null : (
+        filteredNotifications.length === 0 && aiReplies.length === 0 ? (
+          <p className="no-notifications">No pending notifications.</p>
+        ) : (
+          <ul className="notification-list">
+            {filteredNotifications.map((notif, index) => {
+              const pair = getPairForNotif(notif);
+              if (pair) {
+                // If reply exists, show only the pair with Ignore
+                return (
+                  <li key={pair.replyKey} className="ai-reply-item">
+                    <div className="ai-reply-question">
+                      <span className="ai-reply-label">Q:</span> {pair.request.text}
+                    </div>
+                    <div className="ai-reply-answer">
+                      <span className="ai-reply-label">AI:</span> {pair.reply.reply}
+                    </div>
+                    <button
+                      className="ignore-button"
+                      style={{ marginTop: 8, minWidth: 80 }}
+                      onClick={() => handleIgnoreAIReply(pair)}
+                    >
+                      Ignore
+                    </button>
+                  </li>
+                );
+              } else {
+                // No reply yet, show normal notification
+                return (
+                  <li
+                    key={`${notif.type}-${notif.message_id || notif.comment_id}-${index}`}
+                    className="notification-item"
                   >
-                    Ignore
-                  </button>
-                </li>
-              );
-            } else {
-              // No reply yet, show normal notification
-              return (
-                <li
-                  key={`${notif.type}-${notif.message_id || notif.comment_id}-${index}`}
-                  className="notification-item"
-                >
-                  {notif.type === 'message' ? (
-                    <div>
-                      <strong>Message</strong> from {notif.username || notif.sender_id || 'Unknown'}: {notif.text}
-                      <span className="timestamp">{formatTimestamp(notif.timestamp)}</span>
-                      <div className="reply-container">
-                        <input
-                          type="text"
-                          value={replyText[notif.message_id || ''] || ''}
-                          onChange={(e) =>
-                            setReplyText({ ...replyText, [notif.message_id || '']: e.target.value })
-                          }
-                          placeholder="Type your reply..."
-                          className="reply-input"
-                          disabled={sending[notif.message_id || '']}
-                        />
-                        <div className="reply-actions">
-                          <button
-                            onClick={() => handleReply(notif)}
-                            className="reply-button"
-                            disabled={sending[notif.message_id || ''] || !replyText[notif.message_id || '']?.trim()}
-                          >
-                            {sending[notif.message_id || ''] ? 'Sending...' : 'Reply'}
-                          </button>
-                          <button
-                            onClick={() => handleIgnore(notif)}
-                            className="ignore-button"
+                    {notif.type === 'message' ? (
+                      <div>
+                        <strong>Message</strong> from {notif.username || notif.sender_id || 'Unknown'}: {notif.text}
+                        <span className="timestamp">{formatTimestamp(notif.timestamp)}</span>
+                        <div className="reply-container">
+                          <input
+                            type="text"
+                            value={replyText[notif.message_id || ''] || ''}
+                            onChange={(e) =>
+                              setReplyText({ ...replyText, [notif.message_id || '']: e.target.value })
+                            }
+                            placeholder="Type your reply..."
+                            className="reply-input"
                             disabled={sending[notif.message_id || '']}
-                          >
-                            {sending[notif.message_id || ''] ? 'Ignoring...' : 'Ignore'}
-                          </button>
-                          <button
-                            onClick={() => onReplyWithAI(notif)}
-                            className="ai-reply-button"
-                            disabled={sending[notif.message_id || '']}
-                            title="Let AI Manager reply"
-                          >
-                            Reply with AI
-                          </button>
+                          />
+                          <div className="reply-actions">
+                            <button
+                              onClick={() => handleReply(notif)}
+                              className="reply-button"
+                              disabled={sending[notif.message_id || ''] || !replyText[notif.message_id || '']?.trim()}
+                            >
+                              {sending[notif.message_id || ''] ? 'Sending...' : 'Reply'}
+                            </button>
+                            <button
+                              onClick={() => handleIgnore(notif)}
+                              className="ignore-button"
+                              disabled={sending[notif.message_id || '']}
+                            >
+                              {sending[notif.message_id || ''] ? 'Ignoring...' : 'Ignore'}
+                            </button>
+                            <button
+                              onClick={() => onReplyWithAI(notif)}
+                              className="ai-reply-button"
+                              disabled={sending[notif.message_id || '']}
+                              title="Let AI Manager reply"
+                            >
+                              Reply with AI
+                            </button>
+                          </div>
                         </div>
+                        {error[notif.message_id || ''] && (
+                          <span className="error-message">{error[notif.message_id || '']}</span>
+                        )}
                       </div>
-                      {error[notif.message_id || ''] && (
-                        <span className="error-message">{error[notif.message_id || '']}</span>
-                      )}
-                    </div>
-                  ) : (
-                    <div>
-                      <strong>Comment</strong> from @{notif.username || notif.sender_id || 'Unknown'} on post {notif.post_id || 'Unknown'}: {notif.text}
-                      <span className="timestamp">{formatTimestamp(notif.timestamp)}</span>
-                      <div className="reply-container">
-                        <input
-                          type="text"
-                          value={replyText[notif.comment_id || ''] || ''}
-                          onChange={(e) =>
-                            setReplyText({ ...replyText, [notif.comment_id || '']: e.target.value })
-                          }
-                          placeholder="Type your reply..."
-                          className="reply-input"
-                          disabled={sending[notif.comment_id || '']}
-                        />
-                        <div className="reply-actions">
-                          <button
-                            onClick={() => handleReply(notif)}
-                            className="reply-button"
-                            disabled={sending[notif.comment_id || ''] || !replyText[notif.comment_id || '']?.trim()}
-                          >
-                            {sending[notif.comment_id || ''] ? 'Sending...' : 'Reply'}
-                          </button>
-                          <button
-                            onClick={() => handleIgnore(notif)}
-                            className="ignore-button"
+                    ) : (
+                      <div>
+                        <strong>Comment</strong> from @{notif.username || notif.sender_id || 'Unknown'} on post {notif.post_id || 'Unknown'}: {notif.text}
+                        <span className="timestamp">{formatTimestamp(notif.timestamp)}</span>
+                        <div className="reply-container">
+                          <input
+                            type="text"
+                            value={replyText[notif.comment_id || ''] || ''}
+                            onChange={(e) =>
+                              setReplyText({ ...replyText, [notif.comment_id || '']: e.target.value })
+                            }
+                            placeholder="Type your reply..."
+                            className="reply-input"
                             disabled={sending[notif.comment_id || '']}
-                          >
-                            {sending[notif.comment_id || ''] ? 'Ignoring...' : 'Ignore'}
-                          </button>
-                          <button
-                            onClick={() => onReplyWithAI(notif)}
-                            className="ai-reply-button"
-                            disabled={sending[notif.comment_id || '']}
-                            title="Let AI Manager reply"
-                          >
-                            Reply with AI
-                          </button>
+                          />
+                          <div className="reply-actions">
+                            <button
+                              onClick={() => handleReply(notif)}
+                              className="reply-button"
+                              disabled={sending[notif.comment_id || ''] || !replyText[notif.comment_id || '']?.trim()}
+                            >
+                              {sending[notif.comment_id || ''] ? 'Sending...' : 'Reply'}
+                            </button>
+                            <button
+                              onClick={() => handleIgnore(notif)}
+                              className="ignore-button"
+                              disabled={sending[notif.comment_id || '']}
+                            >
+                              {sending[notif.comment_id || ''] ? 'Ignoring...' : 'Ignore'}
+                            </button>
+                            <button
+                              onClick={() => onReplyWithAI(notif)}
+                              className="ai-reply-button"
+                              disabled={sending[notif.comment_id || '']}
+                              title="Let AI Manager reply"
+                            >
+                              Reply with AI
+                            </button>
+                          </div>
                         </div>
+                        {error[notif.comment_id || ''] && (
+                          <span className="error-message">{error[notif.comment_id || '']}</span>
+                        )}
                       </div>
-                      {error[notif.comment_id || ''] && (
-                        <span className="error-message">{error[notif.comment_id || '']}</span>
-                      )}
-                    </div>
-                  )}
-                </li>
-              );
-            }
-          })}
-        </ul>
+                    )}
+                  </li>
+                );
+              }
+            })}
+          </ul>
+        )
       )}
+      
       {/* AI Replies Section */}
       <div className="ai-replies-section">
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>

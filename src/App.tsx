@@ -9,6 +9,7 @@ import Login from './components/auth/Login';
 import PrivateRoute from './components/auth/PrivateRoute';
 import AuthRoute from './components/auth/AuthRoute';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { InstagramProvider } from './context/InstagramContext';
 import axios from 'axios';
 import { syncInstagramConnection, isInstagramDisconnected } from './utils/instagramSessionManager';
 
@@ -16,7 +17,9 @@ import { syncInstagramConnection, isInstagramDisconnected } from './utils/instag
 const App: React.FC = () => {
   return (
     <AuthProvider>
-      <AppContent />
+      <InstagramProvider>
+        <AppContent />
+      </InstagramProvider>
     </AuthProvider>
   );
 };

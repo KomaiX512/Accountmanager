@@ -8,6 +8,7 @@ import DmsComments from './Dms_Comments';
 import PostScheduler from './PostScheduler';
 import InsightsModal from './InsightsModal';
 import GoalModal from './GoalModal';
+import NewsForYou from './NewsForYou';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
@@ -36,19 +37,21 @@ interface Notification {
 interface DashboardProps {
   accountHolder: string;
   competitors: string[];
+  accountType: 'branding' | 'non-branding';
 }
 
 // Local storage keys for Instagram connection data
 const IG_USER_ID_KEY = 'instagram_user_id';
 const IG_GRAPH_ID_KEY = 'instagram_graph_id';
 
-const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => {
+const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accountType }) => {
   const [query, setQuery] = useState('');
   const [toast, setToast] = useState<string | null>(null);
   const [responses, setResponses] = useState<{ key: string; data: any }[]>([]);
   const [strategies, setStrategies] = useState<{ key: string; data: any }[]>([]);
   const [posts, setPosts] = useState<{ key: string; data: any }[]>([]);
   const [competitorData, setCompetitorData] = useState<{ key: string; data: any }[]>([]);
+  const [news, setNews] = useState<{ key: string; data: any }[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [profileInfo, setProfileInfo] = useState<ProfileInfo | null>(null);
@@ -280,12 +283,12 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     }
     try {
       const forceRefresh = firstLoadRef.current;
-      const [responsesData, strategiesData, postsData, competitorDataResponses] = await Promise.all([
+      const [responsesData, strategiesData, postsData, otherData] = await Promise.all([
         axios.get(`http://localhost:3000/responses/${accountHolder}${forceRefresh ? '?forceRefresh=true' : ''}`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        axios.get(`http://localhost:3000/retrieve-strategies/${accountHolder}${forceRefresh ? '?forceRefresh=true' : ''}`).catch(err => {
+        axios.get(`http://localhost:3000/${accountType === 'branding' ? 'retrieve-strategies' : 'retrieve-engagement-strategies'}/${accountHolder}${forceRefresh ? '?forceRefresh=true' : ''}`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
@@ -293,22 +296,38 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        Promise.all(
-          competitors.map(comp =>
-            axios.get(`http://localhost:3000/retrieve/${accountHolder}/${comp}${forceRefresh ? '?forceRefresh=true' : ''}`).catch(err => {
-              if (err.response?.status === 404) {
-                console.warn(`No competitor data found for ${comp}`);
-                return { data: [] };
-              }
+        accountType === 'branding' 
+          ? Promise.all(
+              competitors.map(comp =>
+                axios.get(`http://localhost:3000/retrieve/${accountHolder}/${comp}${forceRefresh ? '?forceRefresh=true' : ''}`).catch(err => {
+                  if (err.response?.status === 404) {
+                    console.warn(`No competitor data found for ${comp}`);
+                    return { data: [] };
+                  }
+                  throw err;
+                })
+              )
+            )
+          : axios.get(`http://localhost:3000/news-for-you/${accountHolder}${forceRefresh ? '?forceRefresh=true' : ''}`).catch(err => {
+              if (err.response?.status === 404) return { data: [] };
               throw err;
             })
-          )
-        ),
       ]);
+
       setResponses(responsesData.data);
       setStrategies(strategiesData.data);
       setPosts(postsData.data);
-      setCompetitorData(competitorDataResponses.flatMap(res => res.data));
+      
+      if (accountType === 'branding') {
+        // otherData is an array of responses for competitor data
+        const competitorResponses = otherData as any[];
+        setCompetitorData(competitorResponses.flatMap(res => res.data));
+      } else {
+        // otherData is a single response for news
+        const newsResponse = otherData as any;
+        setNews(newsResponse.data || []);
+      }
+
       setError(null);
       if (firstLoadRef.current) {
         firstLoadRef.current = false;
@@ -372,8 +391,12 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
             setError(err.response?.data?.error || 'Failed to fetch responses.');
           });
         }
-        if (prefix.startsWith(`recommendations/${accountHolder}/`)) {
-          axios.get(`http://localhost:3000/retrieve-strategies/${accountHolder}`).then(res => {
+        if (prefix.startsWith(`recommendations/${accountHolder}/`) || prefix.startsWith(`engagement_strategies/${accountHolder}/`)) {
+          const endpoint = accountType === 'branding' 
+            ? `http://localhost:3000/retrieve-strategies/${accountHolder}`
+            : `http://localhost:3000/retrieve-engagement-strategies/${accountHolder}`;
+          
+          axios.get(endpoint).then(res => {
             setStrategies(res.data);
             setToast('New strategies available!');
           }).catch(err => {
@@ -390,7 +413,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
             setError(err.response?.data?.error || 'Failed to fetch posts.');
           });
         }
-        if (prefix.startsWith(`competitor_analysis/${accountHolder}/`)) {
+        if (accountType === 'branding' && prefix.startsWith(`competitor_analysis/${accountHolder}/`)) {
           Promise.all(
             competitors.map(comp =>
               axios.get(`http://localhost:3000/retrieve/${accountHolder}/${comp}`).catch(err => {
@@ -407,6 +430,15 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
               console.error('Error fetching competitor data:', err);
               setError(err.response?.data?.error || 'Failed to fetch competitor analysis.');
             });
+        }
+        if (accountType === 'non-branding' && prefix.startsWith(`NewForYou/${accountHolder}/`)) {
+          axios.get(`http://localhost:3000/news-for-you/${accountHolder}`).then(res => {
+            setNews(res.data);
+            setToast('New news article available!');
+          }).catch(err => {
+            console.error('Error fetching news:', err);
+            setError(err.response?.data?.error || 'Failed to fetch news articles.');
+          });
         }
       }
 
@@ -738,12 +770,21 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
 
           <div className="strategies">
             <h2>Our Strategies <span className="badge">{strategies.length || 3} unseen!!!</span></h2>
-            <OurStrategies accountHolder={accountHolder} accountType="branding" />
+            <OurStrategies accountHolder={accountHolder} accountType={accountType} />
           </div>
 
           <div className="competitor-analysis">
-            <h2>Competitor Analysis <span className="badge">{competitorData.length || 5} unseen!!!</span></h2>
-            <Cs_Analysis accountHolder={accountHolder} competitors={competitors} />
+            {accountType === 'branding' ? (
+              <>
+                <h2>Competitor Analysis <span className="badge">{competitorData.length || 5} unseen!!!</span></h2>
+                <Cs_Analysis accountHolder={accountHolder} competitors={competitors} />
+              </>
+            ) : (
+              <>
+                <h2>News For You <span className="badge">{news.length || 5} new articles!!!</span></h2>
+                <NewsForYou accountHolder={accountHolder} />
+              </>
+            )}
           </div>
 
           <div className="chatbot">

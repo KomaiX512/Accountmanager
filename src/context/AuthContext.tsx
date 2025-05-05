@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from 'firebase/auth';
 import { auth, onAuthStateChanged, signInWithGoogle, logoutUser } from '../firebase/config';
+import { clearInstagramConnection, disconnectInstagramAccount } from '../utils/instagramSessionManager';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -53,6 +54,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     setError(null);
     try {
+      // Clear Instagram session data before logging out
+      if (currentUser?.uid) {
+        console.log(`[${new Date().toISOString()}] Clearing Instagram connection data for user ${currentUser.uid} during logout`);
+        
+        try {
+          // First try to disconnect from backend
+          await disconnectInstagramAccount(currentUser.uid);
+        } catch (disconnectError) {
+          console.error(`[${new Date().toISOString()}] Error during Instagram disconnect:`, disconnectError);
+          // Continue with logout even if Instagram disconnect fails
+          
+          // Still clear local storage
+          clearInstagramConnection(currentUser.uid);
+        }
+      }
+      
+      // Proceed with Firebase logout
       await logoutUser();
     } catch (error: any) {
       setError(error.message || 'Failed to sign out');

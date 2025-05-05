@@ -1,4 +1,4 @@
-import React, { useState, ChangeEvent, useEffect } from 'react';
+import React, { useState, ChangeEvent, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import './IG_EntryUsernames.css';
 import { motion } from 'framer-motion';
@@ -22,11 +22,23 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
   const [message, setMessage] = useState<string>('');
   const [messageType, setMessageType] = useState<'info' | 'success' | 'error'>('info');
+  
+  // New state variables for username validation
+  const [isCheckingUsername, setIsCheckingUsername] = useState<boolean>(false);
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const [usernameMessage, setUsernameMessage] = useState<string>('');
+  const [usernameValid, setUsernameValid] = useState<boolean>(true);
+  const [usernameTouched, setUsernameTouched] = useState<boolean>(false);
+  
   const navigate = useNavigate();
   const { currentUser } = useAuth(); // Get the current user from auth context
 
   const apiUrl = 'http://localhost:3000/save-account-info';
   const statusApiUrl = 'http://localhost:3000/user-instagram-status';
+  const usernameCheckUrl = 'http://localhost:3000/check-username-availability';
+
+  // Username validation regex (lowercase letters, numbers, underscores, periods only)
+  const instagramUsernameRegex = /^[a-z0-9._]+$/;
 
   // Check if user has already entered Instagram username
   useEffect(() => {
@@ -76,10 +88,87 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
     checkUserStatus();
   }, [currentUser, navigate, onSubmitSuccess, redirectIfCompleted]);
 
+  // Debounced username validation
+  const checkUsernameAvailability = useCallback(
+    async (value: string) => {
+      if (!value.trim()) {
+        setUsernameAvailable(null);
+        setUsernameMessage('');
+        return;
+      }
+
+      // Validate username format first
+      if (!instagramUsernameRegex.test(value)) {
+        setUsernameValid(false);
+        setUsernameMessage('Username can only contain lowercase letters, numbers, periods, and underscores');
+        setUsernameAvailable(null);
+        return;
+      }
+
+      setUsernameValid(true);
+      setIsCheckingUsername(true);
+
+      try {
+        const response = await axios.get(`${usernameCheckUrl}/${value}`);
+        setUsernameAvailable(response.data.available);
+        setUsernameMessage(response.data.message);
+      } catch (error) {
+        console.error('Error checking username availability:', error);
+        setUsernameAvailable(null);
+        setUsernameMessage('Unable to check username availability');
+      } finally {
+        setIsCheckingUsername(false);
+      }
+    },
+    [usernameCheckUrl]
+  );
+
+  // Implement debouncing for username validation
+  useEffect(() => {
+    if (!usernameTouched || !username.trim()) return;
+
+    const handler = setTimeout(() => {
+      checkUsernameAvailability(username);
+    }, 500); // 500ms delay
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [username, checkUsernameAvailability, usernameTouched]);
+
+  // Updated username change handler
+  const handleUsernameChange = (e: ChangeEvent<HTMLInputElement>) => {
+    // Convert to lowercase and only allow valid Instagram characters
+    const inputValue = e.target.value.toLowerCase();
+    setUsername(inputValue);
+    
+    if (!usernameTouched) {
+      setUsernameTouched(true);
+    }
+  };
+
+  // Function to validate competitor usernames
+  const validateCompetitorUsername = (value: string): boolean => {
+    return value.trim() === '' || instagramUsernameRegex.test(value);
+  };
+
+  // Updated competitor change handler
+  const handleCompetitorChange = (index: number, value: string) => {
+    // Convert to lowercase for consistency
+    const lowercaseValue = value.toLowerCase();
+    const newCompetitors = [...competitors];
+    newCompetitors[index] = lowercaseValue;
+    setCompetitors(newCompetitors);
+  };
+
   const isValidForSubmission = (): boolean => {
     if (!username.trim() || !accountType || !postingStyle.trim()) return false;
+    if (!usernameValid) return false;
+    
     if (accountType === 'branding') {
-      return competitors.length >= 3 && competitors.every(comp => comp.trim() !== '');
+      return competitors.length >= 3 && 
+             competitors.slice(0, 3).every(comp => comp.trim() !== '') &&
+             competitors.every(validateCompetitorUsername);
     }
     return true;
   };
@@ -87,21 +176,22 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
   const validationErrors = (): string[] => {
     const errors: string[] = [];
     if (!username.trim()) errors.push('Username is required');
+    else if (!usernameValid) errors.push('Username format is invalid');
+    
     if (!accountType) errors.push('Account type is required');
     if (!postingStyle.trim()) errors.push('Posting style is required');
+    
     if (accountType === 'branding') {
       if (competitors.length < 3) errors.push('At least 3 competitors are required for branding');
       competitors.forEach((comp, index) => {
-        if (!comp.trim()) errors.push(`Competitor ${index + 1} username is required`);
+        if (index < 3 && !comp.trim()) {
+          errors.push(`Competitor ${index + 1} username is required`);
+        } else if (comp.trim() && !validateCompetitorUsername(comp)) {
+          errors.push(`Competitor ${index + 1} username format is invalid`);
+        }
       });
     }
     return errors;
-  };
-
-  const handleCompetitorChange = (index: number, value: string) => {
-    const newCompetitors = [...competitors];
-    newCompetitors[index] = value;
-    setCompetitors(newCompetitors);
   };
 
   const addCompetitor = () => {
@@ -119,6 +209,9 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
     setAccountType('');
     setPostingStyle('');
     setCompetitors(['', '', '']);
+    setUsernameAvailable(null);
+    setUsernameMessage('');
+    setUsernameTouched(false);
   };
 
   const showMessage = (msg: string, type: 'info' | 'success' | 'error' = 'info') => {
@@ -129,7 +222,7 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
 
   const submitData = async () => {
     if (!isValidForSubmission()) {
-      showMessage('Please fill in all required fields', 'error');
+      showMessage('Please fill in all required fields correctly', 'error');
       return;
     }
 
@@ -229,11 +322,35 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
           <motion.div className="input-group" whileHover={{ x: 5 }}>
             <input
               value={username}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setUsername(e.target.value)}
+              onChange={handleUsernameChange}
               type="text"
-              placeholder="Enter your Instagram username"
+              placeholder="Enter your Instagram username (lowercase only)"
+              className={!usernameValid ? 'invalid-input' : ''}
             />
           </motion.div>
+          {usernameTouched && username.trim() && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`username-status ${
+                isCheckingUsername
+                  ? 'status-checking'
+                  : !usernameValid
+                  ? 'status-invalid'
+                  : usernameAvailable
+                  ? 'status-available'
+                  : 'status-taken'
+              }`}
+            >
+              {isCheckingUsername
+                ? 'Checking...'
+                : !usernameValid
+                ? 'Use only lowercase letters, numbers, periods, underscores'
+                : usernameAvailable
+                ? 'Username is available!'
+                : 'You can go ahead but this is already taken'}
+            </motion.div>
+          )}
         </div>
 
         <div className="section">
@@ -264,10 +381,10 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
           <h2 className="subtitle">Posting Style</h2>
           <motion.div className="input-group" whileHover={{ x: 5 }}>
             <input
-              value={postingStyle}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setPostingStyle(e.target.value)}
               type="text"
-              placeholder="e.g., mood-based or event-based"
+              value={postingStyle}
+              onChange={(e) => setPostingStyle(e.target.value)}
+              placeholder="Describe your posting style (e.g., casual, professional, lifestyle)"
             />
           </motion.div>
         </div>
@@ -288,6 +405,7 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
                   onChange={(e) => handleCompetitorChange(index, e.target.value)}
                   type="text"
                   placeholder={`Enter competitor ${index + 1}`}
+                  className={competitor && !validateCompetitorUsername(competitor) ? 'invalid-input' : ''}
                 />
                 {competitors.length > 3 && (
                   <motion.button
@@ -298,6 +416,11 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
                   >
                     ×
                   </motion.button>
+                )}
+                {competitor && !validateCompetitorUsername(competitor) && (
+                  <div className="validation-error">
+                    Invalid competitor username format
+                  </div>
                 )}
               </motion.div>
             ))}
@@ -327,16 +450,19 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
           </motion.div>
         )}
 
-        <div className="submit-section">
+        <div className="section submit-section">
           <motion.button
-            onClick={submitData}
-            disabled={isLoading || !isValidForSubmission()}
             className="submit-btn"
-            whileHover={{ scale: 1.05 }}
+            whileHover={{ scale: 1.05, boxShadow: '0 0 25px rgba(0, 255, 204, 0.7)' }}
             whileTap={{ scale: 0.95 }}
-            animate={isLoading ? { opacity: 0.7 } : { opacity: 1 }}
+            onClick={submitData}
+            disabled={isLoading || validationErrors().length > 0}
           >
-            {isLoading ? 'Submitting...' : 'Submit'}
+            {isLoading ? (
+              <div className="spinner"></div>
+            ) : (
+              <span>Submit</span>
+            )}
           </motion.button>
         </div>
 
@@ -345,7 +471,6 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
             className={`message ${messageType}`}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
           >
             {message}

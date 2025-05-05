@@ -12,6 +12,7 @@ export const IG_USER_ID_KEY_PREFIX = 'instagram_user_id_';
 export const IG_GRAPH_ID_KEY_PREFIX = 'instagram_graph_id_';
 export const IG_USERNAME_KEY_PREFIX = 'instagram_username_';
 export const IG_ACCOUNT_TYPE_KEY_PREFIX = 'instagram_account_type_';
+export const IG_DISCONNECTED_KEY_PREFIX = 'instagram_disconnected_';
 
 /**
  * Generates a user-specific key for storage
@@ -45,8 +46,9 @@ export const storeInstagramConnection = (
   const userIdKey = getUserSpecificKey(IG_USER_ID_KEY_PREFIX, authUserId);
   const graphIdKey = getUserSpecificKey(IG_GRAPH_ID_KEY_PREFIX, authUserId);
   const usernameKey = getUserSpecificKey(IG_USERNAME_KEY_PREFIX, authUserId);
+  const disconnectedKey = getUserSpecificKey(IG_DISCONNECTED_KEY_PREFIX, authUserId);
   
-  if (!userIdKey || !graphIdKey || !usernameKey) return false;
+  if (!userIdKey || !graphIdKey || !usernameKey || !disconnectedKey) return false;
   
   try {
     // Store in both localStorage and sessionStorage for redundancy
@@ -54,9 +56,13 @@ export const storeInstagramConnection = (
     localStorage.setItem(graphIdKey, graphId);
     if (username) localStorage.setItem(usernameKey, username);
     
+    // Clear the disconnected flag when we're actively connecting
+    localStorage.removeItem(disconnectedKey);
+    
     sessionStorage.setItem(userIdKey, userId);
     sessionStorage.setItem(graphIdKey, graphId);
     if (username) sessionStorage.setItem(usernameKey, username);
+    sessionStorage.removeItem(disconnectedKey);
     
     console.log(`[${new Date().toISOString()}] Stored Instagram connection for auth user ${authUserId}`);
     return true;
@@ -77,10 +83,20 @@ export const getInstagramConnection = (authUserId: string): { instagram_user_id:
   const userIdKey = getUserSpecificKey(IG_USER_ID_KEY_PREFIX, authUserId);
   const graphIdKey = getUserSpecificKey(IG_GRAPH_ID_KEY_PREFIX, authUserId);
   const usernameKey = getUserSpecificKey(IG_USERNAME_KEY_PREFIX, authUserId);
+  const disconnectedKey = getUserSpecificKey(IG_DISCONNECTED_KEY_PREFIX, authUserId);
   
-  if (!userIdKey || !graphIdKey || !usernameKey) return null;
+  if (!userIdKey || !graphIdKey || !usernameKey || !disconnectedKey) return null;
   
   try {
+    // Check if the user has explicitly disconnected Instagram
+    const isDisconnected = localStorage.getItem(disconnectedKey) === 'true' || 
+                          sessionStorage.getItem(disconnectedKey) === 'true';
+    
+    if (isDisconnected) {
+      console.log(`[${new Date().toISOString()}] User ${authUserId} has previously disconnected Instagram, not reconnecting automatically`);
+      return null;
+    }
+    
     // Try sessionStorage first, then fallback to localStorage
     let userId = sessionStorage.getItem(userIdKey) || localStorage.getItem(userIdKey);
     let graphId = sessionStorage.getItem(graphIdKey) || localStorage.getItem(graphIdKey);
@@ -106,8 +122,9 @@ export const clearInstagramConnection = (authUserId: string): void => {
   const graphIdKey = getUserSpecificKey(IG_GRAPH_ID_KEY_PREFIX, authUserId);
   const usernameKey = getUserSpecificKey(IG_USERNAME_KEY_PREFIX, authUserId);
   const tokenKey = getUserSpecificKey(IG_TOKEN_KEY_PREFIX, authUserId);
+  const disconnectedKey = getUserSpecificKey(IG_DISCONNECTED_KEY_PREFIX, authUserId);
   
-  if (!userIdKey || !graphIdKey || !usernameKey || !tokenKey) return;
+  if (!userIdKey || !graphIdKey || !usernameKey || !tokenKey || !disconnectedKey) return;
   
   try {
     // Clear from both localStorage and sessionStorage
@@ -116,12 +133,16 @@ export const clearInstagramConnection = (authUserId: string): void => {
     localStorage.removeItem(usernameKey);
     localStorage.removeItem(tokenKey);
     
+    // Set the disconnected flag to remember the user explicitly disconnected
+    localStorage.setItem(disconnectedKey, 'true');
+    
     sessionStorage.removeItem(userIdKey);
     sessionStorage.removeItem(graphIdKey);
     sessionStorage.removeItem(usernameKey);
     sessionStorage.removeItem(tokenKey);
+    sessionStorage.setItem(disconnectedKey, 'true');
     
-    console.log(`[${new Date().toISOString()}] Cleared Instagram connection for auth user ${authUserId}`);
+    console.log(`[${new Date().toISOString()}] Cleared Instagram connection for auth user ${authUserId} and marked as disconnected`);
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Error clearing Instagram connection:`, error);
   }
@@ -145,7 +166,7 @@ export const disconnectInstagramAccount = async (authUserId: string): Promise<vo
     // Call backend to remove the connection record
     await axios.delete(`http://localhost:3000/instagram-connection/${authUserId}`);
     
-    // Then clear from local storage
+    // Then clear from local storage and mark as disconnected
     clearInstagramConnection(authUserId);
     
     console.log(`[${new Date().toISOString()}] Successfully disconnected Instagram account for ${authUserId}`);
@@ -174,6 +195,37 @@ export const isInstagramConnected = (userId: string): boolean => {
     console.error('Error checking Instagram connection:', error);
     return false;
   }
+};
+
+/**
+ * Checks if a user has explicitly disconnected Instagram
+ * @param userId The ID of the authenticated user
+ * @returns True if the user has explicitly disconnected Instagram
+ */
+export const isInstagramDisconnected = (userId: string): boolean => {
+  if (!userId) return false;
+  
+  const disconnectedKey = getUserSpecificKey(IG_DISCONNECTED_KEY_PREFIX, userId);
+  if (!disconnectedKey) return false;
+  
+  return localStorage.getItem(disconnectedKey) === 'true' || 
+         sessionStorage.getItem(disconnectedKey) === 'true';
+};
+
+/**
+ * Reset the disconnected flag to allow reconnection
+ * @param userId The ID of the authenticated user
+ */
+export const resetDisconnectedFlag = (userId: string): void => {
+  if (!userId) return;
+  
+  const disconnectedKey = getUserSpecificKey(IG_DISCONNECTED_KEY_PREFIX, userId);
+  if (!disconnectedKey) return;
+  
+  localStorage.removeItem(disconnectedKey);
+  sessionStorage.removeItem(disconnectedKey);
+  
+  console.log(`[${new Date().toISOString()}] Reset disconnected flag for user ${userId}`);
 };
 
 /**
@@ -260,6 +312,12 @@ export const syncInstagramConnection = async (authUserId: string): Promise<void>
   if (!authUserId) return;
   
   try {
+    // Check if user has explicitly disconnected Instagram
+    if (isInstagramDisconnected(authUserId)) {
+      console.log(`[${new Date().toISOString()}] User ${authUserId} has explicitly disconnected Instagram, skipping sync`);
+      return;
+    }
+    
     // First check local storage
     const localConnection = getInstagramConnection(authUserId);
     
@@ -268,33 +326,42 @@ export const syncInstagramConnection = async (authUserId: string): Promise<void>
       const response = await axios.get(`http://localhost:3000/instagram-connection/${authUserId}`);
       const backendConnection = response.data;
       
-      // If backend has data but local doesn't, update local
-      if (backendConnection && (!localConnection || localConnection.instagram_user_id !== backendConnection.instagram_user_id)) {
-        storeInstagramConnection(
-          backendConnection.instagram_user_id,
-          backendConnection.instagram_graph_id,
-          backendConnection.username,
-          authUserId
-        );
-        console.log(`[${new Date().toISOString()}] Updated local storage with backend Instagram connection`);
+      if (!backendConnection || !backendConnection.instagram_user_id) {
+        // If backend has no connection but we have a local one that's NOT disconnected, push to backend
+        if (localConnection) {
+          await axios.post(`http://localhost:3000/instagram-connection/${authUserId}`, {
+            instagram_user_id: localConnection.instagram_user_id,
+            instagram_graph_id: localConnection.instagram_graph_id,
+            username: localConnection.username
+          });
+          console.log(`[${new Date().toISOString()}] Updated backend with local Instagram connection`);
+        }
+        return;
       }
-      // If local has data but backend doesn't, update backend
-      else if (localConnection && !backendConnection) {
-        await axios.post(`http://localhost:3000/instagram-connection/${authUserId}`, {
-          instagram_user_id: localConnection.instagram_user_id,
-          instagram_graph_id: localConnection.instagram_graph_id,
-          username: localConnection.username
-        });
-        console.log(`[${new Date().toISOString()}] Updated backend with local Instagram connection`);
+      
+      // If backend has connection but local is missing or different (and user hasn't disconnected), update local
+      if (!localConnection || localConnection.instagram_user_id !== backendConnection.instagram_user_id) {
+        // Only update local if user hasn't explicitly disconnected
+        if (!isInstagramDisconnected(authUserId)) {
+          storeInstagramConnection(
+            backendConnection.instagram_user_id,
+            backendConnection.instagram_graph_id,
+            backendConnection.username,
+            authUserId
+          );
+          console.log(`[${new Date().toISOString()}] Updated local storage with backend Instagram connection`);
+        } else {
+          console.log(`[${new Date().toISOString()}] User has disconnected Instagram, not updating local storage`);
+        }
       }
     } catch (error: any) {
-      // 404 is expected if no connection exists
+      // 404 is expected if no connection exists in backend
       if (error.response?.status !== 404) {
         console.error(`[${new Date().toISOString()}] Error fetching backend Instagram connection:`, error);
       }
       
-      // If we have local data but couldn't fetch from backend, try to push local data
-      if (localConnection) {
+      // If we have local data but backend returned 404 (no connection)
+      if (localConnection && error.response?.status === 404) {
         try {
           await axios.post(`http://localhost:3000/instagram-connection/${authUserId}`, {
             instagram_user_id: localConnection.instagram_user_id,

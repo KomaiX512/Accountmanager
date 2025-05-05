@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import './CanvasEditor.css';
 import { motion } from 'framer-motion';
 import DatePicker from 'react-datepicker';
@@ -31,6 +31,9 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
   const [notification, setNotification] = useState<string | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [selectedColor, setSelectedColor] = useState('#ffffff');
+  const [isEditorReady, setIsEditorReady] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const initialLoadAttemptedRef = useRef(false);
 
   // Color palette for quick selection
   const colorPalette = [
@@ -39,6 +42,16 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
     '#00cc99', '#cc0066', '#ffcc00', '#9900cc', '#66ff33'
   ];
 
+  // Debounce function to avoid rapid consecutive operations
+  const debounce = (func: Function, wait: number) => {
+    let timeout: NodeJS.Timeout;
+    return (...args: any[]) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func(...args), wait);
+    };
+  };
+
+  // Initialize the editor
   useEffect(() => {
     const loadEditor = async () => {
       try {
@@ -83,15 +96,11 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
                 // Enhanced color picker styling
                 'colorpicker.button.border': '1px solid #ddd',
                 'colorpicker.title.color': '#fff',
-                // Add preset colors to UI theme
-                'colorpicker.transparent.rect1.color': colorPalette[0],
-                'colorpicker.transparent.rect2.color': colorPalette[1],
                 'colorpicker.primary.color': '#00ffcc'
-              },
+              } as any,
               menu: ['crop', 'flip', 'rotate', 'draw', 'shape', 'icon', 'text', 'mask', 'filter'],
               initMenu: 'filter',
               menuBarPosition: 'bottom',
-              // Configure color picker with preset colors
               uiSize: {
                 width: '100%',
                 height: '100%'
@@ -113,80 +122,29 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
             }
           });
 
-          // Load initial image if provided
-          if (initialImageUrl) {
-            loadImageFromUrl(initialImageUrl);
+          // Register editor ready state
+          setIsEditorReady(true);
+          
+          // Add event listeners to stabilize editor
+          if (tuiInstanceRef.current._eventHandler) {
+            tuiInstanceRef.current._eventHandler.on('loadImage', () => {
+              console.log('[Canvas] Image loaded event triggered');
+              setImageLoaded(true);
+              setIsProcessing(false);
+            });
+
+            tuiInstanceRef.current._eventHandler.on('applyFilter', () => {
+              console.log('[Canvas] Filter applied successfully');
+              setIsProcessing(false);
+            });
           }
 
-          // Enhance color pickers after editor is initialized
-          setTimeout(() => {
-            try {
-              // Find all color pickers in the editor and enhance them
-              const colorButtons = document.querySelectorAll('.tui-colorpicker-palette-button');
-              if (colorButtons.length > 0) {
-                console.log('[Canvas] Found color picker buttons:', colorButtons.length);
-                
-                // Create preset color elements and add them to each color picker
-                colorButtons.forEach(button => {
-                  button.setAttribute('title', 'Click to select colors');
-
-                  // Find the parent color picker container
-                  const container = button.closest('.tui-colorpicker-container');
-                  if (container) {
-                    // Create preset colors container
-                    const presetsContainer = document.createElement('div');
-                    presetsContainer.className = 'tui-custom-preset-colors';
-                    presetsContainer.style.display = 'flex';
-                    presetsContainer.style.flexWrap = 'wrap';
-                    presetsContainer.style.gap = '5px';
-                    presetsContainer.style.margin = '5px 0';
-                    presetsContainer.style.padding = '5px';
-                    presetsContainer.style.background = 'rgba(0,0,0,0.2)';
-                    presetsContainer.style.borderRadius = '4px';
-                    
-                    // Add preset color swatches
-                    colorPalette.forEach(color => {
-                      const swatch = document.createElement('div');
-                      swatch.style.width = '20px';
-                      swatch.style.height = '20px';
-                      swatch.style.backgroundColor = color;
-                      swatch.style.cursor = 'pointer';
-                      swatch.style.borderRadius = '3px';
-                      swatch.style.border = '1px solid rgba(255,255,255,0.2)';
-                      swatch.setAttribute('data-color', color);
-                      swatch.title = color;
-                      
-                      // When clicked, set this color in the color picker
-                      swatch.addEventListener('click', () => {
-                        // Find the input element and set its value
-                        const input = container.querySelector('.tui-colorpicker-palette-hex');
-                        if (input) {
-                          // @ts-ignore
-                          input.value = color;
-                          // Trigger change event
-                          const event = new Event('change', { bubbles: true });
-                          input.dispatchEvent(event);
-                        }
-                      });
-                      
-                      presetsContainer.appendChild(swatch);
-                    });
-                    
-                    // Insert preset colors before the palette
-                    const paletteElement = container.querySelector('.tui-colorpicker-palette');
-                    if (paletteElement) {
-                      paletteElement.parentNode?.insertBefore(presetsContainer, paletteElement);
-                    }
-                  }
-                });
-              }
-            } catch (err) {
-              console.error('[Canvas] Error enhancing color pickers:', err);
-            }
-          }, 1000);
+          // Load initial image if provided (will be handled in separate useEffect)
         }
       } catch (error) {
         console.error('Failed to load TUI Image Editor:', error);
+        setNotification('Failed to load image editor. Please try again.');
+        setTimeout(() => setNotification(null), 3000);
       }
     };
 
@@ -198,10 +156,110 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
         tuiInstanceRef.current = null;
       }
     };
-  }, [initialImageUrl, colorPalette]);
+  }, []);
 
-  const loadImageFromUrl = async (url: string) => {
+  // Handle loading the initial image separately
+  useEffect(() => {
+    const loadInitialImage = async () => {
+      if (initialImageUrl && isEditorReady && !initialLoadAttemptedRef.current) {
+        initialLoadAttemptedRef.current = true;
+        console.log('[Canvas] Loading initial image...');
+        await loadImageFromUrl(initialImageUrl);
+      }
+    };
+
+    loadInitialImage();
+  }, [initialImageUrl, isEditorReady]);
+
+  // Handle enhancing color pickers
+  useEffect(() => {
+    if (isEditorReady) {
+      // Enhance color pickers after editor is initialized and stable
+      const enhanceColorPickers = debounce(() => {
+        try {
+          // Find all color pickers in the editor and enhance them
+          const colorButtons = document.querySelectorAll('.tui-colorpicker-palette-button');
+          if (colorButtons.length > 0) {
+            console.log('[Canvas] Found color picker buttons:', colorButtons.length);
+            
+            // Create preset color elements and add them to each color picker
+            colorButtons.forEach(button => {
+              button.setAttribute('title', 'Click to select colors');
+
+              // Find the parent color picker container
+              const container = button.closest('.tui-colorpicker-container');
+              if (container) {
+                // Check if we've already added presets to avoid duplication
+                if (container.querySelector('.tui-custom-preset-colors')) {
+                  return;
+                }
+                
+                // Create preset colors container
+                const presetsContainer = document.createElement('div');
+                presetsContainer.className = 'tui-custom-preset-colors';
+                presetsContainer.style.display = 'flex';
+                presetsContainer.style.flexWrap = 'wrap';
+                presetsContainer.style.gap = '5px';
+                presetsContainer.style.margin = '5px 0';
+                presetsContainer.style.padding = '5px';
+                presetsContainer.style.background = 'rgba(0,0,0,0.2)';
+                presetsContainer.style.borderRadius = '4px';
+                
+                // Add preset color swatches
+                colorPalette.forEach(color => {
+                  const swatch = document.createElement('div');
+                  swatch.style.width = '20px';
+                  swatch.style.height = '20px';
+                  swatch.style.backgroundColor = color;
+                  swatch.style.cursor = 'pointer';
+                  swatch.style.borderRadius = '3px';
+                  swatch.style.border = '1px solid rgba(255,255,255,0.2)';
+                  swatch.setAttribute('data-color', color);
+                  swatch.title = color;
+                  
+                  // When clicked, set this color in the color picker
+                  swatch.addEventListener('click', () => {
+                    // Find the input element and set its value
+                    const input = container.querySelector('.tui-colorpicker-palette-hex');
+                    if (input) {
+                      // @ts-ignore
+                      input.value = color;
+                      // Trigger change event
+                      const event = new Event('change', { bubbles: true });
+                      input.dispatchEvent(event);
+                    }
+                  });
+                  
+                  presetsContainer.appendChild(swatch);
+                });
+                
+                // Insert preset colors before the palette
+                const paletteElement = container.querySelector('.tui-colorpicker-palette');
+                if (paletteElement) {
+                  paletteElement.parentNode?.insertBefore(presetsContainer, paletteElement);
+                }
+              }
+            });
+          }
+        } catch (err) {
+          console.error('[Canvas] Error enhancing color pickers:', err);
+        }
+      }, 1000);
+
+      enhanceColorPickers();
+    }
+  }, [isEditorReady, colorPalette]);
+
+  const loadImageFromUrl = useCallback(async (url: string) => {
+    if (!isEditorReady || !tuiInstanceRef.current || isProcessing) {
+      console.log('[Canvas] Editor not ready or processing, deferring image load');
+      return;
+    }
+    
     try {
+      setIsProcessing(true);
+      setImageLoaded(false);
+      
       // If URL is relative or needs proxying, use proxy
       const proxyUrl = url.startsWith('http') 
         ? `http://localhost:3000/proxy-image?url=${encodeURIComponent(url)}`
@@ -209,39 +267,36 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
         
       console.log(`[Canvas] Loading image from URL: ${proxyUrl}`);
       
-      if (tuiInstanceRef.current) {
-        // First try to load directly
+      // Try loading via blob to avoid CORS and state lock issues
+      const response = await fetch(proxyUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+      }
+      
+      const blob = await response.blob();
+      const imageUrl = URL.createObjectURL(blob);
+      
+      // Wait for any ongoing operations to complete
+      setTimeout(async () => {
         try {
-          await tuiInstanceRef.current.loadImageFromURL(proxyUrl, 'user-upload');
-          console.log('[Canvas] Image loaded successfully');
-          setImageLoaded(true);
-          return;
-        } catch (directError) {
-          console.warn('[Canvas] Direct load failed, trying with proxy:', directError);
-        }
-
-        // If direct load fails, try fetching via proxy first
-        try {
-          const response = await fetch(proxyUrl);
-          const blob = await response.blob();
-          const imageUrl = URL.createObjectURL(blob);
-          
           await tuiInstanceRef.current.loadImageFromURL(imageUrl, 'user-upload');
           console.log('[Canvas] Image loaded successfully via blob');
           setImageLoaded(true);
           
           // Clean up the object URL
           URL.revokeObjectURL(imageUrl);
-        } catch (proxyError) {
-          console.error('[Canvas] Proxy load failed:', proxyError);
-          throw proxyError;
+        } catch (error) {
+          console.error('[Canvas] Error loading image from blob:', error);
+          setNotification('Failed to load image. Please try again.');
+          setIsProcessing(false);
         }
-      }
+      }, 100);
     } catch (err) {
-      console.error('[Canvas] Error loading image:', err);
+      console.error('[Canvas] Error in loadImageFromUrl:', err);
       setNotification('Failed to load image. Please try uploading manually.');
+      setIsProcessing(false);
     }
-  };
+  }, [isEditorReady, isProcessing]);
 
   const handleSchedule = () => {
     setShowScheduler(true);
@@ -296,22 +351,37 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !isEditorReady || isProcessing) return;
 
+    setIsProcessing(true);
+    setImageLoaded(false);
+    
     const reader = new FileReader();
     reader.onload = (event) => {
       const imageUrl = event.target?.result as string;
       if (tuiInstanceRef.current) {
-        tuiInstanceRef.current.loadImageFromURL(imageUrl, 'user-upload')
-          .then(() => {
-            console.log('Image loaded successfully');
+        // Use setTimeout to avoid state lock issues
+        setTimeout(async () => {
+          try {
+            await tuiInstanceRef.current.loadImageFromURL(imageUrl, 'user-upload');
+            console.log('[Canvas] Image loaded successfully from file upload');
             setImageLoaded(true);
-          })
-          .catch((err: any) => {
-            console.error('Error loading image:', err);
-          });
+            setIsProcessing(false);
+          } catch (err) {
+            console.error('[Canvas] Error loading image from file upload:', err);
+            setNotification('Failed to load image. Please try again.');
+            setIsProcessing(false);
+          }
+        }, 100);
       }
     };
+    
+    reader.onerror = () => {
+      console.error('[Canvas] Error reading file');
+      setNotification('Failed to read image file. Please try again with a different image.');
+      setIsProcessing(false);
+    };
+    
     reader.readAsDataURL(file);
   };
 
@@ -331,7 +401,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
         <div className="canvas-editor-header">
           <h2>Image Editor</h2>
           <div className="canvas-upload-container">
-            <label htmlFor="image-upload" className="upload-button">
+            <label htmlFor="image-upload" className={`upload-button ${isProcessing ? 'disabled' : ''}`}>
               Upload Image
             </label>
             <input
@@ -340,19 +410,26 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
               accept="image/*"
               onChange={handleFileUpload}
               className="hidden-input"
+              disabled={isProcessing || !isEditorReady}
             />
           </div>
           <button className="close-button" onClick={onClose}>×</button>
         </div>
         
-        <div className="tui-image-editor-container" ref={editorRef}></div>
+        <div className="tui-image-editor-container" ref={editorRef}>
+          {isProcessing && (
+            <div className="editor-loading-overlay">
+              <div className="editor-loading-spinner">Loading...</div>
+            </div>
+          )}
+        </div>
         
         <div className="canvas-editor-footer">
           <button className="cancel-button" onClick={onClose}>Cancel</button>
           <button 
             className="schedule-button" 
             onClick={handleSchedule}
-            disabled={!imageLoaded}
+            disabled={!imageLoaded || isProcessing}
           >
             Schedule
           </button>

@@ -2,58 +2,60 @@ import React, { useState, useEffect, useRef } from 'react';
 import './InstagramConnect.css';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
+import {
+  getInstagramConnection,
+  storeInstagramConnection,
+  clearInstagramConnection
+} from '../../utils/instagramSessionManager';
 
 interface InstagramConnectProps {
   onConnected: (graphId: string, userId: string) => void;
 }
 
-// Local storage keys for Instagram connection data
-const IG_TOKEN_KEY = 'instagram_token';
-const IG_USER_ID_KEY = 'instagram_user_id';
-const IG_GRAPH_ID_KEY = 'instagram_graph_id';
-const IG_USERNAME_KEY = 'instagram_username';
-
 const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected }) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const { currentUser } = useAuth();
-  // Use a ref to track if we're currently trying to store connection data
   const isStoringConnectionRef = useRef(false);
-  // Track connection data to avoid sending duplicate requests
   const connectionDataRef = useRef<{ instagram_user_id: string; instagram_graph_id: string; username?: string } | null>(null);
-
-  // Check for stored connection on component mount
+  
+  // Check for stored connection on auth change or component mount
   useEffect(() => {
     const checkSavedConnection = async () => {
+      // Reset connection state when user changes or logs out
+      if (!currentUser) {
+        setIsConnected(false);
+        connectionDataRef.current = null;
+        return;
+      }
+      
       try {
-        // First check localStorage for cached connection
-        const userId = localStorage.getItem(IG_USER_ID_KEY);
-        const graphId = localStorage.getItem(IG_GRAPH_ID_KEY);
+        // First check local storage for cached connection
+        const connectionData = getInstagramConnection(currentUser.uid);
         
-        if (userId && graphId) {
-          console.log(`[${new Date().toISOString()}] Found cached Instagram connection`);
+        if (connectionData) {
+          console.log(`[${new Date().toISOString()}] Found cached Instagram connection for user ${currentUser.uid}`);
           setIsConnected(true);
           // Notify parent component about the connection
-          onConnected(graphId, userId);
+          onConnected(connectionData.instagram_graph_id, connectionData.instagram_user_id);
           
           // Store connection data in ref to prevent duplicate requests
-          connectionDataRef.current = {
-            instagram_user_id: userId,
-            instagram_graph_id: graphId,
-            username: localStorage.getItem(IG_USERNAME_KEY) || undefined
-          };
+          connectionDataRef.current = connectionData;
           return;
         }
         
-        // If not in localStorage, check if we have a backend stored connection
+        // If not in local storage, check if we have a backend stored connection
         if (currentUser?.uid) {
           try {
             const response = await axios.get(`http://localhost:3000/instagram-connection/${currentUser.uid}`);
             if (response.data && response.data.instagram_user_id) {
-              // Store in localStorage for faster access next time
-              localStorage.setItem(IG_USER_ID_KEY, response.data.instagram_user_id);
-              localStorage.setItem(IG_GRAPH_ID_KEY, response.data.instagram_graph_id);
-              localStorage.setItem(IG_USERNAME_KEY, response.data.username || '');
+              // Store in both storage types for persistence
+              storeInstagramConnection(
+                response.data.instagram_user_id,
+                response.data.instagram_graph_id,
+                response.data.username || '',
+                currentUser.uid
+              );
               
               setIsConnected(true);
               onConnected(response.data.instagram_graph_id, response.data.instagram_user_id);
@@ -66,7 +68,7 @@ const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected }) => {
               };
             }
           } catch (error) {
-            console.log(`[${new Date().toISOString()}] No stored Instagram connection found in backend`);
+            console.log(`[${new Date().toISOString()}] No stored Instagram connection found in backend for user ${currentUser.uid}`);
             // No stored connection, that's okay - user will need to connect
           }
         }
@@ -84,10 +86,20 @@ const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected }) => {
       if (event.data && event.data.type === 'INSTAGRAM_CONNECTED' && event.data.graphId && event.data.userId) {
         console.log(`[${new Date().toISOString()}] Received Instagram connection message:`, event.data);
         
-        // Store connection data in localStorage
-        localStorage.setItem(IG_USER_ID_KEY, event.data.userId);
-        localStorage.setItem(IG_GRAPH_ID_KEY, event.data.graphId);
-        localStorage.setItem(IG_USERNAME_KEY, event.data.username || '');
+        // Ensure we have a current user to bind the Instagram connection to
+        if (!currentUser?.uid) {
+          console.error(`[${new Date().toISOString()}] Cannot store Instagram connection: No authenticated user`);
+          setIsConnecting(false);
+          return;
+        }
+        
+        // Store connection data with user binding
+        storeInstagramConnection(
+          event.data.userId,
+          event.data.graphId,
+          event.data.username || '',
+          currentUser.uid
+        );
         
         // Check if we're already storing this data to avoid duplicate requests
         const isEqualToCurrentData = 
@@ -109,7 +121,7 @@ const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected }) => {
           
           axios.post(`http://localhost:3000/instagram-connection/${currentUser.uid}`, connectionData)
             .then(() => {
-              console.log(`[${new Date().toISOString()}] Successfully stored Instagram connection in backend`);
+              console.log(`[${new Date().toISOString()}] Successfully stored Instagram connection in backend for user ${currentUser.uid}`);
             })
             .catch(error => {
               console.error(`[${new Date().toISOString()}] Failed to store Instagram connection in backend:`, error);
@@ -132,6 +144,11 @@ const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected }) => {
   }, [onConnected, currentUser]);
 
   const connectToInstagram = () => {
+    if (!currentUser) {
+      console.error(`[${new Date().toISOString()}] Cannot connect Instagram: No authenticated user`);
+      return;
+    }
+    
     const appId = '576296982152813';
     const redirectUri = 'https://b697-121-52-146-243.ngrok-free.app/instagram/callback';
     const scope = 'instagram_business_basic,instagram_business_manage_messages,instagram_business_content_publish';
@@ -154,11 +171,13 @@ const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected }) => {
   };
 
   const disconnectInstagram = () => {
-    // Clear localStorage
-    localStorage.removeItem(IG_USER_ID_KEY);
-    localStorage.removeItem(IG_GRAPH_ID_KEY);
-    localStorage.removeItem(IG_USERNAME_KEY);
-    localStorage.removeItem(IG_TOKEN_KEY);
+    if (!currentUser) {
+      console.error(`[${new Date().toISOString()}] Cannot disconnect Instagram: No authenticated user`);
+      return;
+    }
+    
+    // Clear local storage data
+    clearInstagramConnection(currentUser.uid);
     
     // Reset connection data ref
     connectionDataRef.current = null;
@@ -169,7 +188,7 @@ const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected }) => {
       
       axios.delete(`http://localhost:3000/instagram-connection/${currentUser.uid}`)
         .then(() => {
-          console.log(`[${new Date().toISOString()}] Successfully removed Instagram connection from backend`);
+          console.log(`[${new Date().toISOString()}] Successfully removed Instagram connection from backend for user ${currentUser.uid}`);
         })
         .catch(error => {
           console.error(`[${new Date().toISOString()}] Failed to remove Instagram connection from backend:`, error);
@@ -180,7 +199,7 @@ const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected }) => {
     }
     
     setIsConnected(false);
-    console.log(`[${new Date().toISOString()}] Instagram disconnected`);
+    console.log(`[${new Date().toISOString()}] Instagram disconnected for user ${currentUser?.uid}`);
   };
 
   return (
@@ -196,7 +215,7 @@ const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected }) => {
         <button 
           className="instagram-connect-btn" 
           onClick={connectToInstagram}
-          disabled={isConnecting}
+          disabled={isConnecting || !currentUser}
         >
           {isConnecting ? 'Connecting...' : 'Connect Instagram'}
         </button>

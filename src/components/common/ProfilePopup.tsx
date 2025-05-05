@@ -3,6 +3,8 @@ import './ProfilePopup.css';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 import ErrorBoundary from '../ErrorBoundary';
+import { useAuth } from '../../context/AuthContext';
+import { disconnectInstagramAccount, isInstagramConnected } from '../../utils/instagramSessionManager';
 
 interface ProfilePopupProps {
   username: string;
@@ -10,7 +12,7 @@ interface ProfilePopupProps {
 }
 
 const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose }) => {
-  const [activeTab, setActiveTab] = useState<'Rules' | 'Billing Method' | 'Name'>('Rules');
+  const [activeTab, setActiveTab] = useState<'Rules' | 'Billing Method' | 'Name' | 'Account'>('Rules');
   const [rules, setRules] = useState<string | null>(null);
   const [savedRules, setSavedRules] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -19,6 +21,8 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose }) => {
   const [isEditingRules, setIsEditingRules] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const maxRulesLength = 1000;
+  const [isConnectedToInstagram, setIsConnectedToInstagram] = useState(false);
+  const { currentUser } = useAuth();
 
   useEffect(() => {
     if (activeTab === 'Rules') {
@@ -57,6 +61,14 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose }) => {
       return () => clearTimeout(timer);
     }
   }, [toastMessage]);
+
+  // Check if Instagram is connected on component mount
+  useEffect(() => {
+    if (currentUser?.uid) {
+      const connected = isInstagramConnected(currentUser.uid);
+      setIsConnectedToInstagram(connected);
+    }
+  }, [currentUser]);
 
   const handleSubmitRules = async () => {
     if (!rules?.trim()) {
@@ -98,6 +110,33 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose }) => {
 
   const isDirty = rules !== savedRules;
 
+  // Handle Instagram disconnect
+  const handleDisconnectInstagram = async () => {
+    if (!currentUser?.uid) {
+      setError('No authenticated user found');
+      return;
+    }
+    
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      await disconnectInstagramAccount(currentUser.uid);
+      setToastMessage('Instagram account disconnected successfully!');
+      setIsConnectedToInstagram(false);
+      
+      // Refresh the page after a brief delay to update the UI
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (error: any) {
+      console.error('Error disconnecting Instagram:', error);
+      setError('Failed to disconnect Instagram account');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <ErrorBoundary>
       <motion.div
@@ -124,6 +163,14 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose }) => {
               onClick={() => setActiveTab('Rules')}
             >
               Rules
+            </motion.button>
+            <motion.button
+              className={`sidebar-button ${activeTab === 'Account' ? 'active' : ''}`}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setActiveTab('Account')}
+            >
+              Account
             </motion.button>
             <motion.button
               className="sidebar-button"
@@ -273,54 +320,60 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose }) => {
                   </motion.div>
                 )}
               </div>
-            ) : (
-              <div className="logo-placeholder">
-                <svg
-                  className="placeholder-logo"
-                  viewBox="0 0 100 100"
-                  xmlns="http://www.w3.org/2000/svg"
+            ) : activeTab === 'Account' ? (
+              <motion.div
+                className="account-section"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <motion.div
+                  className="account-header"
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4 }}
                 >
-                  <circle cx="50" cy="50" r="40" fill="#4a4a6a" />
-                  <path
-                    d="M50 20 A30 30 0 0 1 80 50 A30 30 0 0 1 50 80 A30 30 0 0 1 20 50 A30 30 0 0 1 50 20 Z"
-                    fill="#00ffcc"
-                    opacity="0.3"
-                  />
-                </svg>
-                <p>Profile Placeholder</p>
+                  <h3>Account Settings for {username}</h3>
+                </motion.div>
+                
+                <div className="account-options">
+                  <div className="account-option">
+                    <h4>Instagram Connection</h4>
+                    {isConnectedToInstagram ? (
+                      <>
+                        <p>Your Instagram account is connected. You can disconnect it at any time.</p>
+                        <motion.button
+                          className="disconnect-instagram-button"
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={handleDisconnectInstagram}
+                          disabled={isLoading}
+                        >
+                          {isLoading ? 'Disconnecting...' : 'Disconnect Instagram'}
+                        </motion.button>
+                      </>
+                    ) : (
+                      <p>No Instagram account connected. You can connect your Instagram account from the dashboard.</p>
+                    )}
+                  </div>
+                </div>
+                
+                {error && <p className="error">{error}</p>}
+              </motion.div>
+            ) : (
+              <div className="placeholder">
+                <p>This feature is coming soon.</p>
               </div>
             )}
           </div>
-          <motion.button
-            className="close-button"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={onClose}
-          >
-            Close
-          </motion.button>
+          
           {toastMessage && (
             <motion.div
-              className="rules-toast"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              transition={{ duration: 0.3 }}
+              className="toast-message"
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 50 }}
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#00ffcc"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="toast-icon"
-              >
-                <path d="M20 6L9 17l-5-5" />
-              </svg>
               {toastMessage}
             </motion.div>
           )}

@@ -49,12 +49,16 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
             navigate('/dashboard', { 
               state: { 
                 accountHolder: savedUsername, 
-                competitors: response.data.competitors || [] 
+                competitors: response.data.competitors || [],
+                accountType: 'branding'
               } 
             });
           } else {
             navigate('/non-branding-dashboard', { 
-              state: { accountHolder: savedUsername } 
+              state: { 
+                accountHolder: savedUsername,
+                accountType: 'non-branding' 
+              } 
             });
           }
         } else {
@@ -160,9 +164,20 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
         setTimeout(() => {
           onSubmitSuccess(username);
           if (accountType === 'branding') {
-            navigate('/dashboard', { state: { accountHolder: username, competitors: payload.competitors } });
+            navigate('/dashboard', { 
+              state: { 
+                accountHolder: username, 
+                competitors: payload.competitors,
+                accountType: 'branding'
+              } 
+            });
           } else {
-            navigate('/non-branding-dashboard', { state: { accountHolder: username } });
+            navigate('/non-branding-dashboard', { 
+              state: { 
+                accountHolder: username,
+                accountType: 'non-branding'
+              } 
+            });
           }
         }, 1000);
       }

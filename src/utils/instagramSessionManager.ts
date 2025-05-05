@@ -4,6 +4,8 @@
  * Utilities for managing Instagram session persistence and user isolation
  */
 
+import axios from 'axios';
+
 // Storage key prefixes for Instagram data
 export const IG_TOKEN_KEY_PREFIX = 'instagram_token_';
 export const IG_USER_ID_KEY_PREFIX = 'instagram_user_id_';
@@ -12,13 +14,15 @@ export const IG_USERNAME_KEY_PREFIX = 'instagram_username_';
 export const IG_ACCOUNT_TYPE_KEY_PREFIX = 'instagram_account_type_';
 
 /**
- * Generates a user-specific storage key
- * @param prefix The prefix for the key
- * @param userId The user ID to associate with the key
- * @returns The user-specific key or null if userId is not provided
+ * Generates a user-specific key for storage
+ * @param prefix The key prefix
+ * @param userId The user ID to associate with this key
  */
-export const getUserSpecificKey = (prefix: string, userId?: string): string | null => {
-  if (!userId) return null;
+const getUserSpecificKey = (prefix: string, userId: string): string | null => {
+  if (!userId) {
+    console.warn('Cannot generate user-specific key without userId');
+    return null;
+  }
   return `${prefix}${userId}`;
 };
 
@@ -124,28 +128,30 @@ export const clearInstagramConnection = (authUserId: string): void => {
 };
 
 /**
- * Disconnects an Instagram account from backend and clears local storage
+ * Disconnects Instagram account from the backend
  * @param authUserId The authenticated user ID to disconnect
- * @returns Promise that resolves when disconnection is complete
  */
 export const disconnectInstagramAccount = async (authUserId: string): Promise<void> => {
-  if (!authUserId) {
-    console.error(`[${new Date().toISOString()}] Cannot disconnect Instagram: No authenticated user ID provided`);
-    return;
-  }
+  if (!authUserId) return;
   
-  // Clear local storage first
-  clearInstagramConnection(authUserId);
-  
-  // Then try to remove from backend
   try {
-    await fetch(`http://localhost:3000/instagram-connection/${authUserId}`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' }
-    });
-    console.log(`[${new Date().toISOString()}] Successfully removed Instagram connection from backend for user ${authUserId}`);
+    // First check if we have a connection to disconnect
+    const connection = getInstagramConnection(authUserId);
+    if (!connection) {
+      console.log(`[${new Date().toISOString()}] No Instagram connection found for ${authUserId}, nothing to disconnect`);
+      return;
+    }
+    
+    // Call backend to remove the connection record
+    await axios.delete(`http://localhost:3000/instagram-connection/${authUserId}`);
+    
+    // Then clear from local storage
+    clearInstagramConnection(authUserId);
+    
+    console.log(`[${new Date().toISOString()}] Successfully disconnected Instagram account for ${authUserId}`);
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] Failed to remove Instagram connection from backend:`, error);
+    console.error(`[${new Date().toISOString()}] Error disconnecting Instagram account:`, error);
+    throw error;
   }
 };
 
@@ -221,5 +227,87 @@ export const getAccountType = (authUserId: string): 'branding' | 'non-branding' 
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Error retrieving account type:`, error);
     return null;
+  }
+};
+
+/**
+ * Retrieves a user's Instagram profile information from the backend
+ * @param authUserId The authenticated user ID
+ * @returns The Instagram profile data or null if not found
+ */
+export const getInstagramProfileData = async (authUserId: string): Promise<{
+  hasEnteredInstagramUsername: boolean;
+  instagram_username?: string;
+  accountType?: 'branding' | 'non-branding';
+  competitors?: string[];
+} | null> => {
+  if (!authUserId) return null;
+  
+  try {
+    const response = await axios.get(`http://localhost:3000/user-instagram-status/${authUserId}`);
+    return response.data;
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error retrieving Instagram profile data:`, error);
+    return null;
+  }
+};
+
+/**
+ * Syncs Instagram connection between local storage and backend
+ * @param authUserId The authenticated user ID to sync
+ */
+export const syncInstagramConnection = async (authUserId: string): Promise<void> => {
+  if (!authUserId) return;
+  
+  try {
+    // First check local storage
+    const localConnection = getInstagramConnection(authUserId);
+    
+    // Then check backend
+    try {
+      const response = await axios.get(`http://localhost:3000/instagram-connection/${authUserId}`);
+      const backendConnection = response.data;
+      
+      // If backend has data but local doesn't, update local
+      if (backendConnection && (!localConnection || localConnection.instagram_user_id !== backendConnection.instagram_user_id)) {
+        storeInstagramConnection(
+          backendConnection.instagram_user_id,
+          backendConnection.instagram_graph_id,
+          backendConnection.username,
+          authUserId
+        );
+        console.log(`[${new Date().toISOString()}] Updated local storage with backend Instagram connection`);
+      }
+      // If local has data but backend doesn't, update backend
+      else if (localConnection && !backendConnection) {
+        await axios.post(`http://localhost:3000/instagram-connection/${authUserId}`, {
+          instagram_user_id: localConnection.instagram_user_id,
+          instagram_graph_id: localConnection.instagram_graph_id,
+          username: localConnection.username
+        });
+        console.log(`[${new Date().toISOString()}] Updated backend with local Instagram connection`);
+      }
+    } catch (error: any) {
+      // 404 is expected if no connection exists
+      if (error.response?.status !== 404) {
+        console.error(`[${new Date().toISOString()}] Error fetching backend Instagram connection:`, error);
+      }
+      
+      // If we have local data but couldn't fetch from backend, try to push local data
+      if (localConnection) {
+        try {
+          await axios.post(`http://localhost:3000/instagram-connection/${authUserId}`, {
+            instagram_user_id: localConnection.instagram_user_id,
+            instagram_graph_id: localConnection.instagram_graph_id,
+            username: localConnection.username
+          });
+          console.log(`[${new Date().toISOString()}] Pushed local Instagram connection to backend`);
+        } catch (pushError) {
+          console.error(`[${new Date().toISOString()}] Error pushing Instagram connection to backend:`, pushError);
+        }
+      }
+    }
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error syncing Instagram connection:`, error);
   }
 }; 

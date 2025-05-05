@@ -10,9 +10,10 @@ import {
 
 interface InstagramConnectProps {
   onConnected: (graphId: string, userId: string) => void;
+  className?: string;
 }
 
-const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected }) => {
+const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected, className = '' }) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const { currentUser } = useAuth();
@@ -203,24 +204,24 @@ const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected }) => {
   };
 
   return (
-    <>
+    <div className={`instagram-connect ${className}`}>
       {isConnected ? (
         <button 
-          className="instagram-disconnect-btn" 
+          className="disconnect-button" 
           onClick={disconnectInstagram}
         >
           Disconnect Instagram
         </button>
       ) : (
         <button 
-          className="instagram-connect-btn" 
+          className="connect-button" 
           onClick={connectToInstagram}
           disabled={isConnecting || !currentUser}
         >
           {isConnecting ? 'Connecting...' : 'Connect Instagram'}
         </button>
       )}
-    </>
+    </div>
   );
 };
 

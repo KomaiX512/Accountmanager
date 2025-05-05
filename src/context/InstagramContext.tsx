@@ -1,0 +1,102 @@
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useAuth } from './AuthContext';
+import { 
+  getInstagramConnection, 
+  isInstagramConnected, 
+  isInstagramDisconnected 
+} from '../utils/instagramSessionManager';
+
+interface InstagramContextType {
+  isConnected: boolean;
+  userId: string | null;
+  graphId: string | null;
+  connectInstagram: (userId: string, graphId: string) => void;
+  disconnectInstagram: () => void;
+}
+
+const InstagramContext = createContext<InstagramContextType>({
+  isConnected: false,
+  userId: null,
+  graphId: null,
+  connectInstagram: () => {},
+  disconnectInstagram: () => {},
+});
+
+export const useInstagram = () => useContext(InstagramContext);
+
+interface InstagramProviderProps {
+  children: ReactNode;
+}
+
+export const InstagramProvider: React.FC<InstagramProviderProps> = ({ children }) => {
+  const [isConnected, setIsConnected] = useState<boolean>(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [graphId, setGraphId] = useState<string | null>(null);
+  const { currentUser } = useAuth();
+
+  useEffect(() => {
+    const checkInstagramConnection = async () => {
+      if (!currentUser) {
+        setIsConnected(false);
+        setUserId(null);
+        setGraphId(null);
+        return;
+      }
+
+      // Check if user explicitly disconnected Instagram
+      if (isInstagramDisconnected(currentUser.uid)) {
+        console.log(`[${new Date().toISOString()}] User ${currentUser.uid} previously disconnected Instagram, not reconnecting`);
+        setIsConnected(false);
+        setUserId(null);
+        setGraphId(null);
+        return;
+      }
+
+      // Check if Instagram is connected
+      const connected = isInstagramConnected(currentUser.uid);
+      setIsConnected(connected);
+
+      if (connected) {
+        const connectionData = getInstagramConnection(currentUser.uid);
+        if (connectionData) {
+          setUserId(connectionData.instagram_user_id);
+          setGraphId(connectionData.instagram_graph_id);
+          console.log(`[${new Date().toISOString()}] Instagram connection loaded: userId=${connectionData.instagram_user_id}, graphId=${connectionData.instagram_graph_id}`);
+        }
+      } else {
+        setUserId(null);
+        setGraphId(null);
+      }
+    };
+
+    checkInstagramConnection();
+  }, [currentUser]);
+
+  const connectInstagram = (newUserId: string, newGraphId: string) => {
+    console.log(`[${new Date().toISOString()}] Instagram connected: userId=${newUserId}, graphId=${newGraphId}`);
+    setIsConnected(true);
+    setUserId(newUserId);
+    setGraphId(newGraphId);
+  };
+
+  const disconnectInstagram = () => {
+    console.log(`[${new Date().toISOString()}] Instagram disconnected`);
+    setIsConnected(false);
+    setUserId(null);
+    setGraphId(null);
+  };
+
+  return (
+    <InstagramContext.Provider 
+      value={{ 
+        isConnected, 
+        userId, 
+        graphId, 
+        connectInstagram, 
+        disconnectInstagram 
+      }}
+    >
+      {children}
+    </InstagramContext.Provider>
+  );
+}; 

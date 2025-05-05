@@ -4,9 +4,10 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import axios from 'axios';
 import './PostScheduler.css';
+import { useInstagram } from '../../context/InstagramContext';
 
 interface PostSchedulerProps {
-  userId: string;
+  userId?: string;
   onClose: () => void;
 }
 
@@ -15,7 +16,11 @@ interface FormData {
   caption: string;
 }
 
-const PostScheduler: React.FC<PostSchedulerProps> = ({ userId, onClose }) => {
+const PostScheduler: React.FC<PostSchedulerProps> = ({ userId: propUserId, onClose }) => {
+  // Get userId from context if not provided as prop
+  const { userId: contextUserId, isConnected } = useInstagram();
+  const userId = propUserId || (isConnected ? contextUserId : null);
+
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>();
   const [scheduleDate, setScheduleDate] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +45,11 @@ const PostScheduler: React.FC<PostSchedulerProps> = ({ userId, onClose }) => {
   };
 
   const onSubmit: SubmitHandler<FormData> = async (data) => {
+    if (!userId) {
+      setError('Instagram connection required. Please connect your Instagram account.');
+      return;
+    }
+    
     console.log(`[${new Date().toISOString()}] Submitting post for user ${userId}`);
     if (!scheduleDate) {
       setError('Please select a schedule date and time.');
@@ -82,69 +92,82 @@ const PostScheduler: React.FC<PostSchedulerProps> = ({ userId, onClose }) => {
     <div className="post-scheduler-modal">
       <div className="post-scheduler-content">
         <h2 className="post-scheduler-title">Schedule Instagram Post</h2>
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <div className="form-group">
-            <label className="form-label">Image (JPEG/PNG, 1080x1080 recommended)</label>
-            <input
-              type="file"
-              accept="image/jpeg,image/png"
-              {...register('image', { required: 'Image is required' })}
-              className="form-input"
-            />
-            {errors.image && <p className="form-error">{errors.image.message}</p>}
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Caption (max 2200 chars, 30 hashtags)</label>
-            <textarea
-              {...register('caption', {
-                maxLength: { value: 2200, message: 'Caption exceeds 2200 characters' },
-                validate: (value) => {
-                  const hashtags = (value.match(/#[^\s#]+/g) || []).length;
-                  return hashtags <= 30 || 'Maximum 30 hashtags allowed';
-                },
-              })}
-              className="form-input"
-              rows={4}
-              placeholder="Enter caption with hashtags..."
-            />
-            {errors.caption && <p className="form-error">{errors.caption.message}</p>}
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Schedule Date & Time</label>
-            <DatePicker
-              selected={scheduleDate}
-              onChange={(date: Date) => setScheduleDate(date)}
-              showTimeSelect
-              dateFormat="Pp"
-              minDate={new Date()}
-              maxDate={new Date(Date.now() + 75 * 24 * 60 * 60 * 1000)}
-              className="form-input"
-              placeholderText="Select date and time"
-              required
-            />
-          </div>
-
-          {error && <p className="form-error">{error}</p>}
-
-          <div className="form-actions">
+        {!userId ? (
+          <div className="instagram-not-connected">
+            <p>Connect your Instagram account to schedule posts.</p>
             <button
               type="button"
               onClick={onClose}
               className="insta-btn disconnect"
             >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className={`insta-btn connect ${isSubmitting ? 'disabled' : ''}`}
-            >
-              {isSubmitting ? 'Scheduling...' : 'Schedule Post'}
+              Close
             </button>
           </div>
-        </form>
+        ) : (
+          <form onSubmit={handleSubmit(onSubmit)}>
+            <div className="form-group">
+              <label className="form-label">Image (JPEG/PNG, 1080x1080 recommended)</label>
+              <input
+                type="file"
+                accept="image/jpeg,image/png"
+                {...register('image', { required: 'Image is required' })}
+                className="form-input"
+              />
+              {errors.image && <p className="form-error">{errors.image.message}</p>}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Caption (max 2200 chars, 30 hashtags)</label>
+              <textarea
+                {...register('caption', {
+                  maxLength: { value: 2200, message: 'Caption exceeds 2200 characters' },
+                  validate: (value) => {
+                    const hashtags = (value.match(/#[^\s#]+/g) || []).length;
+                    return hashtags <= 30 || 'Maximum 30 hashtags allowed';
+                  },
+                })}
+                className="form-input"
+                rows={4}
+                placeholder="Enter caption with hashtags..."
+              />
+              {errors.caption && <p className="form-error">{errors.caption.message}</p>}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Schedule Date & Time</label>
+              <DatePicker
+                selected={scheduleDate}
+                onChange={(date: Date | null) => setScheduleDate(date)}
+                showTimeSelect
+                dateFormat="Pp"
+                minDate={new Date()}
+                maxDate={new Date(Date.now() + 75 * 24 * 60 * 60 * 1000)}
+                className="form-input"
+                placeholderText="Select date and time"
+                required
+              />
+            </div>
+
+            {error && <p className="form-error">{error}</p>}
+
+            <div className="form-actions">
+              <button
+                type="button"
+                onClick={onClose}
+                className="insta-btn disconnect"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className={`insta-btn connect ${isSubmitting ? 'disabled' : ''}`}
+              >
+                {isSubmitting ? 'Scheduling...' : 'Schedule Post'}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );

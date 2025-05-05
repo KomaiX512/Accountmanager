@@ -302,15 +302,36 @@ app.post('/save-account-info', async (req, res) => {
       return res.status(400).json({ error: 'Username, account type, and posting style are required' });
     }
 
+    // Normalize the username to lowercase
+    const normalizedUsername = username.trim().toLowerCase();
+
+    // Check if the username is already in use (for logging purposes)
+    const key = `AccountInfo/${normalizedUsername}/info.json`;
+    let isUsernameAlreadyInUse = false;
+    
+    try {
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: key,
+      });
+      await s3Client.send(getCommand);
+      isUsernameAlreadyInUse = true;
+      console.warn(`Warning: Username '${normalizedUsername}' is already in use by another account, but allowing save operation`);
+    } catch (error) {
+      if (error.name !== 'NoSuchKey' && error.$metadata?.httpStatusCode !== 404) {
+        throw error;
+      }
+      // Username is not in use, which is the normal case
+    }
+
     const payload = {
-      username,
+      username: normalizedUsername,
       accountType,
       postingStyle,
-      ...(competitors && { competitors }),
+      ...(competitors && { competitors: competitors.map(c => c.trim().toLowerCase()) }),
       timestamp: new Date().toISOString(),
     };
 
-    const key = `AccountInfo/${username}/info.json`;
     console.log(`Saving account info to: ${key}`);
     const putCommand = new PutObjectCommand({
       Bucket: 'tasks',
@@ -320,10 +341,14 @@ app.post('/save-account-info', async (req, res) => {
     });
     await s3Client.send(putCommand);
 
-    const cacheKey = `AccountInfo/${username}`;
+    const cacheKey = `AccountInfo/${normalizedUsername}`;
     cache.delete(cacheKey);
 
-    res.json({ success: true, message: 'Account info saved successfully' });
+    res.json({ 
+      success: true, 
+      message: 'Account info saved successfully',
+      isUsernameAlreadyInUse
+    });
   } catch (error) {
     console.error('Save account info error:', error);
     handleErrorResponse(res, error);
@@ -679,8 +704,12 @@ app.post('/responses/:username/:responseId', async (req, res) => {
 
 app.get('/retrieve-account-info/:username', async (req, res) => {
   const { username } = req.params;
-  const key = `AccountInfo/${username}/info.json`;
-  const prefix = `AccountInfo/${username}`;
+  
+  // Normalize the username to lowercase
+  const normalizedUsername = username.trim().toLowerCase();
+  
+  const key = `AccountInfo/${normalizedUsername}/info.json`;
+  const prefix = `AccountInfo/${normalizedUsername}`;
 
   try {
     let data;
@@ -701,7 +730,7 @@ app.get('/retrieve-account-info/:username', async (req, res) => {
 
         if (!body || body.trim() === '') {
           console.warn(`Empty file detected at ${key}, returning default account info`);
-          data = { username, accountType: '', postingStyle: '', competitors: [], timestamp: new Date().toISOString() };
+          data = { username: normalizedUsername, accountType: '', postingStyle: '', competitors: [], timestamp: new Date().toISOString() };
         } else {
           data = JSON.parse(body);
           if (!data.competitors || !Array.isArray(data.competitors)) {
@@ -715,7 +744,7 @@ app.get('/retrieve-account-info/:username', async (req, res) => {
       } catch (error) {
         if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
           console.log(`Account info not found for ${key}, returning default account info`);
-          data = { username, accountType: '', postingStyle: '', competitors: [], timestamp: new Date().toISOString() };
+          data = { username: normalizedUsername, accountType: '', postingStyle: '', competitors: [], timestamp: new Date().toISOString() };
           cache.set(prefix, [{ key, data }]);
           cacheTimestamps.set(prefix, Date.now());
         } else {
@@ -724,7 +753,7 @@ app.get('/retrieve-account-info/:username', async (req, res) => {
       }
     }
 
-    console.log(`Returning account info for ${username}:`, JSON.stringify(data, null, 2));
+    console.log(`Returning account info for ${normalizedUsername}:`, JSON.stringify(data, null, 2));
     res.json(data);
   } catch (error) {
     console.error(`Error retrieving account info for ${key}:`, error.message);
@@ -2898,5 +2927,56 @@ app.post('/user-instagram-status/:userId', async (req, res) => {
   } catch (error) {
     console.error(`Error updating user Instagram status for ${userId}:`, error);
     res.status(500).json({ error: 'Failed to update user Instagram status' });
+  }
+});
+
+app.get('/check-username-availability/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+    
+    if (!username || username.trim() === '') {
+      return res.status(400).json({ 
+        available: false, 
+        message: 'Username is required' 
+      });
+    }
+    
+    // Convert to lowercase to ensure case-insensitive matching
+    const normalizedUsername = username.trim().toLowerCase();
+    
+    // Check for existing username in AccountInfo records
+    const prefix = `AccountInfo/${normalizedUsername}`;
+    const key = `AccountInfo/${normalizedUsername}/info.json`;
+    
+    try {
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: key,
+      });
+      
+      await s3Client.send(getCommand);
+      
+      // If we get here, the file exists, meaning the username is already in use
+      return res.json({
+        available: false,
+        message: 'This username is already in use by another account. If you wish to proceed, you may continue, but you will be using an already assigned username.'
+      });
+      
+    } catch (error) {
+      if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+        // Username is available
+        return res.json({
+          available: true,
+          message: 'Username is available'
+        });
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error(`Error checking username availability:`, error);
+    res.status(500).json({ 
+      error: 'Failed to check username availability', 
+      details: error.message 
+    });
   }
 });

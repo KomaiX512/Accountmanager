@@ -10,7 +10,7 @@ import PrivateRoute from './components/auth/PrivateRoute';
 import AuthRoute from './components/auth/AuthRoute';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import axios from 'axios';
-import { syncInstagramConnection } from './utils/instagramSessionManager';
+import { syncInstagramConnection, isInstagramDisconnected } from './utils/instagramSessionManager';
 
 // Main App component with AuthProvider
 const App: React.FC = () => {
@@ -43,6 +43,12 @@ const AppContent: React.FC = () => {
     const syncUserConnection = async () => {
       if (currentUser?.uid) {
         try {
+          // Skip sync if the user has explicitly disconnected Instagram
+          if (isInstagramDisconnected(currentUser.uid)) {
+            console.log(`[${new Date().toISOString()}] User ${currentUser.uid} has previously disconnected Instagram, skipping connection sync`);
+            return;
+          }
+          
           await syncInstagramConnection(currentUser.uid);
           console.log(`[${new Date().toISOString()}] Synced Instagram connection for user ${currentUser.uid}`);
         } catch (error) {

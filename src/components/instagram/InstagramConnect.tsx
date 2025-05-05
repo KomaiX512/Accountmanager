@@ -5,7 +5,8 @@ import { useAuth } from '../../context/AuthContext';
 import {
   getInstagramConnection,
   storeInstagramConnection,
-  clearInstagramConnection
+  clearInstagramConnection,
+  isInstagramDisconnected
 } from '../../utils/instagramSessionManager';
 
 interface InstagramConnectProps {
@@ -31,6 +32,15 @@ const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected, classN
       }
       
       try {
+        // Check if the user explicitly disconnected Instagram
+        const userDisconnected = isInstagramDisconnected(currentUser.uid);
+        if (userDisconnected) {
+          console.log(`[${new Date().toISOString()}] User ${currentUser.uid} previously disconnected Instagram, honoring that choice`);
+          setIsConnected(false);
+          connectionDataRef.current = null;
+          return;
+        }
+        
         // First check local storage for cached connection
         const connectionData = getInstagramConnection(currentUser.uid);
         
@@ -177,7 +187,7 @@ const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected, classN
       return;
     }
     
-    // Clear local storage data
+    // Clear local storage data and mark as disconnected
     clearInstagramConnection(currentUser.uid);
     
     // Reset connection data ref

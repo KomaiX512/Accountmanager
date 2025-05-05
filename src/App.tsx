@@ -7,8 +7,10 @@ import Instagram from './pages/Instagram';
 import Dashboard from './components/instagram/Dashboard';
 import Login from './components/auth/Login';
 import PrivateRoute from './components/auth/PrivateRoute';
+import AuthRoute from './components/auth/AuthRoute';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import axios from 'axios';
+import { syncInstagramConnection } from './utils/instagramSessionManager';
 
 // Main App component with AuthProvider
 const App: React.FC = () => {
@@ -35,6 +37,22 @@ const AppContent: React.FC = () => {
   };
   
   const isLoginPage = location.pathname === '/login';
+
+  // Sync Instagram connection when user logs in
+  useEffect(() => {
+    const syncUserConnection = async () => {
+      if (currentUser?.uid) {
+        try {
+          await syncInstagramConnection(currentUser.uid);
+          console.log(`[${new Date().toISOString()}] Synced Instagram connection for user ${currentUser.uid}`);
+        } catch (error) {
+          console.error(`[${new Date().toISOString()}] Error syncing Instagram connection:`, error);
+        }
+      }
+    };
+    
+    syncUserConnection();
+  }, [currentUser]);
 
   // Try to load user Instagram data if logged in but no account info
   useEffect(() => {
@@ -95,9 +113,9 @@ const AppContent: React.FC = () => {
             <Route
               path="/"
               element={
-                <PrivateRoute>
+                <AuthRoute>
                   <Instagram />
-                </PrivateRoute>
+                </AuthRoute>
               }
             />
             <Route

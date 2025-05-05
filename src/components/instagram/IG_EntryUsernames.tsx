@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext'; // Fixed import path
 
 interface IG_EntryUsernamesProps {
-  onSubmitSuccess: (username: string) => void;
+  onSubmitSuccess: (username: string, competitors: string[], accountType: 'branding' | 'non-branding') => void;
   redirectIfCompleted?: boolean; // Flag to indicate if we should redirect if user already entered username
 }
 
@@ -43,13 +43,16 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
         if (response.data.hasEnteredInstagramUsername && redirectIfCompleted) {
           // User has already entered username, redirect to dashboard
           const savedUsername = response.data.instagram_username;
-          onSubmitSuccess(savedUsername);
+          const savedCompetitors = response.data.competitors || [];
+          const savedAccountType = response.data.accountType || 'branding';
           
-          if (response.data.accountType === 'branding') {
+          onSubmitSuccess(savedUsername, savedCompetitors, savedAccountType as 'branding' | 'non-branding');
+          
+          if (savedAccountType === 'branding') {
             navigate('/dashboard', { 
               state: { 
                 accountHolder: savedUsername, 
-                competitors: response.data.competitors || [],
+                competitors: savedCompetitors,
                 accountType: 'branding'
               } 
             });
@@ -162,7 +165,12 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
         showMessage('Submission successful', 'success');
         resetForm();
         setTimeout(() => {
-          onSubmitSuccess(username);
+          onSubmitSuccess(
+            username,
+            accountType === 'branding' ? payload.competitors : [],
+            accountType as 'branding' | 'non-branding'
+          );
+          
           if (accountType === 'branding') {
             navigate('/dashboard', { 
               state: { 

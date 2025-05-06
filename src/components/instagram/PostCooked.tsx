@@ -6,6 +6,16 @@ import ErrorBoundary from '../ErrorBoundary';
 import CanvasEditor from '../common/CanvasEditor';
 import InstagramRequiredButton from '../common/InstagramRequiredButton';
 import { useInstagram } from '../../context/InstagramContext';
+import { 
+  storeRejectedPost, 
+  storeScheduledPost, 
+  getRejectedPosts, 
+  getScheduledPosts,
+  filterProcessedPosts,
+  cleanupPostedContent,
+  syncPostStatusFromServer,
+  storeMultipleScheduledPosts
+} from '../../utils/PostsManager';
 
 interface PostCookedProps {
   username: string;
@@ -37,10 +47,49 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   const [editingPost, setEditingPost] = useState<{ key: string; imageUrl: string; caption: string } | null>(null);
   const [editingCaption, setEditingCaption] = useState<{ key: string; caption: string } | null>(null);
 
+  // Initialize rejected posts from localStorage
+  useEffect(() => {
+    if (username) {
+      // Sync with server first to get the latest status
+      const syncWithServer = async () => {
+        try {
+          // Load post status from server and update local storage
+          await syncPostStatusFromServer(username);
+          
+          // Clean up any scheduled posts that should now be posted
+          cleanupPostedContent(username);
+          
+          // Initialize rejected posts from localStorage (which now includes server data)
+          const storedRejectedPosts = getRejectedPosts(username);
+          if (storedRejectedPosts.length > 0) {
+            setRejectedPosts(storedRejectedPosts);
+          }
+        } catch (error) {
+          console.error(`[${new Date().toISOString()}] Error syncing post status:`, error);
+          
+          // Fallback to local data if server sync fails
+          cleanupPostedContent(username);
+          const storedRejectedPosts = getRejectedPosts(username);
+          if (storedRejectedPosts.length > 0) {
+            setRejectedPosts(storedRejectedPosts);
+          }
+        }
+      };
+      
+      syncWithServer();
+    }
+  }, [username]);
+
   useEffect(() => {
     console.log('Posts prop in PostCooked:', posts);
-    setLocalPosts(posts);
-  }, [posts]);
+    if (username && posts.length > 0) {
+      // Filter out posts that are already rejected or scheduled
+      const filteredPosts = filterProcessedPosts(username, posts);
+      setLocalPosts(filteredPosts);
+    } else {
+      setLocalPosts(posts);
+    }
+  }, [posts, username]);
 
   useEffect(() => {
     if (toastMessage) {
@@ -177,8 +226,15 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         const respData = await resp.json().catch(() => ({}));
         console.log(`[Schedule] Scheduled post ${selectedPostKey} successfully:`, respData);
         setToastMessage('Your post is on schedule!');
-        // Optionally remove post from view after scheduling
+        
+        // Remove post from view
         setRejectedPosts(prev => [...prev, selectedPostKey]);
+        setLocalPosts(prev => prev.filter(p => p.key !== selectedPostKey));
+
+        // Persist the scheduled post with timing information
+        if (username) {
+          storeScheduledPost(username, selectedPostKey, scheduleTime.getTime());
+        }
       }
     } catch (err: any) {
       console.error(`[Schedule] Error scheduling post ${selectedPostKey}:`, err.message);
@@ -245,8 +301,15 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   };
 
   const handleReject = (key: string) => {
+    // First store the rejected post in localStorage for persistence
+    if (username) {
+      storeRejectedPost(username, key);
+    }
+    
+    // Update local state to immediately reflect the change
     setRejectedPosts(prev => [...prev, key]);
-    setToastMessage('Post rejected and removed.');
+    setLocalPosts(prev => prev.filter(p => p.key !== key));
+    setToastMessage('Post rejected and removed permanently.');
   };
 
   // Fetch time delay from R2 bucket
@@ -281,9 +344,15 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       console.log('[AutoSchedule] Using delay (hours):', delayHours);
       setAutoScheduleProgress(`Scheduling posts every ${delayHours} hours...`);
       let now = new Date();
-      for (let i = 0; i < localPosts.length; i++) {
-        const post = localPosts[i];
-        setAutoScheduleProgress(`Scheduling post ${i + 1} of ${localPosts.length}...`);
+      
+      // Create a copy of localPosts for processing
+      const postsToSchedule = [...localPosts];
+      const processedPostKeys: string[] = [];
+      const scheduledPostsData: Array<{ postKey: string, scheduleTime: number }> = [];
+      
+      for (let i = 0; i < postsToSchedule.length; i++) {
+        const post = postsToSchedule[i];
+        setAutoScheduleProgress(`Scheduling post ${i + 1} of ${postsToSchedule.length}...`);
         console.log(`[AutoSchedule] Preparing post #${i + 1}:`, post);
         // Always fetch a fresh signed URL for the image
         let imageKey = '';
@@ -370,6 +439,10 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             const respData = await resp.json().catch(() => ({}));
             console.log(`[AutoSchedule] Scheduled post #${i + 1} successfully:`, respData);
             setToastMessage(`Scheduled post ${i + 1} successfully!`);
+            
+            // Track which posts were successfully processed
+            processedPostKeys.push(post.key);
+            scheduledPostsData.push({ postKey: post.key, scheduleTime: scheduleDate.getTime() });
           }
         } catch (err: any) {
           console.error(`[AutoSchedule] Error scheduling post #${i + 1}:`, err.message);
@@ -378,8 +451,20 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         // Wait a bit to avoid hammering the server
         await new Promise(res => setTimeout(res, 500));
       }
+      
+      // Update state to remove all successfully scheduled posts
+      if (processedPostKeys.length > 0) {
+        // Batch store all scheduled posts at once for better efficiency
+        if (username) {
+          storeMultipleScheduledPosts(username, scheduledPostsData);
+        }
+        
+        setRejectedPosts(prev => [...prev, ...processedPostKeys]);
+        setLocalPosts(prev => prev.filter(p => !processedPostKeys.includes(p.key)));
+      }
+      
       setAutoScheduleProgress(null);
-      setToastMessage('All posts scheduled!');
+      setToastMessage('All posts scheduled successfully!');
     } catch (err: any) {
       console.error('[AutoSchedule] Auto-scheduling failed:', err.message);
       setAutoScheduleProgress(null);
@@ -449,8 +534,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     );
   }
 
-  // Filter out rejected posts
-  const filteredPosts = localPosts.filter(post => !rejectedPosts.includes(post.key));
+  // Using local posts state directly which already filters out rejected posts
+  const filteredPosts = localPosts;
 
   return (
     <ErrorBoundary>

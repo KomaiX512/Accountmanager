@@ -4006,3 +4006,158 @@ app.get('/events/:username', (req, res) => {
     }
   });
 });
+
+// Add a new API endpoint for tracking post status
+
+// Endpoint to store post status (rejected/scheduled)
+app.post('/post-status/:username', async (req, res) => {
+  const { username } = req.params;
+  const { postKeys, status, scheduledTimes } = req.body;
+  
+  if (!username || !postKeys || !status || !Array.isArray(postKeys) || !['rejected', 'scheduled'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid request parameters' });
+  }
+  
+  try {
+    // First, try to get existing status data
+    const normalizedUsername = username.toLowerCase().trim().replace(/[^a-z0-9_]/g, '_');
+    const key = `UserPostStatus/${normalizedUsername}/post_status.json`;
+    let existingData = { rejected: [], scheduled: {} };
+    
+    try {
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: key,
+      });
+      
+      try {
+        const response = await s3Client.send(getCommand);
+        const body = await streamToString(response.Body);
+        
+        if (body && body.trim() !== '') {
+          existingData = JSON.parse(body);
+          // Ensure proper structure
+          if (!existingData.rejected) existingData.rejected = [];
+          if (!existingData.scheduled) existingData.scheduled = {};
+        }
+      } catch (error) {
+        if (error.name !== 'NoSuchKey' && error.$metadata?.httpStatusCode !== 404) {
+          throw error;
+        }
+        // If file doesn't exist, use default empty structure
+      }
+      
+      // Update with new data
+      if (status === 'rejected') {
+        // Add new rejected posts (avoiding duplicates)
+        const newRejected = [...new Set([...existingData.rejected, ...postKeys])];
+        existingData.rejected = newRejected;
+      } else if (status === 'scheduled') {
+        // Update scheduled posts
+        postKeys.forEach((postKey, index) => {
+          const scheduleTime = scheduledTimes && scheduledTimes[index] ? scheduledTimes[index] : Date.now();
+          existingData.scheduled[postKey] = {
+            postKey,
+            scheduledAt: scheduleTime,
+            updatedAt: Date.now()
+          };
+        });
+        
+        // Clean up scheduled posts that should be posted by now
+        const now = Date.now();
+        Object.keys(existingData.scheduled).forEach(key => {
+          const post = existingData.scheduled[key];
+          if (post.scheduledAt < now) {
+            delete existingData.scheduled[key];
+          }
+        });
+      }
+      
+      // Save updated data
+      const putCommand = new PutObjectCommand({
+        Bucket: 'tasks',
+        Key: key,
+        Body: JSON.stringify(existingData, null, 2),
+        ContentType: 'application/json',
+      });
+      
+      await s3Client.send(putCommand);
+      
+      console.log(`[${new Date().toISOString()}] Updated post status for ${username}: ${status}, ${postKeys.length} posts`);
+      res.json({ success: true, message: `Post status updated: ${postKeys.length} posts marked as ${status}` });
+    } catch (error) {
+      console.error(`[${new Date().toISOString()}] Error updating post status for ${username}:`, error);
+      res.status(500).json({ error: 'Failed to update post status', details: error.message });
+    }
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Server error handling post status for ${username}:`, error);
+    res.status(500).json({ error: 'Server error', details: error.message });
+  }
+});
+
+// Endpoint to get post status
+app.get('/post-status/:username', async (req, res) => {
+  const { username } = req.params;
+  
+  if (!username) {
+    return res.status(400).json({ error: 'Username is required' });
+  }
+  
+  try {
+    const normalizedUsername = username.toLowerCase().trim().replace(/[^a-z0-9_]/g, '_');
+    const key = `UserPostStatus/${normalizedUsername}/post_status.json`;
+    
+    try {
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: key,
+      });
+      
+      const response = await s3Client.send(getCommand);
+      const body = await streamToString(response.Body);
+      
+      if (!body || body.trim() === '') {
+        return res.json({ rejected: [], scheduled: {} });
+      }
+      
+      const data = JSON.parse(body);
+      
+      // Clean up scheduled posts that should be posted by now
+      const now = Date.now();
+      let hasChanges = false;
+      
+      if (data.scheduled) {
+        Object.keys(data.scheduled).forEach(key => {
+          const post = data.scheduled[key];
+          if (post.scheduledAt < now) {
+            delete data.scheduled[key];
+            hasChanges = true;
+          }
+        });
+        
+        // If we cleaned up any scheduled posts, save the changes
+        if (hasChanges) {
+          const putCommand = new PutObjectCommand({
+            Bucket: 'tasks',
+            Key: key,
+            Body: JSON.stringify(data, null, 2),
+            ContentType: 'application/json',
+          });
+          
+          await s3Client.send(putCommand);
+          console.log(`[${new Date().toISOString()}] Cleaned up expired scheduled posts for ${username}`);
+        }
+      }
+      
+      return res.json(data);
+    } catch (error) {
+      if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+        return res.json({ rejected: [], scheduled: {} });
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error retrieving post status for ${username}:`, error);
+    res.status(500).json({ error: 'Failed to retrieve post status', details: error.message });
+  }
+});

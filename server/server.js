@@ -14,6 +14,197 @@ import schedule from 'node-schedule';
 const app = express();
 const port = 3000;
 
+// ============= ENHANCED CACHING SYSTEM =============
+// Configure cache settings based on module type
+const CACHE_CONFIG = {
+  REALTIME: {
+    TTL: 0, // No caching for real-time data
+    ENABLED: false
+  },
+  STANDARD: {
+    TTL: 24 * 60 * 60 * 1000, // 24 hours for most content modules
+    ENABLED: true
+  },
+  POST_COOKED: {
+    TTL: 3 * 60 * 60 * 1000, // 3 hours for PostCooked module
+    ENABLED: true
+  }
+};
+
+// Map module prefixes to their cache configurations
+const MODULE_CACHE_CONFIG = {
+  'InstagramEvents': CACHE_CONFIG.REALTIME,
+  'ready_post': CACHE_CONFIG.POST_COOKED,
+  'competitor_analysis': CACHE_CONFIG.STANDARD,
+  'recommendations': CACHE_CONFIG.STANDARD,
+  'engagement_strategies': CACHE_CONFIG.STANDARD,
+  'NewForYou': CACHE_CONFIG.STANDARD,
+  'ProfileInfo': CACHE_CONFIG.STANDARD,
+  'queries': CACHE_CONFIG.STANDARD,
+  'rules': CACHE_CONFIG.STANDARD,
+  'feedbacks': CACHE_CONFIG.STANDARD,
+  'AccountInfo': CACHE_CONFIG.STANDARD
+};
+
+// Enhanced cache with TTL enforcement
+const cache = new Map();
+const cacheTimestamps = new Map();
+const cacheHits = new Map(); // Track cache hit statistics
+const cacheMisses = new Map(); // Track cache miss statistics
+
+// Cache control function - determines if cache is valid or needs refresh
+function shouldUseCache(prefix) {
+  // First, extract the module prefix (first part of the path)
+  const moduleName = prefix.split('/')[0];
+  
+  // Get cache configuration for this module
+  const cacheConfig = MODULE_CACHE_CONFIG[moduleName] || CACHE_CONFIG.STANDARD;
+  
+  // If caching is disabled for this module, always fetch fresh
+  if (!cacheConfig.ENABLED) return false;
+  
+  // Check if cache exists and is within TTL
+  const now = Date.now();
+  const lastFetch = cacheTimestamps.get(prefix) || 0;
+  const cacheAge = now - lastFetch;
+  
+  // Use cache if it exists and is within TTL
+  if (cache.has(prefix) && cacheAge < cacheConfig.TTL) {
+    // Increment cache hit counter
+    const hits = cacheHits.get(prefix) || 0;
+    cacheHits.set(prefix, hits + 1);
+    console.log(`[${new Date().toISOString()}] Cache HIT for ${prefix} (age: ${Math.round(cacheAge/1000)}s, TTL: ${Math.round(cacheConfig.TTL/1000)}s)`);
+    return true;
+  }
+  
+  // Increment cache miss counter if applicable
+  if (cache.has(prefix)) {
+    const misses = cacheMisses.get(prefix) || 0;
+    cacheMisses.set(prefix, misses + 1);
+    console.log(`[${new Date().toISOString()}] Cache EXPIRED for ${prefix} (age: ${Math.round(cacheAge/1000)}s, TTL: ${Math.round(cacheConfig.TTL/1000)}s)`);
+  }
+  
+  return false;
+}
+
+// ============= ENHANCED SSE SYSTEM =============
+// Improved SSE client management for better connection stability
+const sseClients = new Map();
+let currentUsername = null;
+const SSE_RECONNECT_TIMEOUT = 60000; // 60 seconds maximum client inactivity
+
+// Track active connections per client
+const activeConnections = new Map();
+console.log(`[${new Date().toISOString()}] Server initialized with enhanced caching and SSE`);
+
+// SSE heartbeat scheduler - ensures connections stay alive
+function scheduleSSEHeartbeats() {
+  // Send heartbeats every 15 seconds to keep connections alive
+  setInterval(() => {
+    const now = Date.now();
+    
+    sseClients.forEach((clients, username) => {
+      // Filter out stale connections first
+      const activeClients = clients.filter(client => {
+        const lastActivity = activeConnections.get(client) || 0;
+        const isStale = (now - lastActivity) > SSE_RECONNECT_TIMEOUT;
+        
+        if (isStale) {
+          console.log(`[${new Date().toISOString()}] Removing stale SSE connection for ${username}`);
+          try {
+            client.end(); // Properly end the connection
+          } catch (err) {
+            // Connection might already be closed
+          }
+          return false;
+        }
+        return true;
+      });
+      
+      // Update the filtered client list
+      if (activeClients.length !== clients.length) {
+        sseClients.set(username, activeClients);
+        console.log(`[${new Date().toISOString()}] Updated SSE clients for ${username}: ${activeClients.length}/${clients.length} active connections`);
+      }
+      
+      // Send heartbeat to active clients
+      activeClients.forEach(client => {
+        try {
+          client.write(`data: ${JSON.stringify({ type: 'heartbeat', timestamp: now })}\n\n`);
+          // Update last activity timestamp
+          activeConnections.set(client, now);
+        } catch (err) {
+          console.error(`[${new Date().toISOString()}] Error sending heartbeat to client:`, err.message);
+          // Will be cleaned up in the next cycle
+        }
+      });
+    });
+  }, 15000);
+  
+  console.log(`[${new Date().toISOString()}] SSE heartbeat scheduler started`);
+}
+
+// Start the heartbeat scheduler
+scheduleSSEHeartbeats();
+
+// Broadcast update to all connected clients for a user
+function broadcastUpdate(username, data) {
+  const clients = sseClients.get(username) || [];
+  const activeCount = clients.length;
+  
+  if (activeCount > 0) {
+    console.log(`[${new Date().toISOString()}] Broadcasting update to ${activeCount} clients for ${username}: ${data.type}`);
+    
+    clients.forEach(client => {
+      try {
+        client.write(`data: ${JSON.stringify(data)}\n\n`);
+        // Update activity timestamp
+        activeConnections.set(client, Date.now());
+      } catch (err) {
+        console.error(`[${new Date().toISOString()}] Error broadcasting to client:`, err.message);
+        // Will be cleaned up by the heartbeat cycle
+      }
+    });
+    return true;
+  }
+  
+  return false;
+}
+
+// Periodic cache cleanup to prevent memory leaks
+function scheduleCacheCleanup() {
+  setInterval(() => {
+    const now = Date.now();
+    let expiredCount = 0;
+    
+    // Check each cache entry
+    for (const [prefix, timestamp] of cacheTimestamps.entries()) {
+      const moduleName = prefix.split('/')[0];
+      const cacheConfig = MODULE_CACHE_CONFIG[moduleName] || CACHE_CONFIG.STANDARD;
+      
+      // Skip if caching is disabled for this module
+      if (!cacheConfig.ENABLED) continue;
+      
+      // Check if entry is expired
+      const cacheAge = now - timestamp;
+      if (cacheAge > cacheConfig.TTL) {
+        cache.delete(prefix);
+        cacheTimestamps.delete(prefix);
+        expiredCount++;
+      }
+    }
+    
+    if (expiredCount > 0) {
+      console.log(`[${new Date().toISOString()}] Cache cleanup: removed ${expiredCount} expired entries`);
+    }
+  }, 30 * 60 * 1000); // Run every 30 minutes
+  
+  console.log(`[${new Date().toISOString()}] Cache cleanup scheduler started`);
+}
+
+// Start the cache cleanup scheduler
+scheduleCacheCleanup();
+
 const s3Client = new S3Client({
   endpoint: 'https://9069781eea9a108d41848d73443b3a87.r2.cloudflarestorage.com',
   region: 'auto',
@@ -61,14 +252,10 @@ app.use((req, res, next) => {
   next();
 });
 
-const cache = new Map();
-const cacheTimestamps = new Map();
-const CACHE_TTL = 5 * 60 * 1000;
+// THROTTLE_INTERVAL is kept for backward compatibility but effectively only used 
+// when cache configuration doesn't provide a specific TTL
 const THROTTLE_INTERVAL = 5 * 60 * 1000;
-
-const sseClients = new Map();
-let currentUsername = null;
-console.log(`[${new Date().toISOString()}] Server initialized with CORS for http://localhost:5173, http://localhost:3000`);
+const CACHE_TTL = 5 * 60 * 1000;
 
 const MODULE_PREFIXES = [
   'competitor_analysis',
@@ -97,6 +284,7 @@ async function initializeCurrentUsername() {
 
 initializeCurrentUsername();
 
+// Enhanced webhook handler with improved event broadcast
 app.post('/webhook/r2', async (req, res) => {
   try {
     const { event, key } = req.body;
@@ -110,9 +298,16 @@ app.post('/webhook/r2', async (req, res) => {
         console.log(`Invalidating cache for ${cacheKey}`);
         cache.delete(cacheKey);
 
-        const clients = sseClients.get(username) || [];
-        for (const client of clients) {
-          client.write(`data: ${JSON.stringify({ type: 'update', prefix: cacheKey })}\n\n`);
+        // Enhanced broadcast with tracking
+        const result = broadcastUpdate(username, { 
+          type: 'update', 
+          prefix: cacheKey,
+          timestamp: Date.now(),
+          key: key
+        });
+        
+        if (!result) {
+          console.log(`No active clients for ${username}, update queued for next connection`);
         }
       }
     }
@@ -124,13 +319,15 @@ app.post('/webhook/r2', async (req, res) => {
   }
 });
 
+// Enhanced SSE connection with improved reliability
 app.get('/events/:username', (req, res) => {
   const { username } = req.params;
 
   console.log(`[${new Date().toISOString()}] Handling SSE request for /events/${username}`);
 
+  // Set headers for SSE
   res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', '*');
@@ -138,32 +335,42 @@ app.get('/events/:username', (req, res) => {
   res.setHeader('Access-Control-Expose-Headers', 'Content-Type');
   res.flushHeaders();
 
+  // Send initial connection confirmation
+  const initialEvent = {
+    type: 'connection',
+    message: `Connected to events for ${username}`,
+    timestamp: Date.now(),
+    connectionId: randomUUID()
+  };
+  
+  res.write(`data: ${JSON.stringify(initialEvent)}\n\n`);
+  
+  // Register this client
   if (!sseClients.has(username)) {
     sseClients.set(username, []);
   }
+  
   const clients = sseClients.get(username);
   clients.push(res);
+  activeConnections.set(res, Date.now());
+  
+  console.log(`[${new Date().toISOString()}] SSE client connected for ${username}. Total clients: ${clients.length}`);
 
-  console.log(`[${Date.now()}] SSE client connected for ${username}. Total clients: ${clients.length}`);
-
-  res.write(`data: ${JSON.stringify({ type: 'connection', message: `Connected to events for ${username}` })}\n\n`);
-
-  const heartbeat = setInterval(() => {
-    res.write(`data: ${JSON.stringify({ type: 'heartbeat' })}\n\n`);
-  }, 15000);
-
+  // Setup connection close handler
   req.on('close', () => {
-    clearInterval(heartbeat);
-    const updatedClients = sseClients.get(username).filter(client => client !== res);
+    const updatedClients = sseClients.get(username)?.filter(client => client !== res) || [];
     sseClients.set(username, updatedClients);
-    console.log(`[${Date.now()}] SSE client disconnected for ${username}`);
+    activeConnections.delete(res);
+    
+    console.log(`[${new Date().toISOString()}] SSE client disconnected for ${username}. Remaining clients: ${updatedClients.length}`);
     if (updatedClients.length === 0) {
+      console.log(`[${new Date().toISOString()}] No more clients for ${username}, cleaning up`);
       sseClients.delete(username);
     }
-    res.end();
   });
 });
 
+// Enhanced data fetching with improved caching strategy
 async function fetchDataForModule(username, prefixTemplate, forceRefresh = false) {
   if (!username) {
     console.error('No username provided, cannot fetch data');
@@ -171,21 +378,14 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
   }
 
   const prefix = prefixTemplate.replace('{username}', username);
-  const now = Date.now();
-  const lastFetch = cacheTimestamps.get(prefix) || 0;
-
-  if (!forceRefresh && cache.has(prefix)) {
-    console.log(`Cache hit for prefix: ${prefix}`);
+  
+  // Check if we should use cache based on the enhanced caching rules
+  if (!forceRefresh && shouldUseCache(prefix)) {
     return cache.get(prefix);
   }
 
-  if (!forceRefresh && now - lastFetch < THROTTLE_INTERVAL) {
-    console.log(`Throttled fetch for prefix: ${prefix}`);
-    return cache.has(prefix) ? cache.get(prefix) : [];
-  }
-
   try {
-    console.log(`Fetching data from R2 for prefix: ${prefix}`);
+    console.log(`[${new Date().toISOString()}] Fetching fresh data from R2 for prefix: ${prefix}`);
     const listCommand = new ListObjectsV2Command({
       Bucket: 'tasks',
       Prefix: prefix,
@@ -218,12 +418,19 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
     );
 
     const validData = data.filter(item => item !== null);
+    
+    // Update cache with fresh data
     cache.set(prefix, validData);
-    cacheTimestamps.set(prefix, now);
-    console.log(`Fetched data for prefix ${prefix}:`, JSON.stringify(validData, null, 2));
+    cacheTimestamps.set(prefix, Date.now());
+    
     return validData;
   } catch (error) {
     console.error(`Error fetching data for prefix ${prefix}:`, error);
+    // Return cached data as fallback if available
+    if (cache.has(prefix)) {
+      console.log(`[${new Date().toISOString()}] Using cached data as fallback for ${prefix} due to fetch error`);
+      return cache.get(prefix);
+    }
     return [];
   }
 }
@@ -424,10 +631,16 @@ app.get('/retrieve/:accountHolder/:competitor', async (req, res) => {
 
   try {
     const data = await fetchDataForModule(accountHolder, `competitor_analysis/{username}/${competitor}`, forceRefresh);
-    console.log(`Returning data for ${accountHolder}/${competitor}:`, JSON.stringify(data, null, 2));
+    console.log(`Returning data for ${accountHolder}/${competitor}`);
     res.json(data);
   } catch (error) {
     console.error(`Retrieve endpoint error for ${accountHolder}/${competitor}:`, error);
+    // Try to use cached data as fallback if available
+    const prefix = `competitor_analysis/${accountHolder}/${competitor}`;
+    if (cache.has(prefix)) {
+      console.log(`[${new Date().toISOString()}] Using cached data as fallback for ${prefix} due to fetch error`);
+      return res.json(cache.get(prefix));
+    }
     res.status(500).json({ error: 'Error retrieving data', details: error.message });
   }
 });
@@ -446,8 +659,19 @@ app.get('/retrieve-multiple/:accountHolder', async (req, res) => {
   try {
     const results = await Promise.all(
       competitors.map(async (competitor) => {
-        const data = await fetchDataForModule(accountHolder, `competitor_analysis/{username}/${competitor}`, forceRefresh);
-        return { competitor, data };
+        try {
+          const data = await fetchDataForModule(accountHolder, `competitor_analysis/{username}/${competitor}`, forceRefresh);
+          return { competitor, data };
+        } catch (error) {
+          console.error(`Error fetching data for ${accountHolder}/${competitor}:`, error);
+          // Try to use cached data as fallback
+          const prefix = `competitor_analysis/${accountHolder}/${competitor}`;
+          if (cache.has(prefix)) {
+            console.log(`[${new Date().toISOString()}] Using cached data as fallback for ${prefix}`);
+            return { competitor, data: cache.get(prefix) };
+          }
+          return { competitor, data: [], error: error.message };
+        }
       })
     );
     res.json(results);
@@ -470,6 +694,17 @@ app.get('/retrieve-strategies/:accountHolder', async (req, res) => {
     }
   } catch (error) {
     console.error(`Retrieve strategies endpoint error for ${accountHolder}:`, error);
+    
+    // Try to use cached data as fallback
+    const prefix = `recommendations/${accountHolder}`;
+    if (cache.has(prefix)) {
+      console.log(`[${new Date().toISOString()}] Using cached recommendations as fallback for ${accountHolder}`);
+      const cachedData = cache.get(prefix);
+      if (cachedData && cachedData.length > 0) {
+        return res.json(cachedData);
+      }
+    }
+    
     if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
       res.status(404).json({ error: 'Data not ready yet' });
     } else {
@@ -491,6 +726,17 @@ app.get('/retrieve-engagement-strategies/:accountHolder', async (req, res) => {
     }
   } catch (error) {
     console.error(`Retrieve engagement strategies endpoint error for ${accountHolder}:`, error);
+    
+    // Try to use cached data as fallback
+    const prefix = `engagement_strategies/${accountHolder}`;
+    if (cache.has(prefix)) {
+      console.log(`[${new Date().toISOString()}] Using cached engagement strategies as fallback for ${accountHolder}`);
+      const cachedData = cache.get(prefix);
+      if (cachedData && cachedData.length > 0) {
+        return res.json(cachedData);
+      }
+    }
+    
     if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
       res.status(404).json({ error: 'Data not ready yet' });
     } else {
@@ -512,6 +758,17 @@ app.get('/news-for-you/:accountHolder', async (req, res) => {
     }
   } catch (error) {
     console.error(`Retrieve news endpoint error for ${accountHolder}:`, error);
+    
+    // Try to use cached data as fallback
+    const prefix = `NewForYou/${accountHolder}`;
+    if (cache.has(prefix)) {
+      console.log(`[${new Date().toISOString()}] Using cached news as fallback for ${accountHolder}`);
+      const cachedData = cache.get(prefix);
+      if (cachedData && cachedData.length > 0) {
+        return res.json(cachedData);
+      }
+    }
+    
     if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
       res.status(404).json({ error: 'Data not ready yet' });
     } else {
@@ -655,6 +912,14 @@ app.get('/responses/:username', async (req, res) => {
     res.json(data);
   } catch (error) {
     console.error(`Retrieve responses error for ${username}:`, error);
+    
+    // Try to use cached data as fallback if available
+    const prefix = `queries/${username}`;
+    if (cache.has(prefix)) {
+      console.log(`[${new Date().toISOString()}] Using cached responses as fallback for ${username}`);
+      return res.json(cache.get(prefix));
+    }
+    
     res.status(500).json({ error: 'Error retrieving responses', details: error.message });
   }
 });
@@ -713,49 +978,66 @@ app.get('/retrieve-account-info/:username', async (req, res) => {
 
   try {
     let data;
-    if (cache.has(prefix)) {
-      console.log(`Cache hit for account info: ${prefix}`);
+    
+    // Check if we should use cache
+    if (shouldUseCache(prefix)) {
+      console.log(`[${new Date().toISOString()}] Cache hit for account info: ${prefix}`);
       const cachedData = cache.get(prefix);
-      data = cachedData.find(item => item.key === key)?.data;
-    }
-
-    if (!data) {
-      try {
-        const getCommand = new GetObjectCommand({
-          Bucket: 'tasks',
-          Key: key,
-        });
-        const response = await s3Client.send(getCommand);
-        const body = await streamToString(response.Body);
-
-        if (!body || body.trim() === '') {
-          console.warn(`Empty file detected at ${key}, returning default account info`);
-          data = { username: normalizedUsername, accountType: '', postingStyle: '', competitors: [], timestamp: new Date().toISOString() };
-        } else {
-          data = JSON.parse(body);
-          if (!data.competitors || !Array.isArray(data.competitors)) {
-            console.warn(`Invalid competitors array in ${key}, setting to empty array`);
-            data.competitors = [];
-          }
-        }
-
-        cache.set(prefix, [{ key, data }]);
-        cacheTimestamps.set(prefix, Date.now());
-      } catch (error) {
-        if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
-          console.log(`Account info not found for ${key}, returning default account info`);
-          data = { username: normalizedUsername, accountType: '', postingStyle: '', competitors: [], timestamp: new Date().toISOString() };
-          cache.set(prefix, [{ key, data }]);
-          cacheTimestamps.set(prefix, Date.now());
-        } else {
-          throw error;
-        }
+      data = cachedData?.find(item => item.key === key)?.data;
+      
+      if (data) {
+        console.log(`[${new Date().toISOString()}] Returning cached account info for ${normalizedUsername}`);
+        return res.json(data);
       }
     }
 
-    console.log(`Returning account info for ${normalizedUsername}:`, JSON.stringify(data, null, 2));
+    // If not in cache or cache invalid, fetch from R2
+    console.log(`[${new Date().toISOString()}] Fetching account info from R2: ${key}`);
+    try {
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: key,
+      });
+      const response = await s3Client.send(getCommand);
+      const body = await streamToString(response.Body);
+
+      if (!body || body.trim() === '') {
+        console.warn(`Empty file detected at ${key}, returning default account info`);
+        data = { username: normalizedUsername, accountType: '', postingStyle: '', competitors: [], timestamp: new Date().toISOString() };
+      } else {
+        data = JSON.parse(body);
+        if (!data.competitors || !Array.isArray(data.competitors)) {
+          console.warn(`Invalid competitors array in ${key}, setting to empty array`);
+          data.competitors = [];
+        }
+      }
+
+      cache.set(prefix, [{ key, data }]);
+      cacheTimestamps.set(prefix, Date.now());
+    } catch (error) {
+      if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+        console.log(`Account info not found for ${key}, returning default account info`);
+        data = { username: normalizedUsername, accountType: '', postingStyle: '', competitors: [], timestamp: new Date().toISOString() };
+        cache.set(prefix, [{ key, data }]);
+        cacheTimestamps.set(prefix, Date.now());
+      } else {
+        throw error;
+      }
+    }
+
+    console.log(`[${new Date().toISOString()}] Returning account info for ${normalizedUsername}`);
     res.json(data);
   } catch (error) {
+    // Try cached version as fallback if available (even if expired)
+    if (cache.has(prefix)) {
+      console.log(`[${new Date().toISOString()}] Using cached account info as fallback for ${normalizedUsername}`);
+      const cachedData = cache.get(prefix);
+      const cachedAccountInfo = cachedData?.find(item => item.key === key)?.data;
+      if (cachedAccountInfo) {
+        return res.json(cachedAccountInfo);
+      }
+    }
+    
     console.error(`Error retrieving account info for ${key}:`, error.message);
     res.status(500).json({ error: 'Failed to retrieve account info', details: error.message });
   }
@@ -767,20 +1049,13 @@ app.get('/posts/:username', async (req, res) => {
   const prefix = `ready_post/${username}/`;
 
   try {
-    const now = Date.now();
-    const lastFetch = cacheTimestamps.get(prefix) || 0;
-
-    if (!forceRefresh && cache.has(prefix)) {
-      console.log(`Cache hit for posts: ${prefix}`);
+    // Check if we should use cache based on PostCooked TTL config (3 hours)
+    if (!forceRefresh && shouldUseCache(prefix)) {
+      console.log(`[${new Date().toISOString()}] Serving posts from cache for ${username}`);
       return res.json(cache.get(prefix));
     }
 
-    if (!forceRefresh && now - lastFetch < THROTTLE_INTERVAL) {
-      console.log(`Throttled fetch for posts: ${prefix}`);
-      return res.json(cache.has(prefix) ? cache.get(prefix) : []);
-    }
-
-    console.log(`Fetching posts from R2 for prefix: ${prefix}`);
+    console.log(`[${new Date().toISOString()}] Fetching posts from R2 for prefix: ${prefix}`);
     const listCommand = new ListObjectsV2Command({
       Bucket: 'tasks',
       Prefix: prefix,
@@ -802,7 +1077,7 @@ app.get('/posts/:username', async (req, res) => {
           const body = await streamToString(data.Body);
 
           if (!body || body.trim() === '') {
-            console.warn(`Empty file detected at ${file.Key}, skipping...`);
+            console.warn(`[${new Date().toISOString()}] Empty file detected at ${file.Key}, skipping...`);
             return null;
           }
 
@@ -814,7 +1089,7 @@ app.get('/posts/:username', async (req, res) => {
 
           const imageFile = imageFiles.find(img => img.Key === `${prefix}image_${postId}.jpg`);
           if (!imageFile) {
-            console.warn(`No matching image found for post ${file.Key}, skipping...`);
+            console.warn(`[${new Date().toISOString()}] No matching image found for post ${file.Key}, skipping...`);
             return null;
           }
 
@@ -832,19 +1107,29 @@ app.get('/posts/:username', async (req, res) => {
             },
           };
         } catch (error) {
-          console.error(`Failed to process post ${file.Key}:`, error.message);
+          console.error(`[${new Date().toISOString()}] Failed to process post ${file.Key}:`, error.message);
           return null;
         }
       })
     );
 
     const validPosts = posts.filter(post => post !== null);
+    
+    // Update cache with PostCooked TTL (3 hours)
     cache.set(prefix, validPosts);
-    cacheTimestamps.set(prefix, now);
-    console.log(`Returning posts for ${username}:`, JSON.stringify(validPosts, null, 2));
+    cacheTimestamps.set(prefix, Date.now());
+    
+    console.log(`[${new Date().toISOString()}] Returning ${validPosts.length} posts for ${username}`);
     res.json(validPosts);
   } catch (error) {
-    console.error(`Retrieve posts error for ${username}:`, error);
+    console.error(`[${new Date().toISOString()}] Retrieve posts error for ${username}:`, error);
+    
+    // Fallback to cache if available
+    if (cache.has(prefix)) {
+      console.log(`[${new Date().toISOString()}] Using cached posts as fallback for ${username}`);
+      return res.json(cache.get(prefix));
+    }
+    
     res.status(500).json({ error: 'Error retrieving posts', details: error.message });
   }
 });
@@ -1038,7 +1323,7 @@ app.get('/webhook/instagram', (req, res) => {
   }
 });
 
-// Webhook Receiver
+// Webhook Receiver - Enhanced with real-time event propagation
 app.post('/webhook/instagram', async (req, res) => {
   const body = req.body;
 
@@ -1054,7 +1339,36 @@ app.post('/webhook/instagram', async (req, res) => {
       const igGraphId = entry.id;
       console.log(`[${new Date().toISOString()}] Processing entry for IG Graph ID: ${igGraphId}`);
 
-      // Handle Direct Messages
+      // Find username associated with this igGraphId for event broadcasting
+      let targetUsername = null;
+      try {
+        const listCommand = new ListObjectsV2Command({
+          Bucket: 'tasks',
+          Prefix: `InstagramTokens/`,
+        });
+        const { Contents } = await s3Client.send(listCommand);
+        if (Contents) {
+          for (const obj of Contents) {
+            if (obj.Key.endsWith('/token.json')) {
+              const getCommand = new GetObjectCommand({
+                Bucket: 'tasks',
+                Key: obj.Key,
+              });
+              const data = await s3Client.send(getCommand);
+              const json = await data.Body.transformToString();
+              const token = JSON.parse(json);
+              if (token.instagram_graph_id === igGraphId && token.username) {
+                targetUsername = token.username;
+                break;
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error(`[${new Date().toISOString()}] Error finding username for graph ID ${igGraphId}:`, err.message);
+      }
+
+      // Handle Direct Messages with improved event broadcasting
       if (Array.isArray(entry.messaging)) {
         for (const msg of entry.messaging) {
           if (!msg.message?.text || msg.message.is_echo) {
@@ -1070,7 +1384,7 @@ app.post('/webhook/instagram', async (req, res) => {
             text: msg.message.text,
             timestamp: msg.timestamp,
             received_at: new Date().toISOString(),
-            username: 'unknown',
+            username: targetUsername || 'unknown',
             status: 'pending'
           };
 
@@ -1085,18 +1399,29 @@ app.post('/webhook/instagram', async (req, res) => {
 
           console.log(`[${new Date().toISOString()}] Stored DM in R2 at ${key}`);
 
-          const clients = sseClients[igGraphId] || [];
-          console.log(`[${new Date().toISOString()}] SSE clients for ${igGraphId}: ${clients.length}`);
-          if (clients.length) {
-            console.log(`[${new Date().toISOString()}] Broadcasting DM to ${clients.length} SSE client(s)`);
-            clients.forEach(client => {
-              client.write(`data: ${JSON.stringify({ event: 'message', data: eventData })}\n\n`);
+          // Broadcast update using enhanced system - by both graph ID and username
+          broadcastUpdate(igGraphId, { 
+            event: 'message', 
+            data: eventData,
+            timestamp: Date.now() 
+          });
+          
+          // Also broadcast to username clients if available
+          if (targetUsername) {
+            broadcastUpdate(targetUsername, { 
+              event: 'message', 
+              data: eventData,
+              timestamp: Date.now() 
             });
           }
+          
+          // Clear any cache for this event type
+          cache.delete(`InstagramEvents/${igGraphId}`);
+          if (targetUsername) cache.delete(`InstagramEvents/${targetUsername}`);
         }
       }
 
-      // Handle Comments
+      // Handle Comments with improved event broadcasting
       if (Array.isArray(entry.changes)) {
         for (const change of entry.changes) {
           if (change.field !== 'comments' || !change.value?.text) {
@@ -1104,7 +1429,7 @@ app.post('/webhook/instagram', async (req, res) => {
             continue;
           }
 
-          let username = 'unknown';
+          let username = targetUsername || 'unknown';
           let tokenData = null;
           for (let attempt = 1; attempt <= 3; attempt++) {
             try {
@@ -1115,7 +1440,7 @@ app.post('/webhook/instagram', async (req, res) => {
                   access_token: tokenData.access_token
                 }
               });
-              username = response.data.username || 'unknown';
+              username = response.data.username || targetUsername || 'unknown';
               console.log(`[${new Date().toISOString()}] Fetched username for comment ${change.value.id}: ${username}`);
               break;
             } catch (error) {
@@ -1150,14 +1475,25 @@ app.post('/webhook/instagram', async (req, res) => {
 
           console.log(`[${new Date().toISOString()}] Stored comment in R2 at ${key}`);
 
-          const clients = sseClients[igGraphId] || [];
-          console.log(`[${new Date().toISOString()}] SSE clients for ${igGraphId}: ${clients.length}`);
-          if (clients.length) {
-            console.log(`[${new Date().toISOString()}] Broadcasting comment to ${clients.length} SSE client(s)`);
-            clients.forEach(client => {
-              client.write(`data: ${JSON.stringify({ event: 'comment', data: eventData })}\n\n`);
+          // Broadcast using enhanced system - by both graph ID and username
+          broadcastUpdate(igGraphId, { 
+            event: 'comment', 
+            data: eventData,
+            timestamp: Date.now() 
+          });
+          
+          // Also broadcast to username clients if available
+          if (targetUsername) {
+            broadcastUpdate(targetUsername, { 
+              event: 'comment', 
+              data: eventData,
+              timestamp: Date.now() 
             });
           }
+          
+          // Clear any cache for this event type
+          cache.delete(`InstagramEvents/${igGraphId}`);
+          if (targetUsername) cache.delete(`InstagramEvents/${targetUsername}`);
         }
       }
     }
@@ -1212,6 +1548,7 @@ app.post('/send-dm-reply/:userId', async (req, res) => {
   }
 
   try {
+    // Find token data
     const listCommand = new ListObjectsV2Command({
       Bucket: 'tasks',
       Prefix: `InstagramTokens/`,
@@ -1219,6 +1556,7 @@ app.post('/send-dm-reply/:userId', async (req, res) => {
     const { Contents } = await s3Client.send(listCommand);
 
     let tokenData = null;
+    let username = null;
     if (Contents) {
       for (const obj of Contents) {
         if (obj.Key.endsWith('/token.json')) {
@@ -1231,6 +1569,7 @@ app.post('/send-dm-reply/:userId', async (req, res) => {
           const token = JSON.parse(json);
           if (token.instagram_user_id === userId) {
             tokenData = token;
+            username = token.username;
             break;
           }
         }
@@ -1245,6 +1584,7 @@ app.post('/send-dm-reply/:userId', async (req, res) => {
     const access_token = tokenData.access_token;
     const instagram_graph_id = tokenData.instagram_graph_id;
 
+    // Send the DM reply
     const response = await axios({
       method: 'post',
       url: `https://graph.instagram.com/v22.0/${instagram_graph_id}/messages`,
@@ -1279,6 +1619,23 @@ app.post('/send-dm-reply/:userId', async (req, res) => {
         ContentType: 'application/json',
       }));
       console.log(`[${new Date().toISOString()}] Updated DM status to replied at ${messageKey}`);
+      
+      // Invalidate cache for this module
+      cache.delete(`InstagramEvents/${userId}`);
+      if (username) cache.delete(`InstagramEvents/${username}`);
+      
+      // Broadcast status update
+      const statusUpdate = {
+        type: 'message_status',
+        message_id,
+        status: 'replied',
+        updated_at: messageData.updated_at,
+        timestamp: Date.now()
+      };
+      
+      broadcastUpdate(userId, { event: 'status_update', data: statusUpdate });
+      if (username) broadcastUpdate(username, { event: 'status_update', data: statusUpdate });
+      
     } catch (error) {
       console.error(`[${new Date().toISOString()}] Error updating DM status:`, error);
     }
@@ -1322,6 +1679,7 @@ app.post('/send-comment-reply/:userId', async (req, res) => {
   }
 
   try {
+    // Find token data
     const listCommand = new ListObjectsV2Command({
       Bucket: 'tasks',
       Prefix: `InstagramTokens/`,
@@ -1329,6 +1687,7 @@ app.post('/send-comment-reply/:userId', async (req, res) => {
     const { Contents } = await s3Client.send(listCommand);
 
     let tokenData = null;
+    let username = null;
     if (Contents) {
       for (const obj of Contents) {
         if (obj.Key.endsWith('/token.json')) {
@@ -1341,6 +1700,7 @@ app.post('/send-comment-reply/:userId', async (req, res) => {
           const token = JSON.parse(json);
           if (token.instagram_user_id === userId) {
             tokenData = token;
+            username = token.username;
             break;
           }
         }
@@ -1354,6 +1714,7 @@ app.post('/send-comment-reply/:userId', async (req, res) => {
 
     const access_token = tokenData.access_token;
 
+    // Send the comment reply
     const response = await axios({
       method: 'post',
       url: `https://graph.instagram.com/v22.0/${comment_id}/replies`,
@@ -1387,6 +1748,23 @@ app.post('/send-comment-reply/:userId', async (req, res) => {
         ContentType: 'application/json',
       }));
       console.log(`[${new Date().toISOString()}] Updated comment status to replied at ${commentKey}`);
+      
+      // Invalidate cache
+      cache.delete(`InstagramEvents/${userId}`);
+      if (username) cache.delete(`InstagramEvents/${username}`);
+      
+      // Broadcast status update
+      const statusUpdate = {
+        type: 'comment_status',
+        comment_id,
+        status: 'replied',
+        updated_at: commentData.updated_at,
+        timestamp: Date.now()
+      };
+      
+      broadcastUpdate(userId, { event: 'status_update', data: statusUpdate });
+      if (username) broadcastUpdate(username, { event: 'status_update', data: statusUpdate });
+      
     } catch (error) {
       console.error(`[${new Date().toISOString()}] Error updating comment status:`, error);
     }
@@ -1429,10 +1807,40 @@ app.post('/ignore-notification/:userId', async (req, res) => {
   }
 
   try {
+    // Find username if available
+    let username = null;
+    try {
+      const listCommand = new ListObjectsV2Command({
+        Bucket: 'tasks',
+        Prefix: `InstagramTokens/`,
+      });
+      const { Contents } = await s3Client.send(listCommand);
+      if (Contents) {
+        for (const obj of Contents) {
+          if (obj.Key.endsWith('/token.json')) {
+            const getCommand = new GetObjectCommand({
+              Bucket: 'tasks',
+              Key: obj.Key,
+            });
+            const data = await s3Client.send(getCommand);
+            const json = await data.Body.transformToString();
+            const token = JSON.parse(json);
+            if (token.instagram_user_id === userId) {
+              username = token.username;
+              break;
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error(`[${new Date().toISOString()}] Error finding username for user ID ${userId}:`, err.message);
+    }
+    
     const fileKey = message_id 
       ? `InstagramEvents/${userId}/${message_id}.json`
       : `InstagramEvents/${userId}/comment_${comment_id}.json`;
 
+    let updatedItem;
     try {
       const getCommand = new GetObjectCommand({
         Bucket: 'tasks',
@@ -1442,6 +1850,7 @@ app.post('/ignore-notification/:userId', async (req, res) => {
       const notifData = JSON.parse(await data.Body.transformToString());
       notifData.status = 'ignored';
       notifData.updated_at = new Date().toISOString();
+      updatedItem = notifData;
 
       await s3Client.send(new PutObjectCommand({
         Bucket: 'tasks',
@@ -1450,6 +1859,23 @@ app.post('/ignore-notification/:userId', async (req, res) => {
         ContentType: 'application/json',
       }));
       console.log(`[${new Date().toISOString()}] Updated notification status to ignored at ${fileKey}`);
+      
+      // Invalidate cache
+      cache.delete(`InstagramEvents/${userId}`);
+      if (username) cache.delete(`InstagramEvents/${username}`);
+      
+      // Broadcast status update
+      const statusUpdate = {
+        type: message_id ? 'message_status' : 'comment_status',
+        [message_id ? 'message_id' : 'comment_id']: message_id || comment_id,
+        status: 'ignored',
+        updated_at: notifData.updated_at,
+        timestamp: Date.now()
+      };
+      
+      broadcastUpdate(userId, { event: 'status_update', data: statusUpdate });
+      if (username) broadcastUpdate(username, { event: 'status_update', data: statusUpdate });
+      
     } catch (error) {
       if (error.name === 'NoSuchKey') {
         console.log(`[${new Date().toISOString()}] Notification file not found at ${fileKey}, proceeding`);
@@ -1458,7 +1884,7 @@ app.post('/ignore-notification/:userId', async (req, res) => {
       }
     }
 
-    res.json({ success: true });
+    res.json({ success: true, updated: !!updatedItem });
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Error ignoring notification:`, error.message || error);
     res.status(500).json({ error: 'Failed to ignore notification', details: error.message || 'Unknown error' });
@@ -1471,32 +1897,48 @@ app.get('/events-list/:userId', async (req, res) => {
   const userId = req.params.userId;
 
   try {
+    // Real-time data should never be cached
+    const prefix = `InstagramEvents/${userId}/`;
+    console.log(`[${new Date().toISOString()}] Fetching fresh events list for user ${userId}`);
+    
     const listCommand = new ListObjectsV2Command({
       Bucket: 'tasks',
-      Prefix: `InstagramEvents/${userId}/`
+      Prefix: prefix
     });
     const { Contents } = await s3Client.send(listCommand);
 
     const events = [];
     if (Contents) {
-      for (const obj of Contents) {
+      await Promise.all(Contents.map(async (obj) => {
         // Only process .json files and skip replies
-        if (!obj.Key.endsWith('.json')) continue;
-        if (obj.Key.includes('reply_') || obj.Key.includes('comment_reply_')) continue;
-        const getCommand = new GetObjectCommand({
-          Bucket: 'tasks',
-          Key: obj.Key
-        });
-        const { Body } = await s3Client.send(getCommand);
-        const data = await Body.transformToString();
-        const event = JSON.parse(data);
-        if (event.status === 'pending') {
-          events.push(event);
+        if (!obj.Key.endsWith('.json')) return;
+        if (obj.Key.includes('reply_') || obj.Key.includes('comment_reply_')) return;
+        
+        try {
+          const getCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: obj.Key
+          });
+          const { Body } = await s3Client.send(getCommand);
+          const data = await Body.transformToString();
+          const event = JSON.parse(data);
+          if (event.status === 'pending') {
+            events.push(event);
+          }
+        } catch (error) {
+          console.error(`[${new Date().toISOString()}] Error processing event file ${obj.Key}:`, error.message);
         }
-      }
+      }));
     }
 
-    console.log(`[${new Date().toISOString()}] Retrieved ${events.length} pending events for user ${userId}:`, events.map(e => ({ id: e.message_id || e.comment_id, type: e.type, status: e.status })));
+    // Sort events by timestamp (newest first)
+    events.sort((a, b) => {
+      const timeA = a.timestamp || Date.parse(a.received_at);
+      const timeB = b.timestamp || Date.parse(b.received_at);
+      return timeB - timeA;
+    });
+
+    console.log(`[${new Date().toISOString()}] Retrieved ${events.length} pending events for user ${userId}`);
     res.json(events);
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Error retrieving events for user ${userId}:`, error);
@@ -2979,4 +3421,588 @@ app.get('/check-username-availability/:username', async (req, res) => {
       details: error.message 
     });
   }
+});
+
+// Configure cache warmup for frequently accessed paths on startup
+async function warmupCacheForActiveUsers() {
+  try {
+    console.log(`[${new Date().toISOString()}] Starting cache warmup for active users...`);
+    
+    // Get recently active users
+    const usernamesData = await getExistingData();
+    if (usernamesData.length === 0) {
+      console.log(`[${new Date().toISOString()}] No users found for cache warmup`);
+      return;
+    }
+    
+    // Sort by most recent activity and take top 5
+    const recentUsers = usernamesData
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      .slice(0, 5)
+      .map(entry => entry.username);
+    
+    console.log(`[${new Date().toISOString()}] Warming up cache for users: ${recentUsers.join(', ')}`);
+    
+    // Warm up cache for each recent user
+    for (const username of recentUsers) {
+      // Warm up critical modules (non-blocking)
+      Promise.all([
+        fetchDataForModule(username, 'ProfileInfo/{username}'),
+        fetchDataForModule(username, 'ready_post/{username}'),
+        fetchDataForModule(username, 'recommendations/{username}'),
+        fetchDataForModule(username, 'NewForYou/{username}')
+      ]).catch(err => {
+        console.error(`[${new Date().toISOString()}] Error during cache warmup for ${username}:`, err.message);
+      });
+    }
+    
+    console.log(`[${new Date().toISOString()}] Cache warmup initiated for ${recentUsers.length} users`);
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error during cache warmup:`, error);
+  }
+}
+
+// Add cache warmup on server start
+setTimeout(warmupCacheForActiveUsers, 5000); // Wait 5 seconds after server start to begin warmup
+
+// Add cache metrics and monitoring
+function scheduleCacheMetricsReporting() {
+  setInterval(() => {
+    const now = Date.now();
+    const metrics = {
+      timestamp: new Date().toISOString(),
+      cacheSize: cache.size,
+      hitRatios: {},
+      moduleStats: {},
+      totalHits: 0,
+      totalMisses: 0,
+      activeConnections: 0
+    };
+    
+    // Calculate hit ratios by prefix
+    for (const [prefix, hits] of cacheHits.entries()) {
+      const misses = cacheMisses.get(prefix) || 0;
+      const total = hits + misses;
+      if (total > 0) {
+        metrics.hitRatios[prefix] = (hits / total * 100).toFixed(2);
+        metrics.totalHits += hits;
+        metrics.totalMisses += misses;
+      }
+    }
+    
+    // Calculate module statistics
+    const moduleUsage = {};
+    for (const [prefix, timestamp] of cacheTimestamps.entries()) {
+      const moduleName = prefix.split('/')[0];
+      const config = MODULE_CACHE_CONFIG[moduleName] || CACHE_CONFIG.STANDARD;
+      
+      if (!moduleUsage[moduleName]) {
+        moduleUsage[moduleName] = { count: 0, avgAge: 0, oldest: 0, newest: Infinity };
+      }
+      
+      moduleUsage[moduleName].count++;
+      const age = now - timestamp;
+      moduleUsage[moduleName].avgAge = 
+        (moduleUsage[moduleName].avgAge * (moduleUsage[moduleName].count - 1) + age) / 
+        moduleUsage[moduleName].count;
+      moduleUsage[moduleName].oldest = Math.max(moduleUsage[moduleName].oldest, age);
+      moduleUsage[moduleName].newest = Math.min(moduleUsage[moduleName].newest, age);
+    }
+    
+    // Convert to readable format
+    for (const [moduleName, stats] of Object.entries(moduleUsage)) {
+      metrics.moduleStats[moduleName] = {
+        count: stats.count,
+        avgAge: `${(stats.avgAge / 1000).toFixed(1)}s`,
+        oldest: `${(stats.oldest / 1000).toFixed(1)}s`,
+        newest: `${(stats.newest / 1000).toFixed(1)}s`,
+        ttl: `${((MODULE_CACHE_CONFIG[moduleName] || CACHE_CONFIG.STANDARD).TTL / 1000 / 60).toFixed(1)}m`
+      };
+    }
+    
+    // Count active SSE connections
+    let totalConnections = 0;
+    for (const [username, clients] of sseClients.entries()) {
+      totalConnections += clients.length;
+    }
+    metrics.activeConnections = totalConnections;
+    
+    // Overall hit ratio
+    if (metrics.totalHits + metrics.totalMisses > 0) {
+      metrics.overallHitRatio = (metrics.totalHits / (metrics.totalHits + metrics.totalMisses) * 100).toFixed(2);
+    } else {
+      metrics.overallHitRatio = "N/A";
+    }
+    
+    console.log(`[${new Date().toISOString()}] CACHE METRICS: ${JSON.stringify(metrics, null, 2)}`);
+  }, 5 * 60 * 1000); // Report every 5 minutes
+  
+  console.log(`[${new Date().toISOString()}] Cache metrics reporting scheduler started`);
+}
+
+// Start cache metrics reporting
+scheduleCacheMetricsReporting();
+
+// Enhanced connection monitor for SSE 
+function scheduleConnectionHealthCheck() {
+  setInterval(() => {
+    const now = Date.now();
+    console.log(`[${new Date().toISOString()}] Running SSE connection health check...`);
+    
+    let totalConnections = 0;
+    let staleConnections = 0;
+    let activeConnections = 0;
+    
+    sseClients.forEach((clients, username) => {
+      totalConnections += clients.length;
+      
+      clients.forEach(client => {
+        const lastActivity = activeConnections.get(client) || 0;
+        const connectionAge = now - lastActivity;
+        
+        if (connectionAge > SSE_RECONNECT_TIMEOUT) {
+          staleConnections++;
+        } else {
+          activeConnections++;
+          
+          // Send a ping to confirm connection is still alive
+          try {
+            client.write(`data: ${JSON.stringify({ 
+              type: 'ping', 
+              timestamp: now,
+              message: 'Connection check' 
+            })}\n\n`);
+            
+            // Update last activity timestamp
+            activeConnections.set(client, now);
+          } catch (err) {
+            console.error(`[${new Date().toISOString()}] Error pinging client for ${username}:`, err.message);
+            staleConnections++;
+          }
+        }
+      });
+    });
+    
+    console.log(`[${new Date().toISOString()}] SSE HEALTH: Total=${totalConnections}, Active=${activeConnections}, Stale=${staleConnections}`);
+  }, 60 * 1000); // Check every minute
+  
+  console.log(`[${new Date().toISOString()}] SSE connection health check scheduler started`);
+}
+
+// Start connection health check
+scheduleConnectionHealthCheck();
+
+// Enhance event streaming with reconnection support and event persistence for missed updates
+app.get('/events-missed/:username', async (req, res) => {
+  const { username } = req.params;
+  const { since } = req.query;
+  let sinceTimestamp = 0;
+  
+  // Validate 'since' timestamp
+  if (since) {
+    try {
+      sinceTimestamp = parseInt(since);
+      if (isNaN(sinceTimestamp) || sinceTimestamp <= 0) {
+        sinceTimestamp = Date.now() - (15 * 60 * 1000); // Default to last 15 minutes
+      }
+    } catch (e) {
+      sinceTimestamp = Date.now() - (15 * 60 * 1000); // Default to last 15 minutes
+    }
+  } else {
+    sinceTimestamp = Date.now() - (15 * 60 * 1000); // Default to last 15 minutes
+  }
+  
+  console.log(`[${new Date().toISOString()}] Fetching missed events for ${username} since ${new Date(sinceTimestamp).toISOString()}`);
+  
+  try {
+    setCorsHeaders(res);
+    
+    // Find associated Instagram graph ID if available
+    let userId = null;
+    try {
+      const listCommand = new ListObjectsV2Command({
+        Bucket: 'tasks',
+        Prefix: `InstagramTokens/`,
+      });
+      const { Contents } = await s3Client.send(listCommand);
+      if (Contents) {
+        for (const obj of Contents) {
+          if (obj.Key.endsWith('/token.json')) {
+            const getCommand = new GetObjectCommand({
+              Bucket: 'tasks',
+              Key: obj.Key,
+            });
+            const data = await s3Client.send(getCommand);
+            const json = await data.Body.transformToString();
+            const token = JSON.parse(json);
+            if (token.username === username) {
+              userId = token.instagram_user_id;
+              break;
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error(`[${new Date().toISOString()}] Error finding user ID for username ${username}:`, err.message);
+    }
+    
+    // Prepare arrays to hold events
+    const missedEvents = [];
+    
+    // Check for missed events in InstagramEvents for both username and userId
+    const checkPaths = [];
+    if (username) checkPaths.push(`InstagramEvents/${username}/`);
+    if (userId) checkPaths.push(`InstagramEvents/${userId}/`);
+    
+    // Process each path
+    for (const prefix of checkPaths) {
+      const listCommand = new ListObjectsV2Command({
+        Bucket: 'tasks',
+        Prefix: prefix,
+      });
+      
+      try {
+        const { Contents } = await s3Client.send(listCommand);
+        if (Contents && Contents.length > 0) {
+          // Process files concurrently
+          await Promise.all(Contents.map(async (obj) => {
+            // Skip non-event files
+            if (!obj.Key.endsWith('.json') || obj.Key.includes('reply_')) return;
+            
+            try {
+              const getCommand = new GetObjectCommand({
+                Bucket: 'tasks',
+                Key: obj.Key,
+              });
+              const data = await s3Client.send(getCommand);
+              const json = await data.Body.transformToString();
+              const event = JSON.parse(json);
+              
+              // Check if the event is newer than the requested timestamp
+              const eventTime = event.timestamp || Date.parse(event.received_at || event.updated_at);
+              if (eventTime > sinceTimestamp) {
+                missedEvents.push({
+                  type: event.type,
+                  data: event,
+                  timestamp: eventTime
+                });
+              }
+            } catch (error) {
+              console.error(`[${new Date().toISOString()}] Error reading event file ${obj.Key}:`, error.message);
+            }
+          }));
+        }
+      } catch (error) {
+        console.error(`[${new Date().toISOString()}] Error listing events for ${prefix}:`, error.message);
+      }
+    }
+    
+    // Sort events by timestamp (newest first)
+    missedEvents.sort((a, b) => b.timestamp - a.timestamp);
+    
+    // Return as JSON response (not SSE)
+    console.log(`[${new Date().toISOString()}] Returning ${missedEvents.length} missed events for ${username}`);
+    res.json({
+      username,
+      userId,
+      since: sinceTimestamp,
+      sinceDate: new Date(sinceTimestamp).toISOString(),
+      now: Date.now(),
+      events: missedEvents
+    });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error retrieving missed events for ${username}:`, error.message);
+    res.status(500).json({ 
+      error: 'Failed to retrieve missed events',
+      message: error.message
+    });
+  }
+});
+
+// Add endpoint for getting cache stats
+app.get('/api/system/cache-stats', (req, res) => {
+  setCorsHeaders(res);
+  
+  const now = Date.now();
+  const stats = {
+    timestamp: new Date().toISOString(),
+    cacheEntries: cache.size,
+    modules: {},
+    hitRatios: {},
+    sseConnections: {}
+  };
+  
+  // Gather module stats
+  for (const [prefix, timestamp] of cacheTimestamps.entries()) {
+    const moduleName = prefix.split('/')[0];
+    const age = now - timestamp;
+    
+    if (!stats.modules[moduleName]) {
+      stats.modules[moduleName] = {
+        count: 0,
+        avgAge: 0,
+        oldestEntry: '',
+        newestEntry: '',
+        ttl: (MODULE_CACHE_CONFIG[moduleName] || CACHE_CONFIG.STANDARD).TTL
+      };
+    }
+    
+    const module = stats.modules[moduleName];
+    module.count++;
+    
+    // Track average age
+    module.avgAge = ((module.avgAge * (module.count - 1)) + age) / module.count;
+    
+    // Track oldest and newest entries
+    if (!module.oldestTime || age > module.oldestTime) {
+      module.oldestTime = age;
+      module.oldestEntry = prefix;
+    }
+    
+    if (!module.newestTime || age < module.newestTime) {
+      module.newestTime = age;
+      module.newestEntry = prefix;
+    }
+  }
+  
+  // Calculate hit ratios
+  for (const [prefix, hits] of cacheHits.entries()) {
+    const misses = cacheMisses.get(prefix) || 0;
+    const total = hits + misses;
+    if (total > 0) {
+      stats.hitRatios[prefix] = {
+        hits,
+        misses,
+        ratio: (hits / total)
+      };
+    }
+  }
+  
+  // Count SSE connections
+  for (const [username, clients] of sseClients.entries()) {
+    stats.sseConnections[username] = clients.length;
+  }
+  
+  res.json(stats);
+});
+
+// Handle disconnections/reconnections more gracefully
+app.get('/events/:username', (req, res) => {
+  const { username } = req.params;
+  const { since } = req.query;
+  let sinceTimestamp = 0;
+  
+  // Parse reconnection timestamp if provided
+  if (since) {
+    try {
+      sinceTimestamp = parseInt(since);
+      if (isNaN(sinceTimestamp) || sinceTimestamp <= 0) {
+        sinceTimestamp = 0;
+      }
+    } catch (e) {
+      sinceTimestamp = 0;
+    }
+  }
+  
+  console.log(`[${new Date().toISOString()}] Handling SSE request for /events/${username} (reconnect since: ${sinceTimestamp || 'new connection'})`);
+
+  // Set headers for SSE
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Type');
+  res.flushHeaders();
+
+  // Generate unique connection ID
+  const connectionId = randomUUID();
+  
+  // Send initial connection confirmation
+  const initialEvent = {
+    type: 'connection',
+    message: `Connected to events for ${username}`,
+    timestamp: Date.now(),
+    connectionId
+  };
+  
+  res.write(`data: ${JSON.stringify(initialEvent)}\n\n`);
+  
+  // Register this client
+  if (!sseClients.has(username)) {
+    sseClients.set(username, []);
+  }
+  
+  const clients = sseClients.get(username);
+  clients.push(res);
+  activeConnections.set(res, Date.now());
+  
+  console.log(`[${new Date().toISOString()}] SSE client connected for ${username}. Total clients: ${clients.length}`);
+
+  // If reconnecting, check for missed events
+  if (sinceTimestamp > 0) {
+    // Send reconnection confirmation
+    res.write(`data: ${JSON.stringify({
+      type: 'reconnection',
+      timestamp: Date.now(),
+      since: sinceTimestamp,
+      sinceDate: new Date(sinceTimestamp).toISOString(),
+      connectionId
+    })}\n\n`);
+    
+    // Non-blocking check for missed events
+    setImmediate(async () => {
+      try {
+        // Find associated Instagram graph ID if available
+        let userId = null;
+        try {
+          const listCommand = new ListObjectsV2Command({
+            Bucket: 'tasks',
+            Prefix: `InstagramTokens/`,
+          });
+          const { Contents } = await s3Client.send(listCommand);
+          if (Contents) {
+            for (const obj of Contents) {
+              if (obj.Key.endsWith('/token.json')) {
+                const getCommand = new GetObjectCommand({
+                  Bucket: 'tasks',
+                  Key: obj.Key,
+                });
+                const data = await s3Client.send(getCommand);
+                const json = await data.Body.transformToString();
+                const token = JSON.parse(json);
+                if (token.username === username) {
+                  userId = token.instagram_user_id;
+                  break;
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.error(`[${new Date().toISOString()}] Error finding user ID for username ${username}:`, err.message);
+        }
+        
+        // Check for missed events in InstagramEvents
+        const checkPaths = [];
+        if (username) checkPaths.push(`InstagramEvents/${username}/`);
+        if (userId) checkPaths.push(`InstagramEvents/${userId}/`);
+        
+        const missedEvents = [];
+        
+        // Process each path
+        for (const prefix of checkPaths) {
+          const listCommand = new ListObjectsV2Command({
+            Bucket: 'tasks',
+            Prefix: prefix,
+          });
+          
+          try {
+            const { Contents } = await s3Client.send(listCommand);
+            if (Contents && Contents.length > 0) {
+              // Find events newer than the reconnection timestamp
+              for (const obj of Contents) {
+                // Skip non-event files and replies
+                if (!obj.Key.endsWith('.json') || obj.Key.includes('reply_')) continue;
+                
+                try {
+                  const getCommand = new GetObjectCommand({
+                    Bucket: 'tasks',
+                    Key: obj.Key,
+                  });
+                  const data = await s3Client.send(getCommand);
+                  const json = await data.Body.transformToString();
+                  const event = JSON.parse(json);
+                  
+                  // Check if the event is newer than the reconnection timestamp
+                  const eventTime = event.timestamp || Date.parse(event.received_at || event.updated_at);
+                  if (eventTime > sinceTimestamp) {
+                    missedEvents.push({
+                      type: event.type === 'message' ? 'message' : 'comment',
+                      data: event,
+                      timestamp: eventTime
+                    });
+                  }
+                } catch (error) {
+                  console.error(`[${new Date().toISOString()}] Error reading event file ${obj.Key}:`, error.message);
+                }
+              }
+            }
+          } catch (error) {
+            console.error(`[${new Date().toISOString()}] Error listing events for ${prefix}:`, error.message);
+          }
+        }
+        
+        // Sort events by timestamp (oldest first) to preserve order
+        missedEvents.sort((a, b) => a.timestamp - b.timestamp);
+        
+        // Send missed events to the client
+        if (missedEvents.length > 0) {
+          console.log(`[${new Date().toISOString()}] Sending ${missedEvents.length} missed events to SSE client for ${username}`);
+          
+          // First send a batch summary
+          res.write(`data: ${JSON.stringify({
+            type: 'missed_events_summary',
+            count: missedEvents.length,
+            since: sinceTimestamp,
+            sinceDate: new Date(sinceTimestamp).toISOString(),
+            timestamp: Date.now(),
+            connectionId
+          })}\n\n`);
+          
+          // Then send each missed event
+          for (const event of missedEvents) {
+            try {
+              res.write(`data: ${JSON.stringify({ 
+                type: 'missed_event',
+                event: event.type,
+                data: event.data,
+                original_timestamp: event.timestamp,
+                timestamp: Date.now(),
+                connectionId
+              })}\n\n`);
+              
+              // Small delay to prevent overwhelming the client
+              await new Promise(resolve => setTimeout(resolve, 50));
+            } catch (err) {
+              console.error(`[${new Date().toISOString()}] Error sending missed event to SSE client:`, err.message);
+              break; // Stop if there's an error
+            }
+          }
+          
+          // Send end of missed events marker
+          res.write(`data: ${JSON.stringify({
+            type: 'missed_events_end',
+            count: missedEvents.length,
+            timestamp: Date.now(),
+            connectionId
+          })}\n\n`);
+        } else {
+          console.log(`[${new Date().toISOString()}] No missed events found for ${username} since ${new Date(sinceTimestamp).toISOString()}`);
+          res.write(`data: ${JSON.stringify({
+            type: 'missed_events_summary',
+            count: 0,
+            timestamp: Date.now(),
+            connectionId
+          })}\n\n`);
+        }
+      } catch (error) {
+        console.error(`[${new Date().toISOString()}] Error checking for missed events:`, error.message);
+      }
+    });
+  }
+  
+  // Setup connection close handler
+  req.on('close', () => {
+    const updatedClients = sseClients.get(username)?.filter(client => client !== res) || [];
+    sseClients.set(username, updatedClients);
+    activeConnections.delete(res);
+    
+    console.log(`[${new Date().toISOString()}] SSE client disconnected for ${username}. Remaining clients: ${updatedClients.length}`);
+    if (updatedClients.length === 0) {
+      console.log(`[${new Date().toISOString()}] No more clients for ${username}, cleaning up`);
+      sseClients.delete(username);
+    }
+  });
 });

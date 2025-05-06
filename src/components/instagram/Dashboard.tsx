@@ -74,11 +74,32 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
   const lastProfilePicRenderTimeRef = useRef<number>(0);
   const [refreshKey, setRefreshKey] = useState(0);
   const { currentUser } = useAuth();
+  const imageRetryAttemptsRef = useRef(0);
+  const maxImageRetryAttempts = 3;
+  const [directProfilePicUrl, setDirectProfilePicUrl] = useState<string | null>(null);
+
+  const tryDirectProfileImageFetch = async (url: string) => {
+    if (!url) return false;
+    
+    try {
+      console.log(`Using proxy endpoint for profile image: ${url.substring(0, 50)}...`);
+      const proxyUrl = `http://localhost:3000/proxy-image?url=${encodeURIComponent(url)}&t=${Date.now()}&nocache=true&forceCors=true&fallback=pixel`;
+      
+      setDirectProfilePicUrl(proxyUrl);
+      setImageError(false);
+      
+      return true;
+    } catch (err) {
+      console.error('Profile pic proxy URL creation error:', err);
+      return false;
+    }
+  };
 
   const fetchProfileInfo = async () => {
     if (!accountHolder) return;
     setProfileLoading(true);
     setProfileError(null);
+    setImageError(false);
     try {
       const now = Date.now();
       if (now - lastProfilePicRenderTimeRef.current < 1800000 && profileInfo) {
@@ -87,9 +108,26 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
         return;
       }
       const response = await axios.get(`http://localhost:3000/profile-info/${accountHolder}?forceRefresh=true`);
-      setProfileInfo(response.data);
+      
+      // Validate profile pic URL data before setting
+      const data = response.data;
+      if (data && data.profilePicUrlHD) {
+        try {
+          // Validate the URL format
+          new URL(data.profilePicUrlHD);
+          
+          // Try direct fetching
+          tryDirectProfileImageFetch(data.profilePicUrlHD);
+        } catch (urlErr) {
+          console.error(`Invalid profilePicUrlHD format: ${data.profilePicUrlHD}`);
+          data.profilePicUrlHD = null; // Clear invalid URL
+        }
+      }
+      
+      setProfileInfo(data);
       lastProfilePicRenderTimeRef.current = now;
-      console.log('Profile Info Fetched:', response.data);
+      imageRetryAttemptsRef.current = 0;
+      console.log('Profile Info Fetched:', data);
     } catch (err: any) {
       if (err.response?.status === 404) {
         setProfileInfo(null);
@@ -613,16 +651,36 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
                 <div className="profile-bar">
                   {profileInfo?.profilePicUrlHD && !imageError ? (
                     <img
-                      src={`http://localhost:3000/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}`}
+                      src={directProfilePicUrl || `http://localhost:3000/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}&nocache=true&forceCors=true&fallback=pixel`}
                       alt={`${accountHolder}'s profile picture`}
                       className="profile-pic-bar"
-                      onError={() => {
-                        console.error(`Failed to load profile picture for ${accountHolder}`);
-                        setImageError(true);
+                      onError={(e) => {
+                        console.error(`Failed to load profile picture for ${accountHolder}`, profileInfo.profilePicUrlHD);
+                        
+                        // Try to reload a few times before giving up
+                        if (imageRetryAttemptsRef.current < maxImageRetryAttempts) {
+                          imageRetryAttemptsRef.current++;
+                          console.log(`Retrying profile picture load, attempt ${imageRetryAttemptsRef.current}/${maxImageRetryAttempts}`);
+                          
+                          // Force reload by changing the URL slightly with a timestamp
+                          const imgElement = e.target as HTMLImageElement;
+                          setTimeout(() => {
+                            // Added more robust parameters to ensure we get at least a fallback pixel
+                            imgElement.src = `http://localhost:3000/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}&retry=${imageRetryAttemptsRef.current}&forceCors=true&fallback=pixel`;
+                          }, 1000 * imageRetryAttemptsRef.current); // Increasing delay for each retry
+                        } else {
+                          setImageError(true);
+                        }
                       }}
+                      style={{ objectFit: 'cover' }}
                     />
                   ) : (
-                    <div className="profile-pic-bar" />
+                    <div className="profile-pic-bar">
+                      {/* Fallback content - display initials */}
+                      <div className="profile-pic-fallback">
+                        {profileInfo?.fullName ? profileInfo.fullName.charAt(0).toUpperCase() : accountHolder.charAt(0).toUpperCase()}
+                      </div>
+                    </div>
                   )}
                   <div className="stats">
                     <div className="stat">
@@ -673,8 +731,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
                       Schedule Post
                     </InstagramRequiredButton>
                     
-                    <InstagramRequiredButton
-                      isConnected={!!igBusinessId}
+                    <button
                       onClick={handleOpenGoalModal}
                       className="insta-btn connect"
                       style={{
@@ -688,7 +745,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
                       }}
                     >
                       Goal
-                    </InstagramRequiredButton>
+                    </button>
                   </div>
                 </div>
               )}
@@ -725,7 +782,9 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
           <div className="post-cooked">
             <PostCooked
               username={accountHolder}
-              profilePicUrl={profileInfo?.profilePicUrlHD ? `http://localhost:3000/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}` : ''}
+              profilePicUrl={profileInfo?.profilePicUrlHD ? 
+                directProfilePicUrl || `http://localhost:3000/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}&nocache=true&forceCors=true&fallback=pixel` : 
+                ''}
               posts={posts}
               userId={igBusinessId || undefined}
             />

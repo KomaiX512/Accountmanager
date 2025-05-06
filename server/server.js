@@ -435,26 +435,169 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
   }
 }
 
+// Add OPTIONS handler for proxy-image endpoint
+app.options('/proxy-image', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  res.sendStatus(204);
+});
+
+// Completely revamped proxy-image endpoint to handle Instagram CORS issues
 app.get('/proxy-image', async (req, res) => {
-  let { url } = req.query;
+  let { url, t, fallback } = req.query;
   if (!url) return res.status(400).send('Image URL is required');
+  
   try {
     if (Array.isArray(url)) url = url[0];
     const decodedUrl = decodeURIComponent(url);
-
-    // Fetch the image directly (no puppeteer)
-    const response = await axios.get(decodedUrl, { responseType: 'arraybuffer' });
-    const contentType = response.headers['content-type'];
-    if (!contentType.startsWith('image/')) {
-      console.error(`[proxy-image] URL did not return an image:`, decodedUrl, 'Content-Type:', contentType);
-      return res.status(400).send('URL did not return an image');
+    
+    // Log the request
+    console.log(`[proxy-image] Processing request for: ${decodedUrl.substring(0, 100)}...`);
+    
+    // Check if the URL is from Instagram
+    const isInstagramUrl = decodedUrl.includes('cdninstagram.com') || 
+                          decodedUrl.includes('fbcdn.net') || 
+                          decodedUrl.includes('instagram.com');
+    
+    // If we're dealing with an Instagram URL, store it in a local cache file
+    // to avoid repeated downloads and potential rate limiting
+    let imageData;
+    if (isInstagramUrl) {
+      // Create a unique filename based on the URL hash
+      const crypto = require('crypto');
+      const urlHash = crypto.createHash('md5').update(decodedUrl).digest('hex');
+      const cachePath = `./temp_image_cache/${urlHash}.jpg`;
+      
+      // Ensure temp directory exists
+      const fs = require('fs');
+      try {
+        if (!fs.existsSync('./temp_image_cache')) {
+          fs.mkdirSync('./temp_image_cache', { recursive: true });
+        }
+      } catch (fsError) {
+        console.error('[proxy-image] Error creating cache directory:', fsError);
+      }
+      
+      try {
+        // Check if we have a cached version that's less than 24 hours old
+        if (fs.existsSync(cachePath)) {
+          const stats = fs.statSync(cachePath);
+          const fileAge = Date.now() - stats.mtimeMs;
+          
+          // Use cache if file is less than 24 hours old
+          if (fileAge < 24 * 60 * 60 * 1000) {
+            console.log(`[proxy-image] Using cached image for ${urlHash}`);
+            imageData = fs.readFileSync(cachePath);
+          }
+        }
+      } catch (cacheError) {
+        console.error('[proxy-image] Cache access error:', cacheError);
+      }
+      
+      // If we don't have cached data, download the image
+      if (!imageData) {
+        console.log(`[proxy-image] Downloading Instagram image: ${urlHash}`);
+        
+        // Configure axios with Instagram-friendly headers
+        const config = {
+          responseType: 'arraybuffer',
+          timeout: 15000,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15',
+            'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Referer': 'https://www.instagram.com/',
+            'Origin': 'https://www.instagram.com',
+            'Cache-Control': 'no-cache'
+          }
+        };
+        
+        try {
+          const response = await axios.get(decodedUrl, config);
+          imageData = response.data;
+          
+          // Save to cache
+          try {
+            fs.writeFileSync(cachePath, imageData);
+          } catch (writeError) {
+            console.error('[proxy-image] Cache write error:', writeError);
+          }
+        } catch (downloadError) {
+          console.error('[proxy-image] Download error:', downloadError.message);
+          try {
+            // Try one more time with different User-Agent
+            config.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
+            const retryResponse = await axios.get(decodedUrl, config);
+            imageData = retryResponse.data;
+            
+            // Save to cache
+            try {
+              fs.writeFileSync(cachePath, imageData);
+            } catch (writeError) {
+              console.error('[proxy-image] Cache write error:', writeError);
+            }
+          } catch (retryError) {
+            console.error('[proxy-image] Retry download error:', retryError.message);
+            throw retryError; // Re-throw to trigger fallback
+          }
+        }
+      }
+    } else {
+      // For non-Instagram URLs, just fetch directly
+      const response = await axios.get(decodedUrl, {
+        responseType: 'arraybuffer',
+        timeout: 10000
+      });
+      imageData = response.data;
     }
-    res.set('Content-Type', contentType);
-    res.set('Access-Control-Allow-Origin', '*');
-    res.send(response.data);
+    
+    // Determine content type
+    let contentType = 'image/jpeg'; // Default
+    try {
+      const fileTypeResult = await fileTypeFromBuffer(imageData);
+      if (fileTypeResult && fileTypeResult.mime) {
+        contentType = fileTypeResult.mime;
+      }
+    } catch (typeError) {
+      console.error('[proxy-image] Error detecting file type:', typeError);
+    }
+    
+    // Process the image with Sharp to validate it, potentially resize/optimize if needed
+    try {
+      const sharp = require('sharp');
+      const processedImage = await sharp(imageData)
+        .resize(1000, 1000, { fit: 'inside', withoutEnlargement: true })
+        .toBuffer();
+      
+      // Set response headers
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+      
+      // Send the processed image
+      res.send(processedImage);
+    } catch (sharpError) {
+      console.error('[proxy-image] Image processing error:', sharpError);
+      throw sharpError; // Re-throw to trigger fallback
+    }
   } catch (error) {
-    console.error(`[proxy-image] Failed to proxy image:`, url, error?.response?.status, error?.message);
-    res.status(500).send('Failed to fetch image');
+    console.error('[proxy-image] Error fetching or processing image:', error.message);
+    
+    // If fallback=pixel is specified, return a transparent 1x1 pixel
+    if (fallback === 'pixel') {
+      const transparentPixel = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Content-Type', 'image/gif');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.send(transparentPixel);
+    }
+    
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.status(500).send('Error fetching image');
   }
 });
 

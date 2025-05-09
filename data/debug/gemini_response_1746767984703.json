@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption:\nObsessed is an understatement! 😍 Get ready to slay with our NEW Matte Obsession Eyeshadow Palette. These velvety-smooth, highly pigmented shades are about to become your go-to for creating endless eye looks. ✨ Which shade are you reaching for first?\n\nHashtags:\n#MACMatteObsession #MACEyeshadow #MatteEyeshadow #NewMakeup #MakeupPalette #MACCosmetics #MakeupLover #EyeshadowPalette #MakeupObsessed #Beauty\n\nCall to Action:\nTap the link in bio to shop the Matte Obsession Palette now!\n\nVisual Description for Image:\nThe image is a close-up shot of the new MAC Matte Obsession Eyeshadow Palette. The palette is sleek and black, with the MAC logo subtly embossed on the top. The palette is open, revealing a stunning array of matte eyeshadows in a variety of neutral and warm-toned shades. Colors range from creamy ivory and soft beige to rich browns, terracotta, and a deep charcoal. The eyeshadows are arranged in a neat grid, showcasing their smooth, velvety texture.\n\nThe lighting is soft and diffused, highlighting the pigmentation and depth of each shade without creating harsh shadows. A makeup brush, preferably a fluffy blending brush, is gently resting on the palette, slightly touching a few of the warmer brown shades, suggesting its use. Small specks of eyeshadow dust are subtly visible on the black surface of the palette, indicating that it has been used and loved.\n\nThe background is blurred and out of focus, creating a shallow depth of field that draws the viewer's attention to the palette itself. The overall mood is luxurious, sophisticated, and inviting, emphasizing the high quality and versatility of the product. The image should evoke a feeling of excitement and inspiration, encouraging viewers to experiment with different eye looks. The style is clean and modern, consistent with MAC's brand aesthetic.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.28726022354679404
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 253,
+    "candidatesTokenCount": 386,
+    "totalTokenCount": 639,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 253
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 386
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

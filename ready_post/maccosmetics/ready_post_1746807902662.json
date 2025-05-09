@@ -1,0 +1,26 @@
+{
+  "post": {
+    "caption": "Pucker up, buttercup! 💋 Our iconic lipsticks are here to slay your day, one swipe at a time. Which shade are you rocking today? Tell us in the comments! 👇",
+    "hashtags": [
+      "#MACLipstick",
+      "#MACCosmetics",
+      "#LipstickLover",
+      "#MakeupObsessed",
+      "#BeautyGram",
+      "#LipstickAddict",
+      "#MakeupGoals",
+      "#MACAddict",
+      "#BeautyCommunity",
+      "#PoutPerfection"
+    ],
+    "call_to_action": "Tap the link in bio to shop your perfect shade!",
+    "image_prompt": "A close-up, vibrant, and luxurious image focusing on a selection of MAC lipsticks. The lipsticks are arranged artfully on a reflective, glossy black surface. The lighting is soft and diffused, creating a glamorous and high-end feel. The lipsticks should be a variety of textures (matte, satin, amplified) and colors (a classic red, a bold berry, a nude, and a vibrant pink). The MAC logo should be clearly visible on at least two of the lipstick tubes. The background is slightly blurred to keep the focus on the lipsticks. There are subtle reflections of light on the lipstick tubes and the glossy surface, adding depth and dimension. The composition is clean and modern, with a focus on showcasing the texture and color payoff of the lipsticks. The overall mood is sophisticated, playful, and inviting. The image should evoke a sense of luxury and desire. A few loose, shimmering gold glitter particles are scattered subtly around the base of the lipsticks to add a touch of sparkle and visual interest. The image should be high-resolution and professionally photographed."
+  },
+  "timestamp": 1746807902662,
+  "image_path": "ready_post/maccosmetics/image_1746807902662.jpg",
+  "image_url": "http://localhost:3002/images/maccosmetics/image_1746807902662.jpg",
+  "r2_image_url": "http://localhost:3002/r2-images/maccosmetics/image_1746807902662.jpg",
+  "generated_at": "2025-05-09T16:25:02.971Z",
+  "queryUsed": "create theem aligned post fro me about the lipstick product",
+  "status": "new"
+}

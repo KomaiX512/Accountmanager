@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "eslint .",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "start-server": "cd server && node simple-rag-server.js",
     "start-main": "cd server && node server.js",
@@ -14,7 +14,12 @@
     "start-rag": "node rag-server.js",
     "test-rag": "node scripts/test-rag.js",
     "test-rag-full": "node scripts/test-rag-comprehensive.js",
-    "start-all": "./start-servers.sh"
+    "test-cors": "node test-rag-post.js",
+    "start-all": "chmod +x ./start-servers.sh && ./start-servers.sh",
+    "start-all:node": "node start-servers.js",
+    "start-all:win": "start-servers.bat",
+    "stop-all": "chmod +x ./stop-servers.sh && ./stop-servers.sh",
+    "stop-all:win": "stop-servers.bat"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.787.0",
@@ -28,8 +33,10 @@
     "file-type": "^20.5.0",
     "firebase": "^11.6.1",
     "framer-motion": "^12.7.2",
+    "jpeg-js": "^0.4.4",
     "konva": "^9.3.20",
     "multer": "^1.4.5-lts.2",
+    "node-fetch": "^2.7.0",
     "react": "^19.0.0",
     "react-chartjs-2": "^5.3.0",
     "react-datepicker": "^8.3.0",

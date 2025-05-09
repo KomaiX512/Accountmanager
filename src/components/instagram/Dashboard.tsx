@@ -16,6 +16,13 @@ import InstagramRequiredButton from '../common/InstagramRequiredButton';
 import { useInstagram } from '../../context/InstagramContext';
 import ChatModal from './ChatModal';
 import RagService from '../../services/RagService';
+import type { ChatMessage as ChatModalMessage } from './ChatModal';
+
+// Define RagService compatible ChatMessage
+interface RagChatMessage {
+  role: string;
+  content: string;
+}
 
 interface ProfileInfo {
   fullName: string;
@@ -70,7 +77,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
   }[]>([]);
   const [chatMode, setChatMode] = useState<'discussion' | 'post'>('discussion');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [chatMessages, setChatMessages] = useState<{role: string, content: string}[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatModalMessage[]>([]);
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectAttempts = useRef(0);
@@ -191,12 +198,12 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
     setIsProcessing(true);
     try {
       if (chatMode === 'discussion') {
-        // For discussion mode, use RagService and show chat modal
         try {
-          const response = await RagService.sendDiscussionQuery(accountHolder, query, chatMessages);
-          setChatMessages(prev => [...prev, 
-            { role: 'user', content: query },
-            { role: 'assistant', content: response.response }
+          const response = await RagService.sendDiscussionQuery(accountHolder, query, chatMessages as RagChatMessage[]);
+          setChatMessages(prev => [
+            ...prev,
+            { role: 'user' as const, content: query },
+            { role: 'assistant' as const, content: response.response }
           ]);
           setToast('Response received!');
           setIsChatModalOpen(true);
@@ -204,8 +211,8 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
           // Save the conversation for future reference
           RagService.saveConversation(accountHolder, [
             ...chatMessages,
-            { role: 'user', content: query },
-            { role: 'assistant', content: response.response }
+            { role: 'user' as const, content: query },
+            { role: 'assistant' as const, content: response.response }
           ]).catch(err => console.error('Error saving conversation:', err));
         } catch (ragError) {
           // Fallback to main server if RAG server is unavailable
@@ -220,47 +227,172 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
           });
           
           // Add only the user's message to chat history for now
-          setChatMessages(prev => [...prev, { role: 'user', content: query }]);
+          setChatMessages(prev => [...prev, { role: 'user' as const, content: query }]);
           setIsChatModalOpen(true);
         }
       } else {
-        // For post mode, use RagService to generate post content
+        // For post mode, use RagService to generate post content with progress indicators
         try {
+          setToast('Starting post generation process...');
+          
+          // Step 1: Send request to generate post structure and image
+          setToast('Step 1/3: Generating post content...');
+          
+          // Track the generation start time to check for successful posts later
+          const generationStartTime = Date.now();
+          
           const response = await RagService.sendPostQuery(accountHolder, query);
           
-          // Save the post content to the main server (port 3000)
-          await axios.post(`http://localhost:3000/save-query/${accountHolder}`, { 
-            query,
-            mode: 'post',
-            response
-          });
-          setToast('Post request sent! Your content will appear in the Post Cooked section soon.');
+          // The response contains the post structure and image key
+          if (!response.success) {
+            // Handle the case where connection was lost but post might still be processing
+            if (response.error?.includes('Connection interrupted')) {
+              console.log('[PostGen] Connection interrupted but continuing with post check');
+              setToast('Connection interrupted. Checking if post is still being processed...');
+              
+              // Use a timer to allow some time for the post processing to complete
+              setTimeout(async () => {
+                try {
+                  // Check if a post was created despite the connection error
+                  const postsResponse = await axios.get(`http://localhost:3000/posts/${accountHolder}?forceRefresh=true`);
+                  const recentPosts = postsResponse.data.filter((post: any) => {
+                    const postTimestamp = post.data.timestamp || 0;
+                    // Look for posts created in the last 60 seconds that might match our query
+                    return (Date.now() - postTimestamp < 60000) && 
+                          (post.data.queryUsed === query || 
+                           (post.data.post?.image_prompt && post.data.post.image_prompt.includes(query.substring(0, 15))));
+                  });
+                  
+                  if (recentPosts.length > 0) {
+                    console.log(`[PostGen] Found ${recentPosts.length} posts that may match our query despite connection error`);
+                    setPosts(postsResponse.data);
+                    setToast('Post was successfully generated! Check the Post Cooked section.');
+                    setQuery('');
+                  } else {
+                    console.log('[PostGen] No matching posts found after 15 seconds');
+                    setToast('Post generation may have failed. Please try again or check back later.');
+                    
+                    // Try again in 30 seconds as a final check
+                    setTimeout(async () => {
+                      try {
+                        const finalCheckResponse = await axios.get(`http://localhost:3000/posts/${accountHolder}?forceRefresh=true`);
+                        const finalRecentPosts = finalCheckResponse.data.filter((post: any) => {
+                          const postTimestamp = post.data.timestamp || 0;
+                          return (Date.now() - postTimestamp < 120000) && // Posts from the last 2 minutes
+                                (post.data.queryUsed === query || 
+                                (post.data.post?.image_prompt && post.data.post.image_prompt.includes(query.substring(0, 15))));
+                        });
+                        
+                        if (finalRecentPosts.length > 0) {
+                          console.log(`[PostGen] Final check found ${finalRecentPosts.length} matching posts`);
+                          setPosts(finalCheckResponse.data);
+                          setToast('Post was successfully generated! Check the Post Cooked section.');
+                          setQuery('');
+                        }
+                      } catch (finalError: any) {
+                        console.error('[PostGen] Error during final post check:', finalError.message);
+                      }
+                    }, 30000);
+                  }
+                } catch (checkError: any) {
+                  console.error('[PostGen] Error checking for posts after connection error:', checkError.message);
+                  setToast('Unable to confirm if post was generated. Please check back later.');
+                } finally {
+                  setIsProcessing(false);
+                }
+              }, 15000); // Give it 15 seconds before first check
+              
+              return; // Exit early to prevent further processing
+            }
+            
+            throw new Error(response.error || 'Unknown error in post generation');
+          }
+          
+          setToast('Step 2/3: Post content generated successfully!');
+          
+          // Step 2: Wait longer for the data to be processed on the server and uploaded to R2
+          setTimeout(() => {
+            setToast('Step 3/3: Refreshing post feed...');
+            
+            // Step 3: Use a series of retries with increasing delays to wait for R2 uploads
+            let retryCount = 0;
+            const maxRetries = 3;
+            
+            const attemptRefresh = () => {
+              axios.get(`http://localhost:3000/posts/${accountHolder}?forceRefresh=true`)
+                .then(res => {
+                  console.log(`[PostGen] Posts fetched successfully (attempt ${retryCount + 1}): ${res.data.length} posts`);
+                  
+                  // Try to find the newly created post by checking timestamp within the last minute
+                  const currentTime = Date.now();
+                  const recentPosts = res.data.filter((post: any) => {
+                    const postTimestamp = post.data.timestamp || 0;
+                    return currentTime - postTimestamp < 60000; // Posts from the last minute
+                  });
+                  
+                  if (recentPosts.length > 0) {
+                    console.log(`[PostGen] Found ${recentPosts.length} recent posts`);
+                    setPosts(res.data);
+                    setToast('Post generation complete! Your content is now visible in the Post Cooked section.');
+                  } else if (retryCount < maxRetries) {
+                    // If no new posts found yet, retry after a delay
+                    console.log(`[PostGen] No recent posts found, retrying (${retryCount + 1}/${maxRetries})...`);
+                    retryCount++;
+                    setTimeout(attemptRefresh, 5000 * retryCount); // Increase delay with each retry
+                    setToast(`Waiting for new post to appear... (Attempt ${retryCount + 1}/${maxRetries + 1})`);
+                  } else {
+                    // Max retries reached
+                    setPosts(res.data);
+                    setToast('Post was generated! If you don\'t see it yet, use the Refresh button in the Post Cooked section.');
+                  }
+                })
+                .catch((err: any) => {
+                  console.error('[PostGen] Error fetching posts:', err);
+                  if (retryCount < maxRetries) {
+                    retryCount++;
+                    setTimeout(attemptRefresh, 5000 * retryCount);
+                    setToast(`Error refreshing posts, retrying... (${retryCount}/${maxRetries})`);
+                  } else {
+                    setToast('Error refreshing posts. Please use the Refresh button in the Post Cooked section manually.');
+                  }
+                });
+            };
+            
+            // Start the first attempt after a longer initial delay
+            setTimeout(attemptRefresh, 5000);
+          }, 5000);
         } catch (ragError) {
-          // Fallback to main server if RAG server is unavailable
-          console.warn('RAG server error, falling back to main server:', ragError);
-          setToast('RAG service is currently unavailable. Your request has been queued for processing.');
+          console.warn('RAG server error in post generation:', ragError);
+          setToast('Post generation failed. Please try again later.');
           
           // Save the query to the main server for later processing
-          await axios.post(`http://localhost:3000/save-query/${accountHolder}`, { 
-            query,
-            mode: 'post',
-            fallback: true
-          });
+          try {
+            // Try with both endpoints sequentially to handle CORS issues
+            try {
+              await axios.post(`http://127.0.0.1:3000/save-query/${accountHolder}`, { 
+                query,
+                mode: 'post',
+                fallback: true
+              });
+              setToast('Your post request has been queued for later processing.');
+            } catch (ipError: any) {
+              // Try with localhost if 127.0.0.1 fails
+              console.warn('Failed with 127.0.0.1, trying localhost:', ipError.message);
+              await axios.post(`http://localhost:3000/save-query/${accountHolder}`, { 
+                query,
+                mode: 'post',
+                fallback: true
+              });
+              setToast('Your post request has been queued for later processing.');
+            }
+          } catch (fallbackError: any) {
+            console.error('Error queuing post for later processing:', fallbackError.message);
+            setToast('Could not save your post request. Please try again later.');
+          }
         }
-        
-        // Refresh the posts to show the new content
-        setTimeout(() => {
-          axios.get(`http://localhost:3000/posts/${accountHolder}`)
-            .then(res => {
-              setPosts(res.data);
-            })
-            .catch(err => {
-              console.error('Error fetching posts:', err);
-            });
-        }, 2000);
       }
       setQuery('');
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error with RAG query:', error);
       setToast('Failed to process your request.');
       setError(error.response?.data?.error || 'Failed to process query.');
@@ -660,11 +792,14 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
     if (accountHolder) {
       RagService.loadConversations(accountHolder)
         .then(messages => {
-          if (messages.length > 0) {
-            setChatMessages(messages);
-          }
+          // Convert RagChatMessage[] to ChatModalMessage[]
+          const safeMessages = messages.map(msg => ({
+            role: msg.role === 'user' ? 'user' as const : 'assistant' as const,
+            content: msg.content
+          }));
+          setChatMessages(safeMessages);
         })
-        .catch(err => console.error('Error loading conversations:', err));
+        .catch(err => console.error('Failed to load conversations:', err));
     }
   }, [accountHolder]);
 
@@ -953,6 +1088,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
       )}
       {isChatModalOpen && (
         <ChatModal 
+          open={isChatModalOpen}
           messages={chatMessages}
           onClose={() => setIsChatModalOpen(false)}
           username={accountHolder}
@@ -960,12 +1096,12 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
             // Handle sending additional messages in the chat modal
             if (!message.trim() || !accountHolder) return;
             setIsProcessing(true);
-            RagService.sendDiscussionQuery(accountHolder, message, chatMessages)
+            RagService.sendDiscussionQuery(accountHolder, message, chatMessages as RagChatMessage[])
               .then(response => {
                 const updatedMessages = [
                   ...chatMessages,
-                  { role: 'user', content: message },
-                  { role: 'assistant', content: response.response }
+                  { role: 'user' as const, content: message },
+                  { role: 'assistant' as const, content: response.response }
                 ];
                 setChatMessages(updatedMessages);
                 

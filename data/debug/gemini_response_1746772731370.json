@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption: Unleash your inner artist! 🎨✨ We're all about bold looks and fearless self-expression. What masterpiece will you create today? Show us your #MACMakeup magic! ✨\n\nHashtags: #MACCosmetics #MACMakeupArt #MakeupInspiration #BoldMakeup #BeautyLooks #MakeupLover #CreativeMakeup #MakeupOfTheDay #MACCrew #MakeupAddict\n\nCall to Action: Tag us in your latest MAC-inspired look for a chance to be featured!\n\nVisual Description for Image: A close-up, high-definition shot focusing on a model's eye. The eye is the central point of focus, showcasing an incredibly intricate and artistic makeup look. The eyeshadow is a vibrant, multi-dimensional blend of electric blue, emerald green, and shimmering gold, creating a peacock-feather effect. Tiny, iridescent glitter particles are strategically placed to catch the light and add a touch of ethereal sparkle. The eyeliner is a sharp, graphic wing in deep black, extending dramatically beyond the outer corner of the eye. The model's eyebrow is perfectly groomed and defined, with subtle highlighting underneath to accentuate the arch. The skin is flawless and dewy, with a soft-focus effect. The background is blurred and out of focus, a gradient of deep blues and purples, creating a sense of depth and mystery. The lighting is soft and diffused, with a subtle highlight on the inner corner of the eye to make it pop. The overall mood is artistic, bold, and glamorous. The image should evoke a sense of creativity and inspire viewers to experiment with their own makeup looks. The style is modern and editorial, with a focus on showcasing the artistry and precision of the makeup application.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.31178446393191644
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 249,
+    "candidatesTokenCount": 347,
+    "totalTokenCount": 596,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 249
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 347
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

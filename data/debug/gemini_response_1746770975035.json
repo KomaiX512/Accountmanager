@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption:\nBeat the heat with these summer makeup trends that are all about that effortless glow! ✨ Think lightweight formulas, pops of color, and staying power that lasts through those sunny days. Ready to rock the season? ☀️\n\nHashtags:\n#SummerMakeup #HotWeatherMakeup #MakeupTrends #MACcosmetics #GlowUp #SummerBeauty #WaterproofMakeup #LightweightMakeup #MakeupTutorial #SummerVibes\n\nCall to Action:\nTap the link in bio to shop our summer essentials and create your perfect hot-weather look!\n\nVisual Description for Image:\nThe image is a split-screen showcasing two distinct summer makeup looks. The left side features a model with a \"no-makeup makeup\" look. Her skin is dewy and radiant, achieved with a light coverage foundation or tinted moisturizer. She has a subtle wash of peachy blush on her cheeks and a touch of shimmering highlighter on her cheekbones, brow bone, and cupid's bow. Her eyes are defined with a brown waterproof eyeliner smudged softly along the lash line and a coat of lengthening mascara. Her lips are stained with a sheer berry lip tint. The right side features a more vibrant look. The model has a pop of bright coral eyeshadow blended seamlessly across her lids. Her skin is matte but still healthy-looking. She has a precise wing of black waterproof liquid eyeliner. Her lips are painted with a bold, glossy orange-red lipstick.\n\nBoth models have sun-kissed skin and are wearing their hair in loose, beachy waves. The background is a soft, blurred gradient of warm pastel colors – pink, orange, and yellow – evoking a summer sunset. The lighting is bright and airy, with a focus on highlighting the models' features and the textures of the makeup. The overall mood is playful, fresh, and confident. The image should feel aspirational yet achievable, inspiring viewers to experiment with different summer makeup looks. The MAC Cosmetics logo is subtly placed in the bottom corner. The image should be high-resolution and professionally lit.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.32259352270685154
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 254,
+    "candidatesTokenCount": 413,
+    "totalTokenCount": 667,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 254
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 413
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

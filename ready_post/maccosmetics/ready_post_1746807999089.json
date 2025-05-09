@@ -1,0 +1,26 @@
+{
+  "post": {
+    "caption": "Pucker up, buttercup! 💋 Our iconic lipsticks are here to slay your makeup game. Which shade are you rocking today? Tell us in the comments! 👇",
+    "hashtags": [
+      "#MACLipstick",
+      "#MACCosmetics",
+      "#LipstickLover",
+      "#MakeupObsessed",
+      "#BeautyGram",
+      "#MakeupGoals",
+      "#LipstickAddict",
+      "#MACAddict",
+      "#BeautyCommunity",
+      "#MakeupOfTheDay"
+    ],
+    "call_to_action": "Shop your perfect shade now! Link in bio.",
+    "image_prompt": "A close-up shot focusing on a diverse range of MAC lipsticks. The lipsticks are arranged artfully on a reflective, slightly blurred surface, creating a soft, diffused light effect. The lipsticks should be a mix of textures (matte, satin, amplified) and a vibrant range of colors, from classic reds and nudes to bold pinks and purples. The MAC logo should be clearly visible on at least three of the lipstick tubes.\n\nThe background is a soft gradient of pastel colors, blending from a light peach to a muted lavender. The lighting is soft and diffused, creating a glamorous and luxurious feel. The composition should be slightly asymmetrical, with some lipsticks slightly overlapping others to create depth.\n\nThe overall mood is playful, sophisticated, and inviting. The image should evoke a sense of excitement and desire for the product. The style is modern and clean, with a focus on showcasing the quality and variety of the MAC lipstick range. Consider adding a few scattered glitter particles or subtle bokeh effects in the background to enhance the magical feel. The image should be high-resolution and visually appealing, suitable for a beauty brand's Instagram feed."
+  },
+  "timestamp": 1746807999089,
+  "image_path": "ready_post/maccosmetics/image_1746807999089.jpg",
+  "image_url": "http://localhost:3002/images/maccosmetics/image_1746807999089.jpg",
+  "r2_image_url": "http://localhost:3002/r2-images/maccosmetics/image_1746807999089.jpg",
+  "generated_at": "2025-05-09T16:26:40.348Z",
+  "queryUsed": "create theem aligned post fro me about the lipstick product",
+  "status": "new"
+}

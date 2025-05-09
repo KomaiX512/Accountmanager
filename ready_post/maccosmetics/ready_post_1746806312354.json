@@ -1,0 +1,26 @@
+{
+  "post": {
+    "caption": "Unleash your inner artist and paint the town with your most daring look yet! ✨ We're talking bold colors, unexpected textures, and a whole lotta attitude. Ready to turn heads? 😉",
+    "hashtags": [
+      "#MACcosmetics",
+      "#MACMakeup",
+      "#BoldMakeup",
+      "#MakeupArt",
+      "#BeautyInspiration",
+      "#CreativeMakeup",
+      "#MakeupLooks",
+      "#ExpressYourself",
+      "#MakeupAddict",
+      "#InstaMakeup"
+    ],
+    "call_to_action": "Tag us in your most creative MAC look using #MACBold for a chance to be featured!",
+    "image_prompt": "A close-up shot of a woman's face, showcasing a bold and artistic makeup look. The background is a blurred, vibrant mix of neon pink, electric blue, and lime green, creating a dynamic and energetic atmosphere. The focus is on the eye makeup, which features a graphic eyeliner design using a deep black liquid liner. The liner extends dramatically beyond the outer corner of the eye, creating a sharp, winged effect. Above the black liner, a wash of iridescent purple eyeshadow shimmers, catching the light. The eyebrows are groomed and defined but not overly dramatic, allowing the eye makeup to take center stage. The skin is flawless and dewy, with a subtle highlight on the cheekbones and brow bone. The lips are painted with a glossy, nude lipstick, providing a neutral contrast to the bold eye makeup. The overall mood is edgy, modern, and confident. The lighting is soft and diffused, highlighting the textures and colors of the makeup without creating harsh shadows. The composition is tight and intimate, drawing the viewer in to appreciate the intricate details of the makeup application. The style is contemporary and fashion-forward, reflecting the brand's commitment to innovation and self-expression. The woman's expression is confident and slightly playful, hinting at the transformative power of makeup."
+  },
+  "timestamp": 1746806312354,
+  "image_path": "ready_post/maccosmetics/image_1746806312354.jpg",
+  "image_url": "http://localhost:3002/images/maccosmetics/image_1746806312354.jpg",
+  "r2_image_url": "http://localhost:3002/r2-images/maccosmetics/image_1746806312354.jpg",
+  "generated_at": "2025-05-09T15:58:33.973Z",
+  "queryUsed": "craete astonishing post fr me",
+  "status": "new"
+}

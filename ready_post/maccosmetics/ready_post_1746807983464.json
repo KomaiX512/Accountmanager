@@ -1,0 +1,26 @@
+{
+  "post": {
+    "caption": "Pucker up, buttercup! 💋 Our iconic lipsticks are here to slay your look, one swipe at a time. What's your go-to shade for instant confidence? ✨ Let us know in the comments! 👇",
+    "hashtags": [
+      "#MACLipstick",
+      "#MACCosmetics",
+      "#LipstickLover",
+      "#MakeupObsessed",
+      "#BeautyEssentials",
+      "#MakeupGoals",
+      "#PoutPerfection",
+      "#LipstickAddict",
+      "#MACAddict",
+      "#MakeupOfTheDay"
+    ],
+    "call_to_action": "Shop your perfect shade now at the link in bio!",
+    "image_prompt": "A close-up, high-resolution shot focusing on a woman's lips, painted with a vibrant, classic red MAC lipstick (e.g., Ruby Woo). The background is blurred and out of focus, possibly a soft, warm-toned gradient. The lighting is soft and diffused, creating a flattering glow on the lips. The lips are slightly parted, showcasing the texture and color of the lipstick. The skin around the lips is flawless and subtly highlighted. The overall mood is glamorous and confident. The lipstick should appear creamy and richly pigmented. The composition is tight, drawing the viewer's eye directly to the lips. The image should have a slightly editorial feel, as if it were pulled from a high-fashion magazine. The focus should be razor-sharp on the center of the lips, with a slight bokeh effect in the background. The image should be vibrant and eye-catching, showcasing the quality and allure of the MAC lipstick. A hint of the woman's chin and nose can be visible to provide context, but the primary focus remains on the lips. A single, strategically placed highlight on the lower lip can add dimension and shine."
+  },
+  "timestamp": 1746807983464,
+  "image_path": "ready_post/maccosmetics/image_1746807983464.jpg",
+  "image_url": "http://localhost:3002/images/maccosmetics/image_1746807983464.jpg",
+  "r2_image_url": "http://localhost:3002/r2-images/maccosmetics/image_1746807983464.jpg",
+  "generated_at": "2025-05-09T16:26:24.039Z",
+  "queryUsed": "create theem aligned post fro me about the lipstick product",
+  "status": "new"
+}

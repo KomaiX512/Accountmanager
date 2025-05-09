@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption:\nTesting, testing, 1, 2, is this thing on?! 🎤 We're experimenting behind the scenes to bring you even MORE MAC magic! ✨ Stay tuned for some exciting new features coming soon. 😉\n\nHashtags:\n#MACcosmetics #MACmakeup #MakeupTesting #BeautyInnovation #ComingSoon #MakeupLover #BeautyHacks #MACAddict #BeautyCommunity #MakeupNews\n\nCall to Action:\nLet us know in the comments what kind of new features you'd love to see from MAC! 👇\n\nVisual Description for Image:\nThe image should be a vibrant, close-up shot of a MAC Cosmetics testing lab. The background is blurred, focusing on a central workbench. On the workbench, various MAC products are arranged artfully: lipsticks in shades of red and nude, eyeshadow palettes with shimmering pigments, and foundation bottles with a soft matte finish. A gloved hand, belonging to a makeup artist or scientist, is delicately holding a small brush, applying a swatch of a vibrant purple eyeshadow onto a clean, white testing card. The lighting is bright and diffused, creating a clean and professional atmosphere. Small beakers and test tubes filled with colorful liquids are scattered around the workbench, adding a touch of scientific intrigue. A computer screen in the background displays lines of code and data visualizations, hinting at the technical aspects of product development. The overall mood is one of innovation, creativity, and meticulous attention to detail. The style should be modern and sleek, with a focus on showcasing the high-quality ingredients and cutting-edge technology behind MAC Cosmetics. The composition should be balanced and visually appealing, drawing the viewer's eye to the central action of the eyeshadow swatch being applied. The image should evoke a sense of excitement and anticipation for new product releases and features.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.33874335016151863
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 249,
+    "candidatesTokenCount": 367,
+    "totalTokenCount": 616,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 249
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 367
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption:\nYour skin, your shade, your story! ✨ We're beyond excited to introduce our most inclusive foundation line yet, designed to perfectly match EVERY skin tone. Find your flawless match and unlock your ultimate glow! 💖\n\nHashtags:\n#MACFoundation #MACCosmetics #FoundationForAll #SkinToneMatching #FlawlessSkin #Makeup #Beauty #NewMakeup #InclusiveBeauty #FindYourMatch\n\nCall to Action:\nHead to the link in our bio to find your perfect shade!\n\nVisual Description for Image:\nThe image is a vibrant and inclusive group shot featuring six diverse models with varying skin tones and ethnicities. They are positioned closely together, radiating confidence and joy. The background is a soft, blurred gradient of warm, neutral tones, creating a sense of unity and harmony. The lighting is soft and diffused, highlighting the natural beauty of each model's skin. Each model is wearing a different shade from the new MAC foundation line, showcasing the range of colors available. The makeup is natural and radiant, emphasizing the skin's texture and glow.\n\nThe composition is balanced and dynamic, with the models arranged in a way that draws the viewer's eye across the frame. The overall mood is positive, empowering, and celebratory. The style is modern and sophisticated, reflecting the MAC brand aesthetic. The models are wearing simple, elegant clothing in neutral colors, allowing the focus to remain on their faces and the foundation. The image should feel authentic and relatable, showcasing the beauty of diversity and the power of makeup to enhance natural features. A subtle MAC logo is placed in the bottom right corner. The image should be high-resolution and professionally edited to ensure a polished and visually appealing final product.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.3062412950575864
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 256,
+    "candidatesTokenCount": 349,
+    "totalTokenCount": 605,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 256
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 349
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

@@ -1,0 +1,26 @@
+{
+  "post": {
+    "caption": "✨ Unleash your inner artist and prepare to be ASTONISHED! ✨ We're talking next-level looks that break the mold and redefine beauty. Get ready to turn heads and own the spotlight, because this is your moment to shine! 💖",
+    "hashtags": [
+      "#MACCosmetics",
+      "#AstonishingLooks",
+      "#MakeupMagic",
+      "#BeautyInspo",
+      "#GlamGoals",
+      "#MACCrew",
+      "#MakeupArtist",
+      "#BoldBeauty",
+      "#ExpressYourself",
+      "#BeautyRevolution"
+    ],
+    "call_to_action": "Tag a friend who needs some makeup inspiration! 👇",
+    "image_prompt": "A close-up shot of a model's face, showcasing an avant-garde makeup look. The model has flawless, dewy skin with a subtle highlight on the cheekbones. The focus is on the eyes, which feature a dramatic, graphic eyeliner design in a vibrant electric blue. The eyeliner extends beyond the natural eye shape, creating a bold, winged effect with sharp, geometric angles. Scattered across the eyelid and extending towards the temple are small, iridescent glitter particles in shades of pink, purple, and gold, catching the light and adding a touch of ethereal sparkle. The eyebrows are softly defined and groomed. The lips are painted with a glossy, nude lipstick, allowing the eye makeup to be the star of the show. The background is a soft, blurred gradient of pastel pink and purple, creating a dreamy and artistic atmosphere. The lighting is soft and diffused, highlighting the textures and colors of the makeup. The overall mood is bold, creative, and inspiring, conveying a sense of artistic expression and confidence. The image should have a high-fashion editorial feel, with a focus on detail and artistry."
+  },
+  "timestamp": 1746806290787,
+  "image_path": "ready_post/maccosmetics/image_1746806290787.jpg",
+  "image_url": "http://localhost:3002/images/maccosmetics/image_1746806290787.jpg",
+  "r2_image_url": "http://localhost:3002/r2-images/maccosmetics/image_1746806290787.jpg",
+  "generated_at": "2025-05-09T15:58:12.024Z",
+  "queryUsed": "make the astonishing post for me",
+  "status": "new"
+}

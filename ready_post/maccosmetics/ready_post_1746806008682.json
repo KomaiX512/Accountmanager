@@ -1,0 +1,26 @@
+{
+  "post": {
+    "caption": "Unleash your inner artist and prepare to be amazed! ✨ We're all about pushing boundaries and creating looks that turn heads. Get ready to be inspired and redefine your beauty game! 💋",
+    "hashtags": [
+      "#MACcosmetics",
+      "#MACArtist",
+      "#MakeupInspiration",
+      "#BeautyTransformation",
+      "#CreativeMakeup",
+      "#MakeupArt",
+      "#BoldLooks",
+      "#GlamGoals",
+      "#MakeupLover",
+      "#MACCrew"
+    ],
+    "call_to_action": "Tag a friend who needs some makeup inspo! 👇",
+    "image_prompt": "A close-up shot focusing on a model's face showcasing an avant-garde makeup look. The background is a blurred, deep purple, creating a dramatic contrast. The model's skin is flawless with a dewy finish. The eye makeup is the focal point: one eye features a vibrant, abstract design using shades of electric blue, emerald green, and shimmering gold, blended seamlessly. The design extends beyond the natural eye shape, creating a wing-like effect. The other eye has a more subtle, smoky effect using deep browns and blacks, with a touch of iridescent shimmer on the inner corner. Bold, graphic black eyeliner defines both eyes. The lips are painted a deep, matte burgundy color with a precise, sharp outline. The model's eyebrows are perfectly groomed and defined. The lighting is dramatic, with a strong key light highlighting the eye makeup and creating shadows that accentuate the model's features. The overall mood is edgy, artistic, and glamorous. The image should have a high-fashion editorial feel, with a focus on showcasing the artistry and creativity of the makeup. The model's expression is confident and alluring, drawing the viewer in. The composition is tight, focusing on the face and minimizing distractions. The style is modern and bold, reflecting MAC's brand identity."
+  },
+  "timestamp": 1746806008682,
+  "image_path": "ready_post/maccosmetics/image_1746806008682.jpg",
+  "image_url": "http://localhost:3002/images/maccosmetics/image_1746806008682.jpg",
+  "r2_image_url": "http://localhost:3002/r2-images/maccosmetics/image_1746806008682.jpg",
+  "generated_at": "2025-05-09T15:53:29.263Z",
+  "queryUsed": "create astonishing post for me",
+  "status": "new"
+}

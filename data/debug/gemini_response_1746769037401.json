@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption: Summer's heating up and so are these trends! 🔥 Get ready to glow with sunkissed skin, pops of vibrant color, and effortless, dewy finishes. Which summer makeup trend are you most excited to try? ✨\n\nHashtags: #SummerMakeup #MakeupTrends #SummerBeauty #MACcosmetics #GlowUp #DewySkin #ColorfulMakeup #BeautyTrends #MakeupInspo #SummerVibes\n\nCall to Action: Tap the link in bio to shop the products you need to create these looks!\n\nVisual Description for Image: A split-screen image showcasing two distinct summer makeup trends.\n\nOn the left side: A close-up shot of a model with radiant, dewy skin. Her complexion is bronzed and glowing, achieved with a subtle shimmer highlighter on her cheekbones, brow bone, and cupid's bow. Her eyes feature a wash of warm, golden eyeshadow and a touch of brown mascara. Her lips are glossy and nude, with a hint of peach. The background is a soft, warm beige, creating a natural and sun-kissed vibe. The lighting is soft and diffused, emphasizing the dewy texture of the skin.\n\nOn the right side: A vibrant and playful look. The model has a clean, fresh base with a focus on bold, colorful eyeliner. A thick, graphic wing in a bright turquoise blue extends from the inner corner of her eye to the outer edge. Her lips are a glossy coral shade. The background is a clean, bright white, allowing the colorful eyeliner to pop. The lighting is bright and even, highlighting the intensity of the colors.\n\nThe overall image should be modern, clean, and aspirational, reflecting the MAC Cosmetics brand aesthetic. The composition should be balanced and visually appealing, with a clear contrast between the two makeup looks. The models should have diverse skin tones and features. The image should evoke a feeling of summer fun, confidence, and effortless beauty.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.3048246349693861
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 252,
+    "candidatesTokenCount": 393,
+    "totalTokenCount": 645,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 252
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 393
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

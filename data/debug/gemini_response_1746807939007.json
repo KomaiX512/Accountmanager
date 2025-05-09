@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption: Pucker up, buttercup! 💋 Our iconic lipsticks are here to slay your day, one swipe at a time. Which shade are you rocking today? Let us know in the comments! 👇\n\nHashtags: #MACLipstick #MACCosmetics #LipstickLover #MakeupObsessed #BeautyGram #InstaMakeup #LipGoals #MakeupAddict #Cosmetics #MACGirl\n\nCall to Action: Shop your perfect shade via the link in bio!\n\nVisual Description for Image: A close-up shot focusing on a woman's lips, showcasing a vibrant, bold lipstick application. The lipstick is a classic MAC shade, perhaps Ruby Woo or Russian Red, with a matte finish. The lips are perfectly shaped and defined, with crisp edges. The skin around the lips is flawless and subtly highlighted to accentuate the pout. The background is blurred and out of focus, possibly a soft, warm color like a muted rose or peach, to keep the attention on the lips. The lighting is soft and diffused, creating a flattering and glamorous effect. The image should have a high-resolution, professional quality. The overall mood is confident, alluring, and sophisticated. The composition is tight, focusing solely on the mouth area. The style is modern and editorial, suitable for a high-end beauty brand. A subtle hint of gloss or lip balm could be added to the lower lip to catch the light and add dimension. The model's skin tone should be warm and inviting. The image should evoke a sense of luxury and desirability.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.3677646057515205
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 255,
+    "candidatesTokenCount": 316,
+    "totalTokenCount": 571,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 255
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 316
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

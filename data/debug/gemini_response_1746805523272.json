@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption:\nObsessed with these vibrant eyeshadows! 🤩 Which shade is calling your name? Let us know in the comments, and get ready to create your most stunning eye looks yet! ✨\n\nHashtags:\n#eyeshadowpalette #vibrantmakeup #makeupinspo #eyemakeup #beautygram #testuserbeauty #pigmentedeyeshadow #makeuplover #newmakeup #eyeshadowlooks\n\nCall to Action:\nTap the link in bio to shop the collection!\n\nVisual Description for Image:\nA close-up, overhead shot of a brand new \"test-user\" eyeshadow palette. The palette is sleek and black with the \"test-user\" logo subtly embossed in silver on the top right corner. Inside, the eyeshadows are arranged in a rainbow gradient, starting with a vibrant, shimmery fuchsia on the left, transitioning through oranges, yellows, greens, blues, and ending with a deep, matte purple on the right. Each eyeshadow pan is perfectly square and filled to the brim with product.\n\nThe lighting is bright and diffused, creating a soft, even glow across the palette, highlighting the texture and shimmer of the shadows. A few loose, iridescent glitter particles are scattered artfully around the palette, adding a touch of magic and sparkle. The background is a clean, white surface, allowing the colors of the eyeshadows to truly pop.\n\nThe overall mood is playful, energetic, and luxurious. The composition is clean and balanced, drawing the viewer's eye directly to the vibrant colors of the eyeshadows. The style is modern and minimalist, with a focus on showcasing the quality and beauty of the product. The image should evoke a sense of excitement and inspire viewers to create their own colorful eye looks.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.25683259694589733
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 251,
+    "candidatesTokenCount": 354,
+    "totalTokenCount": 605,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 251
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 354
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

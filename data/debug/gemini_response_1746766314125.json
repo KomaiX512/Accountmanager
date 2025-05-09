@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption: Meet the tools that will transform your makeup game! ✨ Our brand new brush collection is here, designed with ultra-soft bristles and perfectly weighted handles for effortless application. Get ready to blend, buff, and glow like never before! 💖\n\nHashtags: #MACBrushes #MakeupBrushes #NewMakeup #MakeupTools #BeautyEssentials #MACCosmetics #MakeupLover #BrushSet #FlawlessMakeup #MakeupArtist\n\nCall to Action: Shop the collection now at the link in our bio and tell us which brush you're most excited to try!\n\nVisual Description for Image: A close-up, luxurious product shot showcasing the new MAC Cosmetics makeup brush collection. The brushes are arranged artfully on a clean, white marble surface, with soft, diffused natural light creating a luminous glow. The focus is on the brush heads, highlighting the different shapes and textures of the bristles. The handles are sleek and black, featuring the MAC logo subtly embossed in silver.\n\nThe composition is a slightly overhead shot, with the brushes fanned out in a semi-circular arrangement. Some brushes are angled slightly to show off their profile. The background is blurred slightly to keep the focus on the brushes.\n\nThe overall mood is sophisticated and aspirational. The lighting is warm and inviting, creating a sense of luxury and quality. The color palette is primarily neutral, with the white marble and black handles providing a clean and modern backdrop. The silver MAC logo adds a touch of elegance.\n\nOne or two brushes could have a hint of makeup powder on the bristles to suggest use and functionality. The image should evoke a feeling of wanting to reach out and touch the brushes, emphasizing their softness and quality. The image should be high-resolution and visually appealing, suitable for a luxury beauty brand.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.35200624834766703
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 253,
+    "candidatesTokenCount": 362,
+    "totalTokenCount": 615,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 253
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 362
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

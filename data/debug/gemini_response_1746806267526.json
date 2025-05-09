@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption: ✨ Unleash your inner artist and prepare to be ASTONISHED! ✨ We're talking next-level looks that break the mold and redefine beauty. Get ready to turn heads and own the spotlight, because this is your moment to shine! 💖\n\nHashtags: #MACCosmetics #AstonishingLooks #MakeupMagic #BeautyInspo #GlamGoals #MACCrew #MakeupArtist #BoldBeauty #ExpressYourself #BeautyRevolution\n\nCall to Action: Tag a friend who needs some makeup inspiration! 👇\n\nVisual Description for Image: A close-up shot of a model's face, showcasing an avant-garde makeup look. The model has flawless, dewy skin with a subtle highlight on the cheekbones. The focus is on the eyes, which feature a dramatic, graphic eyeliner design in a vibrant electric blue. The eyeliner extends beyond the natural eye shape, creating a bold, winged effect with sharp, geometric angles. Scattered across the eyelid and extending towards the temple are small, iridescent glitter particles in shades of pink, purple, and gold, catching the light and adding a touch of ethereal sparkle. The eyebrows are softly defined and groomed. The lips are painted with a glossy, nude lipstick, allowing the eye makeup to be the star of the show. The background is a soft, blurred gradient of pastel pink and purple, creating a dreamy and artistic atmosphere. The lighting is soft and diffused, highlighting the textures and colors of the makeup. The overall mood is bold, creative, and inspiring, conveying a sense of artistic expression and confidence. The image should have a high-fashion editorial feel, with a focus on detail and artistry.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.2984467466434319
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 250,
+    "candidatesTokenCount": 334,
+    "totalTokenCount": 584,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 250
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 334
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

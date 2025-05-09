@@ -1,0 +1,26 @@
+{
+  "post": {
+    "caption": "Golden hour glow-up incoming! ✨ We're obsessed with this warm, radiant look that's perfect for summer nights. Ready to recreate this sun-kissed vibe? Stay tuned for our next post where we'll break down all the products and techniques! ☀️",
+    "hashtags": [
+      "#MACcosmetics",
+      "#GoldenHour",
+      "#SummerMakeup",
+      "#GlowUp",
+      "#MakeupTutorial",
+      "#RadiantSkin",
+      "#MakeupLover",
+      "#BeautyTips",
+      "#MakeupInspiration",
+      "#MACArtist"
+    ],
+    "call_to_action": "Tell us in the comments what your favorite summer makeup look is! 👇",
+    "image_prompt": "A close-up beauty shot of a model with a flawless, sun-kissed complexion. The model has warm, golden-toned skin, with a subtle shimmer highlighting the cheekbones, brow bone, and cupid's bow. Her eyes are defined with a warm brown eyeshadow blended seamlessly into the crease, and a touch of gold shimmer on the lid. Lashes are long and full, coated with black mascara. Her lips are a nude shade with a hint of peach, topped with a glossy finish. The background is a soft, diffused golden light, mimicking the effect of golden hour. The lighting is soft and flattering, creating a warm and inviting mood. The composition is focused on the model's face, with a shallow depth of field to blur the background. The overall style is glamorous and sophisticated, yet approachable. The image should evoke a feeling of warmth, radiance, and effortless beauty. The model should have a relaxed and confident expression, with a slight smile. Her hair is styled in loose waves, cascading over her shoulders. The image should be high-resolution and professionally edited, with a focus on enhancing the model's natural beauty."
+  },
+  "timestamp": 1746808446957,
+  "image_path": "ready_post/maccosmetics/image_1746808446957.jpg",
+  "image_url": "http://localhost:3002/images/maccosmetics/image_1746808446957.jpg",
+  "r2_image_url": "http://localhost:3002/r2-images/maccosmetics/image_1746808446957.jpg",
+  "generated_at": "2025-05-09T16:34:08.909Z",
+  "queryUsed": "create the theme aligned next post for me!!!",
+  "status": "new"
+}

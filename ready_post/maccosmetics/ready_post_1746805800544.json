@@ -1,0 +1,26 @@
+{
+  "post": {
+    "caption": "Unleash your inner artist and get ready to GLOW UP! ✨ We're talking next-level looks that'll turn heads and break the internet. What iconic M·A·C product are you reaching for to create your masterpiece? 🎨",
+    "hashtags": [
+      "#MACcosmetics",
+      "#MACMakeup",
+      "#MakeupLooks",
+      "#BeautyInspo",
+      "#GlamMakeup",
+      "#NextLevelGlam",
+      "#MakeupArtist",
+      "#BeautyCommunity",
+      "#MACAddict",
+      "#MakeupObsessed"
+    ],
+    "call_to_action": "Tag us in your next M·A·C look for a chance to be featured!",
+    "image_prompt": "The image should be a close-up shot of a model's face, showcasing a bold and artistic makeup look. The model has flawless, dewy skin with a subtle highlight on the cheekbones. The focus is on the eyes, which feature a dramatic, graphic eyeliner design using M·A·C's Liquidlast 24-Hour Waterproof Liner in a vibrant cobalt blue. The eyeliner extends beyond the outer corner of the eye in a sharp, winged shape, with a smaller, parallel line just above the crease. The eyelids are dusted with a shimmering, iridescent eyeshadow in shades of lavender and pink. The eyebrows are perfectly groomed and defined. The lips are painted with a matte lipstick in a deep berry shade, creating a striking contrast with the blue eyeliner. The background is a soft, blurred gradient of pastel colors, primarily pink and purple, to complement the makeup. The lighting is soft and diffused, creating a dreamy and ethereal atmosphere. The overall style is modern, edgy, and artistic, reflecting M·A·C's commitment to creativity and self-expression. The composition should be tight and focused on the model's face, allowing viewers to appreciate the intricate details of the makeup. The image should evoke a sense of confidence, boldness, and individuality."
+  },
+  "timestamp": 1746805800544,
+  "image_path": "ready_post/maccosmetics/image_1746805800544.jpg",
+  "image_url": "http://localhost:3002/images/maccosmetics/image_1746805800544.jpg",
+  "r2_image_url": "http://localhost:3002/r2-images/maccosmetics/image_1746805800544.jpg",
+  "generated_at": "2025-05-09T15:50:01.429Z",
+  "queryUsed": "create astonishing next post for me ",
+  "status": "new"
+}

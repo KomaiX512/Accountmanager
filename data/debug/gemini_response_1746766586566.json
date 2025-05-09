@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption:\nUnleash your inner artist! 🎨 We're dropping a limited-edition collection inspired by the vibrant world of street art. Get ready to paint the town (or your face!) with bold colors and unapologetic self-expression. ✨\n\nHashtags:\n#MACStreetArt #MACLimitedEdition #MakeupArt #StreetArtMakeup #BoldMakeup #ColorfulMakeup #MACCosmetics #MakeupLover #NewCollection #BeautyInspiration\n\nCall to Action:\nTap the link in bio to sign up for early access and be the first to shop the collection!\n\nVisual Description for Image:\nThe image should be a dynamic and eye-catching flat lay featuring the new MAC Cosmetics Street Art collection. The background is a textured concrete surface, mimicking a city wall, with splatters of vibrant neon paint in pink, yellow, blue, and green. The MAC products are arranged artfully on the concrete, including lipsticks with graffiti-style packaging, eyeshadow palettes with bold color combinations, and a setting spray bottle with a dripping paint effect.\n\nA can of spray paint, partially obscured by the products, adds to the street art vibe. The lighting is bright and slightly diffused, creating a sense of energy and excitement. The composition should be asymmetrical, with products overlapping and spilling slightly off the edges of the frame. The overall mood is edgy, playful, and rebellious.\n\nClose-up shots of the product packaging should highlight the intricate graffiti designs and bold color palettes. The MAC logo is subtly visible on each product. The image should feel authentic and raw, as if captured in a real urban environment. The style should be modern and trendy, appealing to a younger, artistic audience. Consider adding a few scattered paintbrushes or stencils to further enhance the street art theme.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.379424205801105
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 251,
+    "candidatesTokenCount": 362,
+    "totalTokenCount": 613,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 251
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 362
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

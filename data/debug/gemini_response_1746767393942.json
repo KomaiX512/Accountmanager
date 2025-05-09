@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption: ✨ Get ready to GLOW UP, MAC babes! ✨ Our NEW limited-edition highlighter is here to illuminate your features with a radiant, otherworldly shimmer. This is a must-have for that lit-from-within look you've been dreaming of! 💖\n\nHashtags: #MACcosmetics #MACHighlighter #LimitedEdition #GlowUp #HighlightOnFleek #MakeupLover #BeautyEssentials #Shimmer #NewMakeup #MACAddict\n\nCall to Action: Tap the link in bio to shop now before it's gone!\n\nVisual Description for Image: A close-up shot of the new MAC limited-edition highlighter compact. The compact itself is a sleek, rose-gold color with a subtle, embossed MAC logo. The highlighter inside is a multi-dimensional, iridescent powder that shifts between shades of pink, gold, and lavender depending on the angle of the light. The powder has a delicate, almost ethereal texture. The lighting is soft and diffused, creating a luminous effect that highlights the shimmer of the product. The background is a blurred, soft-focus gradient of pastel pink and lavender, further emphasizing the dreamy, otherworldly quality of the highlighter. A makeup brush with soft, white bristles is lightly touching the surface of the highlighter, picking up the product. The overall mood is luxurious, ethereal, and aspirational. The composition is clean and focused, drawing the viewer's eye directly to the highlighter. The image should evoke a sense of wonder and excitement, making the viewer want to reach out and touch the product. The style is modern and sophisticated, reflecting the MAC brand aesthetic.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.2928016662597656
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 253,
+    "candidatesTokenCount": 330,
+    "totalTokenCount": 583,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 253
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 330
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

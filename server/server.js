@@ -222,29 +222,35 @@ const s3Client = new S3Client({
 // Add this helper after your imports, before routes
 function setCorsHeaders(res, origin = '*') {
   res.setHeader('Access-Control-Allow-Origin', origin);
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', '*');
   res.setHeader('Access-Control-Expose-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
 }
 
 app.use(cors({
   origin: '*',
-  methods: ['GET', 'POST', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: '*',
   exposedHeaders: ['Content-Type'],
+  credentials: true,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 app.options('*', (req, res) => {
   console.log(`[${new Date().toISOString()}] OPTIONS request received for ${req.url}`);
-  res.set({
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': '*',
-    'Access-Control-Expose-Headers': 'Content-Type',
-  });
-  res.status(204).send();
+  setCorsHeaders(res);
+  res.status(204).end();
+});
+
+// Add CORS headers middleware to every request
+app.use((req, res, next) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  next();
 });
 
 app.use((req, res, next) => {
@@ -393,10 +399,23 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
     const listResponse = await s3Client.send(listCommand);
 
     const files = listResponse.Contents || [];
+    
+    // Special handling for ready_post directory since it contains both JSON and JPG files
+    if (prefix.startsWith('ready_post/')) {
+      // For ready_post, we need a different approach to properly handle both JSON and image files
+      // This is handled separately by the /posts/:username endpoint
+      // Here we'll just set the cache timestamp for tracking
+      cacheTimestamps.set(prefix, Date.now());
+      
+      // Return existing data if available, otherwise empty array
+      return cache.has(prefix) ? cache.get(prefix) : [];
+    }
+    
+    // Standard processing for other module types (JSON only)
     const data = await Promise.all(
       files.map(async (file) => {
         try {
-          // ** NEW: Only process .json files as JSON **
+          // Only process .json files as JSON (except for ready_post which is handled separately)
           if (!file.Key.endsWith('.json')) {
                console.log(`[${new Date().toISOString()}] Skipping non-JSON file: ${file.Key}`);
                return null; // Skip non-JSON files in this general fetch
@@ -784,6 +803,9 @@ app.get('/news-for-you/:accountHolder', async (req, res) => {
 });
 
 app.post('/save-query/:accountHolder', async (req, res) => {
+  // Set CORS headers explicitly for this endpoint
+  setCorsHeaders(res, req.headers.origin || '*');
+  
   const { accountHolder } = req.params;
   const { query } = req.body;
 
@@ -1076,11 +1098,16 @@ app.get('/posts/:username', async (req, res) => {
     const listResponse = await s3Client.send(listCommand);
 
     const files = listResponse.Contents || [];
-    const postFiles = files.filter(file => file.Key.match(/ready_post_\d+\.json$/));
-    const imageFiles = files.filter(file => file.Key.match(/image_\d+\.jpg$/));
-
+    
+    // First, collect all files
+    const jsonFiles = files.filter(file => file.Key.endsWith('.json'));
+    const jpgFiles = files.filter(file => file.Key.endsWith('.jpg'));
+    
+    console.log(`[${new Date().toISOString()}] Found ${jsonFiles.length} JSON files and ${jpgFiles.length} JPG files in ${prefix}`);
+    
+    // Store the post data
     const posts = await Promise.all(
-      postFiles.map(async (file) => {
+      jsonFiles.map(async (file) => {
         try {
           const getCommand = new GetObjectCommand({
             Bucket: 'tasks',
@@ -1094,38 +1121,68 @@ app.get('/posts/:username', async (req, res) => {
             return null;
           }
 
-          const postData = JSON.parse(body);
-          const postIdMatch = file.Key.match(/ready_post_(\d+)\.json$/);
-          const postId = postIdMatch ? postIdMatch[1] : null;
-
-          if (!postId) return null;
-
-          // ** NEW: Check post status and skip if not 'ready' or if status is missing (assume ready for old posts) **
-          // Treat missing status as 'ready' for backwards compatibility
-          if (postData.status && postData.status !== 'ready') {
-               console.log(`[${new Date().toISOString()}] Skipping post ${file.Key} with status: ${postData.status}`);
-               return null;
-          }
-
-          const imageFile = imageFiles.find(img => img.Key === `${prefix}image_${postId}.jpg`);
-          if (!imageFile) {
-            console.warn(`No matching image found for post ${file.Key}, skipping...`);
-            // If a post JSON exists but the image is missing, perhaps mark it as failed or skip?
-            // For now, skipping.
+          let postData;
+          try {
+            postData = JSON.parse(body);
+          } catch (parseError) {
+            console.error(`Failed to parse JSON for ${file.Key}:`, parseError.message);
             return null;
           }
-
+          
+          // Extract the timestamp/ID from the filename
+          const filenameMatch = file.Key.match(/(\d+)\.json$/);
+          const fileId = filenameMatch ? filenameMatch[1] : null;
+          
+          if (!fileId) {
+            console.warn(`Cannot extract ID from filename: ${file.Key}`);
+            return null;
+          }
+          
+          // Check if this post should be skipped based on status
+          // Only skip if status is explicitly set to 'processed' or 'rejected'
+          if (postData.status === 'processed' || postData.status === 'rejected') {
+            console.log(`[${new Date().toISOString()}] Skipping post ${file.Key} with status: ${postData.status}`);
+            return null;
+          }
+          
+          // Look for matching image file
+          // Check both formats: image_<ID>.jpg and ready_post_<ID>.jpg
+          const potentialImageKeys = [
+            `${prefix}image_${fileId}.jpg`, 
+            `${prefix}ready_post_${fileId}.jpg`
+          ];
+          
+          // Find the first matching image file
+          const imageFile = jpgFiles.find(img => 
+            potentialImageKeys.includes(img.Key)
+          );
+          
+          if (!imageFile) {
+            console.warn(`[${new Date().toISOString()}] No matching image found for post ${file.Key} (ID: ${fileId}), checked: ${potentialImageKeys.join(', ')}`);
+            return null;
+          }
+          
+          // Get signed URL for the image
           const imageCommand = new GetObjectCommand({
             Bucket: 'tasks',
             Key: imageFile.Key,
           });
           const signedUrl = await getSignedUrl(s3Client, imageCommand, { expiresIn: 3600 });
-
+          
+          // Create an R2 direct URL for the image
+          // This is more reliable for specific environments but has a shorter expiry
+          // We'll provide both URLs to the client so they can try both
+          const r2ImageUrl = `${R2_PUBLIC_URL}/${imageFile.Key}`;
+          
+          console.log(`[${new Date().toISOString()}] Successfully loaded post ${file.Key} with image ${imageFile.Key}`);
+          
+          // Return the complete post data
           return {
             key: file.Key,
             data: {
               ...postData,
               image_url: signedUrl,
+              r2_image_url: r2ImageUrl
             },
           };
         } catch (error) {
@@ -1140,10 +1197,10 @@ app.get('/posts/:username', async (req, res) => {
 
     cache.set(prefix, validPosts);
     cacheTimestamps.set(prefix, now);
-    console.log(`Returning ${validPosts.length} ready posts for ${username}`);
+    console.log(`[${new Date().toISOString()}] Returning ${validPosts.length} valid posts for ${username}`);
     res.json(validPosts);
   } catch (error) {
-    console.error(`Retrieve posts error for ${username}:`, error);
+    console.error(`[${new Date().toISOString()}] Retrieve posts error for ${username}:`, error);
     res.status(500).json({ error: 'Error retrieving posts', details: error.message });
   }
 });
@@ -3521,10 +3578,121 @@ async function warmupCacheForActiveUsers() {
     
     // Warm up cache for each recent user
     for (const username of recentUsers) {
-      // Warm up critical modules (non-blocking)
+      // For ready_post, we need to use the /posts/ endpoint to properly handle both JSON and JPG files
+      try {
+        // Silently fetch posts for the user, which will cache the data properly
+        const postsPrefix = `ready_post/${username}/`;
+        console.log(`[${new Date().toISOString()}] Fetching fresh data from R2 for prefix: ${postsPrefix}`);
+        const listCommand = new ListObjectsV2Command({
+          Bucket: 'tasks',
+          Prefix: postsPrefix,
+        });
+        const listResponse = await s3Client.send(listCommand);
+    
+        const files = listResponse.Contents || [];
+        
+        // First, collect all files
+        const jsonFiles = files.filter(file => file.Key.endsWith('.json'));
+        const jpgFiles = files.filter(file => file.Key.endsWith('.jpg'));
+        
+        console.log(`[${new Date().toISOString()}] Found ${jsonFiles.length} JSON files and ${jpgFiles.length} JPG files in ${postsPrefix}`);
+        
+        // Process posts similar to the /posts/:username endpoint but without returning the data
+        const posts = await Promise.all(
+          jsonFiles.map(async (file) => {
+            try {
+              const getCommand = new GetObjectCommand({
+                Bucket: 'tasks',
+                Key: file.Key,
+              });
+              const data = await s3Client.send(getCommand);
+              const body = await streamToString(data.Body);
+    
+              if (!body || body.trim() === '') {
+                console.warn(`Empty file detected at ${file.Key}, skipping...`);
+                return null;
+              }
+    
+              let postData;
+              try {
+                postData = JSON.parse(body);
+              } catch (parseError) {
+                console.error(`Failed to parse JSON for ${file.Key}:`, parseError.message);
+                return null;
+              }
+              
+              // Extract the timestamp/ID from the filename
+              const filenameMatch = file.Key.match(/(\d+)\.json$/);
+              const fileId = filenameMatch ? filenameMatch[1] : null;
+              
+              if (!fileId) {
+                console.warn(`Cannot extract ID from filename: ${file.Key}`);
+                return null;
+              }
+              
+              // Check if this post should be skipped based on status
+              if (postData.status === 'processed' || postData.status === 'rejected') {
+                console.log(`[${new Date().toISOString()}] Skipping post ${file.Key} with status: ${postData.status}`);
+                return null;
+              }
+              
+              // Look for matching image file
+              const potentialImageKeys = [
+                `${postsPrefix}image_${fileId}.jpg`, 
+                `${postsPrefix}ready_post_${fileId}.jpg`
+              ];
+              
+              // Find the first matching image file
+              const imageFile = jpgFiles.find(img => 
+                potentialImageKeys.includes(img.Key)
+              );
+              
+              if (!imageFile) {
+                console.warn(`[${new Date().toISOString()}] No matching image found for post ${file.Key} (ID: ${fileId}), checked: ${potentialImageKeys.join(', ')}`);
+                return null;
+              }
+              
+              // Get signed URL for the image
+              const imageCommand = new GetObjectCommand({
+                Bucket: 'tasks',
+                Key: imageFile.Key,
+              });
+              const signedUrl = await getSignedUrl(s3Client, imageCommand, { expiresIn: 3600 });
+              
+              // Create an R2 direct URL for the image
+              const r2ImageUrl = `${R2_PUBLIC_URL}/${imageFile.Key}`;
+              
+              console.log(`[${new Date().toISOString()}] Successfully loaded post ${file.Key} with image ${imageFile.Key}`);
+              
+              // Return the complete post data
+              return {
+                key: file.Key,
+                data: {
+                  ...postData,
+                  image_url: signedUrl,
+                  r2_image_url: r2ImageUrl
+                },
+              };
+            } catch (error) {
+              console.error(`Failed to process post ${file.Key}:`, error.message);
+              return null;
+            }
+          })
+        );
+    
+        // Filter out null results from skipped posts
+        const validPosts = posts.filter(post => post !== null);
+    
+        // Cache the valid posts
+        cache.set(postsPrefix, validPosts);
+        cacheTimestamps.set(postsPrefix, Date.now());
+      } catch (err) {
+        console.error(`[${new Date().toISOString()}] Error warming up ready_post cache for ${username}:`, err.message);
+      }
+      
+      // Warm up other critical modules (non-blocking)
       Promise.all([
         fetchDataForModule(username, 'ProfileInfo/{username}'),
-        fetchDataForModule(username, 'ready_post/{username}'),
         fetchDataForModule(username, 'recommendations/{username}'),
         fetchDataForModule(username, 'NewForYou/{username}')
       ]).catch(err => {

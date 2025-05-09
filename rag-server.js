@@ -9,8 +9,28 @@ const app = express();
 const port = 3001;
 
 // Configure CORS
-app.use(cors({ origin: ['http://localhost:5173', 'http://127.0.0.1:5173'] }));
+app.use(cors({ 
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: '*',
+  credentials: true 
+}));
 app.use(express.json({ limit: '10mb' }));
+
+// Add explicit CORS headers for all responses
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+  
+  next();
+});
 
 // Enhanced logging middleware
 const loggerMiddleware = (req, res, next) => {
@@ -823,6 +843,137 @@ app.get('/admin/status', (req, res) => {
   };
   
   res.json(status);
+});
+
+// Add a route for post generation
+app.post('/generate_post', async (req, res) => {
+  try {
+    const { username, query } = req.body;
+    
+    if (!username || !query) {
+      return res.status(400).json({ error: 'Username and query are required' });
+    }
+    
+    console.log(`[${new Date().toISOString()}] [RAG SERVER] Post generation request for ${username}: "${query}"`);
+    
+    // Create a customized prompt for the post generator
+    const prompt = `You are a professional social media marketing expert for the brand "${username}" on Instagram. 
+Your task is to create a high-quality, engaging Instagram post about: "${query}"
+
+IMPORTANT: DO NOT include any introductory text like "Here's a caption" or "I've created" or "Here's a post" or similar meta-commentary.
+
+Structure your response EXACTLY as follows (with NO other text):
+
+Caption: [Write a catchy, engaging Instagram caption that is 2-4 sentences long. Include relevant emojis. Make sure it's informal, conversational, and aligned with Instagram best practices.]
+
+Hashtags: [List 5-10 relevant hashtags for discoverability]
+
+Call to Action: [Add a brief call-to-action encouraging followers to take a specific action]
+
+Visual Description for Image: [Write a detailed, vivid description for the image that should accompany this post. Be extremely specific about what should be in the image, including colors, layout, mood, lighting, and key elements. This will be used to generate an AI image, so include details about composition, style, and visual elements. Minimum 100 words.]`;
+
+    try {
+      // Get response from AI model
+      console.log(`[${new Date().toISOString()}] [RAG SERVER] Calling AI API for post generation`);
+      const response = await callGeminiAPI(prompt);
+      
+      // Clean and process the response to extract structured content
+      console.log(`[${new Date().toISOString()}] [RAG SERVER] Raw response:`, response.substring(0, 200) + '...');
+      
+      // Extract the sections using regex
+      const captionMatch = response.match(/Caption:(.*?)(?=Hashtags:|$)/s);
+      const hashtagsMatch = response.match(/Hashtags:(.*?)(?=Call to Action:|$)/s);
+      const ctaMatch = response.match(/Call to Action:(.*?)(?=Visual Description for Image:|$)/s);
+      const visualMatch = response.match(/Visual Description for Image:(.*?)(?=$)/s);
+      
+      // Format the sections into a structured response
+      const caption = captionMatch ? captionMatch[1].trim() : '';
+      let hashtags = [];
+      if (hashtagsMatch && hashtagsMatch[1]) {
+        hashtags = hashtagsMatch[1].match(/#[\w\d]+/g) || [];
+      }
+      const callToAction = ctaMatch ? ctaMatch[1].trim() : '';
+      const imagePrompt = visualMatch ? visualMatch[1].trim() : '';
+      
+      // Create the structured response
+      const structuredResponse = {
+        caption,
+        hashtags,
+        call_to_action: callToAction,
+        image_prompt: imagePrompt
+      };
+      
+      console.log(`[${new Date().toISOString()}] [RAG SERVER] Structured response:`, JSON.stringify(structuredResponse, null, 2));
+      
+      // Return the structured response
+      return res.json({ response: structuredResponse });
+    } catch (apiError) {
+      console.error(`[${new Date().toISOString()}] [RAG SERVER] API error:`, apiError);
+      
+      // In case of API failure, return a simulated response based on the query
+      console.log(`[${new Date().toISOString()}] [RAG SERVER] Falling back to simulated response`);
+      
+      // Extract key elements from the query
+      const keywords = query.match(/\b(\w{4,})\b/g) || ['product'];
+      const uniqueKeywords = [...new Set(keywords)].join(', ');
+      
+      // Create a fallback response that's customized to the query
+      const productType = query.toLowerCase().includes('lipstick') ? 'lipstick' : 
+                          query.toLowerCase().includes('foundation') ? 'foundation' :
+                          query.toLowerCase().includes('brush') ? 'makeup brushes' :
+                          query.toLowerCase().includes('eye') ? 'eyeshadow' :
+                          'beauty products';
+      
+      const seasonalTheme = query.toLowerCase().includes('summer') ? 'summer' :
+                            query.toLowerCase().includes('fall') ? 'fall' :
+                            query.toLowerCase().includes('winter') ? 'winter' :
+                            query.toLowerCase().includes('spring') ? 'spring' :
+                            'season';
+      
+      // Customize the fallback caption based on product type and seasonal theme                    
+      let fallbackCaption = '';
+      let fallbackHashtags = [];
+      let fallbackCTA = '';
+      let fallbackImagePrompt = '';
+      
+      if (productType === 'lipstick') {
+        fallbackCaption = `✨ Make a statement with our NEW ${seasonalTheme} lipstick collection! 💄 These vibrant shades are designed to make your pout absolutely pop. Which shade will be your new favorite? 💋`;
+        fallbackHashtags = ['#MACCosmetics', `#${seasonalTheme.charAt(0).toUpperCase() + seasonalTheme.slice(1)}Makeup`, '#NewLipstick', '#ColorPop', '#BeautyEssentials'];
+        fallbackCTA = 'Shop these limited edition shades now through the link in our bio!';
+        fallbackImagePrompt = `Professional product photography of MAC lipstick collection for ${seasonalTheme}. Beautiful studio lighting, commercial quality photography with vibrant colors and hyper-detailed product shot. Lipsticks arranged artistically to showcase the range of colors.`;
+      } 
+      else if (productType === 'foundation') {
+        fallbackCaption = `🌟 Introducing our most inclusive foundation line yet! 👑 With 40+ shades designed for all skin tones, everyone can find their perfect match. What's your shade? ✨`;
+        fallbackHashtags = ['#MACCosmetics', '#AllSkinTones', '#FoundationForAll', '#FlawlessSkin', '#Inclusive', '#BeautyForAll'];
+        fallbackCTA = 'Find your perfect shade match by visiting our store or clicking the link in bio!';
+        fallbackImagePrompt = `Professional beauty photography showing a diverse range of foundation shades for all skin tones. The image shows glass foundation bottles elegantly arranged in a gradient from light to deep shades. Soft studio lighting with a clean background and MAC branding visible.`;
+      }
+      else if (productType === 'makeup brushes') {
+        fallbackCaption = `🖌️ Elevate your makeup game with our NEW professional brush collection! 🎨 Designed for flawless application every time. Which brush is missing from your kit? ✨`;
+        fallbackHashtags = ['#MACCosmetics', '#MakeupBrushes', '#ProfessionalTools', '#FlawlessApplication', '#MakeupArtistry'];
+        fallbackCTA = 'Upgrade your toolkit! Shop our professional brushes through the link in our bio.';
+        fallbackImagePrompt = `Elegant product photography of MAC professional makeup brushes arranged in a fan pattern against a dark background. Close-up details of the brush bristles and ferrules, with soft dramatic lighting highlighting the quality of the brushes. Clean, professional composition showing the variety of brush shapes and sizes.`;
+      }
+      else {
+        fallbackCaption = `✨ Introducing our NEW ${uniqueKeywords} for ${seasonalTheme}! 🌟 Perfect for creating stunning looks that last. Which one catches your eye? 💖`;
+        fallbackHashtags = ['#MACCosmetics', `#${seasonalTheme.charAt(0).toUpperCase() + seasonalTheme.slice(1)}Beauty`, '#NewLaunch', '#MakeupLover', '#BeautyEssentials'];
+        fallbackCTA = 'Shop now through the link in our bio!';
+        fallbackImagePrompt = `Professional product photography of MAC ${uniqueKeywords} cosmetics. Beautiful studio lighting, high-resolution, commercial quality photography. Clean background, professional shadows, vibrant colors, hyper-detailed product shot with MAC branding visible.`;
+      }
+      
+      const fallbackResponse = {
+        caption: fallbackCaption,
+        hashtags: fallbackHashtags,
+        call_to_action: fallbackCTA,
+        image_prompt: fallbackImagePrompt
+      };
+      
+      return res.json({ response: fallbackResponse });
+    }
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [RAG SERVER] Error in post generation:`, error);
+    return res.status(500).json({ error: 'Failed to generate post', details: error.message });
+  }
 });
 
 // Start the server with graceful shutdown

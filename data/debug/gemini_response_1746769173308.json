@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption: Unleash your inner artist and paint the world with your unique beauty! ✨ This look is all about bold expression and unapologetic glam. What masterpiece will you create today? 🎨\n\nHashtags: #MACCosmetics #MACArtist #MakeupArt #BoldMakeup #GlamLook #BeautyInspiration #MakeupLover #ExpressYourself #CreativeMakeup #MACCrew\n\nCall to Action: Tag us in your most astonishing makeup looks using #MACAstonish for a chance to be featured!\n\nVisual Description for Image: A close-up shot focusing on a model's face, showcasing a vibrant and artistic makeup look. The background is a soft, blurred gradient of deep purple and electric blue, creating a dreamy and ethereal atmosphere. The lighting is dramatic, with a strong key light highlighting the model's left eye and cheekbone, casting subtle shadows that accentuate the contours of the face. The model's skin is flawless and dewy, with a natural-looking base. The focal point is the eye makeup: a bold, graphic eyeliner in a vibrant sapphire blue extends dramatically outwards, ending in a sharp wing. Above the blue liner, a wash of shimmering emerald green eyeshadow blends seamlessly into the brow bone. The eyebrows are perfectly groomed and defined, but not overly harsh. The lips are painted in a glossy, iridescent fuchsia pink, giving them a plump and luscious appearance. Small, strategically placed iridescent glitter particles are scattered across the cheekbone and near the outer corner of the eye, catching the light and adding a touch of magic. The overall style is modern, edgy, and artistic, with a focus on color and texture. The composition is tight and intimate, drawing the viewer in to appreciate the intricate details of the makeup. The model has a confident and slightly mysterious expression, hinting at the power and transformative potential of makeup.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.3043173612610028
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 249,
+    "candidatesTokenCount": 371,
+    "totalTokenCount": 620,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 249
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 371
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

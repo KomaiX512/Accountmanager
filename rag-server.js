@@ -32,30 +32,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Enhanced logging middleware
-const loggerMiddleware = (req, res, next) => {
-  const start = Date.now();
-  const requestId = Math.random().toString(36).substring(2, 15);
-  
-  console.log(`[${new Date().toISOString()}] [${requestId}] ${req.method} ${req.url}`);
-  
-  // Capture the original end method
-  const originalEnd = res.end;
-  
-  // Override the end method to log response time
-  res.end = function(...args) {
-    const duration = Date.now() - start;
-    console.log(`[${new Date().toISOString()}] [${requestId}] Completed ${res.statusCode} in ${duration}ms`);
-    
-    // Call the original end method
-    originalEnd.apply(res, args);
-  };
-  
-  next();
-};
-
-app.use(loggerMiddleware);
-
 // Global error handler
 app.use((err, req, res, next) => {
   console.error(`[${new Date().toISOString()}] [ERROR] ${err.stack}`);
@@ -973,6 +949,89 @@ Visual Description for Image: [Write a detailed, vivid description for the image
   } catch (error) {
     console.error(`[${new Date().toISOString()}] [RAG SERVER] Error in post generation:`, error);
     return res.status(500).json({ error: 'Failed to generate post', details: error.message });
+  }
+});
+
+// Create the instruction prompt for instant AI replies
+function createAIReplyPrompt(profileData, rulesData, notification) {
+  const isMessage = notification.type === 'message';
+  const messageType = isMessage ? 'direct message' : 'comment';
+  const senderInfo = notification.username ? `from username @${notification.username}` : 'from a user';
+  
+  return `
+# INSTRUCTION - INSTANT AI REPLY MODE
+You are an Instagram account manager assistant responding to a ${messageType} ${senderInfo}.
+
+## USER PROFILE DATA
+${JSON.stringify(profileData, null, 2)}
+
+## ACCOUNT RULES
+${JSON.stringify(rulesData, null, 2)}
+
+## ${messageType.toUpperCase()} TO RESPOND TO
+"${notification.text}"
+
+IMPORTANT INSTRUCTIONS:
+1. Respond in the same tone and language as the ${messageType}
+2. Be concise and direct - Instagram ${messageType}s should be brief
+3. Be friendly and conversational
+4. Maintain the brand voice based on profile information
+5. If the message is in a language other than English, respond in that same language
+6. If you cannot determine the appropriate response, simply provide a polite acknowledgment
+7. Do not add introductory phrases like "I would respond with:" or "Here's a reply:"
+8. Just write the actual reply text that should be sent directly to the user
+`;
+}
+
+// API endpoint for instant AI replies to DMs and comments
+app.post('/api/instant-reply', async (req, res) => {
+  const { username, notification } = req.body;
+  
+  if (!username || !notification || !notification.text) {
+    return res.status(400).json({ error: 'Username and notification with text are required' });
+  }
+
+  try {
+    // Fetch profile and rules data
+    console.log(`[RAG-Server] Processing instant reply for ${username}: "${notification.text}"`);
+    const profileData = await getProfileData(username).catch(() => ({}));
+    const rulesData = await getRulesData(username).catch(() => ({}));
+    
+    // Create AI reply prompt
+    const aiReplyPrompt = createAIReplyPrompt(profileData, rulesData, notification);
+    
+    // Call Gemini API with no previous messages (single turn)
+    const reply = await callGeminiAPI(aiReplyPrompt);
+    
+    // Verify we have a valid response
+    if (!reply || reply.trim() === '') {
+      throw new Error('Empty response received from Gemini API');
+    }
+    
+    // Save the request for analytics
+    const replyData = {
+      username,
+      timestamp: new Date().toISOString(),
+      notification,
+      reply,
+      mode: 'instant'
+    };
+    
+    // Save to R2 storage (but don't wait for it to complete)
+    const replyKey = `AI.replies/${username}/${Date.now()}.json`;
+    saveToR2(replyData, replyKey).catch(err => {
+      console.error(`[RAG-Server] Error saving instant reply to R2: ${err.message}`);
+    });
+    
+    // Return response immediately
+    res.json({ 
+      reply,
+      success: true,
+      notification_type: notification.type
+    });
+  } catch (error) {
+    console.error('[RAG-Server] Instant reply endpoint error:', error.message);
+    res.status(500).json({ error: error.message });
   }
 });
 

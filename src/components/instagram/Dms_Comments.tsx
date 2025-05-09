@@ -26,9 +26,11 @@ interface DmsCommentsProps {
   onIgnoreAIReply: (pair: any) => void;
   refreshKey: number;
   igBusinessId?: string | null;
+  aiRepliesRefreshKey?: number;
+  onAIRefresh?: () => void;
 }
 
-const Dms_Comments: React.FC<DmsCommentsProps> = ({ notifications, onReply, onIgnore, onRefresh, onReplyWithAI, username, onIgnoreAIReply, refreshKey, igBusinessId: propIgBusinessId }) => {
+const Dms_Comments: React.FC<DmsCommentsProps> = ({ notifications, onReply, onIgnore, onRefresh, onReplyWithAI, username, onIgnoreAIReply, refreshKey, igBusinessId: propIgBusinessId, aiRepliesRefreshKey = 0, onAIRefresh }) => {
   const { userId: contextUserId, isConnected } = useInstagram();
   const igBusinessId = propIgBusinessId || (isConnected ? contextUserId : null);
 
@@ -38,7 +40,6 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({ notifications, onReply, onIg
   const [aiReplies, setAIReplies] = useState<any[]>([]);
   const [loadingAI, setLoadingAI] = useState(false);
   const [errorAI, setErrorAI] = useState<string | null>(null);
-  const [aiRefreshKey, setAIRefreshKey] = useState(0);
   const [sentAI, setSentAI] = useState<{ [replyKey: string]: boolean }>({});
 
   console.log('DmsComments username:', username);
@@ -86,74 +87,138 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({ notifications, onReply, onIg
     setErrorAI(null);
     try {
       const url = `http://localhost:3000/ai-replies/${username}`;
+      console.log(`[${new Date().toISOString()}] Fetching AI replies from ${url}`);
       const res = await fetch(url);
       const data = await res.json();
+      console.log(`[${new Date().toISOString()}] Received ${data.length} AI replies`);
       setAIReplies(data);
+      
       // Auto-send logic for AI DM replies
-      for (const pair of data) {
-        if (
-          pair.type === 'dm' &&
-          pair.request &&
-          pair.reply &&
-          pair.request.message_id &&
-          pair.request.sender_id &&
-          pair.reply.reply &&
-          !sentAI[pair.replyKey] &&
-          igBusinessId
-        ) {
-          // Debug log before sending
-          console.log('Auto-sending AI DM:', {
-            igBusinessId,
-            sender_id: pair.request.sender_id,
-            text: pair.reply.reply,
-            message_id: pair.request.message_id,
-            pair
-          });
-          // Send DM reply if not already sent
-          setSentAI(prev => ({ ...prev, [pair.replyKey]: true }));
-          fetch(`http://localhost:3000/send-dm-reply/${igBusinessId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+      if (data.length > 0 && igBusinessId) {
+        console.log(`[${new Date().toISOString()}] Found ${data.length} AI replies, attempting auto-send with igBusinessId: ${igBusinessId}`);
+        
+        // Process one reply at a time to avoid race conditions
+        for (const pair of data) {
+          if (
+            pair.type === 'dm' &&
+            pair.request &&
+            pair.reply &&
+            pair.request.message_id &&
+            pair.request.sender_id &&
+            pair.reply.reply &&
+            !sentAI[pair.replyKey] &&
+            igBusinessId
+          ) {
+            // Debug log before sending
+            console.log(`[${new Date().toISOString()}] Auto-sending AI DM for ${pair.request.message_id}:`, {
+              igBusinessId,
               sender_id: pair.request.sender_id,
-              text: pair.reply.reply,
+              text: pair.reply.reply.substring(0, 20) + '...',
               message_id: pair.request.message_id,
-            }),
-          })
-            .then(async (res) => {
-              if (res.ok) {
-                // Optionally, remove from list or mark as sent
-                setAIReplies(prev => prev.filter(p => p.replyKey !== pair.replyKey));
+              replyKey: pair.replyKey
+            });
+            
+            // Mark as being sent to prevent duplicate attempts
+            setSentAI(prev => ({ ...prev, [pair.replyKey]: true }));
+            
+            try {
+              // Use more reliable fetch with improved error handling
+              const sendResponse = await fetch(`http://localhost:3000/send-dm-reply/${igBusinessId}`, {
+                method: 'POST',
+                headers: { 
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json',
+                  'Origin': window.location.origin
+                },
+                body: JSON.stringify({
+                  sender_id: pair.request.sender_id,
+                  text: pair.reply.reply,
+                  message_id: pair.request.message_id,
+                }),
+              });
+              
+              const responseData = await sendResponse.json();
+              
+              if (sendResponse.ok) {
+                console.log(`[${new Date().toISOString()}] Successfully sent AI DM for ${pair.request.message_id}`, responseData);
+                
+                // Check if the message was marked as handled but not actually sent due to user not found
+                if (responseData.handled) {
+                  console.log(`[${new Date().toISOString()}] Message marked as handled but not sent: ${responseData.warning}`);
+                  // Keep in list but mark with status
+                  setAIReplies(prev => prev.map(p => 
+                    p.replyKey === pair.replyKey 
+                      ? {...p, sendStatus: 'user-not-found', sendError: responseData.warning} 
+                      : p
+                  ));
+                } else {
+                  // Successfully sent - remove from list or mark as sent
+                  setAIReplies(prev => prev.filter(p => p.replyKey !== pair.replyKey));
+                }
               } else {
-                // If failed, allow retry
-                setSentAI(prev => {
-                  const copy = { ...prev };
-                  delete copy[pair.replyKey];
-                  return copy;
-                });
+                console.error(`[${new Date().toISOString()}] Server error sending AI DM:`, responseData);
+                
+                // Check for specific user not found error
+                if (responseData.code === 'USER_NOT_FOUND') {
+                  console.log(`[${new Date().toISOString()}] User not found: ${pair.request.sender_id}`);
+                  
+                  // Update the UI to show this specific error
+                  setAIReplies(prev => prev.map(p => 
+                    p.replyKey === pair.replyKey 
+                      ? {...p, sendStatus: 'user-not-found', sendError: 'Instagram user not found, cannot send DM'} 
+                      : p
+                  ));
+                } else {
+                  // Reset sent status to allow retry for other types of errors
+                  setSentAI(prev => {
+                    const copy = { ...prev };
+                    delete copy[pair.replyKey];
+                    return copy;
+                  });
+                  
+                  // Mark with error for UI
+                  setAIReplies(prev => prev.map(p => 
+                    p.replyKey === pair.replyKey 
+                      ? {...p, sendStatus: 'error', sendError: responseData.error || 'Failed to send'} 
+                      : p
+                  ));
+                }
               }
-            })
-            .catch(() => {
+            } catch (sendError: any) {
+              console.error(`[${new Date().toISOString()}] Network error sending AI DM:`, sendError.message);
+              
+              // Reset sent status to allow retry
               setSentAI(prev => {
                 const copy = { ...prev };
                 delete copy[pair.replyKey];
                 return copy;
               });
-            });
+              
+              // Mark with network error for UI
+              setAIReplies(prev => prev.map(p => 
+                p.replyKey === pair.replyKey 
+                  ? {...p, sendStatus: 'network-error', sendError: sendError.message || 'Network error'} 
+                  : p
+              ));
+            }
+          }
         }
+      } else if (!igBusinessId) {
+        console.warn(`[${new Date().toISOString()}] Cannot auto-send AI replies: no igBusinessId available`);
       }
-    } catch (err) {
-      setErrorAI('Failed to load AI replies.');
+    } catch (err: any) {
+      console.error(`[${new Date().toISOString()}] Failed to load AI replies:`, err);
+      setErrorAI(`Failed to load AI replies: ${err.message}`);
     } finally {
       setLoadingAI(false);
     }
   };
 
-  // Fetch AI replies on mount and when username or aiRefreshKey changes
+  // Fetch AI replies on mount and when username or aiRepliesRefreshKey changes
   useEffect(() => {
     fetchAIReplies();
     // eslint-disable-next-line
-  }, [username, aiRefreshKey]);
+  }, [username, aiRepliesRefreshKey]);
 
   // Filter for pending notifications
   const filteredNotifications = notifications.filter(notif => notif.status === 'pending' && (notif.type === 'message' || notif.type === 'comment'));
@@ -352,7 +417,13 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({ notifications, onReply, onIg
             className="ai-refresh-button"
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#00ffcc', fontSize: 18 }}
             title="Refresh AI Replies"
-            onClick={() => setAIRefreshKey(k => k + 1)}
+            onClick={() => {
+              if (onAIRefresh) {
+                onAIRefresh();
+              } else {
+                fetchAIReplies();
+              }
+            }}
             disabled={loadingAI}
           >
             &#x21bb;
@@ -382,7 +453,13 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({ notifications, onReply, onIg
                   Ignore
                 </button>
                 {pair.type === 'dm' && sentAI[pair.replyKey] && (
-                  <span style={{ color: '#00ffcc', marginLeft: 10 }}>Sent as DM</span>
+                  pair.sendStatus === 'user-not-found' ? (
+                    <span style={{ color: '#ff9900', marginLeft: 10 }}>Cannot send: user not found</span>
+                  ) : pair.sendStatus === 'error' || pair.sendStatus === 'network-error' ? (
+                    <span style={{ color: '#ff5555', marginLeft: 10 }}>{pair.sendError || 'Error sending'}</span>
+                  ) : (
+                    <span style={{ color: '#00ffcc', marginLeft: 10 }}>Sent as DM</span>
+                  )
                 )}
               </li>
             ))}

@@ -46,6 +46,17 @@ axios.interceptors.request.use(
     if (config.method === 'post') {
       config.headers['Content-Type'] = 'application/json';
     }
+    
+    // Ensure CORS headers
+    config.headers['Access-Control-Allow-Origin'] = '*';
+    config.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
+    config.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization';
+    
+    // Don't send credentials for cross-origin requests unless specifically needed
+    if (!config.withCredentials) {
+      config.withCredentials = false;
+    }
+    
     return config;
   },
   error => {
@@ -75,6 +86,11 @@ axios.interceptors.response.use(
 class RagService {
   // Accept both localhost and 127.0.0.1 to handle different browser security policies
   private static readonly MAIN_SERVER_URLS = [
+    'http://127.0.0.1:3000',  // Use port 3000 for direct server access
+    'http://localhost:3000'   // This is the main server with all endpoints
+  ];
+  
+  private static readonly PROXY_SERVER_URLS = [
     'http://127.0.0.1:3002',
     'http://localhost:3002'
   ];
@@ -84,12 +100,13 @@ class RagService {
    */
   private static async tryServerUrls<T>(
     endpoint: string, 
-    requestFn: (url: string) => Promise<T>
+    requestFn: (url: string) => Promise<T>,
+    serverUrlList: string[] = this.PROXY_SERVER_URLS
   ): Promise<T> {
     // Try each URL in order until one works
     let lastError: any = null;
     
-    for (const baseUrl of this.MAIN_SERVER_URLS) {
+    for (const baseUrl of serverUrlList) {
       try {
         const fullUrl = `${baseUrl}${endpoint}`;
         console.log(`[RagService] Attempting request to ${fullUrl}`);
@@ -255,6 +272,94 @@ class RagService {
     } catch (error: any) {
       console.error('[RagService] Failed to save conversation:', error.response?.data || error.message);
     }
+  }
+  
+  /**
+   * Sends an instant AI reply request directly to the main server
+   * This bypasses the proxy server to reduce CORS issues
+   */
+  static async sendInstantAIReply(
+    userId: string, 
+    username: string,
+    conversation: { role: string; content: string }[],
+    options?: {
+      maxTokens?: number;
+      temperature?: number;
+      sender_id?: string;
+      message_id?: string;
+    }
+  ): Promise<any> {
+    const urls = ['http://localhost:3000', 'http://127.0.0.1:3000'];
+    let lastError = null;
+
+    // Validate sender_id if provided
+    if (options?.sender_id) {
+      // Instagram IDs are typically numeric
+      if (!/^[0-9]+$/.test(options.sender_id)) {
+        console.warn(`[RagService] Invalid sender_id format: ${options.sender_id}`);
+        // Don't throw, just log warning - we can still generate the response
+      }
+    }
+
+    // Format the request as a notification object that the server expects
+    const userMessage = conversation && conversation.length > 0 ? conversation[0].content : '';
+    const notification = {
+      type: 'message',
+      instagram_user_id: userId,
+      sender_id: options?.sender_id,
+      message_id: options?.message_id,
+      text: userMessage,
+      timestamp: Date.now(),
+      received_at: new Date().toISOString(),
+      status: 'pending'
+    };
+
+    for (const baseUrl of urls) {
+      try {
+        console.log(`[RagService] Trying to send instant AI reply via ${baseUrl}/rag-instant-reply/${username}`);
+        
+        // Add validation headers to ensure the request is properly handled
+        const response = await axios.post(
+          `${baseUrl}/rag-instant-reply/${username}`,
+          notification,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            withCredentials: false, // Important for CORS
+            timeout: 30000, // 30 second timeout
+          }
+        );
+
+        if (!response.data) {
+          throw new Error('No data returned from RAG service');
+        }
+
+        // Log successful response
+        console.log(`[RagService] Successfully received response from ${baseUrl}`);
+        return response.data;
+      } catch (error: any) {
+        console.error(`[RagService] Failed with ${baseUrl}, trying next URL:`, error.message || 'Unknown error');
+        
+        // Check if this is a CORS error
+        if (error.message?.includes('CORS') || error.message?.includes('Network Error')) {
+          console.error('[RagService] Possible CORS issue detected');
+        }
+        
+        // Check if this is a specific error about sender_id format
+        if (error.response?.data?.error?.includes('sender_id')) {
+          const errorMessage = error.response.data.error || 'Invalid sender ID format';
+          console.error(`[RagService] Sender ID validation error:`, errorMessage);
+          throw new Error(errorMessage); // Don't try other URLs, this is a data validation issue
+        }
+        
+        lastError = error;
+      }
+    }
+
+    // If we got here, all URLs failed
+    throw lastError || new Error('Failed to connect to any RAG service endpoint');
   }
 }
 

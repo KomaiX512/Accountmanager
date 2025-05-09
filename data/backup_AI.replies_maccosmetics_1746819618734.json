@@ -1,0 +1,16 @@
+{
+  "username": "maccosmetics",
+  "timestamp": "2025-05-09T19:40:18.734Z",
+  "notification": {
+    "type": "message",
+    "instagram_user_id": "123456789",
+    "sender_id": "987654321",
+    "message_id": "test_message_123",
+    "text": "Hi, do you have this lipstick in red?",
+    "timestamp": 1746819606401,
+    "received_at": "2025-05-09T19:40:06.401Z",
+    "status": "pending"
+  },
+  "reply": "Hey there! We've got tons of reds! Which finish are you looking for? Matte, cream, or something else?💄💋",
+  "mode": "instant"
+}

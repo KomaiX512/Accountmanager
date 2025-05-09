@@ -1,0 +1,26 @@
+{
+  "post": {
+    "caption": "Ready to unleash your inner artist? 🎨 We're diving deep into the world of bold, graphic liner looks that are totally runway-ready! ✨ Get inspired and tag a friend who needs to see this! 👇",
+    "hashtags": [
+      "#MACLiner",
+      "#GraphicLiner",
+      "#MakeupInspo",
+      "#RunwayMakeup",
+      "#BoldMakeup",
+      "#EyeMakeup",
+      "#MakeupTutorial",
+      "#MACCosmetics",
+      "#MakeupArtist",
+      "#BeautyTrends"
+    ],
+    "call_to_action": "Comment below with your favorite liner color! 👇",
+    "image_prompt": "A close-up shot focusing on the eye of a model with a dramatic, graphic eyeliner look. The model has fair skin with a subtle, dewy complexion. The eye is almond-shaped with long, defined lashes. The eyeliner is the star of the show: a bold, double-winged design using MAC's Liquidlast 24-Hour Waterproof Liner in a vibrant cobalt blue. The top wing extends dramatically upwards towards the temple, while the lower wing follows the natural curve of the lower lash line, ending in a sharp point. A thin line of black eyeliner is also present along the upper lash line, creating depth and definition. The eyeshadow is minimal, a soft wash of neutral beige to allow the liner to pop. The overall mood is edgy, modern, and confident. The lighting is bright and diffused, highlighting the precision of the liner and the texture of the skin. The background is blurred and out of focus, a soft gradient of cool grays and blues. The composition is tight, focusing solely on the eye and brow area. The image should evoke a sense of artistry and creativity, inspiring viewers to experiment with their own makeup looks. The style is editorial and high-fashion."
+  },
+  "timestamp": 1746808459541,
+  "image_path": "ready_post/maccosmetics/image_1746808459541.jpg",
+  "image_url": "http://localhost:3002/images/maccosmetics/image_1746808459541.jpg",
+  "r2_image_url": "http://localhost:3002/r2-images/maccosmetics/image_1746808459541.jpg",
+  "generated_at": "2025-05-09T16:34:20.241Z",
+  "queryUsed": "create the theme aligned next post for me!!!",
+  "status": "new"
+}

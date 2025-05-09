@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption: Unleash your inner artist and get ready to GLOW UP! ✨ We're talking next-level looks that'll turn heads and break the internet. What iconic M·A·C product are you reaching for to create your masterpiece? 🎨\n\nHashtags: #MACcosmetics #MACMakeup #MakeupLooks #BeautyInspo #GlamMakeup #NextLevelGlam #MakeupArtist #BeautyCommunity #MACAddict #MakeupObsessed\n\nCall to Action: Tag us in your next M·A·C look for a chance to be featured!\n\nVisual Description for Image: The image should be a close-up shot of a model's face, showcasing a bold and artistic makeup look. The model has flawless, dewy skin with a subtle highlight on the cheekbones. The focus is on the eyes, which feature a dramatic, graphic eyeliner design using M·A·C's Liquidlast 24-Hour Waterproof Liner in a vibrant cobalt blue. The eyeliner extends beyond the outer corner of the eye in a sharp, winged shape, with a smaller, parallel line just above the crease. The eyelids are dusted with a shimmering, iridescent eyeshadow in shades of lavender and pink. The eyebrows are perfectly groomed and defined. The lips are painted with a matte lipstick in a deep berry shade, creating a striking contrast with the blue eyeliner. The background is a soft, blurred gradient of pastel colors, primarily pink and purple, to complement the makeup. The lighting is soft and diffused, creating a dreamy and ethereal atmosphere. The overall style is modern, edgy, and artistic, reflecting M·A·C's commitment to creativity and self-expression. The composition should be tight and focused on the model's face, allowing viewers to appreciate the intricate details of the makeup. The image should evoke a sense of confidence, boldness, and individuality.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.27328267764290276
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 250,
+    "candidatesTokenCount": 379,
+    "totalTokenCount": 629,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 250
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 379
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

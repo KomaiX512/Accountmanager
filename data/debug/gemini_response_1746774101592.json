@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption:\nTesting, testing, 1, 2, is this thing on? 🎤 We're experimenting with some behind-the-scenes magic to bring you even more flawless content! Stay tuned for exciting updates and get ready to see what we've been cooking up! ✨\n\nHashtags:\n#MACcosmetics #MakeupMagic #BehindTheScenes #BeautyTech #Innovation #MakeupLover #ComingSoon #BeautyHacks #MACGirl #MakeupAddict\n\nCall to Action:\nLet us know in the comments what kind of content you want to see more of! 👇\n\nVisual Description for Image:\nThe image should be a vibrant, eye-catching flat lay featuring various MAC Cosmetics products arranged artfully on a clean, white surface. The overall mood should be playful and modern, with bright, diffused lighting that minimizes harsh shadows. Key products to include are a MAC lipstick in a bold red shade (e.g., Ruby Woo), a shimmering eyeshadow palette with jewel-toned colors, a black liquid eyeliner, a foundation compact, and a makeup brush set.\n\nScattered around the products should be small, tech-inspired elements like circuit board fragments (stylized and non-functional), glowing fiber optic strands, and a miniature computer chip. These elements should be subtly integrated, not overpowering the makeup products. The composition should be balanced, with the products arranged in a visually appealing way that draws the eye across the frame.\n\nThe style should be clean and minimalist, with a focus on showcasing the textures and colors of the makeup. The background should be a pure white, allowing the products to pop. The image should evoke a sense of innovation and creativity, hinting at the technological advancements behind the scenes at MAC Cosmetics. The overall feel should be aspirational and exciting, inviting viewers to imagine the possibilities of beauty and technology combined. The image should be high-resolution and professionally lit.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.36211719414113097
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 249,
+    "candidatesTokenCount": 386,
+    "totalTokenCount": 635,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 249
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 386
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

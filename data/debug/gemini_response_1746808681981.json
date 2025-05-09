@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Based on the recent posts and IGTV videos, **Lipglass** (especially the new Lipglass Air Non-Sticky Gloss) appears to be a popular product line for M·A·C right now.\n\n*   **Evidence:** They're promoting it heavily in recent posts, highlighting it as a \"nepo baby\" and offering a \"Create Your Signature Lip Combos\" service featuring it.\n*   **Actionable Advice:** Continue to create content showcasing Lipglass, especially the new Air formula. Focus on lip combos, tutorials, and highlighting its non-sticky texture. Consider user-generated content featuring Lipglass.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.339560072551402
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 77322,
+    "candidatesTokenCount": 129,
+    "totalTokenCount": 77451,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 77322
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 129
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

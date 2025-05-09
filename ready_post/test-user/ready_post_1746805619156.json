@@ -1,0 +1,26 @@
+{
+  "post": {
+    "caption": "Obsessed with this dreamy brush set! ✨ Perfect for creating any look, from natural glam to full-on artistry. What's your go-to brush for flawless foundation? 👇",
+    "hashtags": [
+      "#makeupbrushes",
+      "#makeupphotography",
+      "#beautyproducts",
+      "#makeupartist",
+      "#beautygram",
+      "#makeupessentials",
+      "#brushset",
+      "#beautylover",
+      "#makeuplife",
+      "#testuser"
+    ],
+    "call_to_action": "Tap the link in bio to shop the set!",
+    "image_prompt": "A flat lay product photography shot of a \"test-user\" makeup brush set arranged on a clean, light pink marble surface. The brush set consists of approximately 10-12 brushes with rose gold ferrules and light pink handles. The brushes are fanned out slightly, showcasing the different brush head shapes and sizes. Soft, diffused natural light illuminates the scene from the top left, creating gentle shadows and highlights.\n\nScattered around the brushes are a few delicate, dried pink rose petals and a small, faceted crystal, adding a touch of elegance and visual interest. The composition should be balanced and aesthetically pleasing, with the brushes as the primary focus. The background is slightly blurred to create depth of field and draw attention to the product.\n\nThe overall mood is soft, feminine, and luxurious. The image should evoke a sense of quality and sophistication, highlighting the beauty and functionality of the makeup brush set. The \"test-user\" logo should be subtly visible on one of the brush handles. The image should be high-resolution and professionally styled. The style should be clean and modern, with a focus on showcasing the product in an appealing and aspirational way."
+  },
+  "timestamp": 1746805619156,
+  "image_path": "ready_post/test-user/image_1746805619156.jpg",
+  "image_url": "http://localhost:3002/images/test-user/image_1746805619156.jpg",
+  "r2_image_url": "http://localhost:3002/r2-images/test-user/image_1746805619156.jpg",
+  "generated_at": "2025-05-09T15:47:00.659Z",
+  "queryUsed": "Create a makeup brush set product photography",
+  "status": "new"
+}

@@ -1,0 +1,26 @@
+{
+  "post": {
+    "caption": "Unleash your inner artist and prepare to be amazed! ✨ We're all about pushing boundaries and creating looks that turn heads. Get ready to be inspired! 🔥",
+    "hashtags": [
+      "#MACcosmetics",
+      "#MACArtist",
+      "#MakeupInspiration",
+      "#BeautyLook",
+      "#CreativeMakeup",
+      "#MakeupArt",
+      "#BoldMakeup",
+      "#GlamMakeup",
+      "#MakeupLover",
+      "#Beauty"
+    ],
+    "call_to_action": "Tag a friend who needs some makeup inspo! 👇",
+    "image_prompt": "A close-up shot of a model's face showcasing a bold and artistic makeup look. The background is a blurred, soft gradient of deep purples and blues, creating a dreamy, ethereal atmosphere. The lighting is dramatic, with a strong key light highlighting the model's left eye and cheekbone, casting soft shadows on the right side of the face. The model's skin is flawless, with a dewy, radiant finish. The focus is on the eye makeup, which features a vibrant, multi-dimensional design. Imagine a galaxy painted onto the eyelid: swirling nebulae of shimmering blues, purples, and pinks, accented with tiny, iridescent glitter particles that mimic stars. The eyebrow is sculpted and defined, with a touch of silver shimmer. The lips are a glossy, deep berry color, perfectly complementing the eye makeup. The overall style is high-fashion and editorial, with a touch of fantasy. The image should evoke a sense of wonder, creativity, and limitless possibilities. The model's expression is confident and captivating, drawing the viewer in. The composition is tight and intimate, emphasizing the intricate details of the makeup. The image should be high-resolution and professionally retouched, with a focus on enhancing the colors and textures."
+  },
+  "timestamp": 1746807610905,
+  "image_path": "ready_post/maccosmetics/image_1746807610905.jpg",
+  "image_url": "http://localhost:3002/images/maccosmetics/image_1746807610905.jpg",
+  "r2_image_url": "http://localhost:3002/r2-images/maccosmetics/image_1746807610905.jpg",
+  "generated_at": "2025-05-09T16:20:11.741Z",
+  "queryUsed": "create astonishing post for me",
+  "status": "new"
+}

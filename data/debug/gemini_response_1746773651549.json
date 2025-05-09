@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption:\nTesting, testing, 1, 2, is this thing on?! 🎤 We're playing around with some new tech behind the scenes to bring you even MORE MAC magic. Stay tuned for some seriously cool updates coming soon! ✨\n\nHashtags:\n#MACcosmetics #MACmakeup #MakeupInnovation #BeautyTech #BehindTheScenes #MakeupMagic #NewTech #BeautyUpdates #MakeupLover #ComingSoon\n\nCall to Action:\nLet us know in the comments what kind of content you want to see more of! 👇\n\nVisual Description for Image:\nThe image should be a vibrant, close-up shot of a makeup artist's hand holding a smartphone displaying a simplified code snippet on the screen. The code snippet should be visually appealing, using bright, contrasting colors for different elements (e.g., HTML tags in blue, CSS properties in orange, JavaScript functions in green). The background should be blurred, showing a professional makeup station with various MAC products – lipsticks, eyeshadow palettes, brushes – subtly visible. The lighting should be soft and diffused, highlighting the phone screen and the makeup artist's hand. The makeup artist's hand should have perfectly manicured nails with a glossy, neutral polish. The overall mood should be playful and intriguing, hinting at the intersection of technology and beauty. The composition should be slightly angled, creating a dynamic and modern feel. The style should be clean and minimalist, focusing on the essential elements: the code, the hand, and the MAC products. The image should convey a sense of innovation and excitement, suggesting that MAC is embracing technology to enhance the beauty experience. The phone screen should also display the MAC logo subtly in the corner.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.32394567941654623
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 249,
+    "candidatesTokenCount": 346,
+    "totalTokenCount": 595,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 249
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 346
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

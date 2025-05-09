@@ -6,12 +6,19 @@ import ErrorBoundary from '../ErrorBoundary';
 import CanvasEditor from '../common/CanvasEditor';
 import InstagramRequiredButton from '../common/InstagramRequiredButton';
 import { useInstagram } from '../../context/InstagramContext';
+import axios from 'axios';
 
 interface PostCookedProps {
   username: string;
   profilePicUrl: string;
-  posts?: { key: string; data: { post: any; status: string; image_url: string }; imageFailed?: boolean }[];
+  posts?: { key: string; data: { post: any; status: string; image_url: string; r2_image_url?: string }; imageFailed?: boolean }[];
   userId?: string;
+}
+
+// Define an interface for image error state
+interface ImageErrorState {
+  failed: boolean;
+  retryCount: number;
 }
 
 const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts = [], userId: propUserId }) => {
@@ -20,7 +27,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   const userId = isConnected && contextUserId ? contextUserId : propUserId;
 
   const [localPosts, setLocalPosts] = useState<typeof posts>([]);
-  const [imageErrors, setImageErrors] = useState<{ [key: string]: boolean }>({});
+  const [imageErrors, setImageErrors] = useState<{ [key: string]: ImageErrorState }>({});
   const [profileImageError, setProfileImageError] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState<string | null>(null);
@@ -36,6 +43,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   const [showCanvasEditor, setShowCanvasEditor] = useState(false);
   const [editingPost, setEditingPost] = useState<{ key: string; imageUrl: string; caption: string } | null>(null);
   const [editingCaption, setEditingCaption] = useState<{ key: string; caption: string } | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     console.log('Posts prop in PostCooked:', posts);
@@ -79,7 +87,157 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
 
   const handleImageError = (key: string, url: string) => {
     console.error(`Failed to load image for ${key}: ${url}`);
-    setImageErrors(prev => ({ ...prev, [key]: true }));
+    
+    // Try to reload a few times with timestamp before giving up
+    const retryCount = imageErrors[key] ? imageErrors[key].retryCount || 0 : 0;
+    
+    if (retryCount < 3) {
+      // Try again with a cache-busting timestamp
+      const img = new Image();
+      const newUrl = `${url}?t=${Date.now()}&retry=${retryCount + 1}`;
+      
+      img.onload = () => {
+        // Image loaded successfully on retry
+        const updatedErrors = {...imageErrors};
+        delete updatedErrors[key];
+        setImageErrors(updatedErrors);
+        
+        // Force a refresh
+        setLocalPosts(prev => [...prev]);
+      };
+      
+      img.onerror = () => {
+        // Still failing, increment retry count
+        setImageErrors(prev => ({
+          ...prev,
+          [key]: { 
+            failed: true,
+            retryCount: retryCount + 1
+          }
+        }));
+        
+        // If this is a retry of the r2_image_url, try falling back to the regular image_url
+        const post = localPosts.find(p => p.key === key);
+        if (post && post.data.r2_image_url && post.data.image_url && url.includes(post.data.r2_image_url)) {
+          console.log(`[ImageError] R2 image failed, trying regular image URL for ${key}`);
+          // Find the post in the local posts array
+          const postIndex = localPosts.findIndex(p => p.key === key);
+          if (postIndex >= 0) {
+            // Create a copy of the post without the r2_image_url to force using the regular image_url
+            const updatedPost = {
+              ...localPosts[postIndex],
+              data: {
+                ...localPosts[postIndex].data,
+                r2_image_url: undefined // Clear the r2_image_url to force using image_url
+              }
+            };
+            
+            // Update the posts array
+            const updatedPosts = [...localPosts];
+            updatedPosts[postIndex] = updatedPost;
+            setLocalPosts(updatedPosts);
+            
+            // Reset error state for this image
+            const updatedErrors = {...imageErrors};
+            delete updatedErrors[key];
+            setImageErrors(updatedErrors);
+          }
+        }
+      };
+      
+      img.src = newUrl;
+    } else {
+      // Max retries reached, mark as permanently failed
+      setImageErrors(prev => ({ 
+        ...prev, 
+        [key]: { 
+          failed: true,
+          retryCount: retryCount
+        }
+      }));
+      
+      // Check if we're already trying the fallback URL
+      const post = localPosts.find(p => p.key === key);
+      if (post && post.data.r2_image_url && url.includes(post.data.r2_image_url)) {
+        console.log(`[ImageError] R2 image permanently failed, trying fallback for ${key}`);
+        // Try the fallback image path
+        const fallbackUrl = `/r2-images/${username}/fallback.jpg`;
+        
+        // Try loading the fallback image
+        const fallbackImg = new Image();
+        fallbackImg.onload = () => {
+          console.log(`[ImageError] Fallback image loaded successfully for ${key}`);
+          // Update the post to use the fallback image
+          const postIndex = localPosts.findIndex(p => p.key === key);
+          if (postIndex >= 0) {
+            const updatedPost = {
+              ...localPosts[postIndex],
+              data: {
+                ...localPosts[postIndex].data,
+                r2_image_url: fallbackUrl
+              }
+            };
+            
+            const updatedPosts = [...localPosts];
+            updatedPosts[postIndex] = updatedPost;
+            setLocalPosts(updatedPosts);
+            
+            // Reset error state for this image
+            const updatedErrors = {...imageErrors};
+            delete updatedErrors[key];
+            setImageErrors(updatedErrors);
+          }
+        };
+        
+        fallbackImg.onerror = () => {
+          console.error(`[ImageError] Even fallback image failed for ${key}`);
+        };
+        
+        fallbackImg.src = fallbackUrl;
+      }
+    }
+  };
+
+  // Enhanced image placeholder component
+  const ImagePlaceholder = ({ postKey }: { postKey: string }) => {
+    const retryImage = () => {
+      // Reset error state for this image
+      const updatedErrors = {...imageErrors};
+      delete updatedErrors[postKey];
+      setImageErrors(updatedErrors);
+      
+      // Force refresh
+      setLocalPosts(prev => [...prev]);
+    };
+    
+    return (
+      <div className="post-image-placeholder">
+        <div className="placeholder-content">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="48"
+            height="48"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#e0e0ff"
+            strokeWidth="1"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            <circle cx="8.5" cy="8.5" r="1.5" />
+            <polyline points="21 15 16 10 5 21" />
+          </svg>
+          <p>Image unavailable</p>
+          <button
+            className="retry-image-button"
+            onClick={retryImage}
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
   };
 
   const handleScheduleClick = (key: string) => {
@@ -459,6 +617,24 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     });
   };
 
+  const handleRefreshPosts = async () => {
+    if (!username) return;
+    
+    setIsRefreshing(true);
+    setToastMessage('Refreshing posts...');
+    
+    try {
+      const response = await axios.get(`http://localhost:3000/posts/${username}?forceRefresh=true`);
+      setLocalPosts(response.data);
+      setToastMessage('Posts refreshed successfully!');
+    } catch (error) {
+      console.error('Error refreshing posts:', error);
+      setToastMessage('Failed to refresh posts. Please try again.');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   if (!username) {
     return (
       <ErrorBoundary>
@@ -475,7 +651,33 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   return (
     <ErrorBoundary>
       <div className="post-cooked-container">
-        <h2>Cooked Posts</h2>
+        <div className="post-cooked-header">
+          <h2>Cooked Posts</h2>
+          <button 
+            className="refresh-button"
+            onClick={handleRefreshPosts}
+            disabled={isRefreshing}
+          >
+            {isRefreshing ? (
+              <div className="refresh-spinner"></div>
+            ) : (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+              </svg>
+            )}
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
           <InstagramRequiredButton
             onClick={() => setShowIntervalModal(true)}
@@ -605,16 +807,14 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                     )}
                     <span className="username">{username}</span>
                   </div>
-                  {imageErrors[post.key] || !post.data.image_url ? (
-                    <div className="post-image-placeholder">
-                      Image unavailable
-                    </div>
+                  {post.key in imageErrors || !post.data.image_url ? (
+                    <ImagePlaceholder postKey={post.key} />
                   ) : (
                     <img
-                      src={post.data.image_url}
+                      src={(post.data.r2_image_url || post.data.image_url) + `?t=${Date.now()}`} // Use r2_image_url if available, falling back to image_url
                       alt="Post visual"
                       className="post-image"
-                      onError={() => handleImageError(post.key, post.data.image_url)}
+                      onError={() => handleImageError(post.key, post.data.r2_image_url || post.data.image_url)}
                     />
                   )}
                   <div className="post-actions">

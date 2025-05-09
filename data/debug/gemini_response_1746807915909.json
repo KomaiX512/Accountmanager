@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption: Pucker up, buttercup! 💋 Our iconic lipsticks are here to slay your day, one swipe at a time. Which shade are you rocking today? Let us know in the comments! 👇\n\nHashtags: #MACcosmetics #MACLipstick #LipstickLover #MakeupObsessed #BeautyGram #MakeupGoals #LipstickAddict #MACCrew #MakeupOfTheDay\n\nCall to Action: Shop your perfect shade now via the link in our bio!\n\nVisual Description for Image: A close-up shot featuring three MAC lipsticks in varying shades arranged artfully on a textured, light pink velvet surface. The lipsticks are positioned slightly diagonally, creating a dynamic composition. The lipstick on the left is a classic ruby red with a high-shine finish. The middle lipstick is a matte nude shade, and the lipstick on the right is a deep berry color with a satin finish. The MAC logo is clearly visible on each lipstick tube. Soft, diffused lighting illuminates the scene, creating a luxurious and inviting atmosphere. Subtle shadows add depth and dimension. The background is slightly blurred to keep the focus on the lipsticks. The overall style is clean, modern, and sophisticated. The image should evoke feelings of glamour, confidence, and self-expression. The color palette is primarily pink, red, nude, and berry tones. The image should be high-resolution and suitable for Instagram's aspect ratio. The composition should be balanced and visually appealing, drawing the viewer's eye to the lipsticks and their varying textures and colors.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.32339912124826936
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 255,
+    "candidatesTokenCount": 316,
+    "totalTokenCount": 571,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 255
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 316
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

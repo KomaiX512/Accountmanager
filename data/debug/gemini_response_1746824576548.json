@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "We've got a HUGE range of eyeshadows! To give you the best recommendation, could you tell me what kind of look you're going for? (e.g., smoky, natural, colourful, etc.) ✨\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.20730598936689662
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 77406,
+    "candidatesTokenCount": 47,
+    "totalTokenCount": 77453,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 77406
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 47
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

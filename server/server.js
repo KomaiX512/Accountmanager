@@ -4812,3 +4812,87 @@ app.post('/rag-instant-reply/:username', async (req, res) => {
     }
   }
 });
+
+// Mark notification as handled (for AI replies)
+app.post('/mark-notification-handled/:userId', async (req, res) => {
+  // Set CORS headers
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  // Handle OPTIONS preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+  
+  const { userId } = req.params;
+  const { notification_id, type, handled_by } = req.body;
+  
+  if (!notification_id || !type) {
+    return res.status(400).json({ error: 'Missing notification_id or type' });
+  }
+  
+  try {
+    console.log(`[${new Date().toISOString()}] Marking notification ${notification_id} as handled by ${handled_by || 'AI'}`);
+    
+    // Build the key for the notification in storage
+    const notificationKey = type === 'message' 
+      ? `InstagramEvents/${userId}/${notification_id}.json`
+      : `InstagramEvents/${userId}/comment_${notification_id}.json`;
+    
+    try {
+      // Get the existing notification data
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: notificationKey,
+      });
+      
+      const data = await s3Client.send(getCommand);
+      const notificationData = JSON.parse(await data.Body.transformToString());
+      
+      // Update the status
+      notificationData.status = 'ai_handled';
+      notificationData.updated_at = new Date().toISOString();
+      notificationData.handled_by = handled_by || 'AI';
+      
+      // Save it back
+      await s3Client.send(new PutObjectCommand({
+        Bucket: 'tasks',
+        Key: notificationKey,
+        Body: JSON.stringify(notificationData, null, 2),
+        ContentType: 'application/json',
+      }));
+      
+      console.log(`[${new Date().toISOString()}] Successfully marked notification ${notification_id} as handled`);
+      
+      // Invalidate cache for this module
+      cache.delete(`InstagramEvents/${userId}`);
+      
+      // Broadcast status update
+      const statusUpdate = {
+        type: 'message_status',
+        [type === 'message' ? 'message_id' : 'comment_id']: notification_id,
+        status: 'ai_handled',
+        updated_at: notificationData.updated_at,
+        timestamp: Date.now()
+      };
+      
+      broadcastUpdate(userId, { event: 'status_update', data: statusUpdate });
+      
+      return res.json({ success: true });
+    } catch (error) {
+      // If the notification doesn't exist, that's okay
+      if (error.code === 'NoSuchKey') {
+        console.log(`[${new Date().toISOString()}] Notification ${notification_id} not found, skipping`);
+        return res.json({ success: true, message: 'Notification not found, no action needed' });
+      }
+      
+      console.error(`[${new Date().toISOString()}] Error marking notification as handled:`, error);
+      return res.status(500).json({ 
+        error: 'Failed to mark notification as handled',
+        details: error.message
+      });
+    }
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error in mark-notification-handled:`, error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});

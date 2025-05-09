@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption: Brows so good, they're practically floating! ✨ Get ready to elevate your brow game with our foolproof tips and tricks for achieving the perfect lifted look. Swipe to see our fave products and get ready to slay! 😉\n\nHashtags: #MACBrows #BrowLift #EyebrowGoals #MakeupTutorial #BrowGameStrong #MACCosmetics #BeautyHacks #LiftedBrows #MakeupInspo #BrowTransformation\n\nCall to Action: Tag a friend who needs a brow makeover! 👇\n\nVisual Description for Image: A close-up shot focusing on the upper half of a woman's face, showcasing perfectly sculpted and lifted eyebrows. The model has flawless, dewy skin with a subtle, natural makeup look. The eyebrows are the star of the show: meticulously shaped, filled in with a gradient effect (lighter at the inner corner, darker towards the tail), and brushed upwards to create a feathery, lifted appearance. The brow hairs are clearly defined and separated, not overly filled or blocky. The background is a soft, blurred gradient of warm, neutral tones (beige, cream, light brown) to keep the focus on the brows. The lighting is soft and diffused, creating a flattering glow and highlighting the texture of the brow hairs. The overall mood is sophisticated, polished, and aspirational. The image should have a clean, modern aesthetic, reminiscent of high-end beauty photography. The model's eye is partially visible, with a hint of a soft, neutral eyeshadow and perfectly curled lashes. The composition is slightly asymmetrical, with the focus slightly shifted to one eyebrow to create visual interest. The image should convey a sense of effortless beauty and attainable brow perfection.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.36401987354657805
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 253,
+    "candidatesTokenCount": 342,
+    "totalTokenCount": 595,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 253
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 342
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

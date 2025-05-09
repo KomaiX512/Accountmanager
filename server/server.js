@@ -1284,7 +1284,7 @@ async function streamToString(stream) {
 // Instagram App Credentials
 const APP_ID = '576296982152813';
 const APP_SECRET = 'd48ddc9eaf0e5c4969d4ddc4e293178c';
-const REDIRECT_URI = 'https://be56-121-52-146-243.ngrok-free.app/instagram/callback';
+const REDIRECT_URI = 'https://4a8a-121-52-146-243.ngrok-free.app/instagram/callback';
 const VERIFY_TOKEN = 'myInstagramWebhook2025';
 
 
@@ -2674,7 +2674,7 @@ app.get('/instagram/data-deletion', (req, res) => {
   const signedRequest = req.query.signed_request;
   console.log(`[${new Date().toISOString()}] Data deletion request received:`, signedRequest);
   res.json({
-    url: 'https://be56-121-52-146-243.ngrok-free.app/instagram/data-deletion',
+    url: 'https://4a8a-121-52-146-243.ngrok-free.app/instagram/data-deletion',
     confirmation_code: `delete_${Date.now()}`
   });
 });
@@ -2682,7 +2682,7 @@ app.get('/instagram/data-deletion', (req, res) => {
 app.post('/instagram/data-deletion', (req, res) => {
   console.log(`[${new Date().toISOString()}] Data deletion POST request received:`, JSON.stringify(req.body, null, 2));
   res.json({
-    url: 'https://be56-121-52-146-243.ngrok-free.app/instagram/data-deletion',
+    url: 'https://4a8a-121-52-146-243.ngrok-free.app/instagram/data-deletion',
     confirmation_code: `delete_${Date.now()}`
   });
 });

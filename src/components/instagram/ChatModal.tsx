@@ -7,6 +7,11 @@ export interface ChatMessage {
   content: string;
 }
 
+export interface LinkedAccount {
+  url: string;
+  username: string;
+}
+
 export interface ChatModalProps {
   open: boolean;
   onClose: () => void;
@@ -14,6 +19,7 @@ export interface ChatModalProps {
   onSendMessage?: (message: string) => void;
   username?: string;
   isProcessing?: boolean;
+  linkedAccounts?: LinkedAccount[];
 }
 
 const ChatModal: React.FC<ChatModalProps> = ({
@@ -22,7 +28,8 @@ const ChatModal: React.FC<ChatModalProps> = ({
   messages,
   onSendMessage,
   username = 'Instagram Chat',
-  isProcessing = false
+  isProcessing = false,
+  linkedAccounts = []
 }) => {
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -48,6 +55,35 @@ const ChatModal: React.FC<ChatModalProps> = ({
       onSendMessage(newMessage);
       setNewMessage('');
     }
+  };
+
+  // Function to extract Instagram accounts from a message
+  const findInstagramAccounts = (content: string) => {
+    const matches = content.match(/https:\/\/instagram\.com\/([A-Za-z0-9_.-]+)/g);
+    if (matches?.length) {
+      return matches.map(url => ({
+        url,
+        username: url.replace('https://instagram.com/', '')
+      }));
+    }
+    return [];
+  };
+
+  // Function to format message content with clickable links
+  const formatMessageContent = (content: string) => {
+    // Replace Instagram URLs with clickable links
+    let formattedContent = content.replace(
+      /(https:\/\/instagram\.com\/[A-Za-z0-9_.-]+)/g,
+      '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
+    );
+    
+    // Replace other URLs
+    formattedContent = formattedContent.replace(
+      /(https?:\/\/[^\s]+)/g,
+      '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
+    );
+    
+    return formattedContent;
   };
 
   if (!open) return null;
@@ -83,22 +119,64 @@ const ChatModal: React.FC<ChatModalProps> = ({
                   No chat history yet. Start a conversation!
                 </div>
               ) : (
-                messages.map((message, index) => (
-                  <motion.div
-                    key={index}
-                    className={`chat-message ${message.role === 'user' ? 'user-message' : 'assistant-message'}`}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <div className="message-bubble">
-                      <div className="message-content">{message.content}</div>
-                    </div>
-                  </motion.div>
-                ))
+                messages.map((message, index) => {
+                  // Check if this message contains Instagram account links
+                  const foundAccounts = findInstagramAccounts(message.content);
+                  
+                  return (
+                    <motion.div
+                      key={index}
+                      className={`chat-message ${message.role === 'user' ? 'user-message' : 'assistant-message'}`}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <div className="message-bubble">
+                        <div 
+                          className="message-content"
+                          dangerouslySetInnerHTML={{ __html: formatMessageContent(message.content) }}
+                        />
+                        
+                        {message.role === 'assistant' && foundAccounts.length > 0 && (
+                          <div className="message-linked-accounts">
+                            <h4>Mentioned Accounts:</h4>
+                            <ul>
+                              {foundAccounts.map((account, idx) => (
+                                <li key={idx}>
+                                  <a href={account.url} target="_blank" rel="noopener noreferrer">
+                                    @{account.username}
+                                  </a>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                })
               )}
               <div ref={messagesEndRef} />
             </div>
+
+            {linkedAccounts.length > 0 && (
+              <div className="chat-linked-accounts">
+                <h3>Instagram Accounts:</h3>
+                <div className="linked-accounts-list">
+                  {linkedAccounts.map((account, idx) => (
+                    <a 
+                      key={idx}
+                      href={account.url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="linked-account-pill"
+                    >
+                      @{account.username}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {onSendMessage && (
               <form className="chat-input-form" onSubmit={handleSubmit}>

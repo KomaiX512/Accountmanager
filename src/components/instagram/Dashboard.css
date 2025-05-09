@@ -542,3 +542,74 @@ h2 {
     width: 100%;
   }
 }
+
+/* Add these styles for the chatbot result */
+.chatbot-result {
+  margin-top: 20px;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  position: relative;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.chatbot-result pre {
+  white-space: pre-wrap;
+  font-family: inherit;
+  margin: 0;
+  padding: 0;
+  color: #e0e0ff;
+  line-height: 1.6;
+}
+
+.linked-accounts {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.linked-accounts h3 {
+  font-size: 0.9rem;
+  margin-bottom: 8px;
+  color: #00ffcc;
+}
+
+.linked-accounts ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.linked-accounts li {
+  margin-bottom: 5px;
+}
+
+.linked-accounts a {
+  color: #00ffcc;
+  text-decoration: none;
+  transition: color 0.3s;
+}
+
+.linked-accounts a:hover {
+  color: #ff2e63;
+  text-decoration: underline;
+}
+
+.view-full-chat-btn {
+  margin-top: 15px;
+  background: linear-gradient(90deg, #007bff, #00ffcc);
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.view-full-chat-btn:hover {
+  background: linear-gradient(90deg, #0062cc, #00e6b8);
+  transform: translateY(-2px);
+}

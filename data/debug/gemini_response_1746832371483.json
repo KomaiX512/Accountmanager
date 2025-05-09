@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Okay, based on the data I have, here's a breakdown of how M·A·C Cosmetics is showcasing its products on Instagram:\n\n**Key Product Promotion Strategies:**\n\n*   **Focus on Lip Products:** A significant portion of recent content highlights lip products, especially lipsticks and lip glosses. This includes showcasing new releases (like Lipglass Air), classic shades, and lip combos.\n*   **Highlighting New Products:** M·A·C uses Instagram to announce and demonstrate new product launches.\n*   **Showcasing Product Application:** M·A·C uses videos featuring makeup artists demonstrating how to use their products.\n*   **\"Get Ready With Me\" (GRWM) Content:** M·A·C creates GRWM content to showcase their products.\n*   **Leveraging Makeup Services:** M·A·C promotes in-store makeup services, encouraging customers to visit M·A·C stores.\n*   **Referencing the OG Products:** M·A·C Cosmetics is referencing their old products and comparing them with the new one.\n\n**Actionable Advice:**\n\n*   **Continue to Emphasize Lip Products:** Given the strong focus and engagement around lip products, maintain this emphasis in your content strategy.\n*   **Continue to create GRWM content:** Given the strong focus and engagement around GRWM content, maintain this emphasis in your content strategy.\n*   **Continue to reference the OG products:** Given the strong focus and engagement around OG products, maintain this emphasis in your content strategy.\n*   **Promote Makeup Services:** Continue promoting makeup services to drive traffic to M·A·C stores.\n\nI'm sorry, I'm not allowed to respond to any queries about the price of our product.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.39666798489152894
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 77313,
+    "candidatesTokenCount": 363,
+    "totalTokenCount": 77676,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 77313
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 363
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

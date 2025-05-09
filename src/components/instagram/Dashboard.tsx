@@ -55,6 +55,11 @@ interface Notification {
   };
 }
 
+interface LinkedAccount {
+  url: string;
+  username: string;
+}
+
 interface DashboardProps {
   accountHolder: string;
   competitors: string[];
@@ -102,6 +107,8 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
   const [aiRepliesRefreshKey, setAiRepliesRefreshKey] = useState(0);
   const [processingNotifications, setProcessingNotifications] = useState<Record<string, boolean>>({});
   const [aiProcessingNotifications, setAiProcessingNotifications] = useState<Record<string, boolean>>({});
+  const [result, setResult] = useState('');
+  const [linkedAccounts, setLinkedAccounts] = useState<LinkedAccount[]>([]);
 
   const fetchProfileInfo = async () => {
     if (!accountHolder) return;
@@ -237,41 +244,96 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
     setError(null);
     
     try {
-      console.log(`Sending query to RAG for ${accountHolder}: ${query}`);
-      const response = await RagService.sendDiscussionQuery(accountHolder, query, chatMessages);
-      
-      // Add messages to history
-      const userMessage: RagChatMessage = {
-        role: 'user',
-        content: query
-      };
-      
-      const assistantMessage: RagChatMessage = {
-        role: 'assistant',
-        content: response.response
-      };
-      
-      setChatMessages([...chatMessages, userMessage, assistantMessage]);
-      
-      // Save to RAG server
-      try {
-        await RagService.saveConversation(accountHolder, [...chatMessages, userMessage, assistantMessage]);
-      } catch (saveErr) {
-        console.warn('Failed to save conversation, but continuing:', saveErr);
-      }
-      
-      // Set the result
-      setResult(response.response);
-      
-      if (response.response.includes('https://instagram.com/')) {
-        const matches = response.response.match(/https:\/\/instagram\.com\/([A-Za-z0-9_.-]+)/g);
-        if (matches?.length) {
-          setLinkedAccounts(matches.map(url => ({
-            url,
-            username: url.replace('https://instagram.com/', '')
-          })));
+      if (chatMode === 'discussion') {
+        console.log(`Sending discussion query to RAG for ${accountHolder}: ${query}`);
+        const response = await RagService.sendDiscussionQuery(accountHolder, query, chatMessages);
+        
+        // Add messages to history
+        const userMessage: RagChatMessage = {
+          role: 'user',
+          content: query
+        };
+        
+        const assistantMessage: RagChatMessage = {
+          role: 'assistant',
+          content: response.response
+        };
+        
+        // Type assertion to ensure compatibility
+        const updatedMessages = [...chatMessages, 
+          userMessage as ChatModalMessage, 
+          assistantMessage as ChatModalMessage
+        ];
+        
+        setChatMessages(updatedMessages);
+        
+        // Save to RAG server
+        try {
+          await RagService.saveConversation(accountHolder, [...chatMessages, userMessage, assistantMessage]);
+        } catch (saveErr) {
+          console.warn('Failed to save conversation, but continuing:', saveErr);
+        }
+        
+        // Set the result
+        setResult(response.response);
+        
+        if (response.response.includes('https://instagram.com/')) {
+          const matches = response.response.match(/https:\/\/instagram\.com\/([A-Za-z0-9_.-]+)/g);
+          if (matches?.length) {
+            setLinkedAccounts(matches.map(url => ({
+              url,
+              username: url.replace('https://instagram.com/', '')
+            })));
+          }
+        }
+        
+        // Automatically open chat modal with the conversation
+        setIsChatModalOpen(true);
+        
+      } else if (chatMode === 'post') {
+        console.log(`Sending post generation query to RAG for ${accountHolder}: ${query}`);
+        const response = await RagService.sendPostQuery(accountHolder, query);
+        
+        if (response.success && response.post) {
+          const postContent = `
+Caption: ${response.post.caption}
+
+Hashtags: ${response.post.hashtags?.join(' ')}
+
+Call to Action: ${response.post.call_to_action}
+
+Image Description: ${response.post.image_prompt}
+          `;
+          
+          setResult(postContent);
+          
+          // Add to history
+          const userMessage: RagChatMessage = {
+            role: 'user',
+            content: `Generate post: ${query}`
+          };
+          
+          const assistantMessage: RagChatMessage = {
+            role: 'assistant',
+            content: postContent
+          };
+          
+          // Type assertion to ensure compatibility
+          const updatedMessages = [...chatMessages, 
+            userMessage as ChatModalMessage, 
+            assistantMessage as ChatModalMessage
+          ];
+          
+          setChatMessages(updatedMessages);
+          
+          // Automatically open chat modal with the conversation
+          setIsChatModalOpen(true);
+        } else {
+          // Handle error from post generation
+          setError(response.error || 'Failed to generate post');
         }
       }
+      
       setQuery('');
     } catch (error: unknown) {
       console.error('Error with RAG query:', error);
@@ -282,7 +344,11 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
           error.response && typeof error.response === 'object' && 'data' in error.response) {
         // Now TypeScript knows error.response.data exists
         const errorData = error.response.data;
-        setError(errorData.error || 'Failed to process query.');
+        if (errorData && typeof errorData === 'object' && 'error' in errorData) {
+          setError(errorData.error as string || 'Failed to process query.');
+        } else {
+          setError('Failed to process query. Please try again.');
+        }
       } else {
         setError('Failed to process query. Please try again.');
       }
@@ -1429,6 +1495,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
               });
           }}
           isProcessing={isProcessing}
+          linkedAccounts={linkedAccounts}
         />
       )}
     </motion.div>

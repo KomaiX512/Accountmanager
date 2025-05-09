@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "I'm sorry, I do not have access to real-time follower/following growth data or analytics for specific Instagram accounts. I can't provide you with a current follower and following growth graph.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.39897791544596356
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 77322,
+    "candidatesTokenCount": 42,
+    "totalTokenCount": 77364,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 77322
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 42
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

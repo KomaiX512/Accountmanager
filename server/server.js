@@ -229,6 +229,8 @@ function setCorsHeaders(res, origin = '*') {
   res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
 }
 
+// Add this at the beginning of your server.js file, right after imports
+// Enhanced CORS configuration
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -238,6 +240,26 @@ app.use(cors({
   preflightContinue: false,
   optionsSuccessStatus: 204
 }));
+
+// Add this before your routes
+// Additional CORS handling for RAG endpoints
+app.use((req, res, next) => {
+  // Set CORS headers for all responses
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  // Special handling for RAG endpoints
+  if (req.path.startsWith('/rag-')) {
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+      return res.status(204).end();
+    }
+  }
+  
+  next();
+});
 
 app.use(express.json({ limit: '10mb' }));
 
@@ -1262,7 +1284,7 @@ async function streamToString(stream) {
 // Instagram App Credentials
 const APP_ID = '576296982152813';
 const APP_SECRET = 'd48ddc9eaf0e5c4969d4ddc4e293178c';
-const REDIRECT_URI = 'https://b697-121-52-146-243.ngrok-free.app/instagram/callback';
+const REDIRECT_URI = 'https://be56-121-52-146-243.ngrok-free.app/instagram/callback';
 const VERIFY_TOKEN = 'myInstagramWebhook2025';
 
 
@@ -1610,12 +1632,20 @@ async function getTokenData(instagram_graph_id) {
 
 // Send DM Reply
 app.post('/send-dm-reply/:userId', async (req, res) => {
+  // Set CORS headers explicitly for this endpoint
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  // Handle OPTIONS preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+  
   const { userId } = req.params;
   const { sender_id, text, message_id } = req.body;
 
   if (!sender_id || !text || !message_id) {
     console.log(`[${new Date().toISOString()}] Missing required fields for DM reply`);
-    return res.status(400).send('Missing sender_id, text, or message_id');
+    return res.status(400).json({error: 'Missing sender_id, text, or message_id'});
   }
 
   try {
@@ -1649,27 +1679,88 @@ app.post('/send-dm-reply/:userId', async (req, res) => {
 
     if (!tokenData) {
       console.log(`[${new Date().toISOString()}] No token found for instagram_user_id ${userId}`);
-      return res.status(404).send('No access token found for this Instagram account');
+      return res.status(404).json({error: 'No access token found for this Instagram account'});
     }
 
     const access_token = tokenData.access_token;
     const instagram_graph_id = tokenData.instagram_graph_id;
 
-    // Send the DM reply
-    const response = await axios({
-      method: 'post',
-      url: `https://graph.instagram.com/v22.0/${instagram_graph_id}/messages`,
-      headers: {
-        Authorization: `Bearer ${access_token}`,
-        'Content-Type': 'application/json',
-      },
-      data: {
-        recipient: { id: sender_id },
-        message: { text },
-      },
-    });
+    // Validate sender_id format - this might need adjustment based on your specific ID format
+    if (!/^[0-9]+$/.test(sender_id)) {
+      console.log(`[${new Date().toISOString()}] Invalid sender_id format: ${sender_id}`);
+      return res.status(400).json({error: 'Invalid sender_id format'});
+    }
 
-    console.log(`[${new Date().toISOString()}] DM reply sent to ${sender_id} for instagram_graph_id ${instagram_graph_id}`);
+    try {
+      // Send the DM reply
+      console.log(`[${new Date().toISOString()}] Attempting to send DM to sender_id: ${sender_id} with access token for ${instagram_graph_id}`);
+      
+      const response = await axios({
+        method: 'post',
+        url: `https://graph.instagram.com/v22.0/${instagram_graph_id}/messages`,
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+          'Content-Type': 'application/json',
+        },
+        data: {
+          recipient: { id: sender_id },
+          message: { text },
+        },
+      });
+
+      console.log(`[${new Date().toISOString()}] DM reply sent to ${sender_id} for instagram_graph_id ${instagram_graph_id}`);
+    } catch (dmError) {
+      console.error(`[${new Date().toISOString()}] Error sending DM reply:`, dmError.response?.data || dmError.message);
+      
+      // Handle the specific "user not found" error
+      if (dmError.response?.data?.error?.code === 100 && 
+          dmError.response?.data?.error?.error_subcode === 2534014) {
+            
+        // Mark the message as "handled" in storage even though we couldn't send the reply
+        console.log(`[${new Date().toISOString()}] User ${sender_id} not found. Marking message as handled.`);
+        
+        // Update original message status to "handled" instead of "replied"
+        const messageKey = `InstagramEvents/${userId}/${message_id}.json`;
+        try {
+          const getCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: messageKey,
+          });
+          const data = await s3Client.send(getCommand);
+          const messageData = JSON.parse(await data.Body.transformToString());
+          messageData.status = 'handled';
+          messageData.error = 'User not found';
+          messageData.updated_at = new Date().toISOString();
+
+          await s3Client.send(new PutObjectCommand({
+            Bucket: 'tasks',
+            Key: messageKey,
+            Body: JSON.stringify(messageData, null, 2),
+            ContentType: 'application/json',
+          }));
+          console.log(`[${new Date().toISOString()}] Updated DM status to handled at ${messageKey}`);
+          
+          // Return a "success" response but with a warning
+          return res.json({ 
+            success: true, 
+            warning: 'Message marked as handled but DM not sent: user not found',
+            handled: true
+          });
+        } catch (updateError) {
+          console.error(`[${new Date().toISOString()}] Error updating message status:`, updateError);
+        }
+        
+        // Return specific error for this case
+        return res.status(404).json({ 
+          error: 'Instagram user not found', 
+          code: 'USER_NOT_FOUND',
+          details: dmError.response?.data?.error || 'The specified recipient could not be found on Instagram'
+        });
+      }
+      
+      // Re-throw for general error handling
+      throw dmError;
+    }
 
     // Update original message status
     const messageKey = `InstagramEvents/${userId}/${message_id}.json`;
@@ -1718,7 +1809,7 @@ app.post('/send-dm-reply/:userId', async (req, res) => {
       instagram_user_id: userId,
       instagram_graph_id: instagram_graph_id,
       recipient_id: sender_id,
-      message_id: response.data.id || `reply_${Date.now()}`,
+      message_id: response?.data?.id || `reply_${Date.now()}`,
       text,
       timestamp: Date.now(),
       sent_at: new Date().toISOString(),
@@ -1732,21 +1823,32 @@ app.post('/send-dm-reply/:userId', async (req, res) => {
     }));
     console.log(`[${new Date().toISOString()}] Reply stored in R2 at ${replyKey}`);
 
-    res.json({ success: true, message_id: response.data.id });
+    res.json({ success: true, message_id: response?.data?.id });
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Error sending DM reply:`, error.response?.data || error.message);
-    res.status(500).send('Error sending DM reply');
+    res.status(500).json({ 
+      error: 'Error sending DM reply',
+      details: error.response?.data?.error || error.message 
+    });
   }
 });
 
 // Send Comment Reply
 app.post('/send-comment-reply/:userId', async (req, res) => {
+  // Set CORS headers explicitly for this endpoint
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  // Handle OPTIONS preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+  
   const { userId } = req.params;
   const { comment_id, text } = req.body;
 
   if (!comment_id || !text) {
     console.log(`[${new Date().toISOString()}] Missing required fields for comment reply`);
-    return res.status(400).send('Missing comment_id or text');
+    return res.status(400).json({error: 'Missing comment_id or text'});
   }
 
   try {
@@ -2572,7 +2674,7 @@ app.get('/instagram/data-deletion', (req, res) => {
   const signedRequest = req.query.signed_request;
   console.log(`[${new Date().toISOString()}] Data deletion request received:`, signedRequest);
   res.json({
-    url: 'https://b697-121-52-146-243.ngrok-free.app/instagram/data-deletion',
+    url: 'https://be56-121-52-146-243.ngrok-free.app/instagram/data-deletion',
     confirmation_code: `delete_${Date.now()}`
   });
 });
@@ -2580,7 +2682,7 @@ app.get('/instagram/data-deletion', (req, res) => {
 app.post('/instagram/data-deletion', (req, res) => {
   console.log(`[${new Date().toISOString()}] Data deletion POST request received:`, JSON.stringify(req.body, null, 2));
   res.json({
-    url: 'https://b697-121-52-146-243.ngrok-free.app/instagram/data-deletion',
+    url: 'https://be56-121-52-146-243.ngrok-free.app/instagram/data-deletion',
     confirmation_code: `delete_${Date.now()}`
   });
 });
@@ -4322,4 +4424,391 @@ app.post('/update-post-status/:username', async (req, res) => {
 app.options('/update-post-status/:username', (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
+});
+
+// RAG server proxy endpoint for instant AI replies to DMs/comments
+app.post('/rag-instant-reply/:username', async (req, res, next) => {
+  // Set CORS headers for this specific endpoint
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  // Handle preflight requests explicitly for this endpoint
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+  
+  console.log(`[PROXY] Received instant reply request for ${req.params.username}`);
+  const { username } = req.params;
+  const notification = req.body;
+  
+  if (!username || !notification || !notification.text) {
+    console.log(`[PROXY] Invalid instant reply request: missing username or notification text`);
+    return res.status(400).json({ 
+      error: 'Invalid request',
+      details: 'Username and notification with text are required'
+    });
+  }
+  
+  let retries = 0;
+  const maxRetries = 2;
+  
+  const attemptRequest = async () => {
+    try {
+      console.log(`[${new Date().toISOString()}] Forwarding instant reply request to RAG server for ${username} (attempt ${retries + 1}/${maxRetries + 1})`);
+      
+      const response = await axios.post('http://localhost:3001/api/instant-reply', {
+        username,
+        notification
+      }, {
+        timeout: 15000, // 15 seconds timeout
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Origin': 'http://localhost:3000'
+        }
+      });
+      
+      console.log(`[PROXY] Successfully received reply from RAG server`);
+      return response.data;
+    } catch (error) {
+      if (retries < maxRetries) {
+        retries++;
+        console.log(`[PROXY] Retrying request (${retries}/${maxRetries})...`);
+        return await attemptRequest();
+      }
+      throw error;
+    }
+  };
+  
+  try {
+    // Try to get instant reply from RAG server
+    const data = await attemptRequest();
+    
+    // If successful, save in the traditional AI reply format
+    if (data.success && data.reply) {
+      // Determine file prefix
+      const notifType = notification.type;
+      let fileTypePrefix;
+      
+      if (notifType === 'message') {
+        fileTypePrefix = 'ai_dm_';
+      } else if (notifType === 'comment') {
+        fileTypePrefix = 'ai_comment_';
+      } else {
+        return res.status(400).json({ error: 'Invalid notification type for AI reply' });
+      }
+      
+      const prefix = `ai_reply/${username}/`;
+      
+      try {
+        // --- Determine the next available file number ---
+        const listCommand = new ListObjectsV2Command({
+          Bucket: 'tasks',
+          Prefix: prefix,
+        });
+        const { Contents } = await s3Client.send(listCommand);
+        let nextNumber = 1;
+        if (Contents && Contents.length > 0) {
+          const nums = Contents
+            .map(obj => {
+              const match = obj.Key.match(new RegExp(`${fileTypePrefix}(\\d+)\\.json$`));
+              return match ? parseInt(match[1]) : 0;
+            })
+            .filter(n => n > 0);
+          nextNumber = nums.length > 0 ? Math.max(...nums) + 1 : 1;
+        }
+        
+        // --- Save the original notification ---
+        const reqKey = `${prefix}${fileTypePrefix}${nextNumber}.json`;
+        await s3Client.send(new PutObjectCommand({
+          Bucket: 'tasks',
+          Key: reqKey,
+          Body: JSON.stringify(notification, null, 2),
+          ContentType: 'application/json',
+        }));
+        
+        // --- Save the reply ---
+        const replyKey = `${prefix}${fileTypePrefix}replied_${nextNumber}.json`;
+        await s3Client.send(new PutObjectCommand({
+          Bucket: 'tasks',
+          Key: replyKey,
+          Body: JSON.stringify({ reply: data.reply }, null, 2),
+          ContentType: 'application/json',
+        }));
+        
+        // Clear cache
+        cache.delete(prefix);
+        
+        // Notify clients via SSE
+        const clients = sseClients.get(username) || [];
+        for (const client of clients) {
+          client.write(`data: ${JSON.stringify({ type: 'update', prefix })}\n\n`);
+        }
+        
+        // --- Auto-send DM reply if this is a message notification ---
+        if (notifType === 'message') {
+          const message_id = notification.message_id;
+          const sender_id = notification.sender_id;
+          let userId = null;
+          
+          // Map username to Instagram userId
+          try {
+            const listTokens = new ListObjectsV2Command({
+              Bucket: 'tasks',
+              Prefix: `InstagramTokens/`,
+            });
+            const { Contents: tokenContents } = await s3Client.send(listTokens);
+            if (tokenContents) {
+              for (const obj of tokenContents) {
+                if (obj.Key.endsWith('/token.json')) {
+                  const getCommand = new GetObjectCommand({
+                    Bucket: 'tasks',
+                    Key: obj.Key,
+                  });
+                  const tokenData = await s3Client.send(getCommand);
+                  const json = await tokenData.Body.transformToString();
+                  const token = JSON.parse(json);
+                  if (token.username === username) {
+                    userId = token.instagram_user_id;
+                    break;
+                  }
+                }
+              }
+            }
+          } catch (err) {
+            console.error(`[RAG-INSTANT-REPLY] Error mapping username to userId:`, err);
+          }
+          
+          // Send the reply if all info is available
+          if (userId && sender_id && message_id) {
+            try {
+              // Find access token
+              let access_token = null;
+              let instagram_graph_id = null;
+              const listTokens = new ListObjectsV2Command({
+                Bucket: 'tasks',
+                Prefix: `InstagramTokens/`,
+              });
+              const { Contents: tokenContents } = await s3Client.send(listTokens);
+              if (tokenContents) {
+                for (const obj of tokenContents) {
+                  if (obj.Key.endsWith('/token.json')) {
+                    const getCommand = new GetObjectCommand({
+                      Bucket: 'tasks',
+                      Key: obj.Key,
+                    });
+                    const tokenData = await s3Client.send(getCommand);
+                    const json = await tokenData.Body.transformToString();
+                    const token = JSON.parse(json);
+                    if (token.instagram_user_id === userId) {
+                      access_token = token.access_token;
+                      instagram_graph_id = token.instagram_graph_id;
+                      break;
+                    }
+                  }
+                }
+              }
+              if (access_token && instagram_graph_id) {
+                await axios({
+                  method: 'post',
+                  url: `https://graph.instagram.com/v22.0/${instagram_graph_id}/messages`,
+                  headers: {
+                    Authorization: `Bearer ${access_token}`,
+                    'Content-Type': 'application/json',
+                  },
+                  data: {
+                    recipient: { id: sender_id },
+                    message: { text: data.reply },
+                  },
+                });
+                // Update original message status
+                const messageKey = `InstagramEvents/${userId}/${message_id}.json`;
+                try {
+                  const getCommand = new GetObjectCommand({
+                    Bucket: 'tasks',
+                    Key: messageKey,
+                  });
+                  const messageData = await s3Client.send(getCommand);
+                  const updatedMessage = JSON.parse(await messageData.Body.transformToString());
+                  updatedMessage.status = 'replied';
+                  updatedMessage.updated_at = new Date().toISOString();
+                  await s3Client.send(new PutObjectCommand({
+                    Bucket: 'tasks',
+                    Key: messageKey,
+                    Body: JSON.stringify(updatedMessage, null, 2),
+                    ContentType: 'application/json',
+                  }));
+                } catch (error) {
+                  console.error(`[RAG-INSTANT-REPLY] Error updating DM status:`, error);
+                }
+              }
+            } catch (err) {
+              console.error(`[RAG-INSTANT-REPLY] Error sending AI DM reply:`, err);
+            }
+          }
+        }
+      } catch (saveError) {
+        console.error(`[PROXY] Error saving RAG instant reply:`, saveError);
+        // Continue and return the response even if saving fails
+      }
+    }
+    
+    // Return the RAG server response
+    res.json({ 
+      success: true, 
+      reply: data.reply, 
+      message: 'AI reply generated and saved' 
+    });
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] RAG instant reply proxy error:`, error.message);
+    
+    if (error.code === 'ECONNREFUSED') {
+      console.error(`[${new Date().toISOString()}] Connection refused to RAG server. Check if it's running.`);
+      res.status(503).json({ 
+        error: 'RAG server unavailable',
+        details: 'The RAG server is not accepting connections. Please try again later.'
+      });
+    } else if (error.response) {
+      // Forward the error from RAG server
+      console.log(`[PROXY] Forwarding RAG server error: ${error.response.status}`);
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      console.log(`[PROXY] Internal server error: ${error.message}`);
+      res.status(500).json({ 
+        error: 'Failed to connect to RAG server',
+        details: error.message
+      });
+    }
+    
+    // In case of error, try to fall back to the original AI reply system
+    try {
+      console.log(`[PROXY] Instant reply failed, falling back to original AI reply system`);
+      // Simply forward the notification to the original endpoint
+      next();
+    } catch (fallbackError) {
+      // Already sent error response, no need to send another
+      console.error(`[PROXY] Fallback also failed:`, fallbackError);
+    }
+  }
+});
+
+// RAG proxy - Instant Reply
+app.post('/rag-instant-reply/:username', async (req, res) => {
+  const { username } = req.params;
+  const notification = req.body;
+  
+  console.log(`[${new Date().toISOString()}] POST /rag-instant-reply/${username}`);
+  console.log('[PROXY] Received instant reply request for', username);
+  
+  // Validate input
+  if (!username || !notification || !notification.text) {
+    console.log('[PROXY] Invalid instant reply request:', JSON.stringify(req.body));
+    return res.status(400).json({
+      error: 'Invalid request',
+      details: 'Username and notification with text field are required',
+      received: {
+        username,
+        bodyKeys: Object.keys(req.body),
+        hasText: notification ? !!notification.text : false
+      }
+    });
+  }
+  
+  // Set CORS headers explicitly for this endpoint
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  // Attempt to forward to RAG server
+  let attempt = 1;
+  const maxAttempts = 3;
+  const timeout = 30000; // 30 seconds
+  
+  while (attempt <= maxAttempts) {
+    console.log(`[${new Date().toISOString()}] Forwarding instant reply request to RAG server for ${username} (attempt ${attempt}/${maxAttempts})`);
+    
+    try {
+      const ragResponse = await axios({
+        method: 'post',
+        url: `http://localhost:3001/api/instant-reply`,
+        data: {
+          username,
+          notification
+        },
+        timeout,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
+      
+      console.log('[PROXY] Successfully received reply from RAG server');
+      
+      // Store the AI reply immediately for viewing in the dashboard
+      const reply = ragResponse.data.reply;
+      
+      // Determine the type (dm or comment)
+      const type = notification.type === 'message' ? 'dm' : 'comment';
+      
+      // Generate a unique key for this request
+      const timestamp = Date.now();
+      const requestKey = `ai_reply/${username}/ai_${type}_${timestamp}.json`;
+      const replyKey = `ai_reply/${username}/ai_${type}_replied_${timestamp}.json`;
+      
+      // Store request
+      const requestData = {
+        type,
+        text: notification.text,
+        timestamp,
+        sender_id: notification.sender_id || '',
+        message_id: notification.message_id || ''
+      };
+      
+      // Store reply
+      const replyData = {
+        type,
+        reply,
+        timestamp,
+        generated_at: new Date().toISOString()
+      };
+      
+      try {
+        // Store the request
+        await s3Client.send(new PutObjectCommand({
+          Bucket: 'tasks',
+          Key: requestKey,
+          Body: JSON.stringify(requestData, null, 2),
+          ContentType: 'application/json'
+        }));
+        
+        // Store the reply
+        await s3Client.send(new PutObjectCommand({
+          Bucket: 'tasks',
+          Key: replyKey,
+          Body: JSON.stringify(replyData, null, 2),
+          ContentType: 'application/json'
+        }));
+        
+        console.log(`[${new Date().toISOString()}] AI reply stored for ${username} (${type})`);
+      } catch (storageError) {
+        console.error(`[${new Date().toISOString()}] Error storing AI reply:`, storageError);
+        // Continue anyway as the reply was generated successfully
+      }
+      
+      return res.json(ragResponse.data);
+    } catch (error) {
+      console.error(`[${new Date().toISOString()}] Error forwarding to RAG server (attempt ${attempt}/${maxAttempts}):`, 
+                     error.response?.data?.error || error.message);
+      
+      attempt++;
+      
+      if (attempt <= maxAttempts) {
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } else {
+        // All attempts failed
+        return res.status(503).json({
+          error: 'RAG server unavailable',
+          details: error.response?.data?.error || error.message
+        });
+      }
+    }
+  }
 });

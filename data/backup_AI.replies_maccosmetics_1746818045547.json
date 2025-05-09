@@ -1,0 +1,16 @@
+{
+  "username": "maccosmetics",
+  "timestamp": "2025-05-09T19:14:05.547Z",
+  "notification": {
+    "type": "message",
+    "instagram_user_id": "123456789",
+    "sender_id": "987654321",
+    "message_id": "test_message_123",
+    "text": "Hi, do you have this lipstick in red?",
+    "timestamp": 1746818042732,
+    "received_at": "2025-05-09T19:14:02.732Z",
+    "status": "pending"
+  },
+  "reply": "Hey there! 👋 Yes, we definitely have lipsticks in red! ❤️ To help you find the perfect shade, could you tell me what kind of red you're looking for? (Ex: matte, dark, bright, etc.)💄",
+  "mode": "instant"
+}

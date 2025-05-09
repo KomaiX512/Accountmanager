@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Hey! We've got a ton of products for All Ages, All Races, All Genders. Check out our lipsticks, foundations, and more on maccosmetics.com! ✨\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.17378602027893067
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 77401,
+    "candidatesTokenCount": 40,
+    "totalTokenCount": 77441,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 77401
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 40
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

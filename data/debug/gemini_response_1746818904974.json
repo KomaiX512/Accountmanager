@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Hey there! You can find us at m.maccosmetics.com ✨"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.18321938812732697
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 77402,
+    "candidatesTokenCount": 16,
+    "totalTokenCount": 77418,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 77402
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 16
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

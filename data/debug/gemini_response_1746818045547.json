@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Hey there! 👋 Yes, we definitely have lipsticks in red! ❤️ To help you find the perfect shade, could you tell me what kind of red you're looking for? (Ex: matte, dark, bright, etc.)💄"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.16533520756935588
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 77402,
+    "candidatesTokenCount": 49,
+    "totalTokenCount": 77451,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 77402
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 49
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

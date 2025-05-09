@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Hey! What info are you looking for? 😊💄"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.09393093802712181
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 77404,
+    "candidatesTokenCount": 11,
+    "totalTokenCount": 77415,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 77404
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 11
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

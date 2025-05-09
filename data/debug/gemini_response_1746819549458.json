@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Hey there! We've got tons of reds! Check out our website to see all the shades!💄💋"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.26207614981609845
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 77402,
+    "candidatesTokenCount": 23,
+    "totalTokenCount": 77425,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 77402
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 23
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

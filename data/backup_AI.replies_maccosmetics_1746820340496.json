@@ -1,0 +1,17 @@
+{
+  "username": "maccosmetics",
+  "timestamp": "2025-05-09T19:52:20.496Z",
+  "notification": {
+    "type": "message",
+    "instagram_graph_id": "17841471786269325",
+    "sender_id": "539180445642894",
+    "message_id": "aWdfZAG1faXRlbToxOklHTWVzc2FnZAUlEOjE3ODQxNDcxNzg2MjY5MzI1OjM0MDI4MjM2Njg0MTcxMDMwMTI0NDI3NjAxNzgyNzg1ODU2MDMyODozMjIyMzE0Njc4Mzk4NDA4NDYyMDI0NjIwODEzNTI5OTA3MgZDZD",
+    "text": "hey, I want some info about maccosmetics?",
+    "timestamp": 1746820287375,
+    "received_at": "2025-05-09T19:51:31.567Z",
+    "username": "unknown",
+    "status": "pending"
+  },
+  "reply": "Hey! What info are you looking for? 😊💄",
+  "mode": "instant"
+}

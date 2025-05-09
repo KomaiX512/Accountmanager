@@ -1,133 +1,248 @@
+/* Base styles */
 .dms-comments {
-    margin-top: 10px;
-  }
-  
-  .no-notifications {
-    color: #666;
-    font-style: italic;
-  }
-  
-  .notification-list {
-    list-style: none;
-    padding: 0;
-    max-height: 300px;
-    overflow-y: auto;
-  }
-  
-  .notification-item {
-    padding: 10px;
-    border-bottom: 1px solid #ddd;
-    font-size: 14px;
-  }
-  
-  .notification-item:last-child {
-    border-bottom: none;
-  }
-  
-  .notification-item strong {
-    color: #333;
-  }
-  
-  .notification-item .username {
-    color: #007bff;
-    font-weight: 500;
-  }
-  
-  .timestamp {
-    display: block;
-    font-size: 12px;
-    color: #999;
-    margin-top: 4px;
-  }
-  
-  .reply-container {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    margin-top: 8px;
-  }
-  
-  .reply-actions {
-    display: flex;
-    flex-direction: row;
-    gap: 8px;
-    margin-top: 6px;
-  }
-  
-  .reply-input {
-    flex: 1;
-    padding: 6px;
-    font-size: 14px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    outline: none;
-  }
-  
-  .reply-input:focus {
-    border-color: #007bff;
-  }
-  
-  .reply-button,
-  .ignore-button,
-  .ai-reply-button {
-    padding: 4px 10px;
-    font-size: 12px;
-    border-radius: 4px;
-    border: none;
-    font-weight: 500;
-    transition: background 0.2s, color 0.2s;
-    min-width: 70px;
-  }
-  
-  .reply-button {
-    background: linear-gradient(90deg, #007bff 60%, #00ffcc 100%);
-    color: #fff;
-    border: 1px solid #007bff;
-  }
-  
-  .reply-button:disabled {
-    background: #ccc;
-    color: #fff;
-    cursor: not-allowed;
-  }
-  
-  .ignore-button {
-    background: linear-gradient(90deg, #ff4d4f 60%, #ffb199 100%);
-    color: #fff;
-    border: 1px solid #ff4d4f;
-  }
-  
-  .ignore-button:hover:not(:disabled) {
-    background: #d9363e;
-  }
-  
-  .ignore-button:disabled {
-    background: #ccc;
-    color: #fff;
-    cursor: not-allowed;
-  }
-  
-  .ai-reply-button {
-    background: linear-gradient(90deg, #00ffcc 60%, #007bff 100%);
-    color: #222;
-    border: 1px solid #00ffcc;
-    box-shadow: 0 1px 4px rgba(0,255,204,0.07);
-  }
-  
-  .ai-reply-button:hover:not(:disabled) {
-    background: linear-gradient(90deg, #00e6b2 60%, #005fa3 100%);
-    color: #fff;
-  }
-  
-  .ai-reply-button:disabled {
-    background: #ccc;
-    color: #fff;
-    cursor: not-allowed;
-  }
-  
-  .error-message {
-    display: block;
-    color: #d32f2f;
-    font-size: 12px;
-    margin-top: 4px;
-  }
+  padding: 1rem;
+  background-color: #1a1a1a;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  color: white;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Notification header with refresh button and counters */
+.notifications-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.refresh-button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.refresh-button:hover {
+  background-color: #0069d9;
+}
+
+.refresh-button:disabled {
+  background-color: #282828;
+  color: #888;
+  cursor: not-allowed;
+}
+
+.ai-replies-counter {
+  background-color: #00695f;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 0.9rem;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+}
+
+/* No notifications message */
+.no-notifications {
+  text-align: center;
+  padding: 1rem;
+  color: #888;
+}
+
+/* Instagram not connected message */
+.instagram-not-connected {
+  text-align: center;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  background-color: #3a3a3a;
+  border-radius: 4px;
+  color: #ffcc00;
+}
+
+/* Notification list */
+.notification-list {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+.notification-item {
+  background-color: #222222;
+  border-radius: 6px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  position: relative;
+  border-left: 3px solid #007bff;
+}
+
+.notification-item.ai-reply-item {
+  border-left: 3px solid #00695f;
+}
+
+.notification-header {
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.notification-content {
+  margin-bottom: 10px;
+}
+
+.notification-content p {
+  margin: 0;
+  word-break: break-word;
+}
+
+/* Timestamps */
+.timestamp {
+  font-size: 0.8rem;
+  color: #999;
+  margin-left: auto;
+  display: block;
+}
+
+/* Reply container */
+.reply-container {
+  margin-top: 10px;
+}
+
+.reply-input {
+  width: 100%;
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid #444;
+  background-color: #333;
+  color: white;
+  margin-bottom: 8px;
+}
+
+.reply-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.reply-button, .ignore-button, .ai-reply-button, .send-ai-button {
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  min-width: 90px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.reply-button {
+  background-color: #007bff;
+  color: white;
+}
+
+.reply-button:hover {
+  background-color: #0069d9;
+}
+
+.reply-button:disabled {
+  background-color: #004c80;
+  color: #ccc;
+  cursor: not-allowed;
+}
+
+.ignore-button {
+  background-color: #3a3a3a;
+  color: #fafafa;
+}
+
+.ignore-button:hover {
+  background-color: #444;
+}
+
+.ignore-button:disabled {
+  background-color: #2a2a2a;
+  color: #888;
+  cursor: not-allowed;
+}
+
+.ai-reply-button {
+  background-color: #00695f;
+  color: #ffffff;
+}
+
+.ai-reply-button:hover {
+  background-color: #00564d;
+}
+
+.ai-reply-button:disabled {
+  background-color: #00362f;
+  color: #aaaaaa;
+  cursor: not-allowed;
+}
+
+.send-ai-button {
+  background: linear-gradient(90deg, #00695f, #007bff);
+  color: #ffffff;
+}
+
+.send-ai-button:hover {
+  background: linear-gradient(90deg, #00564d, #0069d9);
+}
+
+.send-ai-button:disabled {
+  background: linear-gradient(90deg, #00362f, #004c80);
+  color: #888;
+  cursor: not-allowed;
+}
+
+/* AI Reply Section in Notifications */
+.ai-reply-section {
+  background-color: #1d2a2a;
+  border-radius: 4px;
+  padding: 10px;
+  margin-top: 10px;
+  border: 1px solid #00695f;
+}
+
+.ai-reply-answer {
+  margin-bottom: 10px;
+  word-break: break-word;
+}
+
+.ai-reply-label {
+  color: #00ffcc;
+  font-weight: bold;
+  margin-right: 6px;
+}
+
+.ai-reply-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ai-reply-status {
+  font-size: 0.9rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.ai-reply-status.sent {
+  color: #00ffcc;
+}
+
+.ai-reply-status.error {
+  color: #ff5555;
+}
+
+/* Error messages */
+.error-message {
+  color: #ff5555;
+  font-size: 0.9rem;
+  margin-top: 5px;
+  display: block;
+}

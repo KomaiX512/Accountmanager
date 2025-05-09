@@ -1,0 +1,15 @@
+{
+  "username": "maccosmetics",
+  "timestamp": "2025-05-09T21:46:16.735Z",
+  "notification": {
+    "type": "message",
+    "sender_id": "539180445642894",
+    "message_id": "aWdfZAG1faXRlbToxOklHTWVzc2FnZAUlEOjE3ODQxNDcxNzg2MjY5MzI1OjM0MDI4MjM2Njg0MTcxMDMwMTI0NDI3NjAxNzgyNzg1ODU2MDMyODozMjIyMzI3MzQ2MDM4MjczNTU3MDQxODU5OTg0NjczOTk2OAZDZD",
+    "text": "tell me about the eyeshadows all product and varients you have...",
+    "timestamp": 1746827171757,
+    "received_at": "2025-05-09T21:46:11.757Z",
+    "status": "pending"
+  },
+  "reply": "Hey there! 👋 We've got a bunch of eyeshadows to choose from! To give you the best recommendation, could you tell me what kind of look you're going for? ✨ Are you looking for something neutral, colorful, matte, or shimmery? Let me know and I can help you find the perfect shades! 🎨",
+  "mode": "instant"
+}

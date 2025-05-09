@@ -1,54 +1,72 @@
-# React + TypeScript + Vite
+# Instagram Account Manager with RAG Chatbot
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This application provides an Instagram account management solution with an integrated Retrieval-Augmented Generation (RAG) chatbot for intelligent Instagram strategy assistance.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Discussion Mode**: Chat with the AI assistant about Instagram strategy, content ideas, and growth tactics
+- **Post Mode**: Generate complete Instagram posts including captions, hashtags, and image prompts
+- **Dashboard Integration**: Access the chatbot directly from your account dashboard
 
-## Expanding the ESLint configuration
+## Setup Instructions
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Prerequisites
 
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
-```
+- Node.js (v16 or higher)
+- npm or yarn
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Installation
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+1. Clone the repository
+2. Install dependencies:
+   ```
+   npm install
+   ```
 
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
-```
+### Running the Application
+
+1. Start the RAG server:
+   ```
+   npm run start-server
+   ```
+
+2. Start the frontend development server:
+   ```
+   npm run dev
+   ```
+
+3. Access the application at `http://localhost:5173`
+
+## Using the RAG Chatbot
+
+1. Navigate to your dashboard
+2. Click the chat icon to open the chatbot modal
+3. Choose between "Discussion Mode" and "Post Mode"
+4. Enter your query and submit
+5. Receive AI-generated responses based on your Instagram profile data
+
+### Discussion Mode
+
+Use this mode to ask questions about your Instagram strategy, such as:
+- "How can I improve my engagement rate?"
+- "What are the best posting times for my audience?"
+- "What content performs best for cosmetics brands?"
+
+### Post Mode
+
+Use this mode to generate complete Instagram posts by providing a brief description:
+- "Create a post about summer makeup trends"
+- "Generate content for a new product launch"
+- "Make a post about our upcoming sale"
+
+## Troubleshooting
+
+If you encounter issues with the RAG server:
+
+1. Ensure the server is running on port 3001
+2. Check that the frontend is correctly configured to connect to the server
+3. If necessary, restart both the server and frontend applications
+
+## License
+
+[MIT License](LICENSE)

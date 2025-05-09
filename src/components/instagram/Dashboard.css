@@ -451,3 +451,94 @@ h2 {
   gap: 15px;
   position: relative;
 }
+
+.chat-mode-selector {
+  position: relative;
+  z-index: 10;
+}
+
+.chat-mode-dropdown {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(0, 255, 204, 0.3);
+  border-radius: 6px;
+  padding: 10px;
+  color: #e0e0ff;
+  font-size: 0.9rem;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2300ffcc' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 30px;
+}
+
+.chat-mode-dropdown:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+  border-color: rgba(0, 255, 204, 0.5);
+}
+
+.chat-mode-dropdown:focus {
+  border-color: #00ffcc;
+  box-shadow: 0 0 8px rgba(0, 255, 204, 0.4);
+}
+
+.chatbot-send-btn.processing {
+  background: #4a4a6a;
+  cursor: not-allowed;
+}
+
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(224, 224, 255, 0.2);
+  border-radius: 50%;
+  border-top-color: #e0e0ff;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "profile profile"
+      "notifications post-cooked"
+      "strategies competitor-analysis"
+      "chatbot chatbot";
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "profile"
+      "notifications"
+      "post-cooked"
+      "strategies"
+      "competitor-analysis"
+      "chatbot";
+    gap: 30px;
+  }
+
+  .chatbot-input-container {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .chat-mode-selector {
+    width: 100%;
+  }
+
+  .chat-mode-dropdown {
+    width: 100%;
+  }
+}

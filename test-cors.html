@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CORS Test</title>
+  <script>
+    // Function to test 127.0.0.1
+    async function testIPv4() {
+      document.getElementById('ipv4-result').innerText = 'Testing...';
+      try {
+        const response = await fetch('http://127.0.0.1:3002/health', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        const data = await response.json();
+        document.getElementById('ipv4-result').innerText = 'Success: ' + JSON.stringify(data);
+      } catch (error) {
+        document.getElementById('ipv4-result').innerText = 'Error: ' + error.message;
+      }
+    }
+
+    // Function to test localhost
+    async function testLocalhost() {
+      document.getElementById('localhost-result').innerText = 'Testing...';
+      try {
+        const response = await fetch('http://localhost:3002/health', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        const data = await response.json();
+        document.getElementById('localhost-result').innerText = 'Success: ' + JSON.stringify(data);
+      } catch (error) {
+        document.getElementById('localhost-result').innerText = 'Error: ' + error.message;
+      }
+    }
+
+    // Function to test the RAG endpoint with 127.0.0.1
+    async function testRagIPv4() {
+      document.getElementById('rag-ipv4-result').innerText = 'Testing...';
+      try {
+        const response = await fetch('http://127.0.0.1:3002/rag-discussion/maccosmetics', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            query: 'test',
+            previousMessages: []
+          })
+        });
+        const data = await response.json();
+        document.getElementById('rag-ipv4-result').innerText = 'Success: Response received';
+      } catch (error) {
+        document.getElementById('rag-ipv4-result').innerText = 'Error: ' + error.message;
+      }
+    }
+
+    // Function to test the RAG endpoint with localhost
+    async function testRagLocalhost() {
+      document.getElementById('rag-localhost-result').innerText = 'Testing...';
+      try {
+        const response = await fetch('http://localhost:3002/rag-discussion/maccosmetics', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            query: 'test',
+            previousMessages: []
+          })
+        });
+        const data = await response.json();
+        document.getElementById('rag-localhost-result').innerText = 'Success: Response received';
+      } catch (error) {
+        document.getElementById('rag-localhost-result').innerText = 'Error: ' + error.message;
+      }
+    }
+  </script>
+</head>
+<body>
+  <h1>CORS Test</h1>
+
+  <div>
+    <h2>Test IPv4 (127.0.0.1)</h2>
+    <button onclick="testIPv4()">Test Health Endpoint (IPv4)</button>
+    <pre id="ipv4-result">Not tested yet</pre>
+  </div>
+
+  <div>
+    <h2>Test Localhost</h2>
+    <button onclick="testLocalhost()">Test Health Endpoint (localhost)</button>
+    <pre id="localhost-result">Not tested yet</pre>
+  </div>
+
+  <div>
+    <h2>Test RAG Endpoint (IPv4)</h2>
+    <button onclick="testRagIPv4()">Test RAG Endpoint (IPv4)</button>
+    <pre id="rag-ipv4-result">Not tested yet</pre>
+  </div>
+
+  <div>
+    <h2>Test RAG Endpoint (localhost)</h2>
+    <button onclick="testRagLocalhost()">Test RAG Endpoint (localhost)</button>
+    <pre id="rag-localhost-result">Not tested yet</pre>
+  </div>
+</body>
+</html> 

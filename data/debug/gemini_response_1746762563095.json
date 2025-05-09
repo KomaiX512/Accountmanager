@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Okay, based on the data I have, here's a list of M·A·C Cosmetics products that have been featured in their recent Instagram content:\n\n*   **Studio Fix Powder Plus Foundation**\n*   **Studio Radiance 24HR Luminous Lift Concealer**\n*   **Hyper Real™ SkinCanvas Balm**\n*   **Fix+ Matte**\n*   **Pro Locked Brow Gel**\n*   **Fast Response Eye Cream**\n*   **Lip Conditioner**\n*   **Lip Pencil (various shades like Chestnut, Stripdown, Cool Spice, Cherry)**\n*   **Lipglass (various, including Oh Baby! and Clear)**\n*   **Lipglass Air Non-Sticky Gloss (various shades like Zephyr, Snobbish)**\n*   **Powder Blush (various shades like Raizin, Pinch Me)**\n*   **Powder Kiss Velvet Blur Slim Stick (in Devoted to Danger)**\n*   **Powder Kiss Liquid Lipcolour (in Date-Maker)**\n*   **Extended Play Gigablack Lash Mascara**\n*   **M·A·CStack Mascara (with Mega and Micro Brush)**\n*   **Brushstroke Brushblack Liner**\n*   **Glow Play Blush (in So Natural)**\n*   **Dazzleshadow (and Dazzleshadow Sticks)**\n*   **Colour Excess Gel Pencil Eyeliner**\n*   **Eyeshadow Palettes (Connect In Colour Palettes, Hawkins Class Of 1986 Eye Palette from the Stranger Things collection)**\n*   **Lustreglass Lipstick (in Business Casual)**\n*   **Mineralize Skinfinish Natural**\n*   **Studio Fix 24 hr concealer**\n*   **Studio Fix Conceal And Correct Palette**\n\nThis list is compiled from the captions and descriptions of recent posts and IGTV videos.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.09358905752499898
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 77314,
+    "candidatesTokenCount": 384,
+    "totalTokenCount": 77698,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 77314
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 384
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

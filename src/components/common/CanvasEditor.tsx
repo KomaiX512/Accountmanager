@@ -266,40 +266,115 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
       setIsProcessing(true);
       setImageLoaded(false);
       
-      // If URL is relative or needs proxying, use proxy
-      const proxyUrl = url.startsWith('http') 
-        ? `http://localhost:3000/proxy-image?url=${encodeURIComponent(url)}`
-        : url;
-        
-      console.log(`[Canvas] Loading image from URL: ${proxyUrl}`);
+      // Try direct loading first, only use proxy as fallback
+      let imageUrl = '';
+      let blob: Blob | null = null;
       
-      // Try loading via blob to avoid CORS and state lock issues
-      const response = await fetch(proxyUrl);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+      // First try: Use a CORS proxy directly
+      try {
+        console.log(`[Canvas] Attempting to load image via CORS proxy: ${url}`);
+        const corsProxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+        const corsResponse = await fetch(corsProxyUrl, { 
+          mode: 'cors',
+          headers: {
+            'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8'
+          }
+        });
+        
+        if (corsResponse.ok) {
+          blob = await corsResponse.blob();
+          imageUrl = URL.createObjectURL(blob);
+          console.log('[Canvas] Successfully loaded image via CORS proxy');
+        } else {
+          console.warn(`[Canvas] CORS proxy failed with status: ${corsResponse.status}`);
+        }
+      } catch (corsError) {
+        console.warn('[Canvas] CORS proxy attempt failed:', corsError);
       }
       
-      const blob = await response.blob();
-      const imageUrl = URL.createObjectURL(blob);
+      // Second try: Use our server proxy
+      if (!imageUrl) {
+        try {
+          console.log('[Canvas] Attempting to load image via server proxy');
+          const proxyUrl = `http://localhost:3000/proxy-image?url=${encodeURIComponent(url)}&fallback=pixel`;
+          
+          const response = await fetch(proxyUrl);
+          if (response.ok) {
+            blob = await response.blob();
+            imageUrl = URL.createObjectURL(blob);
+            console.log('[Canvas] Successfully loaded image via server proxy');
+          } else {
+            console.error(`[Canvas] Server proxy failed with status: ${response.status} ${response.statusText}`);
+          }
+        } catch (proxyError) {
+          console.error('[Canvas] Server proxy attempt failed:', proxyError);
+        }
+      }
+      
+      // Final attempt: Try loading directly (might work for some public images)
+      if (!imageUrl) {
+        try {
+          console.log('[Canvas] Attempting direct image load as last resort');
+          const directResponse = await fetch(url, { 
+            mode: 'no-cors',
+            cache: 'no-cache' 
+          });
+          
+          // Note: With no-cors, we might not get a proper blob, but let's try
+          try {
+            blob = await directResponse.blob();
+            imageUrl = URL.createObjectURL(blob);
+            console.log('[Canvas] Successfully loaded image directly');
+          } catch (blobError) {
+            console.warn('[Canvas] Failed to get blob from direct image load:', blobError);
+          }
+        } catch (directError) {
+          console.error('[Canvas] Direct image load failed:', directError);
+        }
+      }
+      
+      // If all methods failed, create a blank canvas
+      if (!imageUrl) {
+        console.warn('[Canvas] All image loading methods failed, creating blank canvas');
+        const canvas = document.createElement('canvas');
+        canvas.width = 800;
+        canvas.height = 600;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          
+          // Add text indicating image failed to load
+          ctx.font = '16px Arial';
+          ctx.fillStyle = '#999999';
+          ctx.textAlign = 'center';
+          ctx.fillText('Image could not be loaded', canvas.width / 2, canvas.height / 2);
+          ctx.fillText('Click here to upload an image manually', canvas.width / 2, canvas.height / 2 + 30);
+        }
+        imageUrl = canvas.toDataURL();
+        console.log('[Canvas] Created fallback blank canvas');
+      }
       
       // Wait for any ongoing operations to complete
       setTimeout(async () => {
         try {
           await tuiInstanceRef.current.loadImageFromURL(imageUrl, 'user-upload');
-          console.log('[Canvas] Image loaded successfully via blob');
+          console.log('[Canvas] Image loaded successfully');
           setImageLoaded(true);
           
           // Clean up the object URL
-          URL.revokeObjectURL(imageUrl);
+          if (blob) {
+            URL.revokeObjectURL(imageUrl);
+          }
         } catch (error) {
-          console.error('[Canvas] Error loading image from blob:', error);
-          setNotification('Failed to load image. Please try again.');
+          console.error('[Canvas] Error loading image into editor:', error);
+          setNotification('Failed to load image. Please try uploading manually.');
           setIsProcessing(false);
         }
       }, 100);
     } catch (err) {
       console.error('[Canvas] Error in loadImageFromUrl:', err);
-      setNotification('Failed to load image. Please try uploading manually.');
+      setNotification('Failed to load image. Try uploading manually.');
       setIsProcessing(false);
     }
   }, [isEditorReady, isProcessing]);

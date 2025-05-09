@@ -6,6 +6,12 @@ module.exports = {
       sendCommentReply: '/send-comment-reply/:userId',
       ignoreNotification: '/ignore-notification/:userId',
       events: '/events/:userId',
+      
+      // RAG endpoints
+      ragDiscussion: '/rag-discussion/:username',
+      ragPost: '/rag-post/:username',
+      saveConversation: '/save-conversation/:username',
+      loadConversation: '/load-conversation/:username',
     },
     permissions: {
       insights: ['instagram_basic', 'instagram_manage_insights'],

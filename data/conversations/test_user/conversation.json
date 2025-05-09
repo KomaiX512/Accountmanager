@@ -1,0 +1,12 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "How do I get more followers?"
+    },
+    {
+      "role": "assistant",
+      "content": "To increase your followers, focus on consistent posting, engaging with your audience, and using relevant hashtags."
+    }
+  ]
+}

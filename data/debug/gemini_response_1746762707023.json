@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Okay, based on the \"related profiles\" data, here's a closer look at your key competitors on Instagram, focusing on those with similar product offerings and target audiences:\n\n**Direct Competitors (Cosmetics Focused):**\n\n*   **Urban Decay Cosmetics (@urbandecaycosmetics):** Similar product range, strong focus on edgy and trend-driven makeup.\n*   **Rare Beauty by Selena Gomez (@rarebeauty):** Celebrity-owned brand, emphasizes inclusivity and natural beauty.\n*   **Too Faced Cosmetics (@toofaced):** Known for playful packaging and a wide variety of makeup products.\n*   **ONE/SIZE (@onesize):** Focused on inclusivity and bold, high-impact makeup looks.\n*   **SHEGLAM OFFICIAL (@sheglam\\_official):** Fast-fashion beauty brand, known for affordable and trendy products.\n*   **Revlon (@revlon):** Classic drugstore brand, wide range of affordable makeup products.\n*   **Stila Cosmetics (@stilacosmetics):** Known for innovative and high-quality makeup products.\n*   **FENTY SKIN (@fentyskin):** Celebrity-owned brand, focuses on inclusivity and skincare-infused makeup.\n*   **Hourglass Cosmetics (@hourglasscosmetics):** Luxury brand known for high-performance and innovative products.\n*   **r.e.m.beauty (@r.e.m.beauty):** Celebrity-owned brand, focuses on innovative and high-quality makeup products.\n*   **Beauty Creations Cosmetics (@beautycreations.cosmetics):** Known for affordable and colorful makeup products.\n*   **NATASHA DENONA BEAUTY (@natashadenonabeauty):** Luxury brand known for high-performance and innovative products.\n*   **Juvia's Place (@juviasplace):** Known for highly pigmented and affordable makeup products.\n*   **Armani beauty (@armanibeauty):** Luxury brand known for high-performance and innovative products.\n*   **IT Cosmetics 🇺🇸 (@itcosmetics):** Focuses on problem-solving makeup and skincare products.\n*   **Sephora Collection (@sephoracollection):** Wide range of affordable makeup products.\n\n**Competitors with Overlapping Interests (Broader Beauty/Lifestyle):**\n\n*   **Dior Beauty Lovers (@diorbeautylovers):** High-end beauty, but also incorporates fashion and lifestyle elements.\n*   **Glow Recipe (@glowrecipe):** Skincare focused, but skincare and makeup often go hand-in-hand.\n*   **Pixi by Petra (@pixibeauty):** Skincare and makeup brand with a focus on natural beauty.\n\n**Why these are important to watch:**\n\n*   **Content Themes:** Analyze what kind of content (tutorials, product demos, behind-the-scenes, user-generated content) resonates most with *their* audiences.\n*   **Collaboration Strategies:** Note if they're partnering with influencers, makeup artists, or other brands.\n*   **Campaign Focus:** What products or themes are they currently pushing?\n*   **Engagement Tactics:** How are they interacting with their followers (Q&As, contests, polls)?\n*   **Visual Style:** What kind of aesthetic are they using (photography, video editing, graphics)?\n\nBy closely monitoring these accounts, you can identify opportunities to differentiate M·A·C, capitalize on emerging trends, and refine your content strategy to better engage your target audience.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.16156033182275525
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 77317,
+    "candidatesTokenCount": 726,
+    "totalTokenCount": 78043,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 77317
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 726
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

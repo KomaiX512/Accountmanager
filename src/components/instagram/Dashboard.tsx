@@ -14,6 +14,8 @@ import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import InstagramRequiredButton from '../common/InstagramRequiredButton';
 import { useInstagram } from '../../context/InstagramContext';
+import ChatModal from './ChatModal';
+import RagService from '../../services/RagService';
 
 interface ProfileInfo {
   fullName: string;
@@ -66,6 +68,10 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
     type: 'dm' | 'comment';
     id: string;
   }[]>([]);
+  const [chatMode, setChatMode] = useState<'discussion' | 'post'>('discussion');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [chatMessages, setChatMessages] = useState<{role: string, content: string}[]>([]);
+  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
@@ -76,24 +82,6 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
   const { currentUser } = useAuth();
   const imageRetryAttemptsRef = useRef(0);
   const maxImageRetryAttempts = 3;
-  const [directProfilePicUrl, setDirectProfilePicUrl] = useState<string | null>(null);
-
-  const tryDirectProfileImageFetch = async (url: string) => {
-    if (!url) return false;
-    
-    try {
-      console.log(`Using proxy endpoint for profile image: ${url.substring(0, 50)}...`);
-      const proxyUrl = `http://localhost:3000/proxy-image?url=${encodeURIComponent(url)}&t=${Date.now()}&nocache=true&forceCors=true&fallback=pixel`;
-      
-      setDirectProfilePicUrl(proxyUrl);
-      setImageError(false);
-      
-      return true;
-    } catch (err) {
-      console.error('Profile pic proxy URL creation error:', err);
-      return false;
-    }
-  };
 
   const fetchProfileInfo = async () => {
     if (!accountHolder) return;
@@ -108,26 +96,10 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
         return;
       }
       const response = await axios.get(`http://localhost:3000/profile-info/${accountHolder}?forceRefresh=true`);
-      
-      // Validate profile pic URL data before setting
-      const data = response.data;
-      if (data && data.profilePicUrlHD) {
-        try {
-          // Validate the URL format
-          new URL(data.profilePicUrlHD);
-          
-          // Try direct fetching
-          tryDirectProfileImageFetch(data.profilePicUrlHD);
-        } catch (urlErr) {
-          console.error(`Invalid profilePicUrlHD format: ${data.profilePicUrlHD}`);
-          data.profilePicUrlHD = null; // Clear invalid URL
-        }
-      }
-      
-      setProfileInfo(data);
+      setProfileInfo(response.data);
       lastProfilePicRenderTimeRef.current = now;
       imageRetryAttemptsRef.current = 0;
-      console.log('Profile Info Fetched:', data);
+      console.log('Profile Info Fetched:', response.data);
     } catch (err: any) {
       if (err.response?.status === 404) {
         setProfileInfo(null);
@@ -216,14 +188,84 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
 
   const handleSendQuery = async () => {
     if (!query.trim() || !accountHolder) return;
+    setIsProcessing(true);
     try {
-      await axios.post(`http://localhost:3000/save-query/${accountHolder}`, { query });
+      if (chatMode === 'discussion') {
+        // For discussion mode, use RagService and show chat modal
+        try {
+          const response = await RagService.sendDiscussionQuery(accountHolder, query, chatMessages);
+          setChatMessages(prev => [...prev, 
+            { role: 'user', content: query },
+            { role: 'assistant', content: response.response }
+          ]);
+          setToast('Response received!');
+          setIsChatModalOpen(true);
+          
+          // Save the conversation for future reference
+          RagService.saveConversation(accountHolder, [
+            ...chatMessages,
+            { role: 'user', content: query },
+            { role: 'assistant', content: response.response }
+          ]).catch(err => console.error('Error saving conversation:', err));
+        } catch (ragError) {
+          // Fallback to main server if RAG server is unavailable
+          console.warn('RAG server error, falling back to main server:', ragError);
+          setToast('RAG service is currently unavailable. Falling back to local processing.');
+          
+          // Save the user's query to the main server
+          await axios.post(`http://localhost:3000/save-query/${accountHolder}`, { 
+            query,
+            mode: 'discussion',
+            fallback: true
+          });
+          
+          // Add only the user's message to chat history for now
+          setChatMessages(prev => [...prev, { role: 'user', content: query }]);
+          setIsChatModalOpen(true);
+        }
+      } else {
+        // For post mode, use RagService to generate post content
+        try {
+          const response = await RagService.sendPostQuery(accountHolder, query);
+          
+          // Save the post content to the main server (port 3000)
+          await axios.post(`http://localhost:3000/save-query/${accountHolder}`, { 
+            query,
+            mode: 'post',
+            response
+          });
+          setToast('Post request sent! Your content will appear in the Post Cooked section soon.');
+        } catch (ragError) {
+          // Fallback to main server if RAG server is unavailable
+          console.warn('RAG server error, falling back to main server:', ragError);
+          setToast('RAG service is currently unavailable. Your request has been queued for processing.');
+          
+          // Save the query to the main server for later processing
+          await axios.post(`http://localhost:3000/save-query/${accountHolder}`, { 
+            query,
+            mode: 'post',
+            fallback: true
+          });
+        }
+        
+        // Refresh the posts to show the new content
+        setTimeout(() => {
+          axios.get(`http://localhost:3000/posts/${accountHolder}`)
+            .then(res => {
+              setPosts(res.data);
+            })
+            .catch(err => {
+              console.error('Error fetching posts:', err);
+            });
+        }, 2000);
+      }
       setQuery('');
-      setToast('Query sent! Response expected within 15 minutes.');
     } catch (error: any) {
-      console.error('Error saving query:', error);
-      setToast('Failed to send query.');
-      setError(error.response?.data?.error || 'Failed to send query.');
+      console.error('Error with RAG query:', error);
+      setToast('Failed to process your request.');
+      setError(error.response?.data?.error || 'Failed to process query.');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -613,6 +655,19 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
     return () => clearInterval(cleanInterval);
   }, []);
 
+  // Load previous conversations when the component mounts
+  useEffect(() => {
+    if (accountHolder) {
+      RagService.loadConversations(accountHolder)
+        .then(messages => {
+          if (messages.length > 0) {
+            setChatMessages(messages);
+          }
+        })
+        .catch(err => console.error('Error loading conversations:', err));
+    }
+  }, [accountHolder]);
+
   if (!accountHolder) {
     return <div className="error-message">Please specify an account holder to load the dashboard.</div>;
   }
@@ -651,11 +706,11 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
                 <div className="profile-bar">
                   {profileInfo?.profilePicUrlHD && !imageError ? (
                     <img
-                      src={directProfilePicUrl || `http://localhost:3000/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}&nocache=true&forceCors=true&fallback=pixel`}
+                      src={`http://localhost:3000/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}`}
                       alt={`${accountHolder}'s profile picture`}
                       className="profile-pic-bar"
                       onError={(e) => {
-                        console.error(`Failed to load profile picture for ${accountHolder}`, profileInfo.profilePicUrlHD);
+                        console.error(`Failed to load profile picture for ${accountHolder}`);
                         
                         // Try to reload a few times before giving up
                         if (imageRetryAttemptsRef.current < maxImageRetryAttempts) {
@@ -665,14 +720,12 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
                           // Force reload by changing the URL slightly with a timestamp
                           const imgElement = e.target as HTMLImageElement;
                           setTimeout(() => {
-                            // Added more robust parameters to ensure we get at least a fallback pixel
-                            imgElement.src = `http://localhost:3000/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}&retry=${imageRetryAttemptsRef.current}&forceCors=true&fallback=pixel`;
-                          }, 1000 * imageRetryAttemptsRef.current); // Increasing delay for each retry
+                            imgElement.src = `http://localhost:3000/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}`;
+                          }, 1000);
                         } else {
                           setImageError(true);
                         }
                       }}
-                      style={{ objectFit: 'cover' }}
                     />
                   ) : (
                     <div className="profile-pic-bar">
@@ -782,9 +835,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
           <div className="post-cooked">
             <PostCooked
               username={accountHolder}
-              profilePicUrl={profileInfo?.profilePicUrlHD ? 
-                directProfilePicUrl || `http://localhost:3000/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}&nocache=true&forceCors=true&fallback=pixel` : 
-                ''}
+              profilePicUrl={profileInfo?.profilePicUrlHD ? `http://localhost:3000/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}` : ''}
               posts={posts}
               userId={igBusinessId || undefined}
             />
@@ -811,28 +862,49 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
 
           <div className="chatbot">
             <div className="chatbot-input-container">
+              <div className="chat-mode-selector">
+                <select 
+                  value={chatMode} 
+                  onChange={(e) => setChatMode(e.target.value as 'discussion' | 'post')}
+                  className="chat-mode-dropdown"
+                >
+                  <option value="discussion">Discussion Mode</option>
+                  <option value="post">Post Mode</option>
+                </select>
+              </div>
               <input
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Leave Order/Message/Query to your MANAGER..."
+                placeholder={chatMode === 'discussion' 
+                  ? "Ask me anything about your Instagram strategy..." 
+                  : "Describe the post you want to create..."}
                 className="chatbot-input"
+                disabled={isProcessing}
               />
-              <button className="chatbot-send-btn" onClick={handleSendQuery} disabled={!query.trim()}>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#e0e0ff"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <line x1="22" y1="2" x2="11" y2="13" />
-                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                </svg>
+              <button 
+                className={`chatbot-send-btn ${isProcessing ? 'processing' : ''}`} 
+                onClick={handleSendQuery} 
+                disabled={!query.trim() || isProcessing}
+              >
+                {isProcessing ? (
+                  <div className="loading-spinner"></div>
+                ) : (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#e0e0ff"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <line x1="22" y1="2" x2="11" y2="13" />
+                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                  </svg>
+                )}
               </button>
             </div>
           </div>
@@ -878,6 +950,39 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
       )}
       {isGoalModalOpen && (
         <GoalModal username={accountHolder} onClose={() => setIsGoalModalOpen(false)} />
+      )}
+      {isChatModalOpen && (
+        <ChatModal 
+          messages={chatMessages}
+          onClose={() => setIsChatModalOpen(false)}
+          username={accountHolder}
+          onSendMessage={(message: string) => {
+            // Handle sending additional messages in the chat modal
+            if (!message.trim() || !accountHolder) return;
+            setIsProcessing(true);
+            RagService.sendDiscussionQuery(accountHolder, message, chatMessages)
+              .then(response => {
+                const updatedMessages = [
+                  ...chatMessages,
+                  { role: 'user', content: message },
+                  { role: 'assistant', content: response.response }
+                ];
+                setChatMessages(updatedMessages);
+                
+                // Save the updated conversation
+                RagService.saveConversation(accountHolder, updatedMessages)
+                  .catch(err => console.error('Error saving conversation:', err));
+              })
+              .catch(error => {
+                console.error('Error with chat message:', error);
+                setToast('Failed to send message.');
+              })
+              .finally(() => {
+                setIsProcessing(false);
+              });
+          }}
+          isProcessing={isProcessing}
+        />
       )}
     </motion.div>
   );

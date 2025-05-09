@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Okay, I'm on it! Based on the M·A·C Cosmetics Instagram profile, here's some targeted advice, keeping in mind your request for specific, non-generic recommendations:\n\n**1. Leverage the Met Gala Hype (Immediately):**\n\n*   **Action:** You're already doing this with your latest posts, but *double down*. The #MetGala2025 content is performing well (high engagement on recent posts).\n*   **Specifics:**\n    *   Continue featuring makeup breakdowns of celebrity looks from the event, like the Andre 3000 post.\n    *   Create Reels showing users how to achieve Met Gala-inspired looks using M·A·C products.\n    *   Run polls asking followers which Met Gala makeup look was their favorite.\n\n**2. Capitalize on \"Nepo Baby\" Trend:**\n\n*   **Action:** The \"MACLipglassAir\" campaign is generating buzz. Lean into the playful, self-aware humor.\n*   **Specifics:**\n    *   Create more meme-style content around the \"nepo baby\" concept, highlighting the legacy and quality of M·A·C products.\n    *   Partner with influencers known for their comedic content to create skits or reviews of Lipglass Air.\n\n**3. Promote \"Signature Lip Combos\" Service:**\n\n*   **Action:** You're promoting the in-store \"Create Your Signature Lip Combos\" service. Make this a bigger focus.\n*   **Specifics:**\n    *   Run targeted ads on Instagram promoting the service to users in areas with M·A·C stores.\n    *   Create a dedicated highlight reel showcasing different lip combo looks created using the service.\n    *   Encourage users to share their own lip combo creations using a specific hashtag.\n\n**4. Re-Engage with M·A·C Archives:**\n\n*   **Action:** The #MACArchives content is a good way to connect with your history.\n*   **Specifics:**\n    *   Create a series of posts highlighting iconic M·A·C products from the past and how they're still relevant today.\n    *   Partner with makeup artists to recreate classic M·A·C looks from different eras.\n\n**5. Increase User-Generated Content:**\n\n*   **Action:** You're already re-gramming content, but you can do more.\n*   **Specifics:**\n    *   Run contests encouraging users to share their M·A·C makeup looks using a specific hashtag.\n    *   Feature user-generated content in your stories and highlight reels.\n\n**6. Localize Content:**\n\n*   **Action:** You have several regional accounts (e.g., M·A·C Cosmetics Canada, Mexico, etc.).\n*   **Specifics:**\n    *   Ensure that content is tailored to the specific cultural trends and preferences of each region.\n    *   Run collaborations with local influencers and makeup artists.\n\n**7. Igtv Videos:**\n\n*   **Action:** You have a lot of Igtv Videos.\n*   **Specifics:**\n    *   Ensure that content is tailored to the specific cultural trends and preferences of each region.\n    *   Run collaborations with local influencers and makeup artists.\n\n**General Reminders:**\n\n*   **All Ages, All Races, All Genders:** Continue to emphasize inclusivity in your content.\n*   **Link in Bio:** Make sure your link in bio is always up-to-date with your latest promotions and products.\n\nI'm ready for your next question!\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.21663201591501724
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 77307,
+    "candidatesTokenCount": 761,
+    "totalTokenCount": 78068,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 77307
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 761
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

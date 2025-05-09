@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Okay, based on the \"related profiles\" data, here's a closer look at your key competitors on Instagram, focusing on those with similar product offerings and target audiences:\n\n**Direct Competitors (Cosmetics Focus):**\n\n*   **Urban Decay Cosmetics (@urbandecaycosmetics):** Similar product range, strong focus on edgy and trend-driven makeup. They are a very strong competitor.\n*   **Rare Beauty by Selena Gomez (@rarebeauty):** Celebrity-backed brand, emphasis on inclusivity and natural beauty.\n*   **Too Faced Cosmetics (@toofaced):** Known for playful packaging and themed collections, targets a similar demographic.\n*   **ONE/SIZE (@onesize):** Focuses on inclusivity and bold, high-impact makeup looks.\n*   **SHEGLAM OFFICIAL (@sheglam\\_official):** Fast-fashion beauty brand, affordable and trend-focused.\n*   **Revlon (@revlon):** Classic drugstore brand, wide range of products and accessible price point.\n*   **Stila Cosmetics (@stilacosmetics):** Known for its liquid eyeliner and classic, wearable makeup.\n*   **Hourglass Cosmetics (@hourglasscosmetics):** Luxury brand with a focus on high-performance and innovative formulas.\n*   **r.e.m.beauty (@r.e.m.beauty):** Ariana Grande's brand, caters to a younger audience with trendy products.\n*   **Juvia's Place (@juviasplace):** Known for highly pigmented eyeshadow palettes and inclusive shade ranges.\n*   **Armani beauty (@armanibeauty):** High-end brand with a focus on luxury and sophistication.\n*   **IT Cosmetics (@itcosmetics):** Focuses on problem-solving makeup and skincare products.\n*   **Sephora Collection (@sephoracollection):** A private label brand that offers a wide range of beauty products at competitive prices.\n*   **NATASHA DENONA BEAUTY (@natashadenonabeauty):** High-end brand with a focus on professional-quality makeup.\n\n**Competitors with Overlapping Interests (Broader Lifestyle/Fashion):**\n\n*   **Vogue (@voguemagazine):** While not a direct cosmetics competitor, Vogue influences beauty trends and showcases makeup artistry.\n*   **Kim Kardashian (@kimkardashian) & Khloé Kardashian (@khloekardashian):** Influential celebrities with their own beauty brands (SKKN BY KIM), setting trends and driving product interest.\n*   **FENTY SKIN (@fentyskin):** Rihanna's skincare line, strong brand identity and celebrity appeal.\n*   **Gucci (@gucci):** Luxury fashion house with a growing beauty line, targeting a high-end consumer.\n*   **Prada Beauty (@pradabeauty):** High-end fashion house with a growing beauty line, targeting a high-end consumer.\n*   **SHEIN.COM (@sheinofficial):** Fast-fashion retailer that also sells makeup, targeting a younger, budget-conscious audience.\n*   **FashionNova.com (@fashionnova):** Fast-fashion retailer that also sells makeup, targeting a younger, budget-conscious audience.\n\n**Key Takeaways & Actionable Advice:**\n\n1.  **Content Differentiation:** Analyze how these competitors are presenting their products. What kind of content are they creating (tutorials, swatches, lifestyle shots, etc.)? Identify gaps in their content or areas where you can offer a unique perspective.\n2.  **Partnerships & Influencers:** Note which influencers your competitors are working with. Are there opportunities to collaborate with different influencers who align with M·A·C's brand values?\n3.  **Campaign Themes:** Pay attention to the themes and campaigns your competitors are running. How can you create campaigns that are equally engaging but distinctively M·A·C?\n4.  **Community Engagement:** How are your competitors interacting with their followers? What kind of questions are they asking? What kind of contests or giveaways are they running?\n5.  **Highlight Reels:** Analyze their highlight reels. What topics are they covering? How can you improve your highlight reel strategy to provide more value to your followers?\n6.  **MAC Uniqueness:** M·A·C's strength lies in its professional artistry, diverse range, and trendsetting collaborations. Emphasize these aspects in your content to differentiate yourself.\n7.  **\"All Ages, All Races, All Genders\"**: Continue to emphasize this message in your content, showcasing a wide range of models and skin tones.\n\nBy closely monitoring these competitors and identifying opportunities to differentiate your content, you can strengthen M·A·C's position on Instagram and attract a wider audience.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.2251136226038779
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 77317,
+    "candidatesTokenCount": 992,
+    "totalTokenCount": 78309,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 77317
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 992
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

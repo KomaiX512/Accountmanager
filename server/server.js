@@ -396,6 +396,12 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
     const data = await Promise.all(
       files.map(async (file) => {
         try {
+          // ** NEW: Only process .json files as JSON **
+          if (!file.Key.endsWith('.json')) {
+               console.log(`[${new Date().toISOString()}] Skipping non-JSON file: ${file.Key}`);
+               return null; // Skip non-JSON files in this general fetch
+          }
+
           const getCommand = new GetObjectCommand({
             Bucket: 'tasks',
             Key: file.Key,
@@ -435,169 +441,26 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
   }
 }
 
-// Add OPTIONS handler for proxy-image endpoint
-app.options('/proxy-image', (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Max-Age', '86400');
-  res.sendStatus(204);
-});
-
-// Completely revamped proxy-image endpoint to handle Instagram CORS issues
 app.get('/proxy-image', async (req, res) => {
-  let { url, t, fallback } = req.query;
+  let { url } = req.query;
   if (!url) return res.status(400).send('Image URL is required');
-  
   try {
     if (Array.isArray(url)) url = url[0];
     const decodedUrl = decodeURIComponent(url);
-    
-    // Log the request
-    console.log(`[proxy-image] Processing request for: ${decodedUrl.substring(0, 100)}...`);
-    
-    // Check if the URL is from Instagram
-    const isInstagramUrl = decodedUrl.includes('cdninstagram.com') || 
-                          decodedUrl.includes('fbcdn.net') || 
-                          decodedUrl.includes('instagram.com');
-    
-    // If we're dealing with an Instagram URL, store it in a local cache file
-    // to avoid repeated downloads and potential rate limiting
-    let imageData;
-    if (isInstagramUrl) {
-      // Create a unique filename based on the URL hash
-      const crypto = require('crypto');
-      const urlHash = crypto.createHash('md5').update(decodedUrl).digest('hex');
-      const cachePath = `./temp_image_cache/${urlHash}.jpg`;
-      
-      // Ensure temp directory exists
-      const fs = require('fs');
-      try {
-        if (!fs.existsSync('./temp_image_cache')) {
-          fs.mkdirSync('./temp_image_cache', { recursive: true });
-        }
-      } catch (fsError) {
-        console.error('[proxy-image] Error creating cache directory:', fsError);
-      }
-      
-      try {
-        // Check if we have a cached version that's less than 24 hours old
-        if (fs.existsSync(cachePath)) {
-          const stats = fs.statSync(cachePath);
-          const fileAge = Date.now() - stats.mtimeMs;
-          
-          // Use cache if file is less than 24 hours old
-          if (fileAge < 24 * 60 * 60 * 1000) {
-            console.log(`[proxy-image] Using cached image for ${urlHash}`);
-            imageData = fs.readFileSync(cachePath);
-          }
-        }
-      } catch (cacheError) {
-        console.error('[proxy-image] Cache access error:', cacheError);
-      }
-      
-      // If we don't have cached data, download the image
-      if (!imageData) {
-        console.log(`[proxy-image] Downloading Instagram image: ${urlHash}`);
-        
-        // Configure axios with Instagram-friendly headers
-        const config = {
-          responseType: 'arraybuffer',
-          timeout: 15000,
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15',
-            'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Referer': 'https://www.instagram.com/',
-            'Origin': 'https://www.instagram.com',
-            'Cache-Control': 'no-cache'
-          }
-        };
-        
-        try {
-          const response = await axios.get(decodedUrl, config);
-          imageData = response.data;
-          
-          // Save to cache
-          try {
-            fs.writeFileSync(cachePath, imageData);
-          } catch (writeError) {
-            console.error('[proxy-image] Cache write error:', writeError);
-          }
-        } catch (downloadError) {
-          console.error('[proxy-image] Download error:', downloadError.message);
-          try {
-            // Try one more time with different User-Agent
-            config.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
-            const retryResponse = await axios.get(decodedUrl, config);
-            imageData = retryResponse.data;
-            
-            // Save to cache
-            try {
-              fs.writeFileSync(cachePath, imageData);
-            } catch (writeError) {
-              console.error('[proxy-image] Cache write error:', writeError);
-            }
-          } catch (retryError) {
-            console.error('[proxy-image] Retry download error:', retryError.message);
-            throw retryError; // Re-throw to trigger fallback
-          }
-        }
-      }
-    } else {
-      // For non-Instagram URLs, just fetch directly
-      const response = await axios.get(decodedUrl, {
-        responseType: 'arraybuffer',
-        timeout: 10000
-      });
-      imageData = response.data;
+
+    // Fetch the image directly (no puppeteer)
+    const response = await axios.get(decodedUrl, { responseType: 'arraybuffer' });
+    const contentType = response.headers['content-type'];
+    if (!contentType.startsWith('image/')) {
+      console.error(`[proxy-image] URL did not return an image:`, decodedUrl, 'Content-Type:', contentType);
+      return res.status(400).send('URL did not return an image');
     }
-    
-    // Determine content type
-    let contentType = 'image/jpeg'; // Default
-    try {
-      const fileTypeResult = await fileTypeFromBuffer(imageData);
-      if (fileTypeResult && fileTypeResult.mime) {
-        contentType = fileTypeResult.mime;
-      }
-    } catch (typeError) {
-      console.error('[proxy-image] Error detecting file type:', typeError);
-    }
-    
-    // Process the image with Sharp to validate it, potentially resize/optimize if needed
-    try {
-      const sharp = require('sharp');
-      const processedImage = await sharp(imageData)
-        .resize(1000, 1000, { fit: 'inside', withoutEnlargement: true })
-        .toBuffer();
-      
-      // Set response headers
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-      res.setHeader('Content-Type', contentType);
-      res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
-      
-      // Send the processed image
-      res.send(processedImage);
-    } catch (sharpError) {
-      console.error('[proxy-image] Image processing error:', sharpError);
-      throw sharpError; // Re-throw to trigger fallback
-    }
+    res.set('Content-Type', contentType);
+    res.set('Access-Control-Allow-Origin', '*');
+    res.send(response.data);
   } catch (error) {
-    console.error('[proxy-image] Error fetching or processing image:', error.message);
-    
-    // If fallback=pixel is specified, return a transparent 1x1 pixel
-    if (fallback === 'pixel') {
-      const transparentPixel = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Content-Type', 'image/gif');
-      res.setHeader('Cache-Control', 'public, max-age=86400');
-      return res.send(transparentPixel);
-    }
-    
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.status(500).send('Error fetching image');
+    console.error(`[proxy-image] Failed to proxy image:`, url, error?.response?.status, error?.message);
+    res.status(500).send('Failed to fetch image');
   }
 });
 
@@ -1192,13 +1055,20 @@ app.get('/posts/:username', async (req, res) => {
   const prefix = `ready_post/${username}/`;
 
   try {
-    // Check if we should use cache based on PostCooked TTL config (3 hours)
-    if (!forceRefresh && shouldUseCache(prefix)) {
-      console.log(`[${new Date().toISOString()}] Serving posts from cache for ${username}`);
+    const now = Date.now();
+    const lastFetch = cacheTimestamps.get(prefix) || 0;
+
+    if (!forceRefresh && cache.has(prefix)) {
+      console.log(`Cache hit for posts: ${prefix}`);
       return res.json(cache.get(prefix));
     }
 
-    console.log(`[${new Date().toISOString()}] Fetching posts from R2 for prefix: ${prefix}`);
+    if (!forceRefresh && now - lastFetch < THROTTLE_INTERVAL) {
+      console.log(`Throttled fetch for posts: ${prefix}`);
+      return res.json(cache.has(prefix) ? cache.get(prefix) : []);
+    }
+
+    console.log(`Fetching posts from R2 for prefix: ${prefix}`);
     const listCommand = new ListObjectsV2Command({
       Bucket: 'tasks',
       Prefix: prefix,
@@ -1220,7 +1090,7 @@ app.get('/posts/:username', async (req, res) => {
           const body = await streamToString(data.Body);
 
           if (!body || body.trim() === '') {
-            console.warn(`[${new Date().toISOString()}] Empty file detected at ${file.Key}, skipping...`);
+            console.warn(`Empty file detected at ${file.Key}, skipping...`);
             return null;
           }
 
@@ -1230,9 +1100,18 @@ app.get('/posts/:username', async (req, res) => {
 
           if (!postId) return null;
 
+          // ** NEW: Check post status and skip if not 'ready' or if status is missing (assume ready for old posts) **
+          // Treat missing status as 'ready' for backwards compatibility
+          if (postData.status && postData.status !== 'ready') {
+               console.log(`[${new Date().toISOString()}] Skipping post ${file.Key} with status: ${postData.status}`);
+               return null;
+          }
+
           const imageFile = imageFiles.find(img => img.Key === `${prefix}image_${postId}.jpg`);
           if (!imageFile) {
-            console.warn(`[${new Date().toISOString()}] No matching image found for post ${file.Key}, skipping...`);
+            console.warn(`No matching image found for post ${file.Key}, skipping...`);
+            // If a post JSON exists but the image is missing, perhaps mark it as failed or skip?
+            // For now, skipping.
             return null;
           }
 
@@ -1250,29 +1129,21 @@ app.get('/posts/:username', async (req, res) => {
             },
           };
         } catch (error) {
-          console.error(`[${new Date().toISOString()}] Failed to process post ${file.Key}:`, error.message);
+          console.error(`Failed to process post ${file.Key}:`, error.message);
           return null;
         }
       })
     );
 
+    // Filter out null results from skipped posts
     const validPosts = posts.filter(post => post !== null);
-    
-    // Update cache with PostCooked TTL (3 hours)
+
     cache.set(prefix, validPosts);
-    cacheTimestamps.set(prefix, Date.now());
-    
-    console.log(`[${new Date().toISOString()}] Returning ${validPosts.length} posts for ${username}`);
+    cacheTimestamps.set(prefix, now);
+    console.log(`Returning ${validPosts.length} ready posts for ${username}`);
     res.json(validPosts);
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] Retrieve posts error for ${username}:`, error);
-    
-    // Fallback to cache if available
-    if (cache.has(prefix)) {
-      console.log(`[${new Date().toISOString()}] Using cached posts as fallback for ${username}`);
-      return res.json(cache.get(prefix));
-    }
-    
+    console.error(`Retrieve posts error for ${username}:`, error);
     res.status(500).json({ error: 'Error retrieving posts', details: error.message });
   }
 });
@@ -2393,15 +2264,59 @@ app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
         });
         await s3Client.send(updateCommand);
 
+        // ** NEW: Update original ready_post file status to published **
+        try {
+            console.log(`[${new Date().toISOString()}] Updating original ready_post status to published for ${scheduledPostData.image_key}`);
+            // Assuming image_key is related to the original ready_post key, e.g., ready_post/user/image_123.jpg
+            // We need to derive the ready_post json key from the image key.
+            // Example: ready_post/username/image_123.jpg -> ready_post/username/ready_post_123.json
+            const originalPostJson = scheduledPostData.image_key.replace(/InstagramEvents\/\d+\/image_(\d+)\.jpg$/, 'ready_post/$1.json');
+            const usernameMatch = originalPostJson.match(/^ready_post\/(.*?)\/ready_post_\d+\.json$/);
+            const usernameFromKey = usernameMatch ? usernameMatch[1] : null; // Extract username from the derived key
+
+            if (!usernameFromKey) {
+                 console.error(`[${new Date().toISOString()}] Could not extract username from derived ready_post key: ${originalPostJson}`);
+                 // Continue without updating original post status if username cannot be determined
+            } else {
+                 const getOriginalCommand = new GetObjectCommand({ Bucket: 'tasks', Key: originalPostJson });
+                 const originalData = await s3Client.send(getOriginalCommand);
+                 const originalBody = await streamToString(originalData.Body);
+                 const originalPost = JSON.parse(originalBody);
+
+                 originalPost.status = 'published';
+                 originalPost.published_at = new Date().toISOString();
+
+                 const putOriginalCommand = new PutObjectCommand({
+                     Bucket: 'tasks',
+                     Key: originalPostJson,
+                     Body: JSON.stringify(originalPost, null, 2),
+                     ContentType: 'application/json',
+                 });
+                 await s3Client.send(putOriginalCommand);
+                 console.log(`[${new Date().toISOString()}] Original ready_post status updated to published for ${originalPostJson}`);
+
+                  // Invalidate cache for the ready_post directory
+                 cache.delete(`ready_post/${usernameFromKey}/`);
+            }
+
+        } catch (updateErr) {
+             console.error(`[${new Date().toISOString()}] Failed to update original ready_post status to published for ${scheduledPostData.image_key}:`, updateErr);
+        }
+
         // Clean up image after successful publish
         console.log(`[${new Date().toISOString()}] Cleaning up image: ${imageKey}`);
-        await s3Client.send(new DeleteObjectCommand({
-          Bucket: 'tasks',
-          Key: imageKey,
-        }));
+        try {
+          await s3Client.send(new DeleteObjectCommand({
+            Bucket: 'tasks',
+            Key: imageKey,
+          }));
+        } catch (deleteErr) {
+             console.error(`[${new Date().toISOString()}] Failed to delete image ${imageKey} after publish:`, deleteErr);
+        }
+
       } catch (error) {
         console.error(`[${new Date().toISOString()}] Failed to publish post media_id=${mediaId} at ${scheduleTime.toISOString()}:`, error.response?.data || error.message);
-        // Update status to 'failed'
+        // Update status to 'failed' in the scheduled post R2 file
         scheduledPostData.status = 'failed';
         scheduledPostData.error = error.response?.data?.error?.message || error.message;
         const updateCommand = new PutObjectCommand({
@@ -2411,6 +2326,43 @@ app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
           ContentType: 'application/json',
         });
         await s3Client.send(updateCommand);
+
+         // ** NEW: Update original ready_post file status to failed **
+        try {
+             console.log(`[${new Date().toISOString()}] Updating original ready_post status to failed for ${scheduledPostData.image_key}`);
+             const originalPostJson = scheduledPostData.image_key.replace(/InstagramEvents\/\d+\/image_(\d+)\.jpg$/, 'ready_post/$1.json');
+             const usernameMatch = originalPostJson.match(/^ready_post\/(.*?)\/ready_post_\d+\.json$/);
+             const usernameFromKey = usernameMatch ? usernameMatch[1] : null; // Extract username from the derived key
+
+             if (!usernameFromKey) {
+                 console.error(`[${new Date().toISOString()}] Could not extract username from derived ready_post key (failed status): ${originalPostJson}`);
+                 // Continue without updating original post status if username cannot be determined
+             } else {
+                 const getOriginalCommand = new GetObjectCommand({ Bucket: 'tasks', Key: originalPostJson });
+                 const originalData = await s3Client.send(getOriginalCommand);
+                 const originalBody = await streamToString(originalData.Body);
+                 const originalPost = JSON.parse(originalBody);
+
+                 originalPost.status = 'failed';
+                 originalPost.error = error.response?.data?.error?.message || error.message; // Store the actual error message
+                 originalPost.failed_at = new Date().toISOString();
+
+                 const putOriginalCommand = new PutObjectCommand({
+                     Bucket: 'tasks',
+                     Key: originalPostJson,
+                     Body: JSON.stringify(originalPost, null, 2),
+                     ContentType: 'application/json',
+                 });
+                 await s3Client.send(putOriginalCommand);
+                 console.log(`[${new Date().toISOString()}] Original ready_post status updated to failed for ${originalPostJson}`);
+
+                  // Invalidate cache for the ready_post directory
+                 cache.delete(`ready_post/${usernameFromKey}/`);
+             }
+
+        } catch (updateErr) {
+              console.error(`[${new Date().toISOString()}] Failed to update original ready_post status to failed for ${scheduledPostData.image_key}:`, updateErr);
+        }
       }
     });
 
@@ -3123,26 +3075,7 @@ app.get('/signed-image-url/:username/:imageKey', async (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
-  console.log('Ready to receive account info at POST /save-account-info');
-  console.log('Ready to handle R2 webhooks at POST /webhook/r2');
-  console.log('Ready to stream events at GET /events/:username');
-  console.log('Ready to receive hierarchical data at POST /scrape');
-  console.log('Ready to retrieve data at GET /retrieve/:accountHolder/:competitor');
-  console.log('Ready to retrieve strategies at GET /retrieve-strategies/:accountHolder');
-  console.log('Ready to retrieve engagement strategies at GET /retrieve-engagement-strategies/:accountHolder');
-  console.log('Ready to retrieve news at GET /news-for-you/:accountHolder');
-  console.log('Ready to save queries at POST /save-query/:accountHolder');
-  console.log('Ready to handle rules at GET/POST /rules/:username');
-  console.log('Ready to handle responses at GET/POST /responses/:username');
-  console.log('Ready to handle posts at GET /posts/:username');
-  console.log('Ready to handle feedback at POST /feedback/:username');
-  console.log('Ready to retrieve profile info at GET /profile-info/:username');
-  console.log('Ready to handle Instagram OAuth at GET /instagram/callback');
-  console.log('Ready to handle Instagram webhooks at GET/POST /webhook/instagram');
-  console.log('Ready to handle Instagram deauthorization at POST /instagram/deauthorize');
-  console.log('Ready to handle Instagram data deletion at GET/POST /instagram/data-deletion');
-  console.log('Ready to fetch all AI replies for a user at GET /ai-replies/:username');
+  console.log(`Server running on port ${port}`);
 });
 
 app.options('/events/:userId', (req, res) => {
@@ -3694,7 +3627,7 @@ function scheduleConnectionHealthCheck() {
     
     let totalConnections = 0;
     let staleConnections = 0;
-    let activeConnections = 0;
+    let activeConnectionsCount = 0;
     
     sseClients.forEach((clients, username) => {
       totalConnections += clients.length;
@@ -3706,7 +3639,7 @@ function scheduleConnectionHealthCheck() {
         if (connectionAge > SSE_RECONNECT_TIMEOUT) {
           staleConnections++;
         } else {
-          activeConnections++;
+          activeConnectionsCount++;
           
           // Send a ping to confirm connection is still alive
           try {
@@ -3726,7 +3659,7 @@ function scheduleConnectionHealthCheck() {
       });
     });
     
-    console.log(`[${new Date().toISOString()}] SSE HEALTH: Total=${totalConnections}, Active=${activeConnections}, Stale=${staleConnections}`);
+    console.log(`[${new Date().toISOString()}] SSE HEALTH: Total=${totalConnections}, Active=${activeConnectionsCount}, Stale=${staleConnections}`);
   }, 60 * 1000); // Check every minute
   
   console.log(`[${new Date().toISOString()}] SSE connection health check scheduler started`);
@@ -4150,157 +4083,75 @@ app.get('/events/:username', (req, res) => {
   });
 });
 
-// Add a new API endpoint for tracking post status
-
-// Endpoint to store post status (rejected/scheduled)
-app.post('/post-status/:username', async (req, res) => {
+app.post('/update-post-status/:username', async (req, res) => {
   const { username } = req.params;
-  const { postKeys, status, scheduledTimes } = req.body;
-  
-  if (!username || !postKeys || !status || !Array.isArray(postKeys) || !['rejected', 'scheduled'].includes(status)) {
-    return res.status(400).json({ error: 'Invalid request parameters' });
+  const { postKey, status } = req.body; // postKey should be the full R2 key, e.g., ready_post/user/ready_post_123.json
+
+  if (!postKey || !status) {
+    console.log(`[${new Date().toISOString()}] Missing postKey or status for update-post-status`);
+    return res.status(400).json({ error: 'postKey and status are required' });
   }
-  
+
+  // Validate allowed statuses (optional but recommended)
+  const allowedStatuses = ['ready', 'rejected', 'scheduled', 'published', 'failed'];
+  if (!allowedStatuses.includes(status)) {
+    console.log(`[${new Date().toISOString()}] Invalid status provided: ${status}`);
+    return res.status(400).json({ error: `Invalid status. Allowed statuses: ${allowedStatuses.join(', ')}` });
+  }
+
   try {
-    // First, try to get existing status data
-    const normalizedUsername = username.toLowerCase().trim().replace(/[^a-z0-9_]/g, '_');
-    const key = `UserPostStatus/${normalizedUsername}/post_status.json`;
-    let existingData = { rejected: [], scheduled: {} };
-    
+    // Fetch the existing post data
+    const getCommand = new GetObjectCommand({
+      Bucket: 'tasks',
+      Key: postKey,
+    });
+
+    let postData;
     try {
-      const getCommand = new GetObjectCommand({
-        Bucket: 'tasks',
-        Key: key,
-      });
-      
-      try {
         const response = await s3Client.send(getCommand);
         const body = await streamToString(response.Body);
-        
-        if (body && body.trim() !== '') {
-          existingData = JSON.parse(body);
-          // Ensure proper structure
-          if (!existingData.rejected) existingData.rejected = [];
-          if (!existingData.scheduled) existingData.scheduled = {};
-        }
-      } catch (error) {
-        if (error.name !== 'NoSuchKey' && error.$metadata?.httpStatusCode !== 404) {
-          throw error;
-        }
-        // If file doesn't exist, use default empty structure
-      }
-      
-      // Update with new data
-      if (status === 'rejected') {
-        // Add new rejected posts (avoiding duplicates)
-        const newRejected = [...new Set([...existingData.rejected, ...postKeys])];
-        existingData.rejected = newRejected;
-      } else if (status === 'scheduled') {
-        // Update scheduled posts
-        postKeys.forEach((postKey, index) => {
-          const scheduleTime = scheduledTimes && scheduledTimes[index] ? scheduledTimes[index] : Date.now();
-          existingData.scheduled[postKey] = {
-            postKey,
-            scheduledAt: scheduleTime,
-            updatedAt: Date.now()
-          };
-        });
-        
-        // Clean up scheduled posts that should be posted by now
-        const now = Date.now();
-        Object.keys(existingData.scheduled).forEach(key => {
-          const post = existingData.scheduled[key];
-          if (post.scheduledAt < now) {
-            delete existingData.scheduled[key];
-          }
-        });
-      }
-      
-      // Save updated data
-      const putCommand = new PutObjectCommand({
-        Bucket: 'tasks',
-        Key: key,
-        Body: JSON.stringify(existingData, null, 2),
-        ContentType: 'application/json',
-      });
-      
-      await s3Client.send(putCommand);
-      
-      console.log(`[${new Date().toISOString()}] Updated post status for ${username}: ${status}, ${postKeys.length} posts`);
-      res.json({ success: true, message: `Post status updated: ${postKeys.length} posts marked as ${status}` });
+         if (!body || body.trim() === '') {
+            console.warn(`[${new Date().toISOString()}] Empty file detected at ${postKey}`);
+             return res.status(404).json({ error: 'Post data is empty' });
+         }
+        postData = JSON.parse(body);
+        console.log(`[${new Date().toISOString()}] Fetched existing post data for ${postKey}`);
     } catch (error) {
-      console.error(`[${new Date().toISOString()}] Error updating post status for ${username}:`, error);
-      res.status(500).json({ error: 'Failed to update post status', details: error.message });
+         if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+            console.log(`[${new Date().toISOString()}] Post not found at ${postKey}`);
+            return res.status(404).json({ error: 'Post not found' });
+         }
+         throw error; // Re-throw other errors
     }
+
+    // Update the status
+    postData.status = status;
+    postData.updated_at = new Date().toISOString(); // Add an updated timestamp
+
+    // Save the updated data back to R2
+    const putCommand = new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: postKey,
+      Body: JSON.stringify(postData, null, 2),
+      ContentType: 'application/json',
+    });
+    await s3Client.send(putCommand);
+
+    // Invalidate cache for this user's ready_post directory
+    const prefix = `ready_post/${username}/`;
+    cache.delete(prefix);
+
+    console.log(`[${new Date().toISOString()}] Successfully updated status for post ${postKey} to ${status}`);
+    res.json({ success: true, message: 'Post status updated successfully', newStatus: status });
+
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] Server error handling post status for ${username}:`, error);
-    res.status(500).json({ error: 'Server error', details: error.message });
+    console.error(`[${new Date().toISOString()}] Error updating post status for ${postKey}:`, error);
+    res.status(500).json({ error: 'Failed to update post status', details: error.message });
   }
 });
 
-// Endpoint to get post status
-app.get('/post-status/:username', async (req, res) => {
-  const { username } = req.params;
-  
-  if (!username) {
-    return res.status(400).json({ error: 'Username is required' });
-  }
-  
-  try {
-    const normalizedUsername = username.toLowerCase().trim().replace(/[^a-z0-9_]/g, '_');
-    const key = `UserPostStatus/${normalizedUsername}/post_status.json`;
-    
-    try {
-      const getCommand = new GetObjectCommand({
-        Bucket: 'tasks',
-        Key: key,
-      });
-      
-      const response = await s3Client.send(getCommand);
-      const body = await streamToString(response.Body);
-      
-      if (!body || body.trim() === '') {
-        return res.json({ rejected: [], scheduled: {} });
-      }
-      
-      const data = JSON.parse(body);
-      
-      // Clean up scheduled posts that should be posted by now
-      const now = Date.now();
-      let hasChanges = false;
-      
-      if (data.scheduled) {
-        Object.keys(data.scheduled).forEach(key => {
-          const post = data.scheduled[key];
-          if (post.scheduledAt < now) {
-            delete data.scheduled[key];
-            hasChanges = true;
-          }
-        });
-        
-        // If we cleaned up any scheduled posts, save the changes
-        if (hasChanges) {
-          const putCommand = new PutObjectCommand({
-            Bucket: 'tasks',
-            Key: key,
-            Body: JSON.stringify(data, null, 2),
-            ContentType: 'application/json',
-          });
-          
-          await s3Client.send(putCommand);
-          console.log(`[${new Date().toISOString()}] Cleaned up expired scheduled posts for ${username}`);
-        }
-      }
-      
-      return res.json(data);
-    } catch (error) {
-      if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
-        return res.json({ rejected: [], scheduled: {} });
-      }
-      throw error;
-    }
-  } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error retrieving post status for ${username}:`, error);
-    res.status(500).json({ error: 'Failed to retrieve post status', details: error.message });
-  }
+// Add OPTIONS handler for the new endpoint
+app.options('/update-post-status/:username', (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
 });

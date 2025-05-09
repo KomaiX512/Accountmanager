@@ -1,0 +1,34 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Okay, here's an Instagram post draft designed to be engaging, relevant to technology innovation, and aligned with the provided user profile and account rules:\n\n**Image/Video Suggestion:**\n\n*   **Option 1 (Image):** A visually striking image of a futuristic cityscape at night, highlighting innovative architecture and technology.\n*   **Option 2 (Video):** A short, dynamic video showcasing various examples of technological innovation in action (e.g., robotics, AI, sustainable energy solutions).  Fast cuts and upbeat music would make it engaging.\n*   **Option 3 (Image):** A clean, minimalist photo of a person interacting with a cutting-edge piece of technology (e.g., VR headset, advanced tablet, futuristic interface).\n\n**Caption:**\n\n\"The future is NOW! 🚀 From AI breakthroughs to sustainable solutions, technology is constantly reshaping our world. What innovation are you most excited about? Let's discuss in the comments! 👇\n\n#TechInnovation #FutureIsNow #Innovation #Technology #TechTrends #DigitalTransformation #EmergingTech #TechWorld #FutureTech\"\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.22985511913634182
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 1146,
+    "candidatesTokenCount": 228,
+    "totalTokenCount": 1374,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 1146
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 228
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash"
+}

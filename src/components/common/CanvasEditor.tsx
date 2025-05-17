@@ -17,6 +17,16 @@ interface CanvasEditorProps {
   postCaption?: string;
 }
 
+interface BrandElement {
+  id: string;
+  type: 'logo' | 'watermark' | 'contactInfo';
+  url: string;
+  position: { x: number; y: number };
+  scale: number;
+  rotation: number;
+  opacity: number;
+}
+
 const CanvasEditor: React.FC<CanvasEditorProps> = ({ 
   onClose, 
   username, 
@@ -40,6 +50,14 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
   const [isEditorReady, setIsEditorReady] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const initialLoadAttemptedRef = useRef(false);
+  const [caption, setCaption] = useState(postCaption || ''); // Add state for caption
+  
+  // Brand Kit states
+  const [brandKitMode, setBrandKitMode] = useState(false);
+  const [brandElements, setBrandElements] = useState<BrandElement[]>([]);
+  const [selectedElement, setSelectedElement] = useState<string | null>(null);
+  const brandCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [brandKitSaved, setBrandKitSaved] = useState(false);
 
   // Color palette for quick selection
   const colorPalette = [
@@ -106,7 +124,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
               } as any,
               menu: ['crop', 'flip', 'rotate', 'draw', 'shape', 'icon', 'text', 'mask', 'filter'],
               initMenu: 'filter',
-              menuBarPosition: 'bottom',
+              menuBarPosition: 'left',
               uiSize: {
                 width: '100%',
                 height: '100%'
@@ -176,6 +194,455 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
 
     loadInitialImage();
   }, [initialImageUrl, isEditorReady]);
+
+  // Brand Kit Load/Save functions
+  useEffect(() => {
+    // Load saved brand kit if exists
+    const loadBrandKit = async () => {
+      if (userId) {
+        try {
+          // In a real implementation, this would fetch from API
+          const savedBrandKit = localStorage.getItem(`brandKit_${userId}`);
+          if (savedBrandKit) {
+            setBrandElements(JSON.parse(savedBrandKit));
+            setBrandKitSaved(true);
+          }
+        } catch (error) {
+          console.error('[BrandKit] Failed to load brand kit:', error);
+        }
+      }
+    };
+    
+    loadBrandKit();
+  }, [userId]);
+
+  // Initialize brand canvas when brand kit mode is activated
+  useEffect(() => {
+    if (brandKitMode && brandCanvasRef.current) {
+      const canvas = brandCanvasRef.current;
+      const ctx = canvas.getContext('2d');
+      
+      if (ctx) {
+        // Set canvas dimensions
+        canvas.width = 800;
+        canvas.height = 600;
+        
+        // Draw black background
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw existing brand elements
+        renderBrandElements(ctx);
+      }
+    }
+  }, [brandKitMode, brandElements]);
+
+  // Render brand elements on the canvas
+  const renderBrandElements = (ctx: CanvasRenderingContext2D) => {
+    // Clear canvas with black background
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    
+    // Draw each brand element
+    brandElements.forEach(element => {
+      const img = new Image();
+      img.onload = () => {
+        ctx.save();
+        
+        // Position at element's coordinates
+        ctx.translate(element.position.x, element.position.y);
+        
+        // Apply rotation (convert to radians)
+        ctx.rotate((element.rotation * Math.PI) / 180);
+        
+        // Apply opacity
+        ctx.globalAlpha = element.opacity;
+        
+        // Draw the image (centered at position)
+        const width = img.width * element.scale;
+        const height = img.height * element.scale;
+        ctx.drawImage(img, -width/2, -height/2, width, height);
+        
+        ctx.restore();
+        
+        // Highlight selected element with extra controls
+        if (element.id === selectedElement) {
+          // Draw selection box
+          ctx.save();
+          
+          // Position at element's coordinates
+          ctx.translate(element.position.x, element.position.y);
+          ctx.rotate((element.rotation * Math.PI) / 180);
+          
+          // Draw bounding box
+          ctx.strokeStyle = '#00ff00';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([5, 3]);
+          ctx.strokeRect(-width/2, -height/2, width, height);
+          
+          // Draw rotation handles at corners
+          ctx.setLineDash([]);
+          
+          // Rotation handle at top-right
+          const handleSize = 8;
+          ctx.fillStyle = '#00ff00';
+          ctx.fillRect(width/2 - handleSize/2, -height/2 - handleSize/2, handleSize, handleSize);
+          
+          // Draw rotation handle at bottom-right
+          ctx.fillRect(width/2 - handleSize/2, height/2 - handleSize/2, handleSize, handleSize);
+          
+          // Draw rotation handle at bottom-left
+          ctx.fillRect(-width/2 - handleSize/2, height/2 - handleSize/2, handleSize, handleSize);
+          
+          // Draw rotation handle at top-left
+          ctx.fillRect(-width/2 - handleSize/2, -height/2 - handleSize/2, handleSize, handleSize);
+          
+          // Draw rotation indicator line
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(0, -height/2 - 20);
+          ctx.strokeStyle = '#00ff00';
+          ctx.stroke();
+          
+          // Draw rotation handle circle at the end of the line
+          ctx.beginPath();
+          ctx.arc(0, -height/2 - 20, 6, 0, Math.PI * 2);
+          ctx.fillStyle = '#ffff00';
+          ctx.fill();
+          ctx.strokeStyle = '#00ff00';
+          ctx.stroke();
+          
+          ctx.restore();
+          
+          // Draw guidance text
+          ctx.save();
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '12px Arial';
+          ctx.fillText('Drag to move, drag yellow handle to rotate', 10, ctx.canvas.height - 20);
+          ctx.fillText('Hold SHIFT while rotating to scale', 10, ctx.canvas.height - 5);
+          ctx.restore();
+        }
+      };
+      img.src = element.url;
+    });
+  };
+
+  // Toggle brand kit mode
+  const toggleBrandKit = () => {
+    const newMode = !brandKitMode;
+    setBrandKitMode(newMode);
+    
+    // When entering brand kit mode
+    if (newMode) {
+      // Store current editor state if needed
+      console.log('[BrandKit] Entering brand kit mode');
+      
+      // Initialize the brand canvas if not done already
+      setTimeout(() => {
+        if (brandCanvasRef.current) {
+          const canvas = brandCanvasRef.current;
+          const ctx = canvas.getContext('2d');
+          
+          if (ctx) {
+            // Set canvas dimensions
+            canvas.width = 800;
+            canvas.height = 600;
+            
+            // Draw black background
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw existing brand elements
+            renderBrandElements(ctx);
+          }
+        }
+      }, 50);
+    } else {
+      // When exiting brand kit mode
+      console.log('[BrandKit] Exiting brand kit mode');
+      
+      // Restore editor state if needed
+      if (tuiInstanceRef.current) {
+        // Make sure editor is visible again
+        const editorContainer = document.querySelector('.tui-image-editor-container');
+        if (editorContainer) {
+          (editorContainer as HTMLElement).style.display = 'block';
+        }
+      }
+    }
+  };
+  
+  // Add new brand element
+  const addBrandElement = async (type: 'logo' | 'watermark' | 'contactInfo') => {
+    // Open file picker to select image
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      
+      try {
+        // Convert file to data URL
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const url = event.target?.result as string;
+          
+          // Create new element
+          const newElement: BrandElement = {
+            id: `element_${Date.now()}`,
+            type,
+            url,
+            position: { x: 400, y: 300 }, // Center of canvas
+            scale: 0.5,
+            rotation: 0,
+            opacity: 1.0
+          };
+          
+          // Add to brand elements array
+          setBrandElements([...brandElements, newElement]);
+          
+          // Select new element
+          setSelectedElement(newElement.id);
+        };
+        
+        reader.readAsDataURL(file);
+      } catch (error) {
+        console.error('[BrandKit] Failed to add brand element:', error);
+        setNotification('Failed to add brand element. Please try again.');
+      }
+    };
+    
+    input.click();
+  };
+  
+  // Update brand element properties
+  const updateBrandElement = (id: string, updates: Partial<BrandElement>) => {
+    setBrandElements(elements => 
+      elements.map(el => 
+        el.id === id ? { ...el, ...updates } : el
+      )
+    );
+  };
+  
+  // Remove brand element
+  const removeBrandElement = (id: string) => {
+    setBrandElements(elements => elements.filter(el => el.id !== id));
+    if (selectedElement === id) {
+      setSelectedElement(null);
+    }
+  };
+  
+  // Save brand kit configuration
+  const saveBrandKit = () => {
+    if (userId) {
+      try {
+        // In a real implementation, this would save to an API
+        localStorage.setItem(`brandKit_${userId}`, JSON.stringify(brandElements));
+        setBrandKitSaved(true);
+        setNotification('Brand kit saved successfully!');
+        setTimeout(() => setNotification(null), 3000);
+      } catch (error) {
+        console.error('[BrandKit] Failed to save brand kit:', error);
+        setNotification('Failed to save brand kit. Please try again.');
+      }
+    } else {
+      setNotification('Please connect your Instagram account to save brand kit');
+    }
+  };
+  
+  // Apply brand kit to current image
+  const applyBrandKit = async () => {
+    if (!tuiInstanceRef.current) {
+      setNotification('Editor not ready. Please try again.');
+      return;
+    }
+    
+    if (brandElements.length === 0) {
+      setNotification('Please add at least one brand element first');
+      return;
+    }
+    
+    try {
+      setIsProcessing(true);
+      
+      // Get the current image from the editor
+      const currentImageDataUrl = tuiInstanceRef.current.toDataURL();
+      
+      // Create a temporary canvas for overlaying brand elements
+      const tempCanvas = document.createElement('canvas');
+      const ctx = tempCanvas.getContext('2d');
+      
+      if (!ctx) {
+        throw new Error('Failed to get canvas context');
+      }
+      
+      // Load the current image to get dimensions
+      const img = new Image();
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = currentImageDataUrl;
+      });
+      
+      // Set canvas dimensions to match image
+      tempCanvas.width = img.width;
+      tempCanvas.height = img.height;
+      
+      // Draw the current image as background
+      ctx.drawImage(img, 0, 0);
+      
+      // Apply each brand element
+      for (const element of brandElements) {
+        const elementImg = new Image();
+        await new Promise((resolve, reject) => {
+          elementImg.onload = resolve;
+          elementImg.onerror = reject;
+          elementImg.src = element.url;
+        });
+        
+        // Calculate position based on relative percentages instead of absolute pixels
+        const positionRatio = {
+          x: element.position.x / 800, // Convert position to percentage (800 is brand canvas width)
+          y: element.position.y / 600  // Convert position to percentage (600 is brand canvas height)
+        };
+
+        // Calculate actual position in pixels on the target image
+        const x = img.width * positionRatio.x;
+        const y = img.height * positionRatio.y;
+        
+        // Calculate dimensions while preserving original scale
+        const originalWidth = elementImg.width * element.scale;
+        const originalHeight = elementImg.height * element.scale;
+        
+        ctx.save();
+        
+        // Translate to the position
+        ctx.translate(x, y);
+        
+        // Apply rotation
+        ctx.rotate((element.rotation * Math.PI) / 180);
+        
+        // Apply opacity
+        ctx.globalAlpha = element.opacity;
+        
+        // Draw the element centered at its position, maintaining original dimensions
+        ctx.drawImage(
+          elementImg, 
+          -originalWidth / 2,  // Center horizontally
+          -originalHeight / 2, // Center vertically
+          originalWidth,
+          originalHeight
+        );
+        
+        ctx.restore();
+      }
+      
+      // Load the composite image back into the editor
+      const compositeImageDataUrl = tempCanvas.toDataURL();
+      await tuiInstanceRef.current.loadImageFromURL(compositeImageDataUrl, 'branded-image');
+      
+      // Success notification
+      setNotification('Brand kit applied successfully!');
+      setTimeout(() => setNotification(null), 3000);
+      
+      // Exit brand kit mode
+      setBrandKitMode(false);
+    } catch (error) {
+      console.error('[BrandKit] Failed to apply brand kit:', error);
+      setNotification('Failed to apply brand kit. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+  
+  // Handle brand canvas mouse events for element manipulation
+  const handleBrandCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!brandCanvasRef.current || !selectedElement) return;
+    
+    const canvas = brandCanvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Find the selected element
+    const element = brandElements.find(el => el.id === selectedElement);
+    if (!element) return;
+    
+    // Determine which type of operation we're doing based on the mouse position
+    // Calculate distance from element center to determine operation
+    const dx = x - element.position.x;
+    const dy = y - element.position.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    // Get the element's current dimensions 
+    const img = new Image();
+    img.src = element.url;
+    
+    // Check if we're on a control handle or on the main element body
+    const handleSize = 15; // Size of the rotation/scale handles in pixels
+    const isOnRotationHandle = distance > (img.width * element.scale / 2) - handleSize && 
+                              distance < (img.width * element.scale / 2) + handleSize;
+    
+    // Starting angle for rotation
+    const startAngle = Math.atan2(dy, dx) * (180 / Math.PI);
+    // Starting scale
+    const startScale = element.scale;
+    // Starting position
+    const startPos = { ...element.position };
+    
+    // Track operation type
+    const operationType = isOnRotationHandle ? 'rotate' : 'move';
+    
+    const mouseMoveHandler = (moveEvent: MouseEvent) => {
+      const newX = moveEvent.clientX - rect.left;
+      const newY = moveEvent.clientY - rect.top;
+      
+      if (operationType === 'rotate') {
+        // Calculate new angle
+        const newDx = newX - element.position.x;
+        const newDy = newY - element.position.y;
+        const newAngle = Math.atan2(newDy, newDx) * (180 / Math.PI);
+        
+        // Calculate angle difference and apply to rotation
+        const angleDiff = newAngle - startAngle;
+        let newRotation = (element.rotation + angleDiff) % 360;
+        if (newRotation < 0) newRotation += 360;
+        
+        // Update element rotation
+        updateBrandElement(selectedElement, {
+          rotation: newRotation
+        });
+        
+        // If key is pressed, also scale based on distance from center
+        if (moveEvent.shiftKey) {
+          const newDistance = Math.sqrt(newDx * newDx + newDy * newDy);
+          const distanceRatio = newDistance / distance;
+          
+          // Apply scaling but with reasonable limits
+          const newScale = Math.max(0.1, Math.min(3, startScale * distanceRatio));
+          
+          updateBrandElement(selectedElement, {
+            scale: newScale
+          });
+        }
+      } else {
+        // Regular move operation
+        updateBrandElement(selectedElement, {
+          position: { x: newX, y: newY }
+        });
+      }
+    };
+    
+    const mouseUpHandler = () => {
+      document.removeEventListener('mousemove', mouseMoveHandler);
+      document.removeEventListener('mouseup', mouseUpHandler);
+    };
+    
+    document.addEventListener('mousemove', mouseMoveHandler);
+    document.addEventListener('mouseup', mouseUpHandler);
+  };
 
   // Handle enhancing color pickers
   useEffect(() => {
@@ -362,6 +829,9 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
           console.log('[Canvas] Image loaded successfully');
           setImageLoaded(true);
           
+          // Always enable Brand Kit after image is loaded (regardless of source)
+          setIsEditorReady(true);
+          
           // Clean up the object URL
           if (blob) {
             URL.revokeObjectURL(imageUrl);
@@ -400,7 +870,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
       const formData = new FormData();
       const filename = postKey ? `post_${postKey}.jpg` : `canvas_${Date.now()}.jpg`;
       formData.append('image', imageBlob, filename);
-      formData.append('caption', postCaption || '');
+      formData.append('caption', caption || postCaption || '');
       formData.append('scheduleDate', scheduleDate.toISOString());
       
       // Send the scheduled post to the backend
@@ -447,6 +917,10 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
             await tuiInstanceRef.current.loadImageFromURL(imageUrl, 'user-upload');
             console.log('[Canvas] Image loaded successfully from file upload');
             setImageLoaded(true);
+            
+            // Always enable Brand Kit after image is loaded (regardless of source)
+            setIsEditorReady(true);
+            
             setIsProcessing(false);
           } catch (err) {
             console.error('[Canvas] Error loading image from file upload:', err);
@@ -465,6 +939,24 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
     
     reader.readAsDataURL(file);
   };
+
+  // Handle brand canvas keyboard events
+  useEffect(() => {
+    if (!brandKitMode) return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Delete' && selectedElement) {
+        // Remove the selected element
+        removeBrandElement(selectedElement);
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [brandKitMode, selectedElement]);
 
   return (
     <motion.div
@@ -493,11 +985,190 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
               className="hidden-input"
               disabled={isProcessing || !isEditorReady}
             />
+            
+            {/* Brand Kit Button with Tooltip */}
+            <button 
+              className={`brand-kit-button ${brandKitMode ? 'active' : ''}`}
+              onClick={toggleBrandKit}
+              title="Auto-apply your saved branding layout — logo, watermark, and contact info — across all uploaded images."
+            >
+              {brandKitMode ? 'Exit Brand Kit' : 'Apply Brand Kit'}
+            </button>
           </div>
           <button className="close-button" onClick={onClose}>×</button>
         </div>
         
-        <div className="tui-image-editor-container" ref={editorRef}>
+        {/* Brand Kit Canvas (only shown in brand kit mode) */}
+        {brandKitMode && (
+          <div className="brand-kit-container">
+            <div className="brand-canvas-wrapper">
+              <canvas 
+                ref={brandCanvasRef} 
+                className="brand-canvas"
+                onMouseDown={handleBrandCanvasMouseDown}
+                width="800" 
+                height="600"
+              />
+              
+              {/* Keyboard shortcuts reference */}
+              <div className="brand-kit-keyboard-shortcuts">
+                <ul>
+                  <li><span className="key">Drag</span> Move selected element</li>
+                  <li><span className="key">Drag Handle</span> Rotate element</li>
+                  <li><span className="key">Shift + Drag</span> Scale element while rotating</li>
+                  <li><span className="key">Delete</span> Remove selected element</li>
+                </ul>
+              </div>
+            </div>
+            
+            <div className="brand-kit-sidebar">
+              <h3>Brand Kit Editor</h3>
+              
+              <div className="brand-kit-controls">
+                <div className="brand-kit-add-element">
+                  <button 
+                    className="brand-element-add-button"
+                    onClick={() => addBrandElement('logo')}
+                  >
+                    + Add Branding Element
+                  </button>
+                  
+                  <select 
+                    className="brand-element-type-select"
+                    onChange={(e) => {
+                      const type = e.target.value as 'logo' | 'watermark' | 'contactInfo';
+                      if (type) {
+                        addBrandElement(type);
+                      }
+                    }}
+                    defaultValue=""
+                  >
+                    <option value="" disabled>Select Element Type</option>
+                    <option value="logo">Logo</option>
+                    <option value="watermark">Watermark</option>
+                    <option value="contactInfo">Contact Info</option>
+                  </select>
+                </div>
+                
+                {/* List of current brand elements */}
+                <div className="brand-elements-list">
+                  <h4>Current Elements</h4>
+                  {brandElements.length === 0 ? (
+                    <p className="no-elements-message">No elements added yet</p>
+                  ) : (
+                    <ul>
+                      {brandElements.map(element => (
+                        <li 
+                          key={element.id}
+                          className={`brand-element-item ${selectedElement === element.id ? 'selected' : ''}`}
+                          onClick={() => setSelectedElement(element.id)}
+                        >
+                          <span>{element.type}</span>
+                          <button 
+                            className="remove-element-button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeBrandElement(element.id);
+                            }}
+                          >
+                            &times;
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                
+                {/* Element Properties (only shown when an element is selected) */}
+                {selectedElement && (
+                  <div className="element-properties">
+                    <h4>Element Properties</h4>
+                    
+                    {brandElements.filter(e => e.id === selectedElement).map(element => (
+                      <div key={element.id} className="properties-container">
+                        <div className="property-group">
+                          <label>Opacity:</label>
+                          <input 
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.01"
+                            value={element.opacity}
+                            onChange={(e) => {
+                              updateBrandElement(element.id, {
+                                opacity: parseFloat(e.target.value)
+                              });
+                            }}
+                          />
+                          <span>{Math.round(element.opacity * 100)}%</span>
+                        </div>
+                        
+                        <div className="property-group">
+                          <label>Scale:</label>
+                          <input 
+                            type="range"
+                            min="0.1"
+                            max="2"
+                            step="0.05"
+                            value={element.scale}
+                            onChange={(e) => {
+                              updateBrandElement(element.id, {
+                                scale: parseFloat(e.target.value)
+                              });
+                            }}
+                          />
+                          <span>{Math.round(element.scale * 100)}%</span>
+                        </div>
+                        
+                        <div className="property-group">
+                          <label>Rotation:</label>
+                          <input 
+                            type="range"
+                            min="0"
+                            max="360"
+                            step="1"
+                            value={element.rotation}
+                            onChange={(e) => {
+                              updateBrandElement(element.id, {
+                                rotation: parseInt(e.target.value)
+                              });
+                            }}
+                          />
+                          <span>{element.rotation}°</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                <div className="brand-kit-actions">
+                  <button 
+                    className="save-brand-kit-button"
+                    onClick={saveBrandKit}
+                    disabled={brandElements.length === 0}
+                  >
+                    Save Brand Kit
+                  </button>
+                  
+                  <button 
+                    className="apply-brand-kit-button"
+                    onClick={applyBrandKit}
+                    disabled={brandElements.length === 0 || !imageLoaded}
+                  >
+                    Apply to Current Image
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Main TUI Image Editor (hidden when in brand kit mode) */}
+        <div 
+          className="tui-image-editor-container" 
+          ref={editorRef}
+          style={{ display: brandKitMode ? 'none' : 'block' }}
+        >
           {isProcessing && (
             <div className="editor-loading-overlay">
               <div className="editor-loading-spinner">Loading...</div>
@@ -507,6 +1178,14 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
         
         <div className="canvas-editor-footer">
           <button className="cancel-button" onClick={onClose}>Cancel</button>
+          {brandKitMode ? (
+            <button 
+              className="exit-brand-kit-button"
+              onClick={toggleBrandKit}
+            >
+              Exit Brand Kit
+            </button>
+          ) : (
           <InstagramRequiredButton
             onClick={handleSchedule}
             className="schedule-button"
@@ -524,12 +1203,27 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
           >
             Schedule
           </InstagramRequiredButton>
+          )}
         </div>
         
         {showScheduler && (
           <div className="scheduler-overlay">
             <div className="scheduler-container">
               <h3>Schedule Your Post</h3>
+              
+              <div className="caption-container">
+                <label htmlFor="post-caption">Caption:</label>
+                <textarea
+                  id="post-caption"
+                  value={caption}
+                  onChange={(e) => setCaption(e.target.value)}
+                  placeholder="Write your caption here... (include any hashtags)"
+                  rows={4}
+                  className="caption-input"
+                />
+                <p className="caption-count">{caption.length}/2200 characters</p>
+              </div>
+              
               <p>Select date and time to publish your post:</p>
               
               <DatePicker 

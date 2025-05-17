@@ -828,49 +828,9 @@ app.post('/save-query/:accountHolder', async (req, res) => {
   // Set CORS headers explicitly for this endpoint
   setCorsHeaders(res, req.headers.origin || '*');
   
-  const { accountHolder } = req.params;
-  const { query } = req.body;
-
-  const prefix = `queries/${accountHolder}/`;
-
-  if (!query || typeof query !== 'string') {
-    return res.status(400).json({ error: 'Query must be a non-empty string' });
-  }
-
-  try {
-    let queryNumber = 1;
-    if (cache.has(prefix)) {
-      const cachedData = cache.get(prefix);
-      const queryNumbers = cachedData
-        .filter(obj => obj.key.match(/query_\d+\.json$/))
-        .map(file => {
-          const match = file.key.match(/query_(\d+)\.json$/);
-          return match ? parseInt(match[1]) : 0;
-        });
-      queryNumber = queryNumbers.length ? Math.max(...queryNumbers) + 1 : 1;
-    }
-
-    const queryKey = `${prefix}query_${queryNumber}.json`;
-    const queryData = {
-      query: query.trim(),
-      status: 'pending',
-      timestamp: new Date().toISOString(),
-    };
-    const putCommand = new PutObjectCommand({
-      Bucket: 'tasks',
-      Key: queryKey,
-      Body: JSON.stringify(queryData, null, 2),
-      ContentType: 'application/json',
-    });
-    await s3Client.send(putCommand);
-
-    cache.delete(prefix);
-
-    res.json({ success: true, message: 'Query saved successfully' });
-  } catch (error) {
-    console.error(`Save query error for ${prefix}:`, error);
-    res.status(500).json({ error: 'Error saving query', details: error.message });
-  }
+  // Simply respond with success without storing in R2 bucket
+  // The instant AI reply system makes this R2 storage unnecessary
+  res.json({ success: true, message: 'AI instant reply system is enabled, no persistence needed' });
 });
 
 app.get('/rules/:username', async (req, res) => {
@@ -1284,7 +1244,7 @@ async function streamToString(stream) {
 // Instagram App Credentials
 const APP_ID = '576296982152813';
 const APP_SECRET = 'd48ddc9eaf0e5c4969d4ddc4e293178c';
-const REDIRECT_URI = 'https://4a8a-121-52-146-243.ngrok-free.app/instagram/callback';
+const REDIRECT_URI = 'https://a0ee-121-52-146-243.ngrok-free.app/instagram/callback';
 const VERIFY_TOKEN = 'myInstagramWebhook2025';
 
 
@@ -2674,7 +2634,7 @@ app.get('/instagram/data-deletion', (req, res) => {
   const signedRequest = req.query.signed_request;
   console.log(`[${new Date().toISOString()}] Data deletion request received:`, signedRequest);
   res.json({
-    url: 'https://4a8a-121-52-146-243.ngrok-free.app/instagram/data-deletion',
+    url: 'https://a0ee-121-52-146-243.ngrok-free.app/instagram/data-deletion',
     confirmation_code: `delete_${Date.now()}`
   });
 });
@@ -2682,7 +2642,7 @@ app.get('/instagram/data-deletion', (req, res) => {
 app.post('/instagram/data-deletion', (req, res) => {
   console.log(`[${new Date().toISOString()}] Data deletion POST request received:`, JSON.stringify(req.body, null, 2));
   res.json({
-    url: 'https://4a8a-121-52-146-243.ngrok-free.app/instagram/data-deletion',
+    url: 'https://a0ee-121-52-146-243.ngrok-free.app/instagram/data-deletion',
     confirmation_code: `delete_${Date.now()}`
   });
 });

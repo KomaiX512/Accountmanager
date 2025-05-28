@@ -9,8 +9,9 @@ import { useInstagram } from '../../context/InstagramContext';
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 interface InsightsModalProps {
-  userId?: string;
+  userId: string;
   onClose: () => void;
+  platform?: 'instagram' | 'twitter';
 }
 
 interface InsightData {
@@ -23,10 +24,11 @@ interface InsightData {
   follower_demographics: { lifetime: { [key: string]: number } };
 }
 
-const InsightsModal: React.FC<InsightsModalProps> = ({ userId: propUserId, onClose }) => {
+const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform = 'instagram' }) => {
   // Get userId from context if not provided as prop
   const { userId: contextUserId, isConnected } = useInstagram();
-  const userId = propUserId || (isConnected ? contextUserId : null);
+  const userIdFromContext = isConnected ? contextUserId : null;
+  const userIdToUse = userId || userIdFromContext;
 
   const [insights, setInsights] = useState<InsightData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -35,15 +37,15 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId: propUserId, onClo
 
   useEffect(() => {
     const fetchInsights = async () => {
-      if (!userId) {
+      if (!userIdToUse) {
         setError('No Instagram userId available. Please connect your Instagram account.');
         setLoading(false);
         return;
       }
 
       try {
-        console.log(`[${new Date().toISOString()}] Fetching insights for user ${userId}`);
-        const response = await axios.get(`http://localhost:3000/insights/${userId}`);
+        console.log(`[${new Date().toISOString()}] Fetching insights for user ${userIdToUse}`);
+        const response = await axios.get(`http://localhost:3000/insights/${userIdToUse}`);
         setInsights(response.data);
         console.log(`[${new Date().toISOString()}] Insights fetched:`, response.data);
       } catch (err: any) {
@@ -54,7 +56,7 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId: propUserId, onClo
       }
     };
     fetchInsights();
-  }, [userId]);
+  }, [userIdToUse]);
 
   const renderChart = (data: { value: number; end_time: string }[], title: string) => {
     const labels = data.map(d => new Date(d.end_time).toLocaleDateString());

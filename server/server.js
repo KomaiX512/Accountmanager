@@ -206,11 +206,11 @@ function scheduleCacheCleanup() {
 scheduleCacheCleanup();
 
 const s3Client = new S3Client({
-  endpoint: 'https://9069781eea9a108d41848d73443b3a87.r2.cloudflarestorage.com',
+  endpoint: 'https://b21d96e73b908d7d7b822d41516ccc64.r2.cloudflarestorage.com',
   region: 'auto',
   credentials: {
-    accessKeyId: 'b94be077bc48dcc2aec3e4331233327e',
-    secretAccessKey: '791d5eeddcd8ed5bf3f41bfaebbd37e58af7dcb12275b1422747605d7dc75bc4',
+    accessKeyId: '986718fe67d6790c7fe4eeb78943adba',
+    secretAccessKey: '08fb3b012163cce35bee80b54d83e3a6924f2679f466790a9c7fdd9456bc44fe',
   },
   maxAttempt: 3,
   httpOptions: {
@@ -218,6 +218,9 @@ const s3Client = new S3Client({
     timeout: 100000,
   },
 });
+
+// R2 public URL for direct image access
+const R2_PUBLIC_URL = 'https://pub-ba72672df3c041a3844f278dd3c32b22.r2.dev';
 
 // Add this helper after your imports, before routes
 function setCorsHeaders(res, origin = '*') {
@@ -319,11 +322,12 @@ app.post('/webhook/r2', async (req, res) => {
     console.log(`Received R2 event: ${event} for key: ${key}`);
 
     if (event === 'ObjectCreated:Put' || event === 'ObjectCreated:Post' || event === 'ObjectRemoved:Delete') {
-      const match = key.match(/^(.*?)\/(.*?)\/(.*)$/);
+      // Update regex to handle new schema: module/platform/username/file
+      const match = key.match(/^(.*?)\/(.*?)\/(.*?)\/(.*)$/);
       if (match) {
-        const [, prefix, username] = match;
-        const cacheKey = `${prefix}/${username}`;
-        console.log(`Invalidating cache for ${cacheKey}`);
+        const [, module, platform, username] = match;
+        const cacheKey = `${module}/${platform}/${username}`;
+        console.log(`Invalidating cache for ${cacheKey} (module: ${module}, platform: ${platform}, username: ${username})`);
         cache.delete(cacheKey);
 
         // Enhanced broadcast with tracking
@@ -331,7 +335,9 @@ app.post('/webhook/r2', async (req, res) => {
           type: 'update', 
           prefix: cacheKey,
           timestamp: Date.now(),
-          key: key
+          key: key,
+          module: module,
+          platform: platform
         });
         
         if (!result) {
@@ -399,13 +405,22 @@ app.get('/events/:username', (req, res) => {
 });
 
 // Enhanced data fetching with improved caching strategy
-async function fetchDataForModule(username, prefixTemplate, forceRefresh = false) {
+async function fetchDataForModule(username, prefixTemplate, forceRefresh = false, platform = 'instagram') {
   if (!username) {
     console.error('No username provided, cannot fetch data');
     return [];
   }
 
-  const prefix = prefixTemplate.replace('{username}', username);
+  // Create platform-specific prefix using new schema: <module>/<platform>/<username>
+  let prefix;
+  if (prefixTemplate.includes('{username}')) {
+    // Replace {username} placeholder and add platform directory
+    const modulePrefix = prefixTemplate.replace('/{username}', '').replace('{username}', '');
+    prefix = `${modulePrefix}/${platform}/${username}`;
+  } else {
+    // For templates without placeholder, assume it ends with the module name
+    prefix = `${prefixTemplate}/${platform}/${username}`;
+  }
   
   // Check if we should use cache based on the enhanced caching rules
   if (!forceRefresh && shouldUseCache(prefix)) {
@@ -413,7 +428,7 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
   }
 
   try {
-    console.log(`[${new Date().toISOString()}] Fetching fresh data from R2 for prefix: ${prefix}`);
+    console.log(`[${new Date().toISOString()}] Fetching fresh ${platform} data from R2 for prefix: ${prefix}`);
     const listCommand = new ListObjectsV2Command({
       Bucket: 'tasks',
       Prefix: prefix,
@@ -423,7 +438,7 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
     const files = listResponse.Contents || [];
     
     // Special handling for ready_post directory since it contains both JSON and JPG files
-    if (prefix.startsWith('ready_post/')) {
+    if (prefix.includes('ready_post/')) {
       // For ready_post, we need a different approach to properly handle both JSON and image files
       // This is handled separately by the /posts/:username endpoint
       // Here we'll just set the cache timestamp for tracking
@@ -456,9 +471,15 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
           }
 
           const parsedData = JSON.parse(body);
-          return { key: file.Key, data: parsedData };
+          return { 
+            key: file.Key, 
+            data: {
+              ...parsedData,
+              platform: platform
+            }
+          };
         } catch (error) {
-          console.error(`Failed to process file ${file.Key}:`, error.message);
+          console.error(`Failed to process ${platform} file ${file.Key}:`, error.message);
           return null;
         }
       })
@@ -472,10 +493,10 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
     
     return validData;
   } catch (error) {
-    console.error(`Error fetching data for prefix ${prefix}:`, error);
+    console.error(`Error fetching ${platform} data for prefix ${prefix}:`, error);
     // Return cached data as fallback if available
     if (cache.has(prefix)) {
-      console.log(`[${new Date().toISOString()}] Using cached data as fallback for ${prefix} due to fetch error`);
+      console.log(`[${new Date().toISOString()}] Using cached ${platform} data as fallback for ${prefix} due to fetch error`);
       return cache.get(prefix);
     }
     return [];
@@ -508,8 +529,11 @@ app.get('/proxy-image', async (req, res) => {
 app.get('/profile-info/:username', async (req, res) => {
   const { username } = req.params;
   const forceRefresh = req.query.forceRefresh === 'true';
-  const key = `ProfileInfo/${username}.json`;
-  const prefix = `ProfileInfo/${username}`;
+  const platform = req.query.platform || 'instagram'; // Default to Instagram
+  
+  // Create platform-specific key using new schema: ProfileInfo/<platform>/<username>.json
+  const key = `ProfileInfo/${platform}/${username}.json`;
+  const prefix = `ProfileInfo/${platform}/${username}`;
 
   try {
     let data;
@@ -550,17 +574,19 @@ app.get('/profile-info/:username', async (req, res) => {
 
 app.post('/save-account-info', async (req, res) => {
   try {
-    const { username, accountType, postingStyle, competitors } = req.body;
+    const { username, accountType, postingStyle, competitors, platform } = req.body;
+    const platformParam = req.query.platform || platform || 'instagram'; // Default to Instagram for backward compatibility
 
     if (!username || !accountType || !postingStyle) {
       return res.status(400).json({ error: 'Username, account type, and posting style are required' });
     }
 
-    // Normalize the username to lowercase
-    const normalizedUsername = username.trim().toLowerCase();
+    // Normalize the username
+    const normalizedUsername = platformParam === 'twitter' ? username.trim() : username.trim().toLowerCase();
 
-    // Check if the username is already in use (for logging purposes)
-    const key = `AccountInfo/${normalizedUsername}/info.json`;
+    // Create platform-specific key structure using new schema: AccountInfo/<platform>/<username>/info.json
+    const key = `AccountInfo/${platformParam}/${normalizedUsername}/info.json`;
+
     let isUsernameAlreadyInUse = false;
     
     try {
@@ -570,7 +596,7 @@ app.post('/save-account-info', async (req, res) => {
       });
       await s3Client.send(getCommand);
       isUsernameAlreadyInUse = true;
-      console.warn(`Warning: Username '${normalizedUsername}' is already in use by another account, but allowing save operation`);
+      console.warn(`Warning: ${platformParam} username '${normalizedUsername}' is already in use by another account, but allowing save operation`);
     } catch (error) {
       if (error.name !== 'NoSuchKey' && error.$metadata?.httpStatusCode !== 404) {
         throw error;
@@ -582,11 +608,12 @@ app.post('/save-account-info', async (req, res) => {
       username: normalizedUsername,
       accountType,
       postingStyle,
-      ...(competitors && { competitors: competitors.map(c => c.trim().toLowerCase()) }),
+      platform: platformParam,
+      ...(competitors && { competitors: competitors.map(c => platformParam === 'twitter' ? c.trim() : c.trim().toLowerCase()) }),
       timestamp: new Date().toISOString(),
     };
 
-    console.log(`Saving account info to: ${key}`);
+    console.log(`Saving ${platformParam} account info to: ${key}`);
     const putCommand = new PutObjectCommand({
       Bucket: 'tasks',
       Key: key,
@@ -595,13 +622,14 @@ app.post('/save-account-info', async (req, res) => {
     });
     await s3Client.send(putCommand);
 
-    const cacheKey = `AccountInfo/${normalizedUsername}`;
+    const cacheKey = `AccountInfo/${platformParam}/${normalizedUsername}`;
     cache.delete(cacheKey);
 
     res.json({ 
       success: true, 
-      message: 'Account info saved successfully',
-      isUsernameAlreadyInUse
+      message: `${platformParam} account info saved successfully`,
+      isUsernameAlreadyInUse,
+      platform: platformParam
     });
   } catch (error) {
     console.error('Save account info error:', error);
@@ -631,9 +659,12 @@ app.post('/scrape', async (req, res) => {
       currentUsername = newUsername;
 
       MODULE_PREFIXES.forEach((prefixTemplate) => {
-        const prefix = `${prefixTemplate}/${currentUsername}`;
-        console.log(`Clearing cache for ${prefix}`);
-        cache.delete(prefix);
+        // Clear cache for both Instagram and Twitter platforms
+        for (const platform of ['instagram', 'twitter']) {
+          const prefix = `${prefixTemplate}/${platform}/${currentUsername}`;
+          console.log(`Clearing cache for ${prefix}`);
+          cache.delete(prefix);
+        }
       });
 
       const clients = sseClients.get(currentUsername) || [];
@@ -696,6 +727,7 @@ app.get('/retrieve-multiple/:accountHolder', async (req, res) => {
   const { accountHolder } = req.params;
   const competitorsParam = req.query.competitors;
   const forceRefresh = req.query.forceRefresh === 'true';
+  const platform = req.query.platform || 'instagram'; // Default to Instagram
 
   if (!competitorsParam || typeof competitorsParam !== 'string') {
     return res.status(400).json({ error: 'Competitors query parameter is required and must be a string' });
@@ -707,14 +739,20 @@ app.get('/retrieve-multiple/:accountHolder', async (req, res) => {
     const results = await Promise.all(
       competitors.map(async (competitor) => {
         try {
-          const data = await fetchDataForModule(accountHolder, `competitor_analysis/{username}/${competitor}`, forceRefresh);
+          const data = await fetchDataForModule(accountHolder, `competitor_analysis/{username}/${competitor}`, forceRefresh, platform);
           return { competitor, data };
         } catch (error) {
-          console.error(`Error fetching data for ${accountHolder}/${competitor}:`, error);
+          console.error(`Error fetching ${platform} data for ${accountHolder}/${competitor}:`, error);
           // Try to use cached data as fallback
-          const prefix = `competitor_analysis/${accountHolder}/${competitor}`;
+          let prefix;
+          if (platform === 'twitter') {
+            prefix = `competitor_analysis/twitter/${accountHolder}/${competitor}`;
+          } else {
+            prefix = `competitor_analysis/${accountHolder}/${competitor}`;
+          }
+          
           if (cache.has(prefix)) {
-            console.log(`[${new Date().toISOString()}] Using cached data as fallback for ${prefix}`);
+            console.log(`[${new Date().toISOString()}] Using cached ${platform} data as fallback for ${prefix}`);
             return { competitor, data: cache.get(prefix) };
           }
           return { competitor, data: [], error: error.message };
@@ -723,29 +761,36 @@ app.get('/retrieve-multiple/:accountHolder', async (req, res) => {
     );
     res.json(results);
   } catch (error) {
-    console.error(`Retrieve multiple endpoint error for ${accountHolder}:`, error);
-    res.status(500).json({ error: 'Error retrieving data for multiple competitors', details: error.message });
+    console.error(`Retrieve multiple ${platform} endpoint error for ${accountHolder}:`, error);
+    res.status(500).json({ error: `Error retrieving ${platform} data for multiple competitors`, details: error.message });
   }
 });
 
 app.get('/retrieve-strategies/:accountHolder', async (req, res) => {
   const { accountHolder } = req.params;
   const forceRefresh = req.query.forceRefresh === 'true';
+  const platform = req.query.platform || 'instagram'; // Default to Instagram
 
   try {
-    const data = await fetchDataForModule(accountHolder, 'recommendations/{username}', forceRefresh);
+    const data = await fetchDataForModule(accountHolder, 'recommendations/{username}', forceRefresh, platform);
     if (data.length === 0) {
-      res.status(404).json({ error: 'No recommendation files found' });
+      res.status(404).json({ error: `No ${platform} recommendation files found` });
     } else {
       res.json(data);
     }
   } catch (error) {
-    console.error(`Retrieve strategies endpoint error for ${accountHolder}:`, error);
+    console.error(`Retrieve ${platform} strategies endpoint error for ${accountHolder}:`, error);
     
     // Try to use cached data as fallback
-    const prefix = `recommendations/${accountHolder}`;
+    let prefix;
+    if (platform === 'twitter') {
+      prefix = `recommendations/twitter/${accountHolder}`;
+    } else {
+      prefix = `recommendations/${accountHolder}`;
+    }
+    
     if (cache.has(prefix)) {
-      console.log(`[${new Date().toISOString()}] Using cached recommendations as fallback for ${accountHolder}`);
+      console.log(`[${new Date().toISOString()}] Using cached ${platform} recommendations as fallback for ${accountHolder}`);
       const cachedData = cache.get(prefix);
       if (cachedData && cachedData.length > 0) {
         return res.json(cachedData);
@@ -753,9 +798,9 @@ app.get('/retrieve-strategies/:accountHolder', async (req, res) => {
     }
     
     if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
-      res.status(404).json({ error: 'Data not ready yet' });
+      res.status(404).json({ error: `${platform.charAt(0).toUpperCase() + platform.slice(1)} data not ready yet` });
     } else {
-      res.status(500).json({ error: 'Error retrieving data', details: error.message });
+      res.status(500).json({ error: `Error retrieving ${platform} data`, details: error.message });
     }
   }
 });
@@ -763,21 +808,28 @@ app.get('/retrieve-strategies/:accountHolder', async (req, res) => {
 app.get('/retrieve-engagement-strategies/:accountHolder', async (req, res) => {
   const { accountHolder } = req.params;
   const forceRefresh = req.query.forceRefresh === 'true';
+  const platform = req.query.platform || 'instagram'; // Default to Instagram
 
   try {
-    const data = await fetchDataForModule(accountHolder, 'engagement_strategies/{username}', forceRefresh);
+    const data = await fetchDataForModule(accountHolder, 'engagement_strategies/{username}', forceRefresh, platform);
     if (data.length === 0) {
-      res.status(404).json({ error: 'No engagement strategy files found' });
+      res.status(404).json({ error: `No ${platform} engagement strategy files found` });
     } else {
       res.json(data);
     }
   } catch (error) {
-    console.error(`Retrieve engagement strategies endpoint error for ${accountHolder}:`, error);
+    console.error(`Retrieve ${platform} engagement strategies endpoint error for ${accountHolder}:`, error);
     
     // Try to use cached data as fallback
-    const prefix = `engagement_strategies/${accountHolder}`;
+    let prefix;
+    if (platform === 'twitter') {
+      prefix = `engagement_strategies/twitter/${accountHolder}`;
+    } else {
+      prefix = `engagement_strategies/${accountHolder}`;
+    }
+    
     if (cache.has(prefix)) {
-      console.log(`[${new Date().toISOString()}] Using cached engagement strategies as fallback for ${accountHolder}`);
+      console.log(`[${new Date().toISOString()}] Using cached ${platform} engagement strategies as fallback for ${accountHolder}`);
       const cachedData = cache.get(prefix);
       if (cachedData && cachedData.length > 0) {
         return res.json(cachedData);
@@ -785,9 +837,9 @@ app.get('/retrieve-engagement-strategies/:accountHolder', async (req, res) => {
     }
     
     if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
-      res.status(404).json({ error: 'Data not ready yet' });
+      res.status(404).json({ error: `${platform.charAt(0).toUpperCase() + platform.slice(1)} data not ready yet` });
     } else {
-      res.status(500).json({ error: 'Error retrieving data', details: error.message });
+      res.status(500).json({ error: `Error retrieving ${platform} data`, details: error.message });
     }
   }
 });
@@ -795,21 +847,28 @@ app.get('/retrieve-engagement-strategies/:accountHolder', async (req, res) => {
 app.get('/news-for-you/:accountHolder', async (req, res) => {
   const { accountHolder } = req.params;
   const forceRefresh = req.query.forceRefresh === 'true';
+  const platform = req.query.platform || 'instagram'; // Default to Instagram
 
   try {
-    const data = await fetchDataForModule(accountHolder, 'NewForYou/{username}', forceRefresh);
+    const data = await fetchDataForModule(accountHolder, 'NewForYou/{username}', forceRefresh, platform);
     if (data.length === 0) {
-      res.status(404).json({ error: 'No news files found' });
+      res.status(404).json({ error: `No ${platform} news files found` });
     } else {
       res.json(data);
     }
   } catch (error) {
-    console.error(`Retrieve news endpoint error for ${accountHolder}:`, error);
+    console.error(`Retrieve ${platform} news endpoint error for ${accountHolder}:`, error);
     
     // Try to use cached data as fallback
-    const prefix = `NewForYou/${accountHolder}`;
+    let prefix;
+    if (platform === 'twitter') {
+      prefix = `NewForYou/twitter/${accountHolder}`;
+    } else {
+      prefix = `NewForYou/${accountHolder}`;
+    }
+    
     if (cache.has(prefix)) {
-      console.log(`[${new Date().toISOString()}] Using cached news as fallback for ${accountHolder}`);
+      console.log(`[${new Date().toISOString()}] Using cached ${platform} news as fallback for ${accountHolder}`);
       const cachedData = cache.get(prefix);
       if (cachedData && cachedData.length > 0) {
         return res.json(cachedData);
@@ -817,9 +876,9 @@ app.get('/news-for-you/:accountHolder', async (req, res) => {
     }
     
     if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
-      res.status(404).json({ error: 'Data not ready yet' });
+      res.status(404).json({ error: `${platform.charAt(0).toUpperCase() + platform.slice(1)} data not ready yet` });
     } else {
-      res.status(500).json({ error: 'Error retrieving data', details: error.message });
+      res.status(500).json({ error: `Error retrieving ${platform} data`, details: error.message });
     }
   }
 });
@@ -835,9 +894,11 @@ app.post('/save-query/:accountHolder', async (req, res) => {
 
 app.get('/rules/:username', async (req, res) => {
   const { username } = req.params;
+  const platform = req.query.platform || 'instagram'; // Default to Instagram
 
-  const key = `rules/${username}/rules.json`;
-  const prefix = `rules/${username}/`;
+  // Create platform-specific key using new schema: rules/<platform>/<username>/rules.json
+  const key = `rules/${platform}/${username}/rules.json`;
+  const prefix = `rules/${platform}/${username}/`;
 
   try {
     let data;
@@ -878,9 +939,11 @@ app.get('/rules/:username', async (req, res) => {
 app.post('/rules/:username', async (req, res) => {
   const { username } = req.params;
   const { rules } = req.body;
+  const platform = req.query.platform || 'instagram'; // Default to Instagram
 
-  const key = `rules/${username}/rules.json`;
-  const prefix = `rules/${username}/`;
+  // Create platform-specific key using new schema: rules/<platform>/<username>/rules.json
+  const key = `rules/${platform}/${username}/rules.json`;
+  const prefix = `rules/${platform}/${username}/`;
 
   if (!rules || typeof rules !== 'string') {
     return res.status(400).json({ error: 'Rules must be a non-empty string' });
@@ -916,21 +979,28 @@ app.post('/rules/:username', async (req, res) => {
 app.get('/responses/:username', async (req, res) => {
   const { username } = req.params;
   const forceRefresh = req.query.forceRefresh === 'true';
+  const platform = req.query.platform || 'instagram'; // Default to Instagram
 
   try {
-    const data = await fetchDataForModule(username, 'queries/{username}', forceRefresh);
+    const data = await fetchDataForModule(username, 'queries/{username}', forceRefresh, platform);
     res.json(data);
   } catch (error) {
-    console.error(`Retrieve responses error for ${username}:`, error);
+    console.error(`Retrieve ${platform} responses error for ${username}:`, error);
     
     // Try to use cached data as fallback if available
-    const prefix = `queries/${username}`;
+    let prefix;
+    if (platform === 'twitter') {
+      prefix = `queries/twitter/${username}`;
+    } else {
+      prefix = `queries/${username}`;
+    }
+    
     if (cache.has(prefix)) {
-      console.log(`[${new Date().toISOString()}] Using cached responses as fallback for ${username}`);
+      console.log(`[${new Date().toISOString()}] Using cached ${platform} responses as fallback for ${username}`);
       return res.json(cache.get(prefix));
     }
     
-    res.status(500).json({ error: 'Error retrieving responses', details: error.message });
+    res.status(500).json({ error: `Error retrieving ${platform} responses`, details: error.message });
   }
 });
 
@@ -979,12 +1049,14 @@ app.post('/responses/:username/:responseId', async (req, res) => {
 
 app.get('/retrieve-account-info/:username', async (req, res) => {
   const { username } = req.params;
+  const platform = req.query.platform || 'instagram'; // Default to Instagram
   
-  // Normalize the username to lowercase
-  const normalizedUsername = username.trim().toLowerCase();
+  // Normalize the username to lowercase for Instagram, keep original case for Twitter
+  const normalizedUsername = platform === 'twitter' ? username.trim() : username.trim().toLowerCase();
   
-  const key = `AccountInfo/${normalizedUsername}/info.json`;
-  const prefix = `AccountInfo/${normalizedUsername}`;
+  // Create platform-specific key using new schema: AccountInfo/<platform>/<username>/info.json
+  const key = `AccountInfo/${platform}/${normalizedUsername}/info.json`;
+  const prefix = `AccountInfo/${platform}/${normalizedUsername}`;
 
   try {
     let data;
@@ -1056,23 +1128,26 @@ app.get('/retrieve-account-info/:username', async (req, res) => {
 app.get('/posts/:username', async (req, res) => {
   const { username } = req.params;
   const forceRefresh = req.query.forceRefresh === 'true';
-  const prefix = `ready_post/${username}/`;
+  const platform = req.query.platform || 'instagram'; // Default to Instagram
+  
+  // Create platform-specific prefix using new schema: ready_post/<platform>/<username>/
+  const prefix = `ready_post/${platform}/${username}/`;
 
   try {
     const now = Date.now();
     const lastFetch = cacheTimestamps.get(prefix) || 0;
 
     if (!forceRefresh && cache.has(prefix)) {
-      console.log(`Cache hit for posts: ${prefix}`);
+      console.log(`Cache hit for ${platform} posts: ${prefix}`);
       return res.json(cache.get(prefix));
     }
 
     if (!forceRefresh && now - lastFetch < THROTTLE_INTERVAL) {
-      console.log(`Throttled fetch for posts: ${prefix}`);
+      console.log(`Throttled fetch for ${platform} posts: ${prefix}`);
       return res.json(cache.has(prefix) ? cache.get(prefix) : []);
     }
 
-    console.log(`Fetching posts from R2 for prefix: ${prefix}`);
+    console.log(`Fetching ${platform} posts from R2 for prefix: ${prefix}`);
     const listCommand = new ListObjectsV2Command({
       Bucket: 'tasks',
       Prefix: prefix,
@@ -1085,7 +1160,7 @@ app.get('/posts/:username', async (req, res) => {
     const jsonFiles = files.filter(file => file.Key.endsWith('.json'));
     const jpgFiles = files.filter(file => file.Key.endsWith('.jpg'));
     
-    console.log(`[${new Date().toISOString()}] Found ${jsonFiles.length} JSON files and ${jpgFiles.length} JPG files in ${prefix}`);
+    console.log(`[${new Date().toISOString()}] Found ${jsonFiles.length} JSON files and ${jpgFiles.length} JPG files in ${prefix} for ${platform}`);
     
     // Store the post data
     const posts = await Promise.all(
@@ -1123,7 +1198,7 @@ app.get('/posts/:username', async (req, res) => {
           // Check if this post should be skipped based on status
           // Only skip if status is explicitly set to 'processed' or 'rejected'
           if (postData.status === 'processed' || postData.status === 'rejected') {
-            console.log(`[${new Date().toISOString()}] Skipping post ${file.Key} with status: ${postData.status}`);
+            console.log(`[${new Date().toISOString()}] Skipping ${platform} post ${file.Key} with status: ${postData.status}`);
             return null;
           }
           
@@ -1140,7 +1215,7 @@ app.get('/posts/:username', async (req, res) => {
           );
           
           if (!imageFile) {
-            console.warn(`[${new Date().toISOString()}] No matching image found for post ${file.Key} (ID: ${fileId}), checked: ${potentialImageKeys.join(', ')}`);
+            console.warn(`[${new Date().toISOString()}] No matching image found for ${platform} post ${file.Key} (ID: ${fileId}), checked: ${potentialImageKeys.join(', ')}`);
             return null;
           }
           
@@ -1156,7 +1231,7 @@ app.get('/posts/:username', async (req, res) => {
           // We'll provide both URLs to the client so they can try both
           const r2ImageUrl = `${R2_PUBLIC_URL}/${imageFile.Key}`;
           
-          console.log(`[${new Date().toISOString()}] Successfully loaded post ${file.Key} with image ${imageFile.Key}`);
+          console.log(`[${new Date().toISOString()}] Successfully loaded ${platform} post ${file.Key} with image ${imageFile.Key}`);
           
           // Return the complete post data
           return {
@@ -1164,11 +1239,12 @@ app.get('/posts/:username', async (req, res) => {
             data: {
               ...postData,
               image_url: signedUrl,
-              r2_image_url: r2ImageUrl
+              r2_image_url: r2ImageUrl,
+              platform: platform
             },
           };
         } catch (error) {
-          console.error(`Failed to process post ${file.Key}:`, error.message);
+          console.error(`Failed to process ${platform} post ${file.Key}:`, error.message);
           return null;
         }
       })
@@ -1190,8 +1266,10 @@ app.get('/posts/:username', async (req, res) => {
 app.post('/feedback/:username', async (req, res) => {
   const { username } = req.params;
   const { responseKey, feedback, type } = req.body;
+  const platform = req.query.platform || 'instagram'; // Default to Instagram
 
-  const prefix = `feedbacks/${username}/`;
+  // Create platform-specific prefix using new schema: feedbacks/<platform>/<username>/
+  const prefix = `feedbacks/${platform}/${username}/`;
 
   if (!responseKey || !feedback || typeof feedback !== 'string') {
     return res.status(400).json({ error: 'Response key and feedback must be provided' });
@@ -1932,7 +2010,7 @@ app.post('/send-comment-reply/:userId', async (req, res) => {
 // Ignore Notification
 app.post('/ignore-notification/:userId', async (req, res) => {
   const { userId } = req.params;
-  const { message_id, comment_id } = req.body;
+  const { message_id, comment_id, platform = 'instagram' } = req.body;
 
   if (!message_id && !comment_id) {
     console.log(`[${new Date().toISOString()}] Missing message_id or comment_id for ignore action`);
@@ -1943,9 +2021,10 @@ app.post('/ignore-notification/:userId', async (req, res) => {
     // Find username if available
     let username = null;
     try {
+      const tokenPrefix = platform === 'twitter' ? 'TwitterTokens/' : 'InstagramTokens/';
       const listCommand = new ListObjectsV2Command({
         Bucket: 'tasks',
-        Prefix: `InstagramTokens/`,
+        Prefix: tokenPrefix,
       });
       const { Contents } = await s3Client.send(listCommand);
       if (Contents) {
@@ -1958,7 +2037,8 @@ app.post('/ignore-notification/:userId', async (req, res) => {
             const data = await s3Client.send(getCommand);
             const json = await data.Body.transformToString();
             const token = JSON.parse(json);
-            if (token.instagram_user_id === userId) {
+            const userIdField = platform === 'twitter' ? 'twitter_user_id' : 'instagram_user_id';
+            if (token[userIdField] === userId) {
               username = token.username;
               break;
             }
@@ -1966,12 +2046,13 @@ app.post('/ignore-notification/:userId', async (req, res) => {
         }
       }
     } catch (err) {
-      console.error(`[${new Date().toISOString()}] Error finding username for user ID ${userId}:`, err.message);
+      console.error(`[${new Date().toISOString()}] Error finding username for ${platform} user ID ${userId}:`, err.message);
     }
     
+    const eventPrefix = platform === 'twitter' ? 'TwitterEvents' : 'InstagramEvents';
     const fileKey = message_id 
-      ? `InstagramEvents/${userId}/${message_id}.json`
-      : `InstagramEvents/${userId}/comment_${comment_id}.json`;
+      ? `${eventPrefix}/${userId}/${message_id}.json`
+      : `${eventPrefix}/${userId}/comment_${comment_id}.json`;
 
     let updatedItem;
     try {
@@ -1991,11 +2072,11 @@ app.post('/ignore-notification/:userId', async (req, res) => {
         Body: JSON.stringify(notifData, null, 2),
         ContentType: 'application/json',
       }));
-      console.log(`[${new Date().toISOString()}] Updated notification status to ignored at ${fileKey}`);
+      console.log(`[${new Date().toISOString()}] Updated ${platform} notification status to ignored at ${fileKey}`);
       
       // Invalidate cache
-      cache.delete(`InstagramEvents/${userId}`);
-      if (username) cache.delete(`InstagramEvents/${username}`);
+      cache.delete(`${eventPrefix}/${userId}`);
+      if (username) cache.delete(`${eventPrefix}/${username}`);
       
       // Broadcast status update
       const statusUpdate = {
@@ -2003,7 +2084,8 @@ app.post('/ignore-notification/:userId', async (req, res) => {
         [message_id ? 'message_id' : 'comment_id']: message_id || comment_id,
         status: 'ignored',
         updated_at: notifData.updated_at,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        platform: platform
       };
       
       broadcastUpdate(userId, { event: 'status_update', data: statusUpdate });
@@ -2011,7 +2093,7 @@ app.post('/ignore-notification/:userId', async (req, res) => {
       
     } catch (error) {
       if (error.name === 'NoSuchKey') {
-        console.log(`[${new Date().toISOString()}] Notification file not found at ${fileKey}, proceeding`);
+        console.log(`[${new Date().toISOString()}] ${platform} notification file not found at ${fileKey}, proceeding`);
       } else {
         throw error;
       }
@@ -2019,1401 +2101,170 @@ app.post('/ignore-notification/:userId', async (req, res) => {
 
     res.json({ success: true, updated: !!updatedItem });
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error ignoring notification:`, error.message || error);
-    res.status(500).json({ error: 'Failed to ignore notification', details: error.message || 'Unknown error' });
+    console.error(`[${new Date().toISOString()}] Error ignoring ${platform} notification:`, error.message || error);
+    res.status(500).json({ error: `Failed to ignore ${platform} notification`, details: error.message || 'Unknown error' });
   }
 });
 
 // List Stored Events
 app.get('/events-list/:userId', async (req, res) => {
-  setCorsHeaders(res);
-  const userId = req.params.userId;
+  const { userId } = req.params;
+  const platform = req.query.platform || 'instagram';
 
   try {
-    // Real-time data should never be cached
-    const prefix = `InstagramEvents/${userId}/`;
-    console.log(`[${new Date().toISOString()}] Fetching fresh events list for user ${userId}`);
+    let notifications = [];
+    if (platform === 'instagram') {
+      notifications = await fetchInstagramNotifications(userId);
+    } else if (platform === 'twitter') {
+      notifications = await fetchTwitterNotifications(userId);
+    }
+
+    res.json(notifications);
+  } catch (error) {
+    console.error(`Error fetching ${platform} notifications:`, error);
+    res.status(500).json({ error: `Failed to fetch ${platform} notifications` });
+  }
+});
+
+async function fetchInstagramNotifications(userId) {
+  try {
+    // Fetch Instagram DMs
+    const dms = await fetchInstagramDMs(userId);
     
-    const listCommand = new ListObjectsV2Command({
-      Bucket: 'tasks',
-      Prefix: prefix
-    });
-    const { Contents } = await s3Client.send(listCommand);
+    // Fetch Instagram comments
+    const comments = await fetchInstagramComments(userId);
+    
+    // Combine and format notifications
+    const notifications = [
+      ...dms.map(dm => ({
+        type: 'message',
+        instagram_user_id: userId,
+        sender_id: dm.sender_id,
+        message_id: dm.id,
+        text: dm.text,
+        timestamp: new Date(dm.created_at).getTime(),
+        received_at: dm.created_at,
+        username: dm.sender_username,
+        status: 'pending',
+        platform: 'instagram'
+      })),
+      ...comments.map(comment => ({
+        type: 'comment',
+        instagram_user_id: userId,
+        sender_id: comment.user_id,
+        comment_id: comment.id,
+        text: comment.text,
+        post_id: comment.media_id,
+        timestamp: new Date(comment.created_at).getTime(),
+        received_at: comment.created_at,
+        username: comment.username,
+        status: 'pending',
+        platform: 'instagram'
+      }))
+    ];
 
-    const events = [];
-    if (Contents) {
-      await Promise.all(Contents.map(async (obj) => {
-        // Only process .json files and skip replies
-        if (!obj.Key.endsWith('.json')) return;
-        if (obj.Key.includes('reply_') || obj.Key.includes('comment_reply_')) return;
-        
-        try {
-          const getCommand = new GetObjectCommand({
-            Bucket: 'tasks',
-            Key: obj.Key
-          });
-          const { Body } = await s3Client.send(getCommand);
-          const data = await Body.transformToString();
-          const event = JSON.parse(data);
-          if (event.status === 'pending') {
-            events.push(event);
-          }
-        } catch (error) {
-          console.error(`[${new Date().toISOString()}] Error processing event file ${obj.Key}:`, error.message);
-        }
-      }));
-    }
-
-    // Sort events by timestamp (newest first)
-    events.sort((a, b) => {
-      const timeA = a.timestamp || Date.parse(a.received_at);
-      const timeB = b.timestamp || Date.parse(b.received_at);
-      return timeB - timeA;
-    });
-
-    console.log(`[${new Date().toISOString()}] Retrieved ${events.length} pending events for user ${userId}`);
-    res.json(events);
+    return notifications;
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error retrieving events for user ${userId}:`, error);
-    res.status(500).send('Error retrieving events');
-  }
-});
-
-// Add explicit OPTIONS handler for /events-list/:userId
-app.options('/events-list/:userId', (req, res) => {
-  setCorsHeaders(res);
-  res.status(204).send();
-});
-
-// SSE Endpoint
-app.get('/events/:userId', (req, res) => {
-  const userId = req.params.userId;
-  console.log(`[${new Date().toISOString()}] Handling SSE request for /events/${userId}`);
-
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Expose-Headers', 'Content-Type');
-  res.flushHeaders();
-
-  if (!sseClients[userId]) {
-    sseClients[userId] = [];
-  }
-
-  sseClients[userId].push(res);
-  console.log(`[${new Date().toISOString()}] SSE client connected for ${userId}. Total clients: ${sseClients[userId].length}`);
-
-  const heartbeatInterval = setInterval(() => {
-    res.write('data: {"type":"heartbeat"}\n\n');
-  }, 30000);
-
-  req.on('close', () => {
-    clearInterval(heartbeatInterval);
-    sseClients[userId] = sseClients[userId].filter(client => client !== res);
-    console.log(`[${new Date().toISOString()}] SSE client disconnected for ${userId}. Total clients: ${sseClients[userId].length}`);
-    res.end();
-  });
-});
-
-// Public R2.dev URL
-const R2_PUBLIC_URL = 'https://pub-ba72672df3c041a3844f278dd3c32b22.r2.dev';
-
-app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
-  const { userId } = req.params;
-  let { caption, scheduleDate } = req.body;
-  let file = req.file;
-  let baseFilename = file.originalname.replace(/\.[^.]+$/, '');
-
-  console.log(`[${new Date().toISOString()}] Received schedule-post request for user ${userId}: image=${!!file}, caption=${!!caption}, scheduleDate=${scheduleDate}`);
-
-  if (!file || !caption || !scheduleDate) {
-    console.log(`[${new Date().toISOString()}] Missing required fields: image=${!!file}, caption=${!!caption}, scheduleDate=${!!scheduleDate}`);
-    return res.status(400).json({ error: 'Missing image, caption, or scheduleDate' });
-  }
-
-  try {
-    // Validate image file type
-    let format;
-    let buffer = file.buffer;
-    let fileInfo;
-    try {
-      fileInfo = await fileTypeFromBuffer(buffer);
-      format = fileInfo?.mime.split('/')[1];
-      console.log(`[${new Date().toISOString()}] Image format (file-type): ${format || 'unknown'}, mime: ${file.mimetype}, size: ${file.size} bytes, buffer_length: ${buffer.length}`);
-    } catch (fileTypeError) {
-      console.error(`[${new Date().toISOString()}] fileType validation failed:`, fileTypeError.message);
-      format = file.mimetype.split('/')[1]; // Fallback to multer mime
-    }
-    // Convert to jpeg if not jpeg/png and ensure Instagram-compatible dimensions
-    if (!['jpeg', 'png'].includes(format)) {
-      console.log(`[${new Date().toISOString()}] Converting image from ${format} to jpeg using sharp...`);
-      try {
-        let image = sharp(buffer);
-        const metadata = await image.metadata();
-        let { width, height } = metadata;
-        const minDim = 320;
-        const maxDim = 1080;
-        let aspect = width / height;
-        if (width < minDim || height < minDim || width > maxDim || height > maxDim || aspect < 0.8 || aspect > 1.91) {
-          console.log(`[${new Date().toISOString()}] Resizing and cropping image to 1080x1080 for Instagram compliance...`);
-          image = image.resize(1080, 1080, { fit: 'cover', position: 'center' });
-        }
-        buffer = await image
-          .jpeg({ progressive: false, force: true })
-          .toColourspace('srgb')
-          .withMetadata({ exif: undefined, icc: undefined })
-          .toBuffer();
-        fileInfo = await fileTypeFromBuffer(buffer);
-        format = fileInfo?.mime.split('/')[1];
-        file.mimetype = 'image/jpeg';
-        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-        let uniqueFilename = `${baseFilename}_${uniqueSuffix}.jpg`;
-        file.originalname = uniqueFilename;
-        file.size = buffer.length;
-        file.buffer = buffer;
-        console.log(`[${new Date().toISOString()}] Conversion and resize successful. New format: ${format}, size: ${buffer.length}`);
-      } catch (convertErr) {
-        console.error(`[${new Date().toISOString()}] Failed to convert/resize image to jpeg:`, convertErr.message);
-        return res.status(400).json({ error: 'Failed to convert/resize image to JPEG' });
-      }
-    }
-    if (!format || !['jpeg', 'png'].includes(format)) {
-      console.log(`[${new Date().toISOString()}] Invalid image format after conversion: ${format || 'unknown'}`);
-      return res.status(400).json({ error: 'Image must be JPEG or PNG' });
-    }
-    if (file.size > 8 * 1024 * 1024) {
-      console.log(`[${new Date().toISOString()}] Image size too large: ${file.size} bytes`);
-      return res.status(400).json({ error: 'Image size exceeds 8MB' });
-    }
-
-    // Truncate caption to 2200 characters
-    if (caption.length > 2200) {
-      console.warn(`[${new Date().toISOString()}] Caption too long (${caption.length} chars), truncating to 2200 chars`);
-      caption = caption.slice(0, 2200);
-    }
-    console.log(`[${new Date().toISOString()}] Caption length after truncation: ${caption.length} chars`);
-
-    // Validate caption
-    if (caption.length > 2200) {
-      console.log(`[${new Date().toISOString()}] Caption still too long after truncation: ${caption.length} characters`);
-      return res.status(400).json({ error: 'Caption exceeds 2200 characters after truncation' });
-    }
-    const hashtags = (caption.match(/#[^\s#]+/g) || []).length;
-    if (hashtags > 30) {
-      console.log(`[${new Date().toISOString()}] Too many hashtags: ${hashtags}`);
-      return res.status(400).json({ error: 'Maximum 30 hashtags allowed' });
-    }
-
-    // Validate schedule date
-    let scheduleTime = new Date(scheduleDate);
-    const now = new Date();
-    const minSchedule = new Date(now.getTime() + 60 * 1000); // at least 1 min in future
-    const maxDate = new Date(now.getTime() + 75 * 24 * 60 * 60 * 1000);
-    if (isNaN(scheduleTime.getTime()) || scheduleTime > maxDate) {
-      console.log(`[${new Date().toISOString()}] Invalid schedule date: ${scheduleDate}`);
-      return res.status(400).json({ error: 'Schedule date must be within 75 days from now' });
-    }
-    if (scheduleTime <= now) {
-      console.warn(`[${new Date().toISOString()}] scheduleDate is in the past or now; auto-correcting to now + 1 min.`);
-      scheduleTime = minSchedule;
-    } else if (scheduleTime < minSchedule) {
-      console.warn(`[${new Date().toISOString()}] scheduleDate is less than 1 min in the future; auto-correcting to now + 1 min.`);
-      scheduleTime = minSchedule;
-    }
-    console.log(`[${new Date().toISOString()}] Scheduling post with scheduleDate: ${scheduleDate}, corrected scheduleTime: ${scheduleTime.toISOString()}`);
-
-    // Fetch access token
-    console.log(`[${new Date().toISOString()}] Fetching token for user ${userId}`);
-    const listCommand = new ListObjectsV2Command({
-      Bucket: 'tasks',
-      Prefix: `InstagramTokens/`,
-    });
-    const { Contents } = await s3Client.send(listCommand);
-
-    let tokenData = null;
-    if (Contents) {
-      for (const key of Contents) {
-        if (key.Key.endsWith('/token.json')) {
-          const getCommand = new GetObjectCommand({
-            Bucket: 'tasks',
-            Key: key.Key,
-          });
-          const data = await s3Client.send(getCommand);
-          const json = await data.Body.transformToString();
-          const token = JSON.parse(json);
-          if (token.instagram_user_id === userId) {
-            tokenData = token;
-            break;
-          }
-        }
-      }
-    }
-
-    if (!tokenData) {
-      console.log(`[${new Date().toISOString()}] No token found for instagram_user_id ${userId}`);
-      return res.status(404).json({ error: 'No access token found for this Instagram account' });
-    }
-
-    const access_token = tokenData.access_token;
-    const instagram_graph_id = tokenData.instagram_graph_id;
-    console.log(`[${new Date().toISOString()}] Token found: graph_id=${instagram_graph_id}`);
-
-    // Robust R2 upload and validation
-    let uploadAttempts = 0;
-    let imageKey, imageUrl, validUpload = false;
-    while (uploadAttempts < 3 && !validUpload) {
-      uploadAttempts++;
-      imageKey = `InstagramEvents/${userId}/${baseFilename}_${Date.now()}_${Math.round(Math.random() * 1e9)}.jpg`;
-      console.log(`[${new Date().toISOString()}] Uploading image to R2: ${imageKey}, ContentType: image/jpeg`);
-      const putCommand = new PutObjectCommand({
-        Bucket: 'tasks',
-        Key: imageKey,
-        Body: file.buffer,
-        ContentType: 'image/jpeg',
-        ACL: 'public-read',
-      });
-      await s3Client.send(putCommand);
-
-      imageUrl = `${R2_PUBLIC_URL}/${imageKey}`;
-      console.log(`[${new Date().toISOString()}] Testing R2 image URL: ${imageUrl}`);
-      try {
-        const urlTest = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 10000 });
-        const contentType = urlTest.headers['content-type'];
-        const testBuffer = Buffer.from(urlTest.data);
-        const testType = await fileTypeFromBuffer(testBuffer);
-        if (contentType === 'image/jpeg' && testType?.mime === 'image/jpeg') {
-          console.log(`[${new Date().toISOString()}] R2 URL accessible and valid JPEG (attempt ${uploadAttempts}): 200`);
-          validUpload = true;
-        } else {
-          console.warn(`[${new Date().toISOString()}] R2 URL not valid JPEG (attempt ${uploadAttempts}): contentType=${contentType}, fileType=${testType?.mime}`);
-          file.buffer = await sharp(file.buffer)
-            .jpeg({ progressive: false, force: true })
-            .toColourspace('srgb')
-            .withMetadata({ exif: undefined, icc: undefined })
-            .toBuffer();
-        }
-      } catch (urlError) {
-        console.error(`[${new Date().toISOString()}] R2 URL inaccessible (attempt ${uploadAttempts}):`, urlError.message);
-        file.buffer = await sharp(file.buffer)
-          .jpeg({ progressive: false, force: true })
-          .toColourspace('srgb')
-          .withMetadata({ exif: undefined, icc: undefined })
-          .toBuffer();
-      }
-    }
-    if (!validUpload) {
-      return res.status(500).json({ error: 'Failed to upload a valid JPEG image to R2 after 3 attempts.' });
-    }
-
-    // Create media object
-    console.log(`[${new Date().toISOString()}] Creating media object for graph_id ${instagram_graph_id}`);
-    const mediaResponse = await axios.post(
-      `https://graph.instagram.com/v21.0/${instagram_graph_id}/media`,
-      {
-        image_url: imageUrl,
-        caption,
-        is_carousel_item: false,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${access_token}`,
-        },
-      }
-    );
-
-    const mediaId = mediaResponse.data.id;
-    if (!mediaId) {
-      console.log(`[${new Date().toISOString()}] Failed to create media object: ${JSON.stringify(mediaResponse.data)}`);
-      throw new Error('Failed to create media object');
-    }
-    console.log(`[${new Date().toISOString()}] Media object created: media_id=${mediaId}`);
-
-    // Store scheduled post details in R2 (before scheduling, using mediaId)
-    const scheduledPostKey = `InstagramScheduledPosts/${userId}/${mediaId}.json`;
-    const scheduledPostData = {
-      userId,
-      instagram_graph_id,
-      media_id: mediaId,
-      caption,
-      image_key: imageKey,
-      schedule_time: scheduleTime.toISOString(),
-      created_at: new Date().toISOString(),
-      status: 'scheduled',
-      access_token, // Store for job execution
-    };
-    console.log(`[${new Date().toISOString()}] Storing scheduled post: ${scheduledPostKey}`);
-    const putScheduledCommand = new PutObjectCommand({
-      Bucket: 'tasks',
-      Key: scheduledPostKey,
-      Body: JSON.stringify(scheduledPostData, null, 2),
-      ContentType: 'application/json',
-    });
-    await s3Client.send(putScheduledCommand);
-
-    // Schedule the publish job
-    console.log(`[${new Date().toISOString()}] Scheduling publish job for media_id=${mediaId} at ${scheduleTime.toISOString()}`);
-    const job = schedule.scheduleJob(scheduleTime, async () => {
-      try {
-        const publishResponse = await axios.post(
-          `https://graph.instagram.com/v21.0/${instagram_graph_id}/media_publish`,
-          {
-            creation_id: mediaId,
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${access_token}`,
-            },
-          }
-        );
-        const postId = publishResponse.data.id;
-        console.log(`[${new Date().toISOString()}] Post published successfully: post_id=${postId}, media_id=${mediaId}`);
-
-        // Update scheduled post status to 'published'
-        scheduledPostData.status = 'published';
-        scheduledPostData.post_id = postId;
-        scheduledPostData.published_at = new Date().toISOString();
-        const updateCommand = new PutObjectCommand({
-          Bucket: 'tasks',
-          Key: scheduledPostKey,
-          Body: JSON.stringify(scheduledPostData, null, 2),
-          ContentType: 'application/json',
-        });
-        await s3Client.send(updateCommand);
-
-        // ** NEW: Update original ready_post file status to published **
-        try {
-            console.log(`[${new Date().toISOString()}] Updating original ready_post status to published for ${scheduledPostData.image_key}`);
-            // Assuming image_key is related to the original ready_post key, e.g., ready_post/user/image_123.jpg
-            // We need to derive the ready_post json key from the image key.
-            // Example: ready_post/username/image_123.jpg -> ready_post/username/ready_post_123.json
-            const originalPostJson = scheduledPostData.image_key.replace(/InstagramEvents\/\d+\/image_(\d+)\.jpg$/, 'ready_post/$1.json');
-            const usernameMatch = originalPostJson.match(/^ready_post\/(.*?)\/ready_post_\d+\.json$/);
-            const usernameFromKey = usernameMatch ? usernameMatch[1] : null; // Extract username from the derived key
-
-            if (!usernameFromKey) {
-                 console.error(`[${new Date().toISOString()}] Could not extract username from derived ready_post key: ${originalPostJson}`);
-                 // Continue without updating original post status if username cannot be determined
-            } else {
-                 const getOriginalCommand = new GetObjectCommand({ Bucket: 'tasks', Key: originalPostJson });
-                 const originalData = await s3Client.send(getOriginalCommand);
-                 const originalBody = await streamToString(originalData.Body);
-                 const originalPost = JSON.parse(originalBody);
-
-                 originalPost.status = 'published';
-                 originalPost.published_at = new Date().toISOString();
-
-                 const putOriginalCommand = new PutObjectCommand({
-                     Bucket: 'tasks',
-                     Key: originalPostJson,
-                     Body: JSON.stringify(originalPost, null, 2),
-                     ContentType: 'application/json',
-                 });
-                 await s3Client.send(putOriginalCommand);
-                 console.log(`[${new Date().toISOString()}] Original ready_post status updated to published for ${originalPostJson}`);
-
-                  // Invalidate cache for the ready_post directory
-                 cache.delete(`ready_post/${usernameFromKey}/`);
-            }
-
-        } catch (updateErr) {
-             console.error(`[${new Date().toISOString()}] Failed to update original ready_post status to published for ${scheduledPostData.image_key}:`, updateErr);
-        }
-
-        // Clean up image after successful publish
-        console.log(`[${new Date().toISOString()}] Cleaning up image: ${imageKey}`);
-        try {
-          await s3Client.send(new DeleteObjectCommand({
-            Bucket: 'tasks',
-            Key: imageKey,
-          }));
-        } catch (deleteErr) {
-             console.error(`[${new Date().toISOString()}] Failed to delete image ${imageKey} after publish:`, deleteErr);
-        }
-
-      } catch (error) {
-        console.error(`[${new Date().toISOString()}] Failed to publish post media_id=${mediaId} at ${scheduleTime.toISOString()}:`, error.response?.data || error.message);
-        // Update status to 'failed' in the scheduled post R2 file
-        scheduledPostData.status = 'failed';
-        scheduledPostData.error = error.response?.data?.error?.message || error.message;
-        const updateCommand = new PutObjectCommand({
-          Bucket: 'tasks',
-          Key: scheduledPostKey,
-          Body: JSON.stringify(scheduledPostData, null, 2),
-          ContentType: 'application/json',
-        });
-        await s3Client.send(updateCommand);
-
-         // ** NEW: Update original ready_post file status to failed **
-        try {
-             console.log(`[${new Date().toISOString()}] Updating original ready_post status to failed for ${scheduledPostData.image_key}`);
-             const originalPostJson = scheduledPostData.image_key.replace(/InstagramEvents\/\d+\/image_(\d+)\.jpg$/, 'ready_post/$1.json');
-             const usernameMatch = originalPostJson.match(/^ready_post\/(.*?)\/ready_post_\d+\.json$/);
-             const usernameFromKey = usernameMatch ? usernameMatch[1] : null; // Extract username from the derived key
-
-             if (!usernameFromKey) {
-                 console.error(`[${new Date().toISOString()}] Could not extract username from derived ready_post key (failed status): ${originalPostJson}`);
-                 // Continue without updating original post status if username cannot be determined
-             } else {
-                 const getOriginalCommand = new GetObjectCommand({ Bucket: 'tasks', Key: originalPostJson });
-                 const originalData = await s3Client.send(getOriginalCommand);
-                 const originalBody = await streamToString(originalData.Body);
-                 const originalPost = JSON.parse(originalBody);
-
-                 originalPost.status = 'failed';
-                 originalPost.error = error.response?.data?.error?.message || error.message; // Store the actual error message
-                 originalPost.failed_at = new Date().toISOString();
-
-                 const putOriginalCommand = new PutObjectCommand({
-                     Bucket: 'tasks',
-                     Key: originalPostJson,
-                     Body: JSON.stringify(originalPost, null, 2),
-                     ContentType: 'application/json',
-                 });
-                 await s3Client.send(putOriginalCommand);
-                 console.log(`[${new Date().toISOString()}] Original ready_post status updated to failed for ${originalPostJson}`);
-
-                  // Invalidate cache for the ready_post directory
-                 cache.delete(`ready_post/${usernameFromKey}/`);
-             }
-
-        } catch (updateErr) {
-              console.error(`[${new Date().toISOString()}] Failed to update original ready_post status to failed for ${scheduledPostData.image_key}:`, updateErr);
-        }
-      }
-    });
-
-    console.log(`[${new Date().toISOString()}] Post scheduled for user ${userId} with media_id=${mediaId} at ${scheduleTime.toISOString()}`);
-    res.json({ success: true, media_id: mediaId, status: 'scheduled', message: 'Post scheduled successfully.' });
-  } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error scheduling post for user ${userId}:`, error.response?.data || error.message);
-    res.status(500).json({ error: 'Failed to schedule post', details: error.response?.data?.error?.message || error.message });
-  }
-});
-import { metrics } from './insightConfigs.js';
-
-app.get('/insights/:userId', async (req, res) => {
-  const { userId } = req.params;
-  console.log(`[${new Date().toISOString()}] Received insights request for user ${userId}`);
-
-  try {
-    // Fetch access token
-    console.log(`[${new Date().toISOString()}] Fetching token for user ${userId}`);
-    const listCommand = new ListObjectsV2Command({
-      Bucket: 'tasks',
-      Prefix: `InstagramTokens/`,
-    });
-    const { Contents } = await s3Client.send(listCommand);
-
-    let tokenData = null;
-    if (Contents) {
-      for (const key of Contents) {
-        if (key.Key.endsWith('/token.json')) {
-          const getCommand = new GetObjectCommand({
-            Bucket: 'tasks',
-            Key: key.Key,
-          });
-          const data = await s3Client.send(getCommand);
-          const json = await data.Body.transformToString();
-          const token = JSON.parse(json);
-          if (token.instagram_user_id === userId) {
-            tokenData = token;
-            break;
-          }
-        }
-      }
-    }
-
-    if (!tokenData) {
-      console.log(`[${new Date().toISOString()}] No token found for instagram_user_id ${userId}`);
-      return res.status(404).json({ error: 'No access token found for this Instagram account' });
-    }
-
-    const access_token = tokenData.access_token;
-    const instagram_graph_id = tokenData.instagram_graph_id;
-    console.log(`[${new Date().toISOString()}] Token found: graph_id=${instagram_graph_id}`);
-
-    // Fetch follower_count directly
-    let follower_count = 0;
-    try {
-      const profileResponse = await axios.get(`https://graph.instagram.com/v22.0/me`, {
-        params: {
-          fields: 'followers_count',
-          access_token,
-        },
-      });
-      follower_count = profileResponse.data.followers_count || 0;
-      console.log(`[${new Date().toISOString()}] Fetched follower_count: ${follower_count}`);
-    } catch (profileError) {
-      console.error(`[${new Date().toISOString()}] Error fetching follower_count:`, profileError.response?.data || profileError.message);
-    }
-
-    // Initialize insights data
-    const insightsData = {
-      follower_count: { lifetime: follower_count },
-      reach: { daily: [] },
-      impressions: { daily: [] },
-      online_followers: { daily: [] },
-      accounts_engaged: { daily: [] },
-      total_interactions: { daily: [] },
-      follower_demographics: { lifetime: {} },
-    };
-
-    // Fetch insights
-    console.log(`[${new Date().toISOString()}] Fetching insights from Instagram Graph API v22.0`);
-    for (const metric of metrics) {
-      for (const period of metric.periods) {
-        try {
-          const response = await axios.get(`https://graph.instagram.com/v22.0/${instagram_graph_id}/insights`, {
-            params: {
-              metric: metric.name,
-              period,
-              access_token,
-            },
-          });
-          response.data.data.forEach((item) => {
-            if (item.period === 'day') {
-              insightsData[item.name].daily = item.values.map(v => ({
-                value: v.value,
-                end_time: v.end_time,
-              }));
-            } else if (item.period === 'lifetime') {
-              insightsData[item.name].lifetime = item.values[0]?.value || {};
-            }
-          });
-          console.log(`[${new Date().toISOString()}] Fetched metric: ${metric.name} (${period})`);
-        } catch (error) {
-          console.error(`[${new Date().toISOString()}] Failed to fetch metric ${metric.name} (${period}):`, error.response?.data || error.message);
-        }
-      }
-    }
-
-    // Store in R2
-    const insightsKey = `InstagramInsights/${userId}/${Date.now()}.json`;
-    const insightsToStore = {
-      data: insightsData,
-      timestamp: new Date().toISOString(),
-    };
-    console.log(`[${new Date().toISOString()}] Storing insights in R2: ${insightsKey}`);
-    const putCommand = new PutObjectCommand({
-      Bucket: 'tasks',
-      Key: insightsKey,
-      Body: JSON.stringify(insightsToStore, null, 2),
-      ContentType: 'application/json',
-      ACL: 'public-read',
-    });
-    await s3Client.send(putCommand);
-
-    // Update latest cache
-    console.log(`[${new Date().toISOString()}] Updating latest insights cache: InstagramInsights/${userId}/latest.json`);
-    await s3Client.send(new PutObjectCommand({
-      Bucket: 'tasks',
-      Key: `InstagramInsights/${userId}/latest.json`,
-      Body: JSON.stringify(insightsToStore, null, 2),
-      ContentType: 'application/json',
-      ACL: 'public-read',
-    }));
-
-    console.log(`[${new Date().toISOString()}] Insights fetched and stored for user ${userId}`);
-    res.json(insightsData);
-  } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error fetching insights:`, error.response?.data || error.message);
-    res.status(500).json({ error: 'Failed to fetch insights', details: error.response?.data?.error?.message || error.message });
-  }
-});
-// Instagram Deauthorize Callback
-app.post('/instagram/deauthorize', (req, res) => {
-  console.log(`[${new Date().toISOString()}] Deauthorize callback received:`, JSON.stringify(req.body, null, 2));
-  res.sendStatus(200);
-});
-
-// Instagram Data Deletion Request
-app.get('/instagram/data-deletion', (req, res) => {
-  const signedRequest = req.query.signed_request;
-  console.log(`[${new Date().toISOString()}] Data deletion request received:`, signedRequest);
-  res.json({
-    url: 'https://a0ee-121-52-146-243.ngrok-free.app/instagram/data-deletion',
-    confirmation_code: `delete_${Date.now()}`
-  });
-});
-
-app.post('/instagram/data-deletion', (req, res) => {
-  console.log(`[${new Date().toISOString()}] Data deletion POST request received:`, JSON.stringify(req.body, null, 2));
-  res.json({
-    url: 'https://a0ee-121-52-146-243.ngrok-free.app/instagram/data-deletion',
-    confirmation_code: `delete_${Date.now()}`
-  });
-});
-
-async function getExistingData() {
-  const key = 'Usernames/instagram.json';
-  const prefix = 'Usernames/';
-
-  if (cache.has(prefix)) {
-    console.log(`Cache hit for ${prefix}`);
-    const cachedData = cache.get(prefix);
-    const data = cachedData.find(item => item.key === key)?.data;
-    return data || [];
-  }
-
-  try {
-    const command = new GetObjectCommand({
-      Bucket: 'tasks',
-      Key: key,
-    });
-    const data = await s3Client.send(command);
-    const body = await streamToString(data.Body);
-
-    if (!body || body.trim() === '') {
-      return [];
-    }
-
-    const parsedData = JSON.parse(body);
-    cache.set(prefix, [{ key, data: parsedData }]);
-    cacheTimestamps.set(prefix, Date.now());
-    return Array.isArray(parsedData) ? parsedData : [];
-  } catch (error) {
-    if (error.name === 'NoSuchKey') {
-      return [];
-    }
+    console.error('Error fetching Instagram notifications:', error);
     throw error;
   }
 }
 
-async function saveToR2(data) {
-  const key = 'Usernames/instagram.json';
-  const prefix = 'Usernames/';
-  const command = new PutObjectCommand({
-    Bucket: 'tasks',
-    Key: key,
-    Body: JSON.stringify(data, null, 2),
-    ContentType: 'application/json',
-  });
-  await s3Client.send(command);
-  cache.delete(prefix);
+async function fetchTwitterNotifications(userId) {
+  try {
+    // Fetch Twitter DMs
+    const dms = await fetchTwitterDMs(userId);
+    
+    // Fetch Twitter mentions
+    const mentions = await fetchTwitterMentions(userId);
+    
+    // Combine and format notifications
+    const notifications = [
+      ...dms.map(dm => ({
+        type: 'message',
+        twitter_user_id: userId,
+        sender_id: dm.sender_id,
+        message_id: dm.id,
+        text: dm.text,
+        timestamp: new Date(dm.created_at).getTime(),
+        received_at: dm.created_at,
+        username: dm.sender_username,
+        status: 'pending',
+        platform: 'twitter'
+      })),
+      ...mentions.map(mention => ({
+        type: 'comment',
+        twitter_user_id: userId,
+        sender_id: mention.user_id,
+        comment_id: mention.id,
+        text: mention.text,
+        timestamp: new Date(mention.created_at).getTime(),
+        received_at: mention.created_at,
+        username: mention.username,
+        status: 'pending',
+        platform: 'twitter'
+      }))
+    ];
+
+    return notifications;
+  } catch (error) {
+    console.error('Error fetching Twitter notifications:', error);
+    throw error;
+  }
 }
 
-function handleErrorResponse(res, error) {
-  const statusCode = error.name === 'TimeoutError' ? 504 : 500;
-  res.status(statusCode).json({
-    error: error.name || 'Internal server error',
-    message: error.message || 'An unexpected error occurred',
-  });
+// Twitter notification helper functions (placeholder implementations)
+async function fetchTwitterDMs(userId) {
+  try {
+    console.log(`[${new Date().toISOString()}] Fetching Twitter DMs for user ${userId}`);
+    // TODO: Implement actual Twitter API calls
+    // For now, return empty array to prevent crashes
+    return [];
+  } catch (error) {
+    console.error('Error fetching Twitter DMs:', error);
+    return [];
+  }
 }
 
-app.post('/save-goal/:username', async (req, res) => {
-  const { username } = req.params;
-  const { persona = '', timeline, goal, instruction } = req.body;
-  const prefix = `goal/${username}/`;
-
-  // Validation
-  if (!timeline || isNaN(Number(timeline))) {
-    return res.status(400).json({ error: 'Timeline (days) is required and must be a number.' });
-  }
-  if (!goal || !goal.trim()) {
-    return res.status(400).json({ error: 'Goal is required.' });
-  }
-  if (!instruction || !instruction.trim()) {
-    return res.status(400).json({ error: 'Instruction is required.' });
-  }
-
+async function fetchTwitterMentions(userId) {
   try {
-    // Generate unique filename
-    const timestamp = Date.now();
-    const key = `${prefix}goal_${timestamp}.json`;
-    const fileContent = JSON.stringify({
-      persona,
-      timeline: Number(timeline),
-      goal,
-      instruction,
-      createdAt: new Date().toISOString(),
-    }, null, 2);
-
-    // Upload to R2
-    const putCommand = new PutObjectCommand({
-      Bucket: 'tasks',
-      Key: key,
-      Body: fileContent,
-      ContentType: 'application/json',
-    });
-    await s3Client.send(putCommand);
-
-    // Invalidate cache for this user's goals
-    cache.delete(prefix);
-
-    res.json({ success: true, message: 'Goal saved successfully.' });
-  } catch (err) {
-    console.error(`[${new Date().toISOString()}] Error saving goal for ${username}:`, err);
-    res.status(500).json({ error: 'Failed to save goal. Please try again later.' });
-  }
-});
-
-
-// AI Reply upload endpoint
-app.post('/ai-reply/:username', async (req, res) => {
-  const { username } = req.params;
-  const notifType = req.body.type;
-  let fileTypePrefix;
-  if (notifType === 'message') {
-    fileTypePrefix = 'ai_dm_';
-  } else if (notifType === 'comment') {
-    fileTypePrefix = 'ai_comment_';
-  } else {
-    return res.status(400).json({ error: 'Invalid notification type for AI reply' });
-  }
-  const prefix = `ai_reply/${username}/`;
-
-  try {
-    // --- Ensure sender_id and message_id are present for DM AI replies ---
-    let patchedBody = { ...req.body };
-    if (notifType === 'message' && (!patchedBody.sender_id || !patchedBody.message_id)) {
-      // Try to find userId for this username
-      let userId = null;
-      try {
-        const listTokens = new ListObjectsV2Command({
-          Bucket: 'tasks',
-          Prefix: `InstagramTokens/`,
-        });
-        const { Contents: tokenContents } = await s3Client.send(listTokens);
-        if (tokenContents) {
-          for (const obj of tokenContents) {
-            if (obj.Key.endsWith('/token.json')) {
-              const getCommand = new GetObjectCommand({
-                Bucket: 'tasks',
-                Key: obj.Key,
-              });
-              const data = await s3Client.send(getCommand);
-              const json = await data.Body.transformToString();
-              const token = JSON.parse(json);
-              if (token.username === username) {
-                userId = token.instagram_user_id;
-                break;
-              }
-            }
-          }
-        }
-      } catch (err) {
-        console.error(`[AI-REPLY PATCH] Error mapping username to userId:`, err);
-      }
-      if (userId) {
-        try {
-          const listEvents = new ListObjectsV2Command({
-            Bucket: 'tasks',
-            Prefix: `InstagramEvents/${userId}/`,
-          });
-          const { Contents: eventContents } = await s3Client.send(listEvents);
-          if (eventContents) {
-            for (const obj of eventContents) {
-              if (obj.Key.endsWith('.json')) {
-                const getCommand = new GetObjectCommand({
-                  Bucket: 'tasks',
-                  Key: obj.Key,
-                });
-                const data = await s3Client.send(getCommand);
-                const json = await data.Body.transformToString();
-                const event = JSON.parse(json);
-                // Match by text if message_id is missing, or by message_id if present
-                if (
-                  event.type === 'message' &&
-                  ((patchedBody.text && event.text === patchedBody.text) ||
-                   (patchedBody.message_id && event.message_id === patchedBody.message_id))
-                ) {
-                  if (!patchedBody.sender_id && event.sender_id) patchedBody.sender_id = event.sender_id;
-                  if (!patchedBody.message_id && event.message_id) patchedBody.message_id = event.message_id;
-                  break;
-                }
-              }
-            }
-          }
-        } catch (err) {
-          console.error(`[AI-REPLY PATCH] Error finding original DM event:`, err);
-        }
-      }
-    }
-    // List existing ai_dm_ or ai_comment_ files to determine next number
-    const listCommand = new ListObjectsV2Command({
-      Bucket: 'tasks',
-      Prefix: prefix,
-    });
-    const { Contents } = await s3Client.send(listCommand);
-    let nextNumber = 1;
-    if (Contents && Contents.length > 0) {
-      const nums = Contents
-        .map(obj => {
-          const match = obj.Key.match(new RegExp(`${fileTypePrefix}(\\d+)\\.json$`));
-          return match ? parseInt(match[1]) : 0;
-        })
-        .filter(n => n > 0);
-      nextNumber = nums.length > 0 ? Math.max(...nums) + 1 : 1;
-    }
-    const key = `${prefix}${fileTypePrefix}${nextNumber}.json`;
-    const fileContent = JSON.stringify(patchedBody, null, 2);
-    const putCommand = new PutObjectCommand({
-      Bucket: 'tasks',
-      Key: key,
-      Body: fileContent,
-      ContentType: 'application/json',
-    });
-    await s3Client.send(putCommand);
-    cache.delete(prefix);
-
-    // --- SSE update for AI replies ---
-    const clients = sseClients.get(username) || [];
-    for (const client of clients) {
-      client.write(`data: ${JSON.stringify({ type: 'update', prefix })}\n\n`);
-    }
-
-    // --- Send AI reply as real DM if type is message ---
-    if (notifType === 'message') {
-      // Find the original DM file for this message_id
-      const message_id = patchedBody.message_id;
-      let sender_id = patchedBody.sender_id;
-      let userId = null;
-      // Map username to Instagram userId
-      try {
-        const listTokens = new ListObjectsV2Command({
-          Bucket: 'tasks',
-          Prefix: `InstagramTokens/`,
-        });
-        const { Contents: tokenContents } = await s3Client.send(listTokens);
-        if (tokenContents) {
-          for (const obj of tokenContents) {
-            if (obj.Key.endsWith('/token.json')) {
-              const getCommand = new GetObjectCommand({
-                Bucket: 'tasks',
-                Key: obj.Key,
-              });
-              const data = await s3Client.send(getCommand);
-              const json = await data.Body.transformToString();
-              const token = JSON.parse(json);
-              if (token.username === username) {
-                userId = token.instagram_user_id;
-                break;
-              }
-            }
-          }
-        }
-      } catch (err) {
-        console.error(`[AI-REPLY] Error mapping username to userId:`, err);
-      }
-      // If sender_id or message_id missing, try to find from InstagramEvents
-      if ((!sender_id || !message_id) && userId) {
-        try {
-          const listEvents = new ListObjectsV2Command({
-            Bucket: 'tasks',
-            Prefix: `InstagramEvents/${userId}/`,
-          });
-          const { Contents: eventContents } = await s3Client.send(listEvents);
-          if (eventContents) {
-            for (const obj of eventContents) {
-              if (obj.Key.endsWith('.json')) {
-                const getCommand = new GetObjectCommand({
-                  Bucket: 'tasks',
-                  Key: obj.Key,
-                });
-                const data = await s3Client.send(getCommand);
-                const json = await data.Body.transformToString();
-                const event = JSON.parse(json);
-                if (event.type === 'message' && event.text === patchedBody.text) {
-                  sender_id = event.sender_id;
-                  // message_id = event.message_id; // already set
-                  break;
-                }
-              }
-            }
-          }
-        } catch (err) {
-          console.error(`[AI-REPLY] Error finding original DM event:`, err);
-        }
-      }
-      // Send the reply if all info is available
-      if (userId && sender_id && message_id && patchedBody.reply) {
-        try {
-          // Use the same logic as /send-dm-reply/:userId
-          const axios = require('axios');
-          // Find access token
-          let access_token = null;
-          let instagram_graph_id = null;
-          const listTokens = new ListObjectsV2Command({
-            Bucket: 'tasks',
-            Prefix: `InstagramTokens/`,
-          });
-          const { Contents: tokenContents } = await s3Client.send(listTokens);
-          if (tokenContents) {
-            for (const obj of tokenContents) {
-              if (obj.Key.endsWith('/token.json')) {
-                const getCommand = new GetObjectCommand({
-                  Bucket: 'tasks',
-                  Key: obj.Key,
-                });
-                const data = await s3Client.send(getCommand);
-                const json = await data.Body.transformToString();
-                const token = JSON.parse(json);
-                if (token.instagram_user_id === userId) {
-                  access_token = token.access_token;
-                  instagram_graph_id = token.instagram_graph_id;
-                  break;
-                }
-              }
-            }
-          }
-          if (access_token && instagram_graph_id) {
-            await axios({
-              method: 'post',
-              url: `https://graph.instagram.com/v22.0/${instagram_graph_id}/messages`,
-              headers: {
-                Authorization: `Bearer ${access_token}`,
-                'Content-Type': 'application/json',
-              },
-              data: {
-                recipient: { id: sender_id },
-                message: { text: patchedBody.reply },
-              },
-            });
-            // Update original message status
-            const messageKey = `InstagramEvents/${userId}/${message_id}.json`;
-            try {
-              const getCommand = new GetObjectCommand({
-                Bucket: 'tasks',
-                Key: messageKey,
-              });
-              const data = await s3Client.send(getCommand);
-              const messageData = JSON.parse(await data.Body.transformToString());
-              messageData.status = 'replied';
-              messageData.updated_at = new Date().toISOString();
-              await s3Client.send(new PutObjectCommand({
-                Bucket: 'tasks',
-                Key: messageKey,
-                Body: JSON.stringify(messageData, null, 2),
-                ContentType: 'application/json',
-              }));
-            } catch (error) {
-              console.error(`[AI-REPLY] Error updating DM status:`, error);
-            }
-          }
-        } catch (err) {
-          console.error(`[AI-REPLY] Error sending AI DM reply:`, err);
-        }
-      } else {
-        console.warn(`[AI-REPLY] Missing info to send AI DM reply: userId=${userId}, sender_id=${sender_id}, message_id=${message_id}`);
-      }
-    }
-
-    res.json({ success: true, message: 'AI reply request saved', key });
+    console.log(`[${new Date().toISOString()}] Fetching Twitter mentions for user ${userId}`);
+    // TODO: Implement actual Twitter API calls
+    // For now, return empty array to prevent crashes
+    return [];
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error saving AI reply for ${username}:`, error);
-    res.status(500).json({ error: 'Failed to save AI reply request', details: error.message });
+    console.error('Error fetching Twitter mentions:', error);
+    return [];
   }
-});
+}
 
-// Fetch all AI replies for a user (DM and comment)
-app.get('/ai-replies/:username', async (req, res) => {
-  let { username } = req.params;
-  // Support both username and userId as input
-  // If the param is a userId, map it to the correct username using InstagramTokens
-  if (/^\d+$/.test(username)) { // If all digits, likely a userId
-    try {
-      const listCommand = new ListObjectsV2Command({
-        Bucket: 'tasks',
-        Prefix: `InstagramTokens/`,
-      });
-      const { Contents } = await s3Client.send(listCommand);
-      if (Contents) {
-        for (const obj of Contents) {
-          if (obj.Key.endsWith('/token.json')) {
-            const getCommand = new GetObjectCommand({
-              Bucket: 'tasks',
-              Key: obj.Key,
-            });
-            const data = await s3Client.send(getCommand);
-            const json = await data.Body.transformToString();
-            const token = JSON.parse(json);
-            if (token.instagram_user_id === username || token.instagram_graph_id === username) {
-              if (token.username) {
-                username = token.username;
-                break;
-              }
-            }
-          }
-        }
-      }
-    } catch (err) {
-      console.error(`[AI-REPLIES] Error mapping userId to username:`, err);
-      // Continue with original username if mapping fails
-    }
-  }
-  const prefix = `ai_reply/${username}/`;
+async function sendTwitterDMReply(userId, senderId, text, messageId) {
   try {
-    // List all files in the user's ai_reply directory
-    const listCommand = new ListObjectsV2Command({
-      Bucket: 'tasks',
-      Prefix: prefix,
-    });
-    const { Contents } = await s3Client.send(listCommand);
-    if (!Contents || Contents.length === 0) {
-      console.log(`[${new Date().toISOString()}] [AI-REPLIES] No files found for ${username}`);
-      return res.json([]);
-    }
-    const allKeys = Contents.map(f => f.Key);
-    console.log(`[${new Date().toISOString()}] [AI-REPLIES] Files found for ${username}:`, allKeys);
-
-    // Add logging for each file
-    Contents.forEach(obj => {
-      console.log(`[${new Date().toISOString()}] [AI-REPLIES] File: ${obj.Key}`);
-    });
-
-    // Helper to group by type and number
-    const groupFiles = (typePrefix, repliedPrefix) => {
-      const requests = {};
-      const replies = {};
-      for (const obj of Contents) {
-        const reqMatch = obj.Key.match(new RegExp(`${typePrefix}(\\d+)\\.json$`));
-        if (reqMatch) {
-          requests[reqMatch[1]] = obj.Key;
-          console.log(`[${new Date().toISOString()}] [AI-REPLIES] Matched request: ${obj.Key} as number ${reqMatch[1]}`);
-        }
-        const repMatch = obj.Key.match(new RegExp(`${repliedPrefix}(\\d+)\\.json$`));
-        if (repMatch) {
-          replies[repMatch[1]] = obj.Key;
-          console.log(`[${new Date().toISOString()}] [AI-REPLIES] Matched reply: ${obj.Key} as number ${repMatch[1]}`);
-        }
-      }
-      return { requests, replies };
-    };
-
-    // Group DM and comment files
-    const dm = groupFiles('ai_dm_', 'ai_dm_replied_');
-    const comment = groupFiles('ai_comment_', 'ai_comment_replied_');
-    console.log(`[${new Date().toISOString()}] [AI-REPLIES] DM requests:`, dm.requests);
-    console.log(`[${new Date().toISOString()}] [AI-REPLIES] DM replies:`, dm.replies);
-    console.log(`[${new Date().toISOString()}] [AI-REPLIES] Comment requests:`, comment.requests);
-    console.log(`[${new Date().toISOString()}] [AI-REPLIES] Comment replies:`, comment.replies);
-
-    // Helper to fetch file content
-    const fetchFile = async (key) => {
-      const getCommand = new GetObjectCommand({ Bucket: 'tasks', Key: key });
-      const data = await s3Client.send(getCommand);
-      const body = await data.Body.transformToString();
-      return JSON.parse(body);
-    };
-
-    // Merge requests and replies for DM and comment
-    const mergePairs = async (requests, replies, type) => {
-      const pairs = [];
-      for (const num in replies) {
-        const replyKey = replies[num];
-        const reqKey = requests[num];
-        if (!reqKey) {
-          console.warn(`[${new Date().toISOString()}] [AI-REPLIES] No original request for ${type} reply #${num} (${replyKey})`);
-          continue;
-        }
-        try {
-          const [request, reply] = await Promise.all([
-            fetchFile(reqKey),
-            fetchFile(replyKey),
-          ]);
-          pairs.push({
-            type,
-            number: num,
-            request,
-            reply,
-            reqKey,
-            replyKey,
-          });
-        } catch (err) {
-          console.error(`[${new Date().toISOString()}] [AI-REPLIES] Error fetching files for pair #${num}:`, err);
-        }
-      }
-      return pairs;
-    };
-
-    const dmPairs = await mergePairs(dm.requests, dm.replies, 'dm');
-    const commentPairs = await mergePairs(comment.requests, comment.replies, 'comment');
-    const allPairs = [...dmPairs, ...commentPairs];
-    // Sort by number (descending, most recent first)
-    allPairs.sort((a, b) => parseInt(b.number) - parseInt(a.number));
-    console.log(`[${new Date().toISOString()}] [AI-REPLIES] Final pairs returned for ${username}:`, allPairs.map(p => ({ type: p.type, number: p.number, reqKey: p.reqKey, replyKey: p.replyKey })));
-    res.json(allPairs);
+    console.log(`[${new Date().toISOString()}] Sending Twitter DM reply from ${userId} to ${senderId}: ${text}`);
+    // TODO: Implement actual Twitter API calls
+    // For now, just log the action
+    console.log(`[${new Date().toISOString()}] Twitter DM reply would be sent (placeholder implementation)`);
+    return { success: true, message: 'Twitter DM reply sent (placeholder)' };
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error fetching AI replies for ${username}:`, error);
-    res.status(500).json({ error: 'Failed to fetch AI replies', details: error.message });
+    console.error('Error sending Twitter DM reply:', error);
+    throw error;
   }
-});
+}
 
-// Ignore (delete) an AI reply pair for a user
-app.post('/ignore-ai-reply/:username', async (req, res) => {
-  const { username } = req.params;
-  const { replyKey, reqKey } = req.body;
-  if (!replyKey) {
-    console.error(`[${new Date().toISOString()}] Ignore AI reply failed: replyKey missing for user ${username}`);
-    return res.status(400).json({ error: 'replyKey is required' });
-  }
+async function sendTwitterMentionReply(userId, commentId, text) {
   try {
-    // Delete the reply file
-    const delReply = new DeleteObjectCommand({
-      Bucket: 'tasks',
-      Key: replyKey,
-    });
-    await s3Client.send(delReply);
-    console.log(`[${new Date().toISOString()}] Deleted AI reply file: ${replyKey} for user ${username}`);
-    // Optionally, also delete the original request file
-    if (reqKey) {
-      const delReq = new DeleteObjectCommand({
-        Bucket: 'tasks',
-        Key: reqKey,
-      });
-      await s3Client.send(delReq);
-      console.log(`[${new Date().toISOString()}] Deleted original AI request file: ${reqKey} for user ${username}`);
-    }
-    // Invalidate cache for this user's ai_reply directory
-    const prefix = `ai_reply/${username}/`;
-    cache.delete(prefix);
-    res.json({ success: true });
+    console.log(`[${new Date().toISOString()}] Sending Twitter mention reply from ${userId} to comment ${commentId}: ${text}`);
+    // TODO: Implement actual Twitter API calls
+    // For now, just log the action
+    console.log(`[${new Date().toISOString()}] Twitter mention reply would be sent (placeholder implementation)`);
+    return { success: true, message: 'Twitter mention reply sent (placeholder)' };
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error ignoring AI reply for ${username}:`, error);
-    res.status(500).json({ error: 'Failed to ignore AI reply', details: error.message });
+    console.error('Error sending Twitter mention reply:', error);
+    throw error;
   }
-});
-// Generate a fresh signed URL for a ready_post image
-app.get('/signed-image-url/:username/:imageKey', async (req, res) => {
-  const { username, imageKey } = req.params;
-  try {
-    const key = `ready_post/${username}/${imageKey}`;
-    const command = new GetObjectCommand({
-      Bucket: 'tasks',
-      Key: key,
-    });
-    const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
-    res.json({ url: signedUrl });
-  } catch (error) {
-    console.error(`[signed-image-url] Failed to generate signed URL for`, req.params, error?.message);
-    res.status(500).json({ error: 'Failed to generate signed URL' });
-  }
-});
+}
 
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
-
-app.options('/events/:userId', (req, res) => {
-  setCorsHeaders(res);
-  res.status(204).send();
-});
-app.options('/events/:username', (req, res) => {
-  setCorsHeaders(res);
-  res.status(204).send();
-});
-
-// Schedule a post
-app.post('/schedule-post/:userId', async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const { imageData, scheduledFor, username } = req.body;
-    
-    if (!imageData || !scheduledFor || !username) {
-      return res.status(400).json({ error: 'Missing required data' });
-    }
-    
-    // Convert base64 to buffer
-    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
-    const imageBuffer = Buffer.from(base64Data, 'base64');
-    
-    // Detect file type
-    const type = await fileTypeFromBuffer(imageBuffer);
-    if (!type || !type.mime.startsWith('image/')) {
-      return res.status(400).json({ error: 'Invalid image data' });
-    }
-    
-    // Generate a unique filename
-    const filename = `${username}_${randomUUID()}.${type.ext}`;
-    const key = `scheduled/${username}/${filename}`;
-    
-    // Upload to S3
-    await s3Client.send(new PutObjectCommand({
-      Bucket: 'instagram-manager',
-      Key: key,
-      Body: imageBuffer,
-      ContentType: type.mime
-    }));
-    
-    // Schedule the post
-    const scheduleTime = new Date(scheduledFor);
-    const jobName = `post_${username}_${randomUUID()}`;
-    
-    // Store job info in memory (in a real app, this would be stored in a database)
-    const jobs = global.scheduledJobs || {};
-    global.scheduledJobs = jobs;
-    
-    jobs[jobName] = {
-      userId,
-      imageKey: key,
-      scheduledFor: scheduleTime,
-      status: 'scheduled'
-    };
-    
-    // Schedule the job
-    schedule.scheduleJob(jobName, scheduleTime, async function() {
-      console.log(`Executing scheduled post: ${jobName}`);
-      try {
-        // In a real implementation, this would post to Instagram
-        // For now, we'll just mark it as posted
-        jobs[jobName].status = 'posted';
-        console.log(`Post ${jobName} marked as posted`);
-        
-        // You would implement actual Instagram posting logic here
-        // For example:
-        // await axios.post('https://graph.instagram.com/v18.0/me/media', {
-        //   image_url: imageUrl,
-        //   caption: caption,
-        //   access_token: accessToken
-        // });
-      } catch (error) {
-        console.error(`Failed to post scheduled image: ${error}`);
-        jobs[jobName].status = 'failed';
-      }
-    });
-    
-    return res.status(200).json({ 
-      message: 'Post scheduled successfully',
-      scheduledFor: scheduleTime,
-      jobId: jobName
-    });
-  } catch (error) {
-    console.error('Error scheduling post:', error);
-    return res.status(500).json({ error: 'Failed to schedule post' });
-  }
-});
-
-// Get scheduled posts for a user
-app.get('/scheduled-posts/:username', async (req, res) => {
-  try {
-    const { username } = req.params;
-    const jobs = global.scheduledJobs || {};
-    
-    // Filter jobs for this user
-    const userJobs = Object.entries(jobs)
-      .filter(([key]) => key.includes(`post_${username}_`))
-      .map(([key, value]) => ({
-        jobId: key,
-        ...value
-      }));
-    
-    return res.status(200).json(userJobs);
-  } catch (error) {
-    console.error('Error getting scheduled posts:', error);
-    return res.status(500).json({ error: 'Failed to get scheduled posts' });
-  }
-});
-
-// This endpoint checks if a user has entered their Instagram username
-app.get('/user-instagram-status/:userId', async (req, res) => {
-  const { userId } = req.params;
-  
-  try {
-    const key = `UserInstagramStatus/${userId}/status.json`;
-    
-    try {
-      const getCommand = new GetObjectCommand({
-        Bucket: 'tasks',
-        Key: key,
-      });
-      const response = await s3Client.send(getCommand);
-      const body = await streamToString(response.Body);
-      
-      if (!body || body.trim() === '') {
-        return res.json({ hasEnteredInstagramUsername: false });
-      }
-      
-      const userData = JSON.parse(body);
-      return res.json(userData);
-    } catch (error) {
-      if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
-        return res.json({ hasEnteredInstagramUsername: false });
-      }
-      throw error;
-    }
-  } catch (error) {
-    console.error(`Error retrieving user Instagram status for ${userId}:`, error);
-    res.status(500).json({ error: 'Failed to retrieve user Instagram status' });
-  }
-});
-
-// This endpoint updates the user's Instagram username entry state
-app.post('/user-instagram-status/:userId', async (req, res) => {
-  const { userId } = req.params;
-  const { instagram_username } = req.body;
-  
-  if (!instagram_username || !instagram_username.trim()) {
-    return res.status(400).json({ error: 'Instagram username is required' });
-  }
-  
-  try {
-    const key = `UserInstagramStatus/${userId}/status.json`;
-    const userData = {
-      uid: userId,
-      hasEnteredInstagramUsername: true,
-      instagram_username: instagram_username.trim(),
-      lastUpdated: new Date().toISOString()
-    };
-    
-    const putCommand = new PutObjectCommand({
-      Bucket: 'tasks',
-      Key: key,
-      Body: JSON.stringify(userData, null, 2),
-      ContentType: 'application/json',
-    });
-    
-    await s3Client.send(putCommand);
-    res.json({ success: true, message: 'User Instagram status updated successfully' });
-  } catch (error) {
-    console.error(`Error updating user Instagram status for ${userId}:`, error);
-    res.status(500).json({ error: 'Failed to update user Instagram status' });
-  }
-});
-
-// This endpoint retrieves the user's Instagram connection
-app.get('/instagram-connection/:userId', async (req, res) => {
-  // Set CORS headers
-  setCorsHeaders(res);
-  
-  const { userId } = req.params;
-  
-  try {
-    const key = `InstagramConnection/${userId}/connection.json`;
-    
-    try {
-      const getCommand = new GetObjectCommand({
-        Bucket: 'tasks',
-        Key: key,
-      });
-      const response = await s3Client.send(getCommand);
-      const body = await streamToString(response.Body);
-      
-      if (!body || body.trim() === '') {
-        return res.status(404).json({ error: 'No Instagram connection found' });
-      }
-      
-      const connectionData = JSON.parse(body);
-      return res.json(connectionData);
-    } catch (error) {
-      if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
-        return res.status(404).json({ error: 'No Instagram connection found' });
-      }
-      throw error;
-    }
-  } catch (error) {
-    console.error(`Error retrieving Instagram connection for ${userId}:`, error);
-    res.status(500).json({ error: 'Failed to retrieve Instagram connection' });
-  }
-});
-
-// This endpoint stores the user's Instagram connection
-app.post('/instagram-connection/:userId', async (req, res) => {
-  // Set CORS headers
-  setCorsHeaders(res);
-  
+app.post('/send-dm-reply/:userId', async (req, res) => {
   const { userId } = req.params;
   const { instagram_user_id, instagram_graph_id, username } = req.body;
   
@@ -3567,9 +2418,46 @@ app.post('/user-instagram-status/:userId', async (req, res) => {
   }
 });
 
+// This endpoint updates the user's Twitter username entry state
+app.post('/user-twitter-status/:userId', async (req, res) => {
+  // Set CORS headers
+  setCorsHeaders(res);
+  
+  const { userId } = req.params;
+  const { twitter_username } = req.body;
+  
+  if (!twitter_username || !twitter_username.trim()) {
+    return res.status(400).json({ error: 'Twitter username is required' });
+  }
+  
+  try {
+    const key = `UserTwitterStatus/${userId}/status.json`;
+    const userData = {
+      uid: userId,
+      hasEnteredTwitterUsername: true,
+      twitter_username: twitter_username.trim(),
+      lastUpdated: new Date().toISOString()
+    };
+    
+    const putCommand = new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: key,
+      Body: JSON.stringify(userData, null, 2),
+      ContentType: 'application/json',
+    });
+    
+    await s3Client.send(putCommand);
+    res.json({ success: true, message: 'User Twitter status updated successfully' });
+  } catch (error) {
+    console.error(`Error updating user Twitter status for ${userId}:`, error);
+    res.status(500).json({ error: 'Failed to update user Twitter status' });
+  }
+});
+
 app.get('/check-username-availability/:username', async (req, res) => {
   try {
     const { username } = req.params;
+    const platform = req.query.platform || 'instagram'; // Default to Instagram
     
     if (!username || username.trim() === '') {
       return res.status(400).json({ 
@@ -3578,12 +2466,11 @@ app.get('/check-username-availability/:username', async (req, res) => {
       });
     }
     
-    // Convert to lowercase to ensure case-insensitive matching
-    const normalizedUsername = username.trim().toLowerCase();
+    // Normalize the username based on platform
+    const normalizedUsername = platform === 'twitter' ? username.trim() : username.trim().toLowerCase();
     
-    // Check for existing username in AccountInfo records
-    const prefix = `AccountInfo/${normalizedUsername}`;
-    const key = `AccountInfo/${normalizedUsername}/info.json`;
+    // Create platform-specific key using new schema: AccountInfo/<platform>/<username>/info.json
+    const key = `AccountInfo/${platform}/${normalizedUsername}/info.json`;
     
     try {
       const getCommand = new GetObjectCommand({
@@ -3596,7 +2483,7 @@ app.get('/check-username-availability/:username', async (req, res) => {
       // If we get here, the file exists, meaning the username is already in use
       return res.json({
         available: false,
-        message: 'This username is already in use by another account. If you wish to proceed, you may continue, but you will be using an already assigned username.'
+        message: `This ${platform} username is already in use by another account. If you wish to proceed, you may continue, but you will be using an already assigned username.`
       });
       
     } catch (error) {
@@ -3604,7 +2491,7 @@ app.get('/check-username-availability/:username', async (req, res) => {
         // Username is available
         return res.json({
           available: true,
-          message: 'Username is available'
+          message: `${platform.charAt(0).toUpperCase() + platform.slice(1)} username is available`
         });
       }
       throw error;
@@ -3638,131 +2525,134 @@ async function warmupCacheForActiveUsers() {
     
     console.log(`[${new Date().toISOString()}] Warming up cache for users: ${recentUsers.join(', ')}`);
     
-    // Warm up cache for each recent user
+    // Warm up cache for each recent user for both Instagram and Twitter
     for (const username of recentUsers) {
       // For ready_post, we need to use the /posts/ endpoint to properly handle both JSON and JPG files
-      try {
-        // Silently fetch posts for the user, which will cache the data properly
-        const postsPrefix = `ready_post/${username}/`;
-        console.log(`[${new Date().toISOString()}] Fetching fresh data from R2 for prefix: ${postsPrefix}`);
-        const listCommand = new ListObjectsV2Command({
-          Bucket: 'tasks',
-          Prefix: postsPrefix,
-        });
-        const listResponse = await s3Client.send(listCommand);
-    
-        const files = listResponse.Contents || [];
-        
-        // First, collect all files
-        const jsonFiles = files.filter(file => file.Key.endsWith('.json'));
-        const jpgFiles = files.filter(file => file.Key.endsWith('.jpg'));
-        
-        console.log(`[${new Date().toISOString()}] Found ${jsonFiles.length} JSON files and ${jpgFiles.length} JPG files in ${postsPrefix}`);
-        
-        // Process posts similar to the /posts/:username endpoint but without returning the data
-        const posts = await Promise.all(
-          jsonFiles.map(async (file) => {
-            try {
-              const getCommand = new GetObjectCommand({
-                Bucket: 'tasks',
-                Key: file.Key,
-              });
-              const data = await s3Client.send(getCommand);
-              const body = await streamToString(data.Body);
-    
-              if (!body || body.trim() === '') {
-                console.warn(`Empty file detected at ${file.Key}, skipping...`);
-                return null;
-              }
-    
-              let postData;
-              try {
-                postData = JSON.parse(body);
-              } catch (parseError) {
-                console.error(`Failed to parse JSON for ${file.Key}:`, parseError.message);
-                return null;
-              }
-              
-              // Extract the timestamp/ID from the filename
-              const filenameMatch = file.Key.match(/(\d+)\.json$/);
-              const fileId = filenameMatch ? filenameMatch[1] : null;
-              
-              if (!fileId) {
-                console.warn(`Cannot extract ID from filename: ${file.Key}`);
-                return null;
-              }
-              
-              // Check if this post should be skipped based on status
-              if (postData.status === 'processed' || postData.status === 'rejected') {
-                console.log(`[${new Date().toISOString()}] Skipping post ${file.Key} with status: ${postData.status}`);
-                return null;
-              }
-              
-              // Look for matching image file
-              const potentialImageKeys = [
-                `${postsPrefix}image_${fileId}.jpg`, 
-                `${postsPrefix}ready_post_${fileId}.jpg`
-              ];
-              
-              // Find the first matching image file
-              const imageFile = jpgFiles.find(img => 
-                potentialImageKeys.includes(img.Key)
-              );
-              
-              if (!imageFile) {
-                console.warn(`[${new Date().toISOString()}] No matching image found for post ${file.Key} (ID: ${fileId}), checked: ${potentialImageKeys.join(', ')}`);
-                return null;
-              }
-              
-              // Get signed URL for the image
-              const imageCommand = new GetObjectCommand({
-                Bucket: 'tasks',
-                Key: imageFile.Key,
-              });
-              const signedUrl = await getSignedUrl(s3Client, imageCommand, { expiresIn: 3600 });
-              
-              // Create an R2 direct URL for the image
-              const r2ImageUrl = `${R2_PUBLIC_URL}/${imageFile.Key}`;
-              
-              console.log(`[${new Date().toISOString()}] Successfully loaded post ${file.Key} with image ${imageFile.Key}`);
-              
-              // Return the complete post data
-              return {
-                key: file.Key,
-                data: {
-                  ...postData,
-                  image_url: signedUrl,
-                  r2_image_url: r2ImageUrl
-                },
-              };
-            } catch (error) {
-              console.error(`Failed to process post ${file.Key}:`, error.message);
-              return null;
-            }
-          })
-        );
-    
-        // Filter out null results from skipped posts
-        const validPosts = posts.filter(post => post !== null);
-    
-        // Cache the valid posts
-        cache.set(postsPrefix, validPosts);
-        cacheTimestamps.set(postsPrefix, Date.now());
-      } catch (err) {
-        console.error(`[${new Date().toISOString()}] Error warming up ready_post cache for ${username}:`, err.message);
-      }
+      for (const platform of ['instagram', 'twitter']) {
+        try {
+          // Create platform-specific prefix using new schema: ready_post/<platform>/<username>/
+          const postsPrefix = `ready_post/${platform}/${username}/`;
+          console.log(`[${new Date().toISOString()}] Fetching fresh ${platform} data from R2 for prefix: ${postsPrefix}`);
+          const listCommand = new ListObjectsV2Command({
+            Bucket: 'tasks',
+            Prefix: postsPrefix,
+          });
+          const listResponse = await s3Client.send(listCommand);
       
-      // Warm up other critical modules (non-blocking)
-      Promise.all([
-        fetchDataForModule(username, 'ProfileInfo/{username}'),
-        fetchDataForModule(username, 'recommendations/{username}'),
-        fetchDataForModule(username, 'NewForYou/{username}')
-      ]).catch(err => {
-        console.error(`[${new Date().toISOString()}] Error during cache warmup for ${username}:`, err.message);
-      });
+          const files = listResponse.Contents || [];
+          
+          // First, collect all files
+          const jsonFiles = files.filter(file => file.Key.endsWith('.json'));
+          const jpgFiles = files.filter(file => file.Key.endsWith('.jpg'));
+          
+          console.log(`[${new Date().toISOString()}] Found ${jsonFiles.length} JSON files and ${jpgFiles.length} JPG files in ${postsPrefix} for ${platform}`);
+          
+          // Process posts similar to the /posts/:username endpoint but without returning the data
+          const posts = await Promise.all(
+            jsonFiles.map(async (file) => {
+              try {
+                const getCommand = new GetObjectCommand({
+                  Bucket: 'tasks',
+                  Key: file.Key,
+                });
+                const data = await s3Client.send(getCommand);
+                const body = await streamToString(data.Body);
+      
+                if (!body || body.trim() === '') {
+                  console.warn(`Empty file detected at ${file.Key}, skipping...`);
+                  return null;
+                }
+      
+                let postData;
+                try {
+                  postData = JSON.parse(body);
+                } catch (parseError) {
+                  console.error(`Failed to parse JSON for ${file.Key}:`, parseError.message);
+                  return null;
+                }
+                
+                // Extract the timestamp/ID from the filename
+                const filenameMatch = file.Key.match(/(\d+)\.json$/);
+                const fileId = filenameMatch ? filenameMatch[1] : null;
+                
+                if (!fileId) {
+                  console.warn(`Cannot extract ID from filename: ${file.Key}`);
+                  return null;
+                }
+                
+                // Check if this post should be skipped based on status
+                if (postData.status === 'processed' || postData.status === 'rejected') {
+                  console.log(`[${new Date().toISOString()}] Skipping ${platform} post ${file.Key} with status: ${postData.status}`);
+                  return null;
+                }
+                
+                // Look for matching image file
+                const potentialImageKeys = [
+                  `${postsPrefix}image_${fileId}.jpg`, 
+                  `${postsPrefix}ready_post_${fileId}.jpg`
+                ];
+                
+                // Find the first matching image file
+                const imageFile = jpgFiles.find(img => 
+                  potentialImageKeys.includes(img.Key)
+                );
+                
+                if (!imageFile) {
+                  console.warn(`[${new Date().toISOString()}] No matching image found for ${platform} post ${file.Key} (ID: ${fileId}), checked: ${potentialImageKeys.join(', ')}`);
+                  return null;
+                }
+                
+                // Get signed URL for the image
+                const imageCommand = new GetObjectCommand({
+                  Bucket: 'tasks',
+                  Key: imageFile.Key,
+                });
+                const signedUrl = await getSignedUrl(s3Client, imageCommand, { expiresIn: 3600 });
+                
+                // Create an R2 direct URL for the image
+                const r2ImageUrl = `${R2_PUBLIC_URL}/${imageFile.Key}`;
+                
+                console.log(`[${new Date().toISOString()}] Successfully loaded ${platform} post ${file.Key} with image ${imageFile.Key}`);
+                
+                // Return the complete post data
+                return {
+                  key: file.Key,
+                  data: {
+                    ...postData,
+                    image_url: signedUrl,
+                    r2_image_url: r2ImageUrl,
+                    platform: platform
+                  },
+                };
+              } catch (error) {
+                console.error(`Failed to process ${platform} post ${file.Key}:`, error.message);
+                return null;
+              }
+            })
+          );
+      
+          // Filter out null results from skipped posts
+          const validPosts = posts.filter(post => post !== null);
+      
+          // Cache the valid posts
+          cache.set(postsPrefix, validPosts);
+          cacheTimestamps.set(postsPrefix, Date.now());
+        } catch (err) {
+          console.error(`[${new Date().toISOString()}] Error warming up ready_post cache for ${platform}/${username}:`, err.message);
+        }
+        
+        // Warm up other critical modules (non-blocking) for this platform
+        Promise.all([
+          fetchDataForModule(username, 'ProfileInfo/{username}', false, platform),
+          fetchDataForModule(username, 'recommendations/{username}', false, platform),
+          fetchDataForModule(username, 'NewForYou/{username}', false, platform)
+        ]).catch(err => {
+          console.error(`[${new Date().toISOString()}] Error during ${platform} cache warmup for ${username}:`, err.message);
+        });
+      }
     }
     
-    console.log(`[${new Date().toISOString()}] Cache warmup initiated for ${recentUsers.length} users`);
+    console.log(`[${new Date().toISOString()}] Cache warmup initiated for ${recentUsers.length} users across multiple platforms`);
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Error during cache warmup:`, error);
   }
@@ -4368,7 +3258,13 @@ app.post('/update-post-status/:username', async (req, res) => {
     await s3Client.send(putCommand);
 
     // Invalidate cache for this user's ready_post directory
-    const prefix = `ready_post/${username}/`;
+    // Extract platform from postKey if possible, otherwise clear both
+    let platform = 'instagram'; // default
+    const platformMatch = postKey.match(/ready_post\/([^\/]+)\/[^\/]+\//);
+    if (platformMatch) {
+      platform = platformMatch[1];
+    }
+    const prefix = `ready_post/${platform}/${username}/`;
     cache.delete(prefix);
 
     console.log(`[${new Date().toISOString()}] Successfully updated status for post ${postKey} to ${status}`);
@@ -4457,7 +3353,7 @@ app.post('/rag-instant-reply/:username', async (req, res, next) => {
         return res.status(400).json({ error: 'Invalid notification type for AI reply' });
       }
       
-      const prefix = `ai_reply/${username}/`;
+      const prefix = `ai_reply/${platform}/${username}/`;
       
       try {
         // --- Determine the next available file number ---
@@ -4707,10 +3603,13 @@ app.post('/rag-instant-reply/:username', async (req, res) => {
       // Determine the type (dm or comment)
       const type = notification.type === 'message' ? 'dm' : 'comment';
       
+      // Extract platform from notification, default to instagram
+      const platform = notification.platform || 'instagram';
+      
       // Generate a unique key for this request
       const timestamp = Date.now();
-      const requestKey = `ai_reply/${username}/ai_${type}_${timestamp}.json`;
-      const replyKey = `ai_reply/${username}/ai_${type}_replied_${timestamp}.json`;
+      const requestKey = `ai_reply/${platform}/${username}/ai_${type}_${timestamp}.json`;
+      const replyKey = `ai_reply/${platform}/${username}/ai_${type}_replied_${timestamp}.json`;
       
       // Store request
       const requestData = {
@@ -4784,19 +3683,20 @@ app.post('/mark-notification-handled/:userId', async (req, res) => {
   }
   
   const { userId } = req.params;
-  const { notification_id, type, handled_by } = req.body;
+  const { notification_id, type, handled_by, platform = 'instagram' } = req.body;
   
   if (!notification_id || !type) {
     return res.status(400).json({ error: 'Missing notification_id or type' });
   }
   
   try {
-    console.log(`[${new Date().toISOString()}] Marking notification ${notification_id} as handled by ${handled_by || 'AI'}`);
+    console.log(`[${new Date().toISOString()}] Marking ${platform} notification ${notification_id} as handled by ${handled_by || 'AI'}`);
     
     // Build the key for the notification in storage
+    const eventPrefix = platform === 'twitter' ? 'TwitterEvents' : 'InstagramEvents';
     const notificationKey = type === 'message' 
-      ? `InstagramEvents/${userId}/${notification_id}.json`
-      : `InstagramEvents/${userId}/comment_${notification_id}.json`;
+      ? `${eventPrefix}/${userId}/${notification_id}.json`
+      : `${eventPrefix}/${userId}/comment_${notification_id}.json`;
     
     try {
       // Get the existing notification data
@@ -4812,6 +3712,7 @@ app.post('/mark-notification-handled/:userId', async (req, res) => {
       notificationData.status = 'ai_handled';
       notificationData.updated_at = new Date().toISOString();
       notificationData.handled_by = handled_by || 'AI';
+      notificationData.platform = platform;
       
       // Save it back
       await s3Client.send(new PutObjectCommand({
@@ -4821,10 +3722,10 @@ app.post('/mark-notification-handled/:userId', async (req, res) => {
         ContentType: 'application/json',
       }));
       
-      console.log(`[${new Date().toISOString()}] Successfully marked notification ${notification_id} as handled`);
+      console.log(`[${new Date().toISOString()}] Successfully marked ${platform} notification ${notification_id} as handled`);
       
       // Invalidate cache for this module
-      cache.delete(`InstagramEvents/${userId}`);
+      cache.delete(`${eventPrefix}/${userId}`);
       
       // Broadcast status update
       const statusUpdate = {
@@ -4832,7 +3733,8 @@ app.post('/mark-notification-handled/:userId', async (req, res) => {
         [type === 'message' ? 'message_id' : 'comment_id']: notification_id,
         status: 'ai_handled',
         updated_at: notificationData.updated_at,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        platform: platform
       };
       
       broadcastUpdate(userId, { event: 'status_update', data: statusUpdate });
@@ -4841,18 +3743,295 @@ app.post('/mark-notification-handled/:userId', async (req, res) => {
     } catch (error) {
       // If the notification doesn't exist, that's okay
       if (error.code === 'NoSuchKey') {
-        console.log(`[${new Date().toISOString()}] Notification ${notification_id} not found, skipping`);
+        console.log(`[${new Date().toISOString()}] ${platform} notification ${notification_id} not found, skipping`);
         return res.json({ success: true, message: 'Notification not found, no action needed' });
       }
       
-      console.error(`[${new Date().toISOString()}] Error marking notification as handled:`, error);
+      console.error(`[${new Date().toISOString()}] Error marking ${platform} notification as handled:`, error);
       return res.status(500).json({ 
-        error: 'Failed to mark notification as handled',
+        error: `Failed to mark ${platform} notification as handled`,
         details: error.message
       });
     }
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error in mark-notification-handled:`, error);
+    console.error(`[${new Date().toISOString()}] Error in mark-notification-handled for ${platform}:`, error);
     return res.status(500).json({ error: 'Internal server error' });
   }
+});
+
+// ======================== TWITTER STATUS ENDPOINTS ========================
+
+// This endpoint checks if a user has entered their Twitter username
+app.get('/user-twitter-status/:userId', async (req, res) => {
+  // Set CORS headers
+  setCorsHeaders(res);
+  
+  const { userId } = req.params;
+  
+  try {
+    const key = `UserTwitterStatus/${userId}/status.json`;
+    
+    try {
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: key,
+      });
+      const response = await s3Client.send(getCommand);
+      const body = await streamToString(response.Body);
+      
+      if (!body || body.trim() === '') {
+        return res.json({ hasEnteredTwitterUsername: false });
+      }
+      
+      const userData = JSON.parse(body);
+      return res.json(userData);
+    } catch (error) {
+      if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+        return res.json({ hasEnteredTwitterUsername: false });
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error(`Error retrieving user Twitter status for ${userId}:`, error);
+    res.status(500).json({ error: 'Failed to retrieve user Twitter status' });
+  }
+});
+
+// This endpoint updates the user's Twitter username entry state
+app.post('/user-twitter-status/:userId', async (req, res) => {
+  // Set CORS headers
+  setCorsHeaders(res);
+  
+  const { userId } = req.params;
+  const { twitter_username, accountType, competitors } = req.body;
+  
+  if (!twitter_username || !twitter_username.trim()) {
+    return res.status(400).json({ error: 'Twitter username is required' });
+  }
+  
+  try {
+    const key = `UserTwitterStatus/${userId}/status.json`;
+    const userData = {
+      uid: userId,
+      hasEnteredTwitterUsername: true,
+      twitter_username: twitter_username.trim(),
+      accountType: accountType || 'branding',
+      competitors: competitors || [],
+      lastUpdated: new Date().toISOString()
+    };
+    
+    const putCommand = new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: key,
+      Body: JSON.stringify(userData, null, 2),
+      ContentType: 'application/json',
+    });
+    
+    await s3Client.send(putCommand);
+    res.json({ success: true, message: 'User Twitter status updated successfully' });
+  } catch (error) {
+    console.error(`Error updating user Twitter status for ${userId}:`, error);
+    res.status(500).json({ error: 'Failed to update user Twitter status' });
+  }
+});
+
+// Add OPTIONS handlers for Twitter status endpoints
+app.options('/user-twitter-status/:userId', (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+
+// ===============================================================
+
+app.get('/check-username-availability/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+    const platform = req.query.platform || 'instagram'; // Default to Instagram
+    
+    if (!username || username.trim() === '') {
+      return res.status(400).json({ 
+        available: false, 
+        message: 'Username is required' 
+      });
+    }
+    
+    // Normalize the username based on platform
+    const normalizedUsername = platform === 'twitter' ? username.trim() : username.trim().toLowerCase();
+    
+    // Create platform-specific key using new schema: AccountInfo/<platform>/<username>/info.json
+    const key = `AccountInfo/${platform}/${normalizedUsername}/info.json`;
+    
+    try {
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: key,
+      });
+      
+      await s3Client.send(getCommand);
+      
+      // If we get here, the file exists, meaning the username is already in use
+      return res.json({
+        available: false,
+        message: `This ${platform} username is already in use by another account. If you wish to proceed, you may continue, but you will be using an already assigned username.`
+      });
+      
+    } catch (error) {
+      if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+        // Username is available
+        return res.json({
+          available: true,
+          message: `${platform.charAt(0).toUpperCase() + platform.slice(1)} username is available`
+        });
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error(`Error checking username availability:`, error);
+    res.status(500).json({ 
+      error: 'Failed to check username availability', 
+      details: error.message 
+    });
+  }
+});
+
+// Twitter connection endpoints
+app.post('/twitter-connection/:userId', async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  const { userId } = req.params;
+  const { twitter_user_id, username } = req.body;
+  
+  if (!userId || !twitter_user_id) {
+    return res.status(400).json({ error: 'userId and twitter_user_id are required' });
+  }
+  
+  try {
+    const key = `UserTwitterConnection/${userId}/connection.json`;
+    const connectionData = {
+      twitter_user_id,
+      username: username || '',
+      connected_at: new Date().toISOString(),
+      user_id: userId
+    };
+    
+    const putCommand = new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: key,
+      Body: JSON.stringify(connectionData, null, 2),
+      ContentType: 'application/json'
+    });
+    
+    await s3Client.send(putCommand);
+    console.log(`[${new Date().toISOString()}] Stored Twitter connection for user ${userId}`);
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error storing Twitter connection:`, error);
+    res.status(500).json({ error: 'Failed to store Twitter connection' });
+  }
+});
+
+app.get('/twitter-connection/:userId', async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  const { userId } = req.params;
+  
+  try {
+    const key = `UserTwitterConnection/${userId}/connection.json`;
+    const getCommand = new GetObjectCommand({
+      Bucket: 'tasks',
+      Key: key
+    });
+    
+    const response = await s3Client.send(getCommand);
+    const body = await streamToString(response.Body);
+    const connectionData = JSON.parse(body);
+    
+    res.json(connectionData);
+  } catch (error) {
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+      res.status(404).json({ error: 'No Twitter connection found' });
+    } else {
+      console.error(`[${new Date().toISOString()}] Error retrieving Twitter connection:`, error);
+      res.status(500).json({ error: 'Failed to retrieve Twitter connection' });
+    }
+  }
+});
+
+app.delete('/twitter-connection/:userId', async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  const { userId } = req.params;
+  
+  try {
+    const key = `UserTwitterConnection/${userId}/connection.json`;
+    const deleteCommand = new DeleteObjectCommand({
+      Bucket: 'tasks',
+      Key: key
+    });
+    
+    await s3Client.send(deleteCommand);
+    console.log(`[${new Date().toISOString()}] Deleted Twitter connection for user ${userId}`);
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error deleting Twitter connection:`, error);
+    res.status(500).json({ error: 'Failed to delete Twitter connection' });
+  }
+});
+
+// Helper functions
+async function getExistingData() {
+  try {
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: 'data/',
+    });
+    const listResponse = await s3Client.send(listCommand);
+
+    if (!listResponse.Contents || listResponse.Contents.length === 0) {
+      return [];
+    }
+
+    const getCommand = new GetObjectCommand({
+      Bucket: 'tasks',
+      Key: 'data/hierarchical_data.json',
+    });
+    const response = await s3Client.send(getCommand);
+    const body = await streamToString(response.Body);
+    return body ? JSON.parse(body) : [];
+  } catch (error) {
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+      return [];
+    }
+    console.error('Error getting existing data:', error);
+    throw error;
+  }
+}
+
+async function saveToR2(data) {
+  try {
+    const putCommand = new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: 'data/hierarchical_data.json',
+      Body: JSON.stringify(data, null, 2),
+      ContentType: 'application/json',
+    });
+    await s3Client.send(putCommand);
+  } catch (error) {
+    console.error('Error saving to R2:', error);
+    throw error;
+  }
+}
+
+function handleErrorResponse(res, error) {
+  console.error('API Error:', error);
+  const status = error.response?.status || 500;
+  const message = error.response?.data?.message || error.message || 'Internal server error';
+  res.status(status).json({ error: message });
+}
+
+// Start the server
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
 });

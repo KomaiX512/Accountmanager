@@ -1211,7 +1211,6 @@ Image Description: ${response.post.image_prompt}
         <h1 className="welcome-text">
           Welcome {profileInfo?.fullName || accountHolder}!
         </h1>
-        <p className="welcome-subtext">You are listed in Smart People!</p>
       </div>
       {error && <div className="error-message">{error}</div>}
       {profileError && <div className="error-message">{profileError}</div>}
@@ -1230,13 +1229,8 @@ Image Description: ${response.post.image_prompt}
                       className="profile-pic-bar"
                       onError={(e) => {
                         console.error(`Failed to load profile picture for ${accountHolder}`);
-                        
-                        // Try to reload a few times before giving up
                         if (imageRetryAttemptsRef.current < maxImageRetryAttempts) {
                           imageRetryAttemptsRef.current++;
-                          console.log(`Retrying profile picture load, attempt ${imageRetryAttemptsRef.current}/${maxImageRetryAttempts}`);
-                          
-                          // Force reload by changing the URL slightly with a timestamp
                           const imgElement = e.target as HTMLImageElement;
                           setTimeout(() => {
                             imgElement.src = `http://localhost:3000/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}`;
@@ -1248,7 +1242,6 @@ Image Description: ${response.post.image_prompt}
                     />
                   ) : (
                     <div className="profile-pic-bar">
-                      {/* Fallback content - display initials */}
                       <div className="profile-pic-fallback">
                         {profileInfo?.fullName ? profileInfo.fullName.charAt(0).toUpperCase() : accountHolder.charAt(0).toUpperCase()}
                       </div>
@@ -1276,11 +1269,11 @@ Image Description: ${response.post.image_prompt}
                       onClick={handleOpenInsights}
                       className="insta-btn insights"
                       style={{
-                        background: 'linear-gradient(90deg, #ff2e63, #00ffcc)',
+                        background: 'linear-gradient(90deg, #00ffcc, #007bff)',
                         color: '#e0e0ff',
                         padding: '8px 16px',
                         borderRadius: '6px',
-                        border: '1px solid #ff2e63',
+                        border: '1px solid #00ffcc',
                         zIndex: 20,
                       }}
                     >

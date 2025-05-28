@@ -43,9 +43,9 @@ app.use((err, req, res, next) => {
 
 // Configure AWS SDK for R2
 const R2_CONFIG = {
-  endpoint: 'https://9069781eea9a108d41848d73443b3a87.r2.cloudflarestorage.com',
-  accessKeyId: 'b94be077bc48dcc2aec3e4331233327e',
-  secretAccessKey: '791d5eeddcd8ed5bf3f41bfaebbd37e58af7dcb12275b1422747605d7dc75bc4',
+  endpoint: 'https://b21d96e73b908d7d7b822d41516ccc64.r2.cloudflarestorage.com',
+  accessKeyId: '986718fe67d6790c7fe4eeb78943adba',
+  secretAccessKey: '08fb3b012163cce35bee80b54d83e3a6924f2679f466790a9c7fdd9456bc44fe',
   s3ForcePathStyle: true,
   signatureVersion: 'v4',
   httpOptions: {
@@ -633,7 +633,9 @@ app.post('/api/post-generator', async (req, res) => {
       response
     };
     
-    const postKey = `ready_post/${username}/${Date.now()}.json`;
+    // Extract platform from request, default to instagram
+    const platform = req.body.platform || req.query.platform || 'instagram';
+    const postKey = `ready_post/${platform}/${username}/${Date.now()}.json`;
     await saveToR2(postData, postKey);
     
     // Return response

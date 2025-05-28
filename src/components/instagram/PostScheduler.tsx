@@ -7,8 +7,9 @@ import './PostScheduler.css';
 import { useInstagram } from '../../context/InstagramContext';
 
 interface PostSchedulerProps {
-  userId?: string;
+  userId: string;
   onClose: () => void;
+  platform?: 'instagram' | 'twitter';
 }
 
 interface FormData {
@@ -16,10 +17,11 @@ interface FormData {
   caption: string;
 }
 
-const PostScheduler: React.FC<PostSchedulerProps> = ({ userId: propUserId, onClose }) => {
+const PostScheduler: React.FC<PostSchedulerProps> = ({ userId, onClose, platform = 'instagram' }) => {
   // Get userId from context if not provided as prop
   const { userId: contextUserId, isConnected } = useInstagram();
-  const userId = propUserId || (isConnected ? contextUserId : null);
+  const userIdFromContext = isConnected ? contextUserId : null;
+  const userIdToUse = userId || userIdFromContext;
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>();
   const [scheduleDate, setScheduleDate] = useState<Date | null>(null);
@@ -45,12 +47,12 @@ const PostScheduler: React.FC<PostSchedulerProps> = ({ userId: propUserId, onClo
   };
 
   const onSubmit: SubmitHandler<FormData> = async (data) => {
-    if (!userId) {
+    if (!userIdToUse) {
       setError('Instagram connection required. Please connect your Instagram account.');
       return;
     }
     
-    console.log(`[${new Date().toISOString()}] Submitting post for user ${userId}`);
+    console.log(`[${new Date().toISOString()}] Submitting post for user ${userIdToUse}`);
     if (!scheduleDate) {
       setError('Please select a schedule date and time.');
       return;
@@ -75,10 +77,10 @@ const PostScheduler: React.FC<PostSchedulerProps> = ({ userId: propUserId, onClo
 
     setIsSubmitting(true);
     try {
-      await axios.post(`http://localhost:3000/schedule-post/${userId}`, formData, {
+      await axios.post(`http://localhost:3000/schedule-post/${userIdToUse}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      console.log(`[${new Date().toISOString()}] Post scheduled successfully for user ${userId}`);
+      console.log(`[${new Date().toISOString()}] Post scheduled successfully for user ${userIdToUse}`);
       onClose();
     } catch (err: any) {
       console.error(`[${new Date().toISOString()}] Post scheduling failed:`, err.response?.data || err.message);
@@ -92,7 +94,7 @@ const PostScheduler: React.FC<PostSchedulerProps> = ({ userId: propUserId, onClo
     <div className="post-scheduler-modal">
       <div className="post-scheduler-content">
         <h2 className="post-scheduler-title">Schedule Instagram Post</h2>
-        {!userId ? (
+        {!userIdToUse ? (
           <div className="instagram-not-connected">
             <p>Connect your Instagram account to schedule posts.</p>
             <button

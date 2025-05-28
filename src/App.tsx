@@ -4,12 +4,15 @@ import './App.css';
 import LeftBar from './components/common/LeftBar';
 import TopBar from './components/common/TopBar';
 import Instagram from './pages/Instagram';
+import Twitter from './pages/Twitter';
 import Dashboard from './components/instagram/Dashboard';
+import PlatformDashboard from './components/dashboard/PlatformDashboard';
 import Login from './components/auth/Login';
 import PrivateRoute from './components/auth/PrivateRoute';
 import AuthRoute from './components/auth/AuthRoute';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { InstagramProvider } from './context/InstagramContext';
+import { TwitterProvider } from './context/TwitterContext';
 import axios from 'axios';
 import { syncInstagramConnection, isInstagramDisconnected } from './utils/instagramSessionManager';
 
@@ -18,7 +21,9 @@ const App: React.FC = () => {
   return (
     <AuthProvider>
       <InstagramProvider>
-        <AppContent />
+        <TwitterProvider>
+          <AppContent />
+        </TwitterProvider>
       </InstagramProvider>
     </AuthProvider>
   );
@@ -32,11 +37,12 @@ const AppContent: React.FC = () => {
   const [isLoadingUserData, setIsLoadingUserData] = useState(false);
   
   // Extract from location state
-  const { accountHolder, competitors = [], userId, accountType } = location.state || { 
+  const { accountHolder, competitors = [], userId, accountType, platform } = location.state || { 
     accountHolder: '', 
     competitors: [], 
     userId: undefined,
-    accountType: undefined 
+    accountType: undefined,
+    platform: undefined
   };
   
   const isLoginPage = location.pathname === '/login';
@@ -63,21 +69,33 @@ const AppContent: React.FC = () => {
     syncUserConnection();
   }, [currentUser]);
 
-  // Try to load user Instagram data if logged in but no account info
+  // Try to load user data if logged in but no account info
   useEffect(() => {
-    if (currentUser?.uid && !accountHolder && location.pathname.includes('dashboard')) {
+    if (currentUser?.uid && !accountHolder && (location.pathname.includes('dashboard') || location.pathname.includes('twitter-dashboard'))) {
       setIsLoadingUserData(true);
       
       const fetchUserStatus = async () => {
         try {
-          const response = await axios.get(`http://localhost:3000/user-instagram-status/${currentUser.uid}`);
+          // Determine which platform to check based on URL
+          const isTwitterDashboard = location.pathname.includes('twitter');
+          const endpoint = isTwitterDashboard 
+            ? `http://localhost:3000/user-twitter-status/${currentUser.uid}`
+            : `http://localhost:3000/user-instagram-status/${currentUser.uid}`;
           
-          if (response.data.hasEnteredInstagramUsername) {
-            const savedUsername = response.data.instagram_username;
+          const response = await axios.get(endpoint);
+          
+          const hasEnteredUsername = isTwitterDashboard 
+            ? response.data.hasEnteredTwitterUsername
+            : response.data.hasEnteredInstagramUsername;
+          
+          if (hasEnteredUsername) {
+            const savedUsername = isTwitterDashboard 
+              ? response.data.twitter_username
+              : response.data.instagram_username;
             const savedCompetitors = response.data.competitors || [];
             const savedAccountType = response.data.accountType || 'branding';
             
-            console.log(`Retrieved saved Instagram data for ${currentUser.uid}:`, {
+            console.log(`Retrieved saved ${isTwitterDashboard ? 'Twitter' : 'Instagram'} data for ${currentUser.uid}:`, {
               username: savedUsername,
               accountType: savedAccountType
             });
@@ -87,17 +105,18 @@ const AppContent: React.FC = () => {
               state: {
                 accountHolder: savedUsername,
                 competitors: savedCompetitors,
-                accountType: savedAccountType
+                accountType: savedAccountType,
+                platform: isTwitterDashboard ? 'twitter' : 'instagram'
               },
               replace: true
             });
           } else {
-            // User hasn't set up Instagram yet, redirect to setup page
-            navigate('/instagram');
+            // User hasn't set up the platform yet, redirect to setup page
+            navigate(isTwitterDashboard ? '/twitter' : '/instagram');
           }
         } catch (error) {
-          console.error('Error fetching user Instagram status:', error);
-          navigate('/instagram');
+          console.error('Error fetching user status:', error);
+          navigate(location.pathname.includes('twitter') ? '/twitter' : '/instagram');
         } finally {
           setIsLoadingUserData(false);
         }
@@ -136,6 +155,14 @@ const AppContent: React.FC = () => {
               }
             />
             <Route
+              path="/twitter"
+              element={
+                <PrivateRoute>
+                  <Twitter />
+                </PrivateRoute>
+              }
+            />
+            <Route
               path="/dashboard"
               element={
                 <PrivateRoute>
@@ -155,6 +182,32 @@ const AppContent: React.FC = () => {
                     accountHolder={accountHolder} 
                     competitors={[]} 
                     accountType="non-branding" 
+                  />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/twitter-dashboard"
+              element={
+                <PrivateRoute>
+                  <PlatformDashboard 
+                    accountHolder={accountHolder} 
+                    competitors={competitors} 
+                    accountType={accountType || 'branding'}
+                    platform="twitter"
+                  />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/twitter-non-branding-dashboard"
+              element={
+                <PrivateRoute>
+                  <PlatformDashboard 
+                    accountHolder={accountHolder} 
+                    competitors={[]} 
+                    accountType="non-branding"
+                    platform="twitter"
                   />
                 </PrivateRoute>
               }

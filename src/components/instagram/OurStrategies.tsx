@@ -7,16 +7,21 @@ import ErrorBoundary from '../ErrorBoundary';
 interface OurStrategiesProps {
   accountHolder: string;
   accountType: 'branding' | 'non-branding';
+  platform?: 'instagram' | 'twitter';
 }
 
-const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountType }) => {
+const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountType, platform = 'instagram' }) => {
   const [showPopup, setShowPopup] = useState(false);
   const [currentStrategyIndex, setCurrentStrategyIndex] = useState(0);
 
   const normalizedAccountHolder = accountHolder;
-  const endpoint = accountType === 'branding'
+  
+  // Construct endpoint with platform parameter
+  const baseEndpoint = accountType === 'branding'
     ? `http://localhost:3000/retrieve-strategies/${normalizedAccountHolder}`
     : `http://localhost:3000/retrieve-engagement-strategies/${normalizedAccountHolder}`;
+  
+  const endpoint = `${baseEndpoint}?platform=${platform}`;
 
   const { data, loading, error } = useR2Fetch<any[]>(endpoint);
 
@@ -25,8 +30,8 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
     if (!rawText || typeof rawText !== 'string') return [];
 
     const lines = rawText.split('.').map(line => line.trim()).filter(line => line);
-    const sections: { heading: string; content: JSX.Element[] }[] = [];
-    let currentSection: { heading: string; content: JSX.Element[] } | null = null;
+    const sections: { heading: string; content: React.ReactElement[] }[] = [];
+    let currentSection: { heading: string; content: React.ReactElement[] } | null = null;
 
     lines.forEach((line, idx) => {
       // Handle headings (lines ending with a colon or standalone titles)
@@ -53,7 +58,7 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
                 return part;
               });
 
-              currentSection.content.push(
+              currentSection?.content.push(
                 <p key={`${idx}-${subIdx}`} className="strategy-detail">
                   <span className="detail-label">{formattedLabel}:</span> {formattedValue}
                 </p>
@@ -68,7 +73,7 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
                 return part;
               });
 
-              currentSection.content.push(
+              currentSection?.content.push(
                 <p key={`${idx}-${subIdx}`} className="strategy-detail">
                   - {formattedText}
                 </p>
@@ -83,7 +88,7 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
             }
             return part;
           });
-          currentSection.content.push(
+          currentSection?.content.push(
             <p key={idx} className="strategy-detail">{formattedLine}</p>
           );
         }

@@ -252,11 +252,14 @@ app.post('/rag-post/:username', async (req, res) => {
       // Step 3: Save the post data and image
       console.log(`[${new Date().toISOString()}] [POST MODE] Step 3: Saving post data and image to storage`);
       
+      // Extract platform from request, default to instagram
+      const platform = req.body.platform || req.query.platform || 'instagram';
+      
       // Generate timestamp for unique filename
       const timestamp = Date.now();
       
-      // Create directories if they don't exist
-      const outputDir = `ready_post/${username}`;
+      // Create directories if they don't exist using new schema: ready_post/<platform>/<username>
+      const outputDir = `ready_post/${platform}/${username}`;
       if (!fs.existsSync(outputDir)) {
         fs.mkdirSync(outputDir, { recursive: true });
       }
@@ -729,7 +732,8 @@ app.use('/images', express.static('ready_post'));
 app.get('/r2-images/:username/:filename', async (req, res) => {
   try {
     const { username, filename } = req.params;
-    const key = `ready_post/${username}/${filename}`;
+    const platform = req.query.platform || 'instagram'; // Default to instagram for backward compatibility
+    const key = `ready_post/${platform}/${username}/${filename}`;
     
     console.log(`[${new Date().toISOString()}] [IMAGE PROXY] Requesting image from R2: ${key}`);
     
@@ -752,7 +756,7 @@ app.get('/r2-images/:username/:filename', async (req, res) => {
       
       // If the image doesn't exist in R2, try to serve it from local filesystem as backup
       if (r2Error.code === 'NoSuchKey') {
-        const localPath = path.join(process.cwd(), 'ready_post', req.params.username, req.params.filename);
+        const localPath = path.join(process.cwd(), 'ready_post', platform, req.params.username, req.params.filename);
         
         if (fs.existsSync(localPath)) {
           console.log(`[${new Date().toISOString()}] [IMAGE PROXY] Serving local image: ${localPath}`);

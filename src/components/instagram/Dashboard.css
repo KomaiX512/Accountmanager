@@ -16,7 +16,7 @@
 .welcome-text {
   font-size: 2.5rem;
   font-weight: 700;
-  background: linear-gradient(90deg, #00ffcc, #007bff);
+  background: linear-gradient(90deg, #00c9a7, #00b4e6);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   text-shadow: 0 0 15px rgba(0, 255, 204, 0.7), 0 0 30px rgba(0, 255, 204, 0.4);
@@ -385,7 +385,7 @@ h2 {
   padding: 8px 16px;
   border-radius: 6px;
   border: 1px solid #00ffcc;
-  background: linear-gradient(90deg, #007bff, #00ffcc);
+  background: linear-gradient(90deg, #00c9a7, #00b4e6);
   color: #e0e0ff;
   font-weight: bold;
   cursor: pointer;
@@ -394,7 +394,7 @@ h2 {
 }
 
 .theme-btn:hover:not(:disabled) {
-  background: linear-gradient(90deg, #0056b3, #00cc99);
+  background: linear-gradient(90deg, #00c9a7, #00b4e6);
   box-shadow: 0 0 10px rgba(0, 255, 204, 0.7);
 }
 
@@ -599,7 +599,7 @@ h2 {
 
 .view-full-chat-btn {
   margin-top: 15px;
-  background: linear-gradient(90deg, #007bff, #00ffcc);
+  background: linear-gradient(90deg, #00c9a7, #00b4e6);
   color: #fff;
   border: none;
   padding: 8px 16px;
@@ -610,6 +610,6 @@ h2 {
 }
 
 .view-full-chat-btn:hover {
-  background: linear-gradient(90deg, #0062cc, #00e6b8);
+  background: linear-gradient(90deg, #00c9a7, #00b4e6);
   transform: translateY(-2px);
 }

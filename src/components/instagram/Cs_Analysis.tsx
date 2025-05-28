@@ -20,9 +20,10 @@ interface AccountInfo {
 interface Cs_AnalysisProps {
   accountHolder: string;
   competitors: string[];
+  platform?: 'instagram' | 'twitter';
 }
 
-const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors }) => {
+const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, platform = 'instagram' }) => {
   const [selectedCompetitor, setSelectedCompetitor] = useState<string | null>(null);
   const [currentAnalysisIndex, setCurrentAnalysisIndex] = useState(0);
   const [competitorProfiles, setCompetitorProfiles] = useState<Record<string, ProfileInfo>>({});
@@ -41,7 +42,11 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors })
   const normalizedAccountHolder = accountHolder;
 
   const competitorsQuery = localCompetitors.length > 0 ? localCompetitors.join(',') : '';
-  const allCompetitorsFetch = useR2Fetch<any[]>(competitorsQuery ? `http://localhost:3000/retrieve-multiple/${normalizedAccountHolder}?competitors=${competitorsQuery}` : '');
+  const competitorEndpoint = competitorsQuery 
+    ? `http://localhost:3000/retrieve-multiple/${normalizedAccountHolder}?competitors=${competitorsQuery}&platform=${platform}` 
+    : '';
+  
+  const allCompetitorsFetch = useR2Fetch<any[]>(competitorEndpoint);
 
   const competitorData = localCompetitors.map(competitor => {
     const dataForCompetitor = allCompetitorsFetch.data?.find(item => item.competitor === competitor) || null;

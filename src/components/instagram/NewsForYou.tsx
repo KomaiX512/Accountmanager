@@ -6,10 +6,12 @@ import ErrorBoundary from '../ErrorBoundary';
 
 interface NewsForYouProps {
   accountHolder: string;
+  platform?: 'instagram' | 'twitter';
 }
 
-const NewsForYou: React.FC<NewsForYouProps> = ({ accountHolder }) => {
-  const { data, loading } = useR2Fetch<any[]>(`http://localhost:3000/news-for-you/${accountHolder}`);
+const NewsForYou: React.FC<NewsForYouProps> = ({ accountHolder, platform = 'instagram' }) => {
+  const endpoint = `http://localhost:3000/news-for-you/${accountHolder}?platform=${platform}`;
+  const { data, loading } = useR2Fetch<any[]>(endpoint);
   const [selectedNewsIndex, setSelectedNewsIndex] = useState<number | null>(null);
 
   const decodeNewsContent = (newsData: any) => {

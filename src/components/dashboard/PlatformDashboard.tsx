@@ -617,6 +617,74 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         return;
       }
 
+      if (data.type === 'update' && data.prefix) {
+        const { prefix } = data;
+        const platformParam = `?platform=${platform}`;
+        
+        if (prefix.startsWith(`queries/${platform}/${accountHolder}/`)) {
+          axios.get(`http://localhost:3000/responses/${accountHolder}${platformParam}`).then(res => {
+            setResponses(res.data);
+            setToast(`New ${platform} response received!`);
+          }).catch(err => {
+            console.error(`Error fetching ${platform} responses:`, err);
+            setError(err.response?.data?.error || `Failed to fetch ${platform} responses.`);
+          });
+        }
+        
+        if (prefix.startsWith(`recommendations/${platform}/${accountHolder}/`) || prefix.startsWith(`engagement_strategies/${platform}/${accountHolder}/`)) {
+          const endpoint = accountType === 'branding' 
+            ? `http://localhost:3000/retrieve-strategies/${accountHolder}${platformParam}`
+            : `http://localhost:3000/retrieve-engagement-strategies/${accountHolder}${platformParam}`;
+          
+          axios.get(endpoint).then(res => {
+            setStrategies(res.data);
+            setToast(`New ${platform} strategies available!`);
+          }).catch(err => {
+            console.error(`Error fetching ${platform} strategies:`, err);
+            setError(err.response?.data?.error || `Failed to fetch ${platform} strategies.`);
+          });
+        }
+        
+        if (prefix.startsWith(`ready_post/${platform}/${accountHolder}/`)) {
+          axios.get(`http://localhost:3000/posts/${accountHolder}${platformParam}`).then(res => {
+            setPosts(res.data);
+            setToast(`New ${platform} post cooked!`);
+          }).catch(err => {
+            console.error(`Error fetching ${platform} posts:`, err);
+            setError(err.response?.data?.error || `Failed to fetch ${platform} posts.`);
+          });
+        }
+        
+        if (accountType === 'branding' && prefix.startsWith(`competitor_analysis/${platform}/${accountHolder}/`)) {
+          Promise.all(
+            competitors.map(comp =>
+              axios.get(`http://localhost:3000/retrieve/${accountHolder}/${comp}${platformParam}`).catch(err => {
+                if (err.response?.status === 404) return { data: [] };
+                throw err;
+              })
+            )
+          )
+            .then(res => {
+              setCompetitorData(res.flatMap(r => r.data));
+              setToast(`New ${platform} competitor analysis available!`);
+            })
+            .catch(err => {
+              console.error(`Error fetching ${platform} competitor data:`, err);
+              setError(err.response?.data?.error || `Failed to fetch ${platform} competitor analysis.`);
+            });
+        }
+        
+        if (accountType === 'non-branding' && prefix.startsWith(`NewForYou/${platform}/${accountHolder}/`)) {
+          axios.get(`http://localhost:3000/news-for-you/${accountHolder}${platformParam}`).then(res => {
+            setNews(res.data);
+            setToast(`New ${platform} news article available!`);
+          }).catch(err => {
+            console.error(`Error fetching ${platform} news:`, err);
+            setError(err.response?.data?.error || `Failed to fetch ${platform} news articles.`);
+          });
+        }
+      }
+
       if (data.event === 'message' || data.event === 'comment') {
         const notifType = data.event === 'message' ? 'dm' : 'comment';
         const notifId = data.data.message_id || data.data.comment_id;
@@ -1181,6 +1249,7 @@ Image Description: ${response.post.image_prompt}
               profilePicUrl=""
               posts={posts}
               userId={userId || undefined}
+              platform={platform}
             />
           </div>
 

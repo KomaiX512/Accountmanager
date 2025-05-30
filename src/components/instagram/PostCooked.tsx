@@ -13,6 +13,7 @@ interface PostCookedProps {
   profilePicUrl: string;
   posts?: { key: string; data: { post: any; status: string; image_url: string; r2_image_url?: string }; imageFailed?: boolean }[];
   userId?: string;
+  platform?: 'instagram' | 'twitter';
 }
 
 // Define an interface for image error state
@@ -21,7 +22,7 @@ interface ImageErrorState {
   retryCount: number;
 }
 
-const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts = [], userId: propUserId }) => {
+const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts = [], userId: propUserId, platform }) => {
   const { isConnected, userId: contextUserId } = useInstagram();
   
   const userId = isConnected && contextUserId ? contextUserId : propUserId;
@@ -624,7 +625,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     setToastMessage('Refreshing posts...');
     
     try {
-      const response = await axios.get(`http://localhost:3000/posts/${username}?forceRefresh=true`);
+      const platformParam = platform ? `&platform=${platform}` : '';
+      const response = await axios.get(`http://localhost:3000/posts/${username}?forceRefresh=true${platformParam}`);
       setLocalPosts(response.data);
       setToastMessage('Posts refreshed successfully!');
     } catch (error) {

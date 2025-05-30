@@ -14,6 +14,40 @@ import schedule from 'node-schedule';
 const app = express();
 const port = 3000;
 
+/**
+ * ============= R2 SCHEMA DOCUMENTATION =============
+ * 
+ * NEW THREE-LEVEL SCHEMA STRUCTURE:
+ * Format: module/platform/username[/additional]
+ * 
+ * SUPPORTED PLATFORMS: instagram, twitter
+ * 
+ * MODULE EXAMPLES:
+ * - competitor_analysis/instagram/username/competitor_name
+ * - recommendations/instagram/username/
+ * - engagement_strategies/twitter/username/
+ * - ready_post/instagram/username/
+ * - queries/twitter/username/
+ * - rules/instagram/username/
+ * - feedbacks/twitter/username/
+ * - AccountInfo/instagram/username/
+ * - ProfileInfo/twitter/username/
+ * - NewForYou/instagram/username/
+ * 
+ * KEY BENEFITS:
+ * - Platform-specific organization
+ * - Consistent path structure across all modules
+ * - Simplified cache management
+ * - Clear separation of Instagram and Twitter data
+ * - Future-proof for additional platforms
+ * 
+ * CENTRALIZED MANAGEMENT:
+ * - All schema operations use PlatformSchemaManager
+ * - Automatic username normalization per platform
+ * - Validation of platform support
+ * - Consistent error handling
+ */
+
 // ============= ENHANCED CACHING SYSTEM =============
 // Configure cache settings based on module type
 const CACHE_CONFIG = {
@@ -39,7 +73,7 @@ const MODULE_CACHE_CONFIG = {
   'recommendations': CACHE_CONFIG.STANDARD,
   'engagement_strategies': CACHE_CONFIG.STANDARD,
   'NewForYou': CACHE_CONFIG.STANDARD,
-  'ProfileInfo': CACHE_CONFIG.STANDARD,
+  'ProfileInfo': CACHE_CONFIG.REALTIME, // Disable caching for ProfileInfo to always get fresh data
   'queries': CACHE_CONFIG.STANDARD,
   'rules': CACHE_CONFIG.STANDARD,
   'feedbacks': CACHE_CONFIG.STANDARD,
@@ -404,30 +438,38 @@ app.get('/events/:username', (req, res) => {
   });
 });
 
-// Enhanced data fetching with improved caching strategy
+// Enhanced data fetching with centralized schema management
 async function fetchDataForModule(username, prefixTemplate, forceRefresh = false, platform = 'instagram') {
   if (!username) {
     console.error('No username provided, cannot fetch data');
     return [];
   }
 
-  // Create platform-specific prefix using new schema: <module>/<platform>/<username>
-  let prefix;
-  if (prefixTemplate.includes('{username}')) {
-    // Replace {username} placeholder and add platform directory
-    const modulePrefix = prefixTemplate.replace('/{username}', '').replace('{username}', '');
-    prefix = `${modulePrefix}/${platform}/${username}`;
-  } else {
-    // For templates without placeholder, assume it ends with the module name
-    prefix = `${prefixTemplate}/${platform}/${username}`;
-  }
-  
-  // Check if we should use cache based on the enhanced caching rules
-  if (!forceRefresh && shouldUseCache(prefix)) {
-    return cache.get(prefix);
-  }
-
   try {
+    // Parse the module and additional components from the template
+    let module, additional = '';
+    
+    if (prefixTemplate.includes('competitor_analysis') && prefixTemplate.includes('/{username}/')) {
+      // Special handling for competitor analysis: competitor_analysis/{username}/{competitor}
+      const parts = prefixTemplate.split('/{username}/');
+      module = parts[0]; // competitor_analysis
+      additional = parts[1]; // competitor name
+    } else if (prefixTemplate.includes('{username}')) {
+      // Standard template: module/{username} or module/{username}/file
+      module = prefixTemplate.replace('/{username}', '').replace('{username}', '');
+    } else {
+      // Template without placeholder
+      module = prefixTemplate;
+    }
+    
+    // Generate standardized prefix using centralized schema manager
+    const prefix = PlatformSchemaManager.buildPath(module, platform, username, additional);
+    
+    // Check if we should use cache based on the enhanced caching rules
+    if (!forceRefresh && shouldUseCache(prefix)) {
+      return cache.get(prefix);
+    }
+
     console.log(`[${new Date().toISOString()}] Fetching fresh ${platform} data from R2 for prefix: ${prefix}`);
     const listCommand = new ListObjectsV2Command({
       Bucket: 'tasks',
@@ -439,8 +481,7 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
     
     // Special handling for ready_post directory since it contains both JSON and JPG files
     if (prefix.includes('ready_post/')) {
-      // For ready_post, we need a different approach to properly handle both JSON and image files
-      // This is handled separately by the /posts/:username endpoint
+      // For ready_post, this is handled separately by the /posts/:username endpoint
       // Here we'll just set the cache timestamp for tracking
       cacheTimestamps.set(prefix, Date.now());
       
@@ -493,12 +534,23 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
     
     return validData;
   } catch (error) {
-    console.error(`Error fetching ${platform} data for prefix ${prefix}:`, error);
-    // Return cached data as fallback if available
-    if (cache.has(prefix)) {
-      console.log(`[${new Date().toISOString()}] Using cached ${platform} data as fallback for ${prefix} due to fetch error`);
-      return cache.get(prefix);
+    console.error(`Error fetching ${platform} data for username ${username}:`, error);
+    
+    // Try to build prefix for fallback cache lookup
+    try {
+      const module = prefixTemplate.includes('competitor_analysis') && prefixTemplate.includes('/{username}/') 
+        ? prefixTemplate.split('/{username}/')[0]
+        : prefixTemplate.replace('/{username}', '').replace('{username}', '');
+      const fallbackPrefix = PlatformSchemaManager.buildPath(module, platform, username);
+      
+      if (cache.has(fallbackPrefix)) {
+        console.log(`[${new Date().toISOString()}] Using cached ${platform} data as fallback for ${fallbackPrefix} due to fetch error`);
+        return cache.get(fallbackPrefix);
+      }
+    } catch (fallbackError) {
+      console.error(`Error building fallback cache key:`, fallbackError);
     }
+    
     return [];
   }
 }
@@ -531,19 +583,20 @@ app.get('/profile-info/:username', async (req, res) => {
   const forceRefresh = req.query.forceRefresh === 'true';
   const platform = req.query.platform || 'instagram'; // Default to Instagram
   
-  // Create platform-specific key using new schema: ProfileInfo/<platform>/<username>.json
-  const key = `ProfileInfo/${platform}/${username}.json`;
-  const prefix = `ProfileInfo/${platform}/${username}`;
+  // Try multiple possible key formats for ProfileInfo
+  const possibleKeys = [
+    `ProfileInfo/${platform}/${username}/profileinfo.json`,
+    `ProfileInfo/${platform}/${username}.json`,
+    `ProfileInfo/${username}/profileinfo.json`,
+    `ProfileInfo/${username}.json`
+  ];
 
-  try {
-    let data;
-    if (!forceRefresh && cache.has(prefix)) {
-      console.log(`Cache hit for profile info: ${prefix}`);
-      const cachedData = cache.get(prefix);
-      data = cachedData.find(item => item.key === key)?.data;
-    }
+  console.log(`[${new Date().toISOString()}] Attempting to fetch ${platform} profile info for ${username}`);
 
-    if (!data || forceRefresh) {
+  for (const key of possibleKeys) {
+    try {
+      console.log(`[${new Date().toISOString()}] Trying key: ${key}`);
+      
       const getCommand = new GetObjectCommand({
         Bucket: 'tasks',
         Key: key,
@@ -553,39 +606,41 @@ app.get('/profile-info/:username', async (req, res) => {
 
       if (!body || body.trim() === '') {
         console.warn(`Empty file detected at ${key}`);
-        return res.status(404).json({ error: 'Profile info is empty' });
+        continue;
       }
 
-      data = JSON.parse(body);
-      cache.set(prefix, [{ key, data }]);
-      cacheTimestamps.set(prefix, Date.now());
+      const data = JSON.parse(body);
+      console.log(`[${new Date().toISOString()}] Successfully fetched ${platform} profile info for ${username} from ${key}`);
+      return res.json(data);
+    } catch (error) {
+      if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+        console.log(`Key not found: ${key}`);
+        continue;
+      }
+      console.error(`Error fetching profile info from ${key}:`, error.message);
+      continue;
     }
-
-    res.json(data);
-  } catch (error) {
-    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
-      console.log(`Profile info not found for ${key}`);
-      return res.status(404).json({ error: 'Profile info not found' });
-    }
-    console.error(`Error fetching profile info for ${key}:`, error.message);
-    res.status(500).json({ error: 'Error retrieving profile info', details: error.message });
   }
+
+  console.log(`Profile info not found for ${username} on ${platform} (tried ${possibleKeys.length} locations)`);
+  return res.status(404).json({ error: 'Profile info not found' });
 });
 
 app.post('/save-account-info', async (req, res) => {
   try {
     const { username, accountType, postingStyle, competitors, platform } = req.body;
-    const platformParam = req.query.platform || platform || 'instagram'; // Default to Instagram for backward compatibility
+    const platformParam = req.query.platform || platform || 'instagram';
 
     if (!username || !accountType || !postingStyle) {
       return res.status(400).json({ error: 'Username, account type, and posting style are required' });
     }
 
-    // Normalize the username
-    const normalizedUsername = platformParam === 'twitter' ? username.trim() : username.trim().toLowerCase();
+    // Use centralized platform management for normalization
+    const platformConfig = PlatformSchemaManager.getPlatformConfig(platformParam);
+    const normalizedUsername = platformConfig.normalizeUsername(username);
 
-    // Create platform-specific key structure using new schema: AccountInfo/<platform>/<username>/info.json
-    const key = `AccountInfo/${platformParam}/${normalizedUsername}/info.json`;
+    // Create platform-specific key using centralized schema manager
+    const key = PlatformSchemaManager.buildPath('AccountInfo', platformParam, normalizedUsername, 'info.json');
 
     let isUsernameAlreadyInUse = false;
     
@@ -609,7 +664,7 @@ app.post('/save-account-info', async (req, res) => {
       accountType,
       postingStyle,
       platform: platformParam,
-      ...(competitors && { competitors: competitors.map(c => platformParam === 'twitter' ? c.trim() : c.trim().toLowerCase()) }),
+      ...(competitors && { competitors: competitors.map(c => platformConfig.normalizeUsername(c)) }),
       timestamp: new Date().toISOString(),
     };
 
@@ -622,7 +677,8 @@ app.post('/save-account-info', async (req, res) => {
     });
     await s3Client.send(putCommand);
 
-    const cacheKey = `AccountInfo/${platformParam}/${normalizedUsername}`;
+    // Clear cache using centralized schema
+    const cacheKey = PlatformSchemaManager.buildPath('AccountInfo', platformParam, normalizedUsername);
     cache.delete(cacheKey);
 
     res.json({ 
@@ -704,181 +760,131 @@ app.post('/scrape', async (req, res) => {
 });
 
 app.get('/retrieve/:accountHolder/:competitor', async (req, res) => {
-  const { accountHolder, competitor } = req.params;
-  const forceRefresh = req.query.forceRefresh === 'true';
-
   try {
-    const data = await fetchDataForModule(accountHolder, `competitor_analysis/{username}/${competitor}`, forceRefresh);
-    console.log(`Returning data for ${accountHolder}/${competitor}`);
+    const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
+    const { competitor } = req.params;
+    const forceRefresh = req.query.forceRefresh === 'true';
+
+    // Use centralized schema management for competitor analysis
+    const data = await fetchDataForModule(username, `competitor_analysis/{username}/${competitor}`, forceRefresh, platform);
+    console.log(`Returning ${platform} data for ${username}/${competitor}`);
     res.json(data);
   } catch (error) {
-    console.error(`Retrieve endpoint error for ${accountHolder}/${competitor}:`, error);
-    // Try to use cached data as fallback if available
-    const prefix = `competitor_analysis/${accountHolder}/${competitor}`;
-    if (cache.has(prefix)) {
-      console.log(`[${new Date().toISOString()}] Using cached data as fallback for ${prefix} due to fetch error`);
-      return res.json(cache.get(prefix));
-    }
-    res.status(500).json({ error: 'Error retrieving data', details: error.message });
+    console.error(`Retrieve ${req.query.platform || 'instagram'} endpoint error:`, error);
+    res.status(500).json({ 
+      error: `Error retrieving ${req.query.platform || 'instagram'} data`, 
+      details: error.message 
+    });
   }
 });
 
 app.get('/retrieve-multiple/:accountHolder', async (req, res) => {
-  const { accountHolder } = req.params;
-  const competitorsParam = req.query.competitors;
-  const forceRefresh = req.query.forceRefresh === 'true';
-  const platform = req.query.platform || 'instagram'; // Default to Instagram
-
-  if (!competitorsParam || typeof competitorsParam !== 'string') {
-    return res.status(400).json({ error: 'Competitors query parameter is required and must be a string' });
-  }
-
-  const competitors = competitorsParam.split(',').map(c => c.trim()).filter(c => c.length > 0);
-
   try {
+    const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
+    const competitorsParam = req.query.competitors;
+    const forceRefresh = req.query.forceRefresh === 'true';
+
+    if (!competitorsParam || typeof competitorsParam !== 'string') {
+      return res.status(400).json({ error: 'Competitors query parameter is required and must be a string' });
+    }
+
+    const competitors = competitorsParam.split(',').map(c => c.trim()).filter(c => c.length > 0);
+
     const results = await Promise.all(
       competitors.map(async (competitor) => {
         try {
-          const data = await fetchDataForModule(accountHolder, `competitor_analysis/{username}/${competitor}`, forceRefresh, platform);
+          const data = await fetchDataForModule(username, `competitor_analysis/{username}/${competitor}`, forceRefresh, platform);
           return { competitor, data };
         } catch (error) {
-          console.error(`Error fetching ${platform} data for ${accountHolder}/${competitor}:`, error);
-          // Try to use cached data as fallback
-          let prefix;
-          if (platform === 'twitter') {
-            prefix = `competitor_analysis/twitter/${accountHolder}/${competitor}`;
-          } else {
-            prefix = `competitor_analysis/${accountHolder}/${competitor}`;
-          }
-          
-          if (cache.has(prefix)) {
-            console.log(`[${new Date().toISOString()}] Using cached ${platform} data as fallback for ${prefix}`);
-            return { competitor, data: cache.get(prefix) };
-          }
+          console.error(`Error fetching ${platform} data for ${username}/${competitor}:`, error);
           return { competitor, data: [], error: error.message };
         }
       })
     );
     res.json(results);
   } catch (error) {
-    console.error(`Retrieve multiple ${platform} endpoint error for ${accountHolder}:`, error);
-    res.status(500).json({ error: `Error retrieving ${platform} data for multiple competitors`, details: error.message });
+    console.error(`Retrieve multiple ${req.query.platform || 'instagram'} endpoint error:`, error);
+    res.status(500).json({ 
+      error: `Error retrieving ${req.query.platform || 'instagram'} data for multiple competitors`, 
+      details: error.message 
+    });
   }
 });
 
 app.get('/retrieve-strategies/:accountHolder', async (req, res) => {
-  const { accountHolder } = req.params;
-  const forceRefresh = req.query.forceRefresh === 'true';
-  const platform = req.query.platform || 'instagram'; // Default to Instagram
-
   try {
-    const data = await fetchDataForModule(accountHolder, 'recommendations/{username}', forceRefresh, platform);
+    const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
+    const forceRefresh = req.query.forceRefresh === 'true';
+
+    const data = await fetchDataForModule(username, 'recommendations/{username}', forceRefresh, platform);
     if (data.length === 0) {
       res.status(404).json({ error: `No ${platform} recommendation files found` });
     } else {
       res.json(data);
     }
   } catch (error) {
-    console.error(`Retrieve ${platform} strategies endpoint error for ${accountHolder}:`, error);
-    
-    // Try to use cached data as fallback
-    let prefix;
-    if (platform === 'twitter') {
-      prefix = `recommendations/twitter/${accountHolder}`;
-    } else {
-      prefix = `recommendations/${accountHolder}`;
-    }
-    
-    if (cache.has(prefix)) {
-      console.log(`[${new Date().toISOString()}] Using cached ${platform} recommendations as fallback for ${accountHolder}`);
-      const cachedData = cache.get(prefix);
-      if (cachedData && cachedData.length > 0) {
-        return res.json(cachedData);
-      }
-    }
+    console.error(`Retrieve ${req.query.platform || 'instagram'} strategies endpoint error:`, error);
     
     if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
-      res.status(404).json({ error: `${platform.charAt(0).toUpperCase() + platform.slice(1)} data not ready yet` });
+      const platformName = (req.query.platform || 'instagram').charAt(0).toUpperCase() + (req.query.platform || 'instagram').slice(1);
+      res.status(404).json({ error: `${platformName} data not ready yet` });
     } else {
-      res.status(500).json({ error: `Error retrieving ${platform} data`, details: error.message });
+      res.status(500).json({ 
+        error: `Error retrieving ${req.query.platform || 'instagram'} data`, 
+        details: error.message 
+      });
     }
   }
 });
 
 app.get('/retrieve-engagement-strategies/:accountHolder', async (req, res) => {
-  const { accountHolder } = req.params;
-  const forceRefresh = req.query.forceRefresh === 'true';
-  const platform = req.query.platform || 'instagram'; // Default to Instagram
-
   try {
-    const data = await fetchDataForModule(accountHolder, 'engagement_strategies/{username}', forceRefresh, platform);
+    const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
+    const forceRefresh = req.query.forceRefresh === 'true';
+
+    const data = await fetchDataForModule(username, 'engagement_strategies/{username}', forceRefresh, platform);
     if (data.length === 0) {
       res.status(404).json({ error: `No ${platform} engagement strategy files found` });
     } else {
       res.json(data);
     }
   } catch (error) {
-    console.error(`Retrieve ${platform} engagement strategies endpoint error for ${accountHolder}:`, error);
-    
-    // Try to use cached data as fallback
-    let prefix;
-    if (platform === 'twitter') {
-      prefix = `engagement_strategies/twitter/${accountHolder}`;
-    } else {
-      prefix = `engagement_strategies/${accountHolder}`;
-    }
-    
-    if (cache.has(prefix)) {
-      console.log(`[${new Date().toISOString()}] Using cached ${platform} engagement strategies as fallback for ${accountHolder}`);
-      const cachedData = cache.get(prefix);
-      if (cachedData && cachedData.length > 0) {
-        return res.json(cachedData);
-      }
-    }
+    console.error(`Retrieve ${req.query.platform || 'instagram'} engagement strategies endpoint error:`, error);
     
     if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
-      res.status(404).json({ error: `${platform.charAt(0).toUpperCase() + platform.slice(1)} data not ready yet` });
+      const platformName = (req.query.platform || 'instagram').charAt(0).toUpperCase() + (req.query.platform || 'instagram').slice(1);
+      res.status(404).json({ error: `${platformName} data not ready yet` });
     } else {
-      res.status(500).json({ error: `Error retrieving ${platform} data`, details: error.message });
+      res.status(500).json({ 
+        error: `Error retrieving ${req.query.platform || 'instagram'} data`, 
+        details: error.message 
+      });
     }
   }
 });
 
 app.get('/news-for-you/:accountHolder', async (req, res) => {
-  const { accountHolder } = req.params;
-  const forceRefresh = req.query.forceRefresh === 'true';
-  const platform = req.query.platform || 'instagram'; // Default to Instagram
-
   try {
-    const data = await fetchDataForModule(accountHolder, 'NewForYou/{username}', forceRefresh, platform);
+    const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
+    const forceRefresh = req.query.forceRefresh === 'true';
+
+    const data = await fetchDataForModule(username, 'NewForYou/{username}', forceRefresh, platform);
     if (data.length === 0) {
       res.status(404).json({ error: `No ${platform} news files found` });
     } else {
       res.json(data);
     }
   } catch (error) {
-    console.error(`Retrieve ${platform} news endpoint error for ${accountHolder}:`, error);
-    
-    // Try to use cached data as fallback
-    let prefix;
-    if (platform === 'twitter') {
-      prefix = `NewForYou/twitter/${accountHolder}`;
-    } else {
-      prefix = `NewForYou/${accountHolder}`;
-    }
-    
-    if (cache.has(prefix)) {
-      console.log(`[${new Date().toISOString()}] Using cached ${platform} news as fallback for ${accountHolder}`);
-      const cachedData = cache.get(prefix);
-      if (cachedData && cachedData.length > 0) {
-        return res.json(cachedData);
-      }
-    }
+    console.error(`Retrieve ${req.query.platform || 'instagram'} news endpoint error:`, error);
     
     if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
-      res.status(404).json({ error: `${platform.charAt(0).toUpperCase() + platform.slice(1)} data not ready yet` });
+      const platformName = (req.query.platform || 'instagram').charAt(0).toUpperCase() + (req.query.platform || 'instagram').slice(1);
+      res.status(404).json({ error: `${platformName} data not ready yet` });
     } else {
-      res.status(500).json({ error: `Error retrieving ${platform} data`, details: error.message });
+      res.status(500).json({ 
+        error: `Error retrieving ${req.query.platform || 'instagram'} data`, 
+        details: error.message 
+      });
     }
   }
 });
@@ -977,40 +983,28 @@ app.post('/rules/:username', async (req, res) => {
 });
 
 app.get('/responses/:username', async (req, res) => {
-  const { username } = req.params;
-  const forceRefresh = req.query.forceRefresh === 'true';
-  const platform = req.query.platform || 'instagram'; // Default to Instagram
-
   try {
+    const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
+    const forceRefresh = req.query.forceRefresh === 'true';
+
     const data = await fetchDataForModule(username, 'queries/{username}', forceRefresh, platform);
     res.json(data);
   } catch (error) {
-    console.error(`Retrieve ${platform} responses error for ${username}:`, error);
-    
-    // Try to use cached data as fallback if available
-    let prefix;
-    if (platform === 'twitter') {
-      prefix = `queries/twitter/${username}`;
-    } else {
-      prefix = `queries/${username}`;
-    }
-    
-    if (cache.has(prefix)) {
-      console.log(`[${new Date().toISOString()}] Using cached ${platform} responses as fallback for ${username}`);
-      return res.json(cache.get(prefix));
-    }
-    
-    res.status(500).json({ error: `Error retrieving ${platform} responses`, details: error.message });
+    console.error(`Retrieve ${req.query.platform || 'instagram'} responses error:`, error);
+    res.status(500).json({ 
+      error: `Error retrieving ${req.query.platform || 'instagram'} responses`, 
+      details: error.message 
+    });
   }
 });
 
 app.post('/responses/:username/:responseId', async (req, res) => {
-  const { username, responseId } = req.params;
-
-  const key = `queries/${username}/response_${responseId}.json`;
-  const prefix = `queries/${username}/`;
-
   try {
+    const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
+    const { responseId } = req.params;
+
+    const key = PlatformSchemaManager.buildPath('queries', platform, username, `response_${responseId}.json`);
+
     const getCommand = new GetObjectCommand({
       Bucket: 'tasks',
       Key: key,
@@ -1034,11 +1028,13 @@ app.post('/responses/:username/:responseId', async (req, res) => {
     });
     await s3Client.send(putCommand);
 
+    // Clear cache using centralized schema
+    const prefix = PlatformSchemaManager.buildPath('queries', platform, username);
     cache.delete(prefix);
 
     res.json({ success: true, message: 'Response status updated' });
   } catch (error) {
-    console.error(`Update response error for ${key}:`, error);
+    console.error(`Update response error:`, error);
     if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
       res.status(404).json({ error: 'Response not found' });
     } else {
@@ -1048,17 +1044,17 @@ app.post('/responses/:username/:responseId', async (req, res) => {
 });
 
 app.get('/retrieve-account-info/:username', async (req, res) => {
-  const { username } = req.params;
-  const platform = req.query.platform || 'instagram'; // Default to Instagram
-  
-  // Normalize the username to lowercase for Instagram, keep original case for Twitter
-  const normalizedUsername = platform === 'twitter' ? username.trim() : username.trim().toLowerCase();
-  
-  // Create platform-specific key using new schema: AccountInfo/<platform>/<username>/info.json
-  const key = `AccountInfo/${platform}/${normalizedUsername}/info.json`;
-  const prefix = `AccountInfo/${platform}/${normalizedUsername}`;
-
   try {
+    const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
+    
+    // Use centralized platform management for normalization
+    const platformConfig = PlatformSchemaManager.getPlatformConfig(platform);
+    const normalizedUsername = platformConfig.normalizeUsername(username);
+    
+    // Create platform-specific key using centralized schema manager
+    const key = PlatformSchemaManager.buildPath('AccountInfo', platform, normalizedUsername, 'info.json');
+    const prefix = PlatformSchemaManager.buildPath('AccountInfo', platform, normalizedUsername);
+
     let data;
     
     // Check if we should use cache
@@ -1111,29 +1107,38 @@ app.get('/retrieve-account-info/:username', async (req, res) => {
     res.json(data);
   } catch (error) {
     // Try cached version as fallback if available (even if expired)
-    if (cache.has(prefix)) {
-      console.log(`[${new Date().toISOString()}] Using cached account info as fallback for ${normalizedUsername}`);
-      const cachedData = cache.get(prefix);
-      const cachedAccountInfo = cachedData?.find(item => item.key === key)?.data;
-      if (cachedAccountInfo) {
-        return res.json(cachedAccountInfo);
+    try {
+      const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
+      const platformConfig = PlatformSchemaManager.getPlatformConfig(platform);
+      const normalizedUsername = platformConfig.normalizeUsername(username);
+      const prefix = PlatformSchemaManager.buildPath('AccountInfo', platform, normalizedUsername);
+      
+      if (cache.has(prefix)) {
+        console.log(`[${new Date().toISOString()}] Using cached account info as fallback for ${normalizedUsername}`);
+        const cachedData = cache.get(prefix);
+        const key = PlatformSchemaManager.buildPath('AccountInfo', platform, normalizedUsername, 'info.json');
+        const cachedAccountInfo = cachedData?.find(item => item.key === key)?.data;
+        if (cachedAccountInfo) {
+          return res.json(cachedAccountInfo);
+        }
       }
+    } catch (fallbackError) {
+      console.error('Error in fallback cache lookup:', fallbackError);
     }
     
-    console.error(`Error retrieving account info for ${key}:`, error.message);
+    console.error(`Error retrieving account info:`, error.message);
     res.status(500).json({ error: 'Failed to retrieve account info', details: error.message });
   }
 });
 
 app.get('/posts/:username', async (req, res) => {
-  const { username } = req.params;
-  const forceRefresh = req.query.forceRefresh === 'true';
-  const platform = req.query.platform || 'instagram'; // Default to Instagram
-  
-  // Create platform-specific prefix using new schema: ready_post/<platform>/<username>/
-  const prefix = `ready_post/${platform}/${username}/`;
-
   try {
+    const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
+    const forceRefresh = req.query.forceRefresh === 'true';
+    
+    // Create platform-specific prefix using centralized schema manager
+    const prefix = PlatformSchemaManager.buildPath('ready_post', platform, username);
+
     const now = Date.now();
     const lastFetch = cacheTimestamps.get(prefix) || 0;
 
@@ -1147,10 +1152,10 @@ app.get('/posts/:username', async (req, res) => {
       return res.json(cache.has(prefix) ? cache.get(prefix) : []);
     }
 
-    console.log(`Fetching ${platform} posts from R2 for prefix: ${prefix}`);
+    console.log(`Fetching ${platform} posts from R2 for prefix: ${prefix}/`);
     const listCommand = new ListObjectsV2Command({
       Bucket: 'tasks',
-      Prefix: prefix,
+      Prefix: `${prefix}/`, // Add trailing slash for directory listing
     });
     const listResponse = await s3Client.send(listCommand);
 
@@ -1160,7 +1165,7 @@ app.get('/posts/:username', async (req, res) => {
     const jsonFiles = files.filter(file => file.Key.endsWith('.json'));
     const jpgFiles = files.filter(file => file.Key.endsWith('.jpg'));
     
-    console.log(`[${new Date().toISOString()}] Found ${jsonFiles.length} JSON files and ${jpgFiles.length} JPG files in ${prefix} for ${platform}`);
+    console.log(`[${new Date().toISOString()}] Found ${jsonFiles.length} JSON files and ${jpgFiles.length} JPG files in ${prefix}/ for ${platform}`);
     
     // Store the post data
     const posts = await Promise.all(
@@ -1205,8 +1210,8 @@ app.get('/posts/:username', async (req, res) => {
           // Look for matching image file
           // Check both formats: image_<ID>.jpg and ready_post_<ID>.jpg
           const potentialImageKeys = [
-            `${prefix}image_${fileId}.jpg`, 
-            `${prefix}ready_post_${fileId}.jpg`
+            `${prefix}/image_${fileId}.jpg`, 
+            `${prefix}/ready_post_${fileId}.jpg`
           ];
           
           // Find the first matching image file
@@ -2436,6 +2441,8 @@ app.post('/user-twitter-status/:userId', async (req, res) => {
       uid: userId,
       hasEnteredTwitterUsername: true,
       twitter_username: twitter_username.trim(),
+      accountType: accountType || 'branding',
+      competitors: competitors || [],
       lastUpdated: new Date().toISOString()
     };
     
@@ -3803,7 +3810,7 @@ app.post('/user-twitter-status/:userId', async (req, res) => {
   setCorsHeaders(res);
   
   const { userId } = req.params;
-  const { twitter_username, accountType, competitors } = req.body;
+  const { twitter_username } = req.body;
   
   if (!twitter_username || !twitter_username.trim()) {
     return res.status(400).json({ error: 'Twitter username is required' });
@@ -4035,3 +4042,85 @@ function handleErrorResponse(res, error) {
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
+
+// ============= CENTRALIZED PLATFORM SCHEMA MANAGEMENT =============
+// Standardized schema builder for consistent R2 key generation
+class PlatformSchemaManager {
+  /**
+   * Generate standardized R2 key path using new schema: module/platform/username[/additional]
+   * @param {string} module - Module name (e.g., 'competitor_analysis', 'recommendations')
+   * @param {string} platform - Platform ('instagram' or 'twitter')
+   * @param {string} username - Username
+   * @param {string} additional - Additional path component (optional, e.g., competitor name, file name)
+   * @returns {string} Standardized R2 key path
+   */
+  static buildPath(module, platform = 'instagram', username, additional = '') {
+    if (!module || !username) {
+      throw new Error('Module and username are required for R2 path generation');
+    }
+    
+    // Normalize platform
+    const normalizedPlatform = platform.toLowerCase();
+    if (!['instagram', 'twitter'].includes(normalizedPlatform)) {
+      throw new Error(`Unsupported platform: ${platform}. Must be 'instagram' or 'twitter'`);
+    }
+    
+    // Build base path
+    let path = `${module}/${normalizedPlatform}/${username}`;
+    
+    // Add additional component if provided
+    if (additional) {
+      path += `/${additional}`;
+    }
+    
+    return path;
+  }
+
+  /**
+   * Parse platform and username from URL parameters with validation
+   * @param {object} req - Express request object
+   * @returns {object} Parsed platform info with validation
+   */
+  static parseRequestParams(req) {
+    const platform = req.query.platform || 'instagram';
+    const username = req.params.username || req.params.accountHolder;
+    
+    if (!username) {
+      throw new Error('Username parameter is required');
+    }
+    
+    return {
+      platform: platform.toLowerCase(),
+      username: username.trim(),
+      isValidPlatform: ['instagram', 'twitter'].includes(platform.toLowerCase())
+    };
+  }
+
+  /**
+   * Get platform-specific configuration
+   * @param {string} platform - Platform name
+   * @returns {object} Platform configuration
+   */
+  static getPlatformConfig(platform) {
+    const configs = {
+      instagram: {
+        name: 'Instagram',
+        normalizeUsername: (username) => username.trim().toLowerCase(),
+        eventPrefix: 'InstagramEvents',
+        tokenPrefix: 'InstagramTokens',
+        maxUsernameLength: 30
+      },
+      twitter: {
+        name: 'Twitter',
+        normalizeUsername: (username) => username.trim(), // Keep original case for Twitter
+        eventPrefix: 'TwitterEvents', 
+        tokenPrefix: 'TwitterTokens',
+        maxUsernameLength: 15
+      }
+    };
+    
+    return configs[platform.toLowerCase()] || configs.instagram;
+  }
+}
+
+// ============= EXISTING CACHE SYSTEM =============

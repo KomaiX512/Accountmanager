@@ -74,8 +74,8 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
       if (now - lastFetchTime < 1800000 && competitorProfiles[competitor]) {
         return;
       }
-      const response = await axios.get(`http://localhost:3000/profile-info/${competitor}`);
-      console.log(`Profile info for competitor ${competitor}:`, response.data);
+      const response = await axios.get(`http://localhost:3000/profile-info/${competitor}?platform=${platform}`);
+      console.log(`Profile info for ${platform} competitor ${competitor}:`, response.data);
       setCompetitorProfiles(prev => ({
         ...prev,
         [competitor]: response.data,
@@ -88,15 +88,15 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     } catch (err: any) {
       setProfileErrors(prev => ({
         ...prev,
-        [competitor]: 'Failed to load profile info.',
+        [competitor]: `Failed to load ${platform} profile info.`,
       }));
     }
-  }, [competitorProfiles]);
+  }, [competitorProfiles, platform]);
 
   const fetchAccountInfoWithRetry = useCallback(async (retries = 3, delay = 1000): Promise<string[] | null> => {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
-        const response = await axios.get(`http://localhost:3000/retrieve-account-info/${normalizedAccountHolder}`);
+        const response = await axios.get(`http://localhost:3000/retrieve-account-info/${normalizedAccountHolder}?platform=${platform}`);
         const accountInfo: AccountInfo = response.data;
         setError(null);
         setNeedsRefresh(false);
@@ -106,29 +106,30 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
           await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }
-        setError('Failed to fetch updated account info. Using local state.');
+        setError(`Failed to fetch updated ${platform} account info. Using local state.`);
         setNeedsRefresh(true);
-        setToast('Sync failed. Please refresh to ensure data is up-to-date.');
+        setToast(`${platform} sync failed. Please refresh to ensure data is up-to-date.`);
         return null;
       }
     }
     return null;
-  }, [normalizedAccountHolder]);
+  }, [normalizedAccountHolder, platform]);
 
   const updateCompetitors = useCallback(async (updatedCompetitors: string[]) => {
     try {
-      const response = await axios.post(`http://localhost:3000/save-account-info`, {
+      const response = await axios.post(`http://localhost:3000/save-account-info?platform=${platform}`, {
         username: normalizedAccountHolder,
         accountType: 'branding',
         postingStyle: 'I post about NewYork lives',
         competitors: updatedCompetitors,
+        platform: platform
       });
       return response.status === 200;
     } catch (error: any) {
-      console.error('Error updating competitors:', error);
+      console.error(`Error updating ${platform} competitors:`, error);
       return false;
     }
-  }, [normalizedAccountHolder]);
+  }, [normalizedAccountHolder, platform]);
 
   useEffect(() => {
     const syncInitialState = async () => {

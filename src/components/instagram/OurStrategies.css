@@ -258,3 +258,57 @@
 .close-btn:hover {
   box-shadow: 0 0 15px rgba(255, 68, 68, 0.5);
 }
+
+/* Integration with JSON Decoder */
+.strategy-content-wrapper .strategy-content,
+.strategy-content-wrapper .strategy-list-item {
+  line-height: 1.6;
+  color: #e0e0ff;
+  margin: 0.5rem 0;
+  font-size: 0.95rem;
+}
+
+.strategy-content-wrapper .strategy-content strong,
+.strategy-content-wrapper .strategy-list-item strong {
+  color: #00ffcc;
+  font-weight: 600;
+}
+
+.strategy-content-wrapper .strategy-content em,
+.strategy-content-wrapper .strategy-list-item em {
+  color: #ffcc00;
+  font-style: italic;
+}
+
+.strategy-content-wrapper .strategy-highlight {
+  background: linear-gradient(135deg, rgba(0, 255, 204, 0.2), rgba(255, 204, 0, 0.2));
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 255, 204, 0.3);
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.strategy-content-wrapper .strategy-key {
+  color: #00ffcc;
+  font-weight: 600;
+  margin-right: 0.5rem;
+}
+
+.strategy-content-wrapper .strategy-value {
+  color: #e0e0ff;
+}
+
+/* Maintain existing detail styling */
+.strategy-detail {
+  line-height: 1.6;
+  color: #e0e0ff;
+  margin: 0.5rem 0;
+  font-size: 0.95rem;
+}
+
+.detail-label {
+  color: #00ffcc;
+  font-weight: 600;
+  margin-right: 0.5rem;
+}

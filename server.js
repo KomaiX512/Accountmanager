@@ -777,6 +777,239 @@ app.get('/r2-images/:username/:filename', async (req, res) => {
   }
 });
 
+// Goal storage endpoint - Updated schema: tasks/goal/<platform>/<username>/goal_*.json
+app.post('/save-goal/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+    const { persona, timeline, goal, instruction } = req.body;
+    const platform = req.query.platform || 'Instagram'; // Default to Instagram, can be "Twitter" or "Instagram"
+
+    // Validate required fields
+    if (!username || !timeline || !goal || !instruction) {
+      return res.status(400).json({ 
+        error: 'Username, timeline, goal, and instruction are required' 
+      });
+    }
+
+    // Validate timeline is a number
+    if (typeof timeline !== 'number' || timeline <= 0) {
+      return res.status(400).json({ 
+        error: 'Timeline must be a positive number' 
+      });
+    }
+
+    // Generate unique identifier for the goal file
+    const timestamp = Date.now();
+    const goalId = `goal_${timestamp}`;
+    const prefix = `tasks/goal/${platform}/${username}/`;
+    const key = `${prefix}${goalId}.json`;
+
+    // Create goal data structure
+    const goalData = {
+      id: goalId,
+      username,
+      platform,
+      persona: persona || '',
+      timeline,
+      goal: goal.trim(),
+      instruction: instruction.trim(),
+      status: 'active',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    console.log(`[${new Date().toISOString()}] Saving goal to: ${key}`);
+
+    // Save to R2
+    await s3Client.putObject({
+      Bucket: 'tasks',
+      Key: key,
+      Body: JSON.stringify(goalData, null, 2),
+      ContentType: 'application/json'
+    }).promise();
+
+    console.log(`[${new Date().toISOString()}] Goal saved successfully for ${username} on ${platform}`);
+
+    res.json({ 
+      success: true, 
+      message: 'Goal saved successfully',
+      goalId,
+      platform
+    });
+
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Save goal error:`, error);
+    res.status(500).json({ 
+      error: 'Failed to save goal', 
+      details: error.message 
+    });
+  }
+});
+
+// Goal summary retrieval endpoint - Schema: tasks/goal_summary/<platform>/<username>/summary_*.json
+app.get('/goal-summary/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+    const platform = req.query.platform || 'Instagram';
+    const prefix = `tasks/goal_summary/${platform}/${username}/`;
+
+    console.log(`[${new Date().toISOString()}] Retrieving goal summary from: ${prefix}`);
+
+    // List all summary files for the user
+    const listParams = {
+      Bucket: 'tasks',
+      Prefix: prefix
+    };
+
+    const data = await s3Client.listObjectsV2(listParams).promise();
+
+    if (!data.Contents || data.Contents.length === 0) {
+      console.log(`[${new Date().toISOString()}] No goal summary found for ${username} on ${platform}`);
+      return res.status(404).json({ 
+        error: 'Goal summary not found',
+        message: 'Your campaign is processing. Progress will be available shortly.'
+      });
+    }
+
+    // Find the latest summary file (highest number)
+    const summaryFiles = data.Contents
+      .filter(obj => obj.Key.includes('summary_'))
+      .map(obj => ({
+        key: obj.Key,
+        number: parseInt(obj.Key.match(/summary_(\d+)\.json$/)?.[1] || '0')
+      }))
+      .sort((a, b) => b.number - a.number);
+
+    if (summaryFiles.length === 0) {
+      return res.status(404).json({ 
+        error: 'No valid summary files found',
+        message: 'Your campaign is processing. Progress will be available shortly.'
+      });
+    }
+
+    // Get the latest summary file
+    const latestSummaryKey = summaryFiles[0].key;
+    console.log(`[${new Date().toISOString()}] Retrieving latest summary: ${latestSummaryKey}`);
+
+    const summaryData = await s3Client.getObject({
+      Bucket: 'tasks',
+      Key: latestSummaryKey
+    }).promise();
+
+    const summary = JSON.parse(summaryData.Body.toString('utf-8'));
+
+    res.json(summary);
+
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Goal summary retrieval error:`, error);
+    
+    if (error.code === 'NoSuchKey') {
+      return res.status(404).json({ 
+        error: 'Goal summary not found',
+        message: 'Your campaign is processing. Progress will be available shortly.'
+      });
+    }
+
+    res.status(500).json({ 
+      error: 'Failed to retrieve goal summary', 
+      details: error.message 
+    });
+  }
+});
+
+// Campaign ready posts count endpoint - Schema: tasks/ready_post/<platform>/<username>/campaign_ready_post_*.json
+app.get('/campaign-posts-count/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+    const platform = req.query.platform || 'Instagram';
+    const prefix = `tasks/ready_post/${platform}/${username}/`;
+
+    console.log(`[${new Date().toISOString()}] Counting campaign posts from: ${prefix}`);
+
+    // List all campaign ready post files
+    const listParams = {
+      Bucket: 'tasks',
+      Prefix: prefix
+    };
+
+    const data = await s3Client.listObjectsV2(listParams).promise();
+
+    if (!data.Contents || data.Contents.length === 0) {
+      return res.json({ 
+        postCooked: 0,
+        highestId: 0
+      });
+    }
+
+    // Filter and count campaign_ready_post_ files
+    const campaignPosts = data.Contents
+      .filter(obj => obj.Key.includes('campaign_ready_post_'))
+      .map(obj => ({
+        key: obj.Key,
+        number: parseInt(obj.Key.match(/campaign_ready_post_(\d+)\.json$/)?.[1] || '0')
+      }))
+      .filter(item => item.number > 0);
+
+    const postCooked = campaignPosts.length;
+    const highestId = campaignPosts.length > 0 ? Math.max(...campaignPosts.map(p => p.number)) : 0;
+
+    console.log(`[${new Date().toISOString()}] Found ${postCooked} campaign posts for ${username} on ${platform}`);
+
+    res.json({ 
+      postCooked,
+      highestId
+    });
+
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Campaign posts count error:`, error);
+    res.status(500).json({ 
+      error: 'Failed to count campaign posts', 
+      details: error.message,
+      postCooked: 0,
+      highestId: 0
+    });
+  }
+});
+
+// Engagement metrics endpoint (placeholder for platform-specific engagement)
+app.get('/engagement-metrics/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+    const platform = req.query.platform || 'Instagram';
+    const connected = req.query.connected === 'true';
+
+    console.log(`[${new Date().toISOString()}] Retrieving engagement metrics for ${username} on ${platform}, connected: ${connected}`);
+
+    if (!connected) {
+      return res.json({
+        connected: false,
+        message: `Please connect with ${platform} to view engagement results.`
+      });
+    }
+
+    // For now, return mock engagement data
+    // In production, this would integrate with Facebook/Twitter APIs
+    const mockEngagement = {
+      connected: true,
+      currentFactor: 0.75,
+      previousFactor: 0.68,
+      delta: 0.07,
+      message: `Engagement has increased by 0.07 since the campaign started.`,
+      lastUpdated: new Date().toISOString()
+    };
+
+    res.json(mockEngagement);
+
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Engagement metrics error:`, error);
+    res.status(500).json({ 
+      error: 'Failed to retrieve engagement metrics', 
+      details: error.message,
+      connected: false
+    });
+  }
+});
+
 app.listen(port, '0.0.0.0', () => {
   console.log(`Server running at http://localhost:${port}`);
   console.log('Ready to receive hierarchical data at POST /scrape');

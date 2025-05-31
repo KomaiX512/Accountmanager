@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './Cs_Analysis.css';
+import '../../utils/jsonDecoder.css';
 import useR2Fetch from '../../hooks/useR2Fetch';
 import { motion } from 'framer-motion';
 import ErrorBoundary from '../ErrorBoundary';
+import { decodeJSONToReactElements, formatCount } from '../../utils/jsonDecoder';
 import axios from 'axios';
 
 interface ProfileInfo {
@@ -267,150 +269,28 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     setLoading(false);
   };
 
-  const formatCount = (count: number) => {
-    if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
-    if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K`;
-    return count.toString();
-  };
-
-  const decodeRawContent = (rawText: string) => {
-    if (!rawText || typeof rawText !== 'string') return [];
-
-    const lines = rawText.split('.').map(line => line.trim()).filter(line => line);
-    const sections: { heading: string; content: JSX.Element[] }[] = [];
-    let currentSection: { heading: string; content: JSX.Element[] } | null = null;
-
-    lines.forEach((line, idx) => {
-      if (line.match(/^[A-Za-z\s]+:$/) || (line.match(/^[A-Za-z\s]+/) && !line.includes(':'))) {
-        if (currentSection) {
-          sections.push(currentSection);
-        }
-        currentSection = { heading: line.replace(':', '').trim(), content: [] };
-      } else if (currentSection) {
-        if (line.startsWith('*')) {
-          const subItems = line.split('*').filter(item => item.trim());
-          subItems.forEach((subItem, subIdx) => {
-            const [label, ...valueParts] = subItem.trim().split(':');
-            const formattedLabel = label.trim().replace(/^\*\s*/, '');
-            const value = valueParts.join(':').trim();
-
-            if (value) {
-              const formattedValue = value.split(/(\*[^*]+\*)/g).map((part, i) => {
-                if (part.startsWith('*') && part.endsWith('*')) {
-                  return <strong key={i}>{part.slice(1, -1)}</strong>;
-                }
-                return part;
-              });
-
-              currentSection.content.push(
-                <p key={`${idx}-${subIdx}`} className="analysis-detail">
-                  <span className="detail-label">{formattedLabel}:</span> {formattedValue}
-                </p>
-              );
-            } else {
-              const formattedItem = subItem.trim().replace(/^\*\s*/, '');
-              const formattedText = formattedItem.split(/(\*[^*]+\*)/g).map((part, i) => {
-                if (part.startsWith('*') && part.endsWith('*')) {
-                  return <strong key={i}>{part.slice(1, -1)}</strong>;
-                }
-                return part;
-              });
-
-              currentSection.content.push(
-                <p key={`${idx}-${subIdx}`} className="analysis-detail">
-                  - {formattedText}
-                </p>
-              );
-            }
-          });
-        } else {
-          const formattedLine = line.split(/(\*[^*]+\*)/g).map((part, i) => {
-            if (part.startsWith('*') && part.endsWith('*')) {
-              return <strong key={i}>{part.slice(1, -1)}</strong>;
-            }
-            return part;
-          });
-          currentSection.content.push(
-            <p key={idx} className="analysis-detail">{formattedLine}</p>
-          );
-        }
-      }
-    });
-
-    if (currentSection) {
-      sections.push(currentSection);
-    }
-
-    return sections;
-  };
-
   const renderAnalysisContent = (analysisData: any) => {
     if (!analysisData || typeof analysisData !== 'object') {
       return <p className="analysis-detail">No details available.</p>;
     }
 
-    return Object.entries(analysisData).map(([key, value], idx) => {
-      const formattedKey = key
-        .replace(/([A-Z])/g, ' $1')
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, char => char.toUpperCase());
-
-      if (typeof value === 'string' && value.includes(':')) {
-        const decodedSections = decodeRawContent(value);
-        return (
-          <div key={idx} className="analysis-subsection">
-            <h6 className="analysis-subheading">{formattedKey}</h6>
-            {decodedSections.map((section, secIdx) => (
-              <div key={secIdx} className="analysis-subsection">
-                <h6 className="analysis-sub-subheading">{section.heading}</h6>
-                {section.content}
-              </div>
-            ))}
-          </div>
-        );
-      } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-        return (
-          <div key={idx} className="analysis-subsection">
-            <h6 className="analysis-subheading">{formattedKey}</h6>
-            {Object.entries(value).map(([subKey, subValue], subIdx) => {
-              const formattedSubKey = subKey
-                .replace(/([A-Z])/g, ' $1')
-                .replace(/_/g, ' ')
-                .replace(/\b\w/g, char => char.toUpperCase());
-              return (
-                <p key={subIdx} className="analysis-detail">
-                  <span className="detail-label">{formattedSubKey}:</span>{' '}
-                  {typeof subValue === 'string' || typeof subValue === 'number'
-                    ? subValue
-                    : JSON.stringify(subValue)}
-                </p>
-              );
-            })}
-          </div>
-        );
-      } else if (Array.isArray(value)) {
-        return (
-          <div key={idx} className="analysis-subsection">
-            <h6 className="analysis-subheading">{formattedKey}</h6>
-            {value.length > 0 ? (
-              value.map((item, itemIdx) => (
-                <p key={itemIdx} className="analysis-detail">
-                  - {typeof item === 'string' || typeof item === 'number' ? item : JSON.stringify(item)}
-                </p>
-              ))
-            ) : (
-              <p className="analysis-detail">None</p>
-            )}
-          </div>
-        );
-      } else {
-        return (
-          <p key={idx} className="analysis-detail">
-            <span className="detail-label">{formattedKey}:</span> {value ?? 'N/A'}
-          </p>
-        );
-      }
+    // Use the new comprehensive JSON decoder
+    const decodedSections = decodeJSONToReactElements(analysisData, {
+      customClassPrefix: 'analysis',
+      enableBoldFormatting: true,
+      enableItalicFormatting: true,
+      enableHighlighting: true,
+      maxNestingLevel: 4
     });
+
+    return decodedSections.map((section, idx) => (
+      <div key={idx} className="analysis-subsection">
+        <h6 className="analysis-subheading">{section.heading}</h6>
+        <div className="analysis-content-wrapper">
+          {section.content}
+        </div>
+      </div>
+    ));
   };
 
   const handleNextAnalysis = () => {
@@ -692,7 +572,6 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
                   <p className="error-text">{profileErrors[selectedCompetitor]}</p>
                 ) : competitorProfiles[selectedCompetitor] ? (
                   <div className="stats">
-                    {console.log('Rendering competitor profile:', competitorProfiles[selectedCompetitor])}
                     <span>Followers: {formatCount(competitorProfiles[selectedCompetitor].followersCount)}</span>
                     <span>Following: {formatCount(competitorProfiles[selectedCompetitor].followsCount)}</span>
                   </div>

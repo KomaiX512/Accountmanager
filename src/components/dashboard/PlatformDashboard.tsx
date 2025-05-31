@@ -10,6 +10,7 @@ import DmsComments from '../instagram/Dms_Comments';
 import PostScheduler from '../instagram/PostScheduler';
 import InsightsModal from '../instagram/InsightsModal';
 import GoalModal from '../instagram/GoalModal';
+import CampaignModal from '../instagram/CampaignModal';
 import NewsForYou from '../instagram/NewsForYou';
 import { motion } from 'framer-motion';
 import axios, { AxiosError } from 'axios';
@@ -101,6 +102,8 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const [isSchedulerOpen, setIsSchedulerOpen] = useState(false);
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
+  const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
+  const [showCampaignButton, setShowCampaignButton] = useState(false);
   const [replySentTracker, setReplySentTracker] = useState<{
     text: string;
     timestamp: number;
@@ -994,6 +997,22 @@ Image Description: ${response.post.image_prompt}
     return () => clearInterval(cleanInterval);
   }, []);
 
+  // Handle custom event for opening campaign modal
+  useEffect(() => {
+    const handleOpenCampaignEvent = (event: any) => {
+      const { username, platform: eventPlatform } = event.detail;
+      if (username === accountHolder && eventPlatform.toLowerCase() === platform) {
+        setShowCampaignButton(true);
+        setIsCampaignModalOpen(true);
+      }
+    };
+
+    window.addEventListener('openCampaignModal', handleOpenCampaignEvent);
+    return () => {
+      window.removeEventListener('openCampaignModal', handleOpenCampaignEvent);
+    };
+  }, [accountHolder, platform]);
+
   if (!accountHolder) {
     return <div className="error-message">Please specify an account holder to load the {config.name} dashboard.</div>;
   }
@@ -1049,6 +1068,15 @@ Image Description: ${response.post.image_prompt}
 
   const handleOpenGoalModal = () => {
     setIsGoalModalOpen(true);
+  };
+
+  const handleOpenCampaignModal = () => {
+    setIsCampaignModalOpen(true);
+  };
+
+  const handleGoalSuccess = () => {
+    setShowCampaignButton(true);
+    setIsGoalModalOpen(false);
   };
 
   const handleOpenTwitterScheduler = () => {
@@ -1240,6 +1268,24 @@ Image Description: ${response.post.image_prompt}
                   >
                     Goal
                   </button>
+                  
+                  {showCampaignButton && (
+                    <button
+                      onClick={handleOpenCampaignModal}
+                      className={`${platform}-btn connect`}
+                      style={{
+                        background: 'linear-gradient(90deg, #ff6b6b, #ff8e53)',
+                        color: '#fff',
+                        padding: '8px 16px',
+                        borderRadius: '6px',
+                        border: '1px solid #ff6b6b',
+                        zIndex: 20,
+                        marginLeft: '10px',
+                      }}
+                    >
+                      Campaign
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="chart-placeholder"></div>
@@ -1375,7 +1421,12 @@ Image Description: ${response.post.image_prompt}
         </motion.div>
       )}
       {isGoalModalOpen && (
-        <GoalModal username={accountHolder} onClose={() => setIsGoalModalOpen(false)} />
+        <GoalModal 
+          username={accountHolder} 
+          platform={config.name}
+          onClose={() => setIsGoalModalOpen(false)}
+          onSuccess={handleGoalSuccess}
+        />
       )}
       {isSchedulerOpen && config.supportsScheduling && (
         <PostScheduler userId={userId!} onClose={() => {
@@ -1451,6 +1502,14 @@ Image Description: ${response.post.image_prompt}
             console.log(`[${new Date().toISOString()}] Closing Twitter Compose`);
             setIsTwitterComposeOpen(false);
           }} 
+        />
+      )}
+      {isCampaignModalOpen && (
+        <CampaignModal 
+          username={accountHolder}
+          platform={config.name}
+          isConnected={isConnected}
+          onClose={() => setIsCampaignModalOpen(false)}
         />
       )}
     </motion.div>

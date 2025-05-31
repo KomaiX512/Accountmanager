@@ -8,6 +8,7 @@ import DmsComments from './Dms_Comments';
 import PostScheduler from './PostScheduler';
 import InsightsModal from './InsightsModal';
 import GoalModal from './GoalModal';
+import CampaignModal from './CampaignModal';
 import NewsForYou from './NewsForYou';
 import { motion } from 'framer-motion';
 import axios, { AxiosError } from 'axios';
@@ -84,6 +85,8 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
   const [isSchedulerOpen, setIsSchedulerOpen] = useState(false);
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
+  const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
+  const [showCampaignButton, setShowCampaignButton] = useState(false);
   const [replySentTracker, setReplySentTracker] = useState<{
     text: string;
     timestamp: number;
@@ -1161,6 +1164,31 @@ Image Description: ${response.post.image_prompt}
     setIsGoalModalOpen(true);
   };
 
+  const handleOpenCampaignModal = () => {
+    setIsCampaignModalOpen(true);
+  };
+
+  const handleGoalSuccess = () => {
+    setShowCampaignButton(true);
+    setIsGoalModalOpen(false);
+  };
+
+  // Handle custom event for opening campaign modal
+  useEffect(() => {
+    const handleOpenCampaignEvent = (event: any) => {
+      const { username, platform } = event.detail;
+      if (username === accountHolder && platform === 'Instagram') {
+        setShowCampaignButton(true);
+        setIsCampaignModalOpen(true);
+      }
+    };
+
+    window.addEventListener('openCampaignModal', handleOpenCampaignEvent);
+    return () => {
+      window.removeEventListener('openCampaignModal', handleOpenCampaignEvent);
+    };
+  }, [accountHolder]);
+
   // Clean old entries from reply tracker (older than 10 minutes)
   useEffect(() => {
     const cleanInterval = setInterval(() => {
@@ -1311,6 +1339,24 @@ Image Description: ${response.post.image_prompt}
                     >
                       Goal
                     </button>
+                    
+                    {showCampaignButton && (
+                      <button
+                        onClick={handleOpenCampaignModal}
+                        className="insta-btn connect"
+                        style={{
+                          background: 'linear-gradient(90deg, #ff6b6b, #ff8e53)',
+                          color: '#fff',
+                          padding: '8px 16px',
+                          borderRadius: '6px',
+                          border: '1px solid #ff6b6b',
+                          zIndex: 20,
+                          marginLeft: '10px',
+                        }}
+                      >
+                        Campaign
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -1454,7 +1500,19 @@ Image Description: ${response.post.image_prompt}
         }} />
       )}
       {isGoalModalOpen && (
-        <GoalModal username={accountHolder} onClose={() => setIsGoalModalOpen(false)} />
+        <GoalModal 
+          username={accountHolder} 
+          onClose={() => setIsGoalModalOpen(false)}
+          onSuccess={handleGoalSuccess}
+        />
+      )}
+      {isCampaignModalOpen && (
+        <CampaignModal 
+          username={accountHolder}
+          platform="Instagram"
+          isConnected={isInstagramConnected}
+          onClose={() => setIsCampaignModalOpen(false)}
+        />
       )}
       {isChatModalOpen && (
         <ChatModal 

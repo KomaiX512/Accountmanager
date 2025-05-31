@@ -5,7 +5,9 @@ import { saveFeedback } from '../../utils/FeedbackHandler';
 import ErrorBoundary from '../ErrorBoundary';
 import CanvasEditor from '../common/CanvasEditor';
 import InstagramRequiredButton from '../common/InstagramRequiredButton';
+import TwitterRequiredButton from '../common/TwitterRequiredButton';
 import { useInstagram } from '../../context/InstagramContext';
+import { useTwitter } from '../../context/TwitterContext';
 import axios from 'axios';
 
 interface PostCookedProps {
@@ -22,10 +24,14 @@ interface ImageErrorState {
   retryCount: number;
 }
 
-const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts = [], userId: propUserId, platform }) => {
-  const { isConnected, userId: contextUserId } = useInstagram();
+const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts = [], userId: propUserId, platform = 'instagram' }) => {
+  const { isConnected: isInstagramConnected, userId: instagramUserId } = useInstagram();
+  const { isConnected: isTwitterConnected, userId: twitterUserId } = useTwitter();
   
-  const userId = isConnected && contextUserId ? contextUserId : propUserId;
+  // Determine platform-specific values
+  const isConnected = platform === 'twitter' ? isTwitterConnected : isInstagramConnected;
+  const contextUserId = platform === 'twitter' ? twitterUserId : instagramUserId;
+  const userId = propUserId || (isConnected ? (contextUserId ?? undefined) : undefined);
 
   const [localPosts, setLocalPosts] = useState<typeof posts>([]);
   const [imageErrors, setImageErrors] = useState<{ [key: string]: ImageErrorState }>({});
@@ -290,78 +296,107 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       setToastMessage('Network error marking post as scheduled, but attempting to schedule anyway.');
     }
 
-    let imageKey = '';
-    if (post.data.image_url && post.data.image_url.includes('/ready_post/')) {
-      const match = post.data.image_url.match(/ready_post\/[\w-]+\/(image_\d+\.jpg)/);
-      if (match) imageKey = match[1];
-    }
-    if (!imageKey && post.key.match(/ready_post_\d+\.json$/)) {
-      const postIdMatch = post.key.match(/ready_post_(\d+)\.json$/);
-      if (postIdMatch) imageKey = `image_${postIdMatch[1]}.jpg`;
-    }
-    if (!imageKey) {
-      setToastMessage('Could not determine image for post.');
-      return;
-    }
-    let signedImageUrl = '';
-    try {
-      const signedUrlRes = await fetch(`http://localhost:3000/signed-image-url/${username}/${imageKey}`);
-      const signedUrlData = await signedUrlRes.json();
-      signedImageUrl = signedUrlData.url;
-      if (!signedImageUrl) throw new Error('No signed URL returned');
-      console.log(`[Schedule] Got signed URL for post ${selectedPostKey}:`, signedImageUrl);
-    } catch (err: any) {
-      console.error(`[Schedule] Failed to get signed URL for post ${selectedPostKey}:`, err);
-      setToastMessage('Failed to get image for post.');
-      return;
-    }
-    let imageBlob: Blob | null = null;
-    try {
-      const proxyUrl = `http://localhost:3000/proxy-image?url=${encodeURIComponent(signedImageUrl)}`;
-      const imgRes = await fetch(proxyUrl);
-      imageBlob = await imgRes.blob();
-      console.log(`[Schedule] Image fetched for post ${selectedPostKey} via proxy`);
-    } catch (e: any) {
-      console.error(`[Schedule] Failed to fetch image for post ${selectedPostKey}:`, e);
-      setToastMessage('Failed to fetch image for post.');
-      return;
-    }
-    if (!['image/jpeg', 'image/png'].includes(imageBlob.type)) {
-      console.error(`[Schedule] Image is not a valid JPEG/PNG, got: ${imageBlob.type}`);
-      setToastMessage('Image is not a valid JPEG/PNG.');
-      return;
-    }
-    let caption = post.data.post?.caption || '';
-    console.log(`[Schedule] Original caption length: ${caption.length} chars`);
-    if (caption.length > 2150) {
-      console.warn(`[Schedule] Caption too long, truncating to 2150 chars.`);
-      caption = caption.slice(0, 2150);
-    }
-    console.log(`[Schedule] Caption length after truncation: ${caption.length} chars`);
-    const filename = `post_${selectedPostKey}.jpg`;
-    const formData = new FormData();
-    formData.append('image', imageBlob, filename);
-    formData.append('caption', caption);
-    formData.append('scheduleDate', scheduleTime.toISOString());
-    try {
-      console.log(`[Schedule] Sending schedule request for post ${selectedPostKey} to /schedule-post/${userId}`);
-      const resp = await fetch(`http://localhost:3000/schedule-post/${userId}`, {
-        method: 'POST',
-        body: formData,
-      });
-      if (!resp.ok) {
-        const errData = await resp.json().catch(() => ({}));
-        console.error(`[Schedule] Failed to schedule post ${selectedPostKey}:`, errData.error || resp.statusText);
-        setToastMessage(`Failed to schedule post: ${errData.error || 'Unknown server error'}`);
-      } else {
-        const respData = await resp.json().catch(() => ({}));
-        console.log(`[Schedule] Scheduled post ${selectedPostKey} successfully:`, respData);
-        setToastMessage('Your post is on schedule!');
+    if (platform === 'twitter') {
+      // For Twitter, handle text-only scheduling
+      const caption = post.data.post?.caption || '';
+      console.log(`[Schedule] Scheduling Twitter post for ${selectedPostKey}: "${caption}"`);
+      
+      if (caption.length > 280) {
+        setToastMessage('Tweet text exceeds 280 characters.');
+        return;
       }
-    } catch (err: any) {
-      console.error(`[Schedule] Error scheduling post ${selectedPostKey}:`, err.message);
-      setToastMessage(`Error scheduling post: ${err.message}`);
+      
+      try {
+        const response = await axios.post(`http://localhost:3000/schedule-tweet/${userId}`, {
+          text: caption.trim(),
+          scheduled_time: scheduleTime.toISOString()
+        });
+
+        if (response.data.success) {
+          setToastMessage('Your tweet is scheduled!');
+        } else {
+          setToastMessage('Failed to schedule tweet: ' + response.data.message);
+        }
+      } catch (err: any) {
+        console.error(`[Schedule] Error scheduling tweet for ${selectedPostKey}:`, err.message);
+        setToastMessage(`Error scheduling tweet: ${err.response?.data?.error || err.message}`);
+      }
+    } else {
+      // Instagram scheduling logic (existing)
+      let imageKey = '';
+      if (post.data.image_url && post.data.image_url.includes('/ready_post/')) {
+        const match = post.data.image_url.match(/ready_post\/[\w-]+\/(image_\d+\.jpg)/);
+        if (match) imageKey = match[1];
+      }
+      if (!imageKey && post.key.match(/ready_post_\d+\.json$/)) {
+        const postIdMatch = post.key.match(/ready_post_(\d+)\.json$/);
+        if (postIdMatch) imageKey = `image_${postIdMatch[1]}.jpg`;
+      }
+      if (!imageKey) {
+        setToastMessage('Could not determine image for post.');
+        return;
+      }
+      let signedImageUrl = '';
+      try {
+        const signedUrlRes = await fetch(`http://localhost:3000/signed-image-url/${username}/${imageKey}`);
+        const signedUrlData = await signedUrlRes.json();
+        signedImageUrl = signedUrlData.url;
+        if (!signedImageUrl) throw new Error('No signed URL returned');
+        console.log(`[Schedule] Got signed URL for post ${selectedPostKey}:`, signedImageUrl);
+      } catch (err: any) {
+        console.error(`[Schedule] Failed to get signed URL for post ${selectedPostKey}:`, err);
+        setToastMessage('Failed to get image for post.');
+        return;
+      }
+      let imageBlob: Blob | null = null;
+      try {
+        const proxyUrl = `http://localhost:3000/proxy-image?url=${encodeURIComponent(signedImageUrl)}`;
+        const imgRes = await fetch(proxyUrl);
+        imageBlob = await imgRes.blob();
+        console.log(`[Schedule] Image fetched for post ${selectedPostKey} via proxy`);
+      } catch (e: any) {
+        console.error(`[Schedule] Failed to fetch image for post ${selectedPostKey}:`, e);
+        setToastMessage('Failed to fetch image for post.');
+        return;
+      }
+      if (!['image/jpeg', 'image/png'].includes(imageBlob.type)) {
+        console.error(`[Schedule] Image is not a valid JPEG/PNG, got: ${imageBlob.type}`);
+        setToastMessage('Image is not a valid JPEG/PNG.');
+        return;
+      }
+      let caption = post.data.post?.caption || '';
+      console.log(`[Schedule] Original caption length: ${caption.length} chars`);
+      if (caption.length > 2150) {
+        console.warn(`[Schedule] Caption too long, truncating to 2150 chars.`);
+        caption = caption.slice(0, 2150);
+      }
+      console.log(`[Schedule] Caption length after truncation: ${caption.length} chars`);
+      const filename = `post_${selectedPostKey}.jpg`;
+      const formData = new FormData();
+      formData.append('image', imageBlob, filename);
+      formData.append('caption', caption);
+      formData.append('scheduleDate', scheduleTime.toISOString());
+      try {
+        console.log(`[Schedule] Sending schedule request for post ${selectedPostKey} to /schedule-post/${userId}`);
+        const resp = await fetch(`http://localhost:3000/schedule-post/${userId}`, {
+          method: 'POST',
+          body: formData,
+        });
+        if (!resp.ok) {
+          const errData = await resp.json().catch(() => ({}));
+          console.error(`[Schedule] Failed to schedule post ${selectedPostKey}:`, errData.error || resp.statusText);
+          setToastMessage(`Failed to schedule post: ${errData.error || 'Unknown server error'}`);
+        } else {
+          const respData = await resp.json().catch(() => ({}));
+          console.log(`[Schedule] Scheduled post ${selectedPostKey} successfully:`, respData);
+          setToastMessage('Your post is on schedule!');
+        }
+      } catch (err: any) {
+        console.error(`[Schedule] Error scheduling post ${selectedPostKey}:`, err.message);
+        setToastMessage(`Error scheduling post: ${err.message}`);
+      }
     }
+    
     setShowScheduleModal(false);
     setSelectedPostKey(null);
     setScheduleDateTime('');
@@ -471,100 +506,173 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         delayHours = await fetchTimeDelay();
       }
       console.log('[AutoSchedule] Using delay (hours):', delayHours);
-      setAutoScheduleProgress(`Scheduling posts every ${delayHours} hours...`);
+      setAutoScheduleProgress(`Scheduling ${platform === 'twitter' ? 'tweets' : 'posts'} every ${delayHours} hours...`);
       let now = new Date();
+      
       for (let i = 0; i < localPosts.length; i++) {
         const post = localPosts[i];
-        setAutoScheduleProgress(`Scheduling post ${i + 1} of ${localPosts.length}...`);
-        console.log(`[AutoSchedule] Preparing post #${i + 1}:`, post);
-        let imageKey = '';
-        if (post.data.image_url && post.data.image_url.includes('/ready_post/')) {
-          const match = post.data.image_url.match(/ready_post\/[\w-]+\/(image_\d+\.jpg)/);
-          if (match) imageKey = match[1];
-        }
-        if (!imageKey && post.key && post.key.match(/ready_post_\d+\.json$/)) {
-          const postIdMatch = post.key.match(/ready_post_(\d+)\.json$/);
-          if (postIdMatch) imageKey = `image_${postIdMatch[1]}.jpg`;
-        }
-        if (!imageKey) {
-          console.error(`[AutoSchedule] Could not determine imageKey for post #${i + 1}`);
-          setToastMessage(`Could not determine image for post ${i + 1}`);
-          continue;
-        }
-        let signedImageUrl = '';
-        try {
-          const signedUrlRes = await fetch(`http://localhost:3000/signed-image-url/${username}/${imageKey}`);
-          const signedUrlData = await signedUrlRes.json();
-          signedImageUrl = signedUrlData.url;
-          if (!signedImageUrl) throw new Error('No signed URL returned');
-          console.log(`[AutoSchedule] Got fresh signed URL for post #${i + 1}:`, signedImageUrl);
-        } catch (err) {
-          console.error(`[AutoSchedule] Failed to get signed URL for post #${i + 1}:`, err);
-          setToastMessage(`Failed to get image for post ${i + 1}`);
-          continue;
-        }
-        let imageBlob: Blob | null = null;
-        try {
-          const proxyUrl = `http://localhost:3000/proxy-image?url=${encodeURIComponent(signedImageUrl)}`;
-          console.log(`[AutoSchedule] Fetching image for post #${i + 1} via proxy:`, proxyUrl);
-          const imgRes = await fetch(proxyUrl);
-          imageBlob = await imgRes.blob();
-          console.log(`[AutoSchedule] Image fetched for post #${i + 1} via proxy`);
-        } catch (e) {
-          console.error(`[AutoSchedule] Failed to fetch image for post #${i + 1} via proxy:`, e);
-          setToastMessage(`Failed to fetch image for post ${i + 1}`);
-          continue;
-        }
-        if (!['image/jpeg', 'image/png'].includes(imageBlob.type)) {
-          console.error(`[AutoSchedule] Image for post #${i + 1} is not a valid JPEG/PNG, got: ${imageBlob.type}`);
-          setToastMessage(`Image for post ${i + 1} is not a valid JPEG/PNG, skipping.`);
-          continue;
-        }
-        let caption = post.data.post?.caption || '';
-        console.log(`[AutoSchedule] Original caption length for post #${i + 1}: ${caption.length} chars`);
-        if (caption.length > 2150) {
-          console.warn(`[AutoSchedule] Caption too long for post #${i + 1}, truncating to 2150 chars.`);
-          caption = caption.slice(0, 2150);
-        }
-        console.log(`[AutoSchedule] Caption length after truncation for post #${i + 1}: ${caption.length} chars`);
-        const type = imageBlob.type || 'image/jpeg';
-        const filename = `auto_post_${i + 1}.jpg`;
-        let scheduleDate;
-        if (i === 0) {
-          const nowPlusBuffer = new Date(Date.now() + 60 * 1000);
-          scheduleDate = nowPlusBuffer;
-        } else {
-          const prevDate = new Date(Date.now() + 60 * 1000 + (i * delayHours * 60 * 60 * 1000));
-          scheduleDate = prevDate;
-        }
-        console.log(`[AutoSchedule] Scheduling post #${i + 1} at:`, scheduleDate.toISOString());
-        const formData = new FormData();
-        formData.append('image', imageBlob, filename);
-        formData.append('caption', caption);
-        formData.append('scheduleDate', scheduleDate.toISOString());
-        try {
-          console.log(`[AutoSchedule] Sending schedule request for post #${i + 1} to /schedule-post/${userId}`);
-          const resp = await fetch(`http://localhost:3000/schedule-post/${userId}`, {
-            method: 'POST',
-            body: formData,
-          });
-          if (!resp.ok) {
-            const errData = await resp.json().catch(() => ({}));
-            console.error(`[AutoSchedule] Failed to schedule post #${i + 1}:`, errData.error || resp.statusText);
-            setToastMessage(`Failed to schedule post ${i + 1}: ${errData.error || 'Unknown server error'}`);
+        setAutoScheduleProgress(`Scheduling ${platform === 'twitter' ? 'tweet' : 'post'} ${i + 1} of ${localPosts.length}...`);
+        console.log(`[AutoSchedule] Preparing ${platform} post #${i + 1}:`, post);
+        
+        if (platform === 'twitter') {
+          // Twitter auto-scheduling logic
+          const caption = post.data.post?.caption || '';
+          console.log(`[AutoSchedule] Twitter caption for post #${i + 1}: "${caption}"`);
+          
+          if (caption.length > 280) {
+            console.warn(`[AutoSchedule] Tweet text too long for post #${i + 1}, truncating to 280 chars.`);
+            const truncatedCaption = caption.slice(0, 280);
+            
+            let scheduleDate;
+            if (i === 0) {
+              const nowPlusBuffer = new Date(Date.now() + 60 * 1000);
+              scheduleDate = nowPlusBuffer;
+            } else {
+              const prevDate = new Date(Date.now() + 60 * 1000 + (i * delayHours * 60 * 60 * 1000));
+              scheduleDate = prevDate;
+            }
+            
+            console.log(`[AutoSchedule] Scheduling tweet #${i + 1} at:`, scheduleDate.toISOString());
+            
+            try {
+              const response = await axios.post(`http://localhost:3000/schedule-tweet/${userId}`, {
+                text: truncatedCaption,
+                scheduled_time: scheduleDate.toISOString()
+              });
+
+              if (response.data.success) {
+                console.log(`[AutoSchedule] Scheduled tweet #${i + 1} successfully:`, response.data);
+                setToastMessage(`Scheduled tweet ${i + 1} successfully!`);
+              } else {
+                console.error(`[AutoSchedule] Failed to schedule tweet #${i + 1}:`, response.data.message);
+                setToastMessage(`Failed to schedule tweet ${i + 1}: ${response.data.message}`);
+              }
+            } catch (err: any) {
+              console.error(`[AutoSchedule] Error scheduling tweet #${i + 1}:`, err.message);
+              setToastMessage(`Error scheduling tweet ${i + 1}: ${err.response?.data?.error || err.message}`);
+            }
           } else {
-            const respData = await resp.json().catch(() => ({}));
-            console.log(`[AutoSchedule] Scheduled post #${i + 1} successfully:`, respData);
-            setToastMessage(`Scheduled post ${i + 1} successfully!`);
+            let scheduleDate;
+            if (i === 0) {
+              const nowPlusBuffer = new Date(Date.now() + 60 * 1000);
+              scheduleDate = nowPlusBuffer;
+            } else {
+              const prevDate = new Date(Date.now() + 60 * 1000 + (i * delayHours * 60 * 60 * 1000));
+              scheduleDate = prevDate;
+            }
+            
+            console.log(`[AutoSchedule] Scheduling tweet #${i + 1} at:`, scheduleDate.toISOString());
+            
+            try {
+              const response = await axios.post(`http://localhost:3000/schedule-tweet/${userId}`, {
+                text: caption.trim(),
+                scheduled_time: scheduleDate.toISOString()
+              });
+
+              if (response.data.success) {
+                console.log(`[AutoSchedule] Scheduled tweet #${i + 1} successfully:`, response.data);
+                setToastMessage(`Scheduled tweet ${i + 1} successfully!`);
+              } else {
+                console.error(`[AutoSchedule] Failed to schedule tweet #${i + 1}:`, response.data.message);
+                setToastMessage(`Failed to schedule tweet ${i + 1}: ${response.data.message}`);
+              }
+            } catch (err: any) {
+              console.error(`[AutoSchedule] Error scheduling tweet #${i + 1}:`, err.message);
+              setToastMessage(`Error scheduling tweet ${i + 1}: ${err.response?.data?.error || err.message}`);
+            }
           }
-        } catch (err: any) {
-          console.error(`[AutoSchedule] Error scheduling post #${i + 1}:`, err.message);
-          setToastMessage(`Error scheduling post ${i + 1}: ${err.message}`);
+        } else {
+          // Instagram auto-scheduling logic (existing)
+          let imageKey = '';
+          if (post.data.image_url && post.data.image_url.includes('/ready_post/')) {
+            const match = post.data.image_url.match(/ready_post\/[\w-]+\/(image_\d+\.jpg)/);
+            if (match) imageKey = match[1];
+          }
+          if (!imageKey && post.key && post.key.match(/ready_post_\d+\.json$/)) {
+            const postIdMatch = post.key.match(/ready_post_(\d+)\.json$/);
+            if (postIdMatch) imageKey = `image_${postIdMatch[1]}.jpg`;
+          }
+          if (!imageKey) {
+            console.error(`[AutoSchedule] Could not determine imageKey for post #${i + 1}`);
+            setToastMessage(`Could not determine image for post ${i + 1}`);
+            continue;
+          }
+          let signedImageUrl = '';
+          try {
+            const signedUrlRes = await fetch(`http://localhost:3000/signed-image-url/${username}/${imageKey}`);
+            const signedUrlData = await signedUrlRes.json();
+            signedImageUrl = signedUrlData.url;
+            if (!signedImageUrl) throw new Error('No signed URL returned');
+            console.log(`[AutoSchedule] Got fresh signed URL for post #${i + 1}:`, signedImageUrl);
+          } catch (err) {
+            console.error(`[AutoSchedule] Failed to get signed URL for post #${i + 1}:`, err);
+            setToastMessage(`Failed to get image for post ${i + 1}`);
+            continue;
+          }
+          let imageBlob: Blob | null = null;
+          try {
+            const proxyUrl = `http://localhost:3000/proxy-image?url=${encodeURIComponent(signedImageUrl)}`;
+            console.log(`[AutoSchedule] Fetching image for post #${i + 1} via proxy:`, proxyUrl);
+            const imgRes = await fetch(proxyUrl);
+            imageBlob = await imgRes.blob();
+            console.log(`[AutoSchedule] Image fetched for post #${i + 1} via proxy`);
+          } catch (e) {
+            console.error(`[AutoSchedule] Failed to fetch image for post #${i + 1} via proxy:`, e);
+            setToastMessage(`Failed to fetch image for post ${i + 1}`);
+            continue;
+          }
+          if (!['image/jpeg', 'image/png'].includes(imageBlob.type)) {
+            console.error(`[AutoSchedule] Image for post #${i + 1} is not a valid JPEG/PNG, got: ${imageBlob.type}`);
+            setToastMessage(`Image for post ${i + 1} is not a valid JPEG/PNG, skipping.`);
+            continue;
+          }
+          let caption = post.data.post?.caption || '';
+          console.log(`[AutoSchedule] Original caption length for post #${i + 1}: ${caption.length} chars`);
+          if (caption.length > 2150) {
+            console.warn(`[AutoSchedule] Caption too long for post #${i + 1}, truncating to 2150 chars.`);
+            caption = caption.slice(0, 2150);
+          }
+          console.log(`[AutoSchedule] Caption length after truncation for post #${i + 1}: ${caption.length} chars`);
+          const type = imageBlob.type || 'image/jpeg';
+          const filename = `auto_post_${i + 1}.jpg`;
+          let scheduleDate;
+          if (i === 0) {
+            const nowPlusBuffer = new Date(Date.now() + 60 * 1000);
+            scheduleDate = nowPlusBuffer;
+          } else {
+            const prevDate = new Date(Date.now() + 60 * 1000 + (i * delayHours * 60 * 60 * 1000));
+            scheduleDate = prevDate;
+          }
+          console.log(`[AutoSchedule] Scheduling post #${i + 1} at:`, scheduleDate.toISOString());
+          const formData = new FormData();
+          formData.append('image', imageBlob, filename);
+          formData.append('caption', caption);
+          formData.append('scheduleDate', scheduleDate.toISOString());
+          try {
+            console.log(`[AutoSchedule] Sending schedule request for post #${i + 1} to /schedule-post/${userId}`);
+            const resp = await fetch(`http://localhost:3000/schedule-post/${userId}`, {
+              method: 'POST',
+              body: formData,
+            });
+            if (!resp.ok) {
+              const errData = await resp.json().catch(() => ({}));
+              console.error(`[AutoSchedule] Failed to schedule post #${i + 1}:`, errData.error || resp.statusText);
+              setToastMessage(`Failed to schedule post ${i + 1}: ${errData.error || 'Unknown server error'}`);
+            } else {
+              const respData = await resp.json().catch(() => ({}));
+              console.log(`[AutoSchedule] Scheduled post #${i + 1} successfully:`, respData);
+              setToastMessage(`Scheduled post ${i + 1} successfully!`);
+            }
+          } catch (err: any) {
+            console.error(`[AutoSchedule] Error scheduling post #${i + 1}:`, err.message);
+            setToastMessage(`Error scheduling post ${i + 1}: ${err.message}`);
+          }
         }
+        
         await new Promise(res => setTimeout(res, 500));
       }
       setAutoScheduleProgress(null);
-      setToastMessage('All posts scheduled!');
+      setToastMessage(`All ${platform === 'twitter' ? 'tweets' : 'posts'} scheduled!`);
     } catch (err: any) {
       console.error('[AutoSchedule] Auto-scheduling failed:', err.message);
       setAutoScheduleProgress(null);
@@ -681,22 +789,41 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
           </button>
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
-          <InstagramRequiredButton
-            onClick={() => setShowIntervalModal(true)}
-            className="insta-btn connect"
-            disabled={!filteredPosts.length || autoScheduling}
-            style={{ 
-              background: 'linear-gradient(90deg, #007bff, #00ffcc)', 
-              color: '#e0e0ff', 
-              cursor: filteredPosts.length ? 'pointer' : 'not-allowed', 
-              borderRadius: 8, 
-              padding: '8px 16px', 
-              border: '1px solid #00ffcc',
-              opacity: filteredPosts.length ? 1 : 0.5
-            }}
-          >
-            {autoScheduling ? 'Auto-Scheduling...' : 'Auto-Schedule All'}
-          </InstagramRequiredButton>
+          {platform === 'twitter' ? (
+            <TwitterRequiredButton
+              onClick={() => setShowIntervalModal(true)}
+              className="twitter-btn connect"
+              disabled={!filteredPosts.length || autoScheduling}
+              style={{ 
+                background: 'linear-gradient(90deg, #1da1f2, #00acee)', 
+                color: '#ffffff', 
+                cursor: filteredPosts.length ? 'pointer' : 'not-allowed', 
+                borderRadius: 8, 
+                padding: '8px 16px', 
+                border: '1px solid #1da1f2',
+                opacity: filteredPosts.length ? 1 : 0.5
+              }}
+            >
+              {autoScheduling ? 'Auto-Scheduling...' : 'Auto-Schedule All'}
+            </TwitterRequiredButton>
+          ) : (
+            <InstagramRequiredButton
+              onClick={() => setShowIntervalModal(true)}
+              className="insta-btn connect"
+              disabled={!filteredPosts.length || autoScheduling}
+              style={{ 
+                background: 'linear-gradient(90deg, #007bff, #00ffcc)', 
+                color: '#e0e0ff', 
+                cursor: filteredPosts.length ? 'pointer' : 'not-allowed', 
+                borderRadius: 8, 
+                padding: '8px 16px', 
+                border: '1px solid #00ffcc',
+                opacity: filteredPosts.length ? 1 : 0.5
+              }}
+            >
+              {autoScheduling ? 'Auto-Scheduling...' : 'Auto-Schedule All'}
+            </InstagramRequiredButton>
+          )}
         </div>
         {showIntervalModal && (
           <div style={{
@@ -775,6 +902,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             initialImageUrl={editingPost.imageUrl}
             postKey={editingPost.key}
             postCaption={editingPost.caption}
+            platform={platform}
           />
         )}
         {autoScheduleProgress && (
@@ -902,42 +1030,81 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                     </motion.button>
                   </div>
                   <div className="post-control-buttons">
-                    <InstagramRequiredButton
-                      isConnected={!!userId}
-                      onClick={() => handleScheduleClick(post.key)}
-                      className="schedule-button"
-                      style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '5px', 
-                        backgroundColor: '#007bff', 
-                        color: '#e0e0ff',
-                        border: 'none',
-                        padding: '8px 12px',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        fontWeight: 'bold',
-                        transition: 'all 0.2s ease'
-                      }}
-                      notificationPosition="bottom"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#e0e0ff"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
+                    {platform === 'twitter' ? (
+                      <TwitterRequiredButton
+                        isConnected={!!userId}
+                        onClick={() => handleScheduleClick(post.key)}
+                        className="schedule-button"
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '5px', 
+                          backgroundColor: '#1da1f2', 
+                          color: '#ffffff',
+                          border: 'none',
+                          padding: '8px 12px',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          fontWeight: 'bold',
+                          transition: 'all 0.2s ease'
+                        }}
+                        notificationPosition="bottom"
                       >
-                        <circle cx="12" cy="12" r="10" />
-                        <polyline points="12 6 12 12 16 14" />
-                      </svg>
-                      Schedule
-                    </InstagramRequiredButton>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#ffffff"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <circle cx="12" cy="12" r="10" />
+                          <polyline points="12 6 12 12 16 14" />
+                        </svg>
+                        Schedule
+                      </TwitterRequiredButton>
+                    ) : (
+                      <InstagramRequiredButton
+                        isConnected={!!userId}
+                        onClick={() => handleScheduleClick(post.key)}
+                        className="schedule-button"
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '5px', 
+                          backgroundColor: '#007bff', 
+                          color: '#e0e0ff',
+                          border: 'none',
+                          padding: '8px 12px',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          fontWeight: 'bold',
+                          transition: 'all 0.2s ease'
+                        }}
+                        notificationPosition="bottom"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#e0e0ff"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <circle cx="12" cy="12" r="10" />
+                          <polyline points="12 6 12 12 16 14" />
+                        </svg>
+                        Schedule
+                      </InstagramRequiredButton>
+                    )}
                     <motion.button
                       className="edit-button"
                       whileHover={{ scale: 1.05 }}

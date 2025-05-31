@@ -92,7 +92,7 @@ class RagService {
   
   private static readonly PROXY_SERVER_URLS = [
     'http://127.0.0.1:3002',
-    'http://localhost:3002'
+    'http://localhost:3000'
   ];
   
   /**

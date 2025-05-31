@@ -5,7 +5,7 @@ import OurStrategies from '../instagram/OurStrategies';
 import PostCooked from '../instagram/PostCooked';
 import InstagramConnect from '../instagram/InstagramConnect';
 import TwitterConnect from '../twitter/TwitterConnect';
-import TwitterPostTest from '../twitter/TwitterPostTest';
+import TwitterCompose from '../twitter/TwitterCompose';
 import DmsComments from '../instagram/Dms_Comments';
 import PostScheduler from '../instagram/PostScheduler';
 import InsightsModal from '../instagram/InsightsModal';
@@ -118,6 +118,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const [processingNotifications, setProcessingNotifications] = useState<Record<string, boolean>>({});
   const [isTwitterSchedulerOpen, setIsTwitterSchedulerOpen] = useState(false);
   const [isTwitterInsightsOpen, setIsTwitterInsightsOpen] = useState(false);
+  const [isTwitterComposeOpen, setIsTwitterComposeOpen] = useState(false);
 
   // Platform-specific notification handlers
   const handleReply = async (notification: any, replyText: string) => {
@@ -1056,8 +1057,17 @@ Image Description: ${response.post.image_prompt}
   };
 
   const handleOpenTwitterInsights = () => {
+    if (!config.supportsInsights) {
+      setToast(`Insights not available for ${config.name} yet`);
+      return;
+    }
     console.log(`[${new Date().toISOString()}] Opening Twitter InsightsModal for user ${twitterId}`);
     setIsTwitterInsightsOpen(true);
+  };
+
+  const handleOpenTwitterCompose = () => {
+    console.log(`[${new Date().toISOString()}] Opening Twitter Compose for user ${twitterId}`);
+    setIsTwitterComposeOpen(true);
   };
 
   return (
@@ -1167,7 +1177,22 @@ Image Description: ${response.post.image_prompt}
                     <>
                       <TwitterConnect onConnected={handleTwitterConnected} />
                       <TwitterRequiredButton
-                        isConnected={isConnected}
+                        isConnected={isTwitterConnected}
+                        onClick={handleOpenTwitterCompose}
+                        className="twitter-btn compose"
+                        style={{
+                          background: 'linear-gradient(90deg, #1da1f2, #00acee)',
+                          color: '#ffffff',
+                          padding: '8px 16px',
+                          borderRadius: '6px',
+                          border: '1px solid #1da1f2',
+                          zIndex: 20,
+                        }}
+                      >
+                        Compose
+                      </TwitterRequiredButton>
+                      <TwitterRequiredButton
+                        isConnected={isTwitterConnected}
                         onClick={handleOpenTwitterInsights}
                         className="twitter-btn insights"
                         style={{
@@ -1183,7 +1208,7 @@ Image Description: ${response.post.image_prompt}
                       </TwitterRequiredButton>
                       
                       <TwitterRequiredButton
-                        isConnected={isConnected}
+                        isConnected={isTwitterConnected}
                         onClick={handleOpenTwitterScheduler}
                         className="twitter-btn connect"
                         style={{
@@ -1241,14 +1266,6 @@ Image Description: ${response.post.image_prompt}
                 onSendAIReply={handleSendAIReply}
                 platform={platform}
               />
-            </div>
-          )}
-
-          {/* Twitter Post Testing Section - Only show for Twitter platform */}
-          {platform === 'twitter' && (
-            <div className="twitter-test-section">
-              <h2>Twitter Post Test <span className="badge">Test posting functionality!</span></h2>
-              <TwitterPostTest twitterUserId={twitterId || undefined} />
             </div>
           )}
 
@@ -1423,6 +1440,16 @@ Image Description: ${response.post.image_prompt}
           onClose={() => {
             console.log(`[${new Date().toISOString()}] Closing Twitter InsightsModal`);
             setIsTwitterInsightsOpen(false);
+          }} 
+        />
+      )}
+      
+      {isTwitterComposeOpen && (
+        <TwitterCompose 
+          userId={twitterId!} 
+          onClose={() => {
+            console.log(`[${new Date().toISOString()}] Closing Twitter Compose`);
+            setIsTwitterComposeOpen(false);
           }} 
         />
       )}

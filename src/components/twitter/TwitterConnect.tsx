@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './TwitterConnect.css';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
@@ -16,12 +16,28 @@ const TwitterConnect: React.FC<TwitterConnectProps> = ({ onConnected, className 
   const isStoringConnectionRef = useRef(false);
   const connectionDataRef = useRef<{ twitter_user_id: string; username?: string } | null>(null);
   
+  const checkTwitterConnection = useCallback(async () => {
+    if (!currentUser?.uid) return;
+    
+    try {
+      const response = await axios.get(`http://localhost:3000/twitter-connection/${currentUser.uid}`);
+      if (response.data?.twitter_user_id) {
+        setIsConnected(true);
+        setTwitterUsername(response.data.username || 'Twitter User');
+        console.log(`[${new Date().toISOString()}] Found existing Twitter connection for user ${currentUser.uid}`);
+      }
+    } catch (error) {
+      // User doesn't have Twitter connected, which is fine
+      console.log('No Twitter connection found for user');
+    }
+  }, [currentUser?.uid]);
+  
   useEffect(() => {
     // Check if user already has Twitter connected
     if (currentUser?.uid) {
       checkTwitterConnection();
     }
-  }, [currentUser]);
+  }, [currentUser?.uid, checkTwitterConnection]);
 
   useEffect(() => {
     // Listen for OAuth redirect message from popup
@@ -29,46 +45,37 @@ const TwitterConnect: React.FC<TwitterConnectProps> = ({ onConnected, className 
       if (event.data && event.data.type === 'TWITTER_CONNECTED' && event.data.userId && event.data.username) {
         console.log(`[${new Date().toISOString()}] Received Twitter connection message:`, event.data);
         
-        // Ensure we have a current user to bind the Twitter connection to
-        if (!currentUser?.uid) {
-          console.error(`[${new Date().toISOString()}] Cannot store Twitter connection: No authenticated user`);
-          setIsConnecting(false);
-          return;
-        }
-        
-        // Check if we're already storing this data to avoid duplicate requests
-        const isEqualToCurrentData = 
-          connectionDataRef.current && 
-          connectionDataRef.current.twitter_user_id === event.data.userId;
-        
         // Store connection data
-        if (!isStoringConnectionRef.current && !isEqualToCurrentData) {
-          const connectionData = {
-            twitter_user_id: event.data.userId,
-            username: event.data.username
-          };
-          
-          // Update ref to prevent duplicate requests
-          connectionDataRef.current = connectionData;
+        connectionDataRef.current = {
+          twitter_user_id: event.data.userId,
+          username: event.data.username
+        };
+        
+        if (!isStoringConnectionRef.current && currentUser?.uid) {
           isStoringConnectionRef.current = true;
           
-          axios.post(`http://localhost:3000/twitter-connection/${currentUser.uid}`, connectionData)
-            .then(() => {
-              console.log(`[${new Date().toISOString()}] Successfully stored Twitter connection in backend for user ${currentUser.uid}`);
-              setIsConnected(true);
-              setTwitterUsername(event.data.username);
-              
-              if (onConnected) {
-                onConnected(event.data.userId, event.data.username);
-              }
-            })
-            .catch(error => {
-              console.error(`[${new Date().toISOString()}] Failed to store Twitter connection in backend:`, error);
-            })
-            .finally(() => {
-              isStoringConnectionRef.current = false;
-              setIsConnecting(false);
-            });
+          // Store connection in backend
+          axios.post(`http://localhost:3000/twitter-connection/${currentUser.uid}`, {
+            twitter_user_id: event.data.userId,
+            username: event.data.username
+          })
+          .then(() => {
+            console.log(`[${new Date().toISOString()}] Successfully stored Twitter connection in backend`);
+            setIsConnected(true);
+            setTwitterUsername(event.data.username);
+            setIsConnecting(false);
+            
+            if (onConnected) {
+              onConnected(event.data.userId, event.data.username);
+            }
+          })
+          .catch(error => {
+            console.error(`[${new Date().toISOString()}] Failed to store Twitter connection in backend:`, error);
+            setIsConnecting(false);
+          })
+          .finally(() => {
+            isStoringConnectionRef.current = false;
+          });
         } else {
           // Already connected or storing, just update UI
           setIsConnected(true);
@@ -87,23 +94,7 @@ const TwitterConnect: React.FC<TwitterConnectProps> = ({ onConnected, className 
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [onConnected, currentUser]);
-
-  const checkTwitterConnection = async () => {
-    if (!currentUser?.uid) return;
-    
-    try {
-      const response = await axios.get(`http://localhost:3000/twitter-connection/${currentUser.uid}`);
-      if (response.data?.twitter_user_id) {
-        setIsConnected(true);
-        setTwitterUsername(response.data.username || 'Twitter User');
-        console.log(`[${new Date().toISOString()}] Found existing Twitter connection for user ${currentUser.uid}`);
-      }
-    } catch (error) {
-      // User doesn't have Twitter connected, which is fine
-      console.log('No Twitter connection found for user');
-    }
-  };
+  }, [onConnected, currentUser?.uid]); // Only depend on currentUser?.uid
 
   const connectToTwitter = async () => {
     if (!currentUser) {

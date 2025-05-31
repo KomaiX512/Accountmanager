@@ -43,6 +43,13 @@ const TW_EntryUsernames: React.FC<TW_EntryUsernamesProps> = ({
 
   // Check if user has already entered Twitter username
   useEffect(() => {
+    // Only check status if we're allowed to redirect on completion
+    // This prevents double-checking when parent component (Twitter.tsx) is already handling it
+    if (!redirectIfCompleted) {
+      setIsInitializing(false);
+      return;
+    }
+
     const checkUserStatus = async () => {
       if (!currentUser || !currentUser.uid) {
         console.error('No authenticated user found');
@@ -85,11 +92,13 @@ const TW_EntryUsernames: React.FC<TW_EntryUsernamesProps> = ({
       } catch (error) {
         console.error('Error checking user Twitter status:', error);
         setIsInitializing(false);
+        // Don't retry on error to prevent infinite loop
       }
     };
     
+    // Only run once on mount when conditions are met
     checkUserStatus();
-  }, [currentUser, navigate, onSubmitSuccess, redirectIfCompleted]);
+  }, [currentUser?.uid, redirectIfCompleted]); // Removed navigate and onSubmitSuccess to prevent excessive re-runs
 
   // Debounced username validation
   const checkUsernameAvailability = useCallback(

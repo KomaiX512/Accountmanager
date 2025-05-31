@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import './App.css';
 import LeftBar from './components/common/LeftBar';
@@ -40,26 +40,39 @@ const AppContent: React.FC = () => {
   const [userId, setUserId] = useState<string | undefined>(undefined);
   const [isLoadingUserData, setIsLoadingUserData] = useState(false);
   
-  // Extract from location state
-  const { accountHolder: extractedAccountHolder, competitors: extractedCompetitors, userId: extractedUserId, accountType: extractedAccountType } = location.state || { 
-    accountHolder: '', 
-    competitors: [], 
-    userId: undefined,
-    accountType: 'branding'
-  };
+  // Memoize location state extraction to prevent infinite re-renders
+  const locationStateValues = useMemo(() => {
+    const state = location.state || {};
+    return {
+      extractedAccountHolder: state.accountHolder || '',
+      extractedCompetitors: state.competitors || [],
+      extractedUserId: state.userId || undefined,
+      extractedAccountType: state.accountType || 'branding'
+    };
+  }, [location.state]);
+  
+  const { extractedAccountHolder, extractedCompetitors, extractedUserId, extractedAccountType } = locationStateValues;
   
   const isLoginPage = location.pathname === '/login';
 
   // Determine current platform based on route
   const currentPlatform = location.pathname.includes('twitter') ? 'twitter' : 'instagram';
 
-  // Update state when location state changes
+  // Update state when location state changes - now with stable dependencies
   useEffect(() => {
-    if (extractedAccountHolder) setAccountHolder(extractedAccountHolder);
-    if (extractedCompetitors) setCompetitors(extractedCompetitors);
-    if (extractedAccountType) setAccountType(extractedAccountType);
-    if (extractedUserId) setUserId(extractedUserId);
-  }, [extractedAccountHolder, extractedCompetitors, extractedAccountType, extractedUserId]);
+    if (extractedAccountHolder && extractedAccountHolder !== accountHolder) {
+      setAccountHolder(extractedAccountHolder);
+    }
+    if (extractedCompetitors && extractedCompetitors.length > 0 && JSON.stringify(extractedCompetitors) !== JSON.stringify(competitors)) {
+      setCompetitors(extractedCompetitors);
+    }
+    if (extractedAccountType && extractedAccountType !== accountType) {
+      setAccountType(extractedAccountType);
+    }
+    if (extractedUserId && extractedUserId !== userId) {
+      setUserId(extractedUserId);
+    }
+  }, [extractedAccountHolder, extractedCompetitors, extractedAccountType, extractedUserId, accountHolder, competitors, accountType, userId]);
 
   // Memoized sync function to prevent recreation on every render
   const syncUserConnection = useCallback(async (uid: string) => {

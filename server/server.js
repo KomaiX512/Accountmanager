@@ -13,6 +13,7 @@ import { randomUUID } from 'crypto';
 import crypto from 'crypto';
 import schedule from 'node-schedule';
 import OAuth from 'oauth-1.0a';
+import FormData from 'form-data';
 const app = express();
 const port = 3000;
 
@@ -1326,6 +1327,15 @@ async function streamToString(stream) {
   }
   return Buffer.concat(chunks).toString('utf-8');
 }
+
+async function streamToBuffer(stream) {
+  const chunks = [];
+  for await (const chunk of stream) {
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
+}
+
 // Instagram App Credentials
 const APP_ID = '576296982152813';
 const APP_SECRET = 'd48ddc9eaf0e5c4969d4ddc4e293178c';
@@ -4595,6 +4605,167 @@ app.post('/schedule-tweet/:userId', async (req, res) => {
   }
 });
 
+// Schedule tweet endpoint - for future posting with OAuth 2.0
+app.post('/schedule-tweet/:userId', async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  const { userId } = req.params;
+  const { text, scheduled_time } = req.body;
+  
+  if (!text || text.trim().length === 0) {
+    return res.status(400).json({ error: 'Tweet text is required' });
+  }
+  
+  if (text.length > 280) {
+    return res.status(400).json({ error: 'Tweet text exceeds 280 characters' });
+  }
+  
+  if (!scheduled_time) {
+    return res.status(400).json({ error: 'Scheduled time is required' });
+  }
+  
+  const scheduleDate = new Date(scheduled_time);
+  const now = new Date();
+  
+  if (scheduleDate <= now) {
+    return res.status(400).json({ error: 'Scheduled time must be in the future' });
+  }
+  
+  try {
+    console.log(`[${new Date().toISOString()}] Scheduling tweet for user ${userId} at ${scheduleDate.toISOString()}: "${text}"`);
+    
+    // Generate unique schedule ID
+    const scheduleId = crypto.randomUUID();
+    
+    // Store scheduled tweet in R2
+    const scheduledTweetKey = `TwitterScheduled/${userId}/${scheduleId}.json`;
+    const scheduledTweetData = {
+      id: scheduleId,
+      user_id: userId,
+      text: text.trim(),
+      scheduled_time: scheduleDate.toISOString(),
+      created_at: new Date().toISOString(),
+      status: 'pending',
+      type: 'text_only'
+    };
+    
+    await s3Client.send(new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: scheduledTweetKey,
+      Body: JSON.stringify(scheduledTweetData, null, 2),
+      ContentType: 'application/json'
+    }));
+    
+    console.log(`[${new Date().toISOString()}] Scheduled tweet stored with ID ${scheduleId}`);
+    
+    res.json({ 
+      success: true, 
+      message: 'Tweet scheduled successfully',
+      schedule_id: scheduleId,
+      scheduled_time: scheduleDate.toISOString()
+    });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error scheduling tweet:`, error);
+    res.status(500).json({ error: 'Failed to schedule tweet' });
+  }
+});
+
+// Schedule tweet with image endpoint - for future posting with OAuth 2.0 and image
+app.post('/schedule-tweet-with-image/:userId', upload.single('image'), async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  const { userId } = req.params;
+  
+  // Debug: Log all received data
+  console.log(`[${new Date().toISOString()}] POST /schedule-tweet-with-image/${userId} - Request received`);
+  console.log(`[${new Date().toISOString()}] req.body:`, req.body);
+  console.log(`[${new Date().toISOString()}] req.files:`, req.files ? Object.keys(req.files) : 'none');
+  
+  // Get fields from req.body (FormData puts text fields in req.body)
+  const text = req.body.text;
+  const scheduled_time = req.body.scheduled_time;
+  const imageFile = req.files?.image || req.file;
+  
+  console.log(`[${new Date().toISOString()}] Extracted text: "${text}"`);
+  console.log(`[${new Date().toISOString()}] Extracted scheduled_time: "${scheduled_time}"`);
+  console.log(`[${new Date().toISOString()}] Image file present: ${!!imageFile}`);
+  
+  // Allow empty text if there's an image (Twitter allows image-only posts)
+  if (text && text.length > 280) {
+    return res.status(400).json({ error: 'Tweet text exceeds 280 characters' });
+  }
+  
+  if (!scheduled_time) {
+    return res.status(400).json({ error: 'Scheduled time is required' });
+  }
+  
+  if (!imageFile) {
+    return res.status(400).json({ error: 'Image file is required' });
+  }
+  
+  // If no text provided, use empty string (Twitter allows image-only posts)
+  const tweetText = text ? text.trim() : '';
+  
+  const scheduleDate = new Date(scheduled_time);
+  const now = new Date();
+  
+  if (scheduleDate <= now) {
+    return res.status(400).json({ error: 'Scheduled time must be in the future' });
+  }
+  
+  try {
+    console.log(`[${new Date().toISOString()}] Scheduling tweet with image for user ${userId} at ${scheduleDate.toISOString()}: "${tweetText}"`);
+    
+    // Generate unique schedule ID
+    const scheduleId = crypto.randomUUID();
+    
+    // Store image in R2
+    const imageKey = `TwitterScheduled/${userId}/${scheduleId}_image.jpg`;
+    const imageBuffer = imageFile.buffer || imageFile.data;
+    
+    await s3Client.send(new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: imageKey,
+      Body: imageBuffer,
+      ContentType: imageFile.mimetype || 'image/jpeg'
+    }));
+    
+    // Store scheduled tweet data in R2
+    const scheduledTweetKey = `TwitterScheduled/${userId}/${scheduleId}.json`;
+    const scheduledTweetData = {
+      id: scheduleId,
+      user_id: userId,
+      text: tweetText,
+      scheduled_time: scheduleDate.toISOString(),
+      created_at: new Date().toISOString(),
+      status: 'pending',
+      type: 'with_image',
+      image_key: imageKey
+    };
+    
+    await s3Client.send(new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: scheduledTweetKey,
+      Body: JSON.stringify(scheduledTweetData, null, 2),
+      ContentType: 'application/json'
+    }));
+    
+    console.log(`[${new Date().toISOString()}] Scheduled tweet with image stored with ID ${scheduleId}`);
+    
+    res.json({ 
+      success: true, 
+      message: 'Tweet with image scheduled successfully',
+      schedule_id: scheduleId,
+      scheduled_time: scheduleDate.toISOString()
+    });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error scheduling tweet with image:`, error);
+    res.status(500).json({ error: 'Failed to schedule tweet with image' });
+  }
+});
+
 // Get scheduled tweets for a user
 app.get('/scheduled-tweets/:userId', async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
@@ -4768,7 +4939,129 @@ function startTwitterScheduler() {
               }
               
               // Post the tweet using OAuth 2.0 Bearer token
-              const tweetData = { text: scheduledTweet.text };
+              let tweetData = { text: scheduledTweet.text };
+              
+              // Check if this is a tweet with image
+              if (scheduledTweet.type === 'with_image' && scheduledTweet.image_key) {
+                console.log(`[${new Date().toISOString()}] Scheduled tweet has image, uploading media first...`);
+                
+                try {
+                  // Get the image from R2
+                  const imageCommand = new GetObjectCommand({
+                    Bucket: 'tasks',
+                    Key: scheduledTweet.image_key
+                  });
+                  const imageResponse = await s3Client.send(imageCommand);
+                  const imageBuffer = await streamToBuffer(imageResponse.Body);
+                  
+                  // Upload media using X API v1.1 media upload (required for chunked uploads)
+                  console.log(`[${new Date().toISOString()}] Starting chunked media upload...`);
+                  
+                  const totalBytes = imageBuffer.length;
+                  const mediaType = 'image/jpeg';
+                  
+                  // Step 1: INIT - Initialize media upload
+                  const initFormData = new FormData();
+                  initFormData.append('command', 'INIT');
+                  initFormData.append('media_type', mediaType);
+                  initFormData.append('total_bytes', totalBytes.toString());
+                  initFormData.append('media_category', 'tweet_image');
+                  
+                  const initResponse = await axios.post('https://upload.twitter.com/1.1/media/upload.json', initFormData, {
+                    headers: {
+                      'Authorization': `Bearer ${tokenData.access_token}`,
+                      ...initFormData.getHeaders()
+                    }
+                  });
+                  
+                  const mediaId = initResponse.data.media_id_string;
+                  console.log(`[${new Date().toISOString()}] Media upload initialized: ${mediaId}`);
+                  
+                  // Step 2: APPEND - Upload media chunks
+                  const chunkSize = 1024 * 1024; // 1MB chunks
+                  let segmentIndex = 0;
+                  
+                  for (let i = 0; i < totalBytes; i += chunkSize) {
+                    const chunk = imageBuffer.slice(i, Math.min(i + chunkSize, totalBytes));
+                    
+                    const appendFormData = new FormData();
+                    appendFormData.append('command', 'APPEND');
+                    appendFormData.append('media_id', mediaId);
+                    appendFormData.append('segment_index', segmentIndex.toString());
+                    appendFormData.append('media', chunk, {
+                      filename: 'chunk.jpg',
+                      contentType: mediaType
+                    });
+                    
+                    await axios.post('https://upload.twitter.com/1.1/media/upload.json', appendFormData, {
+                      headers: {
+                        'Authorization': `Bearer ${tokenData.access_token}`,
+                        ...appendFormData.getHeaders()
+                      }
+                    });
+                    
+                    console.log(`[${new Date().toISOString()}] Uploaded chunk ${segmentIndex + 1}`);
+                    segmentIndex++;
+                  }
+                  
+                  // Step 3: FINALIZE - Complete media upload
+                  const finalizeFormData = new FormData();
+                  finalizeFormData.append('command', 'FINALIZE');
+                  finalizeFormData.append('media_id', mediaId);
+                  
+                  const finalizeResponse = await axios.post('https://upload.twitter.com/1.1/media/upload.json', finalizeFormData, {
+                    headers: {
+                      'Authorization': `Bearer ${tokenData.access_token}`,
+                      ...finalizeFormData.getHeaders()
+                    }
+                  });
+                  
+                  console.log(`[${new Date().toISOString()}] Media upload finalized: ${mediaId}`);
+                  
+                  // Step 4: STATUS - Check processing status if needed
+                  if (finalizeResponse.data.processing_info) {
+                    console.log(`[${new Date().toISOString()}] Media processing required, checking status...`);
+                    
+                    let processingComplete = false;
+                    let attempts = 0;
+                    const maxAttempts = 30; // 30 attempts with 2 second intervals = 1 minute max
+                    
+                    while (!processingComplete && attempts < maxAttempts) {
+                      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+                      
+                      const statusResponse = await axios.get(`https://upload.twitter.com/1.1/media/upload.json?command=STATUS&media_id=${mediaId}`, {
+                        headers: {
+                          'Authorization': `Bearer ${tokenData.access_token}`
+                        }
+                      });
+                      
+                      const processingInfo = statusResponse.data.processing_info;
+                      console.log(`[${new Date().toISOString()}] Media processing status: ${processingInfo.state}`);
+                      
+                      if (processingInfo.state === 'succeeded') {
+                        processingComplete = true;
+                      } else if (processingInfo.state === 'failed') {
+                        throw new Error('Media processing failed');
+                      }
+                      
+                      attempts++;
+                    }
+                    
+                    if (!processingComplete) {
+                      throw new Error('Media processing timeout');
+                    }
+                  }
+                  
+                  console.log(`[${new Date().toISOString()}] Scheduled tweet: Media uploaded successfully: ${mediaId}`);
+                  
+                  // Add media to tweet data
+                  tweetData.media = { media_ids: [mediaId] };
+                  
+                } catch (mediaError) {
+                  console.error(`[${new Date().toISOString()}] Error uploading media for scheduled tweet:`, mediaError.response?.data || mediaError.message);
+                  throw new Error('Failed to upload media');
+                }
+              }
               
               const response = await axios.post('https://api.x.com/2/tweets', tweetData, {
                 headers: {
@@ -4893,3 +5186,285 @@ app.get('/debug/twitter-users', async (req, res) => {
     });
   }
 });
+
+// Post tweet with image endpoint - immediate posting with OAuth 2.0 and chunked media upload
+app.post('/post-tweet-with-image/:userId', upload.single('image'), async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  const { userId } = req.params;
+  
+  // Debug: Log all received data
+  console.log(`[${new Date().toISOString()}] POST /post-tweet-with-image/${userId} - Request received`);
+  console.log(`[${new Date().toISOString()}] req.body:`, req.body);
+  console.log(`[${new Date().toISOString()}] req.files:`, req.files ? Object.keys(req.files) : 'none');
+  console.log(`[${new Date().toISOString()}] req.file:`, req.file ? 'present' : 'none');
+  
+  // Get text from req.body (FormData puts text fields in req.body)
+  const text = req.body.text;
+  const imageFile = req.files?.image || req.file;
+  
+  console.log(`[${new Date().toISOString()}] Extracted text: "${text}"`);
+  console.log(`[${new Date().toISOString()}] Image file present: ${!!imageFile}`);
+  
+  // Allow empty text if there's an image (Twitter allows image-only posts)
+  if (text && text.length > 280) {
+    return res.status(400).json({ error: 'Tweet text exceeds 280 characters' });
+  }
+  
+  if (!imageFile) {
+    return res.status(400).json({ error: 'Image file is required' });
+  }
+  
+  // If no text provided, use empty string (Twitter allows image-only posts)
+  const tweetText = text ? text.trim() : '';
+  
+  try {
+    console.log(`[${new Date().toISOString()}] Posting tweet with image for user ${userId}: "${tweetText}"`);
+    
+    // Get user's stored Twitter tokens
+    const userTokenKey = `TwitterTokens/${userId}/token.json`;
+    let tokenData;
+    
+    try {
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: userTokenKey
+      });
+      const response = await s3Client.send(getCommand);
+      tokenData = JSON.parse(await streamToString(response.Body));
+    } catch (error) {
+      if (error.name === 'NoSuchKey') {
+        return res.status(404).json({ error: 'Twitter account not connected' });
+      }
+      throw error;
+    }
+    
+    // Check if token is expired and needs refresh
+    if (tokenData.expires_at && new Date() > new Date(tokenData.expires_at)) {
+      console.log(`[${new Date().toISOString()}] Access token expired, attempting to refresh...`);
+      
+      if (tokenData.refresh_token) {
+        try {
+          // Refresh the access token
+          const refreshBody = new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: tokenData.refresh_token
+          });
+          
+          const basicAuthCredentials = Buffer.from(`${TWITTER_CLIENT_ID}:${TWITTER_CLIENT_SECRET}`).toString('base64');
+          
+          const refreshResponse = await axios.post('https://api.x.com/2/oauth2/token', refreshBody, {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'Accept': 'application/json',
+              'Authorization': `Basic ${basicAuthCredentials}`
+            }
+          });
+          
+          const newTokenData = refreshResponse.data;
+          
+          // Update stored token data
+          tokenData.access_token = newTokenData.access_token;
+          tokenData.refresh_token = newTokenData.refresh_token || tokenData.refresh_token;
+          tokenData.expires_in = newTokenData.expires_in || 7200;
+          tokenData.expires_at = new Date(Date.now() + (newTokenData.expires_in || 7200) * 1000).toISOString();
+          
+          // Save updated token
+          await s3Client.send(new PutObjectCommand({
+            Bucket: 'tasks',
+            Key: userTokenKey,
+            Body: JSON.stringify(tokenData, null, 2),
+            ContentType: 'application/json'
+          }));
+          
+          console.log(`[${new Date().toISOString()}] Access token refreshed successfully`);
+        } catch (refreshError) {
+          console.error(`[${new Date().toISOString()}] Token refresh failed:`, refreshError.response?.data || refreshError.message);
+          return res.status(401).json({ 
+            error: 'Token expired and refresh failed', 
+            details: 'Please reconnect your Twitter account' 
+          });
+        }
+      } else {
+        return res.status(401).json({ 
+          error: 'Access token expired', 
+          details: 'Please reconnect your Twitter account' 
+        });
+      }
+    }
+    
+    // Upload media using X API v2 chunked upload process
+    console.log(`[${new Date().toISOString()}] Starting chunked media upload...`);
+    
+    const imageBuffer = imageFile.buffer || imageFile.data;
+    const totalBytes = imageBuffer.length;
+    const mediaType = imageFile.mimetype || 'image/jpeg';
+    
+    // Step 1: INIT - Initialize media upload
+    const initFormData = new FormData();
+    initFormData.append('command', 'INIT');
+    initFormData.append('media_type', mediaType);
+    initFormData.append('total_bytes', totalBytes.toString());
+    initFormData.append('media_category', 'tweet_image');
+    
+    const initResponse = await axios.post('https://upload.twitter.com/1.1/media/upload.json', initFormData, {
+      headers: {
+        'Authorization': `Bearer ${tokenData.access_token}`,
+        ...initFormData.getHeaders()
+      }
+    });
+    
+    const mediaId = initResponse.data.media_id_string;
+    console.log(`[${new Date().toISOString()}] Media upload initialized: ${mediaId}`);
+    
+    // Step 2: APPEND - Upload media chunks
+    const chunkSize = 1024 * 1024; // 1MB chunks
+    let segmentIndex = 0;
+    
+    for (let i = 0; i < totalBytes; i += chunkSize) {
+      const chunk = imageBuffer.slice(i, Math.min(i + chunkSize, totalBytes));
+      
+      const appendFormData = new FormData();
+      appendFormData.append('command', 'APPEND');
+      appendFormData.append('media_id', mediaId);
+      appendFormData.append('segment_index', segmentIndex.toString());
+      appendFormData.append('media', chunk, {
+        filename: 'chunk.jpg',
+        contentType: mediaType
+      });
+      
+      await axios.post('https://upload.twitter.com/1.1/media/upload.json', appendFormData, {
+        headers: {
+          'Authorization': `Bearer ${tokenData.access_token}`,
+          ...appendFormData.getHeaders()
+        }
+      });
+      
+      console.log(`[${new Date().toISOString()}] Uploaded chunk ${segmentIndex + 1}`);
+      segmentIndex++;
+    }
+    
+    // Step 3: FINALIZE - Complete media upload
+    const finalizeFormData = new FormData();
+    finalizeFormData.append('command', 'FINALIZE');
+    finalizeFormData.append('media_id', mediaId);
+    
+    const finalizeResponse = await axios.post('https://upload.twitter.com/1.1/media/upload.json', finalizeFormData, {
+      headers: {
+        'Authorization': `Bearer ${tokenData.access_token}`,
+        ...finalizeFormData.getHeaders()
+      }
+    });
+    
+    console.log(`[${new Date().toISOString()}] Media upload finalized: ${mediaId}`);
+    
+    // Step 4: STATUS - Check processing status if needed
+    if (finalizeResponse.data.processing_info) {
+      console.log(`[${new Date().toISOString()}] Media processing required, checking status...`);
+      
+      let processingComplete = false;
+      let attempts = 0;
+      const maxAttempts = 30; // 30 attempts with 2 second intervals = 1 minute max
+      
+      while (!processingComplete && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+        
+        const statusResponse = await axios.get(`https://upload.twitter.com/1.1/media/upload.json?command=STATUS&media_id=${mediaId}`, {
+          headers: {
+            'Authorization': `Bearer ${tokenData.access_token}`
+          }
+        });
+        
+        const processingInfo = statusResponse.data.processing_info;
+        console.log(`[${new Date().toISOString()}] Media processing status: ${processingInfo.state}`);
+        
+        if (processingInfo.state === 'succeeded') {
+          processingComplete = true;
+        } else if (processingInfo.state === 'failed') {
+          throw new Error('Media processing failed');
+        }
+        
+        attempts++;
+      }
+      
+      if (!processingComplete) {
+        throw new Error('Media processing timeout');
+      }
+    }
+    
+    // Step 5: Post tweet with media
+    const tweetData = {
+      text: tweetText,
+      media: {
+        media_ids: [mediaId]
+      }
+    };
+    
+    const tweetResponse = await axios.post('https://api.x.com/2/tweets', tweetData, {
+      headers: {
+        'Authorization': `Bearer ${tokenData.access_token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const tweetId = tweetResponse.data.data.id;
+    const postedTweetText = tweetResponse.data.data.text;
+    
+    console.log(`[${new Date().toISOString()}] Tweet with image posted successfully: ID ${tweetId}`);
+    
+    // Store tweet record for tracking
+    const tweetKey = `TwitterPosts/${userId}/${tweetId}.json`;
+    const tweetRecord = {
+      tweet_id: tweetId,
+      text: postedTweetText,
+      user_id: userId,
+      posted_at: new Date().toISOString(),
+      scheduled: false,
+      status: 'posted',
+      has_media: true,
+      media_id: mediaId
+    };
+    
+    await s3Client.send(new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: tweetKey,
+      Body: JSON.stringify(tweetRecord, null, 2),
+      ContentType: 'application/json'
+    }));
+    
+    res.json({ 
+      success: true, 
+      tweet_id: tweetId, 
+      text: postedTweetText,
+      media_id: mediaId,
+      message: 'Tweet with image posted successfully' 
+    });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error posting tweet with image:`, error.response?.data || error.message);
+    
+    if (error.response?.status === 401) {
+      res.status(401).json({ 
+        error: 'Twitter authentication failed', 
+        details: 'Please reconnect your Twitter account' 
+      });
+    } else if (error.response?.status === 403) {
+      res.status(403).json({ 
+        error: 'Tweet posting forbidden', 
+        details: error.response?.data?.detail || 'Check your Twitter API permissions and scopes' 
+      });
+    } else if (error.response?.status === 413) {
+      res.status(413).json({ 
+        error: 'Image too large', 
+        details: 'Please use an image smaller than 5MB' 
+      });
+    } else {
+      res.status(500).json({ 
+        error: 'Failed to post tweet with image', 
+        details: error.response?.data || error.message 
+      });
+    }
+  }
+});
+
+// Schedule tweet endpoint - for future posting

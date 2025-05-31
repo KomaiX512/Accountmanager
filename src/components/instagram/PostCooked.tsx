@@ -791,6 +791,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
           {platform === 'twitter' ? (
             <TwitterRequiredButton
+              isConnected={isConnected}
               onClick={() => setShowIntervalModal(true)}
               className="twitter-btn connect"
               disabled={!filteredPosts.length || autoScheduling}
@@ -808,6 +809,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             </TwitterRequiredButton>
           ) : (
             <InstagramRequiredButton
+              isConnected={isConnected}
               onClick={() => setShowIntervalModal(true)}
               className="insta-btn connect"
               disabled={!filteredPosts.length || autoScheduling}
@@ -1032,7 +1034,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                   <div className="post-control-buttons">
                     {platform === 'twitter' ? (
                       <TwitterRequiredButton
-                        isConnected={!!userId}
+                        isConnected={isConnected}
                         onClick={() => handleScheduleClick(post.key)}
                         className="schedule-button"
                         style={{ 
@@ -1069,7 +1071,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                       </TwitterRequiredButton>
                     ) : (
                       <InstagramRequiredButton
-                        isConnected={!!userId}
+                        isConnected={isConnected}
                         onClick={() => handleScheduleClick(post.key)}
                         className="schedule-button"
                         style={{ 

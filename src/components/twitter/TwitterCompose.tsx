@@ -20,6 +20,40 @@ const TwitterCompose: React.FC<TwitterComposeProps> = ({ userId, onClose }) => {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isScheduled, setIsScheduled] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setError('Please select a valid image file.');
+      return;
+    }
+
+    // Validate file size (Twitter limit is 5MB for images)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image size must be less than 5MB.');
+      return;
+    }
+
+    setSelectedImage(file);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setImagePreview(event.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+    setError(null);
+  };
+
+  const removeImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
+  };
 
   const handleSubmit = async () => {
     if (!userIdToUse) {
@@ -27,8 +61,9 @@ const TwitterCompose: React.FC<TwitterComposeProps> = ({ userId, onClose }) => {
       return;
     }
 
-    if (!tweetText.trim()) {
-      setError('Please enter some text for your tweet.');
+    // Allow posting with just image or just text, but not empty
+    if (!tweetText.trim() && !selectedImage) {
+      setError('Please enter some text or select an image for your tweet.');
       return;
     }
 
@@ -49,32 +84,88 @@ const TwitterCompose: React.FC<TwitterComposeProps> = ({ userId, onClose }) => {
           return;
         }
 
-        const response = await axios.post(`http://localhost:3000/schedule-tweet/${userIdToUse}`, {
-          text: tweetText,
-          scheduled_time: scheduleDate.toISOString()
-        });
+        if (selectedImage) {
+          // Schedule tweet with image using FormData
+          const formData = new FormData();
+          formData.append('image', selectedImage);
+          formData.append('text', tweetText.trim() || ''); // Always send text field, even if empty
+          formData.append('scheduled_time', scheduleDate.toISOString());
 
-        if (response.data.success) {
-          setIsScheduled(true);
-          setTimeout(() => {
-            onClose();
-          }, 2000);
+          const response = await fetch(`http://localhost:3000/schedule-tweet-with-image/${userIdToUse}`, {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || 'Failed to schedule tweet with image');
+          }
+
+          const responseData = await response.json();
+          if (responseData.success) {
+            setIsScheduled(true);
+            setTimeout(() => {
+              onClose();
+            }, 2000);
+          } else {
+            setError('Failed to schedule tweet: ' + responseData.message);
+          }
         } else {
-          setError('Failed to schedule tweet: ' + response.data.message);
+          // Schedule text-only tweet
+          const response = await axios.post(`http://localhost:3000/schedule-tweet/${userIdToUse}`, {
+            text: tweetText.trim()
+          });
+
+          if (response.data.success) {
+            setIsScheduled(true);
+            setTimeout(() => {
+              onClose();
+            }, 2000);
+          } else {
+            setError('Failed to schedule tweet: ' + response.data.message);
+          }
         }
       } else {
         // Post immediately
-        const response = await axios.post(`http://localhost:3000/post-tweet/${userIdToUse}`, {
-          text: tweetText
-        });
+        if (selectedImage) {
+          // Post tweet with image using FormData
+          const formData = new FormData();
+          formData.append('image', selectedImage);
+          formData.append('text', tweetText.trim() || ''); // Always send text field, even if empty
 
-        if (response.data.success) {
-          setIsScheduled(true);
-          setTimeout(() => {
-            onClose();
-          }, 2000);
+          const response = await fetch(`http://localhost:3000/post-tweet-with-image/${userIdToUse}`, {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || 'Failed to post tweet with image');
+          }
+
+          const responseData = await response.json();
+          if (responseData.success) {
+            setIsScheduled(true);
+            setTimeout(() => {
+              onClose();
+            }, 2000);
+          } else {
+            setError('Failed to post tweet: ' + responseData.message);
+          }
         } else {
-          setError('Failed to post tweet: ' + response.data.message);
+          // Post text-only tweet
+          const response = await axios.post(`http://localhost:3000/post-tweet/${userIdToUse}`, {
+            text: tweetText.trim()
+          });
+
+          if (response.data.success) {
+            setIsScheduled(true);
+            setTimeout(() => {
+              onClose();
+            }, 2000);
+          } else {
+            setError('Failed to post tweet: ' + response.data.message);
+          }
         }
       }
     } catch (err: any) {
@@ -189,6 +280,44 @@ const TwitterCompose: React.FC<TwitterComposeProps> = ({ userId, onClose }) => {
               </div>
             </div>
 
+            {/* Image Upload Section */}
+            <div className="image-upload-section">
+              <label htmlFor="image-upload" className="image-upload-button">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19 7v2.99s-1.99.01-2 0V7h-3s.01-1.99 0-2h3V2h2v3h3v2h-3zm-3 4V8h-3V5H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-8h-3zM5 19l3-4 2 3 3-4 4 5H5z"/>
+                </svg>
+                Add Image
+              </label>
+              <input
+                id="image-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                style={{ display: 'none' }}
+                disabled={isSubmitting}
+              />
+            </div>
+
+            {/* Image Preview */}
+            {imagePreview && (
+              <div className="image-preview-section">
+                <div className="image-preview-container">
+                  <img src={imagePreview} alt="Tweet preview" className="image-preview" />
+                  <button
+                    type="button"
+                    className="remove-image-button"
+                    onClick={removeImage}
+                    disabled={isSubmitting}
+                  >
+                    ×
+                  </button>
+                </div>
+                <p className="image-info">
+                  {selectedImage?.name} ({((selectedImage?.size || 0) / 1024 / 1024).toFixed(2)} MB)
+                </p>
+              </div>
+            )}
+
             <div className="scheduling-section">
               <label className="schedule-label">
                 <input
@@ -232,7 +361,7 @@ const TwitterCompose: React.FC<TwitterComposeProps> = ({ userId, onClose }) => {
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={isSubmitting || !tweetText.trim() || tweetText.length > 280}
+                disabled={isSubmitting || (!tweetText.trim() && !selectedImage) || tweetText.length > 280}
                 className="twitter-btn primary"
               >
                 {isSubmitting 

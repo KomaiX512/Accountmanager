@@ -34,13 +34,25 @@ interface PostGenerationResponse {
 
 // Configure axios for CORS requests
 axios.defaults.headers.common['Accept'] = 'application/json';
-axios.defaults.timeout = 30000; // 30 second default timeout
+axios.defaults.timeout = 15000; // Reduced from 30 seconds to 15 seconds
+
+// Extend axios config type to include metadata
+declare module 'axios' {
+  interface InternalAxiosRequestConfig {
+    metadata?: {
+      requestId: string;
+      startTime: number;
+    };
+  }
+}
 
 // Add a request interceptor for better error handling
 axios.interceptors.request.use(
   config => {
-    // Log each request
-    console.log(`[Axios] Sending ${config.method?.toUpperCase()} request to ${config.url}`);
+    // Log each request with a request ID to track infinite loops
+    const requestId = Math.random().toString(36).substr(2, 9);
+    config.metadata = { requestId, startTime: Date.now() };
+    console.log(`[Axios][${requestId}] Sending ${config.method?.toUpperCase()} request to ${config.url}`);
     
     // Ensure content type is set for all POST requests
     if (config.method === 'post') {
@@ -68,16 +80,21 @@ axios.interceptors.request.use(
 // Add a response interceptor for better error handling
 axios.interceptors.response.use(
   response => {
-    console.log(`[Axios] Received ${response.status} response from ${response.config.url}`);
+    const requestId = response.config.metadata?.requestId || 'unknown';
+    const duration = Date.now() - (response.config.metadata?.startTime || Date.now());
+    console.log(`[Axios][${requestId}] Received ${response.status} response from ${response.config.url} (${duration}ms)`);
     return response;
   },
   error => {
+    const requestId = error.config?.metadata?.requestId || 'unknown';
+    const duration = Date.now() - (error.config?.metadata?.startTime || Date.now());
+    
     if (error.code === 'ECONNABORTED') {
-      console.error('[Axios] Request timeout:', error.message);
+      console.error(`[Axios][${requestId}] Request timeout after ${duration}ms:`, error.message);
     } else if (error.code === 'ERR_NETWORK') {
-      console.error('[Axios] Network error:', error.message);
+      console.error(`[Axios][${requestId}] Network error after ${duration}ms:`, error.message);
     } else {
-      console.error('[Axios] Response error:', error.message);
+      console.error(`[Axios][${requestId}] Response error after ${duration}ms:`, error.message);
     }
     return Promise.reject(error);
   }

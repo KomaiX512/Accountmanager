@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import './App.css';
 import LeftBar from './components/common/LeftBar';
@@ -61,27 +61,28 @@ const AppContent: React.FC = () => {
     if (extractedUserId) setUserId(extractedUserId);
   }, [extractedAccountHolder, extractedCompetitors, extractedAccountType, extractedUserId]);
 
+  // Memoized sync function to prevent recreation on every render
+  const syncUserConnection = useCallback(async (uid: string) => {
+    try {
+      // Skip sync if the user has explicitly disconnected Instagram
+      if (isInstagramDisconnected(uid)) {
+        console.log(`[${new Date().toISOString()}] User ${uid} has previously disconnected Instagram, skipping connection sync`);
+        return;
+      }
+      
+      await syncInstagramConnection(uid);
+      console.log(`[${new Date().toISOString()}] Synced Instagram connection for user ${uid}`);
+    } catch (error) {
+      console.error(`[${new Date().toISOString()}] Error syncing Instagram connection:`, error);
+    }
+  }, []);
+
   // Sync Instagram connection when user logs in
   useEffect(() => {
-    const syncUserConnection = async () => {
-      if (currentUser?.uid) {
-        try {
-          // Skip sync if the user has explicitly disconnected Instagram
-          if (isInstagramDisconnected(currentUser.uid)) {
-            console.log(`[${new Date().toISOString()}] User ${currentUser.uid} has previously disconnected Instagram, skipping connection sync`);
-            return;
-          }
-          
-          await syncInstagramConnection(currentUser.uid);
-          console.log(`[${new Date().toISOString()}] Synced Instagram connection for user ${currentUser.uid}`);
-        } catch (error) {
-          console.error(`[${new Date().toISOString()}] Error syncing Instagram connection:`, error);
-        }
-      }
-    };
-    
-    syncUserConnection();
-  }, [currentUser]);
+    if (currentUser?.uid) {
+      syncUserConnection(currentUser.uid);
+    }
+  }, [currentUser?.uid, syncUserConnection]);
 
   // Try to load user data if logged in but no account info
   useEffect(() => {
@@ -138,7 +139,7 @@ const AppContent: React.FC = () => {
       
       fetchUserStatus();
     }
-  }, [currentUser, accountHolder, location.pathname, navigate]);
+  }, [currentUser?.uid, accountHolder, location.pathname, navigate]);
   
   if (isLoadingUserData) {
     return <div className="loading-screen">Loading account information...</div>;

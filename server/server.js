@@ -2435,44 +2435,6 @@ app.post('/user-instagram-status/:userId', async (req, res) => {
   }
 });
 
-// This endpoint updates the user's Twitter username entry state
-app.post('/user-twitter-status/:userId', async (req, res) => {
-  // Set CORS headers
-  setCorsHeaders(res);
-  
-  const { userId } = req.params;
-  const { twitter_username } = req.body;
-  
-  if (!twitter_username || !twitter_username.trim()) {
-    return res.status(400).json({ error: 'Twitter username is required' });
-  }
-  
-  try {
-    const key = `UserTwitterStatus/${userId}/status.json`;
-    const userData = {
-      uid: userId,
-      hasEnteredTwitterUsername: true,
-      twitter_username: twitter_username.trim(),
-      accountType: accountType || 'branding',
-      competitors: competitors || [],
-      lastUpdated: new Date().toISOString()
-    };
-    
-    const putCommand = new PutObjectCommand({
-      Bucket: 'tasks',
-      Key: key,
-      Body: JSON.stringify(userData, null, 2),
-      ContentType: 'application/json',
-    });
-    
-    await s3Client.send(putCommand);
-    res.json({ success: true, message: 'User Twitter status updated successfully' });
-  } catch (error) {
-    console.error(`Error updating user Twitter status for ${userId}:`, error);
-    res.status(500).json({ error: 'Failed to update user Twitter status' });
-  }
-});
-
 app.get('/check-username-availability/:username', async (req, res) => {
   try {
     const { username } = req.params;
@@ -3822,7 +3784,7 @@ app.post('/user-twitter-status/:userId', async (req, res) => {
   setCorsHeaders(res);
   
   const { userId } = req.params;
-  const { twitter_username } = req.body;
+  const { twitter_username, accountType, competitors } = req.body;
   
   if (!twitter_username || !twitter_username.trim()) {
     return res.status(400).json({ error: 'Twitter username is required' });

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import axios from 'axios';
 
@@ -30,19 +30,7 @@ export const TwitterProvider: React.FC<TwitterProviderProps> = ({ children }) =>
   const [isConnected, setIsConnected] = useState(false);
   const { currentUser } = useAuth();
 
-  useEffect(() => {
-    // Check for existing Twitter connection when auth state changes
-    if (currentUser?.uid) {
-      checkExistingConnection();
-    } else {
-      // Clear connection state when user logs out
-      setUserId(null);
-      setUsername(null);
-      setIsConnected(false);
-    }
-  }, [currentUser]);
-
-  const checkExistingConnection = async () => {
+  const checkExistingConnection = useCallback(async () => {
     if (!currentUser?.uid) return;
     
     try {
@@ -71,29 +59,41 @@ export const TwitterProvider: React.FC<TwitterProviderProps> = ({ children }) =>
       setUsername(null);
       setIsConnected(false);
     }
-  };
+  }, [currentUser?.uid]);
 
-  const connectTwitter = (twitterId: string, twitterUsername: string) => {
+  useEffect(() => {
+    // Check for existing Twitter connection when auth state changes
+    if (currentUser?.uid) {
+      checkExistingConnection();
+    } else {
+      // Clear connection state when user logs out
+      setUserId(null);
+      setUsername(null);
+      setIsConnected(false);
+    }
+  }, [currentUser?.uid, checkExistingConnection]);
+
+  const connectTwitter = useCallback((twitterId: string, twitterUsername: string) => {
     setUserId(twitterId);
     setUsername(twitterUsername);
     setIsConnected(true);
     console.log(`[${new Date().toISOString()}] Twitter connected via context: ${twitterId} (@${twitterUsername})`);
-  };
+  }, []);
 
-  const disconnectTwitter = () => {
+  const disconnectTwitter = useCallback(() => {
     setUserId(null);
     setUsername(null);
     setIsConnected(false);
     console.log(`[${new Date().toISOString()}] Twitter disconnected via context`);
-  };
+  }, []);
 
-  const value: TwitterContextType = {
+  const value: TwitterContextType = useMemo(() => ({
     userId,
     username,
     isConnected,
     connectTwitter,
     disconnectTwitter,
-  };
+  }), [userId, username, isConnected, connectTwitter, disconnectTwitter]);
 
   return (
     <TwitterContext.Provider value={value}>

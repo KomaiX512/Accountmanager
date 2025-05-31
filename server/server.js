@@ -4815,3 +4815,56 @@ function startTwitterScheduler() {
 
 // Start the Twitter scheduler
 startTwitterScheduler();
+
+// Debug endpoint to list connected Twitter users
+app.get('/debug/twitter-users', async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  try {
+    console.log(`[${new Date().toISOString()}] Listing connected Twitter users...`);
+    
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: 'TwitterTokens/'
+    });
+    
+    const listResponse = await s3Client.send(listCommand);
+    const files = listResponse.Contents || [];
+    
+    const users = [];
+    
+    for (const file of files) {
+      if (file.Key.endsWith('/token.json')) {
+        try {
+          const getCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: file.Key
+          });
+          const data = await s3Client.send(getCommand);
+          const tokenData = JSON.parse(await streamToString(data.Body));
+          
+          users.push({
+            userId: tokenData.twitter_user_id,
+            username: tokenData.username,
+            connected_at: tokenData.timestamp,
+            expires_at: tokenData.expires_at,
+            hasRefreshToken: !!tokenData.refresh_token,
+            scopes: tokenData.scope
+          });
+        } catch (error) {
+          console.error(`Error reading token file ${file.Key}:`, error);
+        }
+      }
+    }
+    
+    console.log(`[${new Date().toISOString()}] Found ${users.length} connected Twitter users`);
+    res.json({ users });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error listing Twitter users:`, error);
+    res.status(500).json({ 
+      error: 'Failed to list Twitter users', 
+      details: error.message 
+    });
+  }
+});

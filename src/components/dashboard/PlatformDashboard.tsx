@@ -5,6 +5,7 @@ import OurStrategies from '../instagram/OurStrategies';
 import PostCooked from '../instagram/PostCooked';
 import InstagramConnect from '../instagram/InstagramConnect';
 import TwitterConnect from '../twitter/TwitterConnect';
+import TwitterPostTest from '../twitter/TwitterPostTest';
 import DmsComments from '../instagram/Dms_Comments';
 import PostScheduler from '../instagram/PostScheduler';
 import InsightsModal from '../instagram/InsightsModal';
@@ -1240,6 +1241,14 @@ Image Description: ${response.post.image_prompt}
                 onSendAIReply={handleSendAIReply}
                 platform={platform}
               />
+            </div>
+          )}
+
+          {/* Twitter Post Testing Section - Only show for Twitter platform */}
+          {platform === 'twitter' && (
+            <div className="twitter-test-section">
+              <h2>Twitter Post Test <span className="badge">Test posting functionality!</span></h2>
+              <TwitterPostTest twitterUserId={twitterId || undefined} />
             </div>
           )}
 

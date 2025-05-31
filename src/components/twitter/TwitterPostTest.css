@@ -1,0 +1,257 @@
+.twitter-post-test {
+  max-width: 600px;
+  margin: 20px auto;
+  padding: 20px;
+  border: 1px solid #e1e8ed;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.twitter-post-header {
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #e1e8ed;
+}
+
+.twitter-post-header h3 {
+  margin: 0 0 10px 0;
+  color: #1da1f2;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.twitter-user-id {
+  margin: 0;
+  font-size: 14px;
+  color: #657786;
+  background: #f7f9fa;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #e1e8ed;
+}
+
+.tweet-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.tweet-input-section {
+  position: relative;
+}
+
+.tweet-textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 15px;
+  border: 2px solid #e1e8ed;
+  border-radius: 8px;
+  font-size: 16px;
+  font-family: inherit;
+  resize: vertical;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+}
+
+.tweet-textarea:focus {
+  outline: none;
+  border-color: #1da1f2;
+}
+
+.tweet-textarea:disabled {
+  background-color: #f7f9fa;
+  color: #657786;
+  cursor: not-allowed;
+}
+
+.tweet-meta {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.character-count {
+  font-size: 14px;
+  color: #657786;
+  font-weight: 500;
+}
+
+.character-count.warning {
+  color: #ff8c00;
+}
+
+.character-count.error {
+  color: #e0245e;
+}
+
+.scheduling-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scheduling-section label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #14171a;
+}
+
+.schedule-input {
+  padding: 10px 12px;
+  border: 2px solid #e1e8ed;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+}
+
+.schedule-input:focus {
+  outline: none;
+  border-color: #1da1f2;
+}
+
+.schedule-input:disabled {
+  background-color: #f7f9fa;
+  color: #657786;
+  cursor: not-allowed;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.post-button,
+.schedule-button {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 25px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 120px;
+}
+
+.post-button {
+  background: #1da1f2;
+  color: white;
+}
+
+.post-button:hover:not(:disabled) {
+  background: #1991da;
+}
+
+.schedule-button {
+  background: #17bf63;
+  color: white;
+}
+
+.schedule-button:hover:not(:disabled) {
+  background: #148f4f;
+}
+
+.post-button:disabled,
+.schedule-button:disabled {
+  background: #aab8c2;
+  color: white;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.result-message {
+  padding: 15px;
+  border-radius: 8px;
+  margin-top: 10px;
+}
+
+.result-message.success {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.result-message.error {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.result-message p {
+  margin: 0 0 8px 0;
+}
+
+.result-message p:last-child {
+  margin-bottom: 0;
+}
+
+.tweet-link a {
+  color: #1da1f2;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.tweet-link a:hover {
+  text-decoration: underline;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .twitter-post-test {
+    background: #15202b;
+    border-color: #38444d;
+    color: #ffffff;
+  }
+
+  .twitter-post-header {
+    border-bottom-color: #38444d;
+  }
+
+  .twitter-user-id {
+    background: #192734;
+    border-color: #38444d;
+    color: #8899a6;
+  }
+
+  .tweet-textarea {
+    background: #192734;
+    border-color: #38444d;
+    color: #ffffff;
+  }
+
+  .tweet-textarea:focus {
+    border-color: #1da1f2;
+  }
+
+  .schedule-input {
+    background: #192734;
+    border-color: #38444d;
+    color: #ffffff;
+  }
+
+  .schedule-input:focus {
+    border-color: #1da1f2;
+  }
+
+  .scheduling-section label {
+    color: #ffffff;
+  }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .twitter-post-test {
+    margin: 10px;
+    padding: 15px;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+  }
+
+  .post-button,
+  .schedule-button {
+    width: 100%;
+  }
+} 

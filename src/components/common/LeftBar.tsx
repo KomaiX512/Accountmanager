@@ -9,9 +9,10 @@ import CanvasEditor from './CanvasEditor';
 interface LeftBarProps {
   accountHolder: string;
   userId?: string;
+  platform?: 'instagram' | 'twitter';
 }
 
-const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId }) => {
+const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'instagram' }) => {
   const navigate = useNavigate();
   const [showProfilePopup, setShowProfilePopup] = useState(false);
   const [showMessagesPopup, setShowMessagesPopup] = useState(false);
@@ -99,6 +100,7 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId }) => {
         <CanvasEditor 
           username={accountHolder} 
           userId={userId}
+          platform={platform}
           onClose={() => setShowCanvasEditor(false)} 
         />
       )}

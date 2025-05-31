@@ -1,0 +1,327 @@
+.twitter-compose-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.twitter-compose-container {
+  background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
+  border-radius: 16px;
+  padding: 0;
+  width: 100%;
+  max-width: 550px;
+  color: #e0e0ff;
+  box-shadow: 0 8px 30px rgba(0, 255, 204, 0.2);
+  border: 1px solid rgba(0, 255, 204, 0.3);
+  overflow: hidden;
+  margin: 20px;
+}
+
+.twitter-compose-container.success {
+  text-align: center;
+  padding: 40px 24px;
+}
+
+.twitter-compose-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(0, 255, 204, 0.2);
+}
+
+.twitter-compose-header h2 {
+  margin: 0;
+  color: #00ffcc;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  color: #e0e0ff;
+  font-size: 24px;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.close-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.compose-content {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.twitter-not-connected {
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.twitter-not-connected p {
+  margin-bottom: 20px;
+  color: #a0a0cc;
+}
+
+.tweet-input-section {
+  position: relative;
+}
+
+.tweet-textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 16px;
+  border: 2px solid rgba(0, 255, 204, 0.2);
+  border-radius: 12px;
+  font-size: 16px;
+  font-family: inherit;
+  resize: vertical;
+  background: rgba(255, 255, 255, 0.05);
+  color: #e0e0ff;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+}
+
+.tweet-textarea:focus {
+  outline: none;
+  border-color: #00ffcc;
+  box-shadow: 0 0 0 3px rgba(0, 255, 204, 0.1);
+}
+
+.tweet-textarea:disabled {
+  background: rgba(255, 255, 255, 0.02);
+  color: #a0a0cc;
+  cursor: not-allowed;
+}
+
+.tweet-textarea::placeholder {
+  color: #8a8aaa;
+}
+
+.tweet-meta {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.character-count {
+  font-size: 14px;
+  color: #a0a0cc;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.character-count.warning {
+  color: #ffaa00;
+  background: rgba(255, 170, 0, 0.1);
+}
+
+.character-count.error {
+  color: #ff4444;
+  background: rgba(255, 68, 68, 0.1);
+}
+
+.scheduling-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.schedule-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #e0e0ff;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.schedule-label:hover {
+  color: #00ffcc;
+}
+
+.schedule-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #00ffcc;
+  cursor: pointer;
+}
+
+.schedule-input {
+  padding: 12px 16px;
+  border: 2px solid rgba(0, 255, 204, 0.2);
+  border-radius: 8px;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #e0e0ff;
+  transition: border-color 0.2s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.schedule-input:focus {
+  outline: none;
+  border-color: #00ffcc;
+  box-shadow: 0 0 0 3px rgba(0, 255, 204, 0.1);
+}
+
+.error-message {
+  padding: 12px 16px;
+  background: rgba(255, 68, 68, 0.1);
+  border: 1px solid rgba(255, 68, 68, 0.3);
+  border-radius: 8px;
+  color: #ff6b6b;
+  font-size: 14px;
+}
+
+.compose-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.twitter-btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 25px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 100px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.twitter-btn.cancel {
+  background: transparent;
+  color: #e0e0ff;
+  border: 1px solid rgba(224, 224, 255, 0.3);
+}
+
+.twitter-btn.cancel:hover:not(:disabled) {
+  background: rgba(224, 224, 255, 0.1);
+  border-color: rgba(224, 224, 255, 0.5);
+}
+
+.twitter-btn.primary {
+  background: linear-gradient(90deg, #1da1f2, #00acee);
+  color: white;
+  border: 1px solid transparent;
+}
+
+.twitter-btn.primary:hover:not(:disabled) {
+  background: linear-gradient(90deg, #1991db, #0099d4);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(29, 161, 242, 0.3);
+}
+
+.twitter-btn.disconnect {
+  background: transparent;
+  color: #e0e0ff;
+  border: 1px solid rgba(224, 224, 255, 0.3);
+}
+
+.twitter-btn.disconnect:hover:not(:disabled) {
+  background: rgba(224, 224, 255, 0.1);
+  border-color: rgba(224, 224, 255, 0.5);
+}
+
+.twitter-btn:disabled {
+  background: #4a4a6a !important;
+  color: #a0a0cc !important;
+  cursor: not-allowed !important;
+  opacity: 0.6;
+  transform: none !important;
+  box-shadow: none !important;
+  border-color: rgba(160, 160, 204, 0.3) !important;
+}
+
+.success-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.success-content h3 {
+  margin: 0;
+  color: #00ffcc;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.success-content p {
+  margin: 0;
+  color: #e0e0ff;
+  font-size: 16px;
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .twitter-compose-container {
+    max-width: 100%;
+    margin: 10px;
+    border-radius: 12px;
+  }
+  
+  .compose-content {
+    padding: 20px;
+    gap: 16px;
+  }
+  
+  .compose-actions {
+    flex-direction: column;
+  }
+  
+  .twitter-btn {
+    width: 100%;
+  }
+}
+
+/* DatePicker custom styles */
+.react-datepicker-wrapper {
+  width: 100%;
+}
+
+.react-datepicker__input-container input {
+  width: 100% !important;
+  padding: 12px 16px !important;
+  border: 2px solid rgba(0, 255, 204, 0.2) !important;
+  border-radius: 8px !important;
+  font-size: 14px !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: #e0e0ff !important;
+  box-sizing: border-box;
+}
+
+.react-datepicker__input-container input:focus {
+  outline: none !important;
+  border-color: #00ffcc !important;
+  box-shadow: 0 0 0 3px rgba(0, 255, 204, 0.1) !important;
+} 

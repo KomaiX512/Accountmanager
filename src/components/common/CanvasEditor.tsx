@@ -6,7 +6,9 @@ import 'react-datepicker/dist/react-datepicker.css';
 import 'tui-image-editor/dist/tui-image-editor.css';
 import axios from 'axios';
 import InstagramRequiredButton from './InstagramRequiredButton';
+import TwitterRequiredButton from './TwitterRequiredButton';
 import { useInstagram } from '../../context/InstagramContext';
+import { useTwitter } from '../../context/TwitterContext';
 
 interface CanvasEditorProps {
   onClose: () => void;
@@ -15,6 +17,7 @@ interface CanvasEditorProps {
   initialImageUrl?: string;
   postKey?: string;
   postCaption?: string;
+  platform?: 'instagram' | 'twitter';
 }
 
 interface BrandElement {
@@ -33,11 +36,17 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
   userId: propUserId, 
   initialImageUrl, 
   postKey, 
-  postCaption 
+  postCaption, 
+  platform = 'instagram'
 }) => {
   // Get userId from context if not provided as prop
-  const { userId: contextUserId, isConnected } = useInstagram();
-  const userId = propUserId || (isConnected ? contextUserId : null);
+  const { userId: instagramUserId, isConnected: isInstagramConnected } = useInstagram();
+  const { userId: twitterUserId, isConnected: isTwitterConnected } = useTwitter();
+  
+  // Determine platform-specific values
+  const isConnected = platform === 'twitter' ? isTwitterConnected : isInstagramConnected;
+  const contextUserId = platform === 'twitter' ? twitterUserId : instagramUserId;
+  const userId = propUserId || (isConnected ? (contextUserId ?? undefined) : undefined);
 
   const editorRef = useRef<HTMLDivElement>(null);
   const tuiInstanceRef = useRef<any>(null);
@@ -862,29 +871,53 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
     setIsScheduling(true);
     
     try {
-      // Get the canvas image as a data URL
-      const imageDataUrl = tuiInstanceRef.current.toDataURL();
-      const imageBlob = await fetch(imageDataUrl).then(r => r.blob());
-      
-      // Convert to form data for the backend API
-      const formData = new FormData();
-      const filename = postKey ? `post_${postKey}.jpg` : `canvas_${Date.now()}.jpg`;
-      formData.append('image', imageBlob, filename);
-      formData.append('caption', caption || postCaption || '');
-      formData.append('scheduleDate', scheduleDate.toISOString());
-      
-      // Send the scheduled post to the backend
-      const resp = await fetch(`http://localhost:3000/schedule-post/${userId}`, {
-        method: 'POST',
-        body: formData,
-      });
-      
-      if (!resp.ok) {
-        const errData = await resp.json().catch(() => ({}));
-        throw new Error(errData.error || 'Unknown server error');
+      if (platform === 'twitter') {
+        // For Twitter, handle text-only scheduling
+        const tweetText = caption || postCaption || '';
+        console.log(`[CanvasEditor] Scheduling Twitter post: "${tweetText}"`);
+        
+        if (tweetText.length > 280) {
+          setNotification('Tweet text exceeds 280 characters.');
+          setIsScheduling(false);
+          return;
+        }
+        
+        const response = await axios.post(`http://localhost:3000/schedule-tweet/${userId}`, {
+          text: tweetText.trim(),
+          scheduled_time: scheduleDate.toISOString()
+        });
+
+        if (response.data.success) {
+          setNotification('Your tweet is scheduled!');
+        } else {
+          setNotification('Failed to schedule tweet: ' + response.data.message);
+        }
+      } else {
+        // Instagram scheduling logic (existing)
+        // Get the canvas image as a data URL
+        const imageDataUrl = tuiInstanceRef.current.toDataURL();
+        const imageBlob = await fetch(imageDataUrl).then(r => r.blob());
+        
+        // Convert to form data for the backend API
+        const formData = new FormData();
+        const filename = postKey ? `post_${postKey}.jpg` : `canvas_${Date.now()}.jpg`;
+        formData.append('image', imageBlob, filename);
+        formData.append('caption', caption || postCaption || '');
+        formData.append('scheduleDate', scheduleDate.toISOString());
+        
+        // Send the scheduled post to the backend
+        const resp = await fetch(`http://localhost:3000/schedule-post/${userId}`, {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (!resp.ok) {
+          const errData = await resp.json().catch(() => ({}));
+          throw new Error(errData.error || 'Unknown server error');
+        }
+        
+        setNotification('Your post is now scheduled!');
       }
-      
-      setNotification('Your post is now scheduled!');
       
       // Close the scheduler after 2 seconds
       setTimeout(() => {
@@ -894,7 +927,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
       }, 2000);
     } catch (error) {
       console.error('Error scheduling post:', error);
-      setNotification(`Failed to schedule post: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setNotification(`Failed to schedule ${platform === 'twitter' ? 'tweet' : 'post'}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsScheduling(false);
     }
@@ -1186,23 +1219,43 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
               Exit Brand Kit
             </button>
           ) : (
-          <InstagramRequiredButton
-            onClick={handleSchedule}
-            className="schedule-button"
-            disabled={!imageLoaded || isProcessing}
-            style={{ 
-              backgroundColor: '#007bff',
-              color: '#e0e0ff',
-              border: 'none',
-              padding: '8px 16px',
-              borderRadius: '4px',
-              fontWeight: 'bold',
-              cursor: imageLoaded && !isProcessing ? 'pointer' : 'not-allowed',
-              opacity: imageLoaded && !isProcessing ? 1 : 0.5
-            }}
-          >
-            Schedule
-          </InstagramRequiredButton>
+            platform === 'twitter' ? (
+              <TwitterRequiredButton
+                onClick={handleSchedule}
+                className="schedule-button"
+                disabled={!imageLoaded || isProcessing}
+                style={{ 
+                  backgroundColor: '#1da1f2',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '8px 16px',
+                  borderRadius: '4px',
+                  fontWeight: 'bold',
+                  cursor: imageLoaded && !isProcessing ? 'pointer' : 'not-allowed',
+                  opacity: imageLoaded && !isProcessing ? 1 : 0.5
+                }}
+              >
+                Schedule
+              </TwitterRequiredButton>
+            ) : (
+              <InstagramRequiredButton
+                onClick={handleSchedule}
+                className="schedule-button"
+                disabled={!imageLoaded || isProcessing}
+                style={{ 
+                  backgroundColor: '#007bff',
+                  color: '#e0e0ff',
+                  border: 'none',
+                  padding: '8px 16px',
+                  borderRadius: '4px',
+                  fontWeight: 'bold',
+                  cursor: imageLoaded && !isProcessing ? 'pointer' : 'not-allowed',
+                  opacity: imageLoaded && !isProcessing ? 1 : 0.5
+                }}
+              >
+                Schedule
+              </InstagramRequiredButton>
+            )
           )}
         </div>
         
@@ -1217,11 +1270,19 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
                   id="post-caption"
                   value={caption}
                   onChange={(e) => setCaption(e.target.value)}
-                  placeholder="Write your caption here... (include any hashtags)"
+                  placeholder={platform === 'twitter' ? "What's happening?" : "Write your caption here... (include any hashtags)"}
                   rows={4}
                   className="caption-input"
+                  maxLength={platform === 'twitter' ? 280 : 2200}
                 />
-                <p className="caption-count">{caption.length}/2200 characters</p>
+                <p className="caption-count">
+                  {caption.length}/{platform === 'twitter' ? 280 : 2200} characters
+                  {platform === 'twitter' && caption.length > 280 && (
+                    <span style={{ color: '#ff4444', marginLeft: '8px' }}>
+                      Tweet exceeds character limit!
+                    </span>
+                  )}
+                </p>
               </div>
               
               <p>Select date and time to publish your post:</p>

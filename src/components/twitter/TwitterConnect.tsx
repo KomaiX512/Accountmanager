@@ -117,7 +117,7 @@ const TwitterConnect: React.FC<TwitterConnectProps> = ({ onConnected, className 
       console.log(`[${new Date().toISOString()}] Initiating Twitter OAuth flow...`);
       
       // Step 1: Get authorization URL from backend
-      const response = await axios.get('http://localhost:3000/twitter/auth');
+      const response = await axios.get(`http://localhost:3000/twitter/auth?userId=${currentUser.uid}`);
       const { authUrl } = response.data;
       
       if (!authUrl) {

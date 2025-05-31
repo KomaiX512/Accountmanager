@@ -4155,8 +4155,14 @@ const pkceStore = new Map();
 app.get('/twitter/auth', async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
   
+  const { userId } = req.query; // Firebase user ID
+  
+  if (!userId) {
+    return res.status(400).json({ error: 'Firebase userId is required' });
+  }
+  
   try {
-    console.log(`[${new Date().toISOString()}] Starting Twitter OAuth 2.0 flow...`);
+    console.log(`[${new Date().toISOString()}] Starting Twitter OAuth 2.0 flow for Firebase user ${userId}...`);
     
     // Generate PKCE parameters
     const codeVerifier = generateCodeVerifier();
@@ -4167,6 +4173,7 @@ app.get('/twitter/auth', async (req, res) => {
     pkceStore.set(state, {
       codeVerifier,
       codeChallenge,
+      firebaseUserId: userId, // Store Firebase user ID
       timestamp: Date.now()
     });
     
@@ -4299,6 +4306,24 @@ app.get('/twitter/callback', async (req, res) => {
     }));
     
     console.log(`[${new Date().toISOString()}] Twitter tokens stored for user ${userId}`);
+    
+    // Also store connection data for frontend detection
+    const connectionKey = `UserTwitterConnection/${pkceData.firebaseUserId}/connection.json`;
+    const connectionData = {
+      twitter_user_id: userId,
+      username: username,
+      connected_at: new Date().toISOString(),
+      user_id: pkceData.firebaseUserId
+    };
+    
+    await s3Client.send(new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: connectionKey,
+      Body: JSON.stringify(connectionData, null, 2),
+      ContentType: 'application/json'
+    }));
+    
+    console.log(`[${new Date().toISOString()}] Twitter connection data stored for Firebase user ${pkceData.firebaseUserId}`);
     
     // Send success response with JavaScript to notify parent window
     res.send(`

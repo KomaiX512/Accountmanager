@@ -445,3 +445,57 @@
   width: 16px;
   height: 16px;
 }
+
+/* Integration with JSON Decoder */
+.analysis-content-wrapper .analysis-content,
+.analysis-content-wrapper .analysis-list-item {
+  line-height: 1.6;
+  color: #e0e0ff;
+  margin: 0.5rem 0;
+  font-size: 0.95rem;
+}
+
+.analysis-content-wrapper .analysis-content strong,
+.analysis-content-wrapper .analysis-list-item strong {
+  color: #00ffcc;
+  font-weight: 600;
+}
+
+.analysis-content-wrapper .analysis-content em,
+.analysis-content-wrapper .analysis-list-item em {
+  color: #ffcc00;
+  font-style: italic;
+}
+
+.analysis-content-wrapper .analysis-highlight {
+  background: linear-gradient(135deg, rgba(0, 255, 204, 0.2), rgba(255, 204, 0, 0.2));
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 255, 204, 0.3);
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.analysis-content-wrapper .analysis-key {
+  color: #00ffcc;
+  font-weight: 600;
+  margin-right: 0.5rem;
+}
+
+.analysis-content-wrapper .analysis-value {
+  color: #e0e0ff;
+}
+
+/* Maintain existing detail styling */
+.analysis-detail {
+  line-height: 1.6;
+  color: #e0e0ff;
+  margin: 0.5rem 0;
+  font-size: 0.95rem;
+}
+
+.detail-label {
+  color: #00ffcc;
+  font-weight: 600;
+  margin-right: 0.5rem;
+}

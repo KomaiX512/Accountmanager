@@ -4,7 +4,9 @@ import axios from 'axios';
 
 interface GoalModalProps {
   username: string;
+  platform?: string; // Make platform optional with default to Instagram
   onClose: () => void;
+  onSuccess?: () => void; // Add success callback
 }
 
 interface GoalForm {
@@ -14,11 +16,12 @@ interface GoalForm {
   instruction: string;
 }
 
-const GoalModal: React.FC<GoalModalProps> = ({ username, onClose }) => {
+const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram', onClose, onSuccess }) => {
   const [form, setForm] = useState<GoalForm>({ persona: '', timeline: '', goal: '', instruction: '' });
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [showCampaignButton, setShowCampaignButton] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -38,22 +41,34 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, onClose }) => {
     setIsSubmitting(true);
     setError(null);
     try {
-      await axios.post(`http://localhost:3000/save-goal/${username}`, {
+      await axios.post(`http://localhost:3000/save-goal/${username}?platform=${platform}`, {
         persona: form.persona,
         timeline: Number(form.timeline),
         goal: form.goal,
         instruction: form.instruction,
       });
       setSuccess(true);
+      // Show campaign button after successful submission
       setTimeout(() => {
         setSuccess(false);
-        onClose();
+        setShowCampaignButton(true);
       }, 1200);
+      if (onSuccess) {
+        onSuccess();
+      }
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to save goal.');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleCampaignClick = () => {
+    // Close this modal and trigger campaign modal
+    onClose();
+    // The parent component should handle opening the campaign modal
+    // We'll pass this information through an event or callback
+    window.dispatchEvent(new CustomEvent('openCampaignModal', { detail: { username, platform } }));
   };
 
   return (
@@ -75,74 +90,107 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, onClose }) => {
         style={{ maxWidth: 500, width: '100%' }}
       >
         <h2 style={{ color: '#00ffcc', textAlign: 'center', marginBottom: 10 }}>Set Your Goal</h2>
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label">Persona <span style={{ color: '#a0a0cc', fontWeight: 400 }}>(optional)</span></label>
-            <input
-              type="text"
-              name="persona"
-              value={form.persona}
-              onChange={handleChange}
-              className="form-input"
-              placeholder="Whom should I mimic? (e.g. as Account holder)"
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Timeline <span style={{ color: '#ff4444' }}>*</span></label>
-            <input
-              type="text"
-              name="timeline"
-              value={form.timeline}
-              onChange={handleChange}
-              className="form-input"
-              placeholder="Days to accomplish (number only)"
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Goal <span style={{ color: '#ff4444' }}>*</span></label>
-            <textarea
-              name="goal"
-              value={form.goal}
-              onChange={handleChange}
-              className="form-input"
-              rows={3}
-              placeholder="What do you want to achieve? (e.g. engagement, reach, followers, etc.)"
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Instruction <span style={{ color: '#ff4444' }}>*</span></label>
-            <textarea
-              name="instruction"
-              value={form.instruction}
-              onChange={handleChange}
-              className="form-input"
-              rows={3}
-              placeholder="What should be the theme? What should be avoided?"
-              required
-            />
-          </div>
-          {error && <div className="form-error">{error}</div>}
-          {success && <div style={{ color: '#00ffcc', textAlign: 'center', margin: '10px 0' }}>Goal saved!</div>}
-          <div className="form-actions">
+        
+        {!showCampaignButton ? (
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label className="form-label">Persona <span style={{ color: '#a0a0cc', fontWeight: 400 }}>(optional)</span></label>
+              <input
+                type="text"
+                name="persona"
+                value={form.persona}
+                onChange={handleChange}
+                className="form-input"
+                placeholder="Whom should I mimic? (e.g. as Account holder)"
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Timeline <span style={{ color: '#ff4444' }}>*</span></label>
+              <input
+                type="text"
+                name="timeline"
+                value={form.timeline}
+                onChange={handleChange}
+                className="form-input"
+                placeholder="Days to accomplish (number only)"
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Goal <span style={{ color: '#ff4444' }}>*</span></label>
+              <textarea
+                name="goal"
+                value={form.goal}
+                onChange={handleChange}
+                className="form-input"
+                rows={3}
+                placeholder="What do you want to achieve? (e.g. engagement, reach, followers, etc.)"
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Instruction <span style={{ color: '#ff4444' }}>*</span></label>
+              <textarea
+                name="instruction"
+                value={form.instruction}
+                onChange={handleChange}
+                className="form-input"
+                rows={3}
+                placeholder="What should be the theme? What should be avoided?"
+                required
+              />
+            </div>
+            {error && <div className="form-error">{error}</div>}
+            {success && <div style={{ color: '#00ffcc', textAlign: 'center', margin: '10px 0' }}>Goal saved!</div>}
+            <div className="form-actions">
+              <button
+                type="button"
+                onClick={onClose}
+                className="insta-btn disconnect"
+                disabled={isSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className={`insta-btn connect${!canSubmit || isSubmitting ? ' disabled' : ''}`}
+                disabled={!canSubmit || isSubmitting}
+              >
+                {isSubmitting ? 'Saving...' : 'Save Goal'}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <div style={{ color: '#00ffcc', marginBottom: '20px', fontSize: '16px' }}>
+              Goal saved successfully! Your campaign is being prepared.
+            </div>
             <button
-              type="button"
+              onClick={handleCampaignClick}
+              className="insta-btn connect"
+              style={{
+                background: 'linear-gradient(90deg, #ff6b6b, #ff8e53)',
+                color: '#fff',
+                padding: '12px 24px',
+                borderRadius: '8px',
+                border: 'none',
+                fontSize: '16px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                marginRight: '10px'
+              }}
+            >
+              View Campaign Progress
+            </button>
+            <button
               onClick={onClose}
               className="insta-btn disconnect"
-              disabled={isSubmitting}
+              style={{ marginLeft: '10px' }}
             >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className={`insta-btn connect${!canSubmit || isSubmitting ? ' disabled' : ''}`}
-              disabled={!canSubmit || isSubmitting}
-            >
-              {isSubmitting ? 'Saving...' : 'Save Goal'}
+              Close
             </button>
           </div>
-        </form>
+        )}
       </motion.div>
     </motion.div>
   );

@@ -5430,3 +5430,311 @@ app.post('/post-tweet-with-image/:userId', upload.single('image'), async (req, r
 });
 
 // Schedule tweet endpoint - for future posting
+
+// ============= GOAL MANAGEMENT ENDPOINTS =============
+
+// Save goal endpoint - Schema: tasks/goal/<platform>/<username>/goal_*.json
+app.post('/save-goal/:username', async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  try {
+    const { username } = req.params;
+    const { persona, timeline, goal, instruction } = req.body;
+    
+    // Parse platform from query params
+    const platform = (req.query.platform || 'instagram').toLowerCase();
+    if (!['instagram', 'twitter'].includes(platform)) {
+      return res.status(400).json({ 
+        error: 'Invalid platform. Must be instagram or twitter.' 
+      });
+    }
+
+    // Validate required fields
+    if (!username || !timeline || !goal || !instruction) {
+      return res.status(400).json({ 
+        error: 'Username, timeline, goal, and instruction are required' 
+      });
+    }
+
+    // Validate timeline is a number
+    if (typeof timeline !== 'number' || timeline <= 0) {
+      return res.status(400).json({ 
+        error: 'Timeline must be a positive number' 
+      });
+    }
+
+    // Generate unique identifier for the goal file
+    const timestamp = Date.now();
+    const goalId = `goal_${timestamp}`;
+    
+    // Build goal path
+    const goalPath = `tasks/goal/${platform}/${username}/${goalId}.json`;
+
+    // Create goal data structure
+    const goalData = {
+      id: goalId,
+      username,
+      platform,
+      persona: persona || '',
+      timeline,
+      goal: goal.trim(),
+      instruction: instruction.trim(),
+      status: 'active',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    console.log(`[${new Date().toISOString()}] Saving goal to: ${goalPath}`);
+
+    // Save to R2
+    const putCommand = new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: goalPath,
+      Body: JSON.stringify(goalData, null, 2),
+      ContentType: 'application/json'
+    });
+    
+    await s3Client.send(putCommand);
+
+    console.log(`[${new Date().toISOString()}] Goal saved successfully for ${username} on ${platform}`);
+
+    res.json({ 
+      success: true, 
+      message: 'Goal saved successfully',
+      goalId,
+      platform
+    });
+
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Save goal error:`, error);
+    res.status(500).json({ 
+      error: 'Failed to save goal', 
+      details: error.message 
+    });
+  }
+});
+
+// OPTIONS handler for save-goal
+app.options('/save-goal/:username', (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+
+// Goal summary retrieval endpoint - Schema: tasks/goal_summary/<platform>/<username>/summary_*.json
+app.get('/goal-summary/:username', async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  try {
+    const { username } = req.params;
+    
+    // Parse platform from query params
+    const platform = (req.query.platform || 'instagram').toLowerCase();
+    if (!['instagram', 'twitter'].includes(platform)) {
+      return res.status(400).json({ 
+        error: 'Invalid platform. Must be instagram or twitter.' 
+      });
+    }
+    
+    // Build summary prefix
+    const summaryPrefix = `tasks/goal_summary/${platform}/${username}`;
+
+    console.log(`[${new Date().toISOString()}] Retrieving goal summary from: ${summaryPrefix}/`);
+
+    // List all summary files for the user
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: `${summaryPrefix}/`
+    });
+
+    const data = await s3Client.send(listCommand);
+
+    if (!data.Contents || data.Contents.length === 0) {
+      console.log(`[${new Date().toISOString()}] No goal summary found for ${username} on ${platform}`);
+      return res.status(404).json({ 
+        error: 'Goal summary not found',
+        message: 'Your campaign is processing. Progress will be available shortly.'
+      });
+    }
+
+    // Find the latest summary file (highest number)
+    const summaryFiles = data.Contents
+      .filter(obj => obj.Key && obj.Key.includes('summary_'))
+      .map(obj => ({
+        key: obj.Key,
+        number: parseInt(obj.Key.match(/summary_(\d+)\.json$/)?.[1] || '0')
+      }))
+      .sort((a, b) => b.number - a.number);
+
+    if (summaryFiles.length === 0) {
+      return res.status(404).json({ 
+        error: 'No valid summary files found',
+        message: 'Your campaign is processing. Progress will be available shortly.'
+      });
+    }
+
+    // Get the latest summary file
+    const latestSummaryKey = summaryFiles[0].key;
+    console.log(`[${new Date().toISOString()}] Retrieving latest summary: ${latestSummaryKey}`);
+
+    const getCommand = new GetObjectCommand({
+      Bucket: 'tasks',
+      Key: latestSummaryKey
+    });
+    
+    const summaryResponse = await s3Client.send(getCommand);
+    const summaryBody = await streamToString(summaryResponse.Body);
+    const summary = JSON.parse(summaryBody);
+
+    res.json(summary);
+
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Goal summary retrieval error:`, error);
+    
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+      return res.status(404).json({ 
+        error: 'Goal summary not found',
+        message: 'Your campaign is processing. Progress will be available shortly.'
+      });
+    }
+
+    res.status(500).json({ 
+      error: 'Failed to retrieve goal summary', 
+      details: error.message 
+    });
+  }
+});
+
+// OPTIONS handler for goal-summary
+app.options('/goal-summary/:username', (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+
+// Campaign ready posts count endpoint - Schema: tasks/ready_post/<platform>/<username>/campaign_ready_post_*.json
+app.get('/campaign-posts-count/:username', async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  try {
+    const { username } = req.params;
+    
+    // Parse platform from query params
+    const platform = (req.query.platform || 'instagram').toLowerCase();
+    if (!['instagram', 'twitter'].includes(platform)) {
+      return res.status(400).json({ 
+        error: 'Invalid platform. Must be instagram or twitter.' 
+      });
+    }
+    
+    // Build posts prefix
+    const postsPrefix = `tasks/ready_post/${platform}/${username}`;
+
+    console.log(`[${new Date().toISOString()}] Counting campaign posts from: ${postsPrefix}/`);
+
+    // List all campaign ready post files
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: `${postsPrefix}/`
+    });
+
+    const data = await s3Client.send(listCommand);
+
+    if (!data.Contents || data.Contents.length === 0) {
+      return res.json({ 
+        postCooked: 0,
+        highestId: 0
+      });
+    }
+
+    // Filter and count campaign_ready_post_ files
+    const campaignPosts = data.Contents
+      .filter(obj => obj.Key && obj.Key.includes('campaign_ready_post_'))
+      .map(obj => ({
+        key: obj.Key,
+        number: parseInt(obj.Key.match(/campaign_ready_post_(\d+)\.json$/)?.[1] || '0')
+      }))
+      .filter(item => item.number > 0);
+
+    const postCooked = campaignPosts.length;
+    const highestId = campaignPosts.length > 0 ? Math.max(...campaignPosts.map(p => p.number)) : 0;
+
+    console.log(`[${new Date().toISOString()}] Found ${postCooked} campaign posts for ${username} on ${platform}`);
+
+    res.json({ 
+      postCooked,
+      highestId
+    });
+
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Campaign posts count error:`, error);
+    res.status(500).json({ 
+      error: 'Failed to count campaign posts', 
+      details: error.message,
+      postCooked: 0,
+      highestId: 0
+    });
+  }
+});
+
+// OPTIONS handler for campaign-posts-count
+app.options('/campaign-posts-count/:username', (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+
+// Engagement metrics endpoint (placeholder for platform-specific engagement)
+app.get('/engagement-metrics/:username', async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  try {
+    const { username } = req.params;
+    
+    // Parse platform from query params
+    const platform = (req.query.platform || 'instagram').toLowerCase();
+    if (!['instagram', 'twitter'].includes(platform)) {
+      return res.status(400).json({ 
+        error: 'Invalid platform. Must be instagram or twitter.' 
+      });
+    }
+    
+    const connected = req.query.connected === 'true';
+
+    console.log(`[${new Date().toISOString()}] Retrieving engagement metrics for ${username} on ${platform}, connected: ${connected}`);
+
+    if (!connected) {
+      return res.json({
+        connected: false,
+        message: `Please connect with ${platform === 'instagram' ? 'Instagram' : 'Twitter'} to view engagement results.`
+      });
+    }
+
+    // For now, return mock engagement data
+    // In production, this would integrate with Facebook/Twitter APIs
+    const mockEngagement = {
+      connected: true,
+      currentFactor: 0.75,
+      previousFactor: 0.68,
+      delta: 0.07,
+      message: `Engagement has increased by 0.07 since the campaign started.`,
+      lastUpdated: new Date().toISOString()
+    };
+
+    res.json(mockEngagement);
+
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Engagement metrics error:`, error);
+    res.status(500).json({ 
+      error: 'Failed to retrieve engagement metrics', 
+      details: error.message,
+      connected: false
+    });
+  }
+});
+
+// OPTIONS handler for engagement-metrics
+app.options('/engagement-metrics/:username', (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+
+// ============= END GOAL MANAGEMENT ENDPOINTS =============
+

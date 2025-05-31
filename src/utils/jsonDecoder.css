@@ -1,0 +1,157 @@
+/* JSON Decoder Styles */
+
+/* Base content styling */
+.decoded-content {
+  line-height: 1.6;
+  color: #e0e0ff;
+  margin: 0.5rem 0;
+  font-size: 0.95rem;
+}
+
+.decoded-list-item {
+  line-height: 1.6;
+  color: #e0e0ff;
+  margin: 0.3rem 0;
+  padding-left: 1rem;
+  font-size: 0.95rem;
+}
+
+/* Level-based indentation */
+.decoded-level-0 {
+  margin-left: 0;
+}
+
+.decoded-level-1 {
+  margin-left: 1rem;
+}
+
+.decoded-level-2 {
+  margin-left: 2rem;
+}
+
+.decoded-level-3 {
+  margin-left: 3rem;
+}
+
+.decoded-level-4 {
+  margin-left: 4rem;
+}
+
+.decoded-level-5 {
+  margin-left: 5rem;
+}
+
+/* Text formatting */
+.decoded-content strong,
+.decoded-list-item strong {
+  color: #00ffcc;
+  font-weight: 600;
+}
+
+.decoded-content em,
+.decoded-list-item em {
+  color: #ffcc00;
+  font-style: italic;
+}
+
+.decoded-highlight {
+  background: linear-gradient(135deg, rgba(0, 255, 204, 0.2), rgba(255, 204, 0, 0.2));
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 255, 204, 0.3);
+  color: #ffffff;
+  font-weight: 500;
+}
+
+/* Key-value pair styling */
+.decoded-key {
+  color: #00ffcc;
+  font-weight: 600;
+  margin-right: 0.5rem;
+}
+
+.decoded-value {
+  color: #e0e0ff;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .decoded-content,
+  .decoded-list-item {
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+  
+  .decoded-level-1 { margin-left: 0.5rem; }
+  .decoded-level-2 { margin-left: 1rem; }
+  .decoded-level-3 { margin-left: 1.5rem; }
+  .decoded-level-4 { margin-left: 2rem; }
+  .decoded-level-5 { margin-left: 2.5rem; }
+  
+  .decoded-list-item {
+    padding-left: 0.5rem;
+  }
+}
+
+/* Animation for content appearance */
+.decoded-content,
+.decoded-list-item {
+  animation: fadeInContent 0.3s ease-out;
+}
+
+@keyframes fadeInContent {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Special styling for different content types */
+.decoded-content[data-type="heading"] {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #00ffcc;
+  margin: 1rem 0 0.5rem 0;
+}
+
+.decoded-content[data-type="subheading"] {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #ffcc00;
+  margin: 0.8rem 0 0.4rem 0;
+}
+
+/* Bullet point styling */
+.decoded-list-item::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  background: #00ffcc;
+  border-radius: 50%;
+  margin-right: 0.5rem;
+  vertical-align: middle;
+}
+
+/* Enhanced spacing for better readability */
+.decoded-content + .decoded-content {
+  margin-top: 0.3rem;
+}
+
+.decoded-list-item + .decoded-list-item {
+  margin-top: 0.2rem;
+}
+
+/* Special highlighting for important content */
+.decoded-content:has(.decoded-highlight),
+.decoded-list-item:has(.decoded-highlight) {
+  background: rgba(0, 255, 204, 0.05);
+  border-left: 2px solid rgba(0, 255, 204, 0.3);
+  padding-left: 0.5rem;
+  margin-left: 0.5rem;
+  border-radius: 0 4px 4px 0;
+} 

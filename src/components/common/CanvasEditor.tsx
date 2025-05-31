@@ -9,6 +9,7 @@ import InstagramRequiredButton from './InstagramRequiredButton';
 import TwitterRequiredButton from './TwitterRequiredButton';
 import { useInstagram } from '../../context/InstagramContext';
 import { useTwitter } from '../../context/TwitterContext';
+import { useLocation } from 'react-router-dom';
 
 interface CanvasEditorProps {
   onClose: () => void;
@@ -37,15 +38,20 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
   initialImageUrl, 
   postKey, 
   postCaption, 
-  platform = 'instagram'
+  platform: propPlatform
 }) => {
+  const location = useLocation();
+  
+  // Determine platform: use prop first, then detect from URL
+  const detectedPlatform = propPlatform || (location.pathname.includes('twitter') ? 'twitter' : 'instagram');
+  
   // Get userId from context if not provided as prop
   const { userId: instagramUserId, isConnected: isInstagramConnected } = useInstagram();
   const { userId: twitterUserId, isConnected: isTwitterConnected } = useTwitter();
   
-  // Determine platform-specific values
-  const isConnected = platform === 'twitter' ? isTwitterConnected : isInstagramConnected;
-  const contextUserId = platform === 'twitter' ? twitterUserId : instagramUserId;
+  // Determine platform-specific values based on detected platform
+  const isConnected = detectedPlatform === 'twitter' ? isTwitterConnected : isInstagramConnected;
+  const contextUserId = detectedPlatform === 'twitter' ? twitterUserId : instagramUserId;
   const userId = propUserId || (isConnected ? (contextUserId ?? undefined) : undefined);
 
   const editorRef = useRef<HTMLDivElement>(null);
@@ -871,8 +877,8 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
     setIsScheduling(true);
     
     try {
-      if (platform === 'twitter') {
-        // For Twitter, handle text-only scheduling
+      if (detectedPlatform === 'twitter') {
+        // For Twitter, handle both text and image scheduling
         const tweetText = caption || postCaption || '';
         console.log(`[CanvasEditor] Scheduling Twitter post: "${tweetText}"`);
         
@@ -882,15 +888,59 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
           return;
         }
         
-        const response = await axios.post(`http://localhost:3000/schedule-tweet/${userId}`, {
-          text: tweetText.trim(),
-          scheduled_time: scheduleDate.toISOString()
-        });
-
-        if (response.data.success) {
-          setNotification('Your tweet is scheduled!');
+        // Check if there's an image to include
+        let hasImage = false;
+        let imageBlob = null;
+        
+        if (imageLoaded && tuiInstanceRef.current) {
+          try {
+            // Get the canvas image as a data URL
+            const imageDataUrl = tuiInstanceRef.current.toDataURL();
+            imageBlob = await fetch(imageDataUrl).then(r => r.blob());
+            hasImage = true;
+            console.log(`[CanvasEditor] Including image with Twitter post`);
+          } catch (imageError) {
+            console.warn(`[CanvasEditor] Failed to get image for Twitter post:`, imageError);
+            // Continue without image
+          }
+        }
+        
+        if (hasImage && imageBlob) {
+          // Schedule tweet with image using FormData
+          const formData = new FormData();
+          const filename = postKey ? `twitter_post_${postKey}.jpg` : `twitter_canvas_${Date.now()}.jpg`;
+          formData.append('image', imageBlob, filename);
+          formData.append('text', tweetText.trim());
+          formData.append('scheduled_time', scheduleDate.toISOString());
+          
+          const response = await fetch(`http://localhost:3000/schedule-tweet-with-image/${userId}`, {
+            method: 'POST',
+            body: formData,
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || 'Failed to schedule tweet with image');
+          }
+          
+          const responseData = await response.json();
+          if (responseData.success) {
+            setNotification('Your tweet with image is scheduled!');
+          } else {
+            setNotification('Failed to schedule tweet: ' + responseData.message);
+          }
         } else {
-          setNotification('Failed to schedule tweet: ' + response.data.message);
+          // Schedule text-only tweet
+          const response = await axios.post(`http://localhost:3000/schedule-tweet/${userId}`, {
+            text: tweetText.trim(),
+            scheduled_time: scheduleDate.toISOString()
+          });
+
+          if (response.data.success) {
+            setNotification('Your tweet is scheduled!');
+          } else {
+            setNotification('Failed to schedule tweet: ' + response.data.message);
+          }
         }
       } else {
         // Instagram scheduling logic (existing)
@@ -927,7 +977,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
       }, 2000);
     } catch (error) {
       console.error('Error scheduling post:', error);
-      setNotification(`Failed to schedule ${platform === 'twitter' ? 'tweet' : 'post'}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setNotification(`Failed to schedule ${detectedPlatform === 'twitter' ? 'tweet' : 'post'}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsScheduling(false);
     }
@@ -1005,7 +1055,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
         exit={{ scale: 0.9, y: 20 }}
       >
         <div className="canvas-editor-header">
-          <h2>Image Editor</h2>
+          <h2>{detectedPlatform === 'twitter' ? 'Tweet Editor' : 'Image Editor'}</h2>
           <div className="canvas-upload-container">
             <label htmlFor="image-upload" className={`upload-button ${isProcessing ? 'disabled' : ''}`}>
               Upload Image
@@ -1219,11 +1269,12 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
               Exit Brand Kit
             </button>
           ) : (
-            platform === 'twitter' ? (
+            detectedPlatform === 'twitter' ? (
               <TwitterRequiredButton
+                isConnected={isTwitterConnected}
                 onClick={handleSchedule}
                 className="schedule-button"
-                disabled={!imageLoaded || isProcessing}
+                disabled={isProcessing}
                 style={{ 
                   backgroundColor: '#1da1f2',
                   color: '#ffffff',
@@ -1231,14 +1282,15 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
                   padding: '8px 16px',
                   borderRadius: '4px',
                   fontWeight: 'bold',
-                  cursor: imageLoaded && !isProcessing ? 'pointer' : 'not-allowed',
-                  opacity: imageLoaded && !isProcessing ? 1 : 0.5
+                  cursor: !isProcessing ? 'pointer' : 'not-allowed',
+                  opacity: !isProcessing ? 1 : 0.5
                 }}
               >
                 Schedule
               </TwitterRequiredButton>
             ) : (
               <InstagramRequiredButton
+                isConnected={isInstagramConnected}
                 onClick={handleSchedule}
                 className="schedule-button"
                 disabled={!imageLoaded || isProcessing}
@@ -1262,30 +1314,40 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
         {showScheduler && (
           <div className="scheduler-overlay">
             <div className="scheduler-container">
-              <h3>Schedule Your Post</h3>
+              <h3>Schedule Your {detectedPlatform === 'twitter' ? 'Tweet' : 'Post'}</h3>
               
               <div className="caption-container">
-                <label htmlFor="post-caption">Caption:</label>
+                <label htmlFor="post-caption">{detectedPlatform === 'twitter' ? 'Tweet Text:' : 'Caption:'}</label>
                 <textarea
                   id="post-caption"
                   value={caption}
                   onChange={(e) => setCaption(e.target.value)}
-                  placeholder={platform === 'twitter' ? "What's happening?" : "Write your caption here... (include any hashtags)"}
+                  placeholder={detectedPlatform === 'twitter' ? "What's happening?" : "Write your caption here... (include any hashtags)"}
                   rows={4}
                   className="caption-input"
-                  maxLength={platform === 'twitter' ? 280 : 2200}
+                  maxLength={detectedPlatform === 'twitter' ? 280 : 2200}
                 />
                 <p className="caption-count">
-                  {caption.length}/{platform === 'twitter' ? 280 : 2200} characters
-                  {platform === 'twitter' && caption.length > 280 && (
+                  {caption.length}/{detectedPlatform === 'twitter' ? 280 : 2200} characters
+                  {detectedPlatform === 'twitter' && caption.length > 280 && (
                     <span style={{ color: '#ff4444', marginLeft: '8px' }}>
                       Tweet exceeds character limit!
                     </span>
                   )}
                 </p>
+                {detectedPlatform === 'twitter' && imageLoaded && (
+                  <p style={{ color: '#1da1f2', fontSize: '14px', marginTop: '8px' }}>
+                    ✓ Image will be included with your tweet
+                  </p>
+                )}
+                {detectedPlatform === 'twitter' && !imageLoaded && (
+                  <p style={{ color: '#666', fontSize: '14px', marginTop: '8px' }}>
+                    Text-only tweet (no image)
+                  </p>
+                )}
               </div>
               
-              <p>Select date and time to publish your post:</p>
+              <p>Select date and time to publish your {detectedPlatform === 'twitter' ? 'tweet' : 'post'}:</p>
               
               <DatePicker 
                 selected={scheduleDate}
@@ -1312,7 +1374,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
                   onClick={handleScheduleConfirm}
                   disabled={isScheduling}
                 >
-                  {isScheduling ? 'Scheduling...' : 'Confirm Schedule'}
+                  {isScheduling ? `Scheduling ${detectedPlatform === 'twitter' ? 'Tweet' : 'Post'}...` : `Confirm Schedule ${detectedPlatform === 'twitter' ? 'Tweet' : 'Post'}`}
                 </button>
               </div>
             </div>

@@ -34,18 +34,32 @@ const AppContent: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { currentUser } = useAuth();
+  const [accountHolder, setAccountHolder] = useState('');
+  const [competitors, setCompetitors] = useState<string[]>([]);
+  const [accountType, setAccountType] = useState<'branding' | 'non-branding'>('branding');
+  const [userId, setUserId] = useState<string | undefined>(undefined);
   const [isLoadingUserData, setIsLoadingUserData] = useState(false);
   
   // Extract from location state
-  const { accountHolder, competitors = [], userId, accountType, platform } = location.state || { 
+  const { accountHolder: extractedAccountHolder, competitors: extractedCompetitors, userId: extractedUserId, accountType: extractedAccountType } = location.state || { 
     accountHolder: '', 
     competitors: [], 
     userId: undefined,
-    accountType: undefined,
-    platform: undefined
+    accountType: 'branding'
   };
   
   const isLoginPage = location.pathname === '/login';
+
+  // Determine current platform based on route
+  const currentPlatform = location.pathname.includes('twitter') ? 'twitter' : 'instagram';
+
+  // Update state when location state changes
+  useEffect(() => {
+    if (extractedAccountHolder) setAccountHolder(extractedAccountHolder);
+    if (extractedCompetitors) setCompetitors(extractedCompetitors);
+    if (extractedAccountType) setAccountType(extractedAccountType);
+    if (extractedUserId) setUserId(extractedUserId);
+  }, [extractedAccountHolder, extractedCompetitors, extractedAccountType, extractedUserId]);
 
   // Sync Instagram connection when user logs in
   useEffect(() => {
@@ -134,7 +148,7 @@ const AppContent: React.FC = () => {
     <div className="App">
       <TopBar />
       <div className="main-content">
-        {!isLoginPage && <LeftBar accountHolder={accountHolder} userId={userId} />}
+        {!isLoginPage && <LeftBar accountHolder={accountHolder} userId={userId} platform={currentPlatform} />}
         <div className={`content-area ${isLoginPage ? 'full-width' : ''}`}>
           <Routes>
             <Route path="/login" element={<Login />} />

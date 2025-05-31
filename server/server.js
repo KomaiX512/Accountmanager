@@ -10,7 +10,9 @@ import * as fileType from 'file-type';
 import { fileTypeFromBuffer } from 'file-type';
 import sharp from 'sharp';
 import { randomUUID } from 'crypto';
+import crypto from 'crypto';
 import schedule from 'node-schedule';
+import OAuth from 'oauth-1.0a';
 const app = express();
 const port = 3000;
 
@@ -4124,3 +4126,692 @@ class PlatformSchemaManager {
 }
 
 // ============= EXISTING CACHE SYSTEM =============
+
+// ======================== TWITTER OAUTH 2.0 & POSTING IMPLEMENTATION ========================
+
+// Twitter OAuth 2.0 credentials
+const TWITTER_CLIENT_ID = 'cVNYR3UxVm5jQ3d5UWw0UHFqUTI6MTpjaQ';
+const TWITTER_CLIENT_SECRET = 'Wr8Kewh92NVB-035hAvpQeQ1Azc7chre3PUTgDoEltjO57mxzO';
+const TWITTER_REDIRECT_URI = 'https://a257-121-52-146-243.ngrok-free.app/twitter/callback';
+
+// Debug logging for OAuth 2.0
+console.log(`[${new Date().toISOString()}] Twitter OAuth 2.0 Configuration:`);
+console.log(`[${new Date().toISOString()}] Client ID: ${TWITTER_CLIENT_ID}`);
+console.log(`[${new Date().toISOString()}] Redirect URI: ${TWITTER_REDIRECT_URI}`);
+
+// OAuth 2.0 PKCE helper functions
+function generateCodeVerifier() {
+  return crypto.randomBytes(32).toString('base64url');
+}
+
+function generateCodeChallenge(codeVerifier) {
+  return crypto.createHash('sha256').update(codeVerifier).digest('base64url');
+}
+
+// Store for PKCE state (in production, use secure session store)
+const pkceStore = new Map();
+
+// Twitter OAuth 2.0 - Step 1: Generate authorization URL
+app.get('/twitter/auth', async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  try {
+    console.log(`[${new Date().toISOString()}] Starting Twitter OAuth 2.0 flow...`);
+    
+    // Generate PKCE parameters
+    const codeVerifier = generateCodeVerifier();
+    const codeChallenge = generateCodeChallenge(codeVerifier);
+    const state = crypto.randomBytes(16).toString('hex');
+    
+    // Store PKCE parameters for verification
+    pkceStore.set(state, {
+      codeVerifier,
+      codeChallenge,
+      timestamp: Date.now()
+    });
+    
+    // Clean up old PKCE entries (older than 10 minutes)
+    for (const [key, value] of pkceStore.entries()) {
+      if (Date.now() - value.timestamp > 10 * 60 * 1000) {
+        pkceStore.delete(key);
+      }
+    }
+    
+    // Build authorization URL
+    const scopes = [
+      'tweet.read',
+      'tweet.write', 
+      'users.read',
+      'offline.access'
+    ].join(' ');
+    
+    const authParams = new URLSearchParams({
+      response_type: 'code',
+      client_id: TWITTER_CLIENT_ID,
+      redirect_uri: TWITTER_REDIRECT_URI,
+      scope: scopes,
+      state: state,
+      code_challenge: codeChallenge,
+      code_challenge_method: 'S256'
+    });
+    
+    const authUrl = `https://x.com/i/oauth2/authorize?${authParams.toString()}`;
+    
+    console.log(`[${new Date().toISOString()}] Generated Twitter OAuth 2.0 auth URL`);
+    console.log(`[${new Date().toISOString()}] State: ${state}`);
+    console.log(`[${new Date().toISOString()}] Code challenge: ${codeChallenge}`);
+    
+    res.json({ authUrl, state });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Twitter OAuth 2.0 step 1 error:`, error.message);
+    res.status(500).json({ 
+      error: 'Failed to initiate Twitter OAuth 2.0', 
+      details: error.message 
+    });
+  }
+});
+
+// Twitter OAuth 2.0 - Step 2: Handle callback and exchange code for access token
+app.get('/twitter/callback', async (req, res) => {
+  const { code, state } = req.query;
+  
+  if (!code || !state) {
+    console.log(`[${new Date().toISOString()}] Twitter callback failed: Missing code or state`);
+    return res.status(400).send('Error: Missing OAuth parameters');
+  }
+  
+  try {
+    console.log(`[${new Date().toISOString()}] Processing Twitter OAuth 2.0 callback...`);
+    
+    // Retrieve stored PKCE parameters
+    const pkceData = pkceStore.get(state);
+    if (!pkceData) {
+      throw new Error('Invalid state parameter or expired PKCE data');
+    }
+    
+    // Clean up used PKCE data
+    pkceStore.delete(state);
+    
+    // Exchange authorization code for access token
+    const tokenRequestBody = new URLSearchParams({
+      grant_type: 'authorization_code',
+      code: code,
+      redirect_uri: TWITTER_REDIRECT_URI,
+      code_verifier: pkceData.codeVerifier
+    });
+    
+    // For confidential clients (Web Apps), use Basic Auth header
+    const basicAuthCredentials = Buffer.from(`${TWITTER_CLIENT_ID}:${TWITTER_CLIENT_SECRET}`).toString('base64');
+    
+    console.log(`[${new Date().toISOString()}] Exchanging code for access token...`);
+    console.log(`[${new Date().toISOString()}] Using Basic Auth for confidential client`);
+    
+    const response = await axios.post('https://api.x.com/2/oauth2/token', tokenRequestBody, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+        'Authorization': `Basic ${basicAuthCredentials}`
+      }
+    });
+    
+    const tokenData = response.data;
+    
+    if (!tokenData.access_token) {
+      throw new Error('Failed to get access token from Twitter');
+    }
+    
+    console.log(`[${new Date().toISOString()}] Got access token, fetching user info...`);
+    
+    // Get user information using the access token
+    const userResponse = await axios.get('https://api.x.com/2/users/me', {
+      headers: {
+        'Authorization': `Bearer ${tokenData.access_token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const userData = userResponse.data.data;
+    const userId = userData.id;
+    const username = userData.username;
+    
+    console.log(`[${new Date().toISOString()}] Twitter OAuth 2.0 successful: user_id=${userId}, username=${username}`);
+    
+    // Store access token in R2
+    const userTokenKey = `TwitterTokens/${userId}/token.json`;
+    const userTokenData = {
+      twitter_user_id: userId,
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token || null,
+      token_type: tokenData.token_type || 'Bearer',
+      expires_in: tokenData.expires_in || 7200,
+      scope: tokenData.scope || '',
+      username: username,
+      expires_at: new Date(Date.now() + (tokenData.expires_in || 7200) * 1000).toISOString(),
+      timestamp: new Date().toISOString()
+    };
+    
+    await s3Client.send(new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: userTokenKey,
+      Body: JSON.stringify(userTokenData, null, 2),
+      ContentType: 'application/json'
+    }));
+    
+    console.log(`[${new Date().toISOString()}] Twitter tokens stored for user ${userId}`);
+    
+    // Send success response with JavaScript to notify parent window
+    res.send(`
+      <html>
+        <body>
+          <h2>Twitter Connected Successfully!</h2>
+          <p>Username: @${username}</p>
+          <p>User ID: ${userId}</p>
+          <p>Token expires in: ${Math.floor((tokenData.expires_in || 7200) / 3600)} hours</p>
+          <p>You can now close this window and return to the dashboard.</p>
+          <script>
+            window.opener.postMessage({ 
+              type: 'TWITTER_CONNECTED', 
+              userId: '${userId}', 
+              username: '${username}',
+              accessToken: '${tokenData.access_token}'
+            }, '*');
+            window.close();
+          </script>
+        </body>
+      </html>
+    `);
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Twitter OAuth 2.0 callback error:`, error.response?.data || error.message);
+    console.error(`[${new Date().toISOString()}] Full error details:`, {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      headers: error.response?.headers,
+      config: {
+        url: error.config?.url,
+        method: error.config?.method,
+        data: error.config?.data
+      }
+    });
+    res.status(500).send(`Error completing Twitter authentication: ${error.message}`);
+  }
+});
+
+// Post tweet endpoint - immediate posting with OAuth 2.0
+app.post('/post-tweet/:userId', async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  const { userId } = req.params;
+  const { text } = req.body;
+  
+  if (!text || text.trim().length === 0) {
+    return res.status(400).json({ error: 'Tweet text is required' });
+  }
+  
+  if (text.length > 280) {
+    return res.status(400).json({ error: 'Tweet text exceeds 280 characters' });
+  }
+  
+  try {
+    console.log(`[${new Date().toISOString()}] Posting tweet for user ${userId}: "${text}"`);
+    
+    // Get user's stored Twitter tokens
+    const userTokenKey = `TwitterTokens/${userId}/token.json`;
+    let tokenData;
+    
+    try {
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: userTokenKey
+      });
+      const response = await s3Client.send(getCommand);
+      tokenData = JSON.parse(await streamToString(response.Body));
+    } catch (error) {
+      if (error.name === 'NoSuchKey') {
+        return res.status(404).json({ error: 'Twitter account not connected' });
+      }
+      throw error;
+    }
+    
+    // Check if token is expired and needs refresh
+    if (tokenData.expires_at && new Date() > new Date(tokenData.expires_at)) {
+      console.log(`[${new Date().toISOString()}] Access token expired, attempting to refresh...`);
+      
+      if (tokenData.refresh_token) {
+        try {
+          // Refresh the access token
+          const refreshBody = new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: tokenData.refresh_token
+          });
+          
+          // Use Basic Auth header for confidential clients
+          const basicAuthCredentials = Buffer.from(`${TWITTER_CLIENT_ID}:${TWITTER_CLIENT_SECRET}`).toString('base64');
+          
+          const refreshResponse = await axios.post('https://api.x.com/2/oauth2/token', refreshBody, {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'Accept': 'application/json',
+              'Authorization': `Basic ${basicAuthCredentials}`
+            }
+          });
+          
+          const newTokenData = refreshResponse.data;
+          
+          // Update stored token data
+          tokenData.access_token = newTokenData.access_token;
+          tokenData.refresh_token = newTokenData.refresh_token || tokenData.refresh_token;
+          tokenData.expires_in = newTokenData.expires_in || 7200;
+          tokenData.expires_at = new Date(Date.now() + (newTokenData.expires_in || 7200) * 1000).toISOString();
+          
+          // Save updated token
+          await s3Client.send(new PutObjectCommand({
+            Bucket: 'tasks',
+            Key: userTokenKey,
+            Body: JSON.stringify(tokenData, null, 2),
+            ContentType: 'application/json'
+          }));
+          
+          console.log(`[${new Date().toISOString()}] Access token refreshed successfully`);
+        } catch (refreshError) {
+          console.error(`[${new Date().toISOString()}] Token refresh failed:`, refreshError.response?.data || refreshError.message);
+          return res.status(401).json({ 
+            error: 'Token expired and refresh failed', 
+            details: 'Please reconnect your Twitter account' 
+          });
+        }
+      } else {
+        return res.status(401).json({ 
+          error: 'Access token expired', 
+          details: 'Please reconnect your Twitter account' 
+        });
+      }
+    }
+    
+    // Post tweet using Twitter API v2 with OAuth 2.0 Bearer token
+    const tweetData = { text: text.trim() };
+    
+    const response = await axios.post('https://api.x.com/2/tweets', tweetData, {
+      headers: {
+        'Authorization': `Bearer ${tokenData.access_token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const tweetId = response.data.data.id;
+    const tweetText = response.data.data.text;
+    
+    console.log(`[${new Date().toISOString()}] Tweet posted successfully: ID ${tweetId}`);
+    
+    // Store tweet record for tracking
+    const tweetKey = `TwitterPosts/${userId}/${tweetId}.json`;
+    const tweetRecord = {
+      tweet_id: tweetId,
+      text: tweetText,
+      user_id: userId,
+      posted_at: new Date().toISOString(),
+      scheduled: false,
+      status: 'posted'
+    };
+    
+    await s3Client.send(new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: tweetKey,
+      Body: JSON.stringify(tweetRecord, null, 2),
+      ContentType: 'application/json'
+    }));
+    
+    res.json({ 
+      success: true, 
+      tweet_id: tweetId, 
+      text: tweetText,
+      message: 'Tweet posted successfully' 
+    });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error posting tweet:`, error.response?.data || error.message);
+    
+    if (error.response?.status === 401) {
+      res.status(401).json({ 
+        error: 'Twitter authentication failed', 
+        details: 'Please reconnect your Twitter account' 
+      });
+    } else if (error.response?.status === 403) {
+      res.status(403).json({ 
+        error: 'Tweet posting forbidden', 
+        details: error.response?.data?.detail || 'Check your Twitter API permissions and scopes' 
+      });
+    } else {
+      res.status(500).json({ 
+        error: 'Failed to post tweet', 
+        details: error.response?.data || error.message 
+      });
+    }
+  }
+});
+
+// Schedule tweet endpoint - for future posting
+app.post('/schedule-tweet/:userId', async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  const { userId } = req.params;
+  const { text, scheduled_time } = req.body;
+  
+  if (!text || text.trim().length === 0) {
+    return res.status(400).json({ error: 'Tweet text is required' });
+  }
+  
+  if (text.length > 280) {
+    return res.status(400).json({ error: 'Tweet text exceeds 280 characters' });
+  }
+  
+  if (!scheduled_time) {
+    return res.status(400).json({ error: 'Scheduled time is required' });
+  }
+  
+  const scheduledDate = new Date(scheduled_time);
+  if (scheduledDate <= new Date()) {
+    return res.status(400).json({ error: 'Scheduled time must be in the future' });
+  }
+  
+  try {
+    console.log(`[${new Date().toISOString()}] Scheduling tweet for user ${userId} at ${scheduledDate.toISOString()}: "${text}"`);
+    
+    // Verify user has Twitter connected
+    const userTokenKey = `TwitterTokens/${userId}/token.json`;
+    try {
+      await s3Client.send(new HeadObjectCommand({
+        Bucket: 'tasks',
+        Key: userTokenKey
+      }));
+    } catch (error) {
+      if (error.name === 'NoSuchKey') {
+        return res.status(404).json({ error: 'Twitter account not connected' });
+      }
+      throw error;
+    }
+    
+    // Store scheduled tweet
+    const scheduleId = randomUUID();
+    const scheduleKey = `TwitterScheduled/${userId}/${scheduleId}.json`;
+    const scheduledTweet = {
+      schedule_id: scheduleId,
+      user_id: userId,
+      text: text.trim(),
+      scheduled_time: scheduledDate.toISOString(),
+      created_at: new Date().toISOString(),
+      status: 'scheduled'
+    };
+    
+    await s3Client.send(new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: scheduleKey,
+      Body: JSON.stringify(scheduledTweet, null, 2),
+      ContentType: 'application/json'
+    }));
+    
+    console.log(`[${new Date().toISOString()}] Tweet scheduled with ID ${scheduleId}`);
+    
+    res.json({ 
+      success: true, 
+      schedule_id: scheduleId,
+      scheduled_time: scheduledDate.toISOString(),
+      message: 'Tweet scheduled successfully' 
+    });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error scheduling tweet:`, error.message);
+    res.status(500).json({ 
+      error: 'Failed to schedule tweet', 
+      details: error.message 
+    });
+  }
+});
+
+// Get scheduled tweets for a user
+app.get('/scheduled-tweets/:userId', async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  const { userId } = req.params;
+  
+  try {
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: `TwitterScheduled/${userId}/`
+    });
+    
+    const listResponse = await s3Client.send(listCommand);
+    const files = listResponse.Contents || [];
+    
+    const scheduledTweets = await Promise.all(
+      files.map(async (file) => {
+        try {
+          const getCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: file.Key
+          });
+          const data = await s3Client.send(getCommand);
+          const tweetData = JSON.parse(await streamToString(data.Body));
+          
+          return {
+            key: file.Key,
+            ...tweetData
+          };
+        } catch (error) {
+          console.error(`Error reading scheduled tweet ${file.Key}:`, error);
+          return null;
+        }
+      })
+    );
+    
+    const validTweets = scheduledTweets.filter(tweet => tweet !== null);
+    
+    // Sort by scheduled time
+    validTweets.sort((a, b) => new Date(a.scheduled_time).getTime() - new Date(b.scheduled_time).getTime());
+    
+    res.json(validTweets);
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error fetching scheduled tweets:`, error);
+    res.status(500).json({ 
+      error: 'Failed to fetch scheduled tweets', 
+      details: error.message 
+    });
+  }
+});
+
+// Delete scheduled tweet
+app.delete('/scheduled-tweet/:userId/:scheduleId', async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  const { userId, scheduleId } = req.params;
+  
+  try {
+    const scheduleKey = `TwitterScheduled/${userId}/${scheduleId}.json`;
+    
+    await s3Client.send(new DeleteObjectCommand({
+      Bucket: 'tasks',
+      Key: scheduleKey
+    }));
+    
+    console.log(`[${new Date().toISOString()}] Deleted scheduled tweet ${scheduleId} for user ${userId}`);
+    
+    res.json({ success: true, message: 'Scheduled tweet deleted' });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error deleting scheduled tweet:`, error);
+    res.status(500).json({ 
+      error: 'Failed to delete scheduled tweet', 
+      details: error.message 
+    });
+  }
+});
+
+// Twitter scheduler worker - checks for due tweets every minute
+function startTwitterScheduler() {
+  console.log(`[${new Date().toISOString()}] Starting Twitter OAuth 2.0 scheduler...`);
+  
+  setInterval(async () => {
+    try {
+      console.log(`[${new Date().toISOString()}] Checking for due tweets...`);
+      
+      // Get all scheduled tweets
+      const listCommand = new ListObjectsV2Command({
+        Bucket: 'tasks',
+        Prefix: 'TwitterScheduled/'
+      });
+      
+      const listResponse = await s3Client.send(listCommand);
+      const files = listResponse.Contents || [];
+      
+      const now = new Date();
+      
+      for (const file of files) {
+        try {
+          const getCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: file.Key
+          });
+          const data = await s3Client.send(getCommand);
+          const scheduledTweet = JSON.parse(await streamToString(data.Body));
+          
+          const scheduledTime = new Date(scheduledTweet.scheduled_time);
+          
+          // Check if tweet is due (within 1 minute tolerance)
+          if (scheduledTime <= now && scheduledTweet.status === 'scheduled') {
+            console.log(`[${new Date().toISOString()}] Processing due tweet: ${scheduledTweet.schedule_id}`);
+            
+            try {
+              // Get user's Twitter tokens
+              const userTokenKey = `TwitterTokens/${scheduledTweet.user_id}/token.json`;
+              const tokenCommand = new GetObjectCommand({
+                Bucket: 'tasks',
+                Key: userTokenKey
+              });
+              const tokenResponse = await s3Client.send(tokenCommand);
+              let tokenData = JSON.parse(await streamToString(tokenResponse.Body));
+              
+              // Check if token is expired and needs refresh
+              if (tokenData.expires_at && new Date() > new Date(tokenData.expires_at)) {
+                console.log(`[${new Date().toISOString()}] Scheduled tweet: Access token expired, attempting to refresh...`);
+                
+                if (tokenData.refresh_token) {
+                  try {
+                    // Refresh the access token
+                    const refreshBody = new URLSearchParams({
+                      grant_type: 'refresh_token',
+                      refresh_token: tokenData.refresh_token
+                    });
+                    
+                    // Use Basic Auth header for confidential clients
+                    const basicAuthCredentials = Buffer.from(`${TWITTER_CLIENT_ID}:${TWITTER_CLIENT_SECRET}`).toString('base64');
+                    
+                    const refreshResponse = await axios.post('https://api.x.com/2/oauth2/token', refreshBody, {
+                      headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Accept': 'application/json',
+                        'Authorization': `Basic ${basicAuthCredentials}`
+                      }
+                    });
+                    
+                    const newTokenData = refreshResponse.data;
+                    
+                    // Update stored token data
+                    tokenData.access_token = newTokenData.access_token;
+                    tokenData.refresh_token = newTokenData.refresh_token || tokenData.refresh_token;
+                    tokenData.expires_in = newTokenData.expires_in || 7200;
+                    tokenData.expires_at = new Date(Date.now() + (newTokenData.expires_in || 7200) * 1000).toISOString();
+                    
+                    // Save updated token
+                    await s3Client.send(new PutObjectCommand({
+                      Bucket: 'tasks',
+                      Key: userTokenKey,
+                      Body: JSON.stringify(tokenData, null, 2),
+                      ContentType: 'application/json'
+                    }));
+                    
+                    console.log(`[${new Date().toISOString()}] Scheduled tweet: Access token refreshed successfully`);
+                  } catch (refreshError) {
+                    console.error(`[${new Date().toISOString()}] Scheduled tweet: Token refresh failed:`, refreshError.response?.data || refreshError.message);
+                    throw new Error('Token refresh failed');
+                  }
+                } else {
+                  throw new Error('Access token expired and no refresh token available');
+                }
+              }
+              
+              // Post the tweet using OAuth 2.0 Bearer token
+              const tweetData = { text: scheduledTweet.text };
+              
+              const response = await axios.post('https://api.x.com/2/tweets', tweetData, {
+                headers: {
+                  'Authorization': `Bearer ${tokenData.access_token}`,
+                  'Content-Type': 'application/json'
+                }
+              });
+              
+              const tweetId = response.data.data.id;
+              
+              console.log(`[${new Date().toISOString()}] Scheduled tweet posted: ${tweetId}`);
+              
+              // Update status to posted
+              scheduledTweet.status = 'posted';
+              scheduledTweet.tweet_id = tweetId;
+              scheduledTweet.posted_at = new Date().toISOString();
+              
+              await s3Client.send(new PutObjectCommand({
+                Bucket: 'tasks',
+                Key: file.Key,
+                Body: JSON.stringify(scheduledTweet, null, 2),
+                ContentType: 'application/json'
+              }));
+              
+              // Also store in posted tweets
+              const tweetKey = `TwitterPosts/${scheduledTweet.user_id}/${tweetId}.json`;
+              const tweetRecord = {
+                tweet_id: tweetId,
+                text: scheduledTweet.text,
+                user_id: scheduledTweet.user_id,
+                posted_at: scheduledTweet.posted_at,
+                scheduled: true,
+                schedule_id: scheduledTweet.schedule_id,
+                status: 'posted'
+              };
+              
+              await s3Client.send(new PutObjectCommand({
+                Bucket: 'tasks',
+                Key: tweetKey,
+                Body: JSON.stringify(tweetRecord, null, 2),
+                ContentType: 'application/json'
+              }));
+              
+            } catch (postError) {
+              console.error(`[${new Date().toISOString()}] Error posting scheduled tweet ${scheduledTweet.schedule_id}:`, postError.response?.data || postError.message);
+              
+              // Update status to failed
+              scheduledTweet.status = 'failed';
+              scheduledTweet.error = postError.response?.data || postError.message;
+              scheduledTweet.failed_at = new Date().toISOString();
+              
+              await s3Client.send(new PutObjectCommand({
+                Bucket: 'tasks',
+                Key: file.Key,
+                Body: JSON.stringify(scheduledTweet, null, 2),
+                ContentType: 'application/json'
+              }));
+            }
+          }
+        } catch (error) {
+          console.error(`[${new Date().toISOString()}] Error processing scheduled tweet file ${file.Key}:`, error);
+        }
+      }
+    } catch (error) {
+      console.error(`[${new Date().toISOString()}] Error in Twitter scheduler:`, error);
+    }
+  }, 60000); // Check every minute
+}
+
+// Start the Twitter scheduler
+startTwitterScheduler();

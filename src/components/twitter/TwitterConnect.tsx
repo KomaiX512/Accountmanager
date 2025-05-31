@@ -23,6 +23,72 @@ const TwitterConnect: React.FC<TwitterConnectProps> = ({ onConnected, className 
     }
   }, [currentUser]);
 
+  useEffect(() => {
+    // Listen for OAuth redirect message from popup
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'TWITTER_CONNECTED' && event.data.userId && event.data.username) {
+        console.log(`[${new Date().toISOString()}] Received Twitter connection message:`, event.data);
+        
+        // Ensure we have a current user to bind the Twitter connection to
+        if (!currentUser?.uid) {
+          console.error(`[${new Date().toISOString()}] Cannot store Twitter connection: No authenticated user`);
+          setIsConnecting(false);
+          return;
+        }
+        
+        // Check if we're already storing this data to avoid duplicate requests
+        const isEqualToCurrentData = 
+          connectionDataRef.current && 
+          connectionDataRef.current.twitter_user_id === event.data.userId;
+        
+        // Store connection data
+        if (!isStoringConnectionRef.current && !isEqualToCurrentData) {
+          const connectionData = {
+            twitter_user_id: event.data.userId,
+            username: event.data.username
+          };
+          
+          // Update ref to prevent duplicate requests
+          connectionDataRef.current = connectionData;
+          isStoringConnectionRef.current = true;
+          
+          axios.post(`http://localhost:3000/twitter-connection/${currentUser.uid}`, connectionData)
+            .then(() => {
+              console.log(`[${new Date().toISOString()}] Successfully stored Twitter connection in backend for user ${currentUser.uid}`);
+              setIsConnected(true);
+              setTwitterUsername(event.data.username);
+              
+              if (onConnected) {
+                onConnected(event.data.userId, event.data.username);
+              }
+            })
+            .catch(error => {
+              console.error(`[${new Date().toISOString()}] Failed to store Twitter connection in backend:`, error);
+            })
+            .finally(() => {
+              isStoringConnectionRef.current = false;
+              setIsConnecting(false);
+            });
+        } else {
+          // Already connected or storing, just update UI
+          setIsConnected(true);
+          setTwitterUsername(event.data.username);
+          setIsConnecting(false);
+          
+          if (onConnected) {
+            onConnected(event.data.userId, event.data.username);
+          }
+        }
+      } else {
+        console.error(`[${new Date().toISOString()}] Invalid Twitter connection message:`, event.data);
+        setIsConnecting(false);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [onConnected, currentUser]);
+
   const checkTwitterConnection = async () => {
     if (!currentUser?.uid) return;
     
@@ -31,6 +97,7 @@ const TwitterConnect: React.FC<TwitterConnectProps> = ({ onConnected, className 
       if (response.data?.twitter_user_id) {
         setIsConnected(true);
         setTwitterUsername(response.data.username || 'Twitter User');
+        console.log(`[${new Date().toISOString()}] Found existing Twitter connection for user ${currentUser.uid}`);
       }
     } catch (error) {
       // User doesn't have Twitter connected, which is fine
@@ -38,47 +105,46 @@ const TwitterConnect: React.FC<TwitterConnectProps> = ({ onConnected, className 
     }
   };
 
-  const connectToTwitter = () => {
+  const connectToTwitter = async () => {
     if (!currentUser) {
       console.error(`[${new Date().toISOString()}] Cannot connect Twitter: No authenticated user`);
       return;
     }
     
-    // For now, we'll simulate a Twitter connection since Twitter API requires approval
-    // In a real implementation, this would use Twitter OAuth 2.0
     setIsConnecting(true);
     
-    // Simulate Twitter OAuth flow
-    setTimeout(() => {
-      const mockTwitterData = {
-        twitter_user_id: `twitter_${Date.now()}`,
-        username: 'twitter_user'
-      };
+    try {
+      console.log(`[${new Date().toISOString()}] Initiating Twitter OAuth flow...`);
       
-      // Store connection data
-      if (currentUser?.uid && !isStoringConnectionRef.current) {
-        connectionDataRef.current = mockTwitterData;
-        isStoringConnectionRef.current = true;
-        
-        axios.post(`http://localhost:3000/twitter-connection/${currentUser.uid}`, mockTwitterData)
-          .then(() => {
-            console.log(`[${new Date().toISOString()}] Successfully stored Twitter connection in backend for user ${currentUser.uid}`);
-            setIsConnected(true);
-            setTwitterUsername(mockTwitterData.username);
-            
-            if (onConnected) {
-              onConnected(mockTwitterData.twitter_user_id, mockTwitterData.username);
-            }
-          })
-          .catch(error => {
-            console.error(`[${new Date().toISOString()}] Failed to store Twitter connection in backend:`, error);
-          })
-          .finally(() => {
-            isStoringConnectionRef.current = false;
-            setIsConnecting(false);
-          });
+      // Step 1: Get authorization URL from backend
+      const response = await axios.get('http://localhost:3000/twitter/auth');
+      const { authUrl } = response.data;
+      
+      if (!authUrl) {
+        throw new Error('Failed to get Twitter authorization URL');
       }
-    }, 1500); // Simulate network delay
+      
+      console.log(`[${new Date().toISOString()}] Opening Twitter OAuth popup: ${authUrl}`);
+      
+      // Open popup for Twitter OAuth
+      const width = 600;
+      const height = 600;
+      const left = window.screen.width / 2 - width / 2;
+      const top = window.screen.height / 2 - height / 2;
+
+      window.open(
+        authUrl,
+        'twitter-auth',
+        `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no`
+      );
+      
+    } catch (error) {
+      console.error(`[${new Date().toISOString()}] Error initiating Twitter OAuth:`, error);
+      setIsConnecting(false);
+      
+      // Show user-friendly error message
+      alert('Failed to connect to Twitter. Please try again.');
+    }
   };
 
   const handleDisconnect = () => {
@@ -121,7 +187,7 @@ const TwitterConnect: React.FC<TwitterConnectProps> = ({ onConnected, className 
           <svg className="twitter-icon" viewBox="0 0 24 24" fill="currentColor">
             <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
           </svg>
-          Disconnect X
+          Disconnect X ({twitterUsername})
         </button>
       ) : (
         <button 

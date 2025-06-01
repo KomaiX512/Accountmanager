@@ -874,7 +874,7 @@ Image Description: ${response.post.image_prompt}
     }
     try {
       const forceRefresh = firstLoadRef.current;
-      const [responsesData, strategiesData, postsData, otherData] = await Promise.all([
+      const [responsesData, strategiesData, postsData, competitorData] = await Promise.all([
         axios.get(`http://localhost:3000/responses/${accountHolder}${forceRefresh ? '?forceRefresh=true' : ''}`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
@@ -887,37 +887,27 @@ Image Description: ${response.post.image_prompt}
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        accountType === 'branding' 
-          ? Promise.all(
-              competitors.map(comp =>
-                axios.get(`http://localhost:3000/retrieve/${accountHolder}/${comp}${forceRefresh ? '?forceRefresh=true' : ''}`).catch(err => {
-                  if (err.response?.status === 404) {
-                    console.warn(`No competitor data found for ${comp}`);
-                    return { data: [] };
-                  }
-                  throw err;
-                })
-              )
-            )
-          : axios.get(`http://localhost:3000/news-for-you/${accountHolder}${forceRefresh ? '?forceRefresh=true' : ''}`).catch(err => {
-              if (err.response?.status === 404) return { data: [] };
+        // Always fetch competitor data for both account types
+        Promise.all(
+          competitors.map(comp =>
+            axios.get(`http://localhost:3000/retrieve/${accountHolder}/${comp}${forceRefresh ? '?forceRefresh=true' : ''}`).catch(err => {
+              if (err.response?.status === 404) {
+                console.warn(`No competitor data found for ${comp}`);
+                return { data: [] };
+              }
               throw err;
             })
+          )
+        )
       ]);
 
       setResponses(responsesData.data);
       setStrategies(strategiesData.data);
       setPosts(postsData.data);
       
-      if (accountType === 'branding') {
-        // otherData is an array of responses for competitor data
-        const competitorResponses = otherData as any[];
-        setCompetitorData(competitorResponses.flatMap(res => res.data));
-      } else {
-        // otherData is a single response for news
-        const newsResponse = otherData as any;
-        setNews(newsResponse.data || []);
-      }
+      // Always set competitor data
+      const competitorResponses = competitorData as any[];
+      setCompetitorData(competitorResponses.flatMap(res => res.data));
 
       setError(null);
       if (firstLoadRef.current) {
@@ -1004,7 +994,7 @@ Image Description: ${response.post.image_prompt}
             setError(err.response?.data?.error || 'Failed to fetch posts.');
           });
         }
-        if (accountType === 'branding' && prefix.startsWith(`competitor_analysis/${accountHolder}/`)) {
+        if (prefix.startsWith(`competitor_analysis/${accountHolder}/`)) {
           Promise.all(
             competitors.map(comp =>
               axios.get(`http://localhost:3000/retrieve/${accountHolder}/${comp}`).catch(err => {
@@ -1021,15 +1011,6 @@ Image Description: ${response.post.image_prompt}
               console.error('Error fetching competitor data:', err);
               setError(err.response?.data?.error || 'Failed to fetch competitor analysis.');
             });
-        }
-        if (accountType === 'non-branding' && prefix.startsWith(`NewForYou/${accountHolder}/`)) {
-          axios.get(`http://localhost:3000/news-for-you/${accountHolder}`).then(res => {
-            setNews(res.data);
-            setToast('New news article available!');
-          }).catch(err => {
-            console.error('Error fetching news:', err);
-            setError(err.response?.data?.error || 'Failed to fetch news articles.');
-          });
         }
       }
 
@@ -1311,6 +1292,7 @@ Image Description: ${response.post.image_prompt}
                     <InstagramRequiredButton
                       isConnected={!!igBusinessId}
                       onClick={handleOpenInsights}
+                      bypassConnectionRequirement={true}
                       className="insta-btn insights"
                       style={{
                         background: 'linear-gradient(90deg, #00ffcc, #007bff)',
@@ -1414,17 +1396,8 @@ Image Description: ${response.post.image_prompt}
           </div>
 
           <div className="competitor-analysis">
-            {accountType === 'branding' ? (
-              <>
-                <h2>Competitor Analysis <span className="badge">{competitorData.length || 5} unseen!!!</span></h2>
-                <Cs_Analysis accountHolder={accountHolder} competitors={competitors} />
-              </>
-            ) : (
-              <>
-                <h2>News For You <span className="badge">{news.length || 5} new articles!!!</span></h2>
-                <NewsForYou accountHolder={accountHolder} />
-              </>
-            )}
+            <h2>Competitor Analysis <span className="badge">{competitorData.length || 5} unseen!!!</span></h2>
+            <Cs_Analysis accountHolder={accountHolder} competitors={competitors} />
           </div>
 
           <div className="chatbot">

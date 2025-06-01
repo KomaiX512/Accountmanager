@@ -1010,6 +1010,77 @@ app.get('/engagement-metrics/:username', async (req, res) => {
   }
 });
 
+// Profit Analysis endpoint - Schema: tasks/prophet_analysis/<platform>/<username>/analysis_*.json
+app.get('/profit-analysis/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+    const platform = req.query.platform || 'instagram';
+    const prefix = `prophet_analysis/${platform}/${username}/`;
+
+    console.log(`[${new Date().toISOString()}] Retrieving profit analysis from: ${prefix}`);
+
+    // List all analysis files for the user
+    const listParams = {
+      Bucket: 'tasks',
+      Prefix: prefix
+    };
+
+    const data = await s3Client.listObjectsV2(listParams).promise();
+
+    if (!data.Contents || data.Contents.length === 0) {
+      console.log(`[${new Date().toISOString()}] No profit analysis found for ${username} on ${platform}`);
+      return res.status(404).json({ 
+        error: 'Profit analysis not found',
+        message: 'No profit analysis data available for this account.'
+      });
+    }
+
+    // Find the latest analysis file (highest number)
+    const analysisFiles = data.Contents
+      .filter(obj => obj.Key.includes('analysis_'))
+      .map(obj => ({
+        key: obj.Key,
+        number: parseInt(obj.Key.match(/analysis_(\d+)\.json$/)?.[1] || '0')
+      }))
+      .sort((a, b) => b.number - a.number);
+
+    if (analysisFiles.length === 0) {
+      return res.status(404).json({ 
+        error: 'No valid analysis files found',
+        message: 'No profit analysis data available for this account.'
+      });
+    }
+
+    // Get the latest analysis file
+    const latestAnalysisKey = analysisFiles[0].key;
+    console.log(`[${new Date().toISOString()}] Retrieving latest analysis: ${latestAnalysisKey}`);
+
+    const analysisData = await s3Client.getObject({
+      Bucket: 'tasks',
+      Key: latestAnalysisKey
+    }).promise();
+
+    const analysis = JSON.parse(analysisData.Body.toString('utf-8'));
+
+    res.json(analysis);
+
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Profit analysis retrieval error:`, error);
+    
+    if (error.code === 'NoSuchKey') {
+      return res.status(404).json({ 
+        error: 'Profit analysis not found',
+        message: 'No profit analysis data available for this account.'
+      });
+    }
+
+    res.status(500).json({ 
+      error: 'Failed to retrieve profit analysis', 
+      details: error.message 
+    });
+  }
+});
+
 app.listen(port, '0.0.0.0', () => {
   console.log(`Server running at http://localhost:${port}`);
   console.log('Ready to receive hierarchical data at POST /scrape');

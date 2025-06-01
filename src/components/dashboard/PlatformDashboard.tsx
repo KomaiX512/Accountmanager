@@ -660,7 +660,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           });
         }
         
-        if (accountType === 'branding' && prefix.startsWith(`competitor_analysis/${platform}/${accountHolder}/`)) {
+        if (prefix.startsWith(`competitor_analysis/${platform}/${accountHolder}/`)) {
           Promise.all(
             competitors.map(comp =>
               axios.get(`http://localhost:3000/retrieve/${accountHolder}/${comp}${platformParam}`).catch(err => {
@@ -677,16 +677,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
               console.error(`Error fetching ${platform} competitor data:`, err);
               setError(err.response?.data?.error || `Failed to fetch ${platform} competitor analysis.`);
             });
-        }
-        
-        if (accountType === 'non-branding' && prefix.startsWith(`NewForYou/${platform}/${accountHolder}/`)) {
-          axios.get(`http://localhost:3000/news-for-you/${accountHolder}${platformParam}`).then(res => {
-            setNews(res.data);
-            setToast(`New ${platform} news article available!`);
-          }).catch(err => {
-            console.error(`Error fetching ${platform} news:`, err);
-            setError(err.response?.data?.error || `Failed to fetch ${platform} news articles.`);
-          });
         }
       }
 
@@ -862,7 +852,7 @@ Image Description: ${response.post.image_prompt}
       const forceRefresh = firstLoadRef.current;
       const platformParam = `?platform=${platform}${forceRefresh ? '&forceRefresh=true' : ''}`;
       
-      const [responsesData, strategiesData, postsData, otherData] = await Promise.all([
+      const [responsesData, strategiesData, postsData, competitorData] = await Promise.all([
         axios.get(`http://localhost:3000/responses/${accountHolder}${platformParam}`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
@@ -875,35 +865,27 @@ Image Description: ${response.post.image_prompt}
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        accountType === 'branding' 
-          ? Promise.all(
-              competitors.map(comp =>
-                axios.get(`http://localhost:3000/retrieve/${accountHolder}/${comp}${platformParam}`).catch(err => {
-                  if (err.response?.status === 404) {
-                    console.warn(`No ${platform} competitor data found for ${comp}`);
-                    return { data: [] };
-                  }
-                  throw err;
-                })
-              )
-            )
-          : axios.get(`http://localhost:3000/news-for-you/${accountHolder}${platformParam}`).catch(err => {
-              if (err.response?.status === 404) return { data: [] };
+        // Always fetch competitor data for both account types
+        Promise.all(
+          competitors.map(comp =>
+            axios.get(`http://localhost:3000/retrieve/${accountHolder}/${comp}${platformParam}`).catch(err => {
+              if (err.response?.status === 404) {
+                console.warn(`No ${platform} competitor data found for ${comp}`);
+                return { data: [] };
+              }
               throw err;
             })
+          )
+        )
       ]);
 
       setResponses(responsesData.data);
       setStrategies(strategiesData.data);
       setPosts(postsData.data);
       
-      if (accountType === 'branding') {
-        const competitorResponses = otherData as any[];
-        setCompetitorData(competitorResponses.flatMap(res => res.data));
-      } else {
-        const newsResponse = otherData as any;
-        setNews(newsResponse.data || []);
-      }
+      // Always set competitor data
+      const competitorResponses = competitorData as any[];
+      setCompetitorData(competitorResponses.flatMap(res => res.data));
 
       setError(null);
       if (firstLoadRef.current) {
@@ -1188,6 +1170,7 @@ Image Description: ${response.post.image_prompt}
                       <InstagramRequiredButton
                         isConnected={isConnected}
                         onClick={handleOpenInsights}
+                        bypassConnectionRequirement={true}
                         className="insta-btn insights"
                         style={{
                           background: 'linear-gradient(90deg, #00ffcc, #007bff)',
@@ -1238,6 +1221,7 @@ Image Description: ${response.post.image_prompt}
                       <TwitterRequiredButton
                         isConnected={isTwitterConnected}
                         onClick={handleOpenTwitterInsights}
+                        bypassConnectionRequirement={true}
                         className="twitter-btn insights"
                         style={{
                           background: 'linear-gradient(90deg, #00ffcc, #007bff)',
@@ -1347,17 +1331,9 @@ Image Description: ${response.post.image_prompt}
           </div>
 
           <div className="competitor-analysis">
-            {accountType === 'branding' ? (
-              <>
-                <h2>{config.name} Competitor Analysis <span className="badge">{competitorData.length || 5} unseen!!!</span></h2>
-                <Cs_Analysis accountHolder={accountHolder} competitors={competitors} platform={platform} />
-              </>
-            ) : (
-              <>
-                <h2>News For You <span className="badge">{news.length || 5} new articles!!!</span></h2>
-                <NewsForYou accountHolder={accountHolder} platform={platform} />
-              </>
-            )}
+            {/* Always show competitor analysis for both account types */}
+            <h2>{config.name} Competitor Analysis <span className="badge">{competitorData.length || 5} unseen!!!</span></h2>
+            <Cs_Analysis accountHolder={accountHolder} competitors={competitors} platform={platform} />
           </div>
 
           <div className="chatbot">

@@ -9,6 +9,7 @@ interface TwitterRequiredButtonProps {
   disabled?: boolean;
   isConnected?: boolean;
   notificationPosition?: 'top' | 'bottom' | 'left' | 'right';
+  bypassConnectionRequirement?: boolean;
 }
 
 const TwitterRequiredButton: React.FC<TwitterRequiredButtonProps> = ({ 
@@ -18,7 +19,8 @@ const TwitterRequiredButton: React.FC<TwitterRequiredButtonProps> = ({
   style = {},
   disabled = false,
   isConnected: propIsConnected,
-  notificationPosition = 'top'
+  notificationPosition = 'top',
+  bypassConnectionRequirement = false
 }) => {
   const { isConnected: contextIsConnected } = useTwitter();
   const [showNotification, setShowNotification] = useState(false);
@@ -27,7 +29,7 @@ const TwitterRequiredButton: React.FC<TwitterRequiredButtonProps> = ({
   const isConnected = propIsConnected !== undefined ? propIsConnected : contextIsConnected;
   
   const handleClick = () => {
-    if (!isConnected) {
+    if (!isConnected && !bypassConnectionRequirement) {
       setShowNotification(true);
       setTimeout(() => setShowNotification(false), 3000);
       return;
@@ -73,15 +75,15 @@ const TwitterRequiredButton: React.FC<TwitterRequiredButtonProps> = ({
         className={className}
         style={{
           ...style,
-          cursor: isConnected && !disabled ? 'pointer' : 'not-allowed',
-          opacity: isConnected && !disabled ? 1 : 0.6
+          cursor: (isConnected || bypassConnectionRequirement) && !disabled ? 'pointer' : 'not-allowed',
+          opacity: (isConnected || bypassConnectionRequirement) && !disabled ? 1 : 0.6
         }}
         disabled={disabled}
       >
         {children}
       </button>
       
-      {showNotification && (
+      {showNotification && !bypassConnectionRequirement && (
         <div style={getNotificationStyle()}>
           Connect X (Twitter) first!
         </div>

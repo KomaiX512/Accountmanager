@@ -165,12 +165,10 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
     if (!username.trim() || !accountType || !postingStyle.trim()) return false;
     if (!usernameValid) return false;
     
-    if (accountType === 'branding') {
-      return competitors.length >= 3 && 
-             competitors.slice(0, 3).every(comp => comp.trim() !== '') &&
-             competitors.every(validateCompetitorUsername);
-    }
-    return true;
+    // Now require competitors for both account types
+    return competitors.length >= 3 && 
+           competitors.slice(0, 3).every(comp => comp.trim() !== '') &&
+           competitors.every(validateCompetitorUsername);
   };
 
   const validationErrors = (): string[] => {
@@ -181,16 +179,16 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
     if (!accountType) errors.push('Account type is required');
     if (!postingStyle.trim()) errors.push('Posting style is required');
     
-    if (accountType === 'branding') {
-      if (competitors.length < 3) errors.push('At least 3 competitors are required for branding');
-      competitors.forEach((comp, index) => {
-        if (index < 3 && !comp.trim()) {
-          errors.push(`Competitor ${index + 1} username is required`);
-        } else if (comp.trim() && !validateCompetitorUsername(comp)) {
-          errors.push(`Competitor ${index + 1} username format is invalid`);
-        }
-      });
-    }
+    // Require competitors for both account types
+    if (competitors.length < 3) errors.push('At least 3 competitors are required');
+    competitors.forEach((comp, index) => {
+      if (index < 3 && !comp.trim()) {
+        errors.push(`Competitor ${index + 1} username is required`);
+      } else if (comp.trim() && !validateCompetitorUsername(comp)) {
+        errors.push(`Competitor ${index + 1} username format is invalid`);
+      }
+    });
+    
     return errors;
   };
 
@@ -238,7 +236,7 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
         username: username.trim(),
         accountType,
         postingStyle: postingStyle.trim(),
-        competitors: accountType === 'branding' ? competitors.map(comp => comp.trim()) : [],
+        competitors: competitors.map(comp => comp.trim()), // Always include competitors
       };
 
       // Save to account info API
@@ -252,7 +250,7 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
         await axios.post(`${statusApiUrl}/${currentUser.uid}`, {
           instagram_username: username.trim(),
           accountType,
-          competitors: accountType === 'branding' ? competitors.map(comp => comp.trim()) : []
+          competitors: competitors.map(comp => comp.trim()) // Always save competitors
         });
         
         showMessage('Submission successful', 'success');
@@ -260,7 +258,7 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
         setTimeout(() => {
           onSubmitSuccess(
             username,
-            accountType === 'branding' ? payload.competitors : [],
+            payload.competitors, // Always pass competitors
             accountType as 'branding' | 'non-branding'
           );
           
@@ -276,6 +274,7 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
             navigate('/non-branding-dashboard', { 
               state: { 
                 accountHolder: username,
+                competitors: payload.competitors, // Always pass competitors
                 accountType: 'non-branding'
               } 
             });
@@ -389,51 +388,49 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
           </motion.div>
         </div>
 
-        {accountType === 'branding' && (
-          <div className="section">
-            <h2 className="subtitle">Competitors (at least 3 required)</h2>
-            {competitors.map((competitor, index) => (
-              <motion.div
-                key={index}
-                className="input-group competitor-input"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: index * 0.1 }}
-              >
-                <input
-                  value={competitor}
-                  onChange={(e) => handleCompetitorChange(index, e.target.value)}
-                  type="text"
-                  placeholder={`Enter competitor ${index + 1}`}
-                  className={competitor && !validateCompetitorUsername(competitor) ? 'invalid-input' : ''}
-                />
-                {competitors.length > 3 && (
-                  <motion.button
-                    className="remove-btn"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => removeCompetitor(index)}
-                  >
-                    ×
-                  </motion.button>
-                )}
-                {competitor && !validateCompetitorUsername(competitor) && (
-                  <div className="validation-error">
-                    Invalid competitor username format
-                  </div>
-                )}
-              </motion.div>
-            ))}
-            <motion.button
-              className="add-btn"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={addCompetitor}
+        <div className="section">
+          <h2 className="subtitle">Competitors (at least 3 required)</h2>
+          {competitors.map((competitor, index) => (
+            <motion.div
+              key={index}
+              className="input-group competitor-input"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: index * 0.1 }}
             >
-              Add Competitor
-            </motion.button>
-          </div>
-        )}
+              <input
+                value={competitor}
+                onChange={(e) => handleCompetitorChange(index, e.target.value)}
+                type="text"
+                placeholder={`Enter competitor ${index + 1}`}
+                className={competitor && !validateCompetitorUsername(competitor) ? 'invalid-input' : ''}
+              />
+              {competitors.length > 3 && (
+                <motion.button
+                  className="remove-btn"
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => removeCompetitor(index)}
+                >
+                  ×
+                </motion.button>
+              )}
+              {competitor && !validateCompetitorUsername(competitor) && (
+                <div className="validation-error">
+                  Invalid competitor username format
+                </div>
+              )}
+            </motion.div>
+          ))}
+          <motion.button
+            className="add-btn"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={addCompetitor}
+          >
+            Add Competitor
+          </motion.button>
+        </div>
 
         {validationErrors().length > 0 && (
           <motion.div

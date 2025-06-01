@@ -5468,7 +5468,7 @@ app.post('/save-goal/:username', async (req, res) => {
     const goalId = `goal_${timestamp}`;
     
     // Build goal path
-    const goalPath = `tasks/goal/${platform}/${username}/${goalId}.json`;
+    const goalPath = `goal/${platform}/${username}/${goalId}.json`;
 
     // Create goal data structure
     const goalData = {
@@ -5732,6 +5732,110 @@ app.get('/engagement-metrics/:username', async (req, res) => {
 
 // OPTIONS handler for engagement-metrics
 app.options('/engagement-metrics/:username', (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+
+// Generated content summary endpoint - Schema: tasks/generated_content/<platform>/<username>/posts.json
+app.get('/generated-content-summary/:username', async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  try {
+    const { username } = req.params;
+    
+    // Parse platform from query params
+    const platform = (req.query.platform || 'instagram').toLowerCase();
+    if (!['instagram', 'twitter'].includes(platform)) {
+      return res.status(400).json({ 
+        error: 'Invalid platform. Must be instagram or twitter.' 
+      });
+    }
+    
+    // Build the specific file path
+    const summaryKey = `generated_content/${platform}/${username}/posts.json`;
+
+    console.log(`[${new Date().toISOString()}] Retrieving generated content summary from: ${summaryKey}`);
+
+    // Try to get the posts.json file
+    const getCommand = new GetObjectCommand({
+      Bucket: 'tasks',
+      Key: summaryKey
+    });
+    
+    const summaryResponse = await s3Client.send(getCommand);
+    const summaryBody = await streamToString(summaryResponse.Body);
+    const summaryData = JSON.parse(summaryBody);
+
+    // Function to decode Unicode escape sequences
+    function decodeUnicodeEscapes(text) {
+      if (typeof text !== 'string') return text;
+      
+      // Decode Unicode escape sequences like \ud83d\udcc8 to 📈
+      return text.replace(/\\u([0-9a-fA-F]{4})/g, (match, code) => {
+        return String.fromCharCode(parseInt(code, 16));
+      });
+    }
+
+    // Extract and decode the Summary field
+    let decodedSummary = '';
+    if (summaryData.Summary) {
+      decodedSummary = decodeUnicodeEscapes(summaryData.Summary);
+    }
+
+    // Extract post count based on highest Post_* key
+    const postKeys = Object.keys(summaryData).filter(key => key.startsWith('Post_'));
+    let postCount = 0;
+    
+    if (postKeys.length > 0) {
+      // Extract numbers from Post_* keys and find the highest
+      const postNumbers = postKeys
+        .map(key => {
+          const match = key.match(/^Post_(\d+)$/);
+          return match ? parseInt(match[1]) : 0;
+        })
+        .filter(num => num > 0);
+      
+      if (postNumbers.length > 0) {
+        postCount = Math.max(...postNumbers);
+      }
+    }
+
+    console.log(`[${new Date().toISOString()}] Processed generated content for ${username} on ${platform}: ${postCount} posts, summary length: ${decodedSummary.length}`);
+
+    // Return the processed data
+    res.json({
+      success: true,
+      summary: decodedSummary || 'No summary available',
+      postCount: postCount,
+      rawData: summaryData, // Include raw data for debugging if needed
+      platform: platform,
+      username: username,
+      retrievedAt: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Generated content summary retrieval error:`, error);
+    
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+      return res.status(404).json({ 
+        error: 'Generated content summary not found',
+        message: 'Your campaign is processing. Progress will be available shortly.',
+        postCount: 0,
+        summary: ''
+      });
+    }
+
+    res.status(500).json({ 
+      error: 'Failed to retrieve generated content summary', 
+      details: error.message,
+      postCount: 0,
+      summary: ''
+    });
+  }
+});
+
+// OPTIONS handler for generated-content-summary
+app.options('/generated-content-summary/:username', (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });

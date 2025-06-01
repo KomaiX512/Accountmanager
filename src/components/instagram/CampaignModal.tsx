@@ -14,6 +14,15 @@ interface CampaignSummary {
   Post_Estimated: string;
 }
 
+interface GeneratedContentSummary {
+  success: boolean;
+  summary: string;
+  postCount: number;
+  platform: string;
+  username: string;
+  retrievedAt: string;
+}
+
 interface EngagementMetrics {
   connected: boolean;
   currentFactor?: number;
@@ -24,6 +33,7 @@ interface EngagementMetrics {
 
 const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isConnected, onClose }) => {
   const [summary, setSummary] = useState<CampaignSummary | null>(null);
+  const [generatedSummary, setGeneratedSummary] = useState<GeneratedContentSummary | null>(null);
   const [postCooked, setPostCooked] = useState<number>(0);
   const [engagement, setEngagement] = useState<EngagementMetrics | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,7 +48,7 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
     setError(null);
 
     try {
-      // Fetch campaign summary
+      // Fetch campaign summary (original endpoint)
       let summaryData = null;
       try {
         const summaryResponse = await axios.get(`http://localhost:3000/goal-summary/${username}?platform=${platform}`);
@@ -50,6 +60,22 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
           setSummary(null);
         } else {
           throw summaryError;
+        }
+      }
+
+      // Fetch generated content summary (new endpoint for posts.json)
+      let generatedSummaryData = null;
+      try {
+        const generatedSummaryResponse = await axios.get(`http://localhost:3000/generated-content-summary/${username}?platform=${platform}`);
+        generatedSummaryData = generatedSummaryResponse.data;
+        setGeneratedSummary(generatedSummaryData);
+      } catch (generatedSummaryError: any) {
+        if (generatedSummaryError.response?.status === 404) {
+          console.log('Generated content summary not yet available');
+          setGeneratedSummary(null);
+        } else {
+          console.warn('Error fetching generated content summary:', generatedSummaryError);
+          // Don't throw here, as this is a new feature and might not always be available
         }
       }
 
@@ -72,6 +98,28 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
   const handleRefresh = () => {
     fetchCampaignData();
   };
+
+  // Helper function to get the best available summary and post count
+  const getSummaryData = () => {
+    // Prefer generated content summary if available, fallback to original
+    if (generatedSummary && generatedSummary.success) {
+      return {
+        summary: generatedSummary.summary,
+        postEstimated: generatedSummary.postCount
+      };
+    } else if (summary) {
+      return {
+        summary: summary.Summary,
+        postEstimated: summary.Post_Estimated
+      };
+    }
+    return {
+      summary: null,
+      postEstimated: null
+    };
+  };
+
+  const { summary: displaySummary, postEstimated } = getSummaryData();
 
   return (
     <motion.div
@@ -140,14 +188,14 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
                 background: 'rgba(0, 255, 204, 0.05)'
               }}>
                 <h3 style={{ color: '#00ffcc', marginBottom: '12px', fontSize: '16px' }}>Summary</h3>
-                {summary ? (
+                {displaySummary ? (
                   <p style={{ 
                     color: '#e0e0ff', 
                     fontStyle: 'italic',
                     lineHeight: '1.5',
                     margin: '0 16px'
                   }}>
-                    {summary.Summary}
+                    {displaySummary}
                   </p>
                 ) : (
                   <p style={{ 
@@ -175,7 +223,7 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
                 }}>
                   <h4 style={{ color: '#007bff', margin: '0 0 8px 0', fontSize: '14px' }}>Post Estimated</h4>
                   <p style={{ color: '#e0e0ff', fontSize: '20px', fontWeight: 'bold', margin: 0 }}>
-                    {summary?.Post_Estimated || '-'}
+                    {postEstimated || (generatedSummary?.postCount ? generatedSummary.postCount : '-')}
                   </p>
                 </div>
 
@@ -229,6 +277,19 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
                   </p>
                 )}
               </div>
+
+              {/* Debug Information (only show if generatedSummary is available) */}
+              {generatedSummary && (
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '8px',
+                  color: '#666',
+                  fontSize: '11px',
+                  borderTop: '1px solid #333'
+                }}>
+                  Generated content retrieved at: {new Date(generatedSummary.retrievedAt).toLocaleString()}
+                </div>
+              )}
 
               {/* Platform Info */}
               <div style={{ 

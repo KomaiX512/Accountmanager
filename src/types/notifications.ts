@@ -39,6 +39,7 @@ export interface ProfileInfo {
   followersCount: number;
   followsCount: number;
   profilePicUrlHD: string;
+  biography?: string;
 }
 
 export interface LinkedAccount {

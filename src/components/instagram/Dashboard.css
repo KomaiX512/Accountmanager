@@ -30,6 +30,58 @@
   margin-top: 5px;
 }
 
+/* Bio animation styles */
+.welcome-subtext-container {
+  position: relative;
+  min-height: 24px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bio-text {
+  font-size: 1rem;
+  color: #b0b0d0;
+  text-shadow: 0 0 8px rgba(0, 255, 204, 0.3);
+  line-height: 1.4;
+  white-space: pre-wrap;
+  font-style: italic;
+  max-width: 800px;
+  word-wrap: break-word;
+  animation: bioFadeIn 0.5s ease-in-out;
+}
+
+.bio-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 16px;
+  background-color: #00ffcc;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: blink 1s infinite;
+}
+
+@keyframes bioFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes blink {
+  0%, 50% {
+    opacity: 1;
+  }
+  51%, 100% {
+    opacity: 0;
+  }
+}
+
 .modules-container {
   background: linear-gradient(135deg, #161625, #2b2b4d);
   border-radius: 16px;

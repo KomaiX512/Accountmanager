@@ -30,6 +30,7 @@ interface ProfileInfo {
   followersCount: number;
   followsCount: number;
   profilePicUrlHD: string;
+  biography?: string;
 }
 
 interface Notification {
@@ -112,6 +113,11 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
   const [aiProcessingNotifications, setAiProcessingNotifications] = useState<Record<string, boolean>>({});
   const [result, setResult] = useState('');
   const [linkedAccounts, setLinkedAccounts] = useState<LinkedAccount[]>([]);
+  // Bio animation states
+  const [showInitialText, setShowInitialText] = useState(true);
+  const [showBio, setShowBio] = useState(false);
+  const [typedBio, setTypedBio] = useState('');
+  const [bioAnimationComplete, setBioAnimationComplete] = useState(false);
 
   const fetchProfileInfo = async () => {
     if (!accountHolder) return;
@@ -1212,6 +1218,54 @@ Image Description: ${response.post.image_prompt}
     }
   }, [accountHolder]);
 
+  // Bio typing animation effect
+  useEffect(() => {
+    if (!profileInfo?.biography || !profileInfo.biography.trim()) {
+      return;
+    }
+
+    // Start the initial animation sequence
+    const timer1 = setTimeout(() => {
+      // Fade out initial text after 5 seconds
+      setShowInitialText(false);
+      
+      // Start showing bio with typing effect after fade out completes
+      setTimeout(() => {
+        setShowBio(true);
+        
+        // Start typing animation
+        const bio = profileInfo.biography!;
+        let currentIndex = 0;
+        
+        const typeNextChar = () => {
+          if (currentIndex < bio.length) {
+            setTypedBio(bio.substring(0, currentIndex + 1));
+            currentIndex++;
+            
+            // Fast typing speed - 50ms per character
+            setTimeout(typeNextChar, 50);
+          } else {
+            setBioAnimationComplete(true);
+          }
+        };
+        
+        typeNextChar();
+      }, 500); // Wait for fade out to complete
+    }, 5000); // Initial 5 second delay
+
+    return () => clearTimeout(timer1);
+  }, [profileInfo?.biography]);
+
+  // Reset animation states when profile info changes
+  useEffect(() => {
+    if (profileInfo?.biography && profileInfo.biography.trim()) {
+      setShowInitialText(true);
+      setShowBio(false);
+      setTypedBio('');
+      setBioAnimationComplete(false);
+    }
+  }, [profileInfo]);
+
   if (!accountHolder) {
     return <div className="error-message">Please specify an account holder to load the dashboard.</div>;
   }
@@ -1236,6 +1290,72 @@ Image Description: ${response.post.image_prompt}
         <h1 className="welcome-text">
           Welcome {profileInfo?.fullName || accountHolder}!
         </h1>
+        <div className="welcome-subtext-container" style={{ position: 'relative', minHeight: '24px' }}>
+          <motion.p 
+            className="welcome-subtext"
+            animate={{ 
+              opacity: showInitialText ? 1 : 0,
+              y: showInitialText ? 0 : -10
+            }}
+            transition={{ duration: 0.5, ease: 'easeInOut' }}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              margin: 0,
+              fontSize: '14px',
+              color: '#888',
+              textAlign: 'center'
+            }}
+          >
+            You are listed in Smart People on Instagram!
+          </motion.p>
+          
+          {profileInfo?.biography && profileInfo.biography.trim() && (
+            <motion.div
+              className="bio-text"
+              animate={{ 
+                opacity: showBio ? 1 : 0,
+                y: showBio ? 0 : 10
+              }}
+              transition={{ duration: 0.5, ease: 'easeInOut', delay: showBio ? 0.2 : 0 }}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                margin: 0,
+                fontSize: '14px',
+                color: '#666',
+                textAlign: 'center',
+                lineHeight: '1.4',
+                whiteSpace: 'pre-wrap',
+                fontStyle: 'italic'
+              }}
+            >
+              {typedBio}
+              {showBio && !bioAnimationComplete && (
+                <motion.span
+                  animate={{ opacity: [1, 0] }}
+                  transition={{ 
+                    duration: 0.5,
+                    repeat: Infinity,
+                    repeatType: 'reverse'
+                  }}
+                  style={{ 
+                    display: 'inline-block',
+                    width: '2px',
+                    height: '16px',
+                    backgroundColor: '#00ffcc',
+                    marginLeft: '2px',
+                    verticalAlign: 'text-bottom'
+                  }}
+                />
+              )}
+            </motion.div>
+          )}
+        </div>
       </div>
       {error && <div className="error-message">{error}</div>}
       {profileError && <div className="error-message">{profileError}</div>}

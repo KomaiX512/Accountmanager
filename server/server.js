@@ -6092,3 +6092,91 @@ app.options('/generated-content-timeline/:username', (req, res) => {
 
 // ============= END GOAL MANAGEMENT ENDPOINTS =============
 
+// Profit Analysis endpoint - Schema: tasks/prophet_analysis/<platform>/<username>/analysis_*.json
+app.get('/profit-analysis/:username', async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  try {
+    const { username } = req.params;
+    
+    // Parse platform from query params
+    const platform = (req.query.platform || 'instagram').toLowerCase();
+    if (!['instagram', 'twitter'].includes(platform)) {
+      return res.status(400).json({ 
+        error: 'Invalid platform. Must be instagram or twitter.' 
+      });
+    }
+    
+    // Build analysis prefix
+    const analysisPrefix = `prophet_analysis/${platform}/${username}`;
+
+    console.log(`[${new Date().toISOString()}] Retrieving profit analysis from: ${analysisPrefix}/`);
+
+    // List all analysis files for the user
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: `${analysisPrefix}/`
+    });
+
+    const data = await s3Client.send(listCommand);
+
+    if (!data.Contents || data.Contents.length === 0) {
+      console.log(`[${new Date().toISOString()}] No profit analysis found for ${username} on ${platform}`);
+      return res.status(404).json({ 
+        error: 'Profit analysis not found',
+        message: 'No profit analysis data available for this account.'
+      });
+    }
+
+    // Find the latest analysis file (highest number)
+    const analysisFiles = data.Contents
+      .filter(obj => obj.Key && obj.Key.includes('analysis_'))
+      .map(obj => ({
+        key: obj.Key,
+        number: parseInt(obj.Key.match(/analysis_(\d+)\.json$/)?.[1] || '0')
+      }))
+      .sort((a, b) => b.number - a.number);
+
+    if (analysisFiles.length === 0) {
+      return res.status(404).json({ 
+        error: 'No valid analysis files found',
+        message: 'No profit analysis data available for this account.'
+      });
+    }
+
+    // Get the latest analysis file
+    const latestAnalysisKey = analysisFiles[0].key;
+    console.log(`[${new Date().toISOString()}] Retrieving latest analysis: ${latestAnalysisKey}`);
+
+    const getCommand = new GetObjectCommand({
+      Bucket: 'tasks',
+      Key: latestAnalysisKey
+    });
+    
+    const analysisResponse = await s3Client.send(getCommand);
+    const analysisBody = await streamToString(analysisResponse.Body);
+    const analysis = JSON.parse(analysisBody);
+
+    res.json(analysis);
+
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Profit analysis retrieval error:`, error);
+    
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+      return res.status(404).json({ 
+        error: 'Profit analysis not found',
+        message: 'No profit analysis data available for this account.'
+      });
+    }
+
+    res.status(500).json({ 
+      error: 'Failed to retrieve profit analysis', 
+      details: error.message 
+    });
+  }
+});
+
+// ============= TWITTER ACCOUNT MANAGEMENT =============
+
+// ... existing code ...
+

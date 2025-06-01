@@ -16,42 +16,80 @@
     padding: 20px;
     border-radius: 10px;
     width: 80%;
-    max-width: 800px;
-    max-height: 80vh;
+    max-width: 900px;
+    max-height: 85vh;
     overflow-y: auto;
     position: relative;
     color: #fff;
+    scrollbar-width: thin;
+    scrollbar-color: #00ffcc #333;
+  }
+
+  .insights-modal::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .insights-modal::-webkit-scrollbar-track {
+    background: #333;
+    border-radius: 4px;
+  }
+
+  .insights-modal::-webkit-scrollbar-thumb {
+    background: #00ffcc;
+    border-radius: 4px;
   }
   
   .insights-close-btn {
     position: absolute;
-    top: 10px;
-    right: 10px;
+    top: 15px;
+    right: 15px;
     background: none;
     border: none;
     color: #fff;
-    font-size: 20px;
+    font-size: 24px;
     cursor: pointer;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background-color 0.2s;
+  }
+
+  .insights-close-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
   }
   
   .insights-tabs {
     display: flex;
-    margin-bottom: 20px;
+    margin: 20px 0;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #333;
   }
   
   .insights-tabs button {
     flex: 1;
-    padding: 10px;
+    padding: 12px 16px;
     background: #333;
     border: none;
     color: #fff;
     cursor: pointer;
-    font-size: 16px;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    position: relative;
+  }
+
+  .insights-tabs button:hover {
+    background: #404040;
   }
   
   .insights-tabs button.active {
     background: #00ffcc;
     color: #000;
+    font-weight: 600;
   }
   
   .insights-grid {
@@ -61,24 +99,390 @@
   
   .insight-chart {
     background: #222;
-    padding: 15px;
-    border-radius: 5px;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #333;
   }
   
   .insight-chart h3 {
-    margin: 0 0 10px;
+    margin: 0 0 15px;
     font-size: 18px;
+    color: #00ffcc;
   }
   
   .insights-note {
     background: #333;
-    padding: 15px;
-    border-radius: 5px;
+    padding: 20px;
+    border-radius: 8px;
     font-size: 14px;
+    border-left: 4px solid #00ffcc;
   }
   
   .insights-loading, .insights-error {
     text-align: center;
-    padding: 20px;
+    padding: 40px 20px;
     color: #fff;
+    font-size: 16px;
+  }
+
+  .insights-error {
+    color: #ff6b6b;
+  }
+
+  /* Profit Analysis Styles */
+  .profit-analysis-content {
+    padding: 10px 0;
+  }
+
+  .analysis-header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+    border-radius: 12px;
+    border: 1px solid #333;
+  }
+
+  .analysis-header h2 {
+    margin: 0 0 10px;
+    font-size: 28px;
+    color: #00ffcc;
+    text-shadow: 0 2px 4px rgba(0, 255, 204, 0.3);
+  }
+
+  .analysis-subtitle {
+    margin: 0;
+    color: #aaa;
+    font-size: 16px;
+    font-weight: 300;
+  }
+
+  .analysis-section {
+    background: #222;
+    padding: 25px;
+    border-radius: 12px;
+    margin-bottom: 25px;
+    border: 1px solid #333;
+  }
+
+  .analysis-section h3 {
+    margin: 0 0 20px;
+    font-size: 22px;
+    color: #00ffcc;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .analysis-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+  }
+
+  .analysis-card {
+    background: #2a2a2a;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #444;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+  }
+
+  .analysis-card:hover {
+    transform: translateY(-2px);
+    border-color: #00ffcc;
+  }
+
+  .analysis-card h4 {
+    margin: 0 0 15px;
+    color: #fff;
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    padding: 8px 0;
+  }
+
+  .metric-label {
+    color: #bbb;
+    font-size: 14px;
+  }
+
+  .metric-value {
+    color: #00ffcc;
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .best-performing {
+    background: linear-gradient(135deg, #2a2a2a 0%, #1a3a3a 100%);
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #00ffcc;
+    text-align: center;
+  }
+
+  .best-performing h4 {
+    margin: 0 0 10px;
+    color: #00ffcc;
+    font-size: 18px;
+  }
+
+  .highlight-text {
+    margin: 0;
+    color: #fff;
+    font-size: 20px;
+    font-weight: 700;
+    text-transform: capitalize;
+  }
+
+  /* Trends Grid */
+  .trends-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 25px;
+  }
+
+  .trend-card {
+    background: #2a2a2a;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid #444;
+    transition: all 0.2s ease;
+  }
+
+  .trend-card:hover {
+    transform: translateY(-2px);
+    border-color: #00ffcc;
+    box-shadow: 0 5px 15px rgba(0, 255, 204, 0.1);
+  }
+
+  .trend-card h4 {
+    margin: 0 0 10px;
+    color: #bbb;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .trend-card .highlight-text {
+    font-size: 24px;
+    color: #00ffcc;
+  }
+
+  /* Distribution Styles */
+  .distribution-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+  }
+
+  .distribution-card {
+    background: #2a2a2a;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #444;
+  }
+
+  .distribution-card h4 {
+    margin: 0 0 15px;
+    color: #fff;
+    font-size: 16px;
+  }
+
+  .distribution-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .distribution-bar {
+    display: grid;
+    grid-template-columns: 80px 1fr 50px;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .bar-label {
+    color: #bbb;
+    font-size: 12px;
+    font-weight: 500;
+    text-align: right;
+  }
+
+  .bar-container {
+    height: 8px;
+    background: #333;
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #00ffcc 0%, #00cc99 100%);
+    border-radius: 4px;
+    transition: width 0.8s ease;
+  }
+
+  .bar-value {
+    color: #00ffcc;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: left;
+  }
+
+  /* Activity Months */
+  .activity-months {
+    margin-top: 20px;
+    padding: 20px;
+    background: #2a2a2a;
+    border-radius: 8px;
+    border: 1px solid #444;
+  }
+
+  .activity-months h4 {
+    margin: 0 0 15px;
+    color: #fff;
+    font-size: 16px;
+  }
+
+  .months-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .month-badge {
+    background: #00ffcc;
+    color: #000;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  /* Connection Required Styles */
+  .connection-required {
+    text-align: center;
+    padding: 40px 20px;
+    background: #222;
+    border-radius: 12px;
+    border: 2px dashed #444;
+    margin: 20px 0;
+  }
+
+  .connection-icon {
+    font-size: 48px;
+    margin-bottom: 20px;
+    opacity: 0.7;
+  }
+
+  .connection-required h3 {
+    margin: 0 0 15px;
+    color: #00ffcc;
+    font-size: 24px;
+  }
+
+  .connection-required p {
+    color: #bbb;
+    font-size: 16px;
+    margin-bottom: 25px;
+    line-height: 1.5;
+  }
+
+  .connection-benefits {
+    background: #2a2a2a;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: left;
+    max-width: 400px;
+    margin: 0 auto;
+  }
+
+  .connection-benefits h4 {
+    margin: 0 0 15px;
+    color: #fff;
+    font-size: 16px;
+    text-align: center;
+  }
+
+  .connection-benefits ul {
+    margin: 0;
+    padding-left: 20px;
+    color: #bbb;
+  }
+
+  .connection-benefits li {
+    margin-bottom: 8px;
+    font-size: 14px;
+  }
+
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    .insights-modal {
+      width: 95%;
+      max-height: 90vh;
+      padding: 15px;
+    }
+
+    .analysis-header h2 {
+      font-size: 24px;
+    }
+
+    .analysis-subtitle {
+      font-size: 14px;
+    }
+
+    .analysis-cards {
+      grid-template-columns: 1fr;
+    }
+
+    .trends-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .distribution-section {
+      grid-template-columns: 1fr;
+    }
+
+    .distribution-bar {
+      grid-template-columns: 60px 1fr 40px;
+      gap: 8px;
+    }
+
+    .bar-label, .bar-value {
+      font-size: 11px;
+    }
+
+    .insights-tabs button {
+      font-size: 12px;
+      padding: 10px 8px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .insights-modal {
+      width: 98%;
+      padding: 10px;
+    }
+
+    .analysis-section {
+      padding: 15px;
+    }
+
+    .trend-card .highlight-text {
+      font-size: 20px;
+    }
+
+    .connection-benefits {
+      padding: 15px;
+    }
   }

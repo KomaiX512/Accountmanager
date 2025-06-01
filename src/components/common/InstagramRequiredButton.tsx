@@ -11,6 +11,7 @@ interface InstagramRequiredButtonProps {
   style?: React.CSSProperties;
   notificationPosition?: 'top' | 'bottom' | 'left' | 'right';
   message?: string;
+  bypassConnectionRequirement?: boolean;
 }
 
 const InstagramRequiredButton: React.FC<InstagramRequiredButtonProps> = ({
@@ -21,7 +22,8 @@ const InstagramRequiredButton: React.FC<InstagramRequiredButtonProps> = ({
   disabled = false,
   style = {},
   notificationPosition = 'top',
-  message = "Please first connect your Instagram."
+  message = "Please first connect your Instagram.",
+  bypassConnectionRequirement = false
 }) => {
   const [showNotification, setShowNotification] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -31,7 +33,7 @@ const InstagramRequiredButton: React.FC<InstagramRequiredButtonProps> = ({
   const isConnected = isConnectedProp !== undefined ? isConnectedProp : isConnectedContext;
 
   const handleClick = () => {
-    if (isConnected) {
+    if (isConnected || bypassConnectionRequirement) {
       onClick();
     } else {
       // Show notification
@@ -48,7 +50,7 @@ const InstagramRequiredButton: React.FC<InstagramRequiredButtonProps> = ({
     }
   };
 
-  const buttonDisabledStyle: React.CSSProperties = isConnected ? {} : {
+  const buttonDisabledStyle: React.CSSProperties = (isConnected || bypassConnectionRequirement) ? {} : {
     opacity: 0.7,
     cursor: 'not-allowed',
     filter: 'grayscale(40%)',
@@ -66,7 +68,7 @@ const InstagramRequiredButton: React.FC<InstagramRequiredButtonProps> = ({
         {children}
       </button>
       
-      {showNotification && !isConnected && (
+      {showNotification && !isConnected && !bypassConnectionRequirement && (
         <ButtonNotification position={notificationPosition} message={message} />
       )}
     </div>

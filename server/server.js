@@ -5463,12 +5463,30 @@ app.post('/save-goal/:username', async (req, res) => {
       });
     }
 
+    // Check for existing active campaign
+    console.log(`[${new Date().toISOString()}] Checking for existing campaign before creating new goal for ${username} on ${platform}`);
+    const goalPrefix = `tasks/goal/${platform}/${username}`;
+    const listExistingCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: `${goalPrefix}/`
+    });
+
+    const existingData = await s3Client.send(listExistingCommand);
+    if (existingData.Contents && existingData.Contents.length > 0) {
+      console.log(`[${new Date().toISOString()}] Found existing campaign for ${username} on ${platform}, rejecting new goal submission`);
+      return res.status(409).json({ 
+        error: 'Campaign already active',
+        message: 'You already have an active campaign. Please stop the current campaign before starting a new one.',
+        hasActiveCampaign: true
+      });
+    }
+
     // Generate unique identifier for the goal file
     const timestamp = Date.now();
     const goalId = `goal_${timestamp}`;
     
     // Build goal path
-    const goalPath = `goal/${platform}/${username}/${goalId}.json`;
+    const goalPath = `tasks/goal/${platform}/${username}/${goalId}.json`;
 
     // Create goal data structure
     const goalData = {
@@ -5836,6 +5854,238 @@ app.get('/generated-content-summary/:username', async (req, res) => {
 
 // OPTIONS handler for generated-content-summary
 app.options('/generated-content-summary/:username', (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+
+// Campaign status check endpoint - Check if user has an active campaign
+app.get('/campaign-status/:username', async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  try {
+    const { username } = req.params;
+    
+    // Parse platform from query params
+    const platform = (req.query.platform || 'instagram').toLowerCase();
+    if (!['instagram', 'twitter'].includes(platform)) {
+      return res.status(400).json({ 
+        error: 'Invalid platform. Must be instagram or twitter.' 
+      });
+    }
+    
+    console.log(`[${new Date().toISOString()}] Checking campaign status for ${username} on ${platform}`);
+
+    // Check for existing goal files
+    const goalPrefix = `tasks/goal/${platform}/${username}`;
+    const listGoalsCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: `${goalPrefix}/`
+    });
+
+    const goalData = await s3Client.send(listGoalsCommand);
+    const hasActiveGoal = goalData.Contents && goalData.Contents.length > 0;
+
+    if (hasActiveGoal) {
+      console.log(`[${new Date().toISOString()}] Active campaign found for ${username} on ${platform}`);
+      return res.json({ 
+        hasActiveCampaign: true,
+        platform: platform,
+        username: username,
+        goalFiles: goalData.Contents?.length || 0
+      });
+    }
+
+    console.log(`[${new Date().toISOString()}] No active campaign found for ${username} on ${platform}`);
+    res.json({ 
+      hasActiveCampaign: false,
+      platform: platform,
+      username: username
+    });
+
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Campaign status check error:`, error);
+    res.status(500).json({ 
+      error: 'Failed to check campaign status', 
+      details: error.message,
+      hasActiveCampaign: false
+    });
+  }
+});
+
+// OPTIONS handler for campaign-status
+app.options('/campaign-status/:username', (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+
+// Stop campaign endpoint - Delete all campaign-related files
+app.delete('/stop-campaign/:username', async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  try {
+    const { username } = req.params;
+    
+    // Parse platform from query params
+    const platform = (req.query.platform || 'instagram').toLowerCase();
+    if (!['instagram', 'twitter'].includes(platform)) {
+      return res.status(400).json({ 
+        error: 'Invalid platform. Must be instagram or twitter.' 
+      });
+    }
+    
+    console.log(`[${new Date().toISOString()}] Stopping campaign for ${username} on ${platform}`);
+
+    let deletedFiles = [];
+    let deletionErrors = [];
+
+    // Define file prefixes to delete
+    const prefixesToDelete = [
+      `tasks/goal/${platform}/${username}`,
+      `tasks/goal_summary/${platform}/${username}`,
+      `tasks/ready_post/${platform}/${username}`
+    ];
+
+    // Delete files from each prefix
+    for (const prefix of prefixesToDelete) {
+      try {
+        const listCommand = new ListObjectsV2Command({
+          Bucket: 'tasks',
+          Prefix: `${prefix}/`
+        });
+
+        const data = await s3Client.send(listCommand);
+
+        if (data.Contents && data.Contents.length > 0) {
+          console.log(`[${new Date().toISOString()}] Found ${data.Contents.length} files to delete in ${prefix}/`);
+          
+          for (const object of data.Contents) {
+            if (object.Key) {
+              try {
+                const deleteCommand = new DeleteObjectCommand({
+                  Bucket: 'tasks',
+                  Key: object.Key
+                });
+                
+                await s3Client.send(deleteCommand);
+                deletedFiles.push(object.Key);
+                console.log(`[${new Date().toISOString()}] Deleted: ${object.Key}`);
+              } catch (deleteError) {
+                console.error(`[${new Date().toISOString()}] Error deleting ${object.Key}:`, deleteError);
+                deletionErrors.push({ key: object.Key, error: deleteError.message });
+              }
+            }
+          }
+        } else {
+          console.log(`[${new Date().toISOString()}] No files found in ${prefix}/ to delete`);
+        }
+      } catch (listError) {
+        console.error(`[${new Date().toISOString()}] Error listing files in ${prefix}/:`, listError);
+        deletionErrors.push({ prefix, error: listError.message });
+      }
+    }
+
+    console.log(`[${new Date().toISOString()}] Campaign deletion completed for ${username} on ${platform}. Deleted ${deletedFiles.length} files, ${deletionErrors.length} errors.`);
+
+    res.json({
+      success: true,
+      message: `Campaign stopped successfully for ${username} on ${platform}`,
+      deletedFiles: deletedFiles,
+      deletedCount: deletedFiles.length,
+      errors: deletionErrors,
+      platform: platform,
+      username: username
+    });
+
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Stop campaign error:`, error);
+    res.status(500).json({ 
+      error: 'Failed to stop campaign', 
+      details: error.message,
+      success: false
+    });
+  }
+});
+
+// OPTIONS handler for stop-campaign
+app.options('/stop-campaign/:username', (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+
+// Get timeline from generated content endpoint
+app.get('/generated-content-timeline/:username', async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  try {
+    const { username } = req.params;
+    
+    // Parse platform from query params
+    const platform = (req.query.platform || 'instagram').toLowerCase();
+    if (!['instagram', 'twitter'].includes(platform)) {
+      return res.status(400).json({ 
+        error: 'Invalid platform. Must be instagram or twitter.' 
+      });
+    }
+    
+    // Build the file path for generated content
+    const contentKey = `generated_content/${platform}/${username}/posts.json`;
+
+    console.log(`[${new Date().toISOString()}] Retrieving timeline from generated content: ${contentKey}`);
+
+    // Try to get the generated content file
+    const getCommand = new GetObjectCommand({
+      Bucket: 'tasks',
+      Key: contentKey
+    });
+    
+    const contentResponse = await s3Client.send(getCommand);
+    const contentBody = await streamToString(contentResponse.Body);
+    const contentData = JSON.parse(contentBody);
+
+    // Extract timeline value
+    let timeline = null;
+    if (contentData.Timeline) {
+      // Parse timeline value, ensure it's a number
+      const timelineValue = parseInt(contentData.Timeline);
+      if (!isNaN(timelineValue) && timelineValue > 0) {
+        timeline = timelineValue;
+      }
+    }
+
+    console.log(`[${new Date().toISOString()}] Timeline extracted for ${username} on ${platform}: ${timeline} hours`);
+
+    res.json({
+      success: true,
+      timeline: timeline,
+      platform: platform,
+      username: username,
+      fallbackUsed: timeline === null
+    });
+
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Generated content timeline retrieval error:`, error);
+    
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+      return res.status(404).json({ 
+        error: 'Generated content not found',
+        timeline: null,
+        fallbackUsed: true,
+        success: false
+      });
+    }
+
+    res.status(500).json({ 
+      error: 'Failed to retrieve timeline from generated content', 
+      details: error.message,
+      timeline: null,
+      fallbackUsed: true,
+      success: false
+    });
+  }
+});
+
+// OPTIONS handler for generated-content-timeline
+app.options('/generated-content-timeline/:username', (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });

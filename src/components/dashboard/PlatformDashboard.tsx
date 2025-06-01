@@ -1000,18 +1000,29 @@ Image Description: ${response.post.image_prompt}
   // Handle custom event for opening campaign modal
   useEffect(() => {
     const handleOpenCampaignEvent = (event: any) => {
-      const { username, platform: eventPlatform } = event.detail;
-      if (username === accountHolder && eventPlatform.toLowerCase() === platform) {
+      const { username, platform } = event.detail;
+      if (username === accountHolder && platform === 'Twitter') {
         setShowCampaignButton(true);
         setIsCampaignModalOpen(true);
       }
     };
 
+    const handleCampaignStoppedEvent = (event: any) => {
+      const { username, platform } = event.detail;
+      if (username === accountHolder && platform === 'twitter') {
+        setShowCampaignButton(false);
+        setIsCampaignModalOpen(false);
+      }
+    };
+
     window.addEventListener('openCampaignModal', handleOpenCampaignEvent);
+    window.addEventListener('campaignStopped', handleCampaignStoppedEvent);
+    
     return () => {
       window.removeEventListener('openCampaignModal', handleOpenCampaignEvent);
+      window.removeEventListener('campaignStopped', handleCampaignStoppedEvent);
     };
-  }, [accountHolder, platform]);
+  }, [accountHolder]);
 
   if (!accountHolder) {
     return <div className="error-message">Please specify an account holder to load the {config.name} dashboard.</div>;
@@ -1077,6 +1088,11 @@ Image Description: ${response.post.image_prompt}
   const handleGoalSuccess = () => {
     setShowCampaignButton(true);
     setIsGoalModalOpen(false);
+  };
+
+  const handleCampaignStopped = () => {
+    setShowCampaignButton(false);
+    setIsCampaignModalOpen(false);
   };
 
   const handleOpenTwitterScheduler = () => {
@@ -1510,6 +1526,7 @@ Image Description: ${response.post.image_prompt}
           platform={config.name}
           isConnected={isConnected}
           onClose={() => setIsCampaignModalOpen(false)}
+          onCampaignStopped={handleCampaignStopped}
         />
       )}
     </motion.div>

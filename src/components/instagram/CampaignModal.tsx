@@ -7,6 +7,7 @@ interface CampaignModalProps {
   platform: string;
   isConnected: boolean;
   onClose: () => void;
+  onCampaignStopped?: () => void;
 }
 
 interface CampaignSummary {
@@ -31,13 +32,15 @@ interface EngagementMetrics {
   message: string;
 }
 
-const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isConnected, onClose }) => {
+const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isConnected, onClose, onCampaignStopped }) => {
   const [summary, setSummary] = useState<CampaignSummary | null>(null);
   const [generatedSummary, setGeneratedSummary] = useState<GeneratedContentSummary | null>(null);
   const [postCooked, setPostCooked] = useState<number>(0);
   const [engagement, setEngagement] = useState<EngagementMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showStopConfirmation, setShowStopConfirmation] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
 
   useEffect(() => {
     fetchCampaignData();
@@ -99,6 +102,47 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
     fetchCampaignData();
   };
 
+  const handleStopCampaign = () => {
+    setShowStopConfirmation(true);
+  };
+
+  const handleConfirmStop = async () => {
+    setIsStopping(true);
+    setError(null);
+
+    try {
+      const response = await axios.delete(`http://localhost:3000/stop-campaign/${username}?platform=${platform.toLowerCase()}`);
+      
+      if (response.data.success) {
+        console.log('Campaign stopped successfully:', response.data);
+        
+        // Close the modal and notify parent component
+        onClose();
+        
+        if (onCampaignStopped) {
+          onCampaignStopped();
+        }
+        
+        // Dispatch event to notify dashboard components
+        window.dispatchEvent(new CustomEvent('campaignStopped', { 
+          detail: { username, platform: platform.toLowerCase() } 
+        }));
+      } else {
+        setError('Failed to stop campaign. Please try again.');
+      }
+    } catch (err: any) {
+      console.error('Error stopping campaign:', err);
+      setError(err.response?.data?.error || 'Failed to stop campaign. Please try again.');
+    } finally {
+      setIsStopping(false);
+      setShowStopConfirmation(false);
+    }
+  };
+
+  const handleCancelStop = () => {
+    setShowStopConfirmation(false);
+  };
+
   // Helper function to get the best available summary and post count
   const getSummaryData = () => {
     // Prefer generated content summary if available, fallback to original
@@ -142,20 +186,36 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
         <div style={{ padding: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <h2 style={{ color: '#00ffcc', margin: 0 }}>Campaign Progress</h2>
-            <button
-              onClick={handleRefresh}
-              className="insta-btn connect"
-              style={{
-                padding: '6px 12px',
-                fontSize: '12px',
-                background: 'transparent',
-                border: '1px solid #00ffcc',
-                color: '#00ffcc'
-              }}
-              disabled={loading}
-            >
-              {loading ? 'Loading...' : 'Refresh'}
-            </button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={handleRefresh}
+                className="insta-btn connect"
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '12px',
+                  background: 'transparent',
+                  border: '1px solid #00ffcc',
+                  color: '#00ffcc'
+                }}
+                disabled={loading}
+              >
+                {loading ? 'Loading...' : 'Refresh'}
+              </button>
+              <button
+                onClick={handleStopCampaign}
+                className="insta-btn disconnect"
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '12px',
+                  background: 'linear-gradient(90deg, #ff4444, #cc3333)',
+                  color: '#fff',
+                  border: '1px solid #ff4444'
+                }}
+                disabled={loading || isStopping}
+              >
+                {isStopping ? 'Stopping...' : 'Stop Campaign'}
+              </button>
+            </div>
           </div>
 
           {error && (
@@ -319,6 +379,57 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
           </div>
         </div>
       </motion.div>
+
+      {/* Stop Campaign Confirmation Modal */}
+      {showStopConfirmation && (
+        <motion.div
+          className="popup-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          style={{ zIndex: 3000 }}
+        >
+          <motion.div
+            className="popup-content"
+            initial={{ scale: 0.8, y: 50 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.8, y: 50 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 400, width: '100%' }}
+          >
+            <div style={{ padding: '24px', textAlign: 'center' }}>
+              <h3 style={{ color: '#ff4444', marginBottom: '16px' }}>Stop Campaign</h3>
+              <p style={{ color: '#e0e0ff', marginBottom: '24px', lineHeight: '1.5' }}>
+                Are you sure you want to stop the campaign? This will delete all campaign files and cannot be undone.
+              </p>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                <button
+                  onClick={handleCancelStop}
+                  className="insta-btn disconnect"
+                  disabled={isStopping}
+                  style={{ padding: '10px 20px' }}
+                >
+                  No, Keep Campaign
+                </button>
+                <button
+                  onClick={handleConfirmStop}
+                  className="insta-btn connect"
+                  disabled={isStopping}
+                  style={{
+                    padding: '10px 20px',
+                    background: 'linear-gradient(90deg, #ff4444, #cc3333)',
+                    borderColor: '#ff4444'
+                  }}
+                >
+                  {isStopping ? 'Stopping...' : 'Yes, Stop Campaign'}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
     </motion.div>
   );
 };

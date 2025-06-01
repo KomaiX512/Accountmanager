@@ -478,16 +478,45 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     }
   };
 
-  const fetchTimeDelay = async (): Promise<number> => {
+  const fetchTimeDelay = async (userDefinedInterval?: number): Promise<number> => {
+    // Priority 1: User-defined interval
+    if (typeof userDefinedInterval === 'number' && !isNaN(userDefinedInterval) && userDefinedInterval > 0) {
+      console.log(`[AutoSchedule] Using user-defined interval: ${userDefinedInterval} hours`);
+      return userDefinedInterval;
+    }
+
+    // Priority 2: Fallback to generated content timeline
+    try {
+      console.log(`[AutoSchedule] Fetching timeline from generated content for ${username} on ${platform}`);
+      const timelineResponse = await fetch(`http://localhost:3000/generated-content-timeline/${username}?platform=${platform}`);
+      
+      if (timelineResponse.ok) {
+        const timelineData = await timelineResponse.json();
+        if (timelineData.success && timelineData.timeline && timelineData.timeline > 0) {
+          console.log(`[AutoSchedule] Using timeline from generated content: ${timelineData.timeline} hours`);
+          return timelineData.timeline;
+        } else {
+          console.log(`[AutoSchedule] Generated content timeline not available or invalid, using default`);
+        }
+      } else {
+        console.log(`[AutoSchedule] Generated content timeline endpoint returned ${timelineResponse.status}, using default`);
+      }
+    } catch (timelineError) {
+      console.warn(`[AutoSchedule] Error fetching timeline from generated content:`, timelineError);
+    }
+
+    // Priority 3: Original time delay endpoint
     try {
       const res = await fetch(`http://localhost:3000/time-delay/${username}`);
       if (!res.ok) throw new Error('Not found');
       const data = await res.json();
       const delay = parseInt(data?.Posting_Delay_Intervals);
-      return isNaN(delay) ? 12 : delay;
+      const finalDelay = isNaN(delay) ? 12 : delay;
+      console.log(`[AutoSchedule] Using time delay from endpoint: ${finalDelay} hours`);
+      return finalDelay;
     } catch (err) {
-      console.warn(`[AutoSchedule] Failed to fetch time delay, using default 12 hours:`, err);
-      return 12;
+      console.warn(`[AutoSchedule] Failed to fetch time delay from endpoint, using default 6 hours:`, err);
+      return 6; // Changed default from 12 to 6 hours as specified in requirements
     }
   };
 
@@ -497,16 +526,15 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       return;
     }
     setAutoScheduling(true);
-    setAutoScheduleProgress('Fetching time delay...');
+    setAutoScheduleProgress('Determining scheduling interval...');
+    
     try {
-      let delayHours: number;
-      if (typeof intervalOverride === 'number' && !isNaN(intervalOverride) && intervalOverride > 0) {
-        delayHours = intervalOverride;
-      } else {
-        delayHours = await fetchTimeDelay();
-      }
-      console.log('[AutoSchedule] Using delay (hours):', delayHours);
+      // Use the enhanced fetchTimeDelay with priority system
+      const delayHours = await fetchTimeDelay(intervalOverride);
+      
+      console.log('[AutoSchedule] Final interval determined:', delayHours, 'hours');
       setAutoScheduleProgress(`Scheduling ${platform === 'twitter' ? 'tweets' : 'posts'} every ${delayHours} hours...`);
+      
       let now = new Date();
       
       for (let i = 0; i < localPosts.length; i++) {
@@ -672,7 +700,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         await new Promise(res => setTimeout(res, 500));
       }
       setAutoScheduleProgress(null);
-      setToastMessage(`All ${platform === 'twitter' ? 'tweets' : 'posts'} scheduled!`);
+      setToastMessage(`All ${platform === 'twitter' ? 'tweets' : 'posts'} scheduled successfully! Interval: ${delayHours} hours`);
     } catch (err: any) {
       console.error('[AutoSchedule] Auto-scheduling failed:', err.message);
       setAutoScheduleProgress(null);
@@ -832,7 +860,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
             background: 'rgba(0,0,0,0.4)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}>
-            <div style={{ background: '#23234a', borderRadius: 12, padding: 24, minWidth: 320, boxShadow: '0 4px 24px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ background: '#23234a', borderRadius: 12, padding: 24, minWidth: 380, boxShadow: '0 4px 24px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', gap: 16 }}>
               <h3 style={{ color: '#e0e0ff', marginBottom: 8 }}>Set Auto-Schedule Interval</h3>
               <input
                 type="number"
@@ -840,12 +868,15 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                 step={1}
                 value={intervalInput}
                 onChange={e => setIntervalInput(e.target.value)}
-                placeholder="Interval in hours (e.g. 12)"
+                placeholder="Interval in hours (e.g. 4)"
                 style={{ padding: 8, borderRadius: 6, border: '1px solid #00ffcc', fontSize: 16, marginBottom: 8 }}
                 autoFocus
               />
-              <div style={{ color: '#a0a0cc', fontSize: 14, marginBottom: 8 }}>
-                Leave blank to let AI decide the interval automatically.
+              <div style={{ color: '#a0a0cc', fontSize: 14, marginBottom: 8, lineHeight: '1.4' }}>
+                <strong>Priority System:</strong><br />
+                1. Your custom interval (if provided)<br />
+                2. Campaign timeline from goal settings<br />
+                3. Default interval (6 hours)
               </div>
               <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
                 <button
@@ -861,7 +892,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                     handleAutoSchedule(interval);
                   }}
                   disabled={autoScheduling}
-                >Confirm</button>
+                >Start Auto-Schedule</button>
               </div>
             </div>
           </div>

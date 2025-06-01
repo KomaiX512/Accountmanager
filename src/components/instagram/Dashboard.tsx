@@ -1173,6 +1173,11 @@ Image Description: ${response.post.image_prompt}
     setIsGoalModalOpen(false);
   };
 
+  const handleCampaignStopped = () => {
+    setShowCampaignButton(false);
+    setIsCampaignModalOpen(false);
+  };
+
   // Handle custom event for opening campaign modal
   useEffect(() => {
     const handleOpenCampaignEvent = (event: any) => {
@@ -1183,9 +1188,20 @@ Image Description: ${response.post.image_prompt}
       }
     };
 
+    const handleCampaignStoppedEvent = (event: any) => {
+      const { username, platform } = event.detail;
+      if (username === accountHolder && platform === 'instagram') {
+        setShowCampaignButton(false);
+        setIsCampaignModalOpen(false);
+      }
+    };
+
     window.addEventListener('openCampaignModal', handleOpenCampaignEvent);
+    window.addEventListener('campaignStopped', handleCampaignStoppedEvent);
+    
     return () => {
       window.removeEventListener('openCampaignModal', handleOpenCampaignEvent);
+      window.removeEventListener('campaignStopped', handleCampaignStoppedEvent);
     };
   }, [accountHolder]);
 
@@ -1512,6 +1528,7 @@ Image Description: ${response.post.image_prompt}
           platform="Instagram"
           isConnected={isInstagramConnected}
           onClose={() => setIsCampaignModalOpen(false)}
+          onCampaignStopped={handleCampaignStopped}
         />
       )}
       {isChatModalOpen && (

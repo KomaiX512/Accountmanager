@@ -18,6 +18,13 @@ import { useInstagram } from '../../context/InstagramContext';
 import ChatModal from './ChatModal';
 import RagService from '../../services/RagService';
 import type { ChatMessage as ChatModalMessage } from './ChatModal';
+// Import icons from react-icons
+import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaLock } from 'react-icons/fa';
+import { MdAnalytics, MdOutlineSchedule, MdOutlineAutoGraph } from 'react-icons/md';
+import { BsLightningChargeFill, BsBinoculars, BsLightbulb } from 'react-icons/bs';
+import { IoMdAnalytics } from 'react-icons/io';
+import { TbTargetArrow } from 'react-icons/tb';
+import { GiSpy } from 'react-icons/gi';
 
 // Define RagService compatible ChatMessage
 interface RagChatMessage {
@@ -1413,66 +1420,36 @@ Image Description: ${response.post.image_prompt}
                       isConnected={!!igBusinessId}
                       onClick={handleOpenInsights}
                       bypassConnectionRequirement={true}
-                      className="insta-btn insights"
-                      style={{
-                        background: 'linear-gradient(90deg, #00ffcc, #007bff)',
-                        color: '#e0e0ff',
-                        padding: '8px 16px',
-                        borderRadius: '6px',
-                        border: '1px solid #00ffcc',
-                        zIndex: 20,
-                      }}
+                      className="dashboard-btn insights-btn"
                     >
-                      Insights
+                      <FaChartLine className="btn-icon" />
+                      <span>Insights</span>
                     </InstagramRequiredButton>
                     
                     <InstagramRequiredButton
                       isConnected={!!igBusinessId}
                       onClick={handleOpenScheduler}
-                      className="insta-btn connect"
-                      style={{
-                        background: 'linear-gradient(90deg, #007bff, #00ffcc)',
-                        color: '#e0e0ff',
-                        padding: '8px 16px',
-                        borderRadius: '6px',
-                        border: '1px solid #00ffcc',
-                        zIndex: 20,
-                      }}
+                      className="dashboard-btn schedule-btn"
                     >
-                      Schedule Post
+                      <FaCalendarAlt className="btn-icon" />
+                      <span>Schedule</span>
                     </InstagramRequiredButton>
                     
                     <button
                       onClick={handleOpenGoalModal}
-                      className="insta-btn connect"
-                      style={{
-                        background: 'linear-gradient(90deg, #00ffcc, #007bff)',
-                        color: '#e0e0ff',
-                        padding: '8px 16px',
-                        borderRadius: '6px',
-                        border: '1px solid #00ffcc',
-                        zIndex: 20,
-                        marginLeft: '10px',
-                      }}
+                      className="dashboard-btn goal-btn"
                     >
-                      Goal
+                      <TbTargetArrow className="btn-icon" />
+                      <span>Goal</span>
                     </button>
                     
                     {showCampaignButton && (
                       <button
                         onClick={handleOpenCampaignModal}
-                        className="insta-btn connect"
-                        style={{
-                          background: 'linear-gradient(90deg, #ff6b6b, #ff8e53)',
-                          color: '#fff',
-                          padding: '8px 16px',
-                          borderRadius: '6px',
-                          border: '1px solid #ff6b6b',
-                          zIndex: 20,
-                          marginLeft: '10px',
-                        }}
+                        className="dashboard-btn campaign-btn"
                       >
-                        Campaign
+                        <FaBullhorn className="btn-icon" />
+                        <span>Campaign</span>
                       </button>
                     )}
                   </div>
@@ -1511,12 +1488,24 @@ Image Description: ${response.post.image_prompt}
           </div>
 
           <div className="strategies">
-            <h2>Our Strategies <span className="badge">{strategies.length || 3} unseen!!!</span></h2>
+            <h2>
+              <div className="section-header">
+                <BsLightbulb className="section-icon" />
+                <span>Our Strategies</span>
+                <span className="badge">{strategies.length || 3} unseen!!!</span>
+              </div>
+            </h2>
             <OurStrategies accountHolder={accountHolder} accountType={accountType} />
           </div>
 
           <div className="competitor-analysis">
-            <h2>Competitor Analysis <span className="badge">{competitorData.length || 5} unseen!!!</span></h2>
+            <h2>
+              <div className="section-header">
+                <GiSpy className="section-icon" />
+                <span>Competitor Analysis</span>
+                <span className="badge">{competitorData.length || 5} unseen!!!</span>
+              </div>
+            </h2>
             <Cs_Analysis accountHolder={accountHolder} competitors={competitors} />
           </div>
 

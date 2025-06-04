@@ -41,6 +41,7 @@ const Twitter: React.FC = () => {
             navigate('/twitter-non-branding-dashboard', { 
               state: { 
                 accountHolder: savedUsername,
+                competitors: savedCompetitors,
                 accountType: 'non-branding',
                 platform: 'twitter'
               },
@@ -75,6 +76,7 @@ const Twitter: React.FC = () => {
       navigate('/twitter-non-branding-dashboard', { 
         state: { 
           accountHolder: username,
+          competitors: competitors,
           accountType: 'non-branding',
           platform: 'twitter'
         },

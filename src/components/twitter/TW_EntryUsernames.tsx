@@ -2,17 +2,19 @@ import React, { useState, ChangeEvent, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import '../instagram/IG_EntryUsernames.css'; // Reuse the same styles
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 interface TW_EntryUsernamesProps {
   onSubmitSuccess: (username: string, competitors: string[], accountType: 'branding' | 'non-branding') => void;
   redirectIfCompleted?: boolean;
+  markPlatformAccessed?: (platformId: string) => void; // Function to mark platform as accessed/claimed
 }
 
 const TW_EntryUsernames: React.FC<TW_EntryUsernamesProps> = ({ 
   onSubmitSuccess, 
-  redirectIfCompleted = true 
+  redirectIfCompleted = true,
+  markPlatformAccessed 
 }) => {
   const [username, setUsername] = useState<string>('');
   const [accountType, setAccountType] = useState<'branding' | 'non-branding' | ''>('');
@@ -261,9 +263,34 @@ const TW_EntryUsernames: React.FC<TW_EntryUsernamesProps> = ({
         await axios.post(`${statusApiUrl}/${currentUser.uid}`, {
           twitter_username: username.trim(),
           accountType,
-          competitors: competitors.map(comp => comp.trim()) // Always save competitors
+          competitors: competitors.map(comp => comp.trim())
         });
         
+        // Check if this was a pending platform to be marked as acquired
+        if (currentUser?.uid) {
+          const pendingKey = `mark_twitter_pending_${currentUser.uid}`;
+          if (localStorage.getItem(pendingKey)) {
+            // Clear the pending flag
+            localStorage.removeItem(pendingKey);
+            // Mark as acquired
+            localStorage.setItem(`twitter_accessed_${currentUser.uid}`, 'true');
+            // Save account type for routing purposes
+            localStorage.setItem(`twitter_account_type_${currentUser.uid}`, accountType);
+          }
+        }
+
+        // Mark Twitter as acquired after successful submission
+        if (markPlatformAccessed) {
+          markPlatformAccessed('twitter');
+        } else {
+          // Fallback if function not provided - update localStorage directly
+          if (currentUser?.uid) {
+            localStorage.setItem(`twitter_accessed_${currentUser.uid}`, 'true');
+            // Save account type for routing purposes
+            localStorage.setItem(`twitter_account_type_${currentUser.uid}`, accountType);
+          }
+        }
+
         showMessage('Submission successful', 'success');
         resetForm();
         setTimeout(() => {

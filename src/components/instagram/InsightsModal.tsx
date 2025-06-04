@@ -334,7 +334,7 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
     return (
       <div className="profit-analysis-content">
         <div className="analysis-header">
-          <h2>💰 Profit Analysis Dashboard</h2>
+          <h2>STATISTICAL ANALYSIS</h2>
           <p className="analysis-subtitle">
             Comprehensive insights for @{accountUsername} on {platform === 'instagram' ? 'Instagram' : 'Twitter'}
           </p>

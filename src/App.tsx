@@ -7,6 +7,7 @@ import Instagram from './pages/Instagram';
 import Twitter from './pages/Twitter';
 import Dashboard from './components/instagram/Dashboard';
 import PlatformDashboard from './components/dashboard/PlatformDashboard';
+import MainDashboard from './components/dashboard/MainDashboard';
 import Login from './components/auth/Login';
 import PrivateRoute from './components/auth/PrivateRoute';
 import AuthRoute from './components/auth/AuthRoute';
@@ -54,6 +55,7 @@ const AppContent: React.FC = () => {
   const { extractedAccountHolder, extractedCompetitors, extractedUserId, extractedAccountType } = locationStateValues;
   
   const isLoginPage = location.pathname === '/login';
+  const isAccountPage = location.pathname === '/account';
 
   // Determine current platform based on route
   const currentPlatform = location.pathname.includes('twitter') ? 'twitter' : 'instagram';
@@ -96,6 +98,13 @@ const AppContent: React.FC = () => {
       syncUserConnection(currentUser.uid);
     }
   }, [currentUser?.uid, syncUserConnection]);
+
+  // Redirect logged in users to account page
+  useEffect(() => {
+    if (currentUser && location.pathname === '/') {
+      navigate('/account');
+    }
+  }, [currentUser, location.pathname, navigate]);
 
   // Try to load user data if logged in but no account info
   useEffect(() => {
@@ -162,16 +171,24 @@ const AppContent: React.FC = () => {
     <div className="App">
       <TopBar />
       <div className="main-content">
-        {!isLoginPage && <LeftBar accountHolder={accountHolder} userId={userId} platform={currentPlatform} />}
-        <div className={`content-area ${isLoginPage ? 'full-width' : ''}`}>
+        {!isLoginPage && !isAccountPage && <LeftBar accountHolder={accountHolder} userId={userId} platform={currentPlatform} />}
+        <div className={`content-area ${isLoginPage || isAccountPage ? 'full-width' : ''}`}>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route
               path="/"
               element={
                 <AuthRoute>
-                  <Instagram />
+                  <MainDashboard />
                 </AuthRoute>
+              }
+            />
+            <Route
+              path="/account"
+              element={
+                <PrivateRoute>
+                  <MainDashboard />
+                </PrivateRoute>
               }
             />
             <Route
@@ -208,7 +225,7 @@ const AppContent: React.FC = () => {
                 <PrivateRoute>
                   <Dashboard 
                     accountHolder={accountHolder} 
-                    competitors={[]} 
+                    competitors={competitors} 
                     accountType="non-branding" 
                   />
                 </PrivateRoute>
@@ -233,7 +250,7 @@ const AppContent: React.FC = () => {
                 <PrivateRoute>
                   <PlatformDashboard 
                     accountHolder={accountHolder} 
-                    competitors={[]} 
+                    competitors={competitors} 
                     accountType="non-branding"
                     platform="twitter"
                   />

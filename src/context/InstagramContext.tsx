@@ -10,6 +10,7 @@ interface InstagramContextType {
   isConnected: boolean;
   userId: string | null;
   graphId: string | null;
+  hasAccessed: boolean;
   connectInstagram: (userId: string, graphId: string) => void;
   disconnectInstagram: () => void;
 }
@@ -18,6 +19,7 @@ const InstagramContext = createContext<InstagramContextType>({
   isConnected: false,
   userId: null,
   graphId: null,
+  hasAccessed: false,
   connectInstagram: () => {},
   disconnectInstagram: () => {},
 });
@@ -32,6 +34,7 @@ export const InstagramProvider: React.FC<InstagramProviderProps> = ({ children }
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [graphId, setGraphId] = useState<string | null>(null);
+  const [hasAccessed, setHasAccessed] = useState<boolean>(false);
   const { currentUser } = useAuth();
 
   useEffect(() => {
@@ -40,6 +43,7 @@ export const InstagramProvider: React.FC<InstagramProviderProps> = ({ children }
         setIsConnected(false);
         setUserId(null);
         setGraphId(null);
+        setHasAccessed(false);
         return;
       }
 
@@ -55,6 +59,11 @@ export const InstagramProvider: React.FC<InstagramProviderProps> = ({ children }
       // Check if Instagram is connected
       const connected = isInstagramConnected(currentUser.uid);
       setIsConnected(connected);
+
+      // In a real app, we would fetch this from the user's profile or preferences
+      // For now, we'll use localStorage to simulate the accessed state
+      const hasUserAccessed = localStorage.getItem(`instagram_accessed_${currentUser.uid}`) === 'true';
+      setHasAccessed(hasUserAccessed);
 
       if (connected) {
         const connectionData = getInstagramConnection(currentUser.uid);
@@ -77,6 +86,12 @@ export const InstagramProvider: React.FC<InstagramProviderProps> = ({ children }
     setIsConnected(true);
     setUserId(newUserId);
     setGraphId(newGraphId);
+    
+    // When connecting, also mark as accessed
+    if (currentUser) {
+      setHasAccessed(true);
+      localStorage.setItem(`instagram_accessed_${currentUser.uid}`, 'true');
+    }
   };
 
   const disconnectInstagram = () => {
@@ -84,6 +99,7 @@ export const InstagramProvider: React.FC<InstagramProviderProps> = ({ children }
     setIsConnected(false);
     setUserId(null);
     setGraphId(null);
+    // Keep hasAccessed true even after disconnecting
   };
 
   return (
@@ -92,6 +108,7 @@ export const InstagramProvider: React.FC<InstagramProviderProps> = ({ children }
         isConnected, 
         userId, 
         graphId, 
+        hasAccessed,
         connectInstagram, 
         disconnectInstagram 
       }}

@@ -40,6 +40,7 @@ const Instagram: React.FC = () => {
             navigate('/non-branding-dashboard', { 
               state: { 
                 accountHolder: savedUsername,
+                competitors: savedCompetitors,
                 accountType: 'non-branding' 
               },
               replace: true
@@ -72,6 +73,7 @@ const Instagram: React.FC = () => {
       navigate('/non-branding-dashboard', { 
         state: { 
           accountHolder: username,
+          competitors: competitors,
           accountType: 'non-branding'
         },
         replace: true

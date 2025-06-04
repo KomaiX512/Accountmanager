@@ -2,17 +2,19 @@ import React, { useState, ChangeEvent, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import './IG_EntryUsernames.css';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext'; // Fixed import path
 
 interface IG_EntryUsernamesProps {
   onSubmitSuccess: (username: string, competitors: string[], accountType: 'branding' | 'non-branding') => void;
   redirectIfCompleted?: boolean; // Flag to indicate if we should redirect if user already entered username
+  markPlatformAccessed?: (platformId: string) => void; // Function to mark platform as accessed/claimed
 }
 
 const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({ 
   onSubmitSuccess, 
-  redirectIfCompleted = true 
+  redirectIfCompleted = true,
+  markPlatformAccessed
 }) => {
   const [username, setUsername] = useState<string>('');
   const [accountType, setAccountType] = useState<'branding' | 'non-branding' | ''>('');
@@ -255,10 +257,34 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
         
         showMessage('Submission successful', 'success');
         resetForm();
+
+        // Check if this was a pending platform to be marked as acquired
+        const pendingKey = `mark_instagram_pending_${currentUser.uid}`;
+        if (localStorage.getItem(pendingKey)) {
+          // Clear the pending flag
+          localStorage.removeItem(pendingKey);
+          // Mark as acquired
+          localStorage.setItem(`instagram_accessed_${currentUser.uid}`, 'true');
+          // Save account type for routing purposes
+          localStorage.setItem(`instagram_account_type_${currentUser.uid}`, accountType);
+        }
+        
+        // Mark Instagram as acquired after successful submission
+        if (markPlatformAccessed) {
+          markPlatformAccessed('instagram');
+        } else {
+          // Fallback if function not provided - update localStorage directly
+          if (currentUser?.uid) {
+            localStorage.setItem(`instagram_accessed_${currentUser.uid}`, 'true');
+            // Save account type for routing purposes
+            localStorage.setItem(`instagram_account_type_${currentUser.uid}`, accountType);
+          }
+        }
+        
         setTimeout(() => {
           onSubmitSuccess(
             username,
-            payload.competitors, // Always pass competitors
+            payload.competitors,
             accountType as 'branding' | 'non-branding'
           );
           

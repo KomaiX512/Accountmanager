@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <defs>
+    <linearGradient id="defaultGradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#5a5a7a" />
+      <stop offset="100%" stop-color="#3a3a5a" />
+    </linearGradient>
+    <filter id="defaultGlow" x="-25%" y="-25%" width="150%" height="150%">
+      <feGaussianBlur stdDeviation="1" result="blur" />
+      <feFlood flood-color="#5a5a7a" flood-opacity="0.5" result="color" />
+      <feComposite in="color" in2="blur" operator="in" result="glow" />
+      <feComposite in="SourceGraphic" in2="glow" operator="over" />
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="44" height="44" x="2" y="2" rx="10" fill="url(#defaultGradient)" filter="url(#defaultGlow)" />
+  
+  <!-- Question mark -->
+  <text x="24" y="30" font-size="28" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold" fill="white">?</text>
+  
+  <!-- Circle highlight -->
+  <circle cx="24" cy="24" r="12" fill="none" stroke="white" stroke-width="2" stroke-opacity="0.5" />
+</svg> 

@@ -89,10 +89,12 @@
   width: 100%;
   max-width: 1550px;
   margin: 0 auto;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(0, 255, 204, 0.4);
+  box-shadow: 0 10px 40px rgba(0, 255, 204, 0.5), 0 0 20px rgba(0, 255, 204, 0.3);
+  border: 2px solid rgba(0, 255, 204, 0.4);
+  backdrop-filter: blur(15px);
 }
 
+/* Improved Grid Layout with Even Spacing */
 .dashboard-grid {
   display: grid;
   grid-template-areas:
@@ -100,14 +102,14 @@
     "notifications post-cooked strategies"
     "notifications post-cooked competitor-analysis"
     "chatbot chatbot chatbot";
-  grid-template-columns: 400px 600px 350px;
+  grid-template-columns: 1fr 1.5fr 1fr;
   grid-template-rows: auto auto auto auto;
-  gap: 60px;
+  gap: 25px;
 }
 
 .profile-metadata {
   grid-area: profile;
-  background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
+  background: linear-gradient(135deg, #1a1a3a, #2e2e5e);
   border-radius: 16px;
   padding: 20px;
   display: flex;
@@ -129,6 +131,7 @@
   align-items: center;
   gap: 20px;
   pointer-events: auto !important;
+  width: 100%;
 }
 
 .profile-pic {
@@ -184,14 +187,20 @@
 
 .stat {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
   transition: transform 0.2s, box-shadow 0.3s;
+  background: rgba(0, 0, 0, 0.1);
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 255, 204, 0.2);
 }
 
 .stat:hover {
-  transform: scale(1.05);
-  box-shadow: 0 0 10px rgba(0, 255, 204, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 0 15px rgba(0, 255, 204, 0.4);
+  border-color: rgba(0, 255, 204, 0.5);
 }
 
 .stat svg {
@@ -202,7 +211,7 @@
 
 .label {
   font-size: 0.9rem;
-  color: #e0e0ff;
+  color: #a0a0cc;
   margin-right: 5px;
 }
 
@@ -217,59 +226,60 @@
 .chart-placeholder {
   flex: 1;
   height: 60px;
-  background: #4a4a6a;
+  background: rgba(0, 0, 0, 0.2);
   border-radius: 8px;
+  border: 1px solid rgba(0, 255, 204, 0.2);
 }
 
 .notifications {
   grid-area: notifications;
-  background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
+  background: linear-gradient(135deg, #1a1a3a, #2e2e5e);
   border-radius: 16px;
   padding: 20px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
   overflow-y: auto;
-  width: 400px;
+  max-height: 600px;
   border: 1px solid rgba(0, 255, 204, 0.4);
 }
 
 .post-cooked {
   grid-area: post-cooked;
-  background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
+  background: linear-gradient(135deg, #1a1a3a, #2e2e5e);
   border-radius: 16px;
   padding: 20px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-  width: 600px;
-  height: auto;
+  max-height: 600px;
+  overflow-y: auto;
   border: 1px solid rgba(0, 255, 204, 0.4);
 }
 
 .strategies {
   grid-area: strategies;
-  background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
+  background: linear-gradient(135deg, #1a1a3a, #2e2e5e);
   border-radius: 16px;
   padding: 20px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
   overflow-y: auto;
-  width: 350px;
+  max-height: 600px;
   border: 1px solid rgba(0, 255, 204, 0.4);
 }
 
 .competitor-analysis {
   grid-area: competitor-analysis;
-  background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
+  background: linear-gradient(135deg, #1a1a3a, #2e2e5e);
   border-radius: 16px;
   padding: 20px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
   overflow-y: auto;
-  width: 350px;
+  max-height: 600px;
   border: 1px solid rgba(0, 255, 204, 0.4);
 }
 
 .chatbot {
   grid-area: chatbot;
-  background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
+  background: linear-gradient(135deg, #1a1a3a, #2e2e5e);
   border-radius: 16px;
-  padding: 10px;
+  padding: 20px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
   display: flex;
   align-items: center;
@@ -279,20 +289,20 @@
 .chatbot-input-container {
   display: flex;
   width: 100%;
-  gap: 10px;
+  gap: 15px;
   align-items: center;
 }
 
 .chatbot-input {
   flex: 1;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(0, 255, 204, 0.3);
-  border-radius: 6px;
-  padding: 10px;
+  border-radius: 8px;
+  padding: 12px 16px;
   color: #e0e0ff;
   font-size: 1rem;
   outline: none;
-  transition: border-color 0.2s;
+  transition: all 0.3s ease;
 }
 
 .chatbot-input::placeholder {
@@ -301,28 +311,32 @@
 
 .chatbot-input:focus {
   border-color: #00ffcc;
-  box-shadow: 0 0 8px rgba(0, 255, 204, 0.4);
+  box-shadow: 0 0 10px rgba(0, 255, 204, 0.4);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .chatbot-send-btn {
   background: linear-gradient(90deg, #007bff, #00ffcc);
   border: none;
-  border-radius: 6px;
-  padding: 10px;
+  border-radius: 8px;
+  padding: 12px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: box-shadow 0.2s;
+  transition: all 0.3s ease;
 }
 
 .chatbot-send-btn:hover {
   box-shadow: 0 0 15px rgba(0, 255, 204, 0.5);
+  transform: translateY(-2px);
 }
 
 .chatbot-send-btn:disabled {
   background: #4a4a6a;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .chatbot-send-btn:disabled svg {
@@ -332,11 +346,24 @@
 h2 {
   font-size: 1.5rem;
   color: #e0e0ff;
-  margin-bottom: 15px;
+  margin-bottom: 20px;
   display: flex;
   align-items: center;
   gap: 10px;
   text-shadow: 0 0 6px rgba(0, 255, 204, 0.3);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.section-icon {
+  color: #00ffcc;
+  font-size: 1.4rem;
+  margin-right: 5px;
 }
 
 .badge {
@@ -346,6 +373,7 @@ h2 {
   border-radius: 12px;
   font-size: 0.8rem;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  margin-left: auto;
 }
 
 .notification-list,
@@ -353,50 +381,121 @@ h2 {
 .strategy-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 15px;
 }
 
 .notification-item,
 .post-item,
 .strategy-item {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
   padding: 15px;
   color: #e0e0ff;
+  border: 1px solid rgba(0, 255, 204, 0.1);
+  transition: all 0.3s ease;
 }
 
-.insta-btn {
-  margin-left: 20px;
-  padding: 6px 12px;
-  border: 1px solid #00ffcc;
-  background: transparent;
-  border-radius: 6px;
+.notification-item:hover,
+.post-item:hover,
+.strategy-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(0, 255, 204, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* New Dashboard Button Styles */
+.dashboard-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 0.95rem;
   cursor: pointer;
-  font-weight: bold;
-  color: #00ffcc;
-  transition: background 0.2s;
+  transition: all 0.3s ease;
+  margin-left: 10px;
+  border: 1px solid;
+  color: #e0e0ff;
+  background: rgba(0, 0, 0, 0.2);
+  z-index: 20;
 }
 
-.insta-btn.connect:hover {
-  background: rgba(0, 255, 204, 0.1);
+.dashboard-btn .btn-icon {
+  font-size: 1.1rem;
 }
 
-.insta-btn.disconnect {
-  border-color: #ff4444;
-  color: #ff4444;
+.dashboard-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
 }
 
-.insta-btn.disconnect:hover {
-  background: rgba(255, 68, 68, 0.1);
+.dashboard-btn.insights-btn {
+  background: linear-gradient(135deg, #00ffcc, #007bff);
+  border-color: #00ffcc;
+  color: #1a1a3a;
+}
+
+.dashboard-btn.schedule-btn {
+  background: linear-gradient(135deg, #007bff, #00ffcc);
+  border-color: #007bff;
+  color: #1a1a3a;
+}
+
+.dashboard-btn.goal-btn {
+  background: linear-gradient(135deg, #00ffcc, #32cd32);
+  border-color: #32cd32;
+  color: #1a1a3a;
+}
+
+.dashboard-btn.campaign-btn {
+  background: linear-gradient(135deg, #ff6b6b, #ff8e53);
+  border-color: #ff6b6b;
+  color: #fff;
+}
+
+.dashboard-btn.compose-btn {
+  background: linear-gradient(135deg, #00b4e6, #00c9a7);
+  border-color: #00b4e6;
+  color: #1a1a3a;
+}
+
+/* Twitter specific button styles */
+.dashboard-btn.twitter {
+  background: linear-gradient(135deg, #1da1f2, #14171a);
+  border-color: #1da1f2;
+  color: #fff;
+}
+
+.dashboard-btn.insights-btn.twitter {
+  background: linear-gradient(135deg, #1da1f2, #657786);
+  border-color: #1da1f2;
+}
+
+.dashboard-btn.schedule-btn.twitter {
+  background: linear-gradient(135deg, #657786, #1da1f2);
+  border-color: #657786;
+}
+
+.dashboard-btn.goal-btn.twitter {
+  background: linear-gradient(135deg, #1da1f2, #14171a);
+  border-color: #1da1f2;
+}
+
+.dashboard-btn.campaign-btn.twitter {
+  background: linear-gradient(135deg, #ff6b6b, #ff8e53);
+  border-color: #ff6b6b;
 }
 
 .toast-notification {
   position: fixed;
   bottom: 20px;
   right: 20px;
-  background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
+  background: linear-gradient(135deg, #1a1a3a, #2e2e5e);
   border-radius: 8px;
-  padding: 10px 20px;
+  padding: 15px 20px;
   color: #e0e0ff;
   font-size: 0.9rem;
   display: flex;
@@ -433,45 +532,15 @@ h2 {
   cursor: pointer;
 }
 
-.theme-btn {
-  padding: 8px 16px;
-  border-radius: 6px;
-  border: 1px solid #00ffcc;
-  background: linear-gradient(90deg, #00c9a7, #00b4e6);
-  color: #e0e0ff;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background 0.3s, box-shadow 0.3s;
-  user-select: none;
-}
-
-.theme-btn:hover:not(:disabled) {
-  background: linear-gradient(90deg, #00c9a7, #00b4e6);
-  box-shadow: 0 0 10px rgba(0, 255, 204, 0.7);
-}
-
-.theme-btn:disabled {
-  background: #4a4a6a;
-  color: #a0a0cc;
-  cursor: not-allowed;
-  box-shadow: none;
-  pointer-events: none;
-}
-
-.post-scheduler-modal {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  z-index: 1000 !important;
-}
-
-.profile-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-left: auto;
+.error-message {
+  background: rgba(255, 68, 68, 0.2);
+  color: #ff4444;
+  padding: 10px 15px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  border: 1px solid rgba(255, 68, 68, 0.4);
+  text-align: center;
+  max-width: 800px;
 }
 
 /* Modal overlay and content for popups (Goal, etc.) */
@@ -481,8 +550,8 @@ h2 {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
   z-index: 1000;
   display: flex;
   justify-content: center;
@@ -490,9 +559,9 @@ h2 {
 }
 
 .popup-content {
-  background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
+  background: linear-gradient(135deg, #1a1a3a, #2e2e5e);
   border-radius: 16px;
-  padding: 24px 24px 16px 24px;
+  padding: 24px;
   width: 100%;
   max-width: 500px;
   color: #e0e0ff;
@@ -510,32 +579,32 @@ h2 {
 }
 
 .chat-mode-dropdown {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(0, 255, 204, 0.3);
-  border-radius: 6px;
-  padding: 10px;
+  border-radius: 8px;
+  padding: 12px 16px;
   color: #e0e0ff;
   font-size: 0.9rem;
   outline: none;
   cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
+  transition: all 0.3s ease;
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
   background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2300ffcc' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 8px center;
-  padding-right: 30px;
+  background-position: right 12px center;
+  padding-right: 35px;
 }
 
 .chat-mode-dropdown:hover {
-  background-color: rgba(255, 255, 255, 0.15);
+  background-color: rgba(255, 255, 255, 0.08);
   border-color: rgba(0, 255, 204, 0.5);
 }
 
 .chat-mode-dropdown:focus {
   border-color: #00ffcc;
-  box-shadow: 0 0 8px rgba(0, 255, 204, 0.4);
+  box-shadow: 0 0 10px rgba(0, 255, 204, 0.4);
 }
 
 .chatbot-send-btn.processing {
@@ -565,6 +634,17 @@ h2 {
       "notifications post-cooked"
       "strategies competitor-analysis"
       "chatbot chatbot";
+    gap: 20px;
+  }
+  
+  .profile-actions {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  
+  .dashboard-btn {
+    margin-left: 0;
+    margin-bottom: 5px;
   }
 }
 
@@ -578,7 +658,28 @@ h2 {
       "strategies"
       "competitor-analysis"
       "chatbot";
-    gap: 30px;
+    gap: 15px;
+  }
+
+  .profile-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+
+  .stats {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .profile-actions {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .dashboard-btn {
+    padding: 8px 12px;
+    font-size: 0.85rem;
   }
 
   .chatbot-input-container {
@@ -593,18 +694,27 @@ h2 {
   .chat-mode-dropdown {
     width: 100%;
   }
+  
+  .chatbot-input {
+    width: 100%;
+  }
+  
+  .chatbot-send-btn {
+    width: 100%;
+  }
 }
 
 /* Add these styles for the chatbot result */
 .chatbot-result {
   margin-top: 20px;
   padding: 20px;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.2);
   border-radius: 12px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
   position: relative;
   max-height: 400px;
   overflow-y: auto;
+  border: 1px solid rgba(0, 255, 204, 0.2);
 }
 
 .chatbot-result pre {
@@ -652,10 +762,10 @@ h2 {
 .view-full-chat-btn {
   margin-top: 15px;
   background: linear-gradient(90deg, #00c9a7, #00b4e6);
-  color: #fff;
+  color: #1a1a3a;
   border: none;
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 0.9rem;
   transition: all 0.3s ease;
@@ -664,4 +774,13 @@ h2 {
 .view-full-chat-btn:hover {
   background: linear-gradient(90deg, #00c9a7, #00b4e6);
   transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* Profile actions container */
+.profile-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
 }

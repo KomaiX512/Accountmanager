@@ -8,7 +8,9 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding-left: 100px;
+  padding-right: 30px;
   z-index: 99;
 }
 
@@ -29,10 +31,28 @@
   align-items: center;
   justify-content: center;
   padding: 5px 10px;
+  position: relative;
 }
 
 .social-icon:hover {
   color: #007bff;
+}
+
+.social-icon.active {
+  color: #00ffff;
+}
+
+.social-icon.active::after {
+  content: '';
+  position: absolute;
+  bottom: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 6px;
+  background-color: #00ffff;
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
 }
 
 .social-icon svg {
@@ -41,10 +61,146 @@
   fill: currentColor;
 }
 
+/* Logo */
+.logo {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+
+.logo span {
+  color: #00ffcc;
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-shadow: 0 0 10px rgba(0, 255, 204, 0.5);
+}
+
+.logo:hover {
+  transform: scale(1.05);
+}
+
+/* Platform title */
+.platform-title {
+  display: flex;
+  align-items: center;
+}
+
+.platform-title span {
+  color: #00ffcc;
+  font-size: 1.3rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-shadow: 0 0 8px rgba(0, 255, 204, 0.6);
+}
+
+/* Navigation links */
+.nav-links {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.nav-link {
+  color: #e0e0ff;
+  text-decoration: none;
+  font-size: 1rem;
+  font-weight: 500;
+  padding: 8px 12px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.nav-link:hover {
+  color: #00ffcc;
+}
+
+.nav-link.active {
+  color: #00ffcc;
+}
+
+.nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background: #00ffcc;
+  transition: all 0.3s ease;
+  transform: translateX(-50%);
+  opacity: 0;
+}
+
+.nav-link:hover::after,
+.nav-link.active::after {
+  width: 80%;
+  opacity: 1;
+}
+
+/* Right controls container */
+.right-controls {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+/* Home button on platform pages */
+.home-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #00ffcc;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  padding: 8px 12px;
+  background: rgba(0, 255, 204, 0.1);
+  border-radius: 20px;
+  border: 1px solid rgba(0, 255, 204, 0.3);
+}
+
+.home-button:hover {
+  background: rgba(0, 255, 204, 0.2);
+  transform: translateY(-2px);
+}
+
+.home-button svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.home-button span {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* Dashboard icon styles - deprecated, replaced by home-button */
+.dashboard-icon {
+  width: 32px;
+  height: 32px;
+  color: #00ffcc;
+  transition: color 0.2s, transform 0.2s;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dashboard-icon:hover {
+  color: #007bff;
+}
+
+.dashboard-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
 /* Login button styles */
 .login-button {
-  margin-left: auto;
-  margin-right: 30px;
   background: linear-gradient(135deg, #00ffcc, #007bff);
   color: #1a1a32;
   font-weight: 600;
@@ -70,11 +226,35 @@
 @media (max-width: 768px) {
   .top-bar {
     padding-left: 80px;
+    padding-right: 15px;
   }
   
   .login-button {
-    margin-right: 15px;
     padding: 8px 16px;
     font-size: 0.85rem;
+  }
+  
+  .right-controls {
+    gap: 10px;
+  }
+  
+  .nav-links {
+    display: none;
+  }
+  
+  .logo span {
+    font-size: 1.2rem;
+  }
+  
+  .platform-title span {
+    font-size: 1.1rem;
+  }
+  
+  .home-button {
+    padding: 6px 10px;
+  }
+  
+  .home-button span {
+    font-size: 0.75rem;
   }
 }

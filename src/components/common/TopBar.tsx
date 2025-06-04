@@ -1,13 +1,46 @@
 import React from 'react';
 import './TopBar.css';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import UserDropdown from '../auth/UserDropdown';
 import { useAuth } from '../../context/AuthContext';
 
 const TopBar: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { currentUser } = useAuth();
+
+  // Determine if we're on a platform-specific page
+  const isPlatformPage = ['/instagram', '/twitter', '/facebook', '/linkedin'].some(
+    path => location.pathname.startsWith(path)
+  );
+  
+  // Get current platform if on a platform page
+  const getCurrentPlatform = () => {
+    if (!isPlatformPage) return null;
+    
+    const platforms = [
+      { icon: 'facebook', path: '/facebook' },
+      { icon: 'instagram', path: '/instagram' },
+      { icon: 'twitter', path: '/twitter' },
+      { icon: 'linkedin', path: '/linkedin' },
+    ];
+    
+    return platforms.find(platform => 
+      location.pathname.startsWith(platform.path)
+    );
+  };
+  
+  const currentPlatform = getCurrentPlatform();
+  
+  // Show platform icons ONLY on platform pages
+  const showPlatformIcons = isPlatformPage;
+  
+  // Show navigation links ONLY on main dashboard (not on platform pages)
+  const showNavLinks = !isPlatformPage;
+  
+  // Show home button ONLY on platform pages
+  const showHomeButton = isPlatformPage;
 
   const platforms = [
     { icon: 'facebook', path: '/facebook' },
@@ -16,6 +49,12 @@ const TopBar: React.FC = () => {
     { icon: 'linkedin', path: '/linkedin' },
   ];
 
+  // Get platform name with proper capitalization
+  const getPlatformName = () => {
+    if (!currentPlatform) return 'Platform';
+    return currentPlatform.icon.charAt(0).toUpperCase() + currentPlatform.icon.slice(1);
+  };
+
   return (
     <motion.div
       className="top-bar"
@@ -23,12 +62,13 @@ const TopBar: React.FC = () => {
       animate={{ y: 0 }}
       transition={{ duration: 0.5 }}
     >
+      {showPlatformIcons && (
       <div className="social-icons">
         {platforms.map((platform, index) => (
           <motion.a
             key={platform.icon}
             href="#"
-            className="social-icon"
+              className={`social-icon ${isPlatformPage && currentPlatform?.icon === platform.icon ? 'active' : ''}`}
             whileHover={{ scale: 1.2 }}
             whileTap={{ scale: 0.9 }}
             initial={{ opacity: 0, x: -20 }}
@@ -62,6 +102,82 @@ const TopBar: React.FC = () => {
           </motion.a>
         ))}
       </div>
+      )}
+      
+      {!isPlatformPage && (
+        <div className="logo" onClick={() => navigate('/')}>
+          <span>Account Manager</span>
+        </div>
+      )}
+      
+      {isPlatformPage && (
+        <div className="platform-title">
+          <span>{getPlatformName()} Dashboard</span>
+        </div>
+      )}
+      
+      {showNavLinks && (
+        <div className="nav-links">
+          <motion.a
+            href="#"
+            className={`nav-link ${location.pathname === '/account' ? 'active' : ''}`}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={(e) => {
+              e.preventDefault();
+              navigate('/account');
+            }}
+          >
+            Dashboard
+          </motion.a>
+          <motion.a
+            href="#"
+            className="nav-link"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={(e) => {
+              e.preventDefault();
+              // No functionality for now
+            }}
+          >
+            Pricing
+          </motion.a>
+          <motion.a
+            href="#"
+            className={`nav-link ${location.pathname === '/' ? 'active' : ''}`}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={(e) => {
+              e.preventDefault();
+              navigate('/');
+            }}
+          >
+            Home
+          </motion.a>
+        </div>
+      )}
+      
+      <div className="right-controls">
+        {currentUser && showHomeButton && (
+          <motion.a
+            href="#"
+            className="home-button"
+            whileHover={{ scale: 1.2 }}
+            whileTap={{ scale: 0.9 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            onClick={(e) => {
+              e.preventDefault();
+              navigate('/account');
+            }}
+          >
+            <svg viewBox="0 0 24 24">
+              <path d="M10,20V14H14V20H19V12H22L12,3L2,12H5V20H10Z" />
+            </svg>
+            <span>Main Dashboard</span>
+          </motion.a>
+        )}
       
       {currentUser ? (
         <UserDropdown />
@@ -78,6 +194,7 @@ const TopBar: React.FC = () => {
           Sign In
         </motion.button>
       )}
+      </div>
     </motion.div>
   );
 };

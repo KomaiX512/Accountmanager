@@ -6,6 +6,7 @@ interface TwitterContextType {
   userId: string | null;
   username: string | null;
   isConnected: boolean;
+  hasAccessed: boolean;
   connectTwitter: (twitterId: string, username: string) => void;
   disconnectTwitter: () => void;
 }
@@ -28,6 +29,7 @@ export const TwitterProvider: React.FC<TwitterProviderProps> = ({ children }) =>
   const [userId, setUserId] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [hasAccessed, setHasAccessed] = useState(false);
   const { currentUser } = useAuth();
 
   const checkExistingConnection = useCallback(async () => {
@@ -61,6 +63,16 @@ export const TwitterProvider: React.FC<TwitterProviderProps> = ({ children }) =>
     }
   }, [currentUser?.uid]);
 
+  // Check if user has accessed Twitter dashboard
+  useEffect(() => {
+    if (currentUser?.uid) {
+      const hasUserAccessed = localStorage.getItem(`twitter_accessed_${currentUser.uid}`) === 'true';
+      setHasAccessed(hasUserAccessed);
+    } else {
+      setHasAccessed(false);
+    }
+  }, [currentUser?.uid]);
+
   useEffect(() => {
     // Check for existing Twitter connection when auth state changes
     if (currentUser?.uid) {
@@ -70,6 +82,7 @@ export const TwitterProvider: React.FC<TwitterProviderProps> = ({ children }) =>
       setUserId(null);
       setUsername(null);
       setIsConnected(false);
+      setHasAccessed(false);
     }
   }, [currentUser?.uid, checkExistingConnection]);
 
@@ -77,13 +90,21 @@ export const TwitterProvider: React.FC<TwitterProviderProps> = ({ children }) =>
     setUserId(twitterId);
     setUsername(twitterUsername);
     setIsConnected(true);
+    
+    // When connecting, also mark as accessed
+    if (currentUser?.uid) {
+      setHasAccessed(true);
+      localStorage.setItem(`twitter_accessed_${currentUser.uid}`, 'true');
+    }
+    
     console.log(`[${new Date().toISOString()}] Twitter connected via context: ${twitterId} (@${twitterUsername})`);
-  }, []);
+  }, [currentUser?.uid]);
 
   const disconnectTwitter = useCallback(() => {
     setUserId(null);
     setUsername(null);
     setIsConnected(false);
+    // Keep hasAccessed true even after disconnecting
     console.log(`[${new Date().toISOString()}] Twitter disconnected via context`);
   }, []);
 
@@ -91,9 +112,10 @@ export const TwitterProvider: React.FC<TwitterProviderProps> = ({ children }) =>
     userId,
     username,
     isConnected,
+    hasAccessed,
     connectTwitter,
     disconnectTwitter,
-  }), [userId, username, isConnected, connectTwitter, disconnectTwitter]);
+  }), [userId, username, isConnected, hasAccessed, connectTwitter, disconnectTwitter]);
 
   return (
     <TwitterContext.Provider value={value}>

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <defs>
+    <linearGradient id="fbGradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1877f2" />
+      <stop offset="100%" stop-color="#0a59c1" />
+    </linearGradient>
+    <filter id="fbGlow" x="-25%" y="-25%" width="150%" height="150%">
+      <feGaussianBlur stdDeviation="1" result="blur" />
+      <feFlood flood-color="#1877f2" flood-opacity="0.4" result="color" />
+      <feComposite in="color" in2="blur" operator="in" result="glow" />
+      <feComposite in="SourceGraphic" in2="glow" operator="over" />
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="44" height="44" x="2" y="2" rx="10" fill="url(#fbGradient)" filter="url(#fbGlow)" />
+  
+  <!-- F letter -->
+  <path d="M26.5 38V25.5h4.2l.8-5.5h-5v-3c0-1.4.5-2.5 2.7-2.5H32v-5c-.5-.1-2.2-.3-4.3-.3-4.3 0-7.2 2.6-7.2 7.3v3h-4.8v5.5h4.8V38h6z" 
+        fill="white" />
+</svg> 

@@ -32,7 +32,7 @@ const Login: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Get the path the user was trying to access before being redirected to login
-  const from = (location.state as LocationState)?.from?.pathname || '/instagram';
+  const from = (location.state as LocationState)?.from?.pathname || '/';
 
   useEffect(() => {
     // If user is already logged in, redirect to the previous page or dashboard

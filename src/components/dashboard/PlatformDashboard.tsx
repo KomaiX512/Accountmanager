@@ -23,6 +23,13 @@ import ChatModal from '../instagram/ChatModal';
 import RagService from '../../services/RagService';
 import type { ChatMessage as ChatModalMessage } from '../instagram/ChatModal';
 import { Notification, ProfileInfo, LinkedAccount } from '../../types/notifications';
+// Import icons from react-icons
+import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaTwitter, FaInstagram, FaPen } from 'react-icons/fa';
+import { MdAnalytics, MdOutlineSchedule, MdOutlineAutoGraph } from 'react-icons/md';
+import { BsLightningChargeFill, BsBinoculars, BsLightbulb } from 'react-icons/bs';
+import { IoMdAnalytics } from 'react-icons/io';
+import { TbTargetArrow } from 'react-icons/tb';
+import { GiSpy } from 'react-icons/gi';
 
 // Define RagService compatible ChatMessage
 interface RagChatMessage {
@@ -69,7 +76,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       baseUrl: 'https://twitter.com/',
       supportsNotifications: true, // Enable Twitter notifications
       supportsScheduling: false, // Not implemented yet for Twitter
-      supportsInsights: false // Not implemented yet for Twitter
+      supportsInsights: true // Enable Twitter insights
     }
   }[platform];
 
@@ -1136,10 +1143,6 @@ Image Description: ${response.post.image_prompt}
   };
 
   const handleOpenTwitterInsights = () => {
-    if (!config.supportsInsights) {
-      setToast(`Insights not available for ${config.name} yet`);
-      return;
-    }
     console.log(`[${new Date().toISOString()}] Opening Twitter InsightsModal for user ${twitterId}`);
     setIsTwitterInsightsOpen(true);
   };
@@ -1289,33 +1292,19 @@ Image Description: ${response.post.image_prompt}
                         isConnected={isConnected}
                         onClick={handleOpenInsights}
                         bypassConnectionRequirement={true}
-                        className="insta-btn insights"
-                        style={{
-                          background: 'linear-gradient(90deg, #00ffcc, #007bff)',
-                          color: '#e0e0ff',
-                          padding: '8px 16px',
-                          borderRadius: '6px',
-                          border: '1px solid #00ffcc',
-                          zIndex: 20,
-                        }}
+                        className="dashboard-btn insights-btn"
                       >
-                        Insights
+                        <FaChartLine className="btn-icon" />
+                        <span>Insights</span>
                       </InstagramRequiredButton>
                       
                       <InstagramRequiredButton
                         isConnected={isConnected}
                         onClick={handleOpenScheduler}
-                        className="insta-btn connect"
-                        style={{
-                          background: 'linear-gradient(90deg, #00ffcc, #007bff)',
-                          color: '#e0e0ff',
-                          padding: '8px 16px',
-                          borderRadius: '6px',
-                          border: '1px solid #00ffcc',
-                          zIndex: 20,
-                        }}
+                        className="dashboard-btn schedule-btn"
                       >
-                        Schedule Post
+                        <FaCalendarAlt className="btn-icon" />
+                        <span>Schedule</span>
                       </InstagramRequiredButton>
                     </>
                   ) : (
@@ -1324,84 +1313,47 @@ Image Description: ${response.post.image_prompt}
                       <TwitterRequiredButton
                         isConnected={isTwitterConnected}
                         onClick={handleOpenTwitterCompose}
-                        className="twitter-btn compose"
-                        style={{
-                          background: 'linear-gradient(90deg, #1da1f2, #00acee)',
-                          color: '#ffffff',
-                          padding: '8px 16px',
-                          borderRadius: '6px',
-                          border: '1px solid #1da1f2',
-                          zIndex: 20,
-                        }}
+                        className="dashboard-btn compose-btn twitter"
                       >
-                        Compose
+                        <FaPen className="btn-icon" />
+                        <span>Compose</span>
                       </TwitterRequiredButton>
                       <TwitterRequiredButton
                         isConnected={isTwitterConnected}
                         onClick={handleOpenTwitterInsights}
                         bypassConnectionRequirement={true}
-                        className="twitter-btn insights"
-                        style={{
-                          background: 'linear-gradient(90deg, #00ffcc, #007bff)',
-                          color: '#e0e0ff',
-                          padding: '8px 16px',
-                          borderRadius: '6px',
-                          border: '1px solid #00ffcc',
-                          zIndex: 20,
-                        }}
+                        className="dashboard-btn insights-btn twitter"
                       >
-                        Insights
+                        <FaChartLine className="btn-icon" />
+                        <span>Insights</span>
                       </TwitterRequiredButton>
                       
                       <TwitterRequiredButton
                         isConnected={isTwitterConnected}
                         onClick={handleOpenTwitterScheduler}
-                        className="twitter-btn connect"
-                        style={{
-                          background: 'linear-gradient(90deg, #00ffcc, #007bff)',
-                          color: '#e0e0ff',
-                          padding: '8px 16px',
-                          borderRadius: '6px',
-                          border: '1px solid #00ffcc',
-                          zIndex: 20,
-                        }}
+                        className="dashboard-btn schedule-btn twitter"
                       >
-                        Schedule Tweet
+                        <FaCalendarAlt className="btn-icon" />
+                        <span>Schedule</span>
                       </TwitterRequiredButton>
                     </>
                   )}
                   
                   <button
                     onClick={handleOpenGoalModal}
-                    className={`${platform}-btn connect`}
-                    style={{
-                      background: 'linear-gradient(90deg, #00ffcc, #007bff)',
-                      color: '#e0e0ff',
-                      padding: '8px 16px',
-                      borderRadius: '6px',
-                      border: '1px solid #00ffcc',
-                      zIndex: 20,
-                      marginLeft: '10px',
-                    }}
+                    className={`dashboard-btn goal-btn ${platform === 'twitter' ? 'twitter' : ''}`}
                   >
-                    Goal
+                    <TbTargetArrow className="btn-icon" />
+                    <span>Goal</span>
                   </button>
                   
                   {showCampaignButton && (
                     <button
                       onClick={handleOpenCampaignModal}
-                      className={`${platform}-btn connect`}
-                      style={{
-                        background: 'linear-gradient(90deg, #ff6b6b, #ff8e53)',
-                        color: '#fff',
-                        padding: '8px 16px',
-                        borderRadius: '6px',
-                        border: '1px solid #ff6b6b',
-                        zIndex: 20,
-                        marginLeft: '10px',
-                      }}
+                      className={`dashboard-btn campaign-btn ${platform === 'twitter' ? 'twitter' : ''}`}
                     >
-                      Campaign
+                      <FaBullhorn className="btn-icon" />
+                      <span>Campaign</span>
                     </button>
                   )}
                 </div>
@@ -1444,13 +1396,25 @@ Image Description: ${response.post.image_prompt}
           </div>
 
           <div className="strategies">
-            <h2>Our {config.name} Strategies <span className="badge">{strategies.length || 3} unseen!!!</span></h2>
+            <h2>
+              <div className="section-header">
+                <BsLightbulb className="section-icon" />
+                <span>{config.name} Strategies</span>
+                <span className="badge">{strategies.length || 3} unseen!!!</span>
+              </div>
+            </h2>
             <OurStrategies accountHolder={accountHolder} accountType={accountType} platform={platform} />
           </div>
 
           <div className="competitor-analysis">
             {/* Always show competitor analysis for both account types */}
-            <h2>{config.name} Competitor Analysis <span className="badge">{competitorData.length || 5} unseen!!!</span></h2>
+            <h2>
+              <div className="section-header">
+                <GiSpy className="section-icon" />
+                <span>{config.name} Competitor Analysis</span>
+                <span className="badge">{competitorData.length || 5} unseen!!!</span>
+              </div>
+            </h2>
             <Cs_Analysis accountHolder={accountHolder} competitors={competitors} platform={platform} />
           </div>
 

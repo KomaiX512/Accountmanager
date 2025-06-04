@@ -9,6 +9,9 @@ import TwitterRequiredButton from '../common/TwitterRequiredButton';
 import { useInstagram } from '../../context/InstagramContext';
 import { useTwitter } from '../../context/TwitterContext';
 import axios from 'axios';
+import { FaCalendarAlt, FaEdit, FaClock, FaRocket, FaTrash, FaInstagram, FaTwitter } from 'react-icons/fa';
+import { MdSchedule, MdAutorenew, MdOutlineScheduleSend } from 'react-icons/md';
+import { BsCalendarCheck, BsLightningChargeFill } from 'react-icons/bs';
 
 interface PostCookedProps {
   username: string;
@@ -817,51 +820,37 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
           </button>
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
-          {platform === 'twitter' ? (
-            <TwitterRequiredButton
-              isConnected={isConnected}
-              onClick={() => setShowIntervalModal(true)}
-              className="twitter-btn connect"
-              disabled={!filteredPosts.length || autoScheduling}
-              style={{ 
-                background: 'linear-gradient(90deg, #1da1f2, #00acee)', 
-                color: '#ffffff', 
-                cursor: filteredPosts.length ? 'pointer' : 'not-allowed', 
-                borderRadius: 8, 
-                padding: '8px 16px', 
-                border: '1px solid #1da1f2',
-                opacity: filteredPosts.length ? 1 : 0.5
-              }}
-            >
-              {autoScheduling ? 'Auto-Scheduling...' : 'Auto-Schedule All'}
-            </TwitterRequiredButton>
-          ) : (
-            <InstagramRequiredButton
-              isConnected={isConnected}
-              onClick={() => setShowIntervalModal(true)}
-              className="insta-btn connect"
-              disabled={!filteredPosts.length || autoScheduling}
-              style={{ 
-                background: 'linear-gradient(90deg, #007bff, #00ffcc)', 
-                color: '#e0e0ff', 
-                cursor: filteredPosts.length ? 'pointer' : 'not-allowed', 
-                borderRadius: 8, 
-                padding: '8px 16px', 
-                border: '1px solid #00ffcc',
-                opacity: filteredPosts.length ? 1 : 0.5
-              }}
-            >
-              {autoScheduling ? 'Auto-Scheduling...' : 'Auto-Schedule All'}
-            </InstagramRequiredButton>
-          )}
+          <div className="auto-schedule-section">
+            {platform === 'twitter' ? (
+              <TwitterRequiredButton
+                isConnected={isConnected && !autoScheduling}
+                onClick={() => setShowIntervalModal(true)}
+                className="dashboard-btn auto-schedule-btn twitter"
+                disabled={autoScheduling}
+              >
+                <MdAutorenew className="btn-icon" />
+                <span>{autoScheduling ? 'Auto-Scheduling...' : 'Auto-Schedule All'}</span>
+              </TwitterRequiredButton>
+            ) : (
+              <InstagramRequiredButton
+                isConnected={isConnected && !autoScheduling}
+                onClick={() => setShowIntervalModal(true)}
+                className="dashboard-btn auto-schedule-btn"
+                disabled={autoScheduling}
+              >
+                <MdAutorenew className="btn-icon" />
+                <span>{autoScheduling ? 'Auto-Scheduling...' : 'Auto-Schedule All'}</span>
+              </InstagramRequiredButton>
+            )}
+          </div>
         </div>
         {showIntervalModal && (
-          <div style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0,0,0,0.4)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}>
-            <div style={{ background: '#23234a', borderRadius: 12, padding: 24, minWidth: 380, boxShadow: '0 4px 24px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <h3 style={{ color: '#e0e0ff', marginBottom: 8 }}>Set Auto-Schedule Interval</h3>
+          <div className="modal-overlay">
+            <div className="modal-content">
+              <h3 className="modal-title">
+                <MdSchedule className="modal-icon" />
+                Set Auto-Schedule Interval
+              </h3>
               <input
                 type="number"
                 min={1}
@@ -869,22 +858,24 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                 value={intervalInput}
                 onChange={e => setIntervalInput(e.target.value)}
                 placeholder="Interval in hours (e.g. 4)"
-                style={{ padding: 8, borderRadius: 6, border: '1px solid #00ffcc', fontSize: 16, marginBottom: 8 }}
+                className="modal-input"
                 autoFocus
               />
-              <div style={{ color: '#a0a0cc', fontSize: 14, marginBottom: 8, lineHeight: '1.4' }}>
+              <div className="modal-info">
                 <strong>Priority System:</strong><br />
                 1. Your custom interval (if provided)<br />
                 2. Campaign timeline from goal settings<br />
                 3. Default interval (6 hours)
               </div>
-              <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+              <div className="modal-actions">
                 <button
-                  className="insta-btn disconnect"
+                  className="dashboard-btn cancel-btn"
                   onClick={() => { setShowIntervalModal(false); setIntervalInput(''); }}
-                >Cancel</button>
+                >
+                  Cancel
+                </button>
                 <button
-                  className="insta-btn connect"
+                  className="dashboard-btn confirm-btn"
                   onClick={() => {
                     setShowIntervalModal(false);
                     const interval = intervalInput.trim() ? parseInt(intervalInput, 10) : undefined;
@@ -892,37 +883,45 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                     handleAutoSchedule(interval);
                   }}
                   disabled={autoScheduling}
-                >Start Auto-Schedule</button>
+                >
+                  <BsLightningChargeFill className="btn-icon" />
+                  Start Auto-Schedule
+                </button>
               </div>
             </div>
           </div>
         )}
         {showScheduleModal && (
-          <div style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0,0,0,0.4)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}>
-            <div className="schedule-modal">
-              <h3>Schedule Post</h3>
-              <label style={{ color: '#e0e0ff', fontSize: '1rem', marginBottom: '8px' }}>
+          <div className="modal-overlay">
+            <div className="modal-content">
+              <h3 className="modal-title">
+                <FaCalendarAlt className="modal-icon" />
+                Schedule Post
+              </h3>
+              <label className="modal-label">
                 Select Date and Time
               </label>
               <input
                 type="datetime-local"
                 value={scheduleDateTime}
                 onChange={e => setScheduleDateTime(e.target.value)}
-                style={{ padding: 8, borderRadius: 6, border: '1px solid #00ffcc', fontSize: 16, width: '100%', background: 'rgba(255, 255, 255, 0.05)', color: '#e0e0ff' }}
+                className="modal-input datetime-input"
               />
-              <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 16 }}>
+              <div className="modal-actions">
                 <button
-                  className="schedule-cancel-button"
+                  className="dashboard-btn cancel-btn"
                   onClick={handleScheduleCancel}
-                >Cancel</button>
+                >
+                  Cancel
+                </button>
                 <button
-                  className="schedule-submit-button"
+                  className="dashboard-btn confirm-btn"
                   onClick={handleScheduleSubmit}
                   disabled={!scheduleDateTime}
-                >Schedule</button>
+                >
+                  <MdSchedule className="btn-icon" />
+                  Schedule
+                </button>
               </div>
             </div>
           </div>
@@ -1067,120 +1066,40 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                       <TwitterRequiredButton
                         isConnected={isConnected}
                         onClick={() => handleScheduleClick(post.key)}
-                        className="schedule-button"
-                        style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '5px', 
-                          backgroundColor: '#1da1f2', 
-                          color: '#ffffff',
-                          border: 'none',
-                          padding: '8px 12px',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          fontWeight: 'bold',
-                          transition: 'all 0.2s ease'
-                        }}
+                        className="dashboard-btn schedule-btn twitter"
                         notificationPosition="bottom"
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#ffffff"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <circle cx="12" cy="12" r="10" />
-                          <polyline points="12 6 12 12 16 14" />
-                        </svg>
-                        Schedule
+                        <FaCalendarAlt className="btn-icon" />
+                        <span>Schedule</span>
                       </TwitterRequiredButton>
                     ) : (
                       <InstagramRequiredButton
                         isConnected={isConnected}
                         onClick={() => handleScheduleClick(post.key)}
-                        className="schedule-button"
-                        style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '5px', 
-                          backgroundColor: '#007bff', 
-                          color: '#e0e0ff',
-                          border: 'none',
-                          padding: '8px 12px',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          fontWeight: 'bold',
-                          transition: 'all 0.2s ease'
-                        }}
+                        className="dashboard-btn schedule-btn"
                         notificationPosition="bottom"
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#e0e0ff"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <circle cx="12" cy="12" r="10" />
-                          <polyline points="12 6 12 12 16 14" />
-                        </svg>
-                        Schedule
+                        <FaCalendarAlt className="btn-icon" />
+                        <span>Schedule</span>
                       </InstagramRequiredButton>
                     )}
                     <motion.button
-                      className="edit-button"
+                      className="dashboard-btn edit-btn"
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => handleEdit(post.key)}
                     >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#e0e0ff"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                      </svg>
-                      Edit
+                      <FaEdit className="btn-icon" />
+                      <span>Edit</span>
                     </motion.button>
                     <motion.button
-                      className="reject-button"
+                      className="dashboard-btn reject-btn"
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => handleReject(post.key)}
                     >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#ff4444"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M18 6L6 18" />
-                        <path d="M6 6l12 12" />
-                      </svg>
-                      Reject
+                      <FaTrash className="btn-icon" />
+                      <span>Reject</span>
                     </motion.button>
                   </div>
                   <div className="post-caption">
@@ -1216,20 +1135,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                           onClick={() => handleEditCaption(post.key)}
                           title="Edit caption"
                         >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="14"
-                            height="14"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="#00ffcc"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                          </svg>
+                          <FaEdit className="btn-icon" />
                         </button>
                       </>
                     )}

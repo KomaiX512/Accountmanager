@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
-import IG_EntryUsernames from '../instagram/IG_EntryUsernames';
 
 interface AuthRouteProps {
   children: React.ReactNode;
@@ -69,31 +68,8 @@ const AuthRoute: React.FC<AuthRouteProps> = ({ children }) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // If user hasn't completed Instagram setup, show the setup form
-  if (!hasCompletedSetup) {
-    return <IG_EntryUsernames onSubmitSuccess={() => {}} />;
-  }
-
-  // If user has completed Instagram setup, redirect to dashboard based on account type
-  if (instagramData) {
-    const dashboardPath = instagramData.accountType === 'branding' 
-      ? '/dashboard' 
-      : '/non-branding-dashboard';
-    
-    return (
-      <Navigate 
-        to={dashboardPath} 
-        state={{
-          accountHolder: instagramData.accountHolder,
-          competitors: instagramData.competitors,
-          accountType: instagramData.accountType
-        }} 
-        replace 
-      />
-    );
-  }
-
-  // If all checks pass, render children
+  // Always render children (MainDashboard) after successful login
+  // This bypasses the Instagram setup form and shows the dashboard first
   return <>{children}</>;
 };
 

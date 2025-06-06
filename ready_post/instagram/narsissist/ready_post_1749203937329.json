@@ -1,0 +1,25 @@
+{
+  "post": {
+    "caption": "Unleash your inner artist! ✨ We're all about celebrating individuality and bold self-expression. What NARS look are you creating today? Show us your artistry! 💋",
+    "hashtags": [
+      "#NARSissist",
+      "#NARS",
+      "#MakeupLover",
+      "#BeautyInspo",
+      "#MakeupAddict",
+      "#SelfExpression",
+      "#BoldBeauty",
+      "#MakeupArt",
+      "#NARS"
+    ],
+    "call_to_action": "Tag us in your NARS makeup looks using #NARSissist for a chance to be featured!",
+    "image_prompt": "A close-up shot focusing on a model's face showcasing a bold and artistic NARS makeup look. The model has flawless, dewy skin with a subtle highlight on the cheekbones. The eyes are the focal point, featuring a vibrant, multi-colored eyeshadow look. Imagine a blend of electric blue, emerald green, and shimmering gold, seamlessly blended to create a captivating gradient. The eyeliner is a sharp, graphic wing in black, adding definition and drama. The lips are painted with a bold, matte red lipstick, perfectly complementing the eye makeup. The background is a soft, blurred gradient of pink and purple, creating a dreamy and ethereal atmosphere. The lighting is soft and diffused, highlighting the model's features and enhancing the vibrancy of the makeup. The overall mood is confident, playful, and artistic. The image should have a high-fashion editorial feel, with a focus on showcasing the artistry and creativity of the makeup look. The model's expression is confident and alluring, drawing the viewer in. The composition is tight, focusing on the face and makeup details. The image should be clean, modern, and visually striking, reflecting the NARS brand aesthetic."
+  },
+  "timestamp": 1749203937329,
+  "image_path": "ready_post/instagram/narsissist/image_1749203937329.jpg",
+  "image_url": "http://localhost:3002/r2-images/narsissist/image_1749203937329.jpg?platform=instagram",
+  "r2_image_url": "http://localhost:3002/r2-images/narsissist/image_1749203937329.jpg?platform=instagram",
+  "generated_at": "2025-06-06T09:58:58.798Z",
+  "queryUsed": "create next post for me",
+  "status": "new"
+}

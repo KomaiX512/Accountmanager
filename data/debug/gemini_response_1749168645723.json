@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption:\nReady to bloom into your best self? 🌸 Our new collection is here to help you unleash your inner radiance! ✨ Get ready for a fresh, dewy look that's perfect for spring. 💖\n\nHashtags:\n#TooFaced #SpringMakeup #NewCollection #DewySkin #GlowUp #MakeupLover #Beauty #Cosmetics #MakeupObsessed #SpringVibes\n\nCall to Action:\nTap the link in bio to shop the collection now!\n\nVisual Description for Image:\nThe image is a close-up shot of a woman's face, showcasing a dewy, radiant makeup look. Her skin is flawless, with a subtle, healthy glow. The focus is on the eyes, which are adorned with soft, shimmering eyeshadows in pastel pinks and peaches. Her eyelashes are long and fluttery, enhanced with a volumizing mascara. Her cheeks have a delicate flush of pink blush, and her lips are coated in a glossy, nude-pink lipstick. The overall effect is fresh, youthful, and ethereal.\n\nThe background is soft and blurred, featuring pastel-colored flowers like cherry blossoms and tulips, creating a spring-like atmosphere. The lighting is soft and diffused, highlighting the dewy texture of the skin and the shimmer of the eyeshadows. The composition is balanced, with the woman's face centered in the frame. The style is feminine, romantic, and playful, reflecting the Too Faced brand aesthetic. The image should evoke a sense of joy, optimism, and beauty. The model should have a gentle smile, conveying a feeling of confidence and happiness. The image should be high-resolution and professionally edited to showcase the makeup products in the best possible light.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.3285776480084899
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 251,
+    "candidatesTokenCount": 346,
+    "totalTokenCount": 597,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 251
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 346
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "AjJCaPSXLdG7nvgP39KQoAs"
+}

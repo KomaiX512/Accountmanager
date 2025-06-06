@@ -97,14 +97,14 @@ const rulesCache = new Map();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 // Helper function to retrieve profile data from structuredb with caching
-async function getProfileData(username) {
-  const cacheKey = `profile_${username}`;
+async function getProfileData(username, platform = 'instagram') {
+  const cacheKey = `profile_${platform}_${username}`;
   
   // Check cache first
   if (profileCache.has(cacheKey)) {
     const { data, timestamp } = profileCache.get(cacheKey);
     if (Date.now() - timestamp < CACHE_TTL) {
-      console.log(`[RAG-Server] Using cached profile data for ${username}`);
+      console.log(`[RAG-Server] Using cached profile data for ${platform}/${username}`);
       return data;
     }
     // Cache expired
@@ -112,12 +112,12 @@ async function getProfileData(username) {
   }
   
   // Check local file cache
-  const cacheFilePath = path.join(cacheDir, `${username}_profile.json`);
+  const cacheFilePath = path.join(cacheDir, `${platform}_${username}_profile.json`);
   if (fs.existsSync(cacheFilePath)) {
     try {
       const cacheData = JSON.parse(fs.readFileSync(cacheFilePath, 'utf8'));
       if (cacheData.timestamp && Date.now() - new Date(cacheData.timestamp).getTime() < CACHE_TTL) {
-        console.log(`[RAG-Server] Using file-cached profile data for ${username}`);
+        console.log(`[RAG-Server] Using file-cached profile data for ${platform}/${username}`);
         
         // Update in-memory cache
         profileCache.set(cacheKey, {
@@ -133,11 +133,11 @@ async function getProfileData(username) {
     }
   }
   
-  console.log(`[RAG-Server] Retrieving profile data for ${username}`);
+  console.log(`[RAG-Server] Retrieving profile data for ${platform}/${username}`);
   try {
     const data = await structuredbS3.getObject({
       Bucket: 'structuredb',
-      Key: `${username}/${username}.json`
+      Key: `${platform}/${username}/${username}.json`
     }).promise();
     
     const profileData = JSON.parse(data.Body.toString());
@@ -159,16 +159,16 @@ async function getProfileData(username) {
     
     return profileData;
   } catch (error) {
-    console.error(`[RAG-Server] Error retrieving profile data for ${username}:`, error);
+    console.error(`[RAG-Server] Error retrieving profile data for ${platform}/${username}:`, error);
     
     if (error.code === 'NoSuchKey') {
-      throw new Error(`Profile data not found for ${username}`);
+      throw new Error(`Profile data not found for ${platform}/${username}`);
     }
     
     // Check if we have a stale cache as fallback
     if (fs.existsSync(cacheFilePath)) {
       try {
-        console.log(`[RAG-Server] Using stale profile cache for ${username} as fallback`);
+        console.log(`[RAG-Server] Using stale profile cache for ${platform}/${username} as fallback`);
         const cacheData = JSON.parse(fs.readFileSync(cacheFilePath, 'utf8'));
         return cacheData.data;
       } catch (cacheError) {
@@ -181,14 +181,14 @@ async function getProfileData(username) {
 }
 
 // Helper function to retrieve rules data with caching
-async function getRulesData(username) {
-  const cacheKey = `rules_${username}`;
+async function getRulesData(username, platform = 'instagram') {
+  const cacheKey = `rules_${platform}_${username}`;
   
   // Check cache first
   if (rulesCache.has(cacheKey)) {
     const { data, timestamp } = rulesCache.get(cacheKey);
     if (Date.now() - timestamp < CACHE_TTL) {
-      console.log(`[RAG-Server] Using cached rules data for ${username}`);
+      console.log(`[RAG-Server] Using cached rules data for ${platform}/${username}`);
       return data;
     }
     // Cache expired
@@ -196,12 +196,12 @@ async function getRulesData(username) {
   }
   
   // Check local file cache
-  const cacheFilePath = path.join(cacheDir, `${username}_rules.json`);
+  const cacheFilePath = path.join(cacheDir, `${platform}_${username}_rules.json`);
   if (fs.existsSync(cacheFilePath)) {
     try {
       const cacheData = JSON.parse(fs.readFileSync(cacheFilePath, 'utf8'));
       if (cacheData.timestamp && Date.now() - new Date(cacheData.timestamp).getTime() < CACHE_TTL) {
-        console.log(`[RAG-Server] Using file-cached rules data for ${username}`);
+        console.log(`[RAG-Server] Using file-cached rules data for ${platform}/${username}`);
         
         // Update in-memory cache
         rulesCache.set(cacheKey, {
@@ -217,11 +217,11 @@ async function getRulesData(username) {
     }
   }
   
-  console.log(`[RAG-Server] Retrieving rules data for ${username}`);
+  console.log(`[RAG-Server] Retrieving rules data for ${platform}/${username}`);
   try {
     const data = await tasksS3.getObject({
       Bucket: 'tasks',
-      Key: `rules/${username}/rules.json`
+      Key: `rules/${platform}/${username}/rules.json`
     }).promise();
     
     const rulesData = JSON.parse(data.Body.toString());
@@ -243,11 +243,11 @@ async function getRulesData(username) {
     
     return rulesData;
   } catch (error) {
-    console.error(`[RAG-Server] Error retrieving rules data for ${username}:`, error);
+    console.error(`[RAG-Server] Error retrieving rules data for ${platform}/${username}:`, error);
     
     // Rules are optional, so return empty object if not found
     if (error.code === 'NoSuchKey') {
-      console.log(`[RAG-Server] No rules found for ${username}, using defaults`);
+      console.log(`[RAG-Server] No rules found for ${platform}/${username}, using defaults`);
       
       // Cache the empty rules
       const emptyRules = {};
@@ -262,7 +262,7 @@ async function getRulesData(username) {
     // Check if we have a stale cache as fallback
     if (fs.existsSync(cacheFilePath)) {
       try {
-        console.log(`[RAG-Server] Using stale rules cache for ${username} as fallback`);
+        console.log(`[RAG-Server] Using stale rules cache for ${platform}/${username} as fallback`);
         const cacheData = JSON.parse(fs.readFileSync(cacheFilePath, 'utf8'));
         return cacheData.data;
       } catch (cacheError) {
@@ -285,6 +285,56 @@ async function saveToR2(data, key, retries = 3) {
     backupFilePath,
     JSON.stringify(data, null, 2)
   );
+  
+  // Ensure any image URLs in the data use our proxy
+  if (data && typeof data === 'object') {
+    // For ready_post data (common case)
+    if (key.includes('ready_post') && key.endsWith('.json')) {
+      const urlPattern = /https?:\/\/[^\/]*(\.r2\.cloudflarestorage\.com|\.r2\.dev)\/ready_post\/([^\/]+)\/([^\/]+)\/([^?]+)/g;
+      
+      // Get base components from the key
+      const keyParts = key.split('/');
+      const platform = keyParts.length > 1 ? keyParts[1] : 'instagram';
+      const username = keyParts.length > 2 ? keyParts[2] : '';
+      
+      // Helper function to replace URLs with proxy
+      const replaceWithProxy = (obj) => {
+        if (!obj) return;
+        
+        // Handle direct image URLs
+        if (obj.image_url && typeof obj.image_url === 'string') {
+          if (obj.image_url.includes('.r2.cloudflarestorage.com') || obj.image_url.includes('.r2.dev')) {
+            // Extract filename from URL
+            const filename = obj.image_url.split('/').pop().split('?')[0];
+            obj.image_url = `http://localhost:3002/fix-image/${username}/${filename}?platform=${platform}`;
+          }
+        }
+        
+        // Handle R2 image URLs
+        if (obj.r2_image_url && typeof obj.r2_image_url === 'string') {
+          if (obj.r2_image_url.includes('.r2.cloudflarestorage.com') || obj.r2_image_url.includes('.r2.dev')) {
+            // Extract filename from URL
+            const filename = obj.r2_image_url.split('/').pop().split('?')[0];
+            obj.r2_image_url = `http://localhost:3002/fix-image/${username}/${filename}?platform=${platform}`;
+          }
+        }
+        
+        // Check nested post object
+        if (obj.post && typeof obj.post === 'object') {
+          replaceWithProxy(obj.post);
+        }
+      };
+      
+      // Fix the URLs in the data
+      replaceWithProxy(data);
+      
+      // Update the backup with fixed URLs
+      fs.writeFileSync(
+        backupFilePath,
+        JSON.stringify(data, null, 2)
+      );
+    }
+  }
   
   let lastError = null;
   for (let attempt = 1; attempt <= retries; attempt++) {
@@ -457,17 +507,17 @@ Keep your response concise but informative, with specific references to the user
 
 // API endpoint for discussion mode
 app.post('/api/discussion', async (req, res) => {
-  const { username, query, previousMessages = [] } = req.body;
+  const { username, query, previousMessages = [], platform = 'instagram' } = req.body;
   
   if (!username || !query) {
     return res.status(400).json({ error: 'Username and query are required' });
   }
 
   try {
-    // Fetch profile and rules data
-    console.log(`[RAG-Server] Processing discussion query for ${username}: "${query}"`);
-    const profileData = await getProfileData(username);
-    const rulesData = await getRulesData(username).catch(() => ({}));
+    // Fetch profile and rules data with platform
+    console.log(`[RAG-Server] Processing discussion query for ${platform}/${username}: "${query}"`);
+    const profileData = await getProfileData(username, platform);
+    const rulesData = await getRulesData(username, platform).catch(() => ({}));
     
     // Check if this is a follow-up message
     const isFollowUp = previousMessages && previousMessages.length > 0;
@@ -547,7 +597,7 @@ Be helpful, direct, and actionable, providing specific advice for the Instagram 
           usedFallback: true
         };
         
-        const conversationKey = `RAG.data/${username}/${Date.now()}_fallback.json`;
+        const conversationKey = `RAG.data/${platform}/${username}/${Date.now()}_fallback.json`;
         await saveToR2(conversationData, conversationKey);
         
         return res.json({ response: fallbackResponse, usedFallback: true });
@@ -566,7 +616,7 @@ Be helpful, direct, and actionable, providing specific advice for the Instagram 
     };
     
     // Save to R2 storage
-    const conversationKey = `RAG.data/${username}/${Date.now()}.json`;
+    const conversationKey = `RAG.data/${platform}/${username}/${Date.now()}.json`;
     await saveToR2(conversationData, conversationKey);
     
     // Return response
@@ -575,7 +625,7 @@ Be helpful, direct, and actionable, providing specific advice for the Instagram 
     console.error('[RAG-Server] Discussion endpoint error:', error.message);
     
     if (error.message.includes('Profile data not found')) {
-      return res.status(404).json({ error: `Profile data not found for ${username}. Please ensure the username is correct.` });
+      return res.status(404).json({ error: `Profile data not found for ${platform}/${username}. Please ensure the username is correct.` });
     }
     
     res.status(500).json({ error: error.message });
@@ -607,17 +657,17 @@ The response should include:
 
 // API endpoint for post generator
 app.post('/api/post-generator', async (req, res) => {
-  const { username, query } = req.body;
+  const { username, query, platform = 'instagram' } = req.body;
   
   if (!username || !query) {
     return res.status(400).json({ error: 'Username and query are required' });
   }
 
   try {
-    // Fetch profile and rules data
-    console.log(`[RAG-Server] Processing post generation query for ${username}: "${query}"`);
-    const profileData = await getProfileData(username);
-    const rulesData = await getRulesData(username).catch(() => ({}));
+    // Fetch profile and rules data with platform
+    console.log(`[RAG-Server] Processing post generation query for ${platform}/${username}: "${query}"`);
+    const profileData = await getProfileData(username, platform);
+    const rulesData = await getRulesData(username, platform).catch(() => ({}));
     
     // Create post generation prompt
     const postPrompt = createPostGenerationPrompt(profileData, rulesData, query);
@@ -628,13 +678,13 @@ app.post('/api/post-generator', async (req, res) => {
     // Save post data to R2
     const postData = {
       username,
+      platform,
       timestamp: new Date().toISOString(),
       query,
       response
     };
     
-    // Extract platform from request, default to instagram
-    const platform = req.body.platform || req.query.platform || 'instagram';
+    // Save with platform-aware path
     const postKey = `ready_post/${platform}/${username}/${Date.now()}.json`;
     await saveToR2(postData, postKey);
     
@@ -644,7 +694,7 @@ app.post('/api/post-generator', async (req, res) => {
     console.error('[RAG-Server] Post generator endpoint error:', error.message);
     
     if (error.message.includes('Profile data not found')) {
-      return res.status(404).json({ error: `Profile data not found for ${username}. Please ensure the username is correct.` });
+      return res.status(404).json({ error: `Profile data not found for ${platform}/${username}. Please ensure the username is correct.` });
     }
     
     res.status(500).json({ error: error.message });
@@ -668,15 +718,16 @@ function safelyReadJsonFile(filePath) {
 // API endpoint to get conversation history
 app.get('/api/conversations/:username', async (req, res) => {
   const { username } = req.params;
+  const platform = req.query.platform || 'instagram';
   
   try {
-    console.log(`[RAG-Server] Fetching conversation history for ${username}`);
+    console.log(`[RAG-Server] Fetching conversation history for ${platform}/${username}`);
     
     // First try to get conversations from R2
     try {
       const data = await tasksS3.listObjects({
         Bucket: 'tasks',
-        Prefix: `RAG.data/${username}/`
+        Prefix: `RAG.data/${platform}/${username}/`
       }).promise();
       
       if (data.Contents && data.Contents.length > 0) {
@@ -706,11 +757,11 @@ app.get('/api/conversations/:username', async (req, res) => {
         return res.json({ messages });
       }
     } catch (error) {
-      console.log(`[RAG-Server] No R2 conversation data for ${username}, using local fallback`);
+      console.log(`[RAG-Server] No R2 conversation data for ${platform}/${username}, using local fallback`);
     }
     
     // Fallback to local storage if R2 fails or has no data
-    const conversationFile = path.join(conversationsDir, `${username}.json`);
+    const conversationFile = path.join(conversationsDir, `${platform}_${username}.json`);
     
     if (fs.existsSync(conversationFile)) {
       const data = fs.readFileSync(conversationFile, 'utf8');
@@ -720,7 +771,7 @@ app.get('/api/conversations/:username', async (req, res) => {
       res.json({ messages: [] });
     }
   } catch (error) {
-    console.error(`[RAG-Server] Error fetching conversations for ${username}:`, error);
+    console.error(`[RAG-Server] Error fetching conversations for ${platform}/${username}:`, error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -728,32 +779,33 @@ app.get('/api/conversations/:username', async (req, res) => {
 // API endpoint to save conversation history
 app.post('/api/conversations/:username', async (req, res) => {
   const { username } = req.params;
-  const { messages } = req.body;
+  const { messages, platform = 'instagram' } = req.body;
   
   if (!Array.isArray(messages)) {
     return res.status(400).json({ error: 'Messages must be an array' });
   }
   
   try {
-    console.log(`[RAG-Server] Saving conversation for ${username} (${messages.length} messages)`);
+    console.log(`[RAG-Server] Saving conversation for ${platform}/${username} (${messages.length} messages)`);
     
-    // Save to local storage
-    const conversationFile = path.join(conversationsDir, `${username}.json`);
+    // Save to local storage with platform prefix
+    const conversationFile = path.join(conversationsDir, `${platform}_${username}.json`);
     fs.writeFileSync(conversationFile, JSON.stringify(messages, null, 2));
     
-    // Also save to R2 for persistence
+    // Also save to R2 for persistence with platform-aware path
     const conversationData = {
       username,
+      platform,
       timestamp: new Date().toISOString(),
       previousMessages: messages
     };
     
-    const conversationKey = `RAG.data/${username}/${Date.now()}_conversation.json`;
+    const conversationKey = `RAG.data/${platform}/${username}/${Date.now()}_conversation.json`;
     await saveToR2(conversationData, conversationKey);
     
     res.json({ success: true });
   } catch (error) {
-    console.error(`[RAG-Server] Error saving conversation for ${username}:`, error);
+    console.error(`[RAG-Server] Error saving conversation for ${platform}/${username}:`, error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -826,13 +878,13 @@ app.get('/admin/status', (req, res) => {
 // Add a route for post generation
 app.post('/generate_post', async (req, res) => {
   try {
-    const { username, query } = req.body;
+    const { username, query, platform = 'instagram' } = req.body;
     
     if (!username || !query) {
       return res.status(400).json({ error: 'Username and query are required' });
     }
     
-    console.log(`[${new Date().toISOString()}] [RAG SERVER] Post generation request for ${username}: "${query}"`);
+    console.log(`[${new Date().toISOString()}] [RAG SERVER] Post generation request for ${platform}/${username}: "${query}"`);
     
     // Create a customized prompt for the post generator
     const prompt = `You are a professional social media marketing expert for the brand "${username}" on Instagram. 
@@ -881,10 +933,38 @@ Visual Description for Image: [Write a detailed, vivid description for the image
         image_prompt: imagePrompt
       };
       
+      // Generate timestamp for unique filename
+      const timestamp = Date.now();
+      
+      // Add proxy URL for images - ensure we use our proxy instead of direct R2
+      const imageFileName = `image_${timestamp}.jpg`;
+      const postFileName = `ready_post_${timestamp}.json`;
+      
+      // Use our proxy URL format
+      const baseUrl = req.get('host') ? `http://${req.get('host').replace('3001', '3002')}` : 'http://localhost:3002';
+      const imageUrl = `${baseUrl}/fix-image/${username}/${imageFileName}?platform=${platform}`;
+      
+      // Create complete post data
+      const postData = {
+        post: structuredResponse,
+        timestamp,
+        image_path: `ready_post/${platform}/${username}/${imageFileName}`,
+        image_url: imageUrl,
+        r2_image_url: imageUrl,
+        generated_at: new Date().toISOString(),
+        queryUsed: query,
+        status: 'new',
+        platform
+      };
+      
+      // Save to R2 for persistence - the saveToR2 function will fix any remaining direct R2 URLs
+      const postKey = `ready_post/${platform}/${username}/${postFileName}`;
+      await saveToR2(postData, postKey);
+      
       console.log(`[${new Date().toISOString()}] [RAG SERVER] Structured response:`, JSON.stringify(structuredResponse, null, 2));
       
-      // Return the structured response
-      return res.json({ response: structuredResponse });
+      // Return the structured response with proper image URLs
+      return res.json({ response: structuredResponse, post: postData });
     } catch (apiError) {
       console.error(`[${new Date().toISOString()}] [RAG SERVER] API error:`, apiError);
       
@@ -939,6 +1019,17 @@ Visual Description for Image: [Write a detailed, vivid description for the image
         fallbackImagePrompt = `Professional product photography of MAC ${uniqueKeywords} cosmetics. Beautiful studio lighting, high-resolution, commercial quality photography. Clean background, professional shadows, vibrant colors, hyper-detailed product shot with MAC branding visible.`;
       }
       
+      // Generate timestamp for unique filename
+      const timestamp = Date.now();
+      
+      // Add proxy URL for images - ensure we use our proxy instead of direct R2
+      const imageFileName = `image_${timestamp}.jpg`;
+      const postFileName = `ready_post_${timestamp}.json`;
+      
+      // Use our proxy URL format
+      const baseUrl = req.get('host') ? `http://${req.get('host').replace('3001', '3002')}` : 'http://localhost:3002';
+      const imageUrl = `${baseUrl}/fix-image/${username}/${imageFileName}?platform=${platform}`;
+      
       const fallbackResponse = {
         caption: fallbackCaption,
         hashtags: fallbackHashtags,
@@ -946,7 +1037,24 @@ Visual Description for Image: [Write a detailed, vivid description for the image
         image_prompt: fallbackImagePrompt
       };
       
-      return res.json({ response: fallbackResponse });
+      // Create complete post data
+      const postData = {
+        post: fallbackResponse,
+        timestamp,
+        image_path: `ready_post/${platform}/${username}/${imageFileName}`,
+        image_url: imageUrl,
+        r2_image_url: imageUrl,
+        generated_at: new Date().toISOString(),
+        queryUsed: query,
+        status: 'new',
+        platform
+      };
+      
+      // Save to R2 for persistence
+      const postKey = `ready_post/${platform}/${username}/${postFileName}`;
+      await saveToR2(postData, postKey);
+      
+      return res.json({ response: fallbackResponse, post: postData });
     }
   } catch (error) {
     console.error(`[${new Date().toISOString()}] [RAG SERVER] Error in post generation:`, error);
@@ -987,17 +1095,17 @@ IMPORTANT INSTRUCTIONS:
 
 // API endpoint for instant AI replies to DMs and comments
 app.post('/api/instant-reply', async (req, res) => {
-  const { username, notification } = req.body;
+  const { username, notification, platform = 'instagram' } = req.body;
   
   if (!username || !notification || !notification.text) {
     return res.status(400).json({ error: 'Username and notification with text are required' });
   }
 
   try {
-    // Fetch profile and rules data
-    console.log(`[RAG-Server] Processing instant reply for ${username}: "${notification.text}"`);
-    const profileData = await getProfileData(username).catch(() => ({}));
-    const rulesData = await getRulesData(username).catch(() => ({}));
+    // Fetch profile and rules data with platform
+    console.log(`[RAG-Server] Processing instant reply for ${platform}/${username}: "${notification.text}"`);
+    const profileData = await getProfileData(username, platform).catch(() => ({}));
+    const rulesData = await getRulesData(username, platform).catch(() => ({}));
     
     // Create AI reply prompt
     const aiReplyPrompt = createAIReplyPrompt(profileData, rulesData, notification);
@@ -1010,17 +1118,18 @@ app.post('/api/instant-reply', async (req, res) => {
       throw new Error('Empty response received from Gemini API');
     }
     
-    // Save the request for analytics
+    // Save the request for analytics with platform
     const replyData = {
       username,
+      platform,
       timestamp: new Date().toISOString(),
       notification,
       reply,
       mode: 'instant'
     };
     
-    // Save to R2 storage (but don't wait for it to complete)
-    const replyKey = `AI.replies/${username}/${Date.now()}.json`;
+    // Save to R2 storage with platform (but don't wait for it to complete)
+    const replyKey = `AI.replies/${platform}/${username}/${Date.now()}.json`;
     saveToR2(replyData, replyKey).catch(err => {
       console.error(`[RAG-Server] Error saving instant reply to R2: ${err.message}`);
     });
@@ -1029,7 +1138,8 @@ app.post('/api/instant-reply', async (req, res) => {
     res.json({ 
       reply,
       success: true,
-      notification_type: notification.type
+      notification_type: notification.type,
+      platform
     });
   } catch (error) {
     console.error('[RAG-Server] Instant reply endpoint error:', error.message);

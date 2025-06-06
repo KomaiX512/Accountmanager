@@ -1,0 +1,27 @@
+{
+  "post": {
+    "caption": "Ready to level up your social media game, besties? ✨ We're spilling our secrets to help you slay your branding journey! Drop your biggest social media struggle in the comments – we're here to help you glow up! 💖",
+    "hashtags": [
+      "#TooFaced",
+      "#SocialMediaTips",
+      "#BrandingJourney",
+      "#BeautyTips",
+      "#MakeupMarketing",
+      "#InstagramGrowth",
+      "#BeautyCommunity",
+      "#SocialMediaStrategy",
+      "#MakeupTips",
+      "#GlowUp"
+    ],
+    "call_to_action": "Comment below with your biggest social media challenge!",
+    "image_prompt": "A split-screen image. On the left side, a chaotic, cluttered desk with scattered makeup products (some generic, some recognizable brands), a tangled phone charger, and a half-eaten snack. The lighting is dim and unflattering. The overall mood is stressed and disorganized. On the right side, a clean, minimalist desk with a single, perfectly arranged Too Faced makeup palette (perhaps the Born This Way palette), a sleek laptop displaying a well-organized social media calendar, and a small succulent. The lighting is bright, clean, and professional. The overall mood is calm, focused, and aspirational.\n\nThe split should be slightly angled, creating a dynamic visual. The background on the left is a dull grey, while the background on the right is a soft, millennial pink. The image should be high-resolution and visually appealing. The Too Faced palette should be prominently displayed and well-lit. The laptop screen should be subtly blurred to avoid showing any sensitive information, but the calendar should be clearly visible. The overall style should be modern, clean, and aspirational, reflecting the Too Faced brand aesthetic. The composition should be balanced and visually engaging, drawing the viewer's eye from the chaotic left side to the organized and beautiful right side.",
+    "platform": "instagram"
+  },
+  "timestamp": 1749169933358,
+  "image_path": "ready_post/instagram/toofaced/image_1749169933358.jpg",
+  "image_url": "http://localhost:3002/serve-image/instagram/toofaced/image_1749169933358.jpg",
+  "image_url_endpoint": "http://localhost:3002/get-image-url/instagram/toofaced/image_1749169933358.jpg",
+  "generated_at": "2025-06-06T00:32:14.119Z",
+  "queryUsed": "tellme how can proceed  my next soxial media branding journey ?",
+  "status": "new"
+}

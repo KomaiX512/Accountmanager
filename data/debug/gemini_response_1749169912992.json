@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption: Ready to level up your social media game, besties? ✨ We're spilling our secrets to help you slay your branding journey! Drop your biggest social media struggle in the comments – we're here to help you glow up! 💖\n\nHashtags: #TooFaced #SocialMediaTips #BrandingJourney #BeautyTips #MakeupMarketing #InstagramGrowth #BeautyCommunity #SocialMediaStrategy #MakeupTips #GlowUp\n\nCall to Action: Comment below with your biggest social media challenge!\n\nVisual Description for Image: A split-screen image. On the left side, a chaotic, cluttered desk with scattered makeup products (some generic, some recognizable brands), a tangled phone charger, and a half-eaten snack. The lighting is dim and unflattering. The overall mood is stressed and disorganized. On the right side, a clean, minimalist desk with a single, perfectly arranged Too Faced makeup palette (perhaps the Born This Way palette), a sleek laptop displaying a well-organized social media calendar, and a small succulent. The lighting is bright, clean, and professional. The overall mood is calm, focused, and aspirational.\n\nThe split should be slightly angled, creating a dynamic visual. The background on the left is a dull grey, while the background on the right is a soft, millennial pink. The image should be high-resolution and visually appealing. The Too Faced palette should be prominently displayed and well-lit. The laptop screen should be subtly blurred to avoid showing any sensitive information, but the calendar should be clearly visible. The overall style should be modern, clean, and aspirational, reflecting the Too Faced brand aesthetic. The composition should be balanced and visually engaging, drawing the viewer's eye from the chaotic left side to the organized and beautiful right side.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.36308334812973486
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 257,
+    "candidatesTokenCount": 363,
+    "totalTokenCount": 620,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 257
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 363
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "9jZCaOSLFq-R1PIPn56f8QM"
+}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './PostCooked.css';
 import { motion } from 'framer-motion';
 import { saveFeedback } from '../../utils/FeedbackHandler';
@@ -9,9 +9,49 @@ import TwitterRequiredButton from '../common/TwitterRequiredButton';
 import { useInstagram } from '../../context/InstagramContext';
 import { useTwitter } from '../../context/TwitterContext';
 import axios from 'axios';
-import { FaCalendarAlt, FaEdit, FaClock, FaRocket, FaTrash, FaInstagram, FaTwitter } from 'react-icons/fa';
-import { MdSchedule, MdAutorenew, MdOutlineScheduleSend } from 'react-icons/md';
-import { BsCalendarCheck, BsLightningChargeFill } from 'react-icons/bs';
+import {
+  Avatar,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  CardMedia,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Grid,
+  IconButton,
+  Menu,
+  MenuItem,
+  TextField,
+  Typography,
+  useTheme
+} from '@mui/material';
+import FavoriteIcon from '@mui/icons-material/Favorite';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
+import ShareIcon from '@mui/icons-material/Share';
+import ThumbDownIcon from '@mui/icons-material/ThumbDown';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import EventIcon from '@mui/icons-material/Event';
+import EditIcon from '@mui/icons-material/Edit';
+import CloseIcon from '@mui/icons-material/Close';
+import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+// Missing modules - comment out until they're available
+// import EditCaption from '../common/EditCaption';
+// import { ScheduleItem } from '../../types/schedule';
+
+// Type definition for ScheduleItem as a temporary replacement
+interface ScheduleItem {
+  id: string;
+  postKey: string;
+  scheduledTime: Date;
+  status: 'pending' | 'posted' | 'failed';
+  platform: string;
+  username: string;
+}
 
 interface PostCookedProps {
   username: string;
@@ -54,6 +94,20 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   const [editingPost, setEditingPost] = useState<{ key: string; imageUrl: string; caption: string } | null>(null);
   const [editingCaption, setEditingCaption] = useState<{ key: string; caption: string } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const [scheduleDialog, setScheduleDialog] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState<Date | null>(new Date());
+  const [scheduleKeyToPost, setScheduleKeyToPost] = useState<string | null>(null);
+  const [editCaptionOpen, setEditCaptionOpen] = useState(false);
+  const [editCaptionKey, setEditCaptionKey] = useState<string | null>(null);
+  const [postDialogOpen, setPostDialogOpen] = useState(false);
+  const [dialogPostKey, setDialogPostKey] = useState<string | null>(null);
+  const [interval, setInterval] = useState<number>(180);
+  const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
+  const [feedback, setFeedback] = useState('');
+
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     console.log('Posts prop in PostCooked:', posts);
@@ -98,13 +152,99 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   const handleImageError = (key: string, url: string) => {
     console.error(`Failed to load image for ${key}: ${url}`);
     
+    // First check if this is the problematic narsissist image
+    if (url.includes('narsissist') && url.includes('image_1749203937329.jpg')) {
+      console.log(`[ImageError] Detected problematic narsissist image - using direct proxy`);
+      
+      // Update the post to use our direct proxy
+      const postIndex = localPosts.findIndex(p => p.key === key);
+      if (postIndex >= 0) {
+        const updatedPost = {
+          ...localPosts[postIndex],
+          data: {
+            ...localPosts[postIndex].data,
+            image_url: `http://localhost:3002/fix-image/narsissist/image_1749203937329.jpg?platform=${platform}`,
+            r2_image_url: `http://localhost:3002/fix-image/narsissist/image_1749203937329.jpg?platform=${platform}`
+          }
+        };
+        
+        const updatedPosts = [...localPosts];
+        updatedPosts[postIndex] = updatedPost;
+        setLocalPosts(updatedPosts);
+        
+        // Reset error state for this image
+        const updatedErrors = {...imageErrors};
+        delete updatedErrors[key];
+        setImageErrors(updatedErrors);
+        
+        return;
+      }
+    }
+    
+    // Check if this is any R2 URL that should be proxied
+    const isR2Url = url.includes('r2.cloudflarestorage.com') || 
+                    url.includes('r2.dev') ||
+                    url.includes('tasks.b21d96e73b908d7d7b822d41516ccc64') ||
+                    url.includes('pub-ba72672df3c041a3844f278dd3c32b22');
+    
+    if (isR2Url) {
+      console.log(`[ImageError] Detected R2 URL, using our proxy server`);
+      
+      // Extract filename from URL
+      let filename = '';
+      const urlParts = url.split('/');
+      for (let i = 0; i < urlParts.length; i++) {
+        if (urlParts[i].includes('.jpg')) {
+          filename = urlParts[i].split('?')[0]; // Remove query params
+          break;
+        }
+      }
+      
+      if (filename) {
+        // Update the post to use our proxy
+        const postIndex = localPosts.findIndex(p => p.key === key);
+        if (postIndex >= 0) {
+          const updatedPost = {
+            ...localPosts[postIndex],
+            data: {
+              ...localPosts[postIndex].data,
+              image_url: `http://localhost:3002/fix-image/${username}/${filename}?platform=${platform}`,
+              r2_image_url: `http://localhost:3002/fix-image/${username}/${filename}?platform=${platform}`
+            }
+          };
+          
+          const updatedPosts = [...localPosts];
+          updatedPosts[postIndex] = updatedPost;
+          setLocalPosts(updatedPosts);
+          
+          // Reset error state for this image
+          const updatedErrors = {...imageErrors};
+          delete updatedErrors[key];
+          setImageErrors(updatedErrors);
+          
+          return;
+        }
+      }
+    }
+    
     // Try to reload a few times with timestamp before giving up
     const retryCount = imageErrors[key] ? imageErrors[key].retryCount || 0 : 0;
     
+    // Use our proxy server for the retry
     if (retryCount < 3) {
       // Try again with a cache-busting timestamp
       const img = new Image();
-      const newUrl = `${url}?t=${Date.now()}&retry=${retryCount + 1}`;
+      
+      // Create a proxied URL
+      let newUrl = url;
+      if (url.includes('r2.cloudflarestorage.com') || url.includes('r2.dev')) {
+        // Extract filename if possible
+        const parts = url.split('/');
+        const filename = parts[parts.length - 1].split('?')[0];
+        newUrl = `http://localhost:3002/fix-image/${username}/${filename}?platform=${platform}&t=${Date.now()}&retry=${retryCount + 1}`;
+      } else {
+        newUrl = `${url}?t=${Date.now()}&retry=${retryCount + 1}`;
+      }
       
       img.onload = () => {
         // Image loaded successfully on retry
@@ -126,31 +266,24 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
           }
         }));
         
-        // If this is a retry of the r2_image_url, try falling back to the regular image_url
-        const post = localPosts.find(p => p.key === key);
-        if (post && post.data.r2_image_url && post.data.image_url && url.includes(post.data.r2_image_url)) {
-          console.log(`[ImageError] R2 image failed, trying regular image URL for ${key}`);
-          // Find the post in the local posts array
+        // Try our backup proxy as last resort
+        if (retryCount === 2) {
+          console.log(`[ImageError] All retries failed, using placeholder for ${key}`);
+          // Update the post to use a placeholder
           const postIndex = localPosts.findIndex(p => p.key === key);
           if (postIndex >= 0) {
-            // Create a copy of the post without the r2_image_url to force using the regular image_url
             const updatedPost = {
               ...localPosts[postIndex],
               data: {
                 ...localPosts[postIndex].data,
-                r2_image_url: undefined // Clear the r2_image_url to force using image_url
+                image_url: `http://localhost:3002/placeholder.jpg?src=${encodeURIComponent(url)}`,
+                r2_image_url: undefined
               }
             };
             
-            // Update the posts array
             const updatedPosts = [...localPosts];
             updatedPosts[postIndex] = updatedPost;
             setLocalPosts(updatedPosts);
-            
-            // Reset error state for this image
-            const updatedErrors = {...imageErrors};
-            delete updatedErrors[key];
-            setImageErrors(updatedErrors);
           }
         }
       };
@@ -166,50 +299,27 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         }
       }));
       
-      // Check if we're already trying the fallback URL
-      const post = localPosts.find(p => p.key === key);
-      if (post && post.data.r2_image_url && url.includes(post.data.r2_image_url)) {
-        console.log(`[ImageError] R2 image permanently failed, trying fallback for ${key}`);
-        // Try the fallback image path
-        const fallbackUrl = `/r2-images/${username}/fallback.jpg`;
-        
-        // Try loading the fallback image
-        const fallbackImg = new Image();
-        fallbackImg.onload = () => {
-          console.log(`[ImageError] Fallback image loaded successfully for ${key}`);
-          // Update the post to use the fallback image
-          const postIndex = localPosts.findIndex(p => p.key === key);
-          if (postIndex >= 0) {
-            const updatedPost = {
-              ...localPosts[postIndex],
-              data: {
-                ...localPosts[postIndex].data,
-                r2_image_url: fallbackUrl
-              }
-            };
-            
-            const updatedPosts = [...localPosts];
-            updatedPosts[postIndex] = updatedPost;
-            setLocalPosts(updatedPosts);
-            
-            // Reset error state for this image
-            const updatedErrors = {...imageErrors};
-            delete updatedErrors[key];
-            setImageErrors(updatedErrors);
+      // Update the post to use a placeholder
+      const postIndex = localPosts.findIndex(p => p.key === key);
+      if (postIndex >= 0) {
+        const updatedPost = {
+          ...localPosts[postIndex],
+          data: {
+            ...localPosts[postIndex].data,
+            image_url: `http://localhost:3002/placeholder.jpg?src=${encodeURIComponent(url)}`,
+            r2_image_url: undefined
           }
         };
         
-        fallbackImg.onerror = () => {
-          console.error(`[ImageError] Even fallback image failed for ${key}`);
-        };
-        
-        fallbackImg.src = fallbackUrl;
+        const updatedPosts = [...localPosts];
+        updatedPosts[postIndex] = updatedPost;
+        setLocalPosts(updatedPosts);
       }
     }
   };
 
   // Enhanced image placeholder component
-  const ImagePlaceholder = ({ postKey }: { postKey: string }) => {
+  const ImagePlaceholder: React.FC<{ postKey: string }> = ({ postKey }) => {
     const retryImage = () => {
       // Reset error state for this image
       const updatedErrors = {...imageErrors};
@@ -220,31 +330,41 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       setLocalPosts(prev => [...prev]);
     };
     
+    const post = localPosts.find(p => p.key === postKey);
+    const imageUrl = post ? post.data.image_url || post.data.r2_image_url : '';
+
     return (
       <div className="post-image-placeholder">
         <div className="placeholder-content">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="48"
-            height="48"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#e0e0ff"
-            strokeWidth="1"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-            <circle cx="8.5" cy="8.5" r="1.5" />
-            <polyline points="21 15 16 10 5 21" />
-          </svg>
-          <p>Image unavailable</p>
+          <p style={{
+            color: '#666',
+            fontSize: '14px',
+            marginBottom: '10px'
+          }}>
+            Image Failed to Load
+          </p>
           <button
             className="retry-image-button"
             onClick={retryImage}
+            style={{
+              backgroundColor: '#007bff',
+              color: 'white',
+              border: 'none',
+              padding: '5px 10px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              marginTop: '8px'
+            }}
           >
             Retry
           </button>
+          <p style={{
+            color: '#999',
+            fontSize: '12px',
+            marginTop: '8px'
+          }}>
+            URL: {imageUrl && imageUrl.substring(0, 50)}...
+          </p>
         </div>
       </div>
     );
@@ -820,62 +940,75 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
           </button>
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
-          <div className="auto-schedule-section">
-            {platform === 'twitter' ? (
-              <TwitterRequiredButton
-                isConnected={isConnected && !autoScheduling}
-                onClick={() => setShowIntervalModal(true)}
-                className="dashboard-btn auto-schedule-btn twitter"
-                disabled={autoScheduling}
-              >
-                <MdAutorenew className="btn-icon" />
-                <span>{autoScheduling ? 'Auto-Scheduling...' : 'Auto-Schedule All'}</span>
-              </TwitterRequiredButton>
-            ) : (
-              <InstagramRequiredButton
-                isConnected={isConnected && !autoScheduling}
-                onClick={() => setShowIntervalModal(true)}
-                className="dashboard-btn auto-schedule-btn"
-                disabled={autoScheduling}
-              >
-                <MdAutorenew className="btn-icon" />
-                <span>{autoScheduling ? 'Auto-Scheduling...' : 'Auto-Schedule All'}</span>
-              </InstagramRequiredButton>
-            )}
-          </div>
+          {platform === 'twitter' ? (
+            <TwitterRequiredButton
+              isConnected={isConnected}
+              onClick={() => setShowIntervalModal(true)}
+              className="twitter-btn connect"
+              disabled={!filteredPosts.length || autoScheduling}
+              style={{ 
+                background: 'linear-gradient(90deg, #1da1f2, #00acee)', 
+                color: '#ffffff', 
+                cursor: filteredPosts.length ? 'pointer' : 'not-allowed', 
+                borderRadius: 8, 
+                padding: '8px 16px', 
+                border: '1px solid #1da1f2',
+                opacity: filteredPosts.length ? 1 : 0.5
+              }}
+            >
+              {autoScheduling ? 'Auto-Scheduling...' : 'Auto-Schedule All'}
+            </TwitterRequiredButton>
+          ) : (
+            <InstagramRequiredButton
+              isConnected={isConnected}
+              onClick={() => setShowIntervalModal(true)}
+              className="insta-btn connect"
+              disabled={!filteredPosts.length || autoScheduling}
+              style={{ 
+                background: 'linear-gradient(90deg, #007bff, #00ffcc)', 
+                color: '#e0e0ff', 
+                cursor: filteredPosts.length ? 'pointer' : 'not-allowed', 
+                borderRadius: 8, 
+                padding: '8px 16px', 
+                border: '1px solid #00ffcc',
+                opacity: filteredPosts.length ? 1 : 0.5
+              }}
+            >
+              {autoScheduling ? 'Auto-Scheduling...' : 'Auto-Schedule All'}
+            </InstagramRequiredButton>
+          )}
         </div>
         {showIntervalModal && (
-          <div className="modal-overlay">
-            <div className="modal-content">
-              <h3 className="modal-title">
-                <MdSchedule className="modal-icon" />
-                Set Auto-Schedule Interval
-              </h3>
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.4)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <div style={{ background: '#23234a', borderRadius: 12, padding: 24, minWidth: 380, boxShadow: '0 4px 24px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <h3 style={{ color: '#e0e0ff', marginBottom: 8 }}>Set Auto-Schedule Interval</h3>
               <input
                 type="number"
                 min={1}
+                
                 step={1}
                 value={intervalInput}
                 onChange={e => setIntervalInput(e.target.value)}
                 placeholder="Interval in hours (e.g. 4)"
-                className="modal-input"
+                style={{ padding: 8, borderRadius: 6, border: '1px solid #00ffcc', fontSize: 16, marginBottom: 8 }}
                 autoFocus
               />
-              <div className="modal-info">
+              <div style={{ color: '#a0a0cc', fontSize: 14, marginBottom: 8, lineHeight: '1.4' }}>
                 <strong>Priority System:</strong><br />
                 1. Your custom interval (if provided)<br />
                 2. Campaign timeline from goal settings<br />
                 3. Default interval (6 hours)
               </div>
-              <div className="modal-actions">
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
                 <button
-                  className="dashboard-btn cancel-btn"
+                  className="insta-btn disconnect"
                   onClick={() => { setShowIntervalModal(false); setIntervalInput(''); }}
-                >
-                  Cancel
-                </button>
+                >Cancel</button>
                 <button
-                  className="dashboard-btn confirm-btn"
+                  className="insta-btn connect"
                   onClick={() => {
                     setShowIntervalModal(false);
                     const interval = intervalInput.trim() ? parseInt(intervalInput, 10) : undefined;
@@ -883,45 +1016,37 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                     handleAutoSchedule(interval);
                   }}
                   disabled={autoScheduling}
-                >
-                  <BsLightningChargeFill className="btn-icon" />
-                  Start Auto-Schedule
-                </button>
+                >Start Auto-Schedule</button>
               </div>
             </div>
           </div>
         )}
         {showScheduleModal && (
-          <div className="modal-overlay">
-            <div className="modal-content">
-              <h3 className="modal-title">
-                <FaCalendarAlt className="modal-icon" />
-                Schedule Post
-              </h3>
-              <label className="modal-label">
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.4)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <div className="schedule-modal">
+              <h3>Schedule Post</h3>
+              <label style={{ color: '#e0e0ff', fontSize: '1rem', marginBottom: '8px' }}>
                 Select Date and Time
               </label>
               <input
                 type="datetime-local"
                 value={scheduleDateTime}
                 onChange={e => setScheduleDateTime(e.target.value)}
-                className="modal-input datetime-input"
+                style={{ padding: 8, borderRadius: 6, border: '1px solid #00ffcc', fontSize: 16, width: '100%', background: 'rgba(255, 255, 255, 0.05)', color: '#e0e0ff' }}
               />
-              <div className="modal-actions">
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 16 }}>
                 <button
-                  className="dashboard-btn cancel-btn"
+                  className="schedule-cancel-button"
                   onClick={handleScheduleCancel}
-                >
-                  Cancel
-                </button>
+                >Cancel</button>
                 <button
-                  className="dashboard-btn confirm-btn"
+                  className="schedule-submit-button"
                   onClick={handleScheduleSubmit}
                   disabled={!scheduleDateTime}
-                >
-                  <MdSchedule className="btn-icon" />
-                  Schedule
-                </button>
+                >Schedule</button>
               </div>
             </div>
           </div>
@@ -973,7 +1098,39 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                     <ImagePlaceholder postKey={post.key} />
                   ) : (
                     <img
-                      src={(post.data.r2_image_url || post.data.image_url) + `?t=${Date.now()}`} // Use r2_image_url if available, falling back to image_url
+                      src={(() => {
+                        const sourceUrl = post.data.r2_image_url || post.data.image_url;
+                        
+                        // Check if this is the problematic narsissist image
+                        if (sourceUrl.includes('narsissist') && sourceUrl.includes('image_1749203937329.jpg')) {
+                          return `http://localhost:3002/fix-image/narsissist/image_1749203937329.jpg?platform=${platform}&t=${Date.now()}`;
+                        }
+                        
+                        // Check if it's an R2 URL
+                        if (sourceUrl.includes('r2.cloudflarestorage.com') || 
+                            sourceUrl.includes('r2.dev') ||
+                            sourceUrl.includes('tasks.b21d96e73b908d7d7b822d41516ccc64') ||
+                            sourceUrl.includes('pub-ba72672df3c041a3844f278dd3c32b22')) {
+                          
+                          // Extract filename from URL
+                          const urlParts = sourceUrl.split('/');
+                          let filename = '';
+                          
+                          for (let i = 0; i < urlParts.length; i++) {
+                            if (urlParts[i].includes('.jpg')) {
+                              filename = urlParts[i].split('?')[0]; // Remove query params
+                              break;
+                            }
+                          }
+                          
+                          if (filename) {
+                            return `http://localhost:3002/fix-image/${username}/${filename}?platform=${platform}&t=${Date.now()}`;
+                          }
+                        }
+                        
+                        // Use original URL as fallback with timestamp
+                        return sourceUrl + `?t=${Date.now()}`;
+                      })()}
                       alt="Post visual"
                       className="post-image"
                       onError={() => handleImageError(post.key, post.data.r2_image_url || post.data.image_url)}
@@ -1066,40 +1223,120 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                       <TwitterRequiredButton
                         isConnected={isConnected}
                         onClick={() => handleScheduleClick(post.key)}
-                        className="dashboard-btn schedule-btn twitter"
+                        className="schedule-button"
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '5px', 
+                          backgroundColor: '#1da1f2', 
+                          color: '#ffffff',
+                          border: 'none',
+                          padding: '8px 12px',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          fontWeight: 'bold',
+                          transition: 'all 0.2s ease'
+                        }}
                         notificationPosition="bottom"
                       >
-                        <FaCalendarAlt className="btn-icon" />
-                        <span>Schedule</span>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#ffffff"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <circle cx="12" cy="12" r="10" />
+                          <polyline points="12 6 12 12 16 14" />
+                        </svg>
+                        Schedule
                       </TwitterRequiredButton>
                     ) : (
                       <InstagramRequiredButton
                         isConnected={isConnected}
                         onClick={() => handleScheduleClick(post.key)}
-                        className="dashboard-btn schedule-btn"
+                        className="schedule-button"
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '5px', 
+                          backgroundColor: '#007bff', 
+                          color: '#e0e0ff',
+                          border: 'none',
+                          padding: '8px 12px',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          fontWeight: 'bold',
+                          transition: 'all 0.2s ease'
+                        }}
                         notificationPosition="bottom"
                       >
-                        <FaCalendarAlt className="btn-icon" />
-                        <span>Schedule</span>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#e0e0ff"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <circle cx="12" cy="12" r="10" />
+                          <polyline points="12 6 12 12 16 14" />
+                        </svg>
+                        Schedule
                       </InstagramRequiredButton>
                     )}
                     <motion.button
-                      className="dashboard-btn edit-btn"
+                      className="edit-button"
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => handleEdit(post.key)}
                     >
-                      <FaEdit className="btn-icon" />
-                      <span>Edit</span>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#e0e0ff"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                      </svg>
+                      Edit
                     </motion.button>
                     <motion.button
-                      className="dashboard-btn reject-btn"
+                      className="reject-button"
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => handleReject(post.key)}
                     >
-                      <FaTrash className="btn-icon" />
-                      <span>Reject</span>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#ff4444"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M18 6L6 18" />
+                        <path d="M6 6l12 12" />
+                      </svg>
+                      Reject
                     </motion.button>
                   </div>
                   <div className="post-caption">
@@ -1135,7 +1372,20 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                           onClick={() => handleEditCaption(post.key)}
                           title="Edit caption"
                         >
-                          <FaEdit className="btn-icon" />
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="#00ffcc"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                          </svg>
                         </button>
                       </>
                     )}

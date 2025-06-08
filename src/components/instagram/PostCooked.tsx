@@ -67,6 +67,9 @@ interface ImageErrorState {
   retryCount: number;
 }
 
+// Base URL for all API requests
+const API_BASE_URL = 'http://localhost:3002';
+
 const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts = [], userId: propUserId, platform = 'instagram' }) => {
   const { isConnected: isInstagramConnected, userId: instagramUserId } = useInstagram();
   const { isConnected: isTwitterConnected, userId: twitterUserId } = useTwitter();
@@ -113,6 +116,29 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     console.log('Posts prop in PostCooked:', posts);
     setLocalPosts(posts);
   }, [posts]);
+
+  // Listen for post updates from Canvas Editor
+  useEffect(() => {
+    const handlePostUpdate = (event: CustomEvent) => {
+      const { postKey, platform: updatedPlatform } = event.detail;
+      
+      if (updatedPlatform === platform) {
+        console.log(`[PostCooked] Post ${postKey} was updated, refreshing...`);
+        setToastMessage('Post updated successfully! Refreshing...');
+        
+        // Refresh posts after a short delay
+        setTimeout(() => {
+          handleRefreshPosts();
+        }, 1000);
+      }
+    };
+
+    window.addEventListener('postUpdated', handlePostUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('postUpdated', handlePostUpdate as EventListener);
+    };
+  }, [platform]);
 
   useEffect(() => {
     if (toastMessage) {
@@ -163,8 +189,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
           ...localPosts[postIndex],
           data: {
             ...localPosts[postIndex].data,
-            image_url: `http://localhost:3002/fix-image/narsissist/image_1749203937329.jpg?platform=${platform}`,
-            r2_image_url: `http://localhost:3002/fix-image/narsissist/image_1749203937329.jpg?platform=${platform}`
+            image_url: `${API_BASE_URL}/fix-image/narsissist/image_1749203937329.jpg?platform=${platform}`,
+            r2_image_url: `${API_BASE_URL}/fix-image/narsissist/image_1749203937329.jpg?platform=${platform}`
           }
         };
         
@@ -208,8 +234,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             ...localPosts[postIndex],
             data: {
               ...localPosts[postIndex].data,
-              image_url: `http://localhost:3002/fix-image/${username}/${filename}?platform=${platform}`,
-              r2_image_url: `http://localhost:3002/fix-image/${username}/${filename}?platform=${platform}`
+              image_url: `${API_BASE_URL}/fix-image/${username}/${filename}?platform=${platform}`,
+              r2_image_url: `${API_BASE_URL}/fix-image/${username}/${filename}?platform=${platform}`
             }
           };
           
@@ -241,7 +267,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         // Extract filename if possible
         const parts = url.split('/');
         const filename = parts[parts.length - 1].split('?')[0];
-        newUrl = `http://localhost:3002/fix-image/${username}/${filename}?platform=${platform}&t=${Date.now()}&retry=${retryCount + 1}`;
+        newUrl = `${API_BASE_URL}/fix-image/${username}/${filename}?platform=${platform}&t=${Date.now()}&retry=${retryCount + 1}`;
       } else {
         newUrl = `${url}?t=${Date.now()}&retry=${retryCount + 1}`;
       }
@@ -276,7 +302,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
               ...localPosts[postIndex],
               data: {
                 ...localPosts[postIndex].data,
-                image_url: `http://localhost:3002/placeholder.jpg?src=${encodeURIComponent(url)}`,
+                image_url: `${API_BASE_URL}/placeholder.jpg?src=${encodeURIComponent(url)}`,
                 r2_image_url: undefined
               }
             };
@@ -306,7 +332,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
           ...localPosts[postIndex],
           data: {
             ...localPosts[postIndex].data,
-            image_url: `http://localhost:3002/placeholder.jpg?src=${encodeURIComponent(url)}`,
+            image_url: `${API_BASE_URL}/placeholder.jpg?src=${encodeURIComponent(url)}`,
             r2_image_url: undefined
           }
         };
@@ -398,7 +424,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
 
     try {
       console.log(`[Schedule] Updating post status to scheduled for ${selectedPostKey}`);
-      const statusUpdateResponse = await fetch(`http://localhost:3000/update-post-status/${username}`, {
+      const statusUpdateResponse = await fetch(`${API_BASE_URL}/api/update-post-status/${username}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -430,7 +456,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       }
       
       try {
-        const response = await axios.post(`http://localhost:3000/schedule-tweet/${userId}`, {
+        const response = await axios.post(`${API_BASE_URL}/api/schedule-tweet/${userId}`, {
           text: caption.trim(),
           scheduled_time: scheduleTime.toISOString()
         });
@@ -461,7 +487,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       }
       let signedImageUrl = '';
       try {
-        const signedUrlRes = await fetch(`http://localhost:3000/signed-image-url/${username}/${imageKey}`);
+        const signedUrlRes = await fetch(`${API_BASE_URL}/api/signed-image-url/${username}/${imageKey}`);
         const signedUrlData = await signedUrlRes.json();
         signedImageUrl = signedUrlData.url;
         if (!signedImageUrl) throw new Error('No signed URL returned');
@@ -473,7 +499,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       }
       let imageBlob: Blob | null = null;
       try {
-        const proxyUrl = `http://localhost:3000/proxy-image?url=${encodeURIComponent(signedImageUrl)}`;
+        const proxyUrl = `${API_BASE_URL}/api/proxy-image?url=${encodeURIComponent(signedImageUrl)}`;
         const imgRes = await fetch(proxyUrl);
         imageBlob = await imgRes.blob();
         console.log(`[Schedule] Image fetched for post ${selectedPostKey} via proxy`);
@@ -500,8 +526,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       formData.append('caption', caption);
       formData.append('scheduleDate', scheduleTime.toISOString());
       try {
-        console.log(`[Schedule] Sending schedule request for post ${selectedPostKey} to /schedule-post/${userId}`);
-        const resp = await fetch(`http://localhost:3000/schedule-post/${userId}`, {
+        console.log(`[Schedule] Sending schedule request for post ${selectedPostKey} to /api/schedule-post/${userId}`);
+        const resp = await fetch(`${API_BASE_URL}/api/schedule-post/${userId}`, {
           method: 'POST',
           body: formData,
         });
@@ -540,36 +566,73 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     }
 
     let imageKey = '';
-    if (post.data.image_url && post.data.image_url.includes('/ready_post/')) {
-      const match = post.data.image_url.match(/ready_post\/[\w-]+\/(image_\d+\.jpg)/);
-      if (match) imageKey = match[1];
-    }
-    if (!imageKey && post.key.match(/ready_post_\d+\.json$/)) {
-      const postIdMatch = post.key.match(/ready_post_(\d+)\.json$/);
+    // Enhanced image key extraction from the post key itself
+    if (key.match(/ready_post_\d+\.json$/)) {
+      const postIdMatch = key.match(/ready_post_(\d+)\.json$/);
       if (postIdMatch) imageKey = `image_${postIdMatch[1]}.jpg`;
     }
+    
+    // Fallback: extract from image URL if available
+    if (!imageKey && post.data.image_url) {
+      const urlMatch = post.data.image_url.match(/(image_\d+\.jpg)/);
+      if (urlMatch) imageKey = urlMatch[1];
+    }
+
+    if (!imageKey) {
+      console.error(`[Edit] Could not determine image key for post ${key}`);
+      setToastMessage('Could not determine image for editing.');
+      return;
+    }
+
+    console.log(`[Edit] Extracted imageKey: ${imageKey} for post ${key}`);
 
     try {
-      const signedUrlRes = await fetch(`http://localhost:3000/signed-image-url/${username}/${imageKey}`);
-      const signedUrlData = await signedUrlRes.json();
-      const signedImageUrl = signedUrlData.url;
+      // Use our direct R2 image endpoint instead of signed URL for editing
+      const directImageUrl = `${API_BASE_URL}/api/r2-image/${username}/${imageKey}?platform=${platform}`;
       
-      if (!signedImageUrl) {
-        throw new Error('No signed URL returned');
-      }
+      console.log(`[Edit] Using direct image URL: ${directImageUrl}`);
 
-      setEditingPost({
-        key: key,
-        imageUrl: signedImageUrl,
-        caption: post.data.post?.caption || ''
-      });
+      // Test if the image is accessible
+      const testResponse = await fetch(directImageUrl, { method: 'HEAD' });
+      
+      if (!testResponse.ok) {
+        console.warn(`[Edit] Direct image not accessible, trying signed URL...`);
+        
+        // Fallback to signed URL
+        const signedUrlRes = await fetch(`${API_BASE_URL}/api/signed-image-url/${username}/${imageKey}?platform=${platform}`);
+        
+        if (!signedUrlRes.ok) {
+          throw new Error(`Failed to get signed URL: ${signedUrlRes.status}`);
+        }
+        
+        const signedUrlData = await signedUrlRes.json();
+        const imageUrl = signedUrlData.url;
+        
+        if (!imageUrl) {
+          throw new Error('No signed URL returned');
+        }
+
+        setEditingPost({
+          key: key,
+          imageUrl: imageUrl,
+          caption: post.data.post?.caption || ''
+        });
+      } else {
+        // Direct image is accessible, use it
+        setEditingPost({
+          key: key,
+          imageUrl: directImageUrl,
+          caption: post.data.post?.caption || ''
+        });
+      }
       
       setShowCanvasEditor(true);
+      console.log(`[Edit] Successfully prepared post for editing: ${key}`);
+      
     } catch (err) {
-      console.error('[Edit] Failed to get signed URL:', err);
-      setToastMessage('Failed to prepare image for editing.');
+      console.error('[Edit] Failed to prepare image for editing:', err);
+      setToastMessage('Failed to prepare image for editing. Please try again.');
     }
-    setScheduleDateTime('');
   };
 
   const handleCanvasClose = () => {
@@ -583,7 +646,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     setToastMessage('Post rejected and removed.');
 
     try {
-      const response = await fetch(`http://localhost:3000/update-post-status/${username}`, {
+      const response = await fetch(`${API_BASE_URL}/api/update-post-status/${username}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -611,7 +674,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     // Priority 2: Fallback to generated content timeline
     try {
       console.log(`[AutoSchedule] Fetching timeline from generated content for ${username} on ${platform}`);
-      const timelineResponse = await fetch(`http://localhost:3000/generated-content-timeline/${username}?platform=${platform}`);
+      const timelineResponse = await fetch(`${API_BASE_URL}/api/generated-content-timeline/${username}?platform=${platform}`);
       
       if (timelineResponse.ok) {
         const timelineData = await timelineResponse.json();
@@ -630,7 +693,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
 
     // Priority 3: Original time delay endpoint
     try {
-      const res = await fetch(`http://localhost:3000/time-delay/${username}`);
+      const res = await fetch(`${API_BASE_URL}/api/time-delay/${username}`);
       if (!res.ok) throw new Error('Not found');
       const data = await res.json();
       const delay = parseInt(data?.Posting_Delay_Intervals);
@@ -686,7 +749,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             console.log(`[AutoSchedule] Scheduling tweet #${i + 1} at:`, scheduleDate.toISOString());
             
             try {
-              const response = await axios.post(`http://localhost:3000/schedule-tweet/${userId}`, {
+              const response = await axios.post(`${API_BASE_URL}/api/schedule-tweet/${userId}`, {
                 text: truncatedCaption,
                 scheduled_time: scheduleDate.toISOString()
               });
@@ -715,7 +778,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             console.log(`[AutoSchedule] Scheduling tweet #${i + 1} at:`, scheduleDate.toISOString());
             
             try {
-              const response = await axios.post(`http://localhost:3000/schedule-tweet/${userId}`, {
+              const response = await axios.post(`${API_BASE_URL}/api/schedule-tweet/${userId}`, {
                 text: caption.trim(),
                 scheduled_time: scheduleDate.toISOString()
               });
@@ -750,7 +813,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
           }
           let signedImageUrl = '';
           try {
-            const signedUrlRes = await fetch(`http://localhost:3000/signed-image-url/${username}/${imageKey}`);
+            const signedUrlRes = await fetch(`${API_BASE_URL}/api/signed-image-url/${username}/${imageKey}`);
             const signedUrlData = await signedUrlRes.json();
             signedImageUrl = signedUrlData.url;
             if (!signedImageUrl) throw new Error('No signed URL returned');
@@ -762,7 +825,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
           }
           let imageBlob: Blob | null = null;
           try {
-            const proxyUrl = `http://localhost:3000/proxy-image?url=${encodeURIComponent(signedImageUrl)}`;
+            const proxyUrl = `${API_BASE_URL}/api/proxy-image?url=${encodeURIComponent(signedImageUrl)}`;
             console.log(`[AutoSchedule] Fetching image for post #${i + 1} via proxy:`, proxyUrl);
             const imgRes = await fetch(proxyUrl);
             imageBlob = await imgRes.blob();
@@ -800,8 +863,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
           formData.append('caption', caption);
           formData.append('scheduleDate', scheduleDate.toISOString());
           try {
-            console.log(`[AutoSchedule] Sending schedule request for post #${i + 1} to /schedule-post/${userId}`);
-            const resp = await fetch(`http://localhost:3000/schedule-post/${userId}`, {
+            console.log(`[AutoSchedule] Sending schedule request for post #${i + 1} to /api/schedule-post/${userId}`);
+            const resp = await fetch(`${API_BASE_URL}/api/schedule-post/${userId}`, {
               method: 'POST',
               body: formData,
             });
@@ -885,7 +948,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     
     try {
       const platformParam = platform ? `&platform=${platform}` : '';
-      const response = await axios.get(`http://localhost:3000/posts/${username}?forceRefresh=true${platformParam}`);
+      const response = await axios.get(`${API_BASE_URL}/api/posts/${username}?forceRefresh=true${platformParam}`);
       setLocalPosts(response.data);
       setToastMessage('Posts refreshed successfully!');
     } catch (error) {
@@ -1103,7 +1166,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                         
                         // Check if this is the problematic narsissist image
                         if (sourceUrl.includes('narsissist') && sourceUrl.includes('image_1749203937329.jpg')) {
-                          return `http://localhost:3002/fix-image/narsissist/image_1749203937329.jpg?platform=${platform}&t=${Date.now()}`;
+                          return `${API_BASE_URL}/fix-image/narsissist/image_1749203937329.jpg?platform=${platform}&t=${Date.now()}`;
                         }
                         
                         // Check if it's an R2 URL
@@ -1112,24 +1175,25 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                             sourceUrl.includes('tasks.b21d96e73b908d7d7b822d41516ccc64') ||
                             sourceUrl.includes('pub-ba72672df3c041a3844f278dd3c32b22')) {
                           
-                          // Extract filename from URL
-                          const urlParts = sourceUrl.split('/');
-                          let filename = '';
-                          
-                          for (let i = 0; i < urlParts.length; i++) {
-                            if (urlParts[i].includes('.jpg')) {
-                              filename = urlParts[i].split('?')[0]; // Remove query params
-                              break;
-                            }
-                          }
-                          
-                          if (filename) {
-                            return `http://localhost:3002/fix-image/${username}/${filename}?platform=${platform}&t=${Date.now()}`;
+                                                  // Extract filename from URL
+                        const urlParts = sourceUrl.split('/');
+                        let filename = '';
+                        
+                        for (let i = 0; i < urlParts.length; i++) {
+                          if (urlParts[i].includes('.jpg')) {
+                            filename = urlParts[i].split('?')[0]; // Remove query params
+                            break;
                           }
                         }
                         
+                        if (filename) {
+                          return `${API_BASE_URL}/fix-image/${username}/${filename}?platform=${platform}&t=${Date.now()}`;
+                        }
+                        }
+                        
                         // Use original URL as fallback with timestamp
-                        return sourceUrl + `?t=${Date.now()}`;
+                        const separator = sourceUrl.includes('?') ? '&' : '?';
+                        return sourceUrl + `${separator}t=${Date.now()}`;
                       })()}
                       alt="Post visual"
                       className="post-image"

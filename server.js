@@ -8,6 +8,7 @@ import { promisify } from 'util';
 import { pipeline } from 'stream';
 import path from 'path';
 import jpeg from 'jpeg-js';
+import multer from 'multer';
 
 const app = express();
 const port = 3002;
@@ -425,7 +426,15 @@ app.get('/fix-image/:username/:filename', async (req, res) => {
     // Extract and normalize parameters
     const username = (req.params.username || '').trim().toLowerCase();
     let filename = (req.params.filename || '').trim();
-    const platform = ((req.query.platform || 'instagram') + '').trim().toLowerCase();
+    
+    // Fix platform extraction - remove any extra query parameters that got mixed in
+    let platform = (req.query.platform || 'instagram').toString().trim().toLowerCase();
+    if (platform.includes('?')) {
+      platform = platform.split('?')[0]; // Remove any additional query params
+    }
+    if (platform.includes('&')) {
+      platform = platform.split('&')[0]; // Remove any additional query params
+    }
     
     // Add basic parameter validation with fallbacks
     if (!username) {
@@ -797,6 +806,449 @@ setInterval(() => {
     console.error(`[${new Date().toISOString()}] [CACHE] Error during cache cleanup:`, error);
   }
 }, 5 * 60 * 1000); // Run every 5 minutes
+
+// Enhanced signed URL generator with R2 optimization
+app.get('/api/signed-image-url/:username/:imageKey', async (req, res) => {
+  const { username, imageKey } = req.params;
+  const platform = req.query.platform || 'instagram';
+  
+  try {
+    const key = `ready_post/${platform}/${username}/${imageKey}`;
+    console.log(`[${new Date().toISOString()}] [SIGNED-URL] Generating signed URL for: ${key}`);
+    
+    // Check if the object exists first
+    const client = getS3Client();
+    try {
+      await client.headObject({
+        Bucket: 'tasks',
+        Key: key,
+      }).promise();
+    } catch (headError) {
+      console.error(`[${new Date().toISOString()}] [SIGNED-URL] Image not found: ${key}`, headError.message);
+      return res.status(404).json({ error: 'Image not found' });
+    }
+    
+    // Generate signed URL with extended expiry for better UX
+    const signedUrl = client.getSignedUrl('getObject', {
+      Bucket: 'tasks',
+      Key: key,
+      Expires: 7200 // 2 hours for better user experience
+    });
+    
+    // Also provide our direct R2 endpoint as fallback
+    const directUrl = `${req.protocol}://${req.get('host')}/api/r2-image/${username}/${imageKey}?platform=${platform}`;
+    
+    res.json({ 
+      url: signedUrl,
+      directUrl: directUrl,
+      key: key
+    });
+    
+    console.log(`[${new Date().toISOString()}] [SIGNED-URL] Generated signed URL successfully for: ${key}`);
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [SIGNED-URL] Failed to generate signed URL for`, req.params, error?.message);
+    res.status(500).json({ error: 'Failed to generate signed URL' });
+  }
+});
+
+// Direct R2 Image Renderer - handles JPG images seamlessly from Cloudflare R2
+app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
+  const { username, imageKey } = req.params;
+  const platform = req.query.platform || 'instagram';
+  
+  try {
+    // Construct the R2 key path
+    const r2Key = `ready_post/${platform}/${username}/${imageKey}`;
+    
+    console.log(`[${new Date().toISOString()}] [R2-IMAGE] Fetching image: ${r2Key}`);
+    
+    // Use our existing fetch mechanism with fallbacks
+    const localFallbackPath = path.join(process.cwd(), 'ready_post', platform, username, imageKey);
+    const { data, source } = await fetchImageWithFallbacks(r2Key, localFallbackPath, username, imageKey);
+    
+    // Set appropriate headers for JPG images
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Content-Length', data.length);
+    res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+    res.setHeader('ETag', `"${imageKey}-${Date.now()}"`);
+    res.setHeader('Last-Modified', new Date().toUTCString());
+    res.setHeader('X-Image-Source', source); // For debugging
+    
+    // Enable CORS for cross-origin requests
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Access-Control-Expose-Headers', 'X-Image-Source, ETag, Last-Modified');
+    
+    // Send the image buffer directly
+    res.send(data);
+    
+    console.log(`[${new Date().toISOString()}] [R2-IMAGE] Successfully served: ${r2Key} (${data.length} bytes) from ${source}`);
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [R2-IMAGE] Error serving image ${username}/${imageKey}:`, error);
+    
+    // Generate and send placeholder
+    try {
+      const placeholderImage = generatePlaceholderImage('Image Error');
+      
+      res.setHeader('Content-Type', 'image/jpeg');
+      res.setHeader('Cache-Control', 'no-cache, no-store');
+      res.setHeader('X-Image-Source', 'error-placeholder');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      
+      res.send(placeholderImage);
+    } catch (placeholderError) {
+      res.status(500).json({ error: 'Failed to retrieve image and generate placeholder' });
+    }
+  }
+});
+
+// HEAD handler for R2 image endpoint (for testing accessibility)
+app.head('/api/r2-image/:username/:imageKey', async (req, res) => {
+  const { username, imageKey } = req.params;
+  const platform = req.query.platform || 'instagram';
+  
+  try {
+    const r2Key = `ready_post/${platform}/${username}/${imageKey}`;
+    
+    console.log(`[${new Date().toISOString()}] [R2-IMAGE-HEAD] Checking image accessibility: ${r2Key}`);
+    
+    // Use our existing fetch mechanism to check if image exists
+    const localFallbackPath = path.join(process.cwd(), 'ready_post', platform, username, imageKey);
+    const { data, source } = await fetchImageWithFallbacks(r2Key, localFallbackPath, username, imageKey);
+    
+    // Set headers without body (HEAD request)
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Content-Length', data.length);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('ETag', `"${imageKey}-${Date.now()}"`);
+    res.setHeader('Last-Modified', new Date().toUTCString());
+    res.setHeader('X-Image-Source', source);
+    
+    // Enable CORS for cross-origin requests
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Access-Control-Expose-Headers', 'X-Image-Source, ETag, Last-Modified');
+    
+    res.status(200).end(); // HEAD response - no body
+    
+    console.log(`[${new Date().toISOString()}] [R2-IMAGE-HEAD] Image accessible: ${r2Key} (${data.length} bytes) from ${source}`);
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [R2-IMAGE-HEAD] Error checking image ${username}/${imageKey}:`, error);
+    
+    // Return 404 for HEAD request
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.status(404).end();
+  }
+});
+
+// OPTIONS handler for R2 image endpoint
+app.options('/api/r2-image/:username/:imageKey', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  res.status(204).end();
+});
+
+// Get posts for a user - essential for PostCooked module refresh
+app.get('/api/posts/:username', async (req, res) => {
+  const { username } = req.params;
+  const platform = req.query.platform || 'instagram';
+  const forceRefresh = req.query.forceRefresh === 'true';
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [API-POSTS] Fetching posts for ${username} on ${platform} (forceRefresh: ${forceRefresh})`);
+    
+    // Clear cache if force refresh is requested
+    if (forceRefresh) {
+      const cacheKey = `ready_post/${platform}/${username}/`;
+      console.log(`[${new Date().toISOString()}] [API-POSTS] Clearing cache for: ${cacheKey}`);
+      // Clear memory cache
+      for (const key of imageCache.keys()) {
+        if (key.startsWith(cacheKey)) {
+          imageCache.delete(key);
+        }
+      }
+    }
+    
+    // List all JSON files for this user/platform
+    const prefix = `ready_post/${platform}/${username}/`;
+    const client = getS3Client();
+    
+    const listParams = {
+      Bucket: 'tasks',
+      Prefix: prefix,
+      MaxKeys: 1000
+    };
+    
+    const listResult = await client.listObjectsV2(listParams).promise();
+    
+    if (!listResult.Contents || listResult.Contents.length === 0) {
+      console.log(`[${new Date().toISOString()}] [API-POSTS] No posts found for ${username} on ${platform}`);
+      return res.json([]);
+    }
+    
+    // Filter for JSON files (posts) and fetch their data
+    const jsonFiles = listResult.Contents
+      .filter(obj => obj.Key.endsWith('.json'))
+      .sort((a, b) => new Date(b.LastModified).getTime() - new Date(a.LastModified).getTime()); // Sort by newest first
+    
+    console.log(`[${new Date().toISOString()}] [API-POSTS] Found ${jsonFiles.length} posts for ${username}`);
+    
+    const posts = [];
+    
+    for (const file of jsonFiles) {
+      try {
+        // Get the post data
+        const getParams = {
+          Bucket: 'tasks',
+          Key: file.Key
+        };
+        
+        const postResponse = await client.getObject(getParams).promise();
+        let postData;
+        
+        if (postResponse.Body) {
+          const bodyString = postResponse.Body.toString('utf-8');
+          if (bodyString.trim()) {
+            postData = JSON.parse(bodyString);
+          } else {
+            console.warn(`[${new Date().toISOString()}] [API-POSTS] Empty post data for ${file.Key}`);
+            continue;
+          }
+        } else {
+          console.warn(`[${new Date().toISOString()}] [API-POSTS] No body for ${file.Key}`);
+          continue;
+        }
+        
+        // Determine image URL
+        let imageUrl = null;
+        let r2ImageUrl = null;
+        
+        // Extract image key from post data or file key
+        let imageKey = null;
+        if (file.Key.includes('ready_post_') && file.Key.endsWith('.json')) {
+          const match = file.Key.match(/ready_post_(\d+)\.json$/);
+          if (match) {
+            imageKey = `image_${match[1]}.jpg`;
+          }
+        }
+        
+        if (imageKey) {
+          // Use our fix-image endpoint for reliable image serving
+          imageUrl = `http://localhost:3002/fix-image/${username}/${imageKey}?platform=${platform}`;
+          r2ImageUrl = `http://localhost:3002/api/r2-image/${username}/${imageKey}?platform=${platform}`;
+        }
+        
+        // Create post entry
+        const postEntry = {
+          key: file.Key,
+          data: {
+            post: postData,
+            status: postData.status || 'pending',
+            image_url: imageUrl,
+            r2_image_url: r2ImageUrl
+          }
+        };
+        
+        posts.push(postEntry);
+        
+      } catch (postError) {
+        console.error(`[${new Date().toISOString()}] [API-POSTS] Error processing post ${file.Key}:`, postError.message);
+        // Continue with other posts even if one fails
+      }
+    }
+    
+    console.log(`[${new Date().toISOString()}] [API-POSTS] Successfully fetched ${posts.length} posts for ${username}`);
+    res.json(posts);
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [API-POSTS] Error fetching posts for ${username}:`, error);
+    res.status(500).json({ 
+      error: 'Failed to fetch posts', 
+      details: error.message 
+    });
+  }
+});
+
+// Configure multer for memory storage
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit
+});
+
+// Add save edited post endpoint for Canvas Editor
+app.post('/api/save-edited-post/:username', upload.single('image'), async (req, res) => {
+  const { username } = req.params;
+  
+  console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Received request for user: ${username}`);
+  console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Content-Type: ${req.get('Content-Type')}`);
+  console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] File:`, req.file ? `${req.file.size} bytes` : 'No file');
+  console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Body:`, req.body);
+  
+  try {
+    const imageData = req.file ? req.file.buffer : null;
+    const postKey = req.body.postKey;
+    const caption = req.body.caption;
+    const platform = req.body.platform || 'instagram';
+    
+    if (!imageData || !postKey) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required data: image or postKey'
+      });
+    }
+    
+    console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Processing save for postKey: ${postKey}`);
+    
+    // Extract image key from post key
+    // Expected format: ready_post/instagram/username/ready_post_1749203937329.json
+    let imageKey = null;
+    if (postKey.includes('ready_post_') && postKey.endsWith('.json')) {
+      const match = postKey.match(/ready_post_(\d+)\.json$/);
+      if (match) {
+        imageKey = `image_${match[1]}.jpg`;
+      }
+    }
+    
+    if (!imageKey) {
+      return res.status(400).json({
+        success: false,
+        error: 'Could not extract image key from post key'
+      });
+    }
+    
+    console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Extracted imageKey: ${imageKey}`);
+    
+    // Save the edited image to R2 with the EXACT same name and location
+    const imageR2Key = `ready_post/${platform}/${username}/${imageKey}`;
+    const client = getS3Client();
+    
+    console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Saving edited image to R2: ${imageR2Key}`);
+    
+    const putImageParams = {
+      Bucket: 'tasks',
+      Key: imageR2Key,
+      Body: imageData,
+      ContentType: 'image/jpeg',
+      CacheControl: 'no-cache' // Force refresh
+    };
+    
+    await client.putObject(putImageParams).promise();
+    console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Successfully saved edited image to R2: ${imageR2Key}`);
+    
+    // Also save a local copy to the exact same location for caching
+    const localImagePath = path.join(process.cwd(), 'ready_post', platform, username, imageKey);
+    const localDir = path.dirname(localImagePath);
+    
+    // Ensure directory exists
+    if (!fs.existsSync(localDir)) {
+      fs.mkdirSync(localDir, { recursive: true });
+    }
+    
+    fs.writeFileSync(localImagePath, imageData);
+    console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Successfully saved edited image locally: ${localImagePath}`);
+    
+    // Update the post JSON data if caption was changed
+    if (caption !== null && caption !== undefined) {
+      try {
+        console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Updating post caption in: ${postKey}`);
+        
+        // Get the existing post data
+        const getPostParams = {
+          Bucket: 'tasks',
+          Key: postKey
+        };
+        
+        const postResponse = await client.getObject(getPostParams).promise();
+        let postData = JSON.parse(postResponse.Body.toString('utf-8'));
+        
+        // Update the caption in the post data
+        if (postData.post && postData.post.caption !== undefined) {
+          postData.post.caption = caption;
+        }
+        if (postData.caption !== undefined) {
+          postData.caption = caption;
+        }
+        
+        // Add update timestamp
+        postData.updated_at = new Date().toISOString();
+        postData.last_edited = new Date().toISOString();
+        
+        // Save updated post data back to R2
+        const putPostParams = {
+          Bucket: 'tasks',
+          Key: postKey,
+          Body: JSON.stringify(postData, null, 2),
+          ContentType: 'application/json',
+          CacheControl: 'no-cache'
+        };
+        
+        await client.putObject(putPostParams).promise();
+        console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Successfully updated post data: ${postKey}`);
+        
+      } catch (postUpdateError) {
+        console.error(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Error updating post data:`, postUpdateError);
+        // Continue even if post update fails - the image was saved
+      }
+    }
+    
+    // Clear ALL caches for this user/platform to force refresh
+    const cacheKey = `ready_post/${platform}/${username}/`;
+    console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Clearing all caches for: ${cacheKey}`);
+    
+    // Clear memory cache
+    for (const key of imageCache.keys()) {
+      if (key.startsWith(cacheKey)) {
+        imageCache.delete(key);
+        console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Cleared memory cache key: ${key}`);
+      }
+    }
+    
+         // Clear local cache files
+     try {
+       const cacheFiles = fs.readdirSync(localCacheDir).filter(file => 
+         file.startsWith(`${username}_${platform}_`)
+       );
+       for (const file of cacheFiles) {
+         const fullPath = path.join(localCacheDir, file);
+         fs.unlinkSync(fullPath);
+         console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Cleared local cache file: ${fullPath}`);
+       }
+     } catch (cacheError) {
+       console.warn(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Error clearing local cache:`, cacheError.message);
+     }
+    
+    console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Successfully saved edited post for ${username}/${imageKey}`);
+    
+    res.json({ 
+      success: true, 
+      message: 'Post edit saved successfully',
+      imageKey: imageKey,
+      postKey: postKey,
+      r2Key: imageR2Key,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Error saving edited post:`, error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to save edited post',
+      details: error.message 
+    });
+  }
+});
 
 // Self-healing mechanism to detect and recover from unresponsive states
 // Track request processing health

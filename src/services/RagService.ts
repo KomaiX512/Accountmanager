@@ -108,7 +108,7 @@ class RagService {
   ];
   
   private static readonly PROXY_SERVER_URLS = [
-    'http://127.0.0.1:3002',
+    'http://127.0.0.1:3000',
     'http://localhost:3000'
   ];
   
@@ -118,7 +118,7 @@ class RagService {
   private static async tryServerUrls<T>(
     endpoint: string, 
     requestFn: (url: string) => Promise<T>,
-    serverUrlList: string[] = this.PROXY_SERVER_URLS
+    serverUrlList: string[] = this.MAIN_SERVER_URLS
   ): Promise<T> {
     // Try each URL in order until one works
     let lastError: any = null;
@@ -150,7 +150,7 @@ class RagService {
     try {
       console.log(`[RagService] Sending discussion query for ${username}: "${query}"`);
       
-      return await this.tryServerUrls(`/rag-discussion/${username}`, (url) => 
+      return await this.tryServerUrls(`/api/rag-discussion/${username}`, (url) => 
         axios.post(url, {
           query,
           previousMessages
@@ -181,7 +181,7 @@ class RagService {
       // Update UI with initial status
       console.log(`[RagService] Step 1/4: Initiating request to RAG server`);
       
-      const response = await this.tryServerUrls(`/rag-post/${username}`, (url) => 
+      const response = await this.tryServerUrls(`/api/rag-post/${username}`, (url) => 
         axios.post(url, {
           query
         }, {
@@ -257,7 +257,7 @@ class RagService {
    */
   static async loadConversations(username: string): Promise<ChatMessage[]> {
     try {
-      const response = await this.tryServerUrls(`/rag-conversations/${username}`, (url) => 
+      const response = await this.tryServerUrls(`/api/rag-conversations/${username}`, (url) => 
         axios.get(url, {
           timeout: 10000, // 10 second timeout
           withCredentials: false, // Disable sending cookies
@@ -275,7 +275,7 @@ class RagService {
    */
   static async saveConversation(username: string, messages: ChatMessage[]): Promise<void> {
     try {
-      await this.tryServerUrls(`/rag-conversations/${username}`, (url) => 
+      await this.tryServerUrls(`/api/rag-conversations/${username}`, (url) => 
         axios.post(url, {
           messages
         }, {
@@ -333,11 +333,11 @@ class RagService {
 
     for (const baseUrl of urls) {
       try {
-        console.log(`[RagService] Trying to send instant AI reply via ${baseUrl}/rag-instant-reply/${username}`);
+        console.log(`[RagService] Trying to send instant AI reply via ${baseUrl}/api/rag-instant-reply/${username}`);
         
         // Add validation headers to ensure the request is properly handled
         const response = await axios.post(
-          `${baseUrl}/rag-instant-reply/${username}`,
+          `${baseUrl}/api/rag-instant-reply/${username}`,
           notification,
           {
             headers: {

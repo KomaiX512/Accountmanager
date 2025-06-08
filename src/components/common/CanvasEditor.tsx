@@ -31,6 +31,15 @@ interface BrandElement {
   opacity: number;
 }
 
+interface ImageItem {
+  id: string;
+  url: string;
+  file?: File;
+  isProcessed: boolean;
+  originalDimensions?: { width: number; height: number };
+  processedUrl?: string;
+}
+
 const CanvasEditor: React.FC<CanvasEditorProps> = ({ 
   onClose, 
   username, 
@@ -74,6 +83,12 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
   const brandCanvasRef = useRef<HTMLCanvasElement>(null);
   const [brandKitSaved, setBrandKitSaved] = useState(false);
 
+  // Multi-image support states
+  const [images, setImages] = useState<ImageItem[]>([]);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [maxImages] = useState(10); // Maximum 10 images as requested
+  const [isAutoSquareCrop, setIsAutoSquareCrop] = useState(true); // Auto-crop to square by default
+
   // Color palette for quick selection
   const colorPalette = [
     '#ffffff', '#000000', '#ff0000', '#00ff00', '#0000ff', 
@@ -88,6 +103,172 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
       clearTimeout(timeout);
       timeout = setTimeout(() => func(...args), wait);
     };
+  };
+
+  // Auto-crop image to square format
+  const cropToSquare = async (imageUrl: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      
+      img.onload = () => {
+        const size = Math.min(img.width, img.height);
+        canvas.width = size;
+        canvas.height = size;
+        
+        if (ctx) {
+          // Calculate crop position to center the image
+          const sx = (img.width - size) / 2;
+          const sy = (img.height - size) / 2;
+          
+          // Draw the cropped square image
+          ctx.drawImage(img, sx, sy, size, size, 0, 0, size, size);
+        }
+        
+        resolve(canvas.toDataURL('image/jpeg', 0.9));
+      };
+      
+      img.src = imageUrl;
+    });
+  };
+
+  // Process multiple image files
+  const processImageFiles = async (files: FileList) => {
+    const fileArray = Array.from(files);
+    const remainingSlots = maxImages - images.length;
+    
+    if (fileArray.length > remainingSlots) {
+      setNotification(`Can only add ${remainingSlots} more images (maximum ${maxImages} total)`);
+      setTimeout(() => setNotification(null), 3000);
+      return;
+    }
+
+    setIsProcessing(true);
+    const newImages: ImageItem[] = [];
+
+    for (const file of fileArray) {
+      if (!file.type.startsWith('image/')) {
+        continue;
+      }
+
+      try {
+        // Read file as data URL
+        const reader = new FileReader();
+        const imageUrl = await new Promise<string>((resolve) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        });
+
+        // Get original dimensions
+        const img = new Image();
+        const dimensions = await new Promise<{ width: number; height: number }>((resolve) => {
+          img.onload = () => resolve({ width: img.width, height: img.height });
+          img.src = imageUrl;
+        });
+
+        // Auto-crop to square if enabled
+        let processedUrl = imageUrl;
+        if (isAutoSquareCrop && dimensions.width !== dimensions.height) {
+          processedUrl = await cropToSquare(imageUrl);
+        }
+
+        const newImage: ImageItem = {
+          id: `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          url: imageUrl,
+          file,
+          isProcessed: isAutoSquareCrop && dimensions.width !== dimensions.height,
+          originalDimensions: dimensions,
+          processedUrl: processedUrl
+        };
+
+        newImages.push(newImage);
+      } catch (error) {
+        console.error('Error processing image file:', error);
+        setNotification(`Failed to process ${file.name}`);
+      }
+    }
+
+    setImages(prev => [...prev, ...newImages]);
+    setIsProcessing(false);
+
+          // Load the first new image if no image is currently loaded
+      if (!imageLoaded && newImages.length > 0) {
+        const indexToLoad = images.length; // Index of the first new image
+        setCurrentImageIndex(indexToLoad);
+        await loadImageIntoEditor(newImages[0].processedUrl || newImages[0].url);
+      }
+  };
+
+  // Load specific image into the TUI editor
+  const loadImageIntoEditor = async (imageUrl: string) => {
+    if (!tuiInstanceRef.current) {
+      console.warn('[Canvas] Editor not ready');
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      await tuiInstanceRef.current.loadImageFromURL(imageUrl, 'user-upload');
+      setImageLoaded(true);
+      console.log('[Canvas] Image loaded into editor successfully');
+    } catch (error) {
+      console.error('[Canvas] Error loading image into editor:', error);
+      setNotification('Failed to load image into editor');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Switch to a different image
+  const switchToImage = async (index: number) => {
+    if (index < 0 || index >= images.length) return;
+    
+    setCurrentImageIndex(index);
+    const image = images[index];
+    await loadImageIntoEditor(image.processedUrl || image.url);
+  };
+
+  // Remove an image from the collection
+  const removeImage = (index: number) => {
+    if (images.length <= 1) {
+      setNotification('Cannot remove the last image');
+      return;
+    }
+
+    const newImages = images.filter((_, i) => i !== index);
+    setImages(newImages);
+
+    // Adjust current index if necessary
+    if (index === currentImageIndex) {
+      const newIndex = Math.min(currentImageIndex, newImages.length - 1);
+      setCurrentImageIndex(newIndex);
+      if (newImages[newIndex]) {
+        loadImageIntoEditor(newImages[newIndex].processedUrl || newImages[newIndex].url);
+      }
+    } else if (index < currentImageIndex) {
+      setCurrentImageIndex(prev => prev - 1);
+    }
+  };
+
+  // Save the current editor state back to the current image
+  const saveCurrentImageState = () => {
+    if (!tuiInstanceRef.current || currentImageIndex < 0 || currentImageIndex >= images.length) {
+      return;
+    }
+
+    try {
+      const editedImageUrl = tuiInstanceRef.current.toDataURL();
+      const updatedImages = [...images];
+      updatedImages[currentImageIndex] = {
+        ...updatedImages[currentImageIndex],
+        processedUrl: editedImageUrl,
+        isProcessed: true
+      };
+      setImages(updatedImages);
+    } catch (error) {
+      console.error('[Canvas] Error saving current image state:', error);
+    }
   };
 
   // Initialize the editor
@@ -203,7 +384,17 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
       if (initialImageUrl && isEditorReady && !initialLoadAttemptedRef.current) {
         initialLoadAttemptedRef.current = true;
         console.log('[Canvas] Loading initial image...');
-        await loadImageFromUrl(initialImageUrl);
+        
+        // Create initial image item
+        const initialImage: ImageItem = {
+          id: 'initial_image',
+          url: initialImageUrl,
+          isProcessed: false
+        };
+        
+        setImages([initialImage]);
+        setCurrentImageIndex(0);
+        await loadImageIntoEditor(initialImageUrl);
       }
     };
 
@@ -983,44 +1174,61 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
     }
   };
 
+  // Enhanced file upload handler for multiple images
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !isEditorReady || isProcessing) return;
+    const files = e.target.files;
+    if (!files || files.length === 0 || !isEditorReady) return;
 
-    setIsProcessing(true);
-    setImageLoaded(false);
-    
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const imageUrl = event.target?.result as string;
-      if (tuiInstanceRef.current) {
-        // Use setTimeout to avoid state lock issues
-        setTimeout(async () => {
-          try {
-            await tuiInstanceRef.current.loadImageFromURL(imageUrl, 'user-upload');
-            console.log('[Canvas] Image loaded successfully from file upload');
-            setImageLoaded(true);
-            
-            // Always enable Brand Kit after image is loaded (regardless of source)
-            setIsEditorReady(true);
-            
-            setIsProcessing(false);
-          } catch (err) {
-            console.error('[Canvas] Error loading image from file upload:', err);
-            setNotification('Failed to load image. Please try again.');
-            setIsProcessing(false);
-          }
-        }, 100);
+    processImageFiles(files);
+  };
+
+  // Save edited post back to the Cook-Post module
+  const saveEditedPost = async () => {
+    if (!tuiInstanceRef.current || !postKey) {
+      setNotification('Cannot save: missing editor or post key');
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      
+      // Get the edited image as blob
+      const editedImageDataUrl = tuiInstanceRef.current.toDataURL();
+      const editedImageBlob = await fetch(editedImageDataUrl).then(r => r.blob());
+      
+      // Create form data to send to server
+      const formData = new FormData();
+      formData.append('image', editedImageBlob, `edited_${postKey}.jpg`);
+      formData.append('postKey', postKey);
+      formData.append('caption', caption || postCaption || '');
+      formData.append('platform', detectedPlatform);
+      
+      // Send to server to update the post
+      const response = await fetch(`http://localhost:3002/api/save-edited-post/${username}`, {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to save edited post');
       }
-    };
-    
-    reader.onerror = () => {
-      console.error('[Canvas] Error reading file');
-      setNotification('Failed to read image file. Please try again with a different image.');
+      
+      const result = await response.json();
+      setNotification('Post saved successfully!');
+      
+      setTimeout(() => {
+        onClose(); // Close the editor
+        // Trigger a refresh of the posts in the parent component
+        window.dispatchEvent(new CustomEvent('postUpdated', { detail: { postKey, platform: detectedPlatform } }));
+      }, 1500);
+      
+    } catch (error) {
+      console.error('[Canvas] Error saving edited post:', error);
+      setNotification('Failed to save edited post. Please try again.');
+    } finally {
       setIsProcessing(false);
-    };
-    
-    reader.readAsDataURL(file);
+    }
   };
 
   // Handle brand canvas keyboard events
@@ -1058,7 +1266,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
           <h2>{detectedPlatform === 'twitter' ? 'Tweet Editor' : 'Image Editor'}</h2>
           <div className="canvas-upload-container">
             <label htmlFor="image-upload" className={`upload-button ${isProcessing ? 'disabled' : ''}`}>
-              Upload Image
+              {images.length > 0 ? 'Add More Images' : 'Upload Images'}
             </label>
             <input
               id="image-upload"
@@ -1067,7 +1275,25 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
               onChange={handleFileUpload}
               className="hidden-input"
               disabled={isProcessing || !isEditorReady}
+              multiple // Enable multiple file selection
             />
+            
+            {/* Auto Square Crop Toggle */}
+            <label className="auto-crop-toggle">
+              <input
+                type="checkbox"
+                checked={isAutoSquareCrop}
+                onChange={(e) => setIsAutoSquareCrop(e.target.checked)}
+              />
+              Auto Square Crop
+            </label>
+
+            {/* Image Counter */}
+            {images.length > 0 && (
+              <span className="image-counter">
+                {images.length}/{maxImages} images
+              </span>
+            )}
             
             {/* Brand Kit Button with Tooltip */}
             <button 
@@ -1080,6 +1306,56 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
           </div>
           <button className="close-button" onClick={onClose}>×</button>
         </div>
+
+        {/* Multi-Image Preview Panel */}
+        {images.length > 1 && !brandKitMode && (
+          <div className="multi-image-panel">
+            <div className="image-preview-header">
+              <h3>Images ({images.length})</h3>
+              <button 
+                className="save-current-button"
+                onClick={saveCurrentImageState}
+                disabled={isProcessing}
+              >
+                Save Current Edits
+              </button>
+            </div>
+            <div className="image-preview-grid">
+              {images.map((image, index) => (
+                <div 
+                  key={image.id} 
+                  className={`image-preview-item ${index === currentImageIndex ? 'active' : ''}`}
+                  onClick={() => switchToImage(index)}
+                >
+                  <img 
+                    src={image.processedUrl || image.url} 
+                    alt={`Image ${index + 1}`}
+                    className="preview-thumbnail"
+                  />
+                  <div className="preview-overlay">
+                    <span className="preview-index">{index + 1}</span>
+                    {image.isProcessed && (
+                      <span className="processed-indicator" title="Auto-cropped to square">■</span>
+                    )}
+                    <button 
+                      className="remove-image-button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeImage(index);
+                      }}
+                      disabled={images.length <= 1}
+                    >
+                      ×
+                    </button>
+                  </div>
+                  {index === currentImageIndex && (
+                    <div className="current-indicator">Editing</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         
         {/* Brand Kit Canvas (only shown in brand kit mode) */}
         {brandKitMode && (
@@ -1261,6 +1537,29 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
         
         <div className="canvas-editor-footer">
           <button className="cancel-button" onClick={onClose}>Cancel</button>
+          
+          {/* Save button for edited posts */}
+          {postKey && (
+            <button 
+              className="save-edit-button" 
+              onClick={saveEditedPost}
+              disabled={!imageLoaded || isProcessing}
+              style={{ 
+                backgroundColor: '#28a745',
+                color: '#ffffff',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '4px',
+                fontWeight: 'bold',
+                cursor: imageLoaded && !isProcessing ? 'pointer' : 'not-allowed',
+                opacity: imageLoaded && !isProcessing ? 1 : 0.5,
+                marginRight: '8px'
+              }}
+            >
+              {isProcessing ? 'Saving...' : 'Save Changes'}
+            </button>
+          )}
+
           {brandKitMode ? (
             <button 
               className="exit-brand-kit-button"

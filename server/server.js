@@ -6180,3 +6180,420 @@ app.get('/profit-analysis/:username', async (req, res) => {
 
 // ... existing code ...
 
+// Generate a fresh signed URL for a ready_post image
+app.get('/api/signed-image-url/:username/:imageKey', async (req, res) => {
+  const { username, imageKey } = req.params;
+  try {
+    const key = `ready_post/${username}/${imageKey}`;
+    const command = new GetObjectCommand({
+      Bucket: 'tasks',
+      Key: key,
+    });
+    const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+    res.json({ url: signedUrl });
+  } catch (error) {
+    console.error(`[signed-image-url] Failed to generate signed URL for`, req.params, error?.message);
+    res.status(500).json({ error: 'Failed to generate signed URL' });
+  }
+});
+
+// Add OPTIONS handler for signed-image-url endpoint
+app.options('/api/signed-image-url/:username/:imageKey', (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+
+// ... existing code ...
+
+// Add the API endpoint for update-post-status
+app.post('/api/update-post-status/:username', async (req, res) => {
+  const { username } = req.params;
+  const { postKey, status, like, dislike, userComment } = req.body;
+
+  if (!username || !postKey) {
+    return res.status(400).json({ error: 'Username and postKey are required' });
+  }
+
+  // Validate status if provided
+  const allowedStatuses = ['pending', 'scheduled', 'posted', 'rejected', 'failed'];
+  if (status && !allowedStatuses.includes(status)) {
+    return res.status(400).json({ error: `Invalid status. Allowed statuses: ${allowedStatuses.join(', ')}` });
+  }
+
+  try {
+    // Fetch the existing post data
+    const getCommand = new GetObjectCommand({
+      Bucket: 'tasks',
+      Key: postKey,
+    });
+
+    let postData;
+    try {
+        const response = await s3Client.send(getCommand);
+        const body = await streamToString(response.Body);
+         if (!body || body.trim() === '') {
+            console.warn(`[${new Date().toISOString()}] Empty file detected at ${postKey}`);
+             return res.status(404).json({ error: 'Post data is empty' });
+         }
+        postData = JSON.parse(body);
+        console.log(`[${new Date().toISOString()}] Fetched existing post data for ${postKey}`);
+    } catch (error) {
+         if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+            console.log(`[${new Date().toISOString()}] Post not found at ${postKey}`);
+            return res.status(404).json({ error: 'Post not found' });
+         }
+         throw error; // Re-throw other errors
+    }
+
+    // Update the status if provided
+    if (status) {
+      postData.status = status;
+    }
+    
+    // Update feedback if provided
+    if (like !== undefined || dislike !== undefined || userComment) {
+      postData.feedback = postData.feedback || {};
+      
+      if (like !== undefined) {
+        postData.feedback.likes = (postData.feedback.likes || 0) + like;
+      }
+      
+      if (dislike !== undefined) {
+        postData.feedback.dislikes = (postData.feedback.dislikes || 0) + dislike;
+      }
+      
+      if (userComment) {
+        postData.feedback.comments = postData.feedback.comments || [];
+        postData.feedback.comments.push({
+          text: userComment,
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+    
+    postData.updated_at = new Date().toISOString(); // Add an updated timestamp
+
+    // Save the updated data back to R2
+    const putCommand = new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: postKey,
+      Body: JSON.stringify(postData, null, 2),
+      ContentType: 'application/json',
+    });
+    await s3Client.send(putCommand);
+
+    // Invalidate cache for this user's ready_post directory
+    // Extract platform from postKey if possible, otherwise clear both
+    let platform = 'instagram'; // default
+    const platformMatch = postKey.match(/ready_post\/([^\/]+)\/[^\/]+\//);
+    if (platformMatch) {
+      platform = platformMatch[1];
+    }
+    const prefix = `ready_post/${platform}/${username}/`;
+    cache.delete(prefix);
+
+    console.log(`[${new Date().toISOString()}] Successfully updated post ${postKey} ${status ? `to ${status}` : 'with feedback'}`);
+    res.json({ success: true, message: 'Post updated successfully', newStatus: status });
+
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error updating post for ${postKey}:`, error);
+    res.status(500).json({ error: 'Failed to update post', details: error.message });
+  }
+});
+
+// Add OPTIONS handler for the new API endpoint
+app.options('/api/update-post-status/:username', (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+
+// Proxy image requests to avoid CORS issues
+app.get('/api/proxy-image', async (req, res) => {
+  const { url } = req.query;
+  if (!url) {
+    return res.status(400).json({ error: 'URL parameter is required' });
+  }
+
+  try {
+    console.log(`[Proxy] Proxying image from: ${url}`);
+    const imageResponse = await axios.get(url, {
+      responseType: 'arraybuffer',
+      timeout: 10000
+    });
+    
+    // Set appropriate content type and other headers
+    const contentType = imageResponse.headers['content-type'] || 'image/jpeg';
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+    
+    // Send the image data
+    res.send(Buffer.from(imageResponse.data));
+  } catch (error) {
+    console.error(`[Proxy] Failed to proxy image: ${error.message}`);
+    res.status(500).json({ error: 'Failed to proxy image' });
+  }
+});
+
+// Add OPTIONS handler for proxy-image endpoint
+app.options('/api/proxy-image', (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+
+// Robust R2 Image Renderer - handles JPG images seamlessly from Cloudflare R2
+app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
+  const { username, imageKey } = req.params;
+  const platform = req.query.platform || 'instagram';
+  
+  try {
+    // Construct the R2 key path
+    const r2Key = `ready_post/${platform}/${username}/${imageKey}`;
+    
+    console.log(`[R2-IMAGE] Fetching image: ${r2Key}`);
+    
+    // Get the object from R2
+    const getCommand = new GetObjectCommand({
+      Bucket: 'tasks',
+      Key: r2Key,
+    });
+    
+    const response = await s3Client.send(getCommand);
+    
+    if (!response.Body) {
+      return res.status(404).json({ error: 'Image not found' });
+    }
+    
+    // Convert stream to buffer
+    const imageBuffer = await streamToBuffer(response.Body);
+    
+    // Set appropriate headers for JPG images
+    res.setHeader('Content-Type', response.ContentType || 'image/jpeg');
+    res.setHeader('Content-Length', imageBuffer.length);
+    res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+    res.setHeader('ETag', response.ETag || `"${imageKey}-${Date.now()}"`);
+    res.setHeader('Last-Modified', response.LastModified?.toUTCString() || new Date().toUTCString());
+    
+    // Enable CORS for cross-origin requests
+    setCorsHeaders(res);
+    
+    // Send the image buffer directly
+    res.send(imageBuffer);
+    
+    console.log(`[R2-IMAGE] Successfully served: ${r2Key} (${imageBuffer.length} bytes)`);
+    
+  } catch (error) {
+    console.error(`[R2-IMAGE] Error serving image ${username}/${imageKey}:`, error);
+    
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+      return res.status(404).json({ error: 'Image not found in R2 storage' });
+    }
+    
+    res.status(500).json({ error: 'Failed to retrieve image from R2 storage' });
+  }
+});
+
+// Enhanced signed URL generator with R2 optimization
+app.get('/api/signed-image-url/:username/:imageKey', async (req, res) => {
+  const { username, imageKey } = req.params;
+  const platform = req.query.platform || 'instagram';
+  
+  try {
+    const key = `ready_post/${platform}/${username}/${imageKey}`;
+    
+    // First, check if the object exists
+    try {
+      const headCommand = new HeadObjectCommand({
+        Bucket: 'tasks',
+        Key: key,
+      });
+      await s3Client.send(headCommand);
+    } catch (headError) {
+      if (headError.name === 'NotFound' || headError.$metadata?.httpStatusCode === 404) {
+        return res.status(404).json({ error: 'Image not found' });
+      }
+      throw headError;
+    }
+    
+    // Generate signed URL with extended expiry for better UX
+    const command = new GetObjectCommand({
+      Bucket: 'tasks',
+      Key: key,
+    });
+    
+    const signedUrl = await getSignedUrl(s3Client, command, { 
+      expiresIn: 7200 // 2 hours for better user experience
+    });
+    
+    // Also provide our direct R2 endpoint as fallback
+    const directUrl = `${req.protocol}://${req.get('host')}/api/r2-image/${username}/${imageKey}?platform=${platform}`;
+    
+    res.json({ 
+      url: signedUrl,
+      directUrl: directUrl,
+      key: key
+    });
+    
+  } catch (error) {
+    console.error(`[signed-image-url] Failed to generate signed URL for`, req.params, error?.message);
+    res.status(500).json({ error: 'Failed to generate signed URL' });
+  }
+});
+
+// OPTIONS handler for R2 image endpoint
+app.options('/api/r2-image/:username/:imageKey', (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+
+// HEAD handler for R2 image endpoint (for testing accessibility)
+app.head('/api/r2-image/:username/:imageKey', async (req, res) => {
+  const { username, imageKey } = req.params;
+  const platform = req.query.platform || 'instagram';
+  
+  try {
+    const r2Key = `ready_post/${platform}/${username}/${imageKey}`;
+    
+    // Check if the object exists
+    const headCommand = new HeadObjectCommand({
+      Bucket: 'tasks',
+      Key: r2Key,
+    });
+    
+    const response = await s3Client.send(headCommand);
+    
+    // Set headers without body
+    res.setHeader('Content-Type', response.ContentType || 'image/jpeg');
+    res.setHeader('Content-Length', response.ContentLength || 0);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('ETag', response.ETag || `"${imageKey}-${Date.now()}"`);
+    res.setHeader('Last-Modified', response.LastModified?.toUTCString() || new Date().toUTCString());
+    
+    setCorsHeaders(res);
+    res.status(200).end();
+    
+  } catch (error) {
+    console.error(`[R2-IMAGE-HEAD] Error checking image ${username}/${imageKey}:`, error);
+    
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+      res.status(404).end();
+    } else {
+      res.status(500).end();
+    }
+  }
+});
+
+// Save edited post from Canvas Editor
+app.post('/api/save-edited-post/:username', upload.single('image'), async (req, res) => {
+  const { username } = req.params;
+  const { postKey, caption, platform } = req.body;
+  const imageFile = req.file;
+
+  if (!username || !postKey || !imageFile) {
+    return res.status(400).json({ error: 'Missing required fields: username, postKey, or image' });
+  }
+
+  try {
+    console.log(`[SAVE-EDITED-POST] Processing edited post ${postKey} for ${username} on ${platform}`);
+
+    // Extract image key from postKey for R2 storage
+    let imageKey = '';
+    if (postKey.match(/ready_post_\d+\.json$/)) {
+      const postIdMatch = postKey.match(/ready_post_(\d+)\.json$/);
+      if (postIdMatch) imageKey = `image_${postIdMatch[1]}.jpg`;
+    }
+
+    if (!imageKey) {
+      return res.status(400).json({ error: 'Could not determine image key from postKey' });
+    }
+
+    // Upload the edited image to R2 storage
+    const platformPath = platform || 'instagram';
+    const r2Key = `ready_post/${platformPath}/${username}/${imageKey}`;
+    
+    const uploadCommand = new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: r2Key,
+      Body: imageFile.buffer,
+      ContentType: 'image/jpeg',
+      CacheControl: 'max-age=31536000', // Cache for 1 year
+      Metadata: {
+        'edited-timestamp': Date.now().toString(),
+        'original-post-key': postKey,
+        'platform': platformPath
+      }
+    });
+
+    await s3Client.send(uploadCommand);
+    console.log(`[SAVE-EDITED-POST] Uploaded edited image to R2: ${r2Key}`);
+
+    // Update the post metadata with new caption if provided
+    if (caption && caption.trim()) {
+      try {
+        // First, try to get the existing post data
+        const getPostCommand = new GetObjectCommand({
+          Bucket: 'tasks',
+          Key: postKey,
+        });
+
+        const postResponse = await s3Client.send(getPostCommand);
+        const postData = JSON.parse(await streamToString(postResponse.Body));
+
+        // Update the caption
+        if (postData.post) {
+          postData.post.caption = caption.trim();
+          postData.lastModified = new Date().toISOString();
+          postData.editedInCanvas = true;
+
+          // Save the updated post data back to R2
+          const updatePostCommand = new PutObjectCommand({
+            Bucket: 'tasks',
+            Key: postKey,
+            Body: JSON.stringify(postData, null, 2),
+            ContentType: 'application/json',
+            Metadata: {
+              'last-modified': Date.now().toString(),
+              'edited-in-canvas': 'true'
+            }
+          });
+
+          await s3Client.send(updatePostCommand);
+          console.log(`[SAVE-EDITED-POST] Updated post metadata: ${postKey}`);
+        }
+      } catch (postUpdateError) {
+        console.warn(`[SAVE-EDITED-POST] Could not update post metadata for ${postKey}:`, postUpdateError.message);
+        // Continue anyway, as the image was successfully updated
+      }
+    }
+
+    // Generate new signed URL for the updated image
+    const signedUrlCommand = new GetObjectCommand({
+      Bucket: 'tasks',
+      Key: r2Key,
+    });
+    
+    const newSignedUrl = await getSignedUrl(s3Client, signedUrlCommand, { expiresIn: 7200 });
+
+    res.json({
+      success: true,
+      message: 'Post updated successfully',
+      postKey: postKey,
+      imageKey: imageKey,
+      newImageUrl: newSignedUrl,
+      r2Key: r2Key
+    });
+
+  } catch (error) {
+    console.error(`[SAVE-EDITED-POST] Error saving edited post ${postKey}:`, error);
+    res.status(500).json({ 
+      error: 'Failed to save edited post',
+      details: error.message 
+    });
+  }
+});
+
+// OPTIONS handler for save-edited-post endpoint
+app.options('/api/save-edited-post/:username', (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+

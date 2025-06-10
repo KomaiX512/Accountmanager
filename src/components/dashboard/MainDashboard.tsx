@@ -327,40 +327,20 @@ const MainDashboard: React.FC = () => {
   };
 
   const navigateToPlatform = (platform: PlatformData) => {
-    // Get account type from localStorage if available
-    const accountType = currentUser?.uid ? 
-      localStorage.getItem(`${platform.id}_account_type_${currentUser.uid}`) || 'branding' : 
-      'branding';
-    
-    // Navigate to the correct dashboard based on platform ID and account type
+    // Navigate to setup pages exactly like top bar navigation
+    // This ensures the username from the entry card is used consistently
     switch(platform.id) {
       case 'instagram':
-        if (accountType === 'non-branding') {
-          navigate('/non-branding-dashboard');
-        } else {
-          navigate('/dashboard'); // Instagram branding dashboard
-        }
+        navigate('/instagram');
         break;
       case 'twitter':
-        if (accountType === 'non-branding') {
-          navigate('/twitter-non-branding-dashboard');
-        } else {
-          navigate('/twitter-dashboard'); // Twitter branding dashboard
-        }
+        navigate('/twitter');
         break;
       case 'facebook':
-        if (accountType === 'non-branding') {
-          navigate('/facebook-non-branding-dashboard');
-        } else {
-          navigate('/facebook-dashboard'); // Facebook dashboard
-        }
+        navigate('/facebook');
         break;
       case 'linkedin':
-        if (accountType === 'non-branding') {
-          navigate('/linkedin-non-branding-dashboard');
-        } else {
-          navigate('/linkedin-dashboard'); // LinkedIn dashboard
-        }
+        navigate('/linkedin');
         break;
       default:
         navigate(platform.route);

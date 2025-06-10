@@ -116,7 +116,9 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
           <div key={notif.message_id || notif.comment_id} className="notification-item">
             <div className="notification-header">
               <span className="notification-type">
-                {notif.type === 'message' ? 'DM' : 'Comment'} from {notif.username || 'Unknown'}
+                {notif.type === 'message' 
+                  ? (platform === 'twitter' ? 'Tweet' : platform === 'facebook' ? 'Message' : 'DM')
+                  : 'Comment'} from {notif.username || 'Unknown'}
               </span>
               <span className="notification-time">{formatTimestamp(notif.timestamp)}</span>
             </div>

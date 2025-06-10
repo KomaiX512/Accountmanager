@@ -489,6 +489,61 @@ h2 {
   border-color: #ff6b6b;
 }
 
+/* Facebook specific button styles */
+.dashboard-btn.facebook {
+  background: linear-gradient(135deg, #1877f2, #42a5f5);
+  border-color: #1877f2;
+  color: #fff;
+}
+
+.dashboard-btn.insights-btn.facebook {
+  background: linear-gradient(135deg, #1877f2, #4267b2);
+  border-color: #1877f2;
+}
+
+.dashboard-btn.schedule-btn.facebook {
+  background: linear-gradient(135deg, #4267b2, #1877f2);
+  border-color: #4267b2;
+}
+
+.dashboard-btn.goal-btn.facebook {
+  background: linear-gradient(135deg, #1877f2, #365899);
+  border-color: #1877f2;
+}
+
+.dashboard-btn.campaign-btn.facebook {
+  background: linear-gradient(135deg, #ff6b6b, #ff8e53);
+  border-color: #ff6b6b;
+}
+
+.dashboard-btn.compose-btn.facebook {
+  background: linear-gradient(135deg, #1877f2, #4267b2);
+  border-color: #1877f2;
+}
+
+.facebook-status {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(24, 119, 242, 0.1);
+  border: 1px solid rgba(24, 119, 242, 0.3);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.platform-indicator.facebook {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #1877f2;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.platform-indicator.facebook .btn-icon {
+  color: #1877f2;
+}
+
 .toast-notification {
   position: fixed;
   bottom: 20px;

@@ -5,6 +5,7 @@ import OurStrategies from '../instagram/OurStrategies';
 import PostCooked from '../instagram/PostCooked';
 import InstagramConnect from '../instagram/InstagramConnect';
 import TwitterConnect from '../twitter/TwitterConnect';
+import FacebookConnect from '../facebook/FacebookConnect';
 import TwitterCompose from '../twitter/TwitterCompose';
 import DmsComments from '../instagram/Dms_Comments';
 import PostScheduler from '../instagram/PostScheduler';
@@ -17,14 +18,16 @@ import axios, { AxiosError } from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import InstagramRequiredButton from '../common/InstagramRequiredButton';
 import TwitterRequiredButton from '../common/TwitterRequiredButton';
+import FacebookRequiredButton from '../common/FacebookRequiredButton';
 import { useInstagram } from '../../context/InstagramContext';
 import { useTwitter } from '../../context/TwitterContext';
+import { useFacebook } from '../../context/FacebookContext';
 import ChatModal from '../instagram/ChatModal';
 import RagService from '../../services/RagService';
 import type { ChatMessage as ChatModalMessage } from '../instagram/ChatModal';
 import { Notification, ProfileInfo, LinkedAccount } from '../../types/notifications';
 // Import icons from react-icons
-import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaTwitter, FaInstagram, FaPen } from 'react-icons/fa';
+import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaTwitter, FaInstagram, FaPen, FaFacebook } from 'react-icons/fa';
 import { MdAnalytics, MdOutlineSchedule, MdOutlineAutoGraph } from 'react-icons/md';
 import { BsLightningChargeFill, BsBinoculars, BsLightbulb } from 'react-icons/bs';
 import { IoMdAnalytics } from 'react-icons/io';
@@ -53,10 +56,15 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   // Platform-specific context hooks
   const { userId: igUserId, isConnected: isInstagramConnected, connectInstagram } = useInstagram();
   const { userId: twitterId, isConnected: isTwitterConnected, connectTwitter } = useTwitter();
+  const { userId: facebookId, isConnected: isFacebookConnected, connectFacebook } = useFacebook();
   
   // Determine current platform connection info
-  const userId = platform === 'twitter' ? twitterId : igUserId;
-  const isConnected = platform === 'twitter' ? isTwitterConnected : isInstagramConnected;
+  const userId = platform === 'twitter' ? twitterId : 
+               platform === 'facebook' ? facebookId : // Use Facebook context userId
+               igUserId;
+  const isConnected = platform === 'twitter' ? isTwitterConnected : 
+                     platform === 'facebook' ? isFacebookConnected : // Use Facebook context connection status
+                     isInstagramConnected;
   
   // Platform configuration
   const config = {
@@ -83,9 +91,9 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       primaryColor: '#1877f2',
       secondaryColor: '#42a5f5',
       baseUrl: 'https://facebook.com/',
-      supportsNotifications: false, // Hide notifications for Facebook
-      supportsScheduling: false, // Not implemented yet for Facebook
-      supportsInsights: false // Not implemented yet for Facebook
+      supportsNotifications: true, // Enable notifications for Facebook
+      supportsScheduling: true, // Enable scheduling for Facebook
+      supportsInsights: true // Enable insights for Facebook
     }
   }[platform];
 
@@ -143,10 +151,15 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const [isTwitterSchedulerOpen, setIsTwitterSchedulerOpen] = useState(false);
   const [isTwitterInsightsOpen, setIsTwitterInsightsOpen] = useState(false);
   const [isTwitterComposeOpen, setIsTwitterComposeOpen] = useState(false);
+  const [isFacebookSchedulerOpen, setIsFacebookSchedulerOpen] = useState(false);
+  const [isFacebookInsightsOpen, setIsFacebookInsightsOpen] = useState(false);
+  const [isFacebookComposeOpen, setIsFacebookComposeOpen] = useState(false);
 
   // Platform-specific notification handlers
   const handleReply = async (notification: any, replyText: string) => {
-    const currentUserId = platform === 'twitter' ? twitterId : igUserId;
+    const currentUserId = platform === 'twitter' ? twitterId : 
+                         platform === 'facebook' ? facebookId :
+                         igUserId;
     if (!currentUserId || !replyText.trim()) return;
 
     try {
@@ -167,7 +180,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           }
         ].slice(-20));
         setNotifications(prev => prev.filter(n => n.message_id !== notification.message_id));
-        setToast(`${platform === 'twitter' ? 'Tweet' : 'DM'} reply sent!`);
+        setToast(`${platform === 'twitter' ? 'Tweet' : platform === 'facebook' ? 'Facebook message' : 'DM'} reply sent!`);
       } else if (notification.type === 'comment' && notification.comment_id) {
         await axios.post(`http://localhost:3000/send-comment-reply/${currentUserId}`, {
           comment_id: notification.comment_id,
@@ -184,7 +197,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           }
         ].slice(-20));
         setNotifications(prev => prev.filter(n => n.comment_id !== notification.comment_id));
-        setToast(`${platform === 'twitter' ? 'Reply' : 'Comment reply'} sent!`);
+        setToast(`${platform === 'twitter' ? 'Reply' : platform === 'facebook' ? 'Facebook comment reply' : 'Comment reply'} sent!`);
       }
     } catch (error: any) {
       console.error('Error sending reply:', error);
@@ -194,7 +207,9 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   };
 
   const handleIgnore = async (notification: any) => {
-    const currentUserId = platform === 'twitter' ? twitterId : igUserId;
+    const currentUserId = platform === 'twitter' ? twitterId : 
+                         platform === 'facebook' ? facebookId :
+                         igUserId;
     if (!currentUserId || (!notification.message_id && !notification.comment_id)) return;
     
     try {
@@ -542,7 +557,9 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   };
 
   const fetchNotifications = async (attempt = 1, maxAttempts = 3) => {
-    const currentUserId = platform === 'twitter' ? twitterId : igUserId;
+    const currentUserId = platform === 'twitter' ? twitterId : 
+                         platform === 'facebook' ? facebookId :
+                         igUserId;
     if (!currentUserId) return;
     
     console.log(`[${new Date().toISOString()}] Fetching ${platform} notifications for ${currentUserId} (attempt ${attempt}/${maxAttempts})`);
@@ -728,8 +745,8 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
             return updated.sort((a, b) => b.timestamp - a.timestamp).slice(0, 10);
           });
           setToast(data.event === 'message' 
-            ? `New ${platform === 'twitter' ? 'Twitter DM' : 'Instagram message'} received!` 
-            : `New ${platform === 'twitter' ? 'Twitter mention' : 'Instagram comment'} received!`);
+            ? `New ${platform === 'twitter' ? 'Twitter DM' : platform === 'facebook' ? 'Facebook message' : 'Instagram message'} received!` 
+            : `New ${platform === 'twitter' ? 'Twitter mention' : platform === 'facebook' ? 'Facebook comment' : 'Instagram comment'} received!`);
         } else {
           console.log(`[${new Date().toISOString()}] Filtered out own ${platform} reply from notifications:`, data.data);
         }
@@ -1124,6 +1141,18 @@ Image Description: ${response.post.image_prompt}
     setToast('Twitter account connected successfully!');
   };
 
+  const handleFacebookConnected = (facebookId: string, username: string) => {
+    if (!facebookId) {
+      console.error(`[${new Date().toISOString()}] Facebook connection failed: facebookId is undefined`);
+      setToast('Failed to connect Facebook: Missing user ID');
+      return;
+    }
+    
+    console.log(`[${new Date().toISOString()}] Facebook connected via FacebookConnect: facebook ID: ${facebookId}, username: ${username}`);
+    connectFacebook(facebookId, username);
+    setToast('Facebook account connected successfully!');
+  };
+
   const handleOpenScheduler = () => {
     if (!config.supportsScheduling) {
       setToast(`Scheduling not available for ${config.name} yet`);
@@ -1173,6 +1202,22 @@ Image Description: ${response.post.image_prompt}
   const handleOpenTwitterCompose = () => {
     console.log(`[${new Date().toISOString()}] Opening Twitter Compose for user ${twitterId}`);
     setIsTwitterComposeOpen(true);
+  };
+
+  // Facebook handlers
+  const handleOpenFacebookScheduler = () => {
+    console.log(`[${new Date().toISOString()}] Opening Facebook PostScheduler for user ${facebookId}`);
+    setIsFacebookSchedulerOpen(true);
+  };
+
+  const handleOpenFacebookInsights = () => {
+    console.log(`[${new Date().toISOString()}] Opening Facebook InsightsModal for user ${facebookId}`);
+    setIsFacebookInsightsOpen(true);
+  };
+
+  const handleOpenFacebookCompose = () => {
+    console.log(`[${new Date().toISOString()}] Opening Facebook Compose for user ${facebookId}`);
+    setIsFacebookComposeOpen(true);
   };
 
   return (
@@ -1332,7 +1377,7 @@ Image Description: ${response.post.image_prompt}
                         <span>Schedule</span>
                       </InstagramRequiredButton>
                     </>
-                  ) : (
+                  ) : platform === 'twitter' ? (
                     <>
                       <TwitterConnect onConnected={handleTwitterConnected} />
                       <TwitterRequiredButton
@@ -1362,11 +1407,42 @@ Image Description: ${response.post.image_prompt}
                         <span>Schedule</span>
                       </TwitterRequiredButton>
                     </>
-                  )}
+                  ) : platform === 'facebook' ? (
+                    <>
+                      <FacebookConnect onConnected={handleFacebookConnected} />
+                      <FacebookRequiredButton
+                        isConnected={isConnected}
+                        onClick={handleOpenFacebookCompose}
+                        className="dashboard-btn compose-btn facebook"
+                      >
+                        <FaPen className="btn-icon" />
+                        <span>Compose</span>
+                      </FacebookRequiredButton>
+                      
+                      <FacebookRequiredButton
+                        isConnected={isConnected}
+                        onClick={handleOpenFacebookInsights}
+                        bypassConnectionRequirement={true}
+                        className="dashboard-btn insights-btn facebook"
+                      >
+                        <FaChartLine className="btn-icon" />
+                        <span>Insights</span>
+                      </FacebookRequiredButton>
+                      
+                      <FacebookRequiredButton
+                        isConnected={isConnected}
+                        onClick={handleOpenFacebookScheduler}
+                        className="dashboard-btn schedule-btn facebook"
+                      >
+                        <FaCalendarAlt className="btn-icon" />
+                        <span>Schedule</span>
+                      </FacebookRequiredButton>
+                    </>
+                  ) : null}
                   
                   <button
                     onClick={handleOpenGoalModal}
-                    className={`dashboard-btn goal-btn ${platform === 'twitter' ? 'twitter' : ''}`}
+                    className={`dashboard-btn goal-btn ${platform === 'twitter' ? 'twitter' : platform === 'facebook' ? 'facebook' : ''}`}
                   >
                     <TbTargetArrow className="btn-icon" />
                     <span>Goal</span>
@@ -1375,7 +1451,7 @@ Image Description: ${response.post.image_prompt}
                   {showCampaignButton && (
                     <button
                       onClick={handleOpenCampaignModal}
-                      className={`dashboard-btn campaign-btn ${platform === 'twitter' ? 'twitter' : ''}`}
+                      className={`dashboard-btn campaign-btn ${platform === 'twitter' ? 'twitter' : platform === 'facebook' ? 'facebook' : ''}`}
                     >
                       <FaBullhorn className="btn-icon" />
                       <span>Campaign</span>
@@ -1601,6 +1677,38 @@ Image Description: ${response.post.image_prompt}
           onClose={() => {
             console.log(`[${new Date().toISOString()}] Closing Twitter Compose`);
             setIsTwitterComposeOpen(false);
+          }} 
+        />
+      )}
+      
+      {isFacebookSchedulerOpen && (
+        <PostScheduler 
+          userId={facebookId!} 
+          platform="facebook"
+          onClose={() => {
+            console.log(`[${new Date().toISOString()}] Closing Facebook PostScheduler`);
+            setIsFacebookSchedulerOpen(false);
+          }} 
+        />
+      )}
+      
+      {isFacebookInsightsOpen && (
+        <InsightsModal 
+          userId={facebookId!} 
+          platform="facebook"
+          onClose={() => {
+            console.log(`[${new Date().toISOString()}] Closing Facebook InsightsModal`);
+            setIsFacebookInsightsOpen(false);
+          }} 
+        />
+      )}
+      
+      {isFacebookComposeOpen && (
+        <TwitterCompose 
+          userId={facebookId!} 
+          onClose={() => {
+            console.log(`[${new Date().toISOString()}] Closing Facebook Compose`);
+            setIsFacebookComposeOpen(false);
           }} 
         />
       )}

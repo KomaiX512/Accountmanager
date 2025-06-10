@@ -16,6 +16,7 @@ import AuthRoute from './components/auth/AuthRoute';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { InstagramProvider } from './context/InstagramContext';
 import { TwitterProvider } from './context/TwitterContext';
+import { FacebookProvider } from './context/FacebookContext';
 import axios from 'axios';
 import { syncInstagramConnection, isInstagramDisconnected } from './utils/instagramSessionManager';
 
@@ -26,7 +27,9 @@ const App: React.FC = () => {
     <AuthProvider>
       <InstagramProvider>
         <TwitterProvider>
-          <AppContent />
+          <FacebookProvider>
+            <AppContent />
+          </FacebookProvider>
         </TwitterProvider>
       </InstagramProvider>
     </AuthProvider>

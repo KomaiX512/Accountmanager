@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption: Thinking about what's next... 🤔 What problems are YOU trying to solve? Let's brainstorm some future-changing ideas! 🚀\n\nHashtags: #FutureIsNow #Innovation #TechVision #ProblemSolving #ElonMusk #SpaceX #Tesla #Engineering #Ideas #NextGen\n\nCall to Action: Share your biggest problem you want to solve in the comments below! 👇\n\nVisual Description for Image: A close-up, dramatic portrait of Elon Musk looking slightly upwards and to the right, with a thoughtful expression. The background is a blurred, abstract representation of a futuristic cityscape at night, with streaks of neon blue, purple, and orange light suggesting flying vehicles and advanced architecture. The lighting should be cinematic, with a strong key light highlighting the right side of his face, creating deep shadows on the left. He should be wearing a simple, dark grey t-shirt. The image should have a slightly desaturated color palette, emphasizing the futuristic glow of the city. The overall mood is contemplative and visionary. Focus should be sharp on his eyes, conveying intelligence and determination. The style should be photorealistic but with a slight artistic flair, almost like a digital painting. There should be a subtle glow around his head, suggesting a halo of innovation. The composition should be slightly off-center, drawing the viewer's eye towards the direction he's looking.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.37802865086490534
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 249,
+    "candidatesTokenCount": 279,
+    "totalTokenCount": 528,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 249
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 279
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "TDhIaOPFOdeI_NUPmYvnoA8"
+}

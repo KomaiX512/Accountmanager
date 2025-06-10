@@ -58,7 +58,7 @@ interface PostCookedProps {
   profilePicUrl: string;
   posts?: { key: string; data: { post: any; status: string; image_url: string; r2_image_url?: string }; imageFailed?: boolean }[];
   userId?: string;
-  platform?: 'instagram' | 'twitter';
+  platform?: 'instagram' | 'twitter' | 'facebook';
 }
 
 // Define an interface for image error state
@@ -134,8 +134,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
      // Check for new posts every 3 seconds when in active use
      const checkForNewPosts = async () => {
        try {
-         const platformParam = platform ? `&platform=${platform}` : '';
-         const response = await axios.get(`${API_BASE_URL}/posts/${username}?platform=${platform?.replace('&', '')}&nocache=${Date.now()}`, {
+         const response = await axios.get(`${API_BASE_URL}/posts/${username}?platform=${platform}&nocache=${Date.now()}`, {
            headers: {
              'Cache-Control': 'no-cache, no-store, must-revalidate',
              'Pragma': 'no-cache'
@@ -203,7 +202,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
           if (match) imageId = match[1];
           
           // Create super cache-busted URL
-          const cacheBust = `?INSTANT=${now}&edited=true&v=${Math.random()}&force=1`;
+          const cacheBust = `?platform=${platform}&INSTANT=${now}&edited=true&v=${Math.random()}&force=1`;
           const freshUrl = `${API_BASE_URL}/api/r2-image/${username}/image_${imageId}.jpg${cacheBust}`;
           
           // Update ONLY the edited post instantly
@@ -246,13 +245,13 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     const match = postKey.match(/ready_post_(\d+)\.json$/);
     if (match) imageId = match[1];
     
-    // Generate URL with minimal cache busting
+    // Generate URL with minimal cache busting and platform parameter
     const cacheBust = imageRefreshKey > 0 
-      ? `?refresh=${imageRefreshKey}`
+      ? `&refresh=${imageRefreshKey}`
       : '';
     
-    return `${API_BASE_URL}/api/r2-image/${username}/image_${imageId}.jpg${cacheBust}`;
-  }, [imageRefreshKey, username]);
+    return `${API_BASE_URL}/api/r2-image/${username}/image_${imageId}.jpg?platform=${platform}${cacheBust}`;
+  }, [imageRefreshKey, username, platform]);
 
   // PERFORMANCE: Handle image load success
   const handleImageLoad = useCallback((postKey: string) => {

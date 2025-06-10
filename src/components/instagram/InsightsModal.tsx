@@ -12,7 +12,7 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 interface InsightsModalProps {
   userId: string;
   onClose: () => void;
-  platform?: 'instagram' | 'twitter';
+  platform?: 'instagram' | 'twitter' | 'facebook';
 }
 
 interface InsightData {

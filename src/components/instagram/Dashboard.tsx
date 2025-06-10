@@ -18,6 +18,7 @@ import { useInstagram } from '../../context/InstagramContext';
 import ChatModal from './ChatModal';
 import RagService from '../../services/RagService';
 import type { ChatMessage as ChatModalMessage } from './ChatModal';
+import type { Notification, ProfileInfo, LinkedAccount } from '../../types/notifications';
 // Import icons from react-icons
 import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaLock } from 'react-icons/fa';
 import { MdAnalytics, MdOutlineSchedule, MdOutlineAutoGraph } from 'react-icons/md';
@@ -30,43 +31,6 @@ import { GiSpy } from 'react-icons/gi';
 interface RagChatMessage {
   role: string;
   content: string;
-}
-
-interface ProfileInfo {
-  fullName: string;
-  followersCount: number;
-  followsCount: number;
-  profilePicUrlHD: string;
-  biography?: string;
-}
-
-interface Notification {
-  type: 'message' | 'comment' | 'reply' | 'comment_reply';
-  instagram_user_id: string;
-  sender_id?: string;
-  message_id?: string;
-  text: string;
-  post_id?: string;
-  comment_id?: string;
-  timestamp: number;
-  received_at: string;
-  username?: string;
-  status: 'pending' | 'replied' | 'ignored' | 'sent' | 'ai_reply_ready';
-  aiProcessing?: boolean;
-  aiReply?: {
-    reply: string;
-    replyKey: string;
-    reqKey: string;
-    timestamp: number;
-    generated_at: string;
-    sendStatus?: string;
-    sendError?: string;
-  };
-}
-
-interface LinkedAccount {
-  url: string;
-  username: string;
 }
 
 interface DashboardProps {
@@ -262,7 +226,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
     try {
       if (chatMode === 'discussion') {
         console.log(`Sending discussion query to RAG for ${accountHolder}: ${query}`);
-        const response = await RagService.sendDiscussionQuery(accountHolder, query, chatMessages);
+        const response = await RagService.sendDiscussionQuery(accountHolder, query, chatMessages, 'instagram');
         
         // Add messages to history
         const userMessage: RagChatMessage = {
@@ -285,7 +249,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
         
         // Save to RAG server
         try {
-          await RagService.saveConversation(accountHolder, [...chatMessages, userMessage, assistantMessage]);
+          await RagService.saveConversation(accountHolder, [...chatMessages, userMessage, assistantMessage], 'instagram');
         } catch (saveErr) {
           console.warn('Failed to save conversation, but continuing:', saveErr);
         }
@@ -308,7 +272,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
         
       } else if (chatMode === 'post') {
         console.log(`Sending post generation query to RAG for ${accountHolder}: ${query}`);
-        const response = await RagService.sendPostQuery(accountHolder, query);
+        const response = await RagService.sendPostQuery(accountHolder, query, 'instagram');
         
         if (response.success && response.post) {
           const postContent = `
@@ -353,8 +317,8 @@ Image Description: ${response.post.image_prompt}
           window.dispatchEvent(newPostEvent);
           console.log('[Dashboard] NEW POST: Triggered PostCooked refresh event for Instagram');
           
-          // Automatically open chat modal with the conversation
-          setIsChatModalOpen(true);
+          // DON'T OPEN POPUP FOR POST MODE: Just show success message via toast
+          setToast('Post generated successfully! Check the Cooked Posts section.');
         } else {
           // Handle error from post generation
           setError(response.error || 'Failed to generate post');
@@ -474,6 +438,13 @@ Image Description: ${response.post.image_prompt}
     const notifId = notification.message_id || notification.comment_id;
     if (!notifId) return;
     
+    // Define userId for consistent access throughout the function
+    const userId = notification.instagram_user_id || igBusinessId;
+    if (!userId) {
+      setToast('No user ID available for AI reply');
+      return;
+    }
+    
     // Check if this notification is already being processed to prevent duplicates
     if (aiProcessingNotifications[notifId]) {
       console.log(`[${new Date().toISOString()}] Skipping duplicate AI reply request for ${notifId}`);
@@ -509,12 +480,13 @@ Image Description: ${response.post.image_prompt}
         
         // Send to RAG service
         const response = await RagService.sendInstantAIReply(
-          notification.instagram_user_id,
+          userId,
           accountHolder,
           conversation,
           {
             sender_id: notification.sender_id,
-            message_id: notifId
+            message_id: notifId,
+            platform: 'instagram'
           }
         );
         
@@ -529,7 +501,7 @@ Image Description: ${response.post.image_prompt}
         try {
           console.log(`[${new Date().toISOString()}] Marking notification ${notifId} as handled permanently`);
           
-          await axios.post(`http://localhost:3000/mark-notification-handled/${notification.instagram_user_id}`, {
+          await axios.post(`http://localhost:3000/mark-notification-handled/${userId}`, {
             notification_id: notifId,
             type: notification.type,
             handled_by: 'ai'
@@ -662,7 +634,7 @@ Image Description: ${response.post.image_prompt}
             try {
               console.log(`[${new Date().toISOString()}] Marking notification ${notifId} as handled permanently`);
               
-              await axios.post(`http://localhost:3000/mark-notification-handled/${notification.instagram_user_id}`, {
+              await axios.post(`http://localhost:3000/mark-notification-handled/${userId}`, {
                 notification_id: notifId,
                 type: notification.type,
                 handled_by: 'ai-fallback'
@@ -676,12 +648,16 @@ Image Description: ${response.post.image_prompt}
               console.log(`[${new Date().toISOString()}] Successfully marked notification as handled`);
               
               // Refresh notifications to get the latest state
-              fetchNotifications(notification.instagram_user_id);
+              if (userId) {
+                fetchNotifications(userId);
+              }
               
             } catch (markError) {
               console.error(`[${new Date().toISOString()}] Error marking notification as handled:`, markError);
               // Continue anyway, as the AI reply was still generated
-              fetchNotifications(notification.instagram_user_id);
+              if (userId) {
+                fetchNotifications(userId);
+              }
             }
             
             // Increment refresh key
@@ -1223,7 +1199,7 @@ Image Description: ${response.post.image_prompt}
   // Load previous conversations when the component mounts
   useEffect(() => {
     if (accountHolder) {
-      RagService.loadConversations(accountHolder)
+      RagService.loadConversations(accountHolder, 'instagram')
         .then(messages => {
           // Convert RagChatMessage[] to ChatModalMessage[]
           const safeMessages = messages.map(msg => ({
@@ -1634,7 +1610,7 @@ Image Description: ${response.post.image_prompt}
             // Handle sending additional messages in the chat modal
             if (!message.trim() || !accountHolder) return;
             setIsProcessing(true);
-            RagService.sendDiscussionQuery(accountHolder, message, chatMessages as RagChatMessage[])
+            RagService.sendDiscussionQuery(accountHolder, message, chatMessages as RagChatMessage[], 'instagram')
               .then(response => {
                 const updatedMessages = [
                   ...chatMessages,
@@ -1644,7 +1620,7 @@ Image Description: ${response.post.image_prompt}
                 setChatMessages(updatedMessages);
                 
                 // Save the updated conversation
-                RagService.saveConversation(accountHolder, updatedMessages)
+                RagService.saveConversation(accountHolder, updatedMessages, 'instagram')
                   .catch(err => console.error('Error saving conversation:', err));
               })
               .catch(error => {
@@ -1657,6 +1633,7 @@ Image Description: ${response.post.image_prompt}
           }}
           isProcessing={isProcessing}
           linkedAccounts={linkedAccounts}
+          platform="instagram"
         />
       )}
     </motion.div>

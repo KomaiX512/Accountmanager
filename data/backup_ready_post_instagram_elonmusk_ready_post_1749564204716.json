@@ -1,0 +1,27 @@
+{
+  "post": {
+    "caption": "Building the future, one line of code (or rocket launch) at a time! 🚀 What should I tackle next? 🤔 Give me your wildest, most innovative ideas in the comments! 👇",
+    "hashtags": [
+      "#Innovation",
+      "#FutureIsNow",
+      "#Tech",
+      "#Engineering",
+      "#SpaceX",
+      "#Tesla",
+      "#Ideas",
+      "#NextBigThing",
+      "#ElonMusk",
+      "#Brainstorm"
+    ],
+    "call_to_action": "Drop your suggestions below! Let's build something amazing together.",
+    "image_prompt": "The image should be a digital artwork, a hyperrealistic rendering in a vibrant, futuristic style. The central focus is a stylized, glowing brain, partially constructed from circuit boards and rocket components. Wires and miniature Tesla cars should be subtly integrated into the brain's structure. The background is a swirling nebula of deep blues, purples, and electric greens, suggesting infinite possibilities and the vastness of space. The lighting should be dramatic, with the brain emitting a soft, ethereal glow that illuminates the surrounding nebula. The overall mood is optimistic, energetic, and forward-thinking. The composition should be dynamic, with the brain positioned slightly off-center to create a sense of movement and anticipation. Small, holographic projections of various inventions (e.g., a neuralink, a Mars colony, a self-driving car) should float around the brain, hinting at the potential outcomes of future innovation. The style should be reminiscent of digital art found on platforms like ArtStation, with a focus on intricate details and a high level of realism. The color palette should be bold and contrasting, with pops of neon colors against the dark, cosmic background."
+  },
+  "timestamp": 1749564204716,
+  "image_path": "ready_post/instagram/elonmusk/image_1749564204716.jpg",
+  "image_url": "http://127.0.0.1:3002/fix-image/elonmusk/image_1749564204716.jpg?platform=instagram",
+  "r2_image_url": "http://127.0.0.1:3002/fix-image/elonmusk/image_1749564204716.jpg?platform=instagram",
+  "generated_at": "2025-06-10T14:03:24.716Z",
+  "queryUsed": "create next post for me",
+  "status": "new",
+  "platform": "instagram"
+}

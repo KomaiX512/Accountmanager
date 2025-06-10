@@ -31,7 +31,7 @@ export interface Notification {
     sendStatus?: string;
     sendError?: string;
   };
-  platform?: 'instagram' | 'twitter';
+  platform?: 'instagram' | 'twitter' | 'facebook';
 }
 
 export interface ProfileInfo {

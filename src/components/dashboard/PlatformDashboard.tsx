@@ -41,7 +41,7 @@ interface PlatformDashboardProps {
   accountHolder: string;
   competitors: string[];
   accountType: 'branding' | 'non-branding';
-  platform: 'instagram' | 'twitter';
+  platform: 'instagram' | 'twitter' | 'facebook';
 }
 
 const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ 
@@ -77,11 +77,20 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       supportsNotifications: true, // Enable Twitter notifications
       supportsScheduling: false, // Not implemented yet for Twitter
       supportsInsights: true // Enable Twitter insights
+    },
+    facebook: {
+      name: 'Facebook',
+      primaryColor: '#1877f2',
+      secondaryColor: '#42a5f5',
+      baseUrl: 'https://facebook.com/',
+      supportsNotifications: false, // Hide notifications for Facebook
+      supportsScheduling: false, // Not implemented yet for Facebook
+      supportsInsights: false // Not implemented yet for Facebook
     }
   }[platform];
 
   // Platform-specific query parameter
-  const platformParam = platform === 'instagram' ? '' : `?platform=${platform}`;
+  const platformParam = `?platform=${platform}`;
 
   const [query, setQuery] = useState('');
   const [toast, setToast] = useState<string | null>(null);
@@ -264,7 +273,8 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           conversation,
           {
             sender_id: notification.sender_id,
-            message_id: notifId
+            message_id: notifId,
+            platform: platform
           }
         );
         
@@ -751,7 +761,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     try {
       if (chatMode === 'discussion') {
         console.log(`Sending ${platform} discussion query to RAG for ${accountHolder}: ${query}`);
-        const response = await RagService.sendDiscussionQuery(accountHolder, query, chatMessages);
+        const response = await RagService.sendDiscussionQuery(accountHolder, query, chatMessages, platform);
         
         const userMessage: RagChatMessage = {
           role: 'user',
@@ -771,7 +781,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         setChatMessages(updatedMessages);
         
         try {
-          await RagService.saveConversation(accountHolder, [...chatMessages, userMessage, assistantMessage]);
+          await RagService.saveConversation(accountHolder, [...chatMessages, userMessage, assistantMessage], platform);
         } catch (saveErr) {
           console.warn('Failed to save conversation, but continuing:', saveErr);
         }
@@ -797,7 +807,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         
       } else if (chatMode === 'post') {
         console.log(`Sending ${platform} post generation query to RAG for ${accountHolder}: ${query}`);
-        const response = await RagService.sendPostQuery(accountHolder, query);
+        const response = await RagService.sendPostQuery(accountHolder, query, platform);
         
         if (response.success && response.post) {
           const postContent = `
@@ -840,7 +850,8 @@ Image Description: ${response.post.image_prompt}
           window.dispatchEvent(newPostEvent);
           console.log(`[PlatformDashboard] NEW POST: Triggered PostCooked refresh event for ${platform}`);
           
-          setIsChatModalOpen(true);
+          // DON'T OPEN POPUP FOR POST MODE: Just show success message via toast
+          setToast('Post generated successfully! Check the Cooked Posts section.');
         } else {
           setError(response.error || `Failed to generate ${platform} post`);
         }
@@ -959,7 +970,7 @@ Image Description: ${response.post.image_prompt}
   // Load previous conversations when the component mounts
   useEffect(() => {
     if (accountHolder) {
-      RagService.loadConversations(accountHolder)
+      RagService.loadConversations(accountHolder, platform)
         .then(messages => {
           const safeMessages = messages.map(msg => ({
             role: msg.role === 'user' ? 'user' as const : 'assistant' as const,
@@ -969,7 +980,7 @@ Image Description: ${response.post.image_prompt}
         })
         .catch(err => console.error('Failed to load conversations:', err));
     }
-  }, [accountHolder]);
+  }, [accountHolder, platform]);
 
   // Initialize notifications and SSE for the current platform
   useEffect(() => {
@@ -1281,20 +1292,22 @@ Image Description: ${response.post.image_prompt}
                     )}
                   </>
                 )}
-                <div className="stats">
-                  <div className="stat">
-                    <span className="label">Followers</span>
-                    <span className="value">
-                      {formatCount(profileInfo?.followersCount)}
-                    </span>
+                {platform !== 'facebook' && (
+                  <div className="stats">
+                    <div className="stat">
+                      <span className="label">Followers</span>
+                      <span className="value">
+                        {formatCount(profileInfo?.followersCount)}
+                      </span>
+                    </div>
+                    <div className="stat">
+                      <span className="label">Following</span>
+                      <span className="value">
+                        {formatCount(profileInfo?.followsCount)}
+                      </span>
+                    </div>
                   </div>
-                  <div className="stat">
-                    <span className="label">Following</span>
-                    <span className="value">
-                      {formatCount(profileInfo?.followsCount)}
-                    </span>
-                  </div>
-                </div>
+                )}
                 <div className="profile-actions">
                   {/* Platform-specific Connect button */}
                   {platform === 'instagram' ? (
@@ -1535,7 +1548,7 @@ Image Description: ${response.post.image_prompt}
           onSendMessage={(message: string) => {
             if (!message.trim() || !accountHolder) return;
             setIsProcessing(true);
-            RagService.sendDiscussionQuery(accountHolder, message, chatMessages as RagChatMessage[])
+            RagService.sendDiscussionQuery(accountHolder, message, chatMessages as RagChatMessage[], platform)
               .then(response => {
                 const updatedMessages = [
                   ...chatMessages,
@@ -1544,7 +1557,7 @@ Image Description: ${response.post.image_prompt}
                 ];
                 setChatMessages(updatedMessages);
                 
-                RagService.saveConversation(accountHolder, updatedMessages)
+                RagService.saveConversation(accountHolder, updatedMessages, platform)
                   .catch(err => console.error('Error saving conversation:', err));
               })
               .catch(error => {
@@ -1557,6 +1570,7 @@ Image Description: ${response.post.image_prompt}
           }}
           isProcessing={isProcessing}
           linkedAccounts={linkedAccounts}
+          platform={platform}
         />
       )}
       {isTwitterSchedulerOpen && (

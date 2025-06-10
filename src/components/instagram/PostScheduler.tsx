@@ -9,7 +9,7 @@ import { useInstagram } from '../../context/InstagramContext';
 interface PostSchedulerProps {
   userId: string;
   onClose: () => void;
-  platform?: 'instagram' | 'twitter';
+  platform?: 'instagram' | 'twitter' | 'facebook';
 }
 
 interface FormData {

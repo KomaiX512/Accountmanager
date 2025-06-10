@@ -9,7 +9,7 @@ import { decodeJSONToReactElements } from '../../utils/jsonDecoder';
 interface OurStrategiesProps {
   accountHolder: string;
   accountType: 'branding' | 'non-branding';
-  platform?: 'instagram' | 'twitter';
+  platform?: 'instagram' | 'twitter' | 'facebook';
 }
 
 const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountType, platform = 'instagram' }) => {

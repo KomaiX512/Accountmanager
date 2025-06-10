@@ -1,0 +1,27 @@
+{
+  "post": {
+    "caption": "Unleash your inner artist! 🎨 We're craving some serious makeup inspo. Show us your boldest, most creative NARS looks and tag us for a chance to be featured! ✨",
+    "hashtags": [
+      "#NARSissist",
+      "#NARSmakeup",
+      "#MakeupInspo",
+      "#CreativeMakeup",
+      "#BeautyLooks",
+      "#MakeupArtist",
+      "#NARS",
+      "#BeautyCommunity",
+      "#MakeupLover",
+      "#BoldMakeup"
+    ],
+    "call_to_action": "Tag us in your NARS makeup looks!",
+    "image_prompt": "A close-up shot focusing on a model's eye, showcasing a vibrant and artistic makeup look using NARS products. The eye is the central focus, with the model's skin appearing flawless and subtly highlighted. The eyeshadow is a gradient of bold, contrasting colors – perhaps a blend of electric blue, shimmering gold, and deep purple, all seamlessly blended. Intricate eyeliner work is visible, possibly a graphic liner design or a bold winged liner. The eyelashes are long and voluminous, achieved with NARS mascara. The eyebrow is perfectly shaped and groomed, enhancing the overall look. The background is blurred and out of focus, a soft gradient of similar colors to the eyeshadow, ensuring the eye remains the focal point. The lighting is soft and diffused, highlighting the texture and color of the makeup without harsh shadows. The overall mood is artistic, bold, and confident. The image should have a high-fashion editorial feel, with a focus on the artistry of the makeup application. The image should be clean, modern, and visually striking, reflecting the NARS brand aesthetic. The model's expression is confident and slightly mysterious, drawing the viewer in. The composition is tight and intimate, emphasizing the details of the makeup."
+  },
+  "timestamp": 1749555427299,
+  "image_path": "ready_post/instagram/narsissist/image_1749555427299.jpg",
+  "image_url": "http://127.0.0.1:3002/fix-image/narsissist/image_1749555427299.jpg?platform=instagram",
+  "r2_image_url": "http://127.0.0.1:3002/fix-image/narsissist/image_1749555427299.jpg?platform=instagram",
+  "generated_at": "2025-06-10T11:37:07.299Z",
+  "queryUsed": "create the next post for me which is high engaging according to our theme",
+  "status": "new",
+  "platform": "instagram"
+}

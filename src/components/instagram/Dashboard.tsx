@@ -342,6 +342,17 @@ Image Description: ${response.post.image_prompt}
           
           setChatMessages(updatedMessages);
           
+          // TRIGGER POST REFRESH: Notify PostCooked component about new post
+          const newPostEvent = new CustomEvent('newPostCreated', {
+            detail: {
+              username: accountHolder,
+              platform: 'instagram',
+              timestamp: Date.now()
+            }
+          });
+          window.dispatchEvent(newPostEvent);
+          console.log('[Dashboard] NEW POST: Triggered PostCooked refresh event for Instagram');
+          
           // Automatically open chat modal with the conversation
           setIsChatModalOpen(true);
         } else {

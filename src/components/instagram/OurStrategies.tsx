@@ -75,8 +75,8 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
           className={`strategy-sub-container ${data ? 'loaded' : ''}`}
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.4 }}
-          whileHover={{ scale: 1.05, boxShadow: '0 0 20px rgba(0, 255, 204, 0.6)' }}
+          transition={{ duration: 0.2 }}
+          whileHover={{ scale: 1.02 }}
           onClick={() => data && setShowPopup(true)}
         >
           <span className="overlay-text">1. Strategies</span>
@@ -130,8 +130,8 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
                     <div className="navigation-buttons">
                       <motion.button
                         className="nav-btn"
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.98 }}
                         onClick={handlePrevStrategy}
                         disabled={currentStrategyIndex === 0}
                       >
@@ -152,8 +152,8 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
                       </motion.button>
                       <motion.button
                         className="nav-btn"
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.98 }}
                         onClick={handleNextStrategy}
                         disabled={currentStrategyIndex === data.length - 1}
                       >
@@ -180,8 +180,8 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
               </div>
               <motion.button
                 className="close-btn"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => setShowPopup(false)}
               >
                 Close

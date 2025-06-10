@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Of course! What are your biggest makeup concerns? 😊"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.26005034013227984
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 74642,
+    "candidatesTokenCount": 11,
+    "totalTokenCount": 74653,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 74642
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 11
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "odZHaLeUNLjX1PIPzJ2c-Qo"
+}

@@ -661,8 +661,8 @@ const MainDashboard: React.FC = () => {
             </div>
             
             {showInstantPostModal && (
-              <div className="instant-post-modal-overlay">
-                <div className="instant-post-modal">
+              <div className="modal-overlay">
+                <div className="modal-content">
                   <h3>Post to Your Platforms</h3>
                   
                   {/* Platform Selection */}

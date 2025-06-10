@@ -1,0 +1,319 @@
+/* Global UI Refinements - Platform-wide fixes */
+
+/* Fix #1: Pop-Up Behavior and Theming - Standardized modal positioning and styling */
+.popup-overlay,
+.modal-overlay,
+.insights-modal-overlay,
+.chat-modal-overlay,
+.canvas-editor-overlay,
+.messages-popup-overlay,
+.twitter-compose-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  background: rgba(0, 0, 0, 0.7) !important;
+  backdrop-filter: blur(8px) !important;
+  z-index: 2000 !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  padding: 20px !important;
+}
+
+.popup-content,
+.modal-content,
+.insights-modal,
+.chat-modal-content,
+.canvas-editor-container,
+.messages-popup-content,
+.twitter-compose-container {
+  background: linear-gradient(135deg, #1a1a3a, #2e2e5e) !important;
+  border-radius: 16px !important;
+  padding: 24px !important;
+  width: 100% !important;
+  max-width: 700px !important;
+  max-height: 85vh !important;
+  overflow-y: auto !important;
+  border: 1px solid rgba(0, 255, 204, 0.4) !important;
+  box-shadow: 0 10px 40px rgba(0, 255, 204, 0.3) !important;
+  color: #e0e0ff !important;
+  position: relative !important;
+  margin: auto !important;
+  animation: modalAppear 0.2s ease-out !important;
+}
+
+@keyframes modalAppear {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Fix #2: Notifications Display - Tiny, non-intrusive, fixed positioned */
+.toast-notification,
+.post-toast,
+.messages-toast,
+.rules-toast {
+  position: fixed !important;
+  bottom: 20px !important;
+  right: 20px !important;
+  background: rgba(30, 30, 47, 0.95) !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  color: #e0e0ff !important;
+  font-size: 0.8rem !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  box-shadow: 0 4px 12px rgba(0, 255, 204, 0.3) !important;
+  border: 1px solid rgba(0, 255, 204, 0.4) !important;
+  z-index: 9999 !important;
+  max-width: 280px !important;
+  word-wrap: break-word !important;
+  animation: slideInNotification 0.3s ease-out !important;
+  pointer-events: auto !important;
+  user-select: none !important;
+}
+
+.notification-popup {
+  position: fixed !important;
+  top: 20px !important;
+  right: 20px !important;
+  background: rgba(30, 30, 47, 0.95) !important;
+  color: #e0e0ff !important;
+  padding: 8px 12px !important;
+  border-radius: 8px !important;
+  border: 1px solid #00ffcc !important;
+  z-index: 9999 !important;
+  max-width: 280px !important;
+  font-size: 0.8rem !important;
+  word-wrap: break-word !important;
+  animation: slideInNotification 0.3s ease !important;
+}
+
+@keyframes slideInNotification {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.toast-icon {
+  flex-shrink: 0 !important;
+  width: 14px !important;
+  height: 14px !important;
+}
+
+/* Fix #3: Button Animations - Minimalistic and snappy */
+button,
+.btn,
+.dashboard-btn,
+.insta-btn,
+.modal-btn,
+.nav-btn,
+.action-btn {
+  transition: all 0.15s ease !important;
+}
+
+button:hover,
+.btn:hover,
+.dashboard-btn:hover,
+.insta-btn:hover,
+.modal-btn:hover,
+.nav-btn:hover,
+.action-btn:hover {
+  transform: translateY(-1px) !important;
+}
+
+button:active,
+.btn:active,
+.dashboard-btn:active,
+.insta-btn:active,
+.modal-btn:active,
+.nav-btn:active,
+.action-btn:active {
+  transform: translateY(0) !important;
+  transition: all 0.08s ease !important;
+}
+
+/* Framer Motion override for consistent button animations */
+[data-framer-component-type="motion.button"],
+.motion-button {
+  transition: all 0.15s ease !important;
+}
+
+/* Override excessive hover animations */
+[whileHover] {
+  transition: all 0.15s ease !important;
+}
+
+/* Notification badges - keep tiny and positioned correctly */
+.notification-badge-container {
+  position: absolute !important;
+  top: 8px !important;
+  right: 8px !important;
+  z-index: 100 !important;
+}
+
+.notification-badge {
+  display: flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+  background: linear-gradient(135deg, #ff6b6b, #ff8e53) !important;
+  border-radius: 10px !important;
+  padding: 3px 6px !important;
+  font-size: 0.65rem !important;
+  font-weight: 600 !important;
+  color: #fff !important;
+  box-shadow: 0 2px 6px rgba(255, 107, 107, 0.4) !important;
+  border: 1px solid rgba(255, 107, 107, 0.6) !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  white-space: nowrap !important;
+  min-width: auto !important;
+  max-width: 80px !important;
+}
+
+.notification-badge:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 3px 8px rgba(255, 107, 107, 0.6) !important;
+}
+
+.notification-bell-icon {
+  width: 10px !important;
+  height: 10px !important;
+  flex-shrink: 0 !important;
+}
+
+.notification-number {
+  font-size: 0.65rem !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+}
+
+/* Mobile responsiveness for notifications and modals */
+@media (max-width: 768px) {
+  .popup-overlay,
+  .modal-overlay {
+    padding: 10px !important;
+  }
+  
+  .popup-content,
+  .modal-content {
+    padding: 16px !important;
+    max-height: 95vh !important;
+    border-radius: 12px !important;
+  }
+  
+  .toast-notification,
+  .post-toast,
+  .messages-toast,
+  .notification-popup {
+    bottom: 15px !important;
+    right: 15px !important;
+    max-width: 250px !important;
+    font-size: 0.75rem !important;
+    padding: 6px 10px !important;
+  }
+  
+  .notification-badge {
+    font-size: 0.6rem !important;
+    padding: 2px 5px !important;
+    max-width: 60px !important;
+  }
+  
+  .notification-bell-icon {
+    width: 8px !important;
+    height: 8px !important;
+  }
+}
+
+/* Ensure z-index hierarchy is maintained */
+.popup-overlay { z-index: 2000 !important; }
+.modal-overlay { z-index: 2100 !important; }
+.toast-notification { z-index: 9999 !important; }
+.notification-popup { z-index: 9999 !important; }
+.notification-badge-container { z-index: 100 !important; }
+
+/* Prevent notification stacking - ensure only one notification shows at a time */
+.toast-notification + .toast-notification,
+.post-toast + .post-toast,
+.messages-toast + .messages-toast {
+  display: none !important;
+}
+
+/* Enhanced scrollbar styling for popups */
+.popup-content::-webkit-scrollbar,
+.modal-content::-webkit-scrollbar {
+  width: 6px !important;
+}
+
+.popup-content::-webkit-scrollbar-track,
+.modal-content::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-radius: 3px !important;
+}
+
+/* Fix #4: Left Sidebar Logic and Styling - Hide on login/entry screens */
+.left-bar.hidden-for-auth,
+.content-area.auth-page {
+  display: none !important;
+}
+
+.content-area.auth-full-width {
+  margin-left: 0 !important;
+  width: 100% !important;
+  padding-left: 0 !important;
+}
+
+/* Fix #5: Cookpost Module - Image Rendering Cache Optimization */
+.post-image,
+.post-img,
+.cooked-post-image {
+  transition: opacity 0.2s ease !important;
+  will-change: opacity !important;
+}
+
+.post-image.loading,
+.post-img.loading,
+.cooked-post-image.loading {
+  opacity: 0.6 !important;
+  filter: blur(1px) !important;
+}
+
+.post-image.loaded,
+.post-img.loaded, 
+.cooked-post-image.loaded {
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+/* Image cache performance boost */
+.post-image,
+.post-img,
+.cooked-post-image {
+  image-rendering: auto !important;
+  image-rendering: crisp-edges !important;
+  image-rendering: -webkit-optimize-contrast !important;
+}
+
+.popup-content::-webkit-scrollbar-thumb,
+.modal-content::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 204, 0.6) !important;
+  border-radius: 3px !important;
+}
+
+.popup-content::-webkit-scrollbar-thumb:hover,
+.modal-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 204, 0.8) !important;
+} 

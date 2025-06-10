@@ -3334,6 +3334,8 @@ app.post('/rag-instant-reply/:username', async (req, res, next) => {
         return res.status(400).json({ error: 'Invalid notification type for AI reply' });
       }
       
+      // Extract platform from notification, default to instagram
+      const platform = notification.platform || 'instagram';
       const prefix = `ai_reply/${platform}/${username}/`;
       
       try {

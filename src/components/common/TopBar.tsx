@@ -121,8 +121,8 @@ const TopBar: React.FC = () => {
           <motion.a
             href="#"
             className={`nav-link ${location.pathname === '/account' ? 'active' : ''}`}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.98 }}
             onClick={(e) => {
               e.preventDefault();
               navigate('/account');

@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Okay, I can help you with that! Based on NARS Cosmetics' Instagram profile, here's a draft for your next post:\n\n**Image/Video Description:**\n\nA high-quality video showcasing the application of NARS' Light Reflecting Foundation, highlighting its natural finish and buildable coverage. The video should feature diverse skin tones and textures. Close-ups of the product and the skin after application are essential.\n\n**Caption:**\n\n\"Unleash your inner radiance! ✨ Get ready to experience the magic of NARS Light Reflecting Foundation. This isn't just makeup; it's skincare with coverage. 💫\n\nOur Light Reflecting Foundation blurs imperfections, enhances your natural beauty, and leaves you with a luminous, breathable finish that lasts all day. ☀️\n\nReady to see your skin in its best light? ✨ Shop now at [Link in bio] and let us know what you think! 👇\n\n#NARS #LightReflectingFoundation #YourBestLight #SkincareMakeup #NaturalFinish #BuildableCoverage #RadiantSkin #MakeupLover #BeautyEssentials #NARSissist\"\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.24767786550730075
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 74568,
+    "candidatesTokenCount": 229,
+    "totalTokenCount": 74797,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 74568
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 229
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "MRVIaLKrF-GTsbQPpq7c8AY"
+}

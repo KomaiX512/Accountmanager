@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Based on your profile and related accounts, here are a few competitor suggestions for NARS Cosmetics on Instagram:\n\n*   **M·A·C Cosmetics (@maccosmetics):** A major player in the cosmetics industry with a strong Instagram presence. They are known for collaborations, diverse product ranges, and professional makeup artistry.\n*   **Rare Beauty by Selena Gomez (@rarebeauty):** A celebrity-owned brand that focuses on inclusivity and natural beauty. Their Instagram features diverse models and emphasizes a positive message.\n*   **FENTY SKIN (@fentyskin):** Another celebrity-owned brand, known for its innovative products and focus on skincare for all skin types.\n*   **Urban Decay Cosmetics (@urbandecaycosmetics):** A brand known for its edgy and trend-setting makeup, often featuring bold colors and collaborations.\n*   **Too Faced Cosmetics (@toofaced):** A brand known for its playful and feminine aesthetic, with a focus on creating fun and accessible makeup products.\n\nWhen analyzing these competitors, pay attention to:\n\n*   **Content themes:** What kind of content do they post (e.g., product demos, tutorials, behind-the-scenes)?\n*   **Aesthetic:** What is the overall look and feel of their feed?\n*   **Engagement tactics:** How do they interact with their audience (e.g., Q&As, contests, live streams)?\n*   **Hashtag strategy:** What hashtags do they use to reach a wider audience?\n*   **Collaboration:** Which influencers or makeup artists do they collaborate with?"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.1873478948334117
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 74554,
+    "candidatesTokenCount": 324,
+    "totalTokenCount": 74878,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 74554
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 324
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "jNdHaJajIImUhMIP79bZkAc"
+}

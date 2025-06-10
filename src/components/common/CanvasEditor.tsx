@@ -1204,7 +1204,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
       formData.append('platform', detectedPlatform);
       
       // Send to server to update the post
-      const response = await fetch(`http://localhost:3002/api/save-edited-post/${username}`, {
+              const response = await fetch(`http://localhost:3000/api/save-edited-post/${username}`, {
         method: 'POST',
         body: formData,
       });
@@ -1217,10 +1217,18 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
       const result = await response.json();
       setNotification('Post saved successfully!');
       
+      // INSTANT UPDATE: Trigger immediate cache busting event
+      window.dispatchEvent(new CustomEvent('postUpdated', { 
+        detail: { 
+          postKey, 
+          platform: detectedPlatform,
+          timestamp: Date.now(),
+          action: 'edited'
+        } 
+      }));
+      
       setTimeout(() => {
         onClose(); // Close the editor
-        // Trigger a refresh of the posts in the parent component
-        window.dispatchEvent(new CustomEvent('postUpdated', { detail: { postKey, platform: detectedPlatform } }));
       }, 1500);
       
     } catch (error) {

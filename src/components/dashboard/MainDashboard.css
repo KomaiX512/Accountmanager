@@ -144,13 +144,19 @@
   padding: 1.2rem;
   width: 100%;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.15s ease;
   position: relative;
 }
 
 .instant-post-button:hover {
-  background: rgba(0, 255, 204, 0.2);
-  transform: translateY(-2px);
+  background: rgba(0, 255, 204, 0.15);
+  transform: translateY(-1px);
+  border-color: rgba(0, 255, 204, 0.7);
+}
+
+.instant-post-button:active {
+  transform: translateY(0);
+  transition: all 0.05s ease;
 }
 
 .instant-post-button:disabled {
@@ -199,43 +205,60 @@
   border: 1px solid rgba(0, 255, 204, 0.3);
 }
 
-/* Modal Styling */
-.instant-post-modal-overlay {
+/* Global Modal Styling - Centered and Theme-Aligned */
+.modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.8);
-  z-index: 1000;
+  backdrop-filter: blur(8px);
+  z-index: 2000;
   display: flex;
   justify-content: center;
   align-items: center;
-  backdrop-filter: blur(5px);
+  padding: 20px;
 }
 
-.instant-post-modal {
-  background: #1a1a3a;
-  border-radius: 12px;
-  padding: 2rem;
-  width: 90%;
+.modal-content {
+  background: linear-gradient(135deg, #1a1a3a, #2e2e5e);
+  border-radius: 16px;
+  padding: 24px;
+  width: 100%;
   max-width: 700px;
-  border: 1px solid rgba(0, 255, 204, 0.4);
-  box-shadow: 0 10px 40px rgba(0, 255, 204, 0.5);
   max-height: 90vh;
   overflow-y: auto;
-}
-
-.instant-post-modal h3 {
-  margin-top: 0;
-  color: #00ffcc;
-  margin-bottom: 1.5rem;
-  text-align: center;
-}
-
-.instant-post-modal h4 {
+  border: 1px solid rgba(0, 255, 204, 0.4);
+  box-shadow: 0 10px 40px rgba(0, 255, 204, 0.3);
   color: #e0e0ff;
-  margin: 0 0 0.8rem 0;
+  position: relative;
+  animation: modalAppear 0.3s ease-out;
+}
+
+@keyframes modalAppear {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal-content h3 {
+  margin: 0 0 20px 0;
+  color: #00ffcc;
+  text-align: center;
+  font-size: 1.4rem;
+  font-weight: 600;
+  text-shadow: 0 0 8px rgba(0, 255, 204, 0.5);
+}
+
+.modal-content h4 {
+  color: #e0e0ff;
+  margin: 0 0 12px 0;
   font-size: 1rem;
   font-weight: 500;
 }
@@ -261,13 +284,18 @@
   border-radius: 8px;
   padding: 8px 12px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .platform-checkbox:hover {
   background: rgba(255, 255, 255, 0.08);
-  transform: translateY(-2px);
+  transform: translateY(-1px);
+}
+
+.platform-checkbox:active {
+  transform: translateY(0);
+  transition: all 0.05s ease;
 }
 
 .platform-checkbox.selected {
@@ -334,12 +362,17 @@
   background-color: rgba(0, 255, 204, 0.1);
   color: #00ffcc;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
 
 .connect-platform-button:hover {
   background-color: rgba(0, 255, 204, 0.2);
-  transform: translateY(-2px);
+  transform: translateY(-1px);
+}
+
+.connect-platform-button:active {
+  transform: translateY(0);
+  transition: all 0.05s ease;
 }
 
 /* Post content section */
@@ -391,14 +424,20 @@
   padding: 0.8rem 1rem;
   color: #00ffcc;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
   justify-content: center;
   margin-bottom: 1rem;
 }
 
 .upload-button:hover {
   background: rgba(255, 255, 255, 0.08);
-  transform: translateY(-2px);
+  transform: translateY(-1px);
+  border-color: rgba(0, 255, 204, 0.6);
+}
+
+.upload-button:active {
+  transform: translateY(0);
+  transition: all 0.05s ease;
 }
 
 .upload-button svg {
@@ -463,39 +502,51 @@
 }
 
 .cancel-button, .post-button {
-  padding: 0.8rem 1.5rem;
+  padding: 12px 24px;
   border-radius: 8px;
+  font-size: 1rem;
   font-weight: 600;
-  font-size: 0.95rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
+  border: none;
 }
 
 .cancel-button {
   background: rgba(255, 255, 255, 0.1);
-  color: #a0a0cc;
+  color: #e0e0ff;
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .cancel-button:hover {
   background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.cancel-button:active {
+  transform: translateY(0);
+  transition: all 0.05s ease;
 }
 
 .post-button {
   background: linear-gradient(135deg, #00ffcc, #007bff);
-  color: #1a1a32;
-  border: none;
+  color: #1a1a3a;
 }
 
 .post-button:disabled {
-  opacity: 0.5;
+  background: rgba(160, 160, 204, 0.3);
+  color: rgba(160, 160, 204, 0.7);
   cursor: not-allowed;
   transform: translateY(0);
 }
 
 .post-button:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 255, 204, 0.4);
+}
+
+.post-button:active:not(:disabled) {
+  transform: translateY(0);
+  transition: all 0.05s ease;
 }
 
 .platforms-container {
@@ -652,45 +703,48 @@
   background: rgba(255, 152, 0, 0.25);
 }
 
+/* Fix #2: Notifications Display - Tiny and Non-intrusive */
 .notification-badge-container {
-  display: flex;
-  align-items: center;
-  margin-left: 1rem;
-  position: relative;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 100;
 }
 
 .notification-badge {
   display: flex;
   align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #1a1a2e, #16213e);
-  color: #e0e0ff;
-  border-radius: 50px;
-  min-width: 38px;
-  height: 32px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  box-shadow: 0 0 10px rgba(26, 26, 46, 0.5);
-  padding: 0 10px;
   gap: 4px;
+  background: linear-gradient(135deg, #ff6b6b, #ff8e53);
+  border-radius: 12px;
+  padding: 4px 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(255, 107, 107, 0.4);
+  border: 1px solid rgba(255, 107, 107, 0.6);
   cursor: pointer;
-  border: 1px solid rgba(224, 224, 255, 0.2);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  min-width: auto;
+  max-width: 120px;
+}
+
+.notification-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.6);
 }
 
 .notification-bell-icon {
-  width: 18px;
-  height: 18px;
-  display: inline-block;
-  vertical-align: middle;
-  margin-right: 4px;
-  color: #e0e0ff;
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
 }
 
 .notification-number {
-  font-size: 1.1em;
+  font-size: 0.7rem;
   font-weight: 700;
-  margin-left: 2px;
-  color: #00ffcc;
+  line-height: 1;
 }
 
 .notification-tooltip {
@@ -897,50 +951,68 @@
     flex-wrap: wrap;
   }
 
-  .notification-badge-container {
-    position: static;
-    transform: none;
-    margin-top: 0.5rem;
-    z-index: 100;
-  }
-  
-  .notification-tooltip {
-    position: fixed;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    width: 80%;
-    max-width: 320px;
-  }
-  
-  .notification-tooltip::before {
-    display: none;
-  }
-  
   .usage-stats {
     grid-template-columns: 1fr;
   }
   
-  .instant-post-modal {
-    width: 95%;
-    padding: 1.5rem;
-    margin: 0 10px;
+  /* Notification positioning for mobile - keep absolute positioning */
+  .notification-badge-container {
+    top: 6px;
+    right: 6px;
+  }
+
+  .modal-overlay {
+    padding: 10px;
+  }
+  
+  .modal-content {
+    padding: 16px;
+    max-height: 95vh;
+    border-radius: 12px;
+  }
+  
+  .modal-content h3 {
+    font-size: 1.2rem;
+    margin-bottom: 16px;
   }
   
   .platform-checkboxes {
-    justify-content: center;
+    flex-direction: column;
+    gap: 8px;
   }
-
+  
   .notification-badge {
-    min-width: 32px;
-    height: 28px;
-    font-size: 0.85rem;
-    padding: 0 6px;
+    font-size: 0.65rem;
+    padding: 3px 6px;
+    max-width: 100px;
   }
+  
   .notification-bell-icon {
-    width: 15px;
-    height: 15px;
-    margin-right: 2px;
+    width: 10px;
+    height: 10px;
+  }
+  
+  .instant-post-button {
+    padding: 1rem;
+    flex-direction: column;
+    text-align: center;
+    gap: 8px;
+  }
+  
+  .instant-post-icon {
+    width: 36px;
+    height: 36px;
+    margin-right: 0;
+  }
+  
+  .modal-buttons {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .cancel-button, .post-button {
+    width: 100%;
+    padding: 14px 20px;
   }
 }
 

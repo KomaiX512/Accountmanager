@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import './App.css';
+import './styles/global-ui-refinements.css';
 import LeftBar from './components/common/LeftBar';
 import TopBar from './components/common/TopBar';
 import Instagram from './pages/Instagram';
@@ -16,6 +17,7 @@ import { InstagramProvider } from './context/InstagramContext';
 import { TwitterProvider } from './context/TwitterContext';
 import axios from 'axios';
 import { syncInstagramConnection, isInstagramDisconnected } from './utils/instagramSessionManager';
+
 
 // Main App component with AuthProvider
 const App: React.FC = () => {
@@ -56,6 +58,8 @@ const AppContent: React.FC = () => {
   
   const isLoginPage = location.pathname === '/login';
   const isAccountPage = location.pathname === '/account';
+  const isEntryPage = location.pathname.includes('/setup') || location.pathname.includes('/connect') || location.pathname.includes('/entry');
+  const shouldHideLeftBar = isLoginPage || isAccountPage || isEntryPage;
 
   // Determine current platform based on route
   const currentPlatform = location.pathname.includes('twitter') ? 'twitter' : 'instagram';
@@ -171,8 +175,8 @@ const AppContent: React.FC = () => {
     <div className="App">
       <TopBar />
       <div className="main-content">
-        {!isLoginPage && !isAccountPage && <LeftBar accountHolder={accountHolder} userId={userId} platform={currentPlatform} />}
-        <div className={`content-area ${isLoginPage || isAccountPage ? 'full-width' : ''}`}>
+        {!shouldHideLeftBar && <LeftBar accountHolder={accountHolder} userId={userId} platform={currentPlatform} />}
+        <div className={`content-area ${shouldHideLeftBar ? 'full-width' : ''}`}>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route
@@ -257,6 +261,7 @@ const AppContent: React.FC = () => {
                 </PrivateRoute>
               }
             />
+
           </Routes>
         </div>
       </div>

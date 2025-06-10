@@ -655,49 +655,130 @@ The response should include:
 `;
 }
 
-// API endpoint for post generator
+// API endpoint for post generator (updated with full image generation functionality)
 app.post('/api/post-generator', async (req, res) => {
-  const { username, query, platform = 'instagram' } = req.body;
-  
-  if (!username || !query) {
-    return res.status(400).json({ error: 'Username and query are required' });
-  }
-
   try {
-    // Fetch profile and rules data with platform
-    console.log(`[RAG-Server] Processing post generation query for ${platform}/${username}: "${query}"`);
-    const profileData = await getProfileData(username, platform);
-    const rulesData = await getRulesData(username, platform).catch(() => ({}));
+    const { username, query, platform = 'instagram' } = req.body;
     
-    // Create post generation prompt
-    const postPrompt = createPostGenerationPrompt(profileData, rulesData, query);
-    
-    // Call Gemini API
-    const response = await callGeminiAPI(postPrompt);
-    
-    // Save post data to R2
-    const postData = {
-      username,
-      platform,
-      timestamp: new Date().toISOString(),
-      query,
-      response
-    };
-    
-    // Save with platform-aware path
-    const postKey = `ready_post/${platform}/${username}/${Date.now()}.json`;
-    await saveToR2(postData, postKey);
-    
-    // Return response
-    res.json({ response });
-  } catch (error) {
-    console.error('[RAG-Server] Post generator endpoint error:', error.message);
-    
-    if (error.message.includes('Profile data not found')) {
-      return res.status(404).json({ error: `Profile data not found for ${platform}/${username}. Please ensure the username is correct.` });
+    if (!username || !query) {
+      return res.status(400).json({ error: 'Username and query are required' });
     }
     
-    res.status(500).json({ error: error.message });
+    console.log(`[${new Date().toISOString()}] [RAG SERVER] Post generation request for ${platform}/${username}: "${query}"`);
+    
+    // Create a customized prompt for the post generator
+    const prompt = `You are a professional social media marketing expert for the brand "${username}" on Instagram. 
+Your task is to create a high-quality, engaging Instagram post about: "${query}"
+
+IMPORTANT: DO NOT include any introductory text like "Here's a caption" or "I've created" or "Here's a post" or similar meta-commentary.
+
+Structure your response EXACTLY as follows (with NO other text):
+
+Caption: [Write a catchy, engaging Instagram caption that is 2-4 sentences long. Include relevant emojis. Make sure it's informal, conversational, and aligned with Instagram best practices.]
+
+Hashtags: [List 5-10 relevant hashtags for discoverability]
+
+Call to Action: [Add a brief call-to-action encouraging followers to take a specific action]
+
+Visual Description for Image: [Write a detailed, vivid description for the image that should accompany this post. Be extremely specific about what should be in the image, including colors, layout, mood, lighting, and key elements. This will be used to generate an AI image, so include details about composition, style, and visual elements. Minimum 100 words.]`;
+
+    try {
+      // Get response from AI model
+      console.log(`[${new Date().toISOString()}] [RAG SERVER] Calling AI API for post generation`);
+      const response = await callGeminiAPI(prompt);
+      
+      // Clean and process the response to extract structured content
+      console.log(`[${new Date().toISOString()}] [RAG SERVER] Raw response:`, response.substring(0, 200) + '...');
+      
+      // Extract the sections using regex
+      const captionMatch = response.match(/Caption:(.*?)(?=Hashtags:|$)/s);
+      const hashtagsMatch = response.match(/Hashtags:(.*?)(?=Call to Action:|$)/s);
+      const ctaMatch = response.match(/Call to Action:(.*?)(?=Visual Description for Image:|$)/s);
+      const visualMatch = response.match(/Visual Description for Image:(.*?)(?=$)/s);
+      
+      // Format the sections into a structured response
+      const caption = captionMatch ? captionMatch[1].trim() : '';
+      let hashtags = [];
+      if (hashtagsMatch && hashtagsMatch[1]) {
+        hashtags = hashtagsMatch[1].match(/#[\w\d]+/g) || [];
+      }
+      const callToAction = ctaMatch ? ctaMatch[1].trim() : '';
+      const imagePrompt = visualMatch ? visualMatch[1].trim() : '';
+      
+      // Create the structured response
+      const structuredResponse = {
+        caption,
+        hashtags,
+        call_to_action: callToAction,
+        image_prompt: imagePrompt
+      };
+      
+      // Generate timestamp for unique filename
+      const timestamp = Date.now();
+      
+      // Add proxy URL for images - ensure we use our proxy instead of direct R2
+      const imageFileName = `image_${timestamp}.jpg`;
+      const postFileName = `ready_post_${timestamp}.json`;
+      
+      // Use our proxy URL format
+      const baseUrl = req.get('host') ? `http://${req.get('host').replace('3001', '3002')}` : 'http://localhost:3002';
+      const imageUrl = `${baseUrl}/fix-image/${username}/${imageFileName}?platform=${platform}`;
+      
+      // Create complete post data
+      const postData = {
+        post: structuredResponse,
+        timestamp,
+        image_path: `ready_post/${platform}/${username}/${imageFileName}`,
+        image_url: imageUrl,
+        r2_image_url: imageUrl,
+        generated_at: new Date().toISOString(),
+        queryUsed: query,
+        status: 'new',
+        platform
+      };
+      
+      // Save to R2 for persistence - the saveToR2 function will fix any remaining direct R2 URLs
+      const postKey = `ready_post/${platform}/${username}/${postFileName}`;
+      await saveToR2(postData, postKey);
+      
+      // GENERATE ACTUAL IMAGE: Create the JPG file based on the refined prompt
+      console.log(`[${new Date().toISOString()}] [RAG SERVER] Starting image generation for: ${imageFileName}`);
+      try {
+        await generateImageFromPrompt(imagePrompt, imageFileName, username, platform);
+        console.log(`[${new Date().toISOString()}] [RAG SERVER] Image generation completed successfully`);
+      } catch (imageError) {
+        console.error(`[${new Date().toISOString()}] [RAG SERVER] Image generation failed:`, imageError.message);
+        // Continue anyway - the placeholder will be created
+      }
+      
+      console.log(`[${new Date().toISOString()}] [RAG SERVER] Structured response:`, JSON.stringify(structuredResponse, null, 2));
+      
+      // NOTIFY FRONTEND: Emit event for PostCooked auto-refresh
+      const notificationPayload = {
+        username,
+        platform,
+        timestamp: postData.timestamp,
+        success: true,
+        message: 'New post generated successfully'
+      };
+      
+      // In a real implementation, you might use WebSockets or Server-Sent Events
+      // For now, we'll rely on the PostCooked auto-refresh mechanism
+      console.log(`[${new Date().toISOString()}] [RAG SERVER] Post generation completed - frontend should auto-refresh`);
+      
+      // Return the structured response with proper image URLs
+      return res.json({ 
+        response: structuredResponse, 
+        post: postData, 
+        notification: notificationPayload 
+      });
+    } catch (apiError) {
+      console.error(`[${new Date().toISOString()}] [RAG SERVER] API error:`, apiError);
+      return res.status(500).json({ error: 'Failed to generate post', details: apiError.message });
+    }
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [RAG SERVER] Error in post generation:`, error);
+    return res.status(500).json({ error: 'Failed to generate post', details: error.message });
   }
 });
 
@@ -961,10 +1042,37 @@ Visual Description for Image: [Write a detailed, vivid description for the image
       const postKey = `ready_post/${platform}/${username}/${postFileName}`;
       await saveToR2(postData, postKey);
       
+      // GENERATE ACTUAL IMAGE: Create the JPG file based on the refined prompt
+      console.log(`[${new Date().toISOString()}] [RAG SERVER] Starting image generation for: ${imageFileName}`);
+      try {
+        await generateImageFromPrompt(imagePrompt, imageFileName, username, platform);
+        console.log(`[${new Date().toISOString()}] [RAG SERVER] Image generation completed successfully`);
+      } catch (imageError) {
+        console.error(`[${new Date().toISOString()}] [RAG SERVER] Image generation failed:`, imageError.message);
+        // Continue anyway - the placeholder will be created
+      }
+      
       console.log(`[${new Date().toISOString()}] [RAG SERVER] Structured response:`, JSON.stringify(structuredResponse, null, 2));
       
+      // NOTIFY FRONTEND: Emit event for PostCooked auto-refresh
+      const notificationPayload = {
+        username,
+        platform,
+        timestamp: postData.timestamp,
+        success: true,
+        message: 'New post generated successfully'
+      };
+      
+      // In a real implementation, you might use WebSockets or Server-Sent Events
+      // For now, we'll rely on the PostCooked auto-refresh mechanism
+      console.log(`[${new Date().toISOString()}] [RAG SERVER] Post generation completed - frontend should auto-refresh`);
+      
       // Return the structured response with proper image URLs
-      return res.json({ response: structuredResponse, post: postData });
+      return res.json({ 
+        response: structuredResponse, 
+        post: postData, 
+        notification: notificationPayload 
+      });
     } catch (apiError) {
       console.error(`[${new Date().toISOString()}] [RAG SERVER] API error:`, apiError);
       
@@ -1053,6 +1161,16 @@ Visual Description for Image: [Write a detailed, vivid description for the image
       // Save to R2 for persistence
       const postKey = `ready_post/${platform}/${username}/${postFileName}`;
       await saveToR2(postData, postKey);
+      
+      // GENERATE ACTUAL IMAGE: Create the JPG file based on the refined prompt
+      console.log(`[${new Date().toISOString()}] [RAG SERVER] Starting fallback image generation for: ${imageFileName}`);
+      try {
+        await generateImageFromPrompt(fallbackImagePrompt, imageFileName, username, platform);
+        console.log(`[${new Date().toISOString()}] [RAG SERVER] Fallback image generation completed successfully`);
+      } catch (imageError) {
+        console.error(`[${new Date().toISOString()}] [RAG SERVER] Fallback image generation failed:`, imageError.message);
+        // Continue anyway - the placeholder will be created
+      }
       
       return res.json({ response: fallbackResponse, post: postData });
     }
@@ -1146,6 +1264,173 @@ app.post('/api/instant-reply', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// Add image generation function using Stable Horde API
+async function generateImageFromPrompt(imagePrompt, filename, username, platform = 'instagram') {
+  console.log(`[${new Date().toISOString()}] [IMAGE-GEN] Starting image generation for ${filename}`);
+  
+  const AI_HORDE_CONFIG = {
+    api_key: "VxVGZGSL20PDRbi3mW2D5Q",
+    base_url: "https://stablehorde.net/api/v2"
+  };
+  
+  try {
+    // Create the payload for the Stable Horde API
+    const payload = {
+      prompt: imagePrompt,
+      params: {
+        width: 512,
+        height: 512,
+        steps: 30,
+        cfg_scale: 7.5,
+        sampler_name: "k_euler_a",
+        clip_skip: 1
+      },
+      trusted_workers: true,
+      slow_workers: true,
+      workers: [],
+      models: ["stable_diffusion"]
+    };
+
+    console.log(`[${new Date().toISOString()}] [IMAGE-GEN] Sending request to Stable Horde API`);
+    
+    // Step 1: Submit the generation request to get a job ID
+    const generationResponse = await axios.post(
+      'https://stablehorde.net/api/v2/generate/async', 
+      payload, 
+      {
+        headers: { 
+          'Content-Type': 'application/json',
+          'apikey': AI_HORDE_CONFIG.api_key
+        },
+        timeout: 15000
+      }
+    );
+    
+    if (!generationResponse.data || !generationResponse.data.id) {
+      throw new Error('No job ID received from Stable Horde API');
+    }
+    
+    const jobId = generationResponse.data.id;
+    console.log(`[${new Date().toISOString()}] [IMAGE-GEN] Received job ID: ${jobId}`);
+    
+    // Step 2: Poll for job completion
+    let imageUrl = null;
+    let attempts = 0;
+    const maxAttempts = 20;
+    const pollInterval = 5000; // 5 seconds
+    
+    while (!imageUrl && attempts < maxAttempts) {
+      attempts++;
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+      
+      console.log(`[${new Date().toISOString()}] [IMAGE-GEN] Checking job status (attempt ${attempts}/${maxAttempts})`);
+      
+      const checkResponse = await axios.get(
+        `https://stablehorde.net/api/v2/generate/check/${jobId}`,
+        {
+          headers: { 'apikey': AI_HORDE_CONFIG.api_key },
+          timeout: 10000
+        }
+      );
+      
+      if (checkResponse.data && checkResponse.data.done) {
+        console.log(`[${new Date().toISOString()}] [IMAGE-GEN] Job complete, retrieving result`);
+        
+        const resultResponse = await axios.get(
+          `https://stablehorde.net/api/v2/generate/status/${jobId}`,
+          {
+            headers: { 'apikey': AI_HORDE_CONFIG.api_key },
+            timeout: 10000
+          }
+        );
+        
+        if (resultResponse.data && 
+            resultResponse.data.generations && 
+            resultResponse.data.generations.length > 0 &&
+            resultResponse.data.generations[0].img) {
+          
+          imageUrl = resultResponse.data.generations[0].img;
+          console.log(`[${new Date().toISOString()}] [IMAGE-GEN] Successfully generated image`);
+        }
+      } else {
+        console.log(`[${new Date().toISOString()}] [IMAGE-GEN] Job still processing...`);
+      }
+    }
+    
+    if (!imageUrl) {
+      throw new Error(`Failed to generate image after ${maxAttempts} attempts`);
+    }
+    
+    // Step 3: Download the generated image
+    console.log(`[${new Date().toISOString()}] [IMAGE-GEN] Downloading generated image`);
+    const imageResponse = await axios.get(imageUrl, {
+      responseType: 'arraybuffer',
+      timeout: 30000
+    });
+    
+    const imageBuffer = Buffer.from(imageResponse.data);
+    
+    // Step 4: Save the image to R2 storage
+    const imageKey = `ready_post/${platform}/${username}/${filename}`;
+    
+    await tasksS3.putObject({
+      Bucket: 'tasks',
+      Key: imageKey,
+      Body: imageBuffer,
+      ContentType: 'image/jpeg'
+    }).promise();
+    
+    console.log(`[${new Date().toISOString()}] [IMAGE-GEN] Successfully saved image to R2: ${imageKey}`);
+    
+    // Also save locally for backup
+    const localImageDir = path.join(process.cwd(), 'ready_post', platform, username);
+    if (!fs.existsSync(localImageDir)) {
+      fs.mkdirSync(localImageDir, { recursive: true });
+    }
+    const localImagePath = path.join(localImageDir, filename);
+    fs.writeFileSync(localImagePath, imageBuffer);
+    
+    console.log(`[${new Date().toISOString()}] [IMAGE-GEN] Image generation completed successfully`);
+    return true;
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [IMAGE-GEN] Error generating image:`, error.message);
+    
+    // Create a placeholder image instead
+    try {
+      const placeholderBuffer = await createPlaceholderImage(username, platform);
+      const imageKey = `ready_post/${platform}/${username}/${filename}`;
+      
+      await tasksS3.putObject({
+        Bucket: 'tasks',
+        Key: imageKey,
+        Body: placeholderBuffer,
+        ContentType: 'image/jpeg'
+      }).promise();
+      
+      console.log(`[${new Date().toISOString()}] [IMAGE-GEN] Created placeholder image instead`);
+      return true;
+    } catch (placeholderError) {
+      console.error(`[${new Date().toISOString()}] [IMAGE-GEN] Failed to create placeholder:`, placeholderError.message);
+      return false;
+    }
+  }
+}
+
+// Helper function to create a placeholder image
+async function createPlaceholderImage(username, platform) {
+  // Simple colored rectangle as placeholder
+  const width = 512;
+  const height = 512;
+  
+  // Create a simple colored placeholder (this is a minimal implementation)
+  // In a real scenario, you might want to use a proper image generation library
+  const placeholderData = Buffer.alloc(width * height * 3, 128); // Gray image
+  
+  // Return a simple gray image buffer (this is very basic - you might want to use canvas or similar)
+  return placeholderData;
+}
 
 // Start the server with graceful shutdown
 const server = app.listen(port, () => {

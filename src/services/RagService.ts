@@ -102,14 +102,15 @@ axios.interceptors.response.use(
 
 class RagService {
   // Accept both localhost and 127.0.0.1 to handle different browser security policies
-  private static readonly MAIN_SERVER_URLS = [
-    'http://127.0.0.1:3000',  // Use port 3000 for direct server access
-    'http://localhost:3000'   // This is the main server with all endpoints
+  // Use port 3001 for RAG server (not port 3000 which is the main server)
+  private static readonly RAG_SERVER_URLS = [
+    'http://127.0.0.1:3001',  // RAG server on port 3001
+    'http://localhost:3001'   // RAG server on port 3001
   ];
   
-  private static readonly PROXY_SERVER_URLS = [
-    'http://127.0.0.1:3000',
-    'http://localhost:3000'
+  private static readonly MAIN_SERVER_URLS = [
+    'http://127.0.0.1:3000',  // Main server on port 3000
+    'http://localhost:3000'   // Main server on port 3000
   ];
   
   /**
@@ -140,7 +141,7 @@ class RagService {
   }
   
   /**
-   * Sends a discussion query to the RAG server via the main server proxy
+   * Sends a discussion query to the RAG server directly
    */
   static async sendDiscussionQuery(
     username: string, 
@@ -150,8 +151,9 @@ class RagService {
     try {
       console.log(`[RagService] Sending discussion query for ${username}: "${query}"`);
       
-      return await this.tryServerUrls(`/api/rag-discussion/${username}`, (url) => 
+      return await this.tryServerUrls(`/api/discussion`, (url) => 
         axios.post(url, {
+          username,
           query,
           previousMessages
         }, {
@@ -160,7 +162,7 @@ class RagService {
           headers: {
             'Content-Type': 'application/json'
           }
-        })
+        }), this.RAG_SERVER_URLS
       ).then(response => response.data);
       
     } catch (error: any) {
@@ -170,7 +172,7 @@ class RagService {
   }
   
   /**
-   * Sends a post generation query to the RAG server via the main server proxy
+   * Sends a post generation query to the RAG server directly
    */
   static async sendPostQuery(username: string, query: string): Promise<PostGenerationResponse> {
     let lastError: any = null;
@@ -181,8 +183,9 @@ class RagService {
       // Update UI with initial status
       console.log(`[RagService] Step 1/4: Initiating request to RAG server`);
       
-      const response = await this.tryServerUrls(`/api/rag-post/${username}`, (url) => 
+      const response = await this.tryServerUrls(`/api/post-generator`, (url) => 
         axios.post(url, {
+          username,
           query
         }, {
           timeout: 60000, // 60 second timeout for image generation
@@ -190,7 +193,7 @@ class RagService {
           headers: {
             'Content-Type': 'application/json'
           }
-        })
+        }), this.RAG_SERVER_URLS
       );
       
       // Process the result
@@ -203,6 +206,22 @@ class RagService {
         generatedAt: new Date().toISOString(),
         queryUsed: query
       };
+      
+      // EMIT EVENT: Notify PostCooked component to refresh
+      try {
+        const newPostEvent = new CustomEvent('newPostCreated', {
+          detail: {
+            username,
+            platform: 'instagram', // Default to instagram, could be passed as parameter
+            timestamp: postData.timestamp || Date.now(),
+            success: true
+          }
+        });
+        window.dispatchEvent(newPostEvent);
+        console.log(`[RagService] Emitted newPostCreated event for ${username}`);
+      } catch (eventError) {
+        console.warn('[RagService] Failed to emit newPostCreated event:', eventError);
+      }
       
       return {
         success: true,
@@ -253,15 +272,15 @@ class RagService {
   }
   
   /**
-   * Loads the conversation history for a user via the main server proxy
+   * Loads the conversation history for a user from the RAG server directly
    */
   static async loadConversations(username: string): Promise<ChatMessage[]> {
     try {
-      const response = await this.tryServerUrls(`/api/rag-conversations/${username}`, (url) => 
+      const response = await this.tryServerUrls(`/api/conversations/${username}`, (url) => 
         axios.get(url, {
           timeout: 10000, // 10 second timeout
           withCredentials: false, // Disable sending cookies
-        })
+        }), this.RAG_SERVER_URLS
       );
       return response.data.messages || [];
     } catch (error: any) {
@@ -271,11 +290,11 @@ class RagService {
   }
   
   /**
-   * Saves the conversation history for a user via the main server proxy
+   * Saves the conversation history for a user to the RAG server directly
    */
   static async saveConversation(username: string, messages: ChatMessage[]): Promise<void> {
     try {
-      await this.tryServerUrls(`/api/rag-conversations/${username}`, (url) => 
+      await this.tryServerUrls(`/api/conversations/${username}`, (url) => 
         axios.post(url, {
           messages
         }, {
@@ -284,7 +303,7 @@ class RagService {
           headers: {
             'Content-Type': 'application/json'
           }
-        })
+        }), this.RAG_SERVER_URLS
       );
     } catch (error: any) {
       console.error('[RagService] Failed to save conversation:', error.response?.data || error.message);
@@ -333,11 +352,11 @@ class RagService {
 
     for (const baseUrl of urls) {
       try {
-        console.log(`[RagService] Trying to send instant AI reply via ${baseUrl}/api/rag-instant-reply/${username}`);
+        console.log(`[RagService] Trying to send instant AI reply via ${baseUrl}/rag-instant-reply/${username}`);
         
         // Add validation headers to ensure the request is properly handled
         const response = await axios.post(
-          `${baseUrl}/api/rag-instant-reply/${username}`,
+          `${baseUrl}/rag-instant-reply/${username}`,
           notification,
           {
             headers: {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import './PostCooked.css';
 import { motion } from 'framer-motion';
 import { saveFeedback } from '../../utils/FeedbackHandler';
@@ -68,7 +68,7 @@ interface ImageErrorState {
 }
 
 // Base URL for all API requests
-const API_BASE_URL = 'http://localhost:3002';
+const API_BASE_URL = 'http://localhost:3000';
 
 const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts = [], userId: propUserId, platform = 'instagram' }) => {
   const { isConnected: isInstagramConnected, userId: instagramUserId } = useInstagram();
@@ -82,6 +82,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   const [localPosts, setLocalPosts] = useState<typeof posts>([]);
   const [imageErrors, setImageErrors] = useState<{ [key: string]: ImageErrorState }>({});
   const [profileImageError, setProfileImageError] = useState(false);
+  const [loadingImages, setLoadingImages] = useState<Set<string>>(new Set());
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState<string | null>(null);
   const [feedbackText, setFeedbackText] = useState('');
@@ -115,30 +116,121 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   useEffect(() => {
     console.log('Posts prop in PostCooked:', posts);
     setLocalPosts(posts);
-  }, [posts]);
+    
+    // REAL-TIME INITIALIZATION: Auto-refresh on mount to ensure fresh data
+    if (username && posts.length === 0) {
+      console.log('[PostCooked] Auto-refreshing for real-time data on mount');
+      setTimeout(() => handleRefreshPosts(), 500);
+    }
+  }, [posts, username]);
+
+  // AUTO-REFRESH: Set up periodic refresh for new posts created in post mode
+  useEffect(() => {
+    if (!username) return;
+
+         let refreshInterval: number;
+     let lastPostCount = localPosts.length;
+
+     // Check for new posts every 3 seconds when in active use
+     const checkForNewPosts = async () => {
+       try {
+         const platformParam = platform ? `&platform=${platform}` : '';
+         const response = await axios.get(`${API_BASE_URL}/posts/${username}?platform=${platform?.replace('&', '')}&nocache=${Date.now()}`, {
+           headers: {
+             'Cache-Control': 'no-cache, no-store, must-revalidate',
+             'Pragma': 'no-cache'
+           },
+           timeout: 5000 // Quick timeout for background checks
+         });
+
+         const newPostCount = response.data.length;
+         
+         // If we have new posts, update immediately
+         if (newPostCount > lastPostCount) {
+           console.log(`[PostCooked] AUTO-REFRESH: New posts detected! ${lastPostCount} → ${newPostCount}`);
+           setLocalPosts(response.data);
+           setToastMessage('✨ New post arrived! PostCooked module refreshed automatically.');
+           lastPostCount = newPostCount;
+         }
+       } catch (error: any) {
+         // Silently handle errors for background refresh to avoid spam
+         console.log('[PostCooked] Background refresh failed (silent):', error.message);
+       }
+     };
+
+     // Start periodic checking
+     refreshInterval = window.setInterval(checkForNewPosts, 3000);
+
+    // Also listen for custom events from post creation
+    const handleNewPostEvent = (event: CustomEvent) => {
+      const { username: eventUsername, platform: eventPlatform } = event.detail;
+      
+      if (eventUsername === username && eventPlatform === platform) {
+        console.log('[PostCooked] NEW POST EVENT: Refreshing immediately');
+        setTimeout(() => handleRefreshPosts(), 1000); // Small delay to allow server processing
+      }
+    };
+
+    window.addEventListener('newPostCreated', handleNewPostEvent as EventListener);
+
+         // Cleanup
+     return () => {
+       if (refreshInterval) window.clearInterval(refreshInterval);
+       window.removeEventListener('newPostCreated', handleNewPostEvent as EventListener);
+     };
+  }, [username, platform, localPosts.length]);
+
+  // State for forcing image refresh
+  const [imageRefreshKey, setImageRefreshKey] = useState(0);
 
   // Listen for post updates from Canvas Editor
   useEffect(() => {
     const handlePostUpdate = (event: CustomEvent) => {
-      const { postKey, platform: updatedPlatform } = event.detail;
+      const { postKey, platform: updatedPlatform, timestamp } = event.detail;
       
       if (updatedPlatform === platform) {
-        console.log(`[PostCooked] Post ${postKey} was updated, refreshing...`);
-        setToastMessage('Post updated successfully! Refreshing...');
+        console.log(`[PostCooked] INSTANT UPDATE for ${postKey}`);
+        setToastMessage('✅ Image updated instantly!');
         
-        // Refresh posts after a short delay
-        setTimeout(() => {
-          handleRefreshPosts();
-        }, 1000);
+        // INSTANT METHOD: Force all images to reload with cache busting
+        const now = Date.now();
+        const postIndex = localPosts.findIndex(p => p.key === postKey);
+        
+        if (postIndex >= 0) {
+          // Extract image identifier
+          let imageId = '';
+          const match = postKey.match(/ready_post_(\d+)\.json$/);
+          if (match) imageId = match[1];
+          
+          // Create super cache-busted URL
+          const cacheBust = `?INSTANT=${now}&edited=true&v=${Math.random()}&force=1`;
+          const freshUrl = `${API_BASE_URL}/api/r2-image/${username}/image_${imageId}.jpg${cacheBust}`;
+          
+          // Update ONLY the edited post instantly
+          setLocalPosts(prev => {
+            const updated = [...prev];
+            updated[postIndex] = {
+              ...updated[postIndex],
+              data: {
+                ...updated[postIndex].data,
+                image_url: freshUrl,
+                r2_image_url: freshUrl
+              }
+            };
+            return updated;
+          });
+          
+          // Force React re-render
+          setImageRefreshKey(now);
+          
+          console.log(`[PostCooked] ⚡ INSTANT REFRESH: ${freshUrl}`);
+        }
       }
     };
 
     window.addEventListener('postUpdated', handlePostUpdate as EventListener);
-    
-    return () => {
-      window.removeEventListener('postUpdated', handlePostUpdate as EventListener);
-    };
-  }, [platform]);
+    return () => window.removeEventListener('postUpdated', handlePostUpdate as EventListener);
+  }, [platform, localPosts, username]);
 
   useEffect(() => {
     if (toastMessage) {
@@ -146,6 +238,35 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       return () => clearTimeout(timer);
     }
   }, [toastMessage]);
+
+  // CACHE OPTIMIZATION: Get optimized image URL for a post
+  const getCachedImageUrl = useCallback((post: any) => {
+    const postKey = post.key;
+    let imageId = '';
+    const match = postKey.match(/ready_post_(\d+)\.json$/);
+    if (match) imageId = match[1];
+    
+    // Generate URL with minimal cache busting
+    const cacheBust = imageRefreshKey > 0 
+      ? `?refresh=${imageRefreshKey}`
+      : '';
+    
+    return `${API_BASE_URL}/api/r2-image/${username}/image_${imageId}.jpg${cacheBust}`;
+  }, [imageRefreshKey, username]);
+
+  // PERFORMANCE: Handle image load success
+  const handleImageLoad = useCallback((postKey: string) => {
+    setLoadingImages(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(postKey);
+      return newSet;
+    });
+  }, []);
+
+  // PERFORMANCE: Handle image load start
+  const handleImageLoadStart = useCallback((postKey: string) => {
+    setLoadingImages(prev => new Set([...prev, postKey]));
+  }, []);
 
   const handleLike = (key: string) => {
     setToastMessage('Liked! Thanks for the love! ❤️');
@@ -948,7 +1069,17 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     
     try {
       const platformParam = platform ? `&platform=${platform}` : '';
-      const response = await axios.get(`${API_BASE_URL}/api/posts/${username}?forceRefresh=true${platformParam}`);
+      const realTimeTimestamp = Date.now();
+      
+      // REAL-TIME REQUEST: Always bypass cache with multiple parameters
+      const response = await axios.get(`${API_BASE_URL}/posts/${username}?forceRefresh=true${platformParam}&realtime=${realTimeTimestamp}&nocache=1&v=${Math.random()}`, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
+      
       setLocalPosts(response.data);
       setToastMessage('Posts refreshed successfully!');
     } catch (error) {
@@ -1161,50 +1292,20 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                     <ImagePlaceholder postKey={post.key} />
                   ) : (
                     <img
-                      src={(() => {
-                        const sourceUrl = post.data.r2_image_url || post.data.image_url;
-                        
-                        // Check if this is the problematic narsissist image
-                        if (sourceUrl.includes('narsissist') && sourceUrl.includes('image_1749203937329.jpg')) {
-                          return `${API_BASE_URL}/fix-image/narsissist/image_1749203937329.jpg?platform=${platform}&t=${Date.now()}`;
-                        }
-                        
-                        // Check if it's an R2 URL
-                        if (sourceUrl.includes('r2.cloudflarestorage.com') || 
-                            sourceUrl.includes('r2.dev') ||
-                            sourceUrl.includes('tasks.b21d96e73b908d7d7b822d41516ccc64') ||
-                            sourceUrl.includes('pub-ba72672df3c041a3844f278dd3c32b22')) {
-                          
-                                                  // Extract filename from URL
-                        const urlParts = sourceUrl.split('/');
-                        let filename = '';
-                        
-                        for (let i = 0; i < urlParts.length; i++) {
-                          if (urlParts[i].includes('.jpg')) {
-                            filename = urlParts[i].split('?')[0]; // Remove query params
-                            break;
-                          }
-                        }
-                        
-                        if (filename) {
-                          return `${API_BASE_URL}/fix-image/${username}/${filename}?platform=${platform}&t=${Date.now()}`;
-                        }
-                        }
-                        
-                        // Use original URL as fallback with timestamp
-                        const separator = sourceUrl.includes('?') ? '&' : '?';
-                        return sourceUrl + `${separator}t=${Date.now()}`;
-                      })()}
+                      src={getCachedImageUrl(post)}
                       alt="Post visual"
-                      className="post-image"
+                      className={`post-image ${loadingImages.has(post.key) ? 'loading' : 'loaded'}`}
+                      onLoadStart={() => handleImageLoadStart(post.key)}
+                      onLoad={() => handleImageLoad(post.key)}
                       onError={() => handleImageError(post.key, post.data.r2_image_url || post.data.image_url)}
+                      key={`${post.key}-${imageRefreshKey}`} // CACHED key for React
                     />
                   )}
                   <div className="post-actions">
                     <motion.button
                       className="like-button"
-                      whileHover={{ scale: 1.2 }}
-                      whileTap={{ scale: 0.9 }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.98 }}
                       onClick={() => handleLike(post.key)}
                     >
                       <svg
@@ -1223,8 +1324,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                     </motion.button>
                     <motion.button
                       className="comment-button"
-                      whileHover={{ scale: 1.2 }}
-                      whileTap={{ scale: 0.9 }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.98 }}
                       onClick={() => handleComment(post.key)}
                     >
                       <svg
@@ -1243,8 +1344,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                     </motion.button>
                     <motion.button
                       className="share-button"
-                      whileHover={{ scale: 1.2 }}
-                      whileTap={{ scale: 0.9 }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.98 }}
                       onClick={() => handleShare(post.key)}
                     >
                       <svg
@@ -1263,8 +1364,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                     </motion.button>
                     <motion.button
                       className="dislike-button"
-                      whileHover={{ scale: 1.2 }}
-                      whileTap={{ scale: 0.9 }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.98 }}
                       onClick={() => handleDislike(post.key)}
                     >
                       <svg
@@ -1382,8 +1483,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                     </motion.button>
                     <motion.button
                       className="reject-button"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
                       onClick={() => handleReject(post.key)}
                     >
                       <svg
@@ -1430,7 +1531,10 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                       </div>
                     ) : (
                       <>
-                        {post.data.post?.caption || 'No caption available'}
+                        {post.data.post?.caption && post.data.post.caption.trim() ? 
+                          post.data.post.caption : 
+                          <em style={{ color: '#888', fontStyle: 'italic' }}>Click edit to add a caption</em>
+                        }
                         <button 
                           className="caption-edit-icon" 
                           onClick={() => handleEditCaption(post.key)}
@@ -1455,7 +1559,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                     )}
                   </div>
                   <div className="post-hashtags">
-                    {post.data.post?.hashtags?.length ? (
+                    {post.data.post?.hashtags && post.data.post.hashtags.length > 0 ? (
                       post.data.post.hashtags.map((tag: string, index: number) => (
                         <a
                           key={index}
@@ -1468,10 +1572,15 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                         </a>
                       ))
                     ) : (
-                      <span>No hashtags available</span>
+                      <em style={{ color: '#888', fontStyle: 'italic' }}>No hashtags</em>
                     )}
                   </div>
-                  <p className="post-cta">{post.data.post?.call_to_action || 'No call to action'}</p>
+                  <p className="post-cta">
+                    {post.data.post?.call_to_action && post.data.post.call_to_action.trim() ? 
+                      post.data.post.call_to_action : 
+                      <em style={{ color: '#888', fontStyle: 'italic' }}>No call to action</em>
+                    }
+                  </p>
                 </div>
               </motion.div>
             ))}
@@ -1495,8 +1604,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             <div className="feedback-actions">
               <motion.button
                 className="submit-feedback-button"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => handleFeedbackSubmit(isFeedbackOpen)}
                 disabled={!feedbackText.trim()}
               >
@@ -1504,8 +1613,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
               </motion.button>
               <motion.button
                 className="cancel-feedback-button"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => setIsFeedbackOpen(null)}
               >
                 Cancel

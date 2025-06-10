@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Okay, here's an Instagram post draft for NARS Cosmetics, focusing on makeup tips for beginners:\n\n**Image/Video Suggestion:**\n\n*   **Option 1 (Image):** A flat lay featuring a curated selection of essential NARS products for beginners (e.g., Light Reflecting Foundation, a neutral blush, a versatile eyeshadow stick, a lip shine).  Arrange them artfully with some brushes.\n*   **Option 2 (Video):** A short, quick video demonstrating 3-5 simple makeup tips on a model with a fresh, natural look.  Each tip should be visually clear and easy to follow.\n\n**Caption:**\n\nNew to the makeup game? Don't sweat it, NARS has you covered! ✨  We're sharing our top tips for building a simple, stunning routine that's all about enhancing *your* natural beauty.\n\n1.  **Start with Skin:** A lightweight base like our Light Reflecting Foundation evens tone without feeling heavy.\n2.  **Blush is Your Friend:** A touch of blush (we love a neutral rose) instantly wakes up the face.\n3.  **Eyes Made Easy:**  Try a single swipe of an eyeshadow stick for effortless definition.\n4.  **Lip Love:** A hydrating lip shine adds a touch of color and keeps your pout happy.\n5.  **Blend, Blend, Blend:**  The key to a flawless finish is seamless blending!\n\nWhat are your go-to beginner tips? Share them in the comments! 👇\n\n#NARS #NARSCosmetics #MakeupForBeginners #BeginnerMakeup #EasyMakeup #MakeupTips #BeautyTips #NaturalMakeup #LightReflectingFoundation #BeautyRoutine\n\n**Explanation of Choices:**\n\n*   **Brand Alignment:** The post promotes NARS products while staying true to the brand's focus on artistry and enhancing natural beauty.\n*   **Beginner-Friendly:** The tips are simple, actionable, and avoid overwhelming beginners with complex techniques.\n*   **Product Focus:**  The caption subtly highlights key NARS products that are suitable for beginners.\n*   **Engagement:** The question at the end encourages followers to share their own tips, boosting engagement.\n*   **Hashtags:** The hashtags are a mix of brand-specific, general makeup, and beginner-focused terms to increase visibility.\n*   **Visual Appeal:** Both image/video options are visually appealing and align with NARS' aesthetic.\n\nI hope this helps!\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.16849640305775507
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 74563,
+    "candidatesTokenCount": 517,
+    "totalTokenCount": 75080,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 74563
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 517
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "mdZHaKTULeOLqsMP7bunsQM"
+}

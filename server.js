@@ -870,7 +870,23 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
     // Set appropriate headers for JPG images
     res.setHeader('Content-Type', 'image/jpeg');
     res.setHeader('Content-Length', data.length);
-    res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+    
+    // Check if this is a real-time or cache-busting request
+    const isRealTime = req.query.realtime || req.query.nocache || req.query.cb || req.query.updated || req.query.v;
+    
+    if (isRealTime) {
+      // REAL-TIME MODE: Aggressive no-cache for always fresh content
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('Last-Modified', new Date().toUTCString());
+      res.setHeader('X-Real-Time', 'true');
+      console.log(`[${new Date().toISOString()}] [R2-IMAGE] REAL-TIME serving for ${imageKey}`);
+    } else {
+      // Normal caching for regular requests  
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+    }
+    
     res.setHeader('ETag', `"${imageKey}-${Date.now()}"`);
     res.setHeader('Last-Modified', new Date().toUTCString());
     res.setHeader('X-Image-Source', source); // For debugging
@@ -924,7 +940,18 @@ app.head('/api/r2-image/:username/:imageKey', async (req, res) => {
     // Set headers without body (HEAD request)
     res.setHeader('Content-Type', 'image/jpeg');
     res.setHeader('Content-Length', data.length);
-    res.setHeader('Cache-Control', 'public, max-age=86400');
+    
+    // Check if this is a cache-busting request
+    const isCacheBusting = req.query.cb || req.query.updated || req.query.v;
+    
+    if (isCacheBusting) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    } else {
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+    }
+    
     res.setHeader('ETag', `"${imageKey}-${Date.now()}"`);
     res.setHeader('Last-Modified', new Date().toUTCString());
     res.setHeader('X-Image-Source', source);
@@ -965,14 +992,24 @@ app.get('/api/posts/:username', async (req, res) => {
   const { username } = req.params;
   const platform = req.query.platform || 'instagram';
   const forceRefresh = req.query.forceRefresh === 'true';
+  const isRealTime = req.query.realtime || req.query.nocache;
   
   try {
-    console.log(`[${new Date().toISOString()}] [API-POSTS] Fetching posts for ${username} on ${platform} (forceRefresh: ${forceRefresh})`);
+    console.log(`[${new Date().toISOString()}] [API-POSTS] Fetching posts for ${username} on ${platform} (forceRefresh: ${forceRefresh}, realTime: ${!!isRealTime})`);
     
-    // Clear cache if force refresh is requested
-    if (forceRefresh) {
+    // Set real-time headers if requested
+    if (isRealTime) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('X-Real-Time', 'true');
+      console.log(`[${new Date().toISOString()}] [API-POSTS] REAL-TIME mode activated for ${username}`);
+    }
+    
+    // Clear cache if force refresh or real-time is requested
+    if (forceRefresh || isRealTime) {
       const cacheKey = `ready_post/${platform}/${username}/`;
-      console.log(`[${new Date().toISOString()}] [API-POSTS] Clearing cache for: ${cacheKey}`);
+      console.log(`[${new Date().toISOString()}] [API-POSTS] Clearing ALL caches for: ${cacheKey}`);
       // Clear memory cache
       for (const key of imageCache.keys()) {
         if (key.startsWith(cacheKey)) {
@@ -1050,18 +1087,36 @@ app.get('/api/posts/:username', async (req, res) => {
           r2ImageUrl = `http://localhost:3002/api/r2-image/${username}/${imageKey}?platform=${platform}`;
         }
         
-        // Create post entry
+        // Extract and properly structure post data for frontend
+        const structuredPostData = {
+          caption: postData.caption || postData.post?.caption || '',
+          hashtags: postData.hashtags || postData.post?.hashtags || [],
+          call_to_action: postData.call_to_action || postData.post?.call_to_action || '',
+          status: postData.status || 'ready',
+          created_at: postData.created_at || postData.timestamp || file.LastModified,
+          updated_at: postData.updated_at || postData.last_edited || file.LastModified
+        };
+        
+        // Create post entry with proper structure that matches frontend expectations
         const postEntry = {
           key: file.Key,
           data: {
-            post: postData,
-            status: postData.status || 'pending',
+            post: {
+              caption: structuredPostData.caption,
+              hashtags: structuredPostData.hashtags,
+              call_to_action: structuredPostData.call_to_action,
+              ...postData.post // Include any other post fields
+            },
+            status: structuredPostData.status,
             image_url: imageUrl,
-            r2_image_url: r2ImageUrl
+            r2_image_url: r2ImageUrl,
+            created_at: structuredPostData.created_at,
+            updated_at: structuredPostData.updated_at
           }
         };
         
         posts.push(postEntry);
+        console.log(`[${new Date().toISOString()}] [API-POSTS] Added post: ${file.Key} with caption: "${structuredPostData.caption.substring(0, 50)}..."`);
         
       } catch (postError) {
         console.error(`[${new Date().toISOString()}] [API-POSTS] Error processing post ${file.Key}:`, postError.message);
@@ -1069,7 +1124,7 @@ app.get('/api/posts/:username', async (req, res) => {
       }
     }
     
-    console.log(`[${new Date().toISOString()}] [API-POSTS] Successfully fetched ${posts.length} posts for ${username}`);
+    console.log(`[${new Date().toISOString()}] [API-POSTS] Successfully fetched ${posts.length} posts for ${username} with complete JSON data`);
     res.json(posts);
     
   } catch (error) {
@@ -1231,13 +1286,20 @@ app.post('/api/save-edited-post/:username', upload.single('image'), async (req, 
     
     console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Successfully saved edited post for ${username}/${imageKey}`);
     
+    // Set aggressive cache-busting headers
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Last-Modified', new Date().toUTCString());
+    
     res.json({ 
       success: true, 
       message: 'Post edit saved successfully',
       imageKey: imageKey,
       postKey: postKey,
       r2Key: imageR2Key,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      cacheBuster: Date.now() // For frontend to use
     });
     
   } catch (error) {

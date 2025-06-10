@@ -828,6 +828,18 @@ Image Description: ${response.post.image_prompt}
           ];
           
           setChatMessages(updatedMessages);
+          
+          // TRIGGER POST REFRESH: Notify PostCooked component about new post
+          const newPostEvent = new CustomEvent('newPostCreated', {
+            detail: {
+              username: accountHolder,
+              platform: platform,
+              timestamp: Date.now()
+            }
+          });
+          window.dispatchEvent(newPostEvent);
+          console.log(`[PlatformDashboard] NEW POST: Triggered PostCooked refresh event for ${platform}`);
+          
           setIsChatModalOpen(true);
         } else {
           setError(response.error || `Failed to generate ${platform} post`);

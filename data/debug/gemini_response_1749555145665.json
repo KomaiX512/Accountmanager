@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption: Summer just got a whole lot brighter! ☀️ Our new lipstick collection is here to add a pop of color to your sun-kissed glow. Which shade are you rocking first? Tell us in the comments! 👇\n\nHashtags: #SummerMakeup #LipstickCollection #VibrantLips #MakeupLover #SummerVibes #NewMakeup #BeautyEssentials #TestUserBeauty #LipstickAddict #MakeupOfTheDay\n\nCall to Action: Tap the link in bio to shop the collection!\n\nVisual Description for Image: A vibrant, eye-catching flat lay showcasing the \"testuser\" summer lipstick collection. The background is a soft, pastel pink, providing a clean and bright canvas. Five lipsticks are arranged diagonally across the frame, each in a different shade of the summer collection: a coral, a hot pink, a bright orange, a berry red, and a nude peach. The lipsticks are slightly staggered to create visual interest.\n\nScattered around the lipsticks are small, summery props: a pair of stylish sunglasses with mirrored lenses reflecting the sky, a few scattered seashells in varying sizes and colors (white, beige, and light pink), and a sprig of fresh mint. The lighting is bright and natural, casting soft shadows that add depth. The overall mood is playful, energetic, and summery.\n\nThe lipsticks themselves should be the focal point, with their caps off to showcase the actual lipstick bullets. The \"testuser\" logo is subtly visible on each lipstick tube. The image should have a high-resolution, professional quality, with sharp focus on the lipsticks and props. The style is modern and minimalist, with a touch of whimsy. The composition is balanced and visually appealing, drawing the viewer's eye across the frame.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.2816152203807515
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 252,
+    "candidatesTokenCount": 362,
+    "totalTokenCount": 614,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 252
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 362
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "xhdIaOCOJeGTsbQPpq7c8AY"
+}

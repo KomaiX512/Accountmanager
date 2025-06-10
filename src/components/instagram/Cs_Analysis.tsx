@@ -362,14 +362,14 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
             className={`competitor-sub-container ${fetch.data !== undefined ? 'loaded' : ''} ${fetch.data?.length === 0 ? 'no-data' : ''}`}
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: index * 0.2, duration: 0.4 }}
-            whileHover={{ scale: 1.05, boxShadow: '0 0 20px rgba(0, 255, 204, 0.6)' }}
+            transition={{ delay: index * 0.1, duration: 0.2 }}
+            whileHover={{ scale: 1.02 }}
           >
             <div className="competitor-actions">
               <motion.button
                 className="action-btn edit-btn"
-                whileHover={{ scale: 1.2 }}
-                whileTap={{ scale: 0.9 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => {
                   setCurrentCompetitor(competitor);
                   setEditCompetitor(competitor);
@@ -394,8 +394,8 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
               </motion.button>
               <motion.button
                 className="action-btn delete-btn"
-                whileHover={{ scale: 1.2 }}
-                whileTap={{ scale: 0.9 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => handleDeleteCompetitor(competitor)}
                 disabled={loading}
               >
@@ -467,8 +467,8 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
               <div className="modal-actions">
                 <motion.button
                   className="modal-btn save-btn"
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={handleAddCompetitor}
                   disabled={loading || !newCompetitor.trim()}
                 >
@@ -476,8 +476,8 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
                 </motion.button>
                 <motion.button
                   className="modal-btn cancel-btn"
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => {
                     setShowAddModal(false);
                     setNewCompetitor('');
@@ -524,8 +524,8 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
               <div className="modal-actions">
                 <motion.button
                   className="modal-btn save-btn"
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={handleEditCompetitor}
                   disabled={loading || !editCompetitor.trim()}
                 >
@@ -533,8 +533,8 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
                 </motion.button>
                 <motion.button
                   className="modal-btn cancel-btn"
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => {
                     setShowEditModal(false);
                     setEditCompetitor('');
@@ -597,8 +597,8 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
                     <div className="navigation-buttons">
                       <motion.button
                         className="nav-btn"
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.98 }}
                         onClick={handlePrevAnalysis}
                         disabled={currentAnalysisIndex === 0}
                       >
@@ -619,8 +619,8 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
                       </motion.button>
                       <motion.button
                         className="nav-btn"
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.98 }}
                         onClick={handleNextAnalysis}
                         disabled={currentAnalysisIndex === selectedData.length - 1}
                       >

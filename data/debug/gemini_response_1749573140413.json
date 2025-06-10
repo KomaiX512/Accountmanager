@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption: Feeling the rhythm and ready to create some magic with you all! ✨ What kind of music video should I make next? 🤔 Let me know your wildest ideas in the comments! 👇\n\nHashtags: #Shakira #NewMusic #MusicVideo #CreativeIdeas #ShakiraFans\n\nCall to Action: Drop your music video ideas in the comments below!\n\nVisual Description for Image: A vibrant and energetic image featuring Shakira in a creative brainstorming session. The scene is a brightly lit, modern studio space with large windows overlooking a cityscape at sunset. Shakira is seated at a large wooden table covered in colorful sketches, handwritten notes, and scattered musical instruments like a guitar and a small keyboard. She's wearing a casual but stylish outfit – ripped jeans, a graphic tee, and a bright red bomber jacket. Her hair is styled in loose, wavy curls. She's leaning forward, a pen in her hand, with a focused and inspired expression on her face. Around her, floating holographic projections display snippets of past music videos, abstract shapes, and musical notes. The overall mood is creative, collaborative, and exciting. The lighting is warm and inviting, with a mix of natural sunlight and soft studio lights. The image should have a slightly blurred background to emphasize Shakira and the brainstorming elements on the table. The style should be modern and artistic, with a touch of fantasy due to the holographic projections. The composition should be dynamic and engaging, drawing the viewer into the creative process.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.33391992065021425
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 268,
+    "candidatesTokenCount": 299,
+    "totalTokenCount": 567,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 268
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 299
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "EV5IaM2YLNeI_NUPmYvnoA8"
+}

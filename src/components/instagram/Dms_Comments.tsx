@@ -19,7 +19,7 @@ interface DmsCommentsProps {
   aiProcessingNotifications?: Record<string, boolean>;
   onSendAIReply?: (notification: Notification) => void;
   onIgnoreAIReply?: (notification: Notification) => void;
-  platform?: 'instagram' | 'twitter';
+  platform?: 'instagram' | 'twitter' | 'facebook';
 }
 
 const Dms_Comments: React.FC<DmsCommentsProps> = ({ 

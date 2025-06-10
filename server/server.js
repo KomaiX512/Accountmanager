@@ -4037,8 +4037,8 @@ class PlatformSchemaManager {
     
     // Normalize platform
     const normalizedPlatform = platform.toLowerCase();
-    if (!['instagram', 'twitter'].includes(normalizedPlatform)) {
-      throw new Error(`Unsupported platform: ${platform}. Must be 'instagram' or 'twitter'`);
+    if (!['instagram', 'twitter', 'facebook'].includes(normalizedPlatform)) {
+      throw new Error(`Unsupported platform: ${platform}. Must be 'instagram', 'twitter', or 'facebook'`);
     }
     
     // Build base path
@@ -4068,7 +4068,7 @@ class PlatformSchemaManager {
     return {
       platform: platform.toLowerCase(),
       username: username.trim(),
-      isValidPlatform: ['instagram', 'twitter'].includes(platform.toLowerCase())
+      isValidPlatform: ['instagram', 'twitter', 'facebook'].includes(platform.toLowerCase())
     };
   }
 
@@ -4092,6 +4092,13 @@ class PlatformSchemaManager {
         eventPrefix: 'TwitterEvents', 
         tokenPrefix: 'TwitterTokens',
         maxUsernameLength: 15
+      },
+      facebook: {
+        name: 'Facebook',
+        normalizeUsername: (username) => username.trim(), // Keep original case for Facebook
+        eventPrefix: 'FacebookEvents', 
+        tokenPrefix: 'FacebookTokens',
+        maxUsernameLength: 50
       }
     };
     
@@ -6598,4 +6605,88 @@ app.options('/api/save-edited-post/:username', (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });
+
+// =================== FACEBOOK STATUS ENDPOINTS ===================
+
+// This endpoint checks if a user has entered their Facebook username
+app.get('/user-facebook-status/:userId', async (req, res) => {
+  // Set CORS headers
+  setCorsHeaders(res);
+  
+  const { userId } = req.params;
+  
+  try {
+    const key = `UserFacebookStatus/${userId}/status.json`;
+    
+    try {
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: key,
+      });
+      const response = await s3Client.send(getCommand);
+      const body = await streamToString(response.Body);
+      
+      if (!body || body.trim() === '') {
+        return res.json({ hasEnteredFacebookUsername: false });
+      }
+      
+      const userData = JSON.parse(body);
+      return res.json(userData);
+    } catch (error) {
+      if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+        return res.json({ hasEnteredFacebookUsername: false });
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error(`Error retrieving user Facebook status for ${userId}:`, error);
+    res.status(500).json({ error: 'Failed to retrieve user Facebook status' });
+  }
+});
+
+// This endpoint updates the user's Facebook username entry state
+app.post('/user-facebook-status/:userId', async (req, res) => {
+  // Set CORS headers
+  setCorsHeaders(res);
+  
+  const { userId } = req.params;
+  const { facebook_username, accountType, competitors } = req.body;
+  
+  if (!facebook_username || !facebook_username.trim()) {
+    return res.status(400).json({ error: 'Facebook username is required' });
+  }
+  
+  try {
+    const key = `UserFacebookStatus/${userId}/status.json`;
+    const userData = {
+      uid: userId,
+      hasEnteredFacebookUsername: true,
+      facebook_username: facebook_username.trim(),
+      accountType: accountType || 'branding',
+      competitors: competitors || [],
+      lastUpdated: new Date().toISOString()
+    };
+    
+    const putCommand = new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: key,
+      Body: JSON.stringify(userData, null, 2),
+      ContentType: 'application/json',
+    });
+    
+    await s3Client.send(putCommand);
+    res.json({ success: true, message: 'User Facebook status updated successfully' });
+  } catch (error) {
+    console.error(`Error updating user Facebook status for ${userId}:`, error);
+    res.status(500).json({ error: 'Failed to update user Facebook status' });
+  }
+});
+
+// Add OPTIONS handlers for Facebook status endpoints
+app.options('/user-facebook-status/:userId', (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+
+// ===============================================================
 

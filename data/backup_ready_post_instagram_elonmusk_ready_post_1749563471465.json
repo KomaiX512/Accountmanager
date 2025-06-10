@@ -1,0 +1,27 @@
+{
+  "post": {
+    "caption": "Thinking about what's next... 🤔 What problems are YOU trying to solve? Let's brainstorm some future-changing ideas! 🚀",
+    "hashtags": [
+      "#FutureIsNow",
+      "#Innovation",
+      "#TechVision",
+      "#ProblemSolving",
+      "#ElonMusk",
+      "#SpaceX",
+      "#Tesla",
+      "#Engineering",
+      "#Ideas",
+      "#NextGen"
+    ],
+    "call_to_action": "Share your biggest problem you want to solve in the comments below! 👇",
+    "image_prompt": "A close-up, dramatic portrait of Elon Musk looking slightly upwards and to the right, with a thoughtful expression. The background is a blurred, abstract representation of a futuristic cityscape at night, with streaks of neon blue, purple, and orange light suggesting flying vehicles and advanced architecture. The lighting should be cinematic, with a strong key light highlighting the right side of his face, creating deep shadows on the left. He should be wearing a simple, dark grey t-shirt. The image should have a slightly desaturated color palette, emphasizing the futuristic glow of the city. The overall mood is contemplative and visionary. Focus should be sharp on his eyes, conveying intelligence and determination. The style should be photorealistic but with a slight artistic flair, almost like a digital painting. There should be a subtle glow around his head, suggesting a halo of innovation. The composition should be slightly off-center, drawing the viewer's eye towards the direction he's looking."
+  },
+  "timestamp": 1749563471465,
+  "image_path": "ready_post/instagram/elonmusk/image_1749563471465.jpg",
+  "image_url": "http://127.0.0.1:3002/fix-image/elonmusk/image_1749563471465.jpg?platform=instagram",
+  "r2_image_url": "http://127.0.0.1:3002/fix-image/elonmusk/image_1749563471465.jpg?platform=instagram",
+  "generated_at": "2025-06-10T13:51:11.465Z",
+  "queryUsed": "create next post for me ",
+  "status": "new",
+  "platform": "instagram"
+}

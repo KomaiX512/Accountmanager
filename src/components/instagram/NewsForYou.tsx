@@ -6,7 +6,7 @@ import ErrorBoundary from '../ErrorBoundary';
 
 interface NewsForYouProps {
   accountHolder: string;
-  platform?: 'instagram' | 'twitter';
+  platform?: 'instagram' | 'twitter' | 'facebook';
 }
 
 const NewsForYou: React.FC<NewsForYouProps> = ({ accountHolder, platform = 'instagram' }) => {
@@ -14,12 +14,12 @@ const NewsForYou: React.FC<NewsForYouProps> = ({ accountHolder, platform = 'inst
   const { data, loading } = useR2Fetch<any[]>(endpoint);
   const [selectedNewsIndex, setSelectedNewsIndex] = useState<number | null>(null);
 
-  const decodeNewsContent = (newsData: any) => {
+  const decodeNewsContent = (newsData: any): React.ReactNode => {
     if (!newsData || typeof newsData !== 'object') {
       return <p className="news-detail">No details available.</p>;
     }
 
-    return Object.entries(newsData).map(([key, value], idx) => {
+    return Object.entries(newsData).map(([key, value], idx): React.ReactNode => {
       const formattedKey = key
         .replace(/([A-Z])/g, ' $1')
         .replace(/_/g, ' ')

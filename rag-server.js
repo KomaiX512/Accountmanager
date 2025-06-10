@@ -486,10 +486,14 @@ async function callGeminiAPI(prompt, messages = [], retries = 2) {
 }
 
 // Create the instruction prompt for RAG with profile and rules
-function createRagPrompt(profileData, rulesData, query) {
+function createRagPrompt(profileData, rulesData, query, platform = 'instagram') {
+  const platformName = platform === 'twitter' ? 'X (Twitter)' : 
+                      platform === 'facebook' ? 'Facebook' : 
+                      'Instagram';
+  
   return `
 # INSTRUCTION A - DISCUSSION MODE
-You are an Instagram Manager Assistant helping with social media strategy for a user.
+You are a ${platformName} Manager Assistant helping with social media strategy for a user.
 
 ## USER PROFILE DATA
 ${JSON.stringify(profileData, null, 2)}
@@ -500,8 +504,9 @@ ${JSON.stringify(rulesData, null, 2)}
 ## QUERY
 ${query}
 
-Please respond in a helpful, direct, and actionable manner that provides specific advice for the Instagram account based on their profile information.
+Please respond in a helpful, direct, and actionable manner that provides specific advice for the ${platformName} account based on their profile information.
 Keep your response concise but informative, with specific references to the user's account details when relevant.
+Focus on ${platformName}-specific best practices and strategies.
 `;
 }
 
@@ -525,10 +530,14 @@ app.post('/api/discussion', async (req, res) => {
     // Create RAG prompt
     let ragPrompt;
     if (isFollowUp) {
+      const platformName = platform === 'twitter' ? 'X (Twitter)' : 
+                          platform === 'facebook' ? 'Facebook' : 
+                          'Instagram';
+      
       // For follow-up messages, include a special instruction to handle context
       ragPrompt = `
 # INSTRUCTION A - DISCUSSION MODE (FOLLOW-UP)
-You are an Instagram Manager Assistant having a conversation with a user about their social media strategy.
+You are a ${platformName} Manager Assistant having a conversation with a user about their social media strategy.
 
 ## USER PROFILE DATA
 ${JSON.stringify(profileData, null, 2)}
@@ -537,19 +546,20 @@ ${JSON.stringify(profileData, null, 2)}
 ${JSON.stringify(rulesData, null, 2)}
 
 ## CONVERSATION HISTORY
-The user has been asking about their Instagram strategy. You've been answering their questions.
+The user has been asking about their ${platformName} strategy. You've been answering their questions.
 Review the conversation history provided separately to maintain context.
 
 ## CURRENT QUERY
 ${query}
 
-Please respond in a helpful, direct, and actionable manner that provides specific advice for the Instagram account.
+Please respond in a helpful, direct, and actionable manner that provides specific advice for the ${platformName} account.
 Maintain continuity with the previous parts of the conversation.
 Keep your response concise but informative, with specific references to the user's account details when relevant.
+Focus on ${platformName}-specific best practices and strategies.
 `;
     } else {
       // For initial messages, use the standard prompt
-      ragPrompt = createRagPrompt(profileData, rulesData, query);
+      ragPrompt = createRagPrompt(profileData, rulesData, query, platform);
     }
     
     // Call Gemini API
@@ -561,10 +571,14 @@ Keep your response concise but informative, with specific references to the user
       if (isFollowUp) {
         console.log(`[RAG-Server] Empty response received for follow-up, trying fallback approach`);
         
+        const platformName = platform === 'twitter' ? 'X (Twitter)' : 
+                            platform === 'facebook' ? 'Facebook' : 
+                            'Instagram';
+        
         // Create a simplified prompt that doesn't rely on conversation history
         const fallbackPrompt = `
 # INSTRUCTION A - DISCUSSION MODE (FALLBACK)
-You are an Instagram Manager Assistant helping with social media strategy.
+You are a ${platformName} Manager Assistant helping with social media strategy.
 
 ## USER PROFILE DATA
 ${JSON.stringify(profileData, null, 2)}
@@ -573,11 +587,12 @@ ${JSON.stringify(profileData, null, 2)}
 ${JSON.stringify(rulesData, null, 2)}
 
 ## CONTEXT
-The user has been asking about their Instagram strategy.
+The user has been asking about their ${platformName} strategy.
 Their latest question is: "${query}"
 
 Please respond directly to this question without requiring previous context.
-Be helpful, direct, and actionable, providing specific advice for the Instagram account.
+Be helpful, direct, and actionable, providing specific advice for the ${platformName} account.
+Focus on ${platformName}-specific best practices and strategies.
 `;
         
         // Call Gemini API without previous messages
@@ -590,6 +605,7 @@ Be helpful, direct, and actionable, providing specific advice for the Instagram 
         // Save conversation with fallback response
         const conversationData = {
           username,
+          platform,
           timestamp: new Date().toISOString(),
           query,
           response: fallbackResponse,
@@ -609,6 +625,7 @@ Be helpful, direct, and actionable, providing specific advice for the Instagram 
     // Save conversation to R2
     const conversationData = {
       username,
+      platform,
       timestamp: new Date().toISOString(),
       query,
       response,
@@ -633,10 +650,26 @@ Be helpful, direct, and actionable, providing specific advice for the Instagram 
 });
 
 // Create the post generation prompt
-function createPostGenerationPrompt(profileData, rulesData, query) {
+function createPostGenerationPrompt(profileData, rulesData, query, platform = 'instagram') {
+  const platformName = platform === 'twitter' ? 'X (Twitter)' : 
+                      platform === 'facebook' ? 'Facebook' : 
+                      'Instagram';
+  
+  const characterLimit = platform === 'twitter' ? 280 : 
+                        platform === 'instagram' ? 2200 : 
+                        63206; // Facebook
+  
+  const hashtagGuidance = platform === 'twitter' ? '1-3 hashtags (Twitter best practice)' :
+                         platform === 'instagram' ? '5-10 hashtags' :
+                         '3-5 hashtags (Facebook best practice)';
+  
+  const contentGuidance = platform === 'twitter' ? 'Keep it concise and engaging for Twitter\'s fast-paced environment' :
+                         platform === 'instagram' ? 'Make it visually appealing and Instagram-friendly' :
+                         'Make it suitable for Facebook\'s diverse audience';
+
   return `
 # POST GENERATION MODE
-You are an Instagram content creator assistant.
+You are a ${platformName} content creator assistant.
 
 ## USER PROFILE DATA
 ${JSON.stringify(profileData, null, 2)}
@@ -647,11 +680,13 @@ ${JSON.stringify(rulesData, null, 2)}
 ## POST REQUEST
 ${query}
 
-Please create an Instagram post content that aligns with the user's profile and follows their account rules.
+Please create a ${platformName} post content that aligns with the user's profile and follows their account rules.
 The response should include:
-1. A caption that is engaging and relevant
-2. Appropriate hashtags (5-10)
-3. A brief description of what image or video should accompany this post
+1. A caption that is engaging, relevant, and under ${characterLimit} characters (${contentGuidance})
+2. Appropriate hashtags (${hashtagGuidance})
+3. A brief description of what image or video should accompany this post for ${platformName}
+
+Follow ${platformName}-specific best practices and tone.
 `;
 }
 
@@ -666,25 +701,37 @@ app.post('/api/post-generator', async (req, res) => {
     
     console.log(`[${new Date().toISOString()}] [RAG SERVER] Post generation request for ${platform}/${username}: "${query}"`);
     
+    const platformName = platform === 'twitter' ? 'X (Twitter)' : 
+                        platform === 'facebook' ? 'Facebook' : 
+                        'Instagram';
+    
+    const characterLimit = platform === 'twitter' ? 280 : 
+                          platform === 'instagram' ? 2200 : 
+                          63206; // Facebook
+    
+    const hashtagGuidance = platform === 'twitter' ? '1-3 hashtags (Twitter best practice)' :
+                           platform === 'instagram' ? '5-10 hashtags' :
+                           '3-5 hashtags (Facebook best practice)';
+    
     // Create a customized prompt for the post generator
-    const prompt = `You are a professional social media marketing expert for the brand "${username}" on Instagram. 
-Your task is to create a high-quality, engaging Instagram post about: "${query}"
+    const prompt = `You are a professional social media marketing expert for the brand "${username}" on ${platformName}. 
+Your task is to create a high-quality, engaging ${platformName} post about: "${query}"
 
 IMPORTANT: DO NOT include any introductory text like "Here's a caption" or "I've created" or "Here's a post" or similar meta-commentary.
 
 Structure your response EXACTLY as follows (with NO other text):
 
-Caption: [Write a catchy, engaging Instagram caption that is 2-4 sentences long. Include relevant emojis. Make sure it's informal, conversational, and aligned with Instagram best practices.]
+Caption: [Write a catchy, engaging ${platformName} caption that is 2-4 sentences long and under ${characterLimit} characters. Include relevant emojis. Make sure it's informal, conversational, and aligned with ${platformName} best practices.]
 
-Hashtags: [List 5-10 relevant hashtags for discoverability]
+Hashtags: [List ${hashtagGuidance} for discoverability on ${platformName}]
 
-Call to Action: [Add a brief call-to-action encouraging followers to take a specific action]
+Call to Action: [Add a brief call-to-action encouraging followers to take a specific action suitable for ${platformName}]
 
-Visual Description for Image: [Write a detailed, vivid description for the image that should accompany this post. Be extremely specific about what should be in the image, including colors, layout, mood, lighting, and key elements. This will be used to generate an AI image, so include details about composition, style, and visual elements. Minimum 100 words.]`;
+Visual Description for Image: [Write a detailed, vivid description for the image that should accompany this post. Be extremely specific about what should be in the image, including colors, layout, mood, lighting, and key elements. This will be used to generate an AI image, so include details about composition, style, and visual elements suitable for ${platformName}. Minimum 100 words.]`;
 
     try {
       // Get response from AI model
-      console.log(`[${new Date().toISOString()}] [RAG SERVER] Calling AI API for post generation`);
+      console.log(`[${new Date().toISOString()}] [RAG SERVER] Calling AI API for ${platform} post generation`);
       const response = await callGeminiAPI(prompt);
       
       // Clean and process the response to extract structured content
@@ -956,239 +1003,26 @@ app.get('/admin/status', (req, res) => {
   res.json(status);
 });
 
-// Add a route for post generation
-app.post('/generate_post', async (req, res) => {
-  try {
-    const { username, query, platform = 'instagram' } = req.body;
-    
-    if (!username || !query) {
-      return res.status(400).json({ error: 'Username and query are required' });
-    }
-    
-    console.log(`[${new Date().toISOString()}] [RAG SERVER] Post generation request for ${platform}/${username}: "${query}"`);
-    
-    // Create a customized prompt for the post generator
-    const prompt = `You are a professional social media marketing expert for the brand "${username}" on Instagram. 
-Your task is to create a high-quality, engaging Instagram post about: "${query}"
-
-IMPORTANT: DO NOT include any introductory text like "Here's a caption" or "I've created" or "Here's a post" or similar meta-commentary.
-
-Structure your response EXACTLY as follows (with NO other text):
-
-Caption: [Write a catchy, engaging Instagram caption that is 2-4 sentences long. Include relevant emojis. Make sure it's informal, conversational, and aligned with Instagram best practices.]
-
-Hashtags: [List 5-10 relevant hashtags for discoverability]
-
-Call to Action: [Add a brief call-to-action encouraging followers to take a specific action]
-
-Visual Description for Image: [Write a detailed, vivid description for the image that should accompany this post. Be extremely specific about what should be in the image, including colors, layout, mood, lighting, and key elements. This will be used to generate an AI image, so include details about composition, style, and visual elements. Minimum 100 words.]`;
-
-    try {
-      // Get response from AI model
-      console.log(`[${new Date().toISOString()}] [RAG SERVER] Calling AI API for post generation`);
-      const response = await callGeminiAPI(prompt);
-      
-      // Clean and process the response to extract structured content
-      console.log(`[${new Date().toISOString()}] [RAG SERVER] Raw response:`, response.substring(0, 200) + '...');
-      
-      // Extract the sections using regex
-      const captionMatch = response.match(/Caption:(.*?)(?=Hashtags:|$)/s);
-      const hashtagsMatch = response.match(/Hashtags:(.*?)(?=Call to Action:|$)/s);
-      const ctaMatch = response.match(/Call to Action:(.*?)(?=Visual Description for Image:|$)/s);
-      const visualMatch = response.match(/Visual Description for Image:(.*?)(?=$)/s);
-      
-      // Format the sections into a structured response
-      const caption = captionMatch ? captionMatch[1].trim() : '';
-      let hashtags = [];
-      if (hashtagsMatch && hashtagsMatch[1]) {
-        hashtags = hashtagsMatch[1].match(/#[\w\d]+/g) || [];
-      }
-      const callToAction = ctaMatch ? ctaMatch[1].trim() : '';
-      const imagePrompt = visualMatch ? visualMatch[1].trim() : '';
-      
-      // Create the structured response
-      const structuredResponse = {
-        caption,
-        hashtags,
-        call_to_action: callToAction,
-        image_prompt: imagePrompt
-      };
-      
-      // Generate timestamp for unique filename
-      const timestamp = Date.now();
-      
-      // Add proxy URL for images - ensure we use our proxy instead of direct R2
-      const imageFileName = `image_${timestamp}.jpg`;
-      const postFileName = `ready_post_${timestamp}.json`;
-      
-      // Use our proxy URL format
-      const baseUrl = req.get('host') ? `http://${req.get('host').replace('3001', '3002')}` : 'http://localhost:3002';
-      const imageUrl = `${baseUrl}/fix-image/${username}/${imageFileName}?platform=${platform}`;
-      
-      // Create complete post data
-      const postData = {
-        post: structuredResponse,
-        timestamp,
-        image_path: `ready_post/${platform}/${username}/${imageFileName}`,
-        image_url: imageUrl,
-        r2_image_url: imageUrl,
-        generated_at: new Date().toISOString(),
-        queryUsed: query,
-        status: 'new',
-        platform
-      };
-      
-      // Save to R2 for persistence - the saveToR2 function will fix any remaining direct R2 URLs
-      const postKey = `ready_post/${platform}/${username}/${postFileName}`;
-      await saveToR2(postData, postKey);
-      
-      // GENERATE ACTUAL IMAGE: Create the JPG file based on the refined prompt
-      console.log(`[${new Date().toISOString()}] [RAG SERVER] Starting image generation for: ${imageFileName}`);
-      try {
-        await generateImageFromPrompt(imagePrompt, imageFileName, username, platform);
-        console.log(`[${new Date().toISOString()}] [RAG SERVER] Image generation completed successfully`);
-      } catch (imageError) {
-        console.error(`[${new Date().toISOString()}] [RAG SERVER] Image generation failed:`, imageError.message);
-        // Continue anyway - the placeholder will be created
-      }
-      
-      console.log(`[${new Date().toISOString()}] [RAG SERVER] Structured response:`, JSON.stringify(structuredResponse, null, 2));
-      
-      // NOTIFY FRONTEND: Emit event for PostCooked auto-refresh
-      const notificationPayload = {
-        username,
-        platform,
-        timestamp: postData.timestamp,
-        success: true,
-        message: 'New post generated successfully'
-      };
-      
-      // In a real implementation, you might use WebSockets or Server-Sent Events
-      // For now, we'll rely on the PostCooked auto-refresh mechanism
-      console.log(`[${new Date().toISOString()}] [RAG SERVER] Post generation completed - frontend should auto-refresh`);
-      
-      // Return the structured response with proper image URLs
-      return res.json({ 
-        response: structuredResponse, 
-        post: postData, 
-        notification: notificationPayload 
-      });
-    } catch (apiError) {
-      console.error(`[${new Date().toISOString()}] [RAG SERVER] API error:`, apiError);
-      
-      // In case of API failure, return a simulated response based on the query
-      console.log(`[${new Date().toISOString()}] [RAG SERVER] Falling back to simulated response`);
-      
-      // Extract key elements from the query
-      const keywords = query.match(/\b(\w{4,})\b/g) || ['product'];
-      const uniqueKeywords = [...new Set(keywords)].join(', ');
-      
-      // Create a fallback response that's customized to the query
-      const productType = query.toLowerCase().includes('lipstick') ? 'lipstick' : 
-                          query.toLowerCase().includes('foundation') ? 'foundation' :
-                          query.toLowerCase().includes('brush') ? 'makeup brushes' :
-                          query.toLowerCase().includes('eye') ? 'eyeshadow' :
-                          'beauty products';
-      
-      const seasonalTheme = query.toLowerCase().includes('summer') ? 'summer' :
-                            query.toLowerCase().includes('fall') ? 'fall' :
-                            query.toLowerCase().includes('winter') ? 'winter' :
-                            query.toLowerCase().includes('spring') ? 'spring' :
-                            'season';
-      
-      // Customize the fallback caption based on product type and seasonal theme                    
-      let fallbackCaption = '';
-      let fallbackHashtags = [];
-      let fallbackCTA = '';
-      let fallbackImagePrompt = '';
-      
-      if (productType === 'lipstick') {
-        fallbackCaption = `✨ Make a statement with our NEW ${seasonalTheme} lipstick collection! 💄 These vibrant shades are designed to make your pout absolutely pop. Which shade will be your new favorite? 💋`;
-        fallbackHashtags = ['#MACCosmetics', `#${seasonalTheme.charAt(0).toUpperCase() + seasonalTheme.slice(1)}Makeup`, '#NewLipstick', '#ColorPop', '#BeautyEssentials'];
-        fallbackCTA = 'Shop these limited edition shades now through the link in our bio!';
-        fallbackImagePrompt = `Professional product photography of MAC lipstick collection for ${seasonalTheme}. Beautiful studio lighting, commercial quality photography with vibrant colors and hyper-detailed product shot. Lipsticks arranged artistically to showcase the range of colors.`;
-      } 
-      else if (productType === 'foundation') {
-        fallbackCaption = `🌟 Introducing our most inclusive foundation line yet! 👑 With 40+ shades designed for all skin tones, everyone can find their perfect match. What's your shade? ✨`;
-        fallbackHashtags = ['#MACCosmetics', '#AllSkinTones', '#FoundationForAll', '#FlawlessSkin', '#Inclusive', '#BeautyForAll'];
-        fallbackCTA = 'Find your perfect shade match by visiting our store or clicking the link in bio!';
-        fallbackImagePrompt = `Professional beauty photography showing a diverse range of foundation shades for all skin tones. The image shows glass foundation bottles elegantly arranged in a gradient from light to deep shades. Soft studio lighting with a clean background and MAC branding visible.`;
-      }
-      else if (productType === 'makeup brushes') {
-        fallbackCaption = `🖌️ Elevate your makeup game with our NEW professional brush collection! 🎨 Designed for flawless application every time. Which brush is missing from your kit? ✨`;
-        fallbackHashtags = ['#MACCosmetics', '#MakeupBrushes', '#ProfessionalTools', '#FlawlessApplication', '#MakeupArtistry'];
-        fallbackCTA = 'Upgrade your toolkit! Shop our professional brushes through the link in our bio.';
-        fallbackImagePrompt = `Elegant product photography of MAC professional makeup brushes arranged in a fan pattern against a dark background. Close-up details of the brush bristles and ferrules, with soft dramatic lighting highlighting the quality of the brushes. Clean, professional composition showing the variety of brush shapes and sizes.`;
-      }
-      else {
-        fallbackCaption = `✨ Introducing our NEW ${uniqueKeywords} for ${seasonalTheme}! 🌟 Perfect for creating stunning looks that last. Which one catches your eye? 💖`;
-        fallbackHashtags = ['#MACCosmetics', `#${seasonalTheme.charAt(0).toUpperCase() + seasonalTheme.slice(1)}Beauty`, '#NewLaunch', '#MakeupLover', '#BeautyEssentials'];
-        fallbackCTA = 'Shop now through the link in our bio!';
-        fallbackImagePrompt = `Professional product photography of MAC ${uniqueKeywords} cosmetics. Beautiful studio lighting, high-resolution, commercial quality photography. Clean background, professional shadows, vibrant colors, hyper-detailed product shot with MAC branding visible.`;
-      }
-      
-      // Generate timestamp for unique filename
-      const timestamp = Date.now();
-      
-      // Add proxy URL for images - ensure we use our proxy instead of direct R2
-      const imageFileName = `image_${timestamp}.jpg`;
-      const postFileName = `ready_post_${timestamp}.json`;
-      
-      // Use our proxy URL format
-      const baseUrl = req.get('host') ? `http://${req.get('host').replace('3001', '3002')}` : 'http://localhost:3002';
-      const imageUrl = `${baseUrl}/fix-image/${username}/${imageFileName}?platform=${platform}`;
-      
-      const fallbackResponse = {
-        caption: fallbackCaption,
-        hashtags: fallbackHashtags,
-        call_to_action: fallbackCTA,
-        image_prompt: fallbackImagePrompt
-      };
-      
-      // Create complete post data
-      const postData = {
-        post: fallbackResponse,
-        timestamp,
-        image_path: `ready_post/${platform}/${username}/${imageFileName}`,
-        image_url: imageUrl,
-        r2_image_url: imageUrl,
-        generated_at: new Date().toISOString(),
-        queryUsed: query,
-        status: 'new',
-        platform
-      };
-      
-      // Save to R2 for persistence
-      const postKey = `ready_post/${platform}/${username}/${postFileName}`;
-      await saveToR2(postData, postKey);
-      
-      // GENERATE ACTUAL IMAGE: Create the JPG file based on the refined prompt
-      console.log(`[${new Date().toISOString()}] [RAG SERVER] Starting fallback image generation for: ${imageFileName}`);
-      try {
-        await generateImageFromPrompt(fallbackImagePrompt, imageFileName, username, platform);
-        console.log(`[${new Date().toISOString()}] [RAG SERVER] Fallback image generation completed successfully`);
-      } catch (imageError) {
-        console.error(`[${new Date().toISOString()}] [RAG SERVER] Fallback image generation failed:`, imageError.message);
-        // Continue anyway - the placeholder will be created
-      }
-      
-      return res.json({ response: fallbackResponse, post: postData });
-    }
-  } catch (error) {
-    console.error(`[${new Date().toISOString()}] [RAG SERVER] Error in post generation:`, error);
-    return res.status(500).json({ error: 'Failed to generate post', details: error.message });
-  }
-});
-
 // Create the instruction prompt for instant AI replies
-function createAIReplyPrompt(profileData, rulesData, notification) {
+function createAIReplyPrompt(profileData, rulesData, notification, platform = 'instagram') {
   const isMessage = notification.type === 'message';
-  const messageType = isMessage ? 'direct message' : 'comment';
+  const platformName = platform === 'twitter' ? 'X (Twitter)' : 
+                      platform === 'facebook' ? 'Facebook' : 
+                      'Instagram';
+  
+  const messageType = isMessage ? 
+    (platform === 'twitter' ? 'direct message' : platform === 'facebook' ? 'private message' : 'direct message') : 
+    (platform === 'twitter' ? 'mention' : platform === 'facebook' ? 'comment' : 'comment');
+  
   const senderInfo = notification.username ? `from username @${notification.username}` : 'from a user';
+  
+  const characterLimit = platform === 'twitter' ? 280 : 
+                        platform === 'instagram' ? 2200 : 
+                        8000; // Facebook DM limit
   
   return `
 # INSTRUCTION - INSTANT AI REPLY MODE
-You are an Instagram account manager assistant responding to a ${messageType} ${senderInfo}.
+You are a ${platformName} account manager assistant responding to a ${messageType} ${senderInfo}.
 
 ## USER PROFILE DATA
 ${JSON.stringify(profileData, null, 2)}
@@ -1201,13 +1035,13 @@ ${JSON.stringify(rulesData, null, 2)}
 
 IMPORTANT INSTRUCTIONS:
 1. Respond in the same tone and language as the ${messageType}
-2. Be concise and direct - Instagram ${messageType}s should be brief
-3. Be friendly and conversational
+2. Be concise and direct - ${platformName} ${messageType}s should be brief (under ${characterLimit} characters)
+3. Be friendly and conversational, following ${platformName} best practices
 4. Maintain the brand voice based on profile information
 5. If the message is in a language other than English, respond in that same language
 6. If you cannot determine the appropriate response, simply provide a polite acknowledgment
 7. Do not add introductory phrases like "I would respond with:" or "Here's a reply:"
-8. Just write the actual reply text that should be sent directly to the user
+8. Just write the actual reply text that should be sent directly to the user on ${platformName}
 `;
 }
 
@@ -1226,7 +1060,7 @@ app.post('/api/instant-reply', async (req, res) => {
     const rulesData = await getRulesData(username, platform).catch(() => ({}));
     
     // Create AI reply prompt
-    const aiReplyPrompt = createAIReplyPrompt(profileData, rulesData, notification);
+    const aiReplyPrompt = createAIReplyPrompt(profileData, rulesData, notification, platform);
     
     // Call Gemini API with no previous messages (single turn)
     const reply = await callGeminiAPI(aiReplyPrompt);

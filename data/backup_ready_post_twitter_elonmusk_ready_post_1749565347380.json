@@ -1,0 +1,20 @@
+{
+  "post": {
+    "caption": "Building something new… again. 🛠️ What should we disrupt next? 🤔 Let me know your wildest ideas! 👇",
+    "hashtags": [
+      "#Innovation",
+      "#FutureIsNow",
+      "#X"
+    ],
+    "call_to_action": "Reply with your craziest invention idea!",
+    "image_prompt": "A futuristic, high-tech workshop bathed in neon blue and electric purple light. In the center, Elon Musk, wearing a simple grey t-shirt, stands amidst a chaotic yet organized array of tools, wires, and circuit boards. He's looking directly at the camera with a slight smirk, holding a partially assembled, gleaming silver robotic arm. Sparks fly from a welding torch in the background, illuminating a whiteboard covered in complex equations and diagrams. Scattered around are prototypes of various futuristic gadgets: a sleek, minimalist electric vehicle wheel, a partially disassembled neural interface device, and a holographic display projecting schematics of a rocket engine. The overall mood is one of intense creativity, focused energy, and a hint of playful madness. The style should be a blend of photorealism and cyberpunk aesthetics, with a focus on sharp details and vibrant colors. The composition should be dynamic, capturing the energy and excitement of the workshop environment. The background should be slightly blurred to emphasize Elon and the robotic arm as the focal point."
+  },
+  "timestamp": 1749565347380,
+  "image_path": "ready_post/twitter/elonmusk/image_1749565347380.jpg",
+  "image_url": "http://127.0.0.1:3002/fix-image/elonmusk/image_1749565347380.jpg?platform=twitter",
+  "r2_image_url": "http://127.0.0.1:3002/fix-image/elonmusk/image_1749565347380.jpg?platform=twitter",
+  "generated_at": "2025-06-10T14:22:27.380Z",
+  "queryUsed": "create new post for me fully theme aligned",
+  "status": "new",
+  "platform": "twitter"
+}

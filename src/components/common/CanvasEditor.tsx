@@ -18,7 +18,7 @@ interface CanvasEditorProps {
   initialImageUrl?: string;
   postKey?: string;
   postCaption?: string;
-  platform?: 'instagram' | 'twitter';
+  platform?: 'instagram' | 'twitter' | 'facebook';
 }
 
 interface BrandElement {
@@ -52,7 +52,11 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
   const location = useLocation();
   
   // Determine platform: use prop first, then detect from URL
-  const detectedPlatform = propPlatform || (location.pathname.includes('twitter') ? 'twitter' : 'instagram');
+  const detectedPlatform = propPlatform || (
+    location.pathname.includes('twitter') ? 'twitter' : 
+    location.pathname.includes('facebook') ? 'facebook' : 
+    'instagram'
+  );
   
   // Get userId from context if not provided as prop
   const { userId: instagramUserId, isConnected: isInstagramConnected } = useInstagram();

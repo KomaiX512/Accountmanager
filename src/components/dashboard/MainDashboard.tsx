@@ -375,13 +375,13 @@ const MainDashboard: React.FC = () => {
     }
 
     if (platformId === 'instagram') {
-      navigate('/instagram/setup');
+      navigate('/instagram');
     } else if (platformId === 'twitter') {
-      navigate('/twitter/setup');
+      navigate('/twitter');
     } else if (platformId === 'facebook') {
-      navigate('/facebook/setup');
+      navigate('/facebook');
     } else if (platformId === 'linkedin') {
-      navigate('/linkedin/setup');
+      navigate('/linkedin');
     }
   };
 
@@ -393,9 +393,9 @@ const MainDashboard: React.FC = () => {
       } else if (platform.id === 'twitter') {
         navigate('/twitter/connect');
       } else if (platform.id === 'facebook') {
-        navigate('/facebook/connect');
+        navigate('/facebook');
       } else if (platform.id === 'linkedin') {
-        navigate('/linkedin/connect');
+        navigate('/linkedin');
       }
     }
   };

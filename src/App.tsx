@@ -6,6 +6,7 @@ import LeftBar from './components/common/LeftBar';
 import TopBar from './components/common/TopBar';
 import Instagram from './pages/Instagram';
 import Twitter from './pages/Twitter';
+import Facebook from './pages/Facebook';
 import Dashboard from './components/instagram/Dashboard';
 import PlatformDashboard from './components/dashboard/PlatformDashboard';
 import MainDashboard from './components/dashboard/MainDashboard';
@@ -62,7 +63,9 @@ const AppContent: React.FC = () => {
   const shouldHideLeftBar = isLoginPage || isAccountPage || isEntryPage;
 
   // Determine current platform based on route
-  const currentPlatform = location.pathname.includes('twitter') ? 'twitter' : 'instagram';
+  const currentPlatform = location.pathname.includes('twitter') ? 'twitter' : 
+                         location.pathname.includes('facebook') ? 'facebook' : 
+                         'instagram';
 
   // Update state when location state changes - now with stable dependencies
   useEffect(() => {
@@ -119,24 +122,31 @@ const AppContent: React.FC = () => {
         try {
           // Determine which platform to check based on URL
           const isTwitterDashboard = location.pathname.includes('twitter');
+          const isFacebookDashboard = location.pathname.includes('facebook');
           const endpoint = isTwitterDashboard 
             ? `http://localhost:3000/user-twitter-status/${currentUser.uid}`
+            : isFacebookDashboard
+            ? `http://localhost:3000/user-facebook-status/${currentUser.uid}`
             : `http://localhost:3000/user-instagram-status/${currentUser.uid}`;
           
           const response = await axios.get(endpoint);
           
           const hasEnteredUsername = isTwitterDashboard 
             ? response.data.hasEnteredTwitterUsername
+            : isFacebookDashboard
+            ? response.data.hasEnteredFacebookUsername
             : response.data.hasEnteredInstagramUsername;
           
           if (hasEnteredUsername) {
             const savedUsername = isTwitterDashboard 
               ? response.data.twitter_username
+              : isFacebookDashboard
+              ? response.data.facebook_username
               : response.data.instagram_username;
             const savedCompetitors = response.data.competitors || [];
             const savedAccountType = response.data.accountType || 'branding';
             
-            console.log(`Retrieved saved ${isTwitterDashboard ? 'Twitter' : 'Instagram'} data for ${currentUser.uid}:`, {
+            console.log(`Retrieved saved ${isTwitterDashboard ? 'Twitter' : isFacebookDashboard ? 'Facebook' : 'Instagram'} data for ${currentUser.uid}:`, {
               username: savedUsername,
               accountType: savedAccountType
             });
@@ -147,17 +157,17 @@ const AppContent: React.FC = () => {
                 accountHolder: savedUsername,
                 competitors: savedCompetitors,
                 accountType: savedAccountType,
-                platform: isTwitterDashboard ? 'twitter' : 'instagram'
+                platform: isTwitterDashboard ? 'twitter' : isFacebookDashboard ? 'facebook' : 'instagram'
               },
               replace: true
             });
           } else {
             // User hasn't set up the platform yet, redirect to setup page
-            navigate(isTwitterDashboard ? '/twitter' : '/instagram');
+            navigate(isTwitterDashboard ? '/twitter' : isFacebookDashboard ? '/facebook' : '/instagram');
           }
         } catch (error) {
           console.error('Error fetching user status:', error);
-          navigate(location.pathname.includes('twitter') ? '/twitter' : '/instagram');
+          navigate(location.pathname.includes('twitter') ? '/twitter' : location.pathname.includes('facebook') ? '/facebook' : '/instagram');
         } finally {
           setIsLoadingUserData(false);
         }
@@ -212,6 +222,14 @@ const AppContent: React.FC = () => {
               }
             />
             <Route
+              path="/facebook"
+              element={
+                <PrivateRoute>
+                  <Facebook />
+                </PrivateRoute>
+              }
+            />
+            <Route
               path="/dashboard"
               element={
                 <PrivateRoute>
@@ -257,6 +275,32 @@ const AppContent: React.FC = () => {
                     competitors={competitors} 
                     accountType="non-branding"
                     platform="twitter"
+                  />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/facebook-dashboard"
+              element={
+                <PrivateRoute>
+                  <PlatformDashboard 
+                    accountHolder={accountHolder} 
+                    competitors={competitors} 
+                    accountType={accountType || 'branding'}
+                    platform="facebook"
+                  />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/facebook-non-branding-dashboard"
+              element={
+                <PrivateRoute>
+                  <PlatformDashboard 
+                    accountHolder={accountHolder} 
+                    competitors={competitors} 
+                    accountType="non-branding"
+                    platform="facebook"
                   />
                 </PrivateRoute>
               }

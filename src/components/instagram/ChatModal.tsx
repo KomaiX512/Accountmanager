@@ -20,6 +20,7 @@ export interface ChatModalProps {
   username?: string;
   isProcessing?: boolean;
   linkedAccounts?: LinkedAccount[];
+  platform?: 'instagram' | 'twitter' | 'facebook';
 }
 
 const ChatModal: React.FC<ChatModalProps> = ({
@@ -27,13 +28,39 @@ const ChatModal: React.FC<ChatModalProps> = ({
   onClose,
   messages,
   onSendMessage,
-  username = 'Instagram Chat',
+  username = 'Chat',
   isProcessing = false,
-  linkedAccounts = []
+  linkedAccounts = [],
+  platform = 'instagram'
 }) => {
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Platform configuration
+  const platformConfig = {
+    instagram: {
+      name: 'Instagram',
+      baseUrl: 'https://instagram.com/',
+      urlPattern: /https:\/\/instagram\.com\/([A-Za-z0-9_.-]+)/g,
+      usernamePrefix: '@',
+      displayName: 'Instagram Account'
+    },
+    twitter: {
+      name: 'X (Twitter)',
+      baseUrl: 'https://twitter.com/',
+      urlPattern: /https:\/\/twitter\.com\/([A-Za-z0-9_.-]+)/g,
+      usernamePrefix: '@',
+      displayName: 'Twitter Account'
+    },
+    facebook: {
+      name: 'Facebook',
+      baseUrl: 'https://facebook.com/',
+      urlPattern: /https:\/\/facebook\.com\/([A-Za-z0-9_.-]+)/g,
+      usernamePrefix: '',
+      displayName: 'Facebook Profile'
+    }
+  }[platform];
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -57,13 +84,13 @@ const ChatModal: React.FC<ChatModalProps> = ({
     }
   };
 
-  // Function to extract Instagram accounts from a message
-  const findInstagramAccounts = (content: string) => {
-    const matches = content.match(/https:\/\/instagram\.com\/([A-Za-z0-9_.-]+)/g);
+  // Function to extract platform-specific accounts from a message
+  const findPlatformAccounts = (content: string) => {
+    const matches = content.match(platformConfig.urlPattern);
     if (matches?.length) {
       return matches.map(url => ({
         url,
-        username: url.replace('https://instagram.com/', '')
+        username: url.replace(platformConfig.baseUrl, '')
       }));
     }
     return [];
@@ -71,10 +98,10 @@ const ChatModal: React.FC<ChatModalProps> = ({
 
   // Function to format message content with clickable links
   const formatMessageContent = (content: string) => {
-    // Replace Instagram URLs with clickable links
+    // Replace platform-specific URLs with clickable links
     let formattedContent = content.replace(
-      /(https:\/\/instagram\.com\/[A-Za-z0-9_.-]+)/g,
-      '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
+      platformConfig.urlPattern,
+      '<a href="$&" target="_blank" rel="noopener noreferrer">$&</a>'
     );
     
     // Replace other URLs
@@ -120,8 +147,8 @@ const ChatModal: React.FC<ChatModalProps> = ({
                 </div>
               ) : (
                 messages.map((message, index) => {
-                  // Check if this message contains Instagram account links
-                  const foundAccounts = findInstagramAccounts(message.content);
+                  // Check if this message contains platform-specific account links
+                  const foundAccounts = findPlatformAccounts(message.content);
                   
                   return (
                     <motion.div
@@ -144,7 +171,7 @@ const ChatModal: React.FC<ChatModalProps> = ({
                               {foundAccounts.map((account, idx) => (
                                 <li key={idx}>
                                   <a href={account.url} target="_blank" rel="noopener noreferrer">
-                                    @{account.username}
+                                    {platformConfig.usernamePrefix}{account.username}
                                   </a>
                                 </li>
                               ))}
@@ -161,7 +188,7 @@ const ChatModal: React.FC<ChatModalProps> = ({
 
             {linkedAccounts.length > 0 && (
               <div className="chat-linked-accounts">
-                <h3>Instagram Accounts:</h3>
+                <h3>{platformConfig.name} Accounts:</h3>
                 <div className="linked-accounts-list">
                   {linkedAccounts.map((account, idx) => (
                     <a 
@@ -171,7 +198,7 @@ const ChatModal: React.FC<ChatModalProps> = ({
                       rel="noopener noreferrer"
                       className="linked-account-pill"
                     >
-                      @{account.username}
+                      {platformConfig.usernamePrefix}{account.username}
                     </a>
                   ))}
                 </div>
@@ -186,7 +213,7 @@ const ChatModal: React.FC<ChatModalProps> = ({
                   className="chat-input"
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Type a message..."
+                  placeholder={`Ask me anything about your ${platformConfig.name} strategy...`}
                   disabled={isProcessing}
                 />
                 <button

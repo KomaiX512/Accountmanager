@@ -9,9 +9,10 @@ interface MessagesPopupProps {
   username: string;
   onClose: () => void;
   setHasNewMessages: (value: boolean) => void;
+  onOpenChat?: (messageContent: string) => void;
 }
 
-const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHasNewMessages }) => {
+const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHasNewMessages, onOpenChat }) => {
   const [recentResponses, setRecentResponses] = useState<{ key: string; data: any }[]>([]);
   const [viewedKeys, setViewedKeys] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -74,9 +75,20 @@ const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHas
     }
   };
 
+  const handleOpenChat = (response: any) => {
+    // Mark as viewed
+    handleViewResponse(response.key);
+    // Close the messages popup
+    onClose();
+    // Trigger chat modal with the response content
+    if (onOpenChat) {
+      onOpenChat(response.data.response);
+    }
+  };
+
   const handleLike = (key: string) => {
     handleViewResponse(key);
-    setToastMessage('Your enthusiasm lights up our path—thank you for the love!');
+    setToastMessage('Your enthusiasm lights up our path - thank you for the love!');
   };
 
   const handleDislike = (key: string) => {
@@ -91,7 +103,7 @@ const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHas
     setIsFeedbackOpen(null);
     setToastMessage(
       result.success
-        ? 'Your insights are a gift—we’re grateful for your feedback!'
+        ? 'Your insights are a gift - we are grateful for your feedback!'
         : 'Failed to submit feedback. Try again.'
     );
   };
@@ -121,14 +133,14 @@ const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHas
           transition={{ duration: 0.3 }}
           onClick={(e) => e.stopPropagation()}
         >
-          <h2>Manager’s Insights for {username}</h2>
+          <h2>Manager's Insights for {username}</h2>
           <div className="messages-list">
             {isLoading ? (
               <div className="loading">Loading messages...</div>
             ) : error ? (
               <p className="error">{error}</p>
             ) : recentResponses.length === 0 ? (
-              <p className="no-messages">No new insights yet for {username}. Your manager’s wisdom is on the way!</p>
+              <p className="no-messages">No new insights yet for {username}. Your manager wisdom is on the way!</p>
             ) : (
               recentResponses.map((res) => (
                 <motion.div
@@ -137,7 +149,7 @@ const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHas
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3 }}
-                  onClick={() => handleViewResponse(res.key)}
+                  onClick={() => handleOpenChat(res)}
                 >
                   <div className="message-header">
                     <span className="message-id">
@@ -149,7 +161,7 @@ const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHas
                   </div>
                   <div className="message-content-wrapper">
                     <p className="message-intro">
-                      Your strategy is poised for brilliance—here’s how to elevate it:
+                      Your strategy is poised for brilliance - here is how to elevate it:
                     </p>
                     <p className="message-content">{res.data.response}</p>
                   </div>
@@ -212,7 +224,7 @@ const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHas
               <textarea
                 value={feedbackText}
                 onChange={(e) => setFeedbackText(e.target.value)}
-                placeholder="What didn’t resonate with this insight?"
+                placeholder="What did not resonate with this insight?"
                 className="feedback-textarea"
               />
               <div className="feedback-actions">

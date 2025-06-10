@@ -1,0 +1,20 @@
+{
+  "post": {
+    "caption": "What should I tweet next? 🤔 Give me your wildest ideas! Let's brainstorm some chaos. 🚀",
+    "hashtags": [
+      "#ElonMusk",
+      "#Twitter",
+      "#Ideas"
+    ],
+    "call_to_action": "Reply with your best tweet suggestion!",
+    "image_prompt": "A vibrant, dynamic digital illustration in a pop-art style. The central figure is a stylized, slightly cartoonish version of Elon Musk, wearing a futuristic silver spacesuit with subtle Dogecoin logos integrated into the design. He's positioned in the center of the frame, looking directly at the viewer with a playful, mischievous grin. Behind him, a swirling vortex of colorful, abstract shapes and symbols representing different potential tweet topics: rockets, electric cars, memes, coding, and philosophical concepts. These symbols should be easily recognizable and visually engaging. The background should be a gradient of electric blue and neon green, creating a sense of energy and innovation. The overall lighting should be bright and optimistic, with a slight glow emanating from Elon's spacesuit and the swirling vortex. The composition should be slightly tilted, adding to the sense of dynamism and excitement. Text bubbles with question marks should float around Elon's head, visually representing the brainstorming process. The style should be reminiscent of classic comic book art, with bold lines and vibrant colors. The image should convey a sense of fun, creativity, and engagement."
+  },
+  "timestamp": 1749565031366,
+  "image_path": "ready_post/twitter/elonmusk/image_1749565031366.jpg",
+  "image_url": "http://127.0.0.1:3002/fix-image/elonmusk/image_1749565031366.jpg?platform=twitter",
+  "r2_image_url": "http://127.0.0.1:3002/fix-image/elonmusk/image_1749565031366.jpg?platform=twitter",
+  "generated_at": "2025-06-10T14:17:11.366Z",
+  "queryUsed": "createthe next post for me ",
+  "status": "new",
+  "platform": "twitter"
+}

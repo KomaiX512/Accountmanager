@@ -1,0 +1,20 @@
+{
+  "post": {
+    "caption": "Building the future, one tweet at a time! 🚀 What groundbreaking idea are you working on today? Let's inspire each other! ✨",
+    "hashtags": [
+      "#Innovation",
+      "#FutureIsNow",
+      "#Tech"
+    ],
+    "call_to_action": "Share your project in the comments! 👇",
+    "image_prompt": "A dynamic, futuristic cityscape at dusk. The sky is a blend of deep blues, purples, and oranges, with streaks of light suggesting advanced technology. Dominating the foreground is a sleek, silver, almost liquid-metal sculpture resembling a stylized \"X\" logo, reflecting the city lights. Tiny, glowing drones zip between towering, organically shaped skyscrapers. The overall mood is optimistic and forward-thinking. The image should have a slightly blurred, almost dreamlike quality, emphasizing the potential of future technology. The lighting should be dramatic, with strong contrasts between light and shadow. In the lower right corner, subtly include a small, stylized portrait of Elon Musk looking towards the cityscape, almost as if he's observing his creation. The style should be a blend of photorealism and digital art, making it visually striking and shareable on X. The composition should be wide-angle, capturing the vastness and potential of the future."
+  },
+  "timestamp": 1749565167441,
+  "image_path": "ready_post/twitter/elonmusk/image_1749565167441.jpg",
+  "image_url": "http://127.0.0.1:3002/fix-image/elonmusk/image_1749565167441.jpg?platform=twitter",
+  "r2_image_url": "http://127.0.0.1:3002/fix-image/elonmusk/image_1749565167441.jpg?platform=twitter",
+  "generated_at": "2025-06-10T14:19:27.441Z",
+  "queryUsed": "create next post for me",
+  "status": "new",
+  "platform": "twitter"
+}

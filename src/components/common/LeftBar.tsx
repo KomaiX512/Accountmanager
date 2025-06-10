@@ -9,10 +9,11 @@ import CanvasEditor from './CanvasEditor';
 interface LeftBarProps {
   accountHolder: string;
   userId?: string;
-  platform?: 'instagram' | 'twitter';
+  platform?: 'instagram' | 'twitter' | 'facebook';
+  onOpenChat?: (messageContent: string) => void;
 }
 
-const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'instagram' }) => {
+const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'instagram', onOpenChat }) => {
   const navigate = useNavigate();
   const [showProfilePopup, setShowProfilePopup] = useState(false);
   const [showMessagesPopup, setShowMessagesPopup] = useState(false);
@@ -29,7 +30,6 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
   }, [navigate]);
 
   const menuItems = [
-    { icon: 'dashboard', path: '/account', label: 'Dashboard' },
     { icon: 'content', label: 'Content Hub', action: () => setShowCanvasEditor(true) },
     { icon: 'profile', label: 'Profile', action: () => setShowProfilePopup(true) },
     { 
@@ -57,13 +57,8 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.05, duration: 0.15 }}
-            onClick={item.action || (() => navigate(item.path))}
+            onClick={item.action}
           >
-            {item.icon === 'dashboard' && (
-              <svg className="icon" viewBox="0 0 24 24">
-                <path d="M13,3V9H21V3M13,21H21V11H13M3,21H11V15H3M3,13H11V3H3V13Z" />
-              </svg>
-            )}
             {item.icon === 'content' && (
               <svg className="icon" viewBox="0 0 24 24">
                 <path d="M19,3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M19,19H5V5H19V19Z M17,17H7V15H17V17Z M17,13H7V11H17V13Z M17,9H7V7H17V9Z" />
@@ -94,6 +89,7 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
           username={accountHolder}
           onClose={() => setShowMessagesPopup(false)}
           setHasNewMessages={setHasNewMessages}
+          onOpenChat={onOpenChat}
         />
       )}
       {showCanvasEditor && (

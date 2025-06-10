@@ -22,7 +22,7 @@ interface AccountInfo {
 interface Cs_AnalysisProps {
   accountHolder: string;
   competitors: string[];
-  platform?: 'instagram' | 'twitter';
+  platform?: 'instagram' | 'twitter' | 'facebook';
 }
 
 const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, platform = 'instagram' }) => {

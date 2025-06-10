@@ -146,16 +146,18 @@ class RagService {
   static async sendDiscussionQuery(
     username: string, 
     query: string, 
-    previousMessages: ChatMessage[] = []
+    previousMessages: ChatMessage[] = [],
+    platform: string = 'instagram'
   ): Promise<{ response: string }> {
     try {
-      console.log(`[RagService] Sending discussion query for ${username}: "${query}"`);
+      console.log(`[RagService] Sending discussion query for ${platform}/${username}: "${query}"`);
       
       return await this.tryServerUrls(`/api/discussion`, (url) => 
         axios.post(url, {
           username,
           query,
-          previousMessages
+          previousMessages,
+          platform
         }, {
           timeout: 30000, // 30 second timeout
           withCredentials: false, // Disable sending cookies
@@ -174,11 +176,15 @@ class RagService {
   /**
    * Sends a post generation query to the RAG server directly
    */
-  static async sendPostQuery(username: string, query: string): Promise<PostGenerationResponse> {
+  static async sendPostQuery(
+    username: string, 
+    query: string, 
+    platform: string = 'instagram'
+  ): Promise<PostGenerationResponse> {
     let lastError: any = null;
     
     try {
-      console.log(`[RagService] Starting post generation for ${username}: "${query}"`);
+      console.log(`[RagService] Starting post generation for ${platform}/${username}: "${query}"`);
       
       // Update UI with initial status
       console.log(`[RagService] Step 1/4: Initiating request to RAG server`);
@@ -186,7 +192,8 @@ class RagService {
       const response = await this.tryServerUrls(`/api/post-generator`, (url) => 
         axios.post(url, {
           username,
-          query
+          query,
+          platform
         }, {
           timeout: 60000, // 60 second timeout for image generation
           withCredentials: false, // Disable sending cookies
@@ -212,13 +219,13 @@ class RagService {
         const newPostEvent = new CustomEvent('newPostCreated', {
           detail: {
             username,
-            platform: 'instagram', // Default to instagram, could be passed as parameter
+            platform,
             timestamp: postData.timestamp || Date.now(),
             success: true
           }
         });
         window.dispatchEvent(newPostEvent);
-        console.log(`[RagService] Emitted newPostCreated event for ${username}`);
+        console.log(`[RagService] Emitted newPostCreated event for ${platform}/${username}`);
       } catch (eventError) {
         console.warn('[RagService] Failed to emit newPostCreated event:', eventError);
       }
@@ -274,9 +281,12 @@ class RagService {
   /**
    * Loads the conversation history for a user from the RAG server directly
    */
-  static async loadConversations(username: string): Promise<ChatMessage[]> {
+  static async loadConversations(
+    username: string, 
+    platform: string = 'instagram'
+  ): Promise<ChatMessage[]> {
     try {
-      const response = await this.tryServerUrls(`/api/conversations/${username}`, (url) => 
+      const response = await this.tryServerUrls(`/api/conversations/${username}?platform=${platform}`, (url) => 
         axios.get(url, {
           timeout: 10000, // 10 second timeout
           withCredentials: false, // Disable sending cookies
@@ -292,11 +302,16 @@ class RagService {
   /**
    * Saves the conversation history for a user to the RAG server directly
    */
-  static async saveConversation(username: string, messages: ChatMessage[]): Promise<void> {
+  static async saveConversation(
+    username: string, 
+    messages: ChatMessage[], 
+    platform: string = 'instagram'
+  ): Promise<void> {
     try {
       await this.tryServerUrls(`/api/conversations/${username}`, (url) => 
         axios.post(url, {
-          messages
+          messages,
+          platform
         }, {
           timeout: 10000, // 10 second timeout
           withCredentials: false, // Disable sending cookies
@@ -323,17 +338,21 @@ class RagService {
       temperature?: number;
       sender_id?: string;
       message_id?: string;
+      platform?: string;
     }
   ): Promise<any> {
     const urls = ['http://localhost:3000', 'http://127.0.0.1:3000'];
     let lastError = null;
 
+    const platform = options?.platform || 'instagram';
+
     // Validate sender_id if provided
     if (options?.sender_id) {
-      // Instagram IDs are typically numeric
-      if (!/^[0-9]+$/.test(options.sender_id)) {
-        console.warn(`[RagService] Invalid sender_id format: ${options.sender_id}`);
-        // Don't throw, just log warning - we can still generate the response
+      // Instagram IDs are typically numeric, Twitter IDs can be alphanumeric
+      if (platform === 'instagram' && !/^[0-9]+$/.test(options.sender_id)) {
+        console.warn(`[RagService] Invalid Instagram sender_id format: ${options.sender_id}`);
+      } else if (platform === 'twitter' && !/^[a-zA-Z0-9_]+$/.test(options.sender_id)) {
+        console.warn(`[RagService] Invalid Twitter sender_id format: ${options.sender_id}`);
       }
     }
 
@@ -341,18 +360,20 @@ class RagService {
     const userMessage = conversation && conversation.length > 0 ? conversation[0].content : '';
     const notification = {
       type: 'message',
-      instagram_user_id: userId,
+      instagram_user_id: platform === 'instagram' ? userId : undefined,
+      twitter_user_id: platform === 'twitter' ? userId : undefined,
       sender_id: options?.sender_id,
       message_id: options?.message_id,
       text: userMessage,
       timestamp: Date.now(),
       received_at: new Date().toISOString(),
-      status: 'pending'
+      status: 'pending',
+      platform
     };
 
     for (const baseUrl of urls) {
       try {
-        console.log(`[RagService] Trying to send instant AI reply via ${baseUrl}/rag-instant-reply/${username}`);
+        console.log(`[RagService] Trying to send instant ${platform} AI reply via ${baseUrl}/rag-instant-reply/${username}`);
         
         // Add validation headers to ensure the request is properly handled
         const response = await axios.post(
@@ -373,7 +394,7 @@ class RagService {
         }
 
         // Log successful response
-        console.log(`[RagService] Successfully received response from ${baseUrl}`);
+        console.log(`[RagService] Successfully received ${platform} response from ${baseUrl}`);
         return response.data;
       } catch (error: any) {
         console.error(`[RagService] Failed with ${baseUrl}, trying next URL:`, error.message || 'Unknown error');

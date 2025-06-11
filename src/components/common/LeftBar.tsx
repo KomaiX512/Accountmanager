@@ -33,8 +33,8 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
     { icon: 'content', label: 'Content Hub', action: () => setShowCanvasEditor(true) },
     { icon: 'profile', label: 'Profile', action: () => setShowProfilePopup(true) },
     { 
-      icon: 'messages', 
-      label: 'Messages', 
+      icon: 'ai-chat', 
+      label: 'AI Manager', 
       action: () => setShowMessagesPopup(true),
       hasNotification: hasNewMessages,
     },
@@ -69,10 +69,13 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
                 <path d="M12,4A4,4 0 0,1 16,8A4,4 0 0,1 12,12A4,4 0 0,1 8,8A4,4 0 0,1 12,4M12,14C16.42,14 20,15.79 20,18V20H4V18C4,15.79 7.58,14 12,14Z" />
               </svg>
             )}
-            {item.icon === 'messages' && (
+            {item.icon === 'ai-chat' && (
               <div className="icon-wrapper">
                 <svg className="icon" viewBox="0 0 24 24">
-                  <path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2ZM20 16H6L4 18V4H20V16Z" />
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  <circle cx="9" cy="12" r="1"/>
+                  <circle cx="15" cy="12" r="1"/>
+                  <circle cx="12" cy="8" r="1"/>
                 </svg>
                 {item.hasNotification && <span className="notification-dot"></span>}
               </div>
@@ -90,6 +93,7 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
           onClose={() => setShowMessagesPopup(false)}
           setHasNewMessages={setHasNewMessages}
           onOpenChat={onOpenChat}
+          platform={platform}
         />
       )}
       {showCanvasEditor && (

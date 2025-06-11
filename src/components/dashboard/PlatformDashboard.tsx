@@ -27,7 +27,7 @@ import RagService from '../../services/RagService';
 import type { ChatMessage as ChatModalMessage } from '../instagram/ChatModal';
 import { Notification, ProfileInfo, LinkedAccount } from '../../types/notifications';
 // Import icons from react-icons
-import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaTwitter, FaInstagram, FaPen, FaFacebook } from 'react-icons/fa';
+import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaTwitter, FaInstagram, FaPen, FaFacebook, FaBell } from 'react-icons/fa';
 import { MdAnalytics, MdOutlineSchedule, MdOutlineAutoGraph } from 'react-icons/md';
 import { BsLightningChargeFill, BsBinoculars, BsLightbulb } from 'react-icons/bs';
 import { IoMdAnalytics } from 'react-icons/io';
@@ -45,13 +45,15 @@ interface PlatformDashboardProps {
   competitors: string[];
   accountType: 'branding' | 'non-branding';
   platform: 'instagram' | 'twitter' | 'facebook';
+  onOpenChat?: (messageContent: string, platform?: string) => void;
 }
 
 const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ 
   accountHolder, 
   competitors, 
   accountType, 
-  platform 
+  platform,
+  onOpenChat
 }) => {
   // Platform-specific context hooks
   const { userId: igUserId, isConnected: isInstagramConnected, connectInstagram } = useInstagram();
@@ -121,6 +123,26 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const [linkedAccounts, setLinkedAccounts] = useState<any[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [aiProcessingNotifications, setAiProcessingNotifications] = useState<Record<string, boolean>>({});
+  
+  // Content viewed tracking - track what has been seen vs unseen with localStorage persistence
+  const getViewedStorageKey = (section: string) => `viewed_${section}_${platform}_${accountHolder}`;
+  
+  // Initialize viewed sets from localStorage
+  const [viewedStrategies, setViewedStrategies] = useState<Set<string>>(() => {
+    const stored = localStorage.getItem(getViewedStorageKey('strategies'));
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  });
+  
+  const [viewedCompetitorData, setViewedCompetitorData] = useState<Set<string>>(() => {
+    const stored = localStorage.getItem(getViewedStorageKey('competitor'));
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  });
+  
+  const [viewedPosts, setViewedPosts] = useState<Set<string>>(() => {
+    const stored = localStorage.getItem(getViewedStorageKey('posts'));
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  });
+
   // Bio animation states
   const [showInitialText, setShowInitialText] = useState(true);
   const [showBio, setShowBio] = useState(false);
@@ -154,6 +176,163 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const [isFacebookSchedulerOpen, setIsFacebookSchedulerOpen] = useState(false);
   const [isFacebookInsightsOpen, setIsFacebookInsightsOpen] = useState(false);
   const [isFacebookComposeOpen, setIsFacebookComposeOpen] = useState(false);
+
+  // Helper function to get unseen count for each section
+  const getUnseenStrategiesCount = () => {
+    return strategies.filter(strategy => !viewedStrategies.has(strategy.key)).length;
+  };
+
+  const getUnseenCompetitorCount = () => {
+    return competitorData.filter(data => !viewedCompetitorData.has(data.key)).length;
+  };
+
+  const getUnseenPostsCount = () => {
+    return posts.filter(post => !viewedPosts.has(post.key)).length;
+  };
+
+  // Function to mark content as viewed with localStorage persistence
+  const markStrategiesAsViewed = () => {
+    const newViewedStrategies = new Set(strategies.map(s => s.key));
+    setViewedStrategies(newViewedStrategies);
+    localStorage.setItem(getViewedStorageKey('strategies'), JSON.stringify(Array.from(newViewedStrategies)));
+  };
+
+  const markCompetitorDataAsViewed = () => {
+    const newViewedCompetitorData = new Set(competitorData.map(c => c.key));
+    setViewedCompetitorData(newViewedCompetitorData);
+    localStorage.setItem(getViewedStorageKey('competitor'), JSON.stringify(Array.from(newViewedCompetitorData)));
+  };
+
+  const markPostsAsViewed = () => {
+    const newViewedPosts = new Set(posts.map(p => p.key));
+    setViewedPosts(newViewedPosts);
+    localStorage.setItem(getViewedStorageKey('posts'), JSON.stringify(Array.from(newViewedPosts)));
+  };
+
+  // Auto-mark strategies as viewed when they're accessed/opened (via intersection observer)
+  useEffect(() => {
+    const strategiesContainer = document.querySelector('.strategies');
+    if (!strategiesContainer) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
+            // Mark as viewed if user scrolls to and stays on strategies section
+            setTimeout(() => {
+              if (entry.isIntersecting && getUnseenStrategiesCount() > 0) {
+                markStrategiesAsViewed();
+              }
+            }, 2000); // Mark as viewed after 2 seconds of viewing
+          }
+        });
+      },
+      { threshold: 0.5 }
+    );
+
+    observer.observe(strategiesContainer);
+    return () => observer.disconnect();
+  }, [strategies]);
+
+  // Auto-mark competitor data as viewed when accessed
+  useEffect(() => {
+    const competitorContainer = document.querySelector('.competitor-analysis');
+    if (!competitorContainer) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
+            setTimeout(() => {
+              if (entry.isIntersecting && getUnseenCompetitorCount() > 0) {
+                markCompetitorDataAsViewed();
+              }
+            }, 2000);
+          }
+        });
+      },
+      { threshold: 0.5 }
+    );
+
+    observer.observe(competitorContainer);
+    return () => observer.disconnect();
+  }, [competitorData]);
+
+  // Auto-mark posts as viewed when accessed
+  useEffect(() => {
+    const postsContainer = document.querySelector('.post-cooked');
+    if (!postsContainer) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
+            setTimeout(() => {
+              if (entry.isIntersecting && getUnseenPostsCount() > 0) {
+                markPostsAsViewed();
+              }
+            }, 2000);
+          }
+        });
+      },
+      { threshold: 0.5 }
+    );
+
+    observer.observe(postsContainer);
+    return () => observer.disconnect();
+  }, [posts]);
+
+  // Update viewed sets when new data arrives
+  useEffect(() => {
+    const currentViewed = localStorage.getItem(getViewedStorageKey('strategies'));
+    if (currentViewed) {
+      setViewedStrategies(new Set(JSON.parse(currentViewed)));
+    }
+  }, [strategies]);
+
+  useEffect(() => {
+    const currentViewed = localStorage.getItem(getViewedStorageKey('competitor'));
+    if (currentViewed) {
+      setViewedCompetitorData(new Set(JSON.parse(currentViewed)));
+    }
+  }, [competitorData]);
+
+  useEffect(() => {
+    const currentViewed = localStorage.getItem(getViewedStorageKey('posts'));
+    if (currentViewed) {
+      setViewedPosts(new Set(JSON.parse(currentViewed)));
+    }
+  }, [posts]);
+
+  const handleOpenChatFromMessages = (messageContent: string) => {
+    console.log(`[PlatformDashboard] Opening chat for ${platform} with message: "${messageContent}"`);
+    
+    // If parent provides onOpenChat, use it and ALWAYS pass the platform
+    if (onOpenChat) {
+      // CRITICAL FIX: Pass the platform to ensure correct platform context
+      if (onOpenChat.length >= 2) {
+        // New signature: (messageContent: string, platform?: string) => void
+        (onOpenChat as any)(messageContent, platform);
+      } else {
+        // Fallback for old signature
+        onOpenChat(messageContent);
+      }
+    } else {
+      // Set chat mode to discussion
+      setChatMode('discussion');
+      
+      // Add the message content to chat messages as an assistant message
+      const assistantMessage: ChatModalMessage = {
+        role: 'assistant',
+        content: messageContent
+      };
+      
+      setChatMessages(prev => [...prev, assistantMessage]);
+      
+      // Open the chat modal
+      setIsChatModalOpen(true);
+    }
+  };
 
   // Platform-specific notification handlers
   const handleReply = async (notification: any, replyText: string) => {
@@ -281,9 +460,11 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       try {
         console.log(`[${new Date().toISOString()}] Calling RAG service for instant ${platform} AI reply`);
         
-        const currentUserId = platform === 'twitter' ? twitterId : igUserId;
+        const currentUserId = platform === 'twitter' ? twitterId : 
+                               platform === 'facebook' ? facebookId :
+                               igUserId;
         const response = await RagService.sendInstantAIReply(
-          currentUserId || notification.twitter_user_id || notification.instagram_user_id,
+          currentUserId || notification.twitter_user_id || notification.instagram_user_id || notification.facebook_user_id,
           accountHolder,
           conversation,
           {
@@ -1412,15 +1593,6 @@ Image Description: ${response.post.image_prompt}
                       <FacebookConnect onConnected={handleFacebookConnected} />
                       <FacebookRequiredButton
                         isConnected={isConnected}
-                        onClick={handleOpenFacebookCompose}
-                        className="dashboard-btn compose-btn facebook"
-                      >
-                        <FaPen className="btn-icon" />
-                        <span>Compose</span>
-                      </FacebookRequiredButton>
-                      
-                      <FacebookRequiredButton
-                        isConnected={isConnected}
                         onClick={handleOpenFacebookInsights}
                         bypassConnectionRequirement={true}
                         className="dashboard-btn insights-btn facebook"
@@ -1501,7 +1673,17 @@ Image Description: ${response.post.image_prompt}
               <div className="section-header">
                 <BsLightbulb className="section-icon" />
                 <span>{config.name} Strategies</span>
-                <span className="badge">{strategies.length || 3} unseen!!!</span>
+                {getUnseenStrategiesCount() > 0 ? (
+                  <div className="content-badge" onClick={markStrategiesAsViewed}>
+                    <FaBell className="badge-icon" />
+                    <span className="badge-count">{getUnseenStrategiesCount()}</span>
+                  </div>
+                ) : (
+                  <div className="content-badge viewed">
+                    <FaBell className="badge-icon" />
+                    <span className="badge-text">Viewed</span>
+                  </div>
+                )}
               </div>
             </h2>
             <OurStrategies accountHolder={accountHolder} accountType={accountType} platform={platform} />
@@ -1513,7 +1695,17 @@ Image Description: ${response.post.image_prompt}
               <div className="section-header">
                 <GiSpy className="section-icon" />
                 <span>{config.name} Competitor Analysis</span>
-                <span className="badge">{competitorData.length || 5} unseen!!!</span>
+                {getUnseenCompetitorCount() > 0 ? (
+                  <div className="content-badge" onClick={markCompetitorDataAsViewed}>
+                    <FaBell className="badge-icon" />
+                    <span className="badge-count">{getUnseenCompetitorCount()}</span>
+                  </div>
+                ) : (
+                  <div className="content-badge viewed">
+                    <FaBell className="badge-icon" />
+                    <span className="badge-text">Viewed</span>
+                  </div>
+                )}
               </div>
             </h2>
             <Cs_Analysis accountHolder={accountHolder} competitors={competitors} platform={platform} />

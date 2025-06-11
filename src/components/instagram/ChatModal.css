@@ -40,6 +40,12 @@
   background: rgba(0, 0, 0, 0.2);
 }
 
+.chat-modal-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .chat-modal-header h2 {
   margin: 0;
   font-size: 1.4rem;
@@ -47,6 +53,14 @@
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   text-shadow: 0 0 15px rgba(0, 255, 204, 0.5);
+}
+
+.platform-indicator {
+  font-size: 0.8rem;
+  color: #a0a0cc;
+  font-weight: normal;
+  font-style: italic;
+  opacity: 0.8;
 }
 
 .chat-modal-close {

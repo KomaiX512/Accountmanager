@@ -53,6 +53,22 @@ const MainDashboard: React.FC = () => {
   const [showInstagramScheduler, setShowInstagramScheduler] = useState<boolean>(false);
   const [showTwitterComposer, setShowTwitterComposer] = useState<boolean>(false);
   
+  // Real-time notification counts
+  const [realTimeNotifications, setRealTimeNotifications] = useState<Record<string, number>>({
+    instagram: 0,
+    twitter: 0,
+    facebook: 0,
+    linkedin: 0
+  });
+  
+  // Viewed content tracking
+  const [viewedContent, setViewedContent] = useState<Record<string, Set<string>>>({
+    instagram: new Set(),
+    twitter: new Set(),
+    facebook: new Set(),
+    linkedin: new Set()
+  });
+  
   const [postContent, setPostContent] = useState<PostContent>({
     text: '',
     images: [],
@@ -87,6 +103,116 @@ const MainDashboard: React.FC = () => {
     ? localStorage.getItem(`twitter_accessed_${currentUser.uid}`) === 'true'
     : false;
 
+  // Function to fetch real-time notification counts for all platforms
+  const fetchRealTimeNotifications = async () => {
+    if (!currentUser?.uid) return;
+    
+    const platforms = ['instagram', 'twitter', 'facebook', 'linkedin'];
+    const counts: Record<string, number> = {};
+    
+    for (const platform of platforms) {
+      try {
+        let userId = null;
+        if (platform === 'instagram' && instagramUserId) userId = instagramUserId;
+        if (platform === 'twitter' && twitterUserId) userId = twitterUserId;
+        
+        let totalCount = 0;
+        
+        // Only count notifications if platform is claimed (accessed)
+        const isClaimedPlatform = localStorage.getItem(`${platform}_accessed_${currentUser.uid}`) === 'true';
+        
+        if (isClaimedPlatform) {
+          // Real-time notifications (DMs/comments) - only if connected
+          if (userId) {
+            try {
+              const response = await fetch(`http://localhost:3000/events-list/${userId}?platform=${platform}`);
+              if (response.ok) {
+                const notifications = await response.json();
+                totalCount += notifications.length;
+              }
+            } catch (err) {
+              console.warn(`Failed to fetch ${platform} notifications:`, err);
+            }
+          }
+          
+          // Get a real username for this platform instead of using dummy
+          const platformUsername = localStorage.getItem(`${platform}_username_${currentUser.uid}`);
+          if (platformUsername) {
+            // Fetch strategies count
+            try {
+              const strategiesResponse = await fetch(`http://localhost:3000/retrieve-strategies/${platformUsername}?platform=${platform}`);
+              if (strategiesResponse.ok) {
+                const strategies = await strategiesResponse.json();
+                // Count unseen strategies
+                const viewedKey = `viewed_strategies_${platform}_${platformUsername}`;
+                const viewedStrategies = JSON.parse(localStorage.getItem(viewedKey) || '[]');
+                const unseenStrategies = strategies.filter((s: any) => !viewedStrategies.includes(s.key));
+                totalCount += unseenStrategies.length;
+              }
+            } catch (err) {
+              // Ignore strategy fetch errors
+            }
+            
+            // Fetch posts count  
+            try {
+              const postsResponse = await fetch(`http://localhost:3000/posts/${platformUsername}?platform=${platform}`);
+              if (postsResponse.ok) {
+                const posts = await postsResponse.json();
+                // Count unseen posts
+                const viewedKey = `viewed_posts_${platform}_${platformUsername}`;
+                const viewedPosts = JSON.parse(localStorage.getItem(viewedKey) || '[]');
+                const unseenPosts = posts.filter((p: any) => !viewedPosts.includes(p.key));
+                totalCount += unseenPosts.length;
+              }
+            } catch (err) {
+              // Ignore posts fetch errors
+            }
+            
+            // Fetch competitor analysis count
+            try {
+              const accountInfoResponse = await fetch(`http://localhost:3000/retrieve-account-info/${platformUsername}?platform=${platform}`);
+              if (accountInfoResponse.ok) {
+                const accountInfo = await accountInfoResponse.json();
+                const competitors = accountInfo.competitors || [];
+                
+                if (competitors.length > 0) {
+                  const competitorResponse = await fetch(`http://localhost:3000/retrieve-multiple/${platformUsername}?competitors=${competitors.join(',')}&platform=${platform}`);
+                  if (competitorResponse.ok) {
+                    const competitorData = await competitorResponse.json();
+                    // Count unseen competitor analysis
+                    const viewedKey = `viewed_competitor_${platform}_${platformUsername}`;
+                    const viewedCompetitor = JSON.parse(localStorage.getItem(viewedKey) || '[]');
+                    const unseenCompetitor = competitorData.filter((c: any) => !viewedCompetitor.includes(c.key || `${c.competitor}_${c.timestamp}`));
+                    totalCount += unseenCompetitor.length;
+                  }
+                }
+              }
+            } catch (err) {
+              // Ignore competitor fetch errors
+            }
+          }
+        }
+        
+        counts[platform] = totalCount;
+      } catch (error) {
+        console.warn(`Failed to fetch notifications for ${platform}:`, error);
+        counts[platform] = 0;
+      }
+    }
+    
+    setRealTimeNotifications(counts);
+  };
+
+  // Effect to fetch real-time notifications on mount and when connections change
+  useEffect(() => {
+    fetchRealTimeNotifications();
+    
+    // Set up interval to refresh every 30 seconds
+    const interval = setInterval(fetchRealTimeNotifications, 30000);
+    
+    return () => clearInterval(interval);
+  }, [currentUser?.uid, instagramUserId, twitterUserId, isInstagramConnected, isTwitterConnected]);
+
   // Claimed platforms - based on whether user has accessed the platform dashboard
   // Connected platforms - based on whether user has connected their social media account
   const [platforms, setPlatforms] = useState<PlatformData[]>([
@@ -97,12 +223,12 @@ const MainDashboard: React.FC = () => {
       claimed: hasAccessedInstagram || instagramAccessedInLocalStorage, // Check both context and localStorage
       connected: isInstagramConnected,
       notifications: {
-        total: (hasAccessedInstagram || instagramAccessedInLocalStorage) ? 12 : 0,
+        total: 0, // Will be updated by real-time data
         breakdown: {
-          cs_analysis: 3,
-          our_strategies: 4,
-          dms_comments: 2,
-          cooked_posts: 3
+          cs_analysis: 0,
+          our_strategies: 0,
+          dms_comments: 0,
+          cooked_posts: 0
         }
       },
       route: '/dashboard',
@@ -117,12 +243,12 @@ const MainDashboard: React.FC = () => {
       claimed: hasAccessedTwitter || twitterAccessedInLocalStorage, // Check both context and localStorage
       connected: isTwitterConnected,
       notifications: {
-        total: (hasAccessedTwitter || twitterAccessedInLocalStorage) ? 8 : 0,
+        total: 0, // Will be updated by real-time data
         breakdown: {
-          cs_analysis: 2,
-          our_strategies: 3,
-          dms_comments: 1,
-          cooked_posts: 2
+          cs_analysis: 0,
+          our_strategies: 0,
+          dms_comments: 0,
+          cooked_posts: 0
         }
       },
       route: '/twitter-dashboard',
@@ -137,12 +263,12 @@ const MainDashboard: React.FC = () => {
       claimed: hasAccessedFacebook,
       connected: false, // No context for Facebook yet
       notifications: {
-        total: hasAccessedFacebook ? 5 : 0,
+        total: 0, // Will be updated by real-time data
         breakdown: {
-          cs_analysis: 1,
-          our_strategies: 2,
-          dms_comments: 1,
-          cooked_posts: 1
+          cs_analysis: 0,
+          our_strategies: 0,
+          dms_comments: 0,
+          cooked_posts: 0
         }
       },
       route: '/facebook-dashboard',
@@ -157,12 +283,12 @@ const MainDashboard: React.FC = () => {
       claimed: hasAccessedLinkedIn,
       connected: false, // No context for LinkedIn yet
       notifications: {
-        total: hasAccessedLinkedIn ? 3 : 0,
+        total: 0, // Will be updated by real-time data
         breakdown: {
-          cs_analysis: 1,
-          our_strategies: 1,
+          cs_analysis: 0,
+          our_strategies: 0,
           dms_comments: 0,
-          cooked_posts: 1
+          cooked_posts: 0
         }
       },
       route: '/linkedin-dashboard',
@@ -175,42 +301,44 @@ const MainDashboard: React.FC = () => {
   // Get only connected platforms
   const connectedPlatforms = platforms.filter(p => p.connected);
 
-  // Effect to update connection status when context changes
+  // Effect to update connection status and real-time notification counts
   useEffect(() => {
     setPlatforms(prev => 
       prev.map(platform => {
+        const platformNotificationCount = realTimeNotifications[platform.id] || 0;
+        
         if (platform.id === 'instagram') {
           return { 
             ...platform, 
-            connected: isInstagramConnected, 
-            // Keep the existing claimed status or use context value
+            connected: isInstagramConnected,
             notifications: {
               ...platform.notifications,
-              total: platform.claimed ? platform.notifications.breakdown.cs_analysis + 
-                                        platform.notifications.breakdown.our_strategies + 
-                                        platform.notifications.breakdown.dms_comments + 
-                                        platform.notifications.breakdown.cooked_posts : 0
+              total: platform.claimed ? platformNotificationCount : 0
             }
           };
         }
         if (platform.id === 'twitter') {
           return { 
             ...platform, 
-            connected: isTwitterConnected, 
-            // Keep the existing claimed status or use context value
+            connected: isTwitterConnected,
             notifications: {
               ...platform.notifications,
-              total: platform.claimed ? platform.notifications.breakdown.cs_analysis + 
-                                        platform.notifications.breakdown.our_strategies + 
-                                        platform.notifications.breakdown.dms_comments + 
-                                        platform.notifications.breakdown.cooked_posts : 0
+              total: platform.claimed ? platformNotificationCount : 0
             }
           };
         }
-        return platform;
+        
+        // For Facebook and LinkedIn, use real-time counts if claimed
+        return {
+          ...platform,
+          notifications: {
+            ...platform.notifications,
+            total: platform.claimed ? platformNotificationCount : 0
+          }
+        };
       })
     );
-  }, [isInstagramConnected, isTwitterConnected]);
+  }, [isInstagramConnected, isTwitterConnected, realTimeNotifications]);
 
   // Add an effect to recheck localStorage on focus, this helps when returning from platform pages
   useEffect(() => {
@@ -222,64 +350,30 @@ const MainDashboard: React.FC = () => {
         const facebookAccessed = localStorage.getItem(`facebook_accessed_${currentUser.uid}`) === 'true';
         const linkedinAccessed = localStorage.getItem(`linkedin_accessed_${currentUser.uid}`) === 'true';
         
-        // Update platforms with fresh localStorage values
+        // Update platforms with fresh localStorage values and refresh notifications
         setPlatforms(prev => 
           prev.map(p => {
-            if (p.id === 'instagram' && instagramAccessed) {
-              return { 
-                ...p, 
-                claimed: true,
-                notifications: {
-                  ...p.notifications,
-                  total: p.notifications.breakdown.cs_analysis + 
-                         p.notifications.breakdown.our_strategies + 
-                         p.notifications.breakdown.dms_comments + 
-                         p.notifications.breakdown.cooked_posts
-                }
-              };
-            }
-            if (p.id === 'twitter' && twitterAccessed) {
-              return { 
-                ...p, 
-                claimed: true,
-                notifications: {
-                  ...p.notifications,
-                  total: p.notifications.breakdown.cs_analysis + 
-                         p.notifications.breakdown.our_strategies + 
-                         p.notifications.breakdown.dms_comments + 
-                         p.notifications.breakdown.cooked_posts
-                }
-              };
-            }
-            if (p.id === 'facebook' && facebookAccessed) {
-              return { 
-                ...p, 
-                claimed: true,
-                notifications: {
-                  ...p.notifications,
-                  total: p.notifications.breakdown.cs_analysis + 
-                         p.notifications.breakdown.our_strategies + 
-                         p.notifications.breakdown.dms_comments + 
-                         p.notifications.breakdown.cooked_posts
-                }
-              };
-            }
-            if (p.id === 'linkedin' && linkedinAccessed) {
-              return { 
-                ...p, 
-                claimed: true,
-                notifications: {
-                  ...p.notifications,
-                  total: p.notifications.breakdown.cs_analysis + 
-                         p.notifications.breakdown.our_strategies + 
-                         p.notifications.breakdown.dms_comments + 
-                         p.notifications.breakdown.cooked_posts
-                }
-              };
-            }
-            return p;
+            const wasClaimedBefore = p.claimed;
+            let newClaimed = p.claimed;
+            
+            if (p.id === 'instagram' && instagramAccessed) newClaimed = true;
+            if (p.id === 'twitter' && twitterAccessed) newClaimed = true;
+            if (p.id === 'facebook' && facebookAccessed) newClaimed = true;
+            if (p.id === 'linkedin' && linkedinAccessed) newClaimed = true;
+            
+            return { 
+              ...p, 
+              claimed: newClaimed,
+              notifications: {
+                ...p.notifications,
+                total: newClaimed ? realTimeNotifications[p.id] || 0 : 0
+              }
+            };
           })
         );
+        
+        // Refresh notification counts
+        fetchRealTimeNotifications();
       }
     };
 
@@ -291,7 +385,7 @@ const MainDashboard: React.FC = () => {
     return () => {
       window.removeEventListener('focus', handleFocus);
     };
-  }, [currentUser?.uid]);
+  }, [currentUser?.uid, realTimeNotifications]);
 
   // Sort platforms so claimed ones appear first
   const sortedPlatforms = [...platforms].sort((a, b) => {
@@ -525,6 +619,22 @@ const MainDashboard: React.FC = () => {
     }));
   };
 
+  // Handle notification click to mark content as viewed
+  const handleNotificationClick = (platformId: string) => {
+    setViewedContent(prev => ({
+      ...prev,
+      [platformId]: new Set() // Reset viewed content when clicking notification
+    }));
+    
+    // Navigate to platform
+    const platform = platforms.find(p => p.id === platformId);
+    if (platform?.claimed) {
+      navigateToPlatform(platform);
+    } else {
+      navigateToSetup(platformId);
+    }
+  };
+
   return (
     <div className="dashboard-page">
       <div className="welcome-banner">
@@ -628,7 +738,10 @@ const MainDashboard: React.FC = () => {
                   
                   {platform.claimed && platform.notifications.total > 0 && (
                     <div className="notification-badge-container">
-                      <div className="notification-badge">
+                      <div 
+                        className="notification-badge"
+                        onClick={() => handleNotificationClick(platform.id)}
+                      >
                         <svg className="notification-bell-icon" viewBox="0 0 24 24" width="16" height="16" style={{marginRight: '4px'}}>
                           <path d="M12 22c1.1 0 2-.9 2-2h-4a2 2 0 0 0 2 2zm6-6V11c0-3.07-1.63-5.64-5-6.32V4a1 1 0 1 0-2 0v.68C7.63 5.36 6 7.92 6 11v5l-1.29 1.29A1 1 0 0 0 6 19h12a1 1 0 0 0 .71-1.71L18 16zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z" fill="#fff"/>
                         </svg>

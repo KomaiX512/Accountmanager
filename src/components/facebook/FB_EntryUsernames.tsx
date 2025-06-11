@@ -298,6 +298,9 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
           }
         }
 
+        // Store username for notification counting in main dashboard
+        localStorage.setItem(`facebook_username_${currentUser.uid}`, username.trim());
+
         // Mark Facebook as acquired after successful submission
         if (markPlatformAccessed) {
           markPlatformAccessed('facebook');

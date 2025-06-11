@@ -12,6 +12,7 @@ export interface Notification {
   type: 'message' | 'comment' | 'reply' | 'comment_reply';
   instagram_user_id?: string;
   twitter_user_id?: string;
+  facebook_page_id?: string;
   sender_id?: string;
   message_id?: string;
   text: string;

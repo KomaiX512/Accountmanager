@@ -148,7 +148,15 @@ class RagService {
     query: string, 
     previousMessages: ChatMessage[] = [],
     platform: string = 'instagram'
-  ): Promise<{ response: string }> {
+  ): Promise<{ 
+    response: string; 
+    usedFallback?: boolean; 
+    quotaInfo?: { 
+      exhausted: boolean; 
+      resetTime?: string; 
+      message: string; 
+    } 
+  }> {
     try {
       console.log(`[RagService] Sending discussion query for ${platform}/${username}: "${query}"`);
       
@@ -159,13 +167,16 @@ class RagService {
           previousMessages,
           platform
         }, {
-          timeout: 30000, // 30 second timeout
+          timeout: 20000, // 20 second timeout - reduced for faster fallback
           withCredentials: false, // Disable sending cookies
           headers: {
             'Content-Type': 'application/json'
           }
-        }), this.RAG_SERVER_URLS
-      ).then(response => response.data);
+        }        ), this.RAG_SERVER_URLS
+      ).then(response => {
+        console.log(`[RagService] Discussion response:`, response.data);
+        return response.data;
+      });
       
     } catch (error: any) {
       console.error('[RagService] Discussion query error:', error.response?.data || error.message);

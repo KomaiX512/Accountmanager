@@ -98,9 +98,9 @@ export const getInstagramConnection = (authUserId: string): { instagram_user_id:
     }
     
     // Try sessionStorage first, then fallback to localStorage
-    let userId = sessionStorage.getItem(userIdKey) || localStorage.getItem(userIdKey);
-    let graphId = sessionStorage.getItem(graphIdKey) || localStorage.getItem(graphIdKey);
-    let username = sessionStorage.getItem(usernameKey) || localStorage.getItem(usernameKey) || undefined;
+    const userId = sessionStorage.getItem(userIdKey) || localStorage.getItem(userIdKey);
+    const graphId = sessionStorage.getItem(graphIdKey) || localStorage.getItem(graphIdKey);
+    const username = sessionStorage.getItem(usernameKey) || localStorage.getItem(usernameKey) || undefined;
     
     if (!userId || !graphId) return null;
     

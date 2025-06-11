@@ -7,8 +7,10 @@ import 'tui-image-editor/dist/tui-image-editor.css';
 import axios from 'axios';
 import InstagramRequiredButton from './InstagramRequiredButton';
 import TwitterRequiredButton from './TwitterRequiredButton';
+import FacebookRequiredButton from './FacebookRequiredButton';
 import { useInstagram } from '../../context/InstagramContext';
 import { useTwitter } from '../../context/TwitterContext';
+import { useFacebook } from '../../context/FacebookContext';
 import { useLocation } from 'react-router-dom';
 
 interface CanvasEditorProps {
@@ -61,10 +63,13 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
   // Get userId from context if not provided as prop
   const { userId: instagramUserId, isConnected: isInstagramConnected } = useInstagram();
   const { userId: twitterUserId, isConnected: isTwitterConnected } = useTwitter();
+  const { userId: facebookUserId, isConnected: isFacebookConnected } = useFacebook();
   
   // Determine platform-specific values based on detected platform
-  const isConnected = detectedPlatform === 'twitter' ? isTwitterConnected : isInstagramConnected;
-  const contextUserId = detectedPlatform === 'twitter' ? twitterUserId : instagramUserId;
+  const isConnected = detectedPlatform === 'twitter' ? isTwitterConnected : 
+                     detectedPlatform === 'facebook' ? isFacebookConnected : isInstagramConnected;
+  const contextUserId = detectedPlatform === 'twitter' ? twitterUserId : 
+                       detectedPlatform === 'facebook' ? facebookUserId : instagramUserId;
   const userId = propUserId || (isConnected ? (contextUserId ?? undefined) : undefined);
 
   const editorRef = useRef<HTMLDivElement>(null);
@@ -1137,6 +1142,49 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
             setNotification('Failed to schedule tweet: ' + response.data.message);
           }
         }
+      } else if (detectedPlatform === 'facebook') {
+        // Facebook scheduling logic (supports optional images)
+        const facebookCaption = caption || postCaption || '';
+        console.log(`[CanvasEditor] Scheduling Facebook post: "${facebookCaption}"`);
+        
+        const formData = new FormData();
+        formData.append('caption', facebookCaption);
+        formData.append('scheduleDate', scheduleDate.toISOString());
+        formData.append('platform', 'facebook');
+        
+        // Check if there's an image to include
+        let hasImage = false;
+        if (imageLoaded && tuiInstanceRef.current) {
+          try {
+            // Get the canvas image as a data URL
+            const imageDataUrl = tuiInstanceRef.current.toDataURL();
+            const imageBlob = await fetch(imageDataUrl).then(r => r.blob());
+            const filename = postKey ? `facebook_post_${postKey}.jpg` : `facebook_canvas_${Date.now()}.jpg`;
+            formData.append('image', imageBlob, filename);
+            hasImage = true;
+            console.log(`[CanvasEditor] Including image with Facebook post`);
+          } catch (imageError) {
+            console.warn(`[CanvasEditor] Failed to get image for Facebook post:`, imageError);
+            // Continue without image - Facebook supports text-only posts
+          }
+        }
+        
+                 const response = await fetch(`http://localhost:3000/schedule-post/${userId}`, {
+           method: 'POST',
+           body: formData,
+         });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || 'Failed to schedule Facebook post');
+        }
+        
+        const responseData = await response.json();
+        if (responseData.success) {
+          setNotification(`Your Facebook post is scheduled! ${hasImage ? '(with image)' : '(text-only)'}`);
+        } else {
+          setNotification('Failed to schedule Facebook post: ' + responseData.message);
+        }
       } else {
         // Instagram scheduling logic (existing)
         // Get the canvas image as a data URL
@@ -1599,6 +1647,25 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
               >
                 Schedule
               </TwitterRequiredButton>
+            ) : detectedPlatform === 'facebook' ? (
+              <FacebookRequiredButton
+                isConnected={isFacebookConnected}
+                onClick={handleSchedule}
+                className="schedule-button"
+                disabled={isProcessing}
+                style={{ 
+                  backgroundColor: '#3b5998',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '8px 16px',
+                  borderRadius: '4px',
+                  fontWeight: 'bold',
+                  cursor: !isProcessing ? 'pointer' : 'not-allowed',
+                  opacity: !isProcessing ? 1 : 0.5
+                }}
+              >
+                Schedule
+              </FacebookRequiredButton>
             ) : (
               <InstagramRequiredButton
                 isConnected={isInstagramConnected}

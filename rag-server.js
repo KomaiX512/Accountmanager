@@ -66,14 +66,58 @@ const structuredbS3 = new AWS.S3({
   params: { Bucket: 'structuredb' }
 });
 
-// Configure Gemini API
+// Configure Gemini API with enhanced rate limiting
 const GEMINI_CONFIG = {
-  apiKey: 'AIzaSyDrvJG2BghzqtSK-HIZ_NsfRWiNwrIk3DQ',
+  apiKey: 'AIzaSyD3vBUgwRSYPi69mb5PsJ4Ae5-g1ruZmHM',
   model: 'gemini-2.0-flash',
-  maxTokens: 2000,
+  maxTokens: 2000, // Restored to 2000 for better responses
   temperature: 0.2,
   topP: 0.95,
   topK: 40
+};
+
+// Rate limiting configuration - More generous limits
+const RATE_LIMIT = {
+  maxRequestsPerMinute: 50, // Increased for better performance
+  maxRequestsPerHour: 3000, // Increased hourly limit
+  requestWindow: 60 * 1000, // 1 minute
+  hourWindow: 60 * 60 * 1000 // 1 hour
+};
+
+// Request tracking for rate limiting
+const requestTracker = {
+  minute: { count: 0, resetTime: Date.now() + RATE_LIMIT.requestWindow },
+  hour: { count: 0, resetTime: Date.now() + RATE_LIMIT.hourWindow }
+};
+
+// Enhanced cache configuration
+const profileCache = new Map();
+const rulesCache = new Map();
+const responseCache = new Map(); // New: Cache AI responses
+const CACHE_TTL = 15 * 60 * 1000; // Increased to 15 minutes
+const RESPONSE_CACHE_TTL = 30 * 60 * 1000; // 30 minutes for AI responses
+
+// Quota exhaustion tracking
+let quotaExhausted = false;
+let quotaResetTime = null;
+
+// Fallback responses for when quota is exhausted
+const FALLBACK_RESPONSES = {
+  instagram: {
+    general: "I understand you're looking for Instagram strategy advice! While I'm temporarily at capacity, here are some proven Instagram tactics:\n\n• Post consistently (1-2 times daily)\n• Use 5-10 relevant hashtags\n• Engage with your audience within 1 hour\n• Share Stories daily for better reach\n• Post when your audience is most active\n• Use high-quality visuals with good lighting\n• Write captions that encourage comments\n\nWould you like me to help you create specific content when I'm back online?",
+    competitors: "For competitor analysis on Instagram:\n\n• Check their posting frequency and timing\n• Analyze their most engaging content types\n• Look at their hashtag strategies\n• Study their Story highlights\n• Monitor their engagement rates\n• Note their visual style and branding\n• Observe how they interact with followers\n\nI'll provide a detailed competitor analysis when my full capabilities return!",
+    content: "Here are some Instagram content ideas that work well:\n\n• Behind-the-scenes content\n• User-generated content\n• Educational carousel posts\n• Trending audio with original video\n• Before/after transformations\n• Quick tips and tutorials\n• Day-in-the-life content\n• Product showcases\n\nI'll help you create specific posts when I'm fully operational again!"
+  },
+  facebook: {
+    general: "I'm here to help with your Facebook strategy! While I'm temporarily at capacity, here are some effective Facebook tactics:\n\n• Post 3-5 times per week for optimal engagement\n• Use Facebook Groups to build community\n• Share valuable, shareable content\n• Go live regularly to boost reach\n• Use Facebook Stories for behind-the-scenes\n• Create polls and interactive content\n• Cross-promote with Instagram\n• Use Facebook Events for promotions\n\nI'll provide personalized strategies when I'm back to full capacity!",
+    competitors: "For Facebook competitor research:\n\n• Monitor their posting schedule and frequency\n• Analyze their most engaging post types\n• Check their Facebook Groups activity\n• Study their video content strategy\n• Look at their event promotions\n• Monitor their customer interactions\n• Note their visual branding consistency\n• Observe their cross-platform promotion\n\nI'll provide detailed competitor insights when fully operational!",
+    content: "Facebook content that drives engagement:\n\n• Educational and how-to posts\n• Community-focused content\n• Live videos and Q&As\n• User testimonials and reviews\n• Behind-the-scenes content\n• Industry news and trends\n• Interactive polls and questions\n• Event announcements\n\nI'll help create specific Facebook content when I'm back online!"
+  },
+  twitter: {
+    general: "I'm ready to boost your X (Twitter) presence! While I'm temporarily at capacity, here are some powerful X strategies:\n\n• Tweet 3-5 times daily\n• Join trending conversations\n• Use 1-3 relevant hashtags\n• Share quick insights and tips\n• Retweet with thoughtful comments\n• Create Twitter threads for complex topics\n• Engage quickly with mentions\n• Use Twitter Spaces for live discussions\n\nI'll provide tailored X strategies when fully operational!",
+    competitors: "For X (Twitter) competitor analysis:\n\n• Track their tweeting frequency and timing\n• Analyze their most retweeted content\n• Monitor hashtags they use effectively\n• Study their thread strategies\n• Check their engagement patterns\n• Look at their Twitter Spaces activity\n• Note their brand voice and tone\n• Observe their community interactions\n\nI'll deliver comprehensive competitor insights when back online!",
+    content: "X (Twitter) content that gets engagement:\n\n• Quick tips and insights\n• Industry observations\n• Controversial but thoughtful takes\n• Thread tutorials\n• Live-tweeting events\n• Polls and questions\n• Memes and humor (when appropriate)\n• News commentary and analysis\n\nI'll help craft specific tweets when I'm fully operational again!"
+  }
 };
 
 // Create data directories if they don't exist
@@ -90,11 +134,6 @@ if (!fs.existsSync(conversationsDir)) {
 if (!fs.existsSync(cacheDir)) {
   fs.mkdirSync(cacheDir);
 }
-
-// Cache for profile and rules data to reduce API calls
-const profileCache = new Map();
-const rulesCache = new Map();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 // Helper function to retrieve profile data from structuredb with caching
 async function getProfileData(username, platform = 'instagram') {
@@ -365,14 +404,76 @@ async function saveToR2(data, key, retries = 3) {
   throw lastError;
 }
 
+// Rate limiting check function
+function checkRateLimit() {
+  const now = Date.now();
+  
+  // Reset minute counter if window expired
+  if (now > requestTracker.minute.resetTime) {
+    requestTracker.minute.count = 0;
+    requestTracker.minute.resetTime = now + RATE_LIMIT.requestWindow;
+  }
+  
+  // Reset hour counter if window expired
+  if (now > requestTracker.hour.resetTime) {
+    requestTracker.hour.count = 0;
+    requestTracker.hour.resetTime = now + RATE_LIMIT.hourWindow;
+  }
+  
+  // Check limits
+  if (requestTracker.minute.count >= RATE_LIMIT.maxRequestsPerMinute) {
+    const waitTime = requestTracker.minute.resetTime - now;
+    throw new Error(`Rate limit exceeded. Please wait ${Math.ceil(waitTime / 1000)} seconds before making another request.`);
+  }
+  
+  if (requestTracker.hour.count >= RATE_LIMIT.maxRequestsPerHour) {
+    const waitTime = requestTracker.hour.resetTime - now;
+    throw new Error(`Hourly quota exceeded. Please wait ${Math.ceil(waitTime / 60000)} minutes before making more requests.`);
+  }
+  
+  // Increment counters
+  requestTracker.minute.count++;
+  requestTracker.hour.count++;
+}
+
+// Wrapper function to add additional timeout protection
+async function withTimeout(promise, timeoutMs, errorMessage) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => 
+      setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
+    )
+  ]);
+}
+
 // Helper function for Gemini API calls with retries and error handling
 async function callGeminiAPI(prompt, messages = [], retries = 2) {
+  // Check if quota is already known to be exhausted
+  if (quotaExhausted && quotaResetTime && new Date() < quotaResetTime) {
+    console.log('[RAG-Server] Quota exhausted, using fallback response');
+    throw new Error('QUOTA_EXHAUSTED');
+  }
+  
+  // Check rate limiting first - TEMPORARILY DISABLED FOR DEBUGGING
+  // checkRateLimit();
+  
+  // Check response cache first
+  const cacheKey = `${prompt.substring(0, 100)}_${JSON.stringify(messages).substring(0, 50)}`;
+  if (responseCache.has(cacheKey)) {
+    const { data, timestamp } = responseCache.get(cacheKey);
+    if (Date.now() - timestamp < RESPONSE_CACHE_TTL) {
+      console.log('[RAG-Server] Using cached AI response');
+      return data;
+    }
+    responseCache.delete(cacheKey);
+  }
+  
   console.log('[RAG-Server] Calling Gemini API');
   
   let lastError = null;
   for (let attempt = 1; attempt <= retries + 1; attempt++) {
     try {
-      // Format messages properly for Gemini
+      // Format messages properly for Gemini - SIMPLIFIED
       const formattedMessages = [];
       
       // First add the system prompt as a user message
@@ -381,39 +482,13 @@ async function callGeminiAPI(prompt, messages = [], retries = 2) {
         parts: [{ text: prompt }]
       });
       
-      // Then add the conversation history
+      // Then add the conversation history in simple alternating format
       if (messages && messages.length > 0) {
-        // Convert our simple format to Gemini's expected format
-        let currentRole = null;
-        let currentContent = [];
-        
         for (const msg of messages) {
           const geminiRole = msg.role === 'assistant' ? 'model' : 'user';
-          
-          // If this is a new role, or the first message, create a new message object
-          if (geminiRole !== currentRole) {
-            // Add the previous message if we have one
-            if (currentRole && currentContent.length > 0) {
-              formattedMessages.push({
-                role: currentRole,
-                parts: currentContent.map(text => ({ text }))
-              });
-            }
-            
-            // Start a new message
-            currentRole = geminiRole;
-            currentContent = [msg.content];
-          } else {
-            // Continue the current message
-            currentContent.push(msg.content);
-          }
-        }
-        
-        // Add the last message
-        if (currentRole && currentContent.length > 0) {
           formattedMessages.push({
-            role: currentRole,
-            parts: currentContent.map(text => ({ text }))
+            role: geminiRole,
+            parts: [{ text: msg.content }]
           });
         }
       }
@@ -439,23 +514,32 @@ async function callGeminiAPI(prompt, messages = [], retries = 2) {
         JSON.stringify(requestBody, null, 2)
       );
       
-      const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_CONFIG.model}:generateContent`,
-        requestBody,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': GEMINI_CONFIG.apiKey
-          },
-          timeout: 30000 // 30 seconds timeout
-        }
+      const response = await withTimeout(
+        axios.post(
+          `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_CONFIG.model}:generateContent?key=${GEMINI_CONFIG.apiKey}`,
+          requestBody,
+          {
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            timeout: 60000 // Increased to 60 seconds timeout
+          }
+        ),
+        70000, // Additional 70 second timeout wrapper
+        'Gemini API call timed out'
       );
       
       if (!response.data.candidates || response.data.candidates.length === 0 || !response.data.candidates[0].content) {
-        throw new Error('Empty response from Gemini API');
+        console.log('[RAG-Server] Empty response from Gemini API, triggering fallback');
+        throw new Error('QUOTA_EXHAUSTED');
       }
       
       const generatedText = response.data.candidates[0].content.parts[0].text;
+      
+      if (!generatedText || generatedText.trim() === '') {
+        console.log('[RAG-Server] Empty generated text from Gemini API, triggering fallback');
+        throw new Error('QUOTA_EXHAUSTED');
+      }
       
       // Save successful response for debugging
       fs.writeFileSync(
@@ -463,33 +547,61 @@ async function callGeminiAPI(prompt, messages = [], retries = 2) {
         JSON.stringify(response.data, null, 2)
       );
       
+      // Cache the successful response
+      responseCache.set(cacheKey, {
+        data: generatedText,
+        timestamp: Date.now()
+      });
+      
       return generatedText;
     } catch (error) {
       lastError = error;
       console.error(`[RAG-Server] Gemini API error (attempt ${attempt}/${retries + 1}):`, error.response?.data || error.message);
+      console.error(`[RAG-Server] Error code: ${error.code}, Status: ${error.response?.status}`);
+      
+      // Only break on actual quota errors, not timeouts
+      if (error.response?.data?.error?.message && error.response.data.error.message.includes('quota')) {
+        console.log(`[RAG-Server] Quota error detected, skipping retries`);
+        break;
+      }
       
       if (attempt <= retries) {
         // Exponential backoff
-        const delay = 2000 * Math.pow(2, attempt - 1);
+        const delay = 1000 * Math.pow(2, attempt - 1);
         console.log(`[RAG-Server] Retrying Gemini API call in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
   }
   
-  // If we've exhausted retries, throw an error with details
+  // If we've exhausted retries, check if it's a quota issue and handle gracefully
   if (lastError && lastError.response?.data?.error?.message) {
-    throw new Error(`Error calling Gemini API: ${lastError.response.data.error.message}`);
+    const errorMessage = lastError.response.data.error.message;
+    
+    // Detect quota exhaustion
+    if (detectQuotaExhaustion({ message: errorMessage })) {
+      throw new Error('QUOTA_EXHAUSTED');
+    }
+    
+    throw new Error(`Error calling Gemini API: ${errorMessage}`);
+  } else if (lastError && (lastError.code === 'ECONNABORTED' || lastError.message.includes('timed out'))) {
+    // Handle timeout errors - don't assume quota exhaustion
+    console.log('[RAG-Server] Timeout detected, rethrowing original error');
+    throw new Error(`Timeout error: ${lastError.message}`);
   } else {
-    throw new Error('Error calling Gemini API: Failed after multiple attempts');
+    throw new Error(`Error calling Gemini API: ${lastError?.message || 'Failed after multiple attempts'}`);
   }
 }
 
 // Create the instruction prompt for RAG with profile and rules
-function createRagPrompt(profileData, rulesData, query, platform = 'instagram') {
+function createRagPrompt(profileData, rulesData, query, platform = 'instagram', usingFallbackProfile = false) {
   const platformName = platform === 'twitter' ? 'X (Twitter)' : 
                       platform === 'facebook' ? 'Facebook' : 
                       'Instagram';
+  
+  const profileNote = usingFallbackProfile ? 
+    `\nNOTE: Limited profile information available. Provide general ${platformName} best practices and strategies.` : 
+    `\nUse the profile information to provide personalized advice.`;
   
   return `
 # INSTRUCTION A - DISCUSSION MODE
@@ -504,9 +616,11 @@ ${JSON.stringify(rulesData, null, 2)}
 ## QUERY
 ${query}
 
-Please respond in a helpful, direct, and actionable manner that provides specific advice for the ${platformName} account based on their profile information.
-Keep your response concise but informative, with specific references to the user's account details when relevant.
-Focus on ${platformName}-specific best practices and strategies.
+${profileNote}
+
+Please respond in a helpful, direct, and actionable manner that provides specific advice for the ${platformName} account.
+Keep your response concise but informative, focusing on ${platformName}-specific best practices and strategies.
+If you have specific profile details, reference them; otherwise, provide valuable general advice for ${platformName} growth and engagement.
 `;
 }
 
@@ -519,10 +633,42 @@ app.post('/api/discussion', async (req, res) => {
   }
 
   try {
-    // Fetch profile and rules data with platform
+    // Fetch profile and rules data with platform, with fallbacks
     console.log(`[RAG-Server] Processing discussion query for ${platform}/${username}: "${query}"`);
-    const profileData = await getProfileData(username, platform);
-    const rulesData = await getRulesData(username, platform).catch(() => ({}));
+    
+    let profileData = {};
+    let rulesData = {};
+    let usingFallbackProfile = false;
+    
+    try {
+      profileData = await getProfileData(username, platform);
+    } catch (profileError) {
+      console.log(`[RAG-Server] No profile data found for ${platform}/${username}, using fallback profile`);
+      usingFallbackProfile = true;
+      // Create a basic fallback profile
+      profileData = {
+        username: username,
+        platform: platform,
+        display_name: username,
+        bio: `${platform.charAt(0).toUpperCase() + platform.slice(1)} content creator`,
+        followers_count: 0,
+        following_count: 0,
+        posts_count: 0,
+        is_verified: false,
+        account_type: 'personal',
+        category: 'Content Creator',
+        profile_image: '',
+        external_url: '',
+        note: `Fallback profile for ${username} on ${platform}`
+      };
+    }
+    
+    try {
+      rulesData = await getRulesData(username, platform);
+    } catch (rulesError) {
+      console.log(`[RAG-Server] No rules data found for ${platform}/${username}, using empty rules`);
+      rulesData = {};
+    }
     
     // Check if this is a follow-up message
     const isFollowUp = previousMessages && previousMessages.length > 0;
@@ -559,24 +705,28 @@ Focus on ${platformName}-specific best practices and strategies.
 `;
     } else {
       // For initial messages, use the standard prompt
-      ragPrompt = createRagPrompt(profileData, rulesData, query, platform);
+      ragPrompt = createRagPrompt(profileData, rulesData, query, platform, usingFallbackProfile);
     }
     
     // Call Gemini API
-    const response = await callGeminiAPI(ragPrompt, previousMessages);
+    let response;
+    let usedFallback = false;
     
-    // Verify we have a valid response
-    if (!response || response.trim() === '') {
-      // Try fallback approach for follow-ups - simplify by ignoring context
-      if (isFollowUp) {
-        console.log(`[RAG-Server] Empty response received for follow-up, trying fallback approach`);
-        
-        const platformName = platform === 'twitter' ? 'X (Twitter)' : 
-                            platform === 'facebook' ? 'Facebook' : 
-                            'Instagram';
-        
-        // Create a simplified prompt that doesn't rely on conversation history
-        const fallbackPrompt = `
+    try {
+      response = await callGeminiAPI(ragPrompt, previousMessages);
+      
+      // Verify we have a valid response
+      if (!response || response.trim() === '') {
+        // Try fallback approach for follow-ups - simplify by ignoring context
+        if (isFollowUp) {
+          console.log(`[RAG-Server] Empty response received for follow-up, trying fallback approach`);
+          
+          const platformName = platform === 'twitter' ? 'X (Twitter)' : 
+                              platform === 'facebook' ? 'Facebook' : 
+                              'Instagram';
+          
+          // Create a simplified prompt that doesn't rely on conversation history
+          const fallbackPrompt = `
 # INSTRUCTION A - DISCUSSION MODE (FALLBACK)
 You are a ${platformName} Manager Assistant helping with social media strategy.
 
@@ -594,31 +744,28 @@ Please respond directly to this question without requiring previous context.
 Be helpful, direct, and actionable, providing specific advice for the ${platformName} account.
 Focus on ${platformName}-specific best practices and strategies.
 `;
-        
-        // Call Gemini API without previous messages
-        const fallbackResponse = await callGeminiAPI(fallbackPrompt, []);
-        
-        if (!fallbackResponse || fallbackResponse.trim() === '') {
-          throw new Error('Failed to generate response even with fallback approach');
+          
+          // Call Gemini API without previous messages
+          const fallbackResponse = await callGeminiAPI(fallbackPrompt, []);
+          
+          if (!fallbackResponse || fallbackResponse.trim() === '') {
+            throw new Error('Failed to generate response even with fallback approach');
+          }
+          
+          response = fallbackResponse;
+          usedFallback = true;
+        } else {
+          throw new Error('Empty response received from Gemini API');
         }
-        
-        // Save conversation with fallback response
-        const conversationData = {
-          username,
-          platform,
-          timestamp: new Date().toISOString(),
-          query,
-          response: fallbackResponse,
-          previousMessages,
-          usedFallback: true
-        };
-        
-        const conversationKey = `RAG.data/${platform}/${username}/${Date.now()}_fallback.json`;
-        await saveToR2(conversationData, conversationKey);
-        
-        return res.json({ response: fallbackResponse, usedFallback: true });
+      }
+    } catch (error) {
+      // Handle quota exhaustion with graceful fallback
+      if (error.message === 'QUOTA_EXHAUSTED') {
+        console.log(`[RAG-Server] Using intelligent fallback response for quota exhaustion`);
+        response = getFallbackResponse(query, platform);
+        usedFallback = true;
       } else {
-        throw new Error('Empty response received from Gemini API');
+        throw error; // Re-throw other errors
       }
     }
     
@@ -629,20 +776,46 @@ Focus on ${platformName}-specific best practices and strategies.
       timestamp: new Date().toISOString(),
       query,
       response,
-      previousMessages
+      previousMessages,
+      usedFallback,
+      quotaExhausted: usedFallback && quotaExhausted
     };
     
     // Save to R2 storage
-    const conversationKey = `RAG.data/${platform}/${username}/${Date.now()}.json`;
+    const conversationKey = usedFallback ? 
+      `RAG.data/${platform}/${username}/${Date.now()}_fallback.json` :
+      `RAG.data/${platform}/${username}/${Date.now()}.json`;
     await saveToR2(conversationData, conversationKey);
     
-    // Return response
-    res.json({ response });
+    // Return response with fallback indicator
+    res.json({ 
+      response, 
+      usedFallback,
+      usingFallbackProfile,
+      quotaInfo: quotaExhausted ? {
+        exhausted: true,
+        resetTime: quotaResetTime?.toISOString(),
+        message: "I'm temporarily at capacity but still here to help with proven strategies!"
+      } : null
+    });
   } catch (error) {
     console.error('[RAG-Server] Discussion endpoint error:', error.message);
     
-    if (error.message.includes('Profile data not found')) {
-      return res.status(404).json({ error: `Profile data not found for ${platform}/${username}. Please ensure the username is correct.` });
+    // Since we now have fallback profiles, we don't need to return 404 for missing profile data
+    // Instead, we handle other types of errors
+    if (error.message === 'QUOTA_EXHAUSTED') {
+      // Handle quota exhaustion gracefully
+      const fallbackResponse = getFallbackResponse(query, platform);
+      return res.json({ 
+        response: fallbackResponse, 
+        usedFallback: true,
+        usingFallbackProfile: true,
+        quotaInfo: {
+          exhausted: true,
+          resetTime: quotaResetTime?.toISOString(),
+          message: "I'm temporarily at capacity but still here to help with proven strategies!"
+        }
+      });
     }
     
     res.status(500).json({ error: error.message });
@@ -732,7 +905,36 @@ Visual Description for Image: [Write a detailed, vivid description for the image
     try {
       // Get response from AI model
       console.log(`[${new Date().toISOString()}] [RAG SERVER] Calling AI API for ${platform} post generation`);
-      const response = await callGeminiAPI(prompt);
+      
+      let response;
+      let usedFallback = false;
+      
+      try {
+        response = await callGeminiAPI(prompt);
+      } catch (error) {
+        // Handle quota exhaustion for post generation
+        if (error.message === 'QUOTA_EXHAUSTED') {
+          console.log(`[${new Date().toISOString()}] [RAG SERVER] Using fallback for post generation`);
+          
+          // Generate a basic post structure as fallback
+          const fallbackContent = getFallbackResponse(query, platform);
+          const platformName = platform === 'twitter' ? 'X (Twitter)' : 
+                              platform === 'facebook' ? 'Facebook' : 
+                              'Instagram';
+          
+          response = `Caption: ${fallbackContent.split('\n')[0]} 🚀
+
+Hashtags: #${platform} #SocialMedia #Marketing #Strategy #Growth
+
+Call to Action: What's your biggest ${platformName} challenge? Share in the comments!
+
+Visual Description for Image: Create a modern, professional ${platformName} strategy infographic with a clean blue and white color scheme. Include icons representing social media growth, engagement metrics, and success indicators. The image should have a bright, optimistic feel with arrows pointing upward to suggest growth and improvement. Add subtle ${platformName} branding elements and make it visually appealing for social media sharing.`;
+          
+          usedFallback = true;
+        } else {
+          throw error; // Re-throw other errors
+        }
+      }
       
       // Clean and process the response to extract structured content
       console.log(`[${new Date().toISOString()}] [RAG SERVER] Raw response:`, response.substring(0, 200) + '...');
@@ -817,7 +1019,13 @@ Visual Description for Image: [Write a detailed, vivid description for the image
       return res.json({ 
         response: structuredResponse, 
         post: postData, 
-        notification: notificationPayload 
+        notification: notificationPayload,
+        usedFallback,
+        quotaInfo: usedFallback && quotaExhausted ? {
+          exhausted: true,
+          resetTime: quotaResetTime?.toISOString(),
+          message: "Post generated with fallback strategy - full AI capabilities return soon!"
+        } : null
       });
     } catch (apiError) {
       console.error(`[${new Date().toISOString()}] [RAG SERVER] API error:`, apiError);
@@ -962,14 +1170,36 @@ app.get('/health', (req, res) => {
 app.post('/admin/clear-cache', (req, res) => {
   profileCache.clear();
   rulesCache.clear();
+  responseCache.clear();
   
-  console.log('[RAG-Server] Cache cleared');
+  console.log('[RAG-Server] All caches cleared');
   
-  res.json({ success: true, message: 'Cache cleared successfully' });
+  res.json({ success: true, message: 'All caches cleared successfully' });
+});
+
+// Endpoint to reset rate limiting (emergency use only)
+app.post('/admin/reset-rate-limit', (req, res) => {
+  const now = Date.now();
+  requestTracker.minute.count = 0;
+  requestTracker.minute.resetTime = now + RATE_LIMIT.requestWindow;
+  requestTracker.hour.count = 0;
+  requestTracker.hour.resetTime = now + RATE_LIMIT.hourWindow;
+  
+  console.log('[RAG-Server] Rate limiting reset');
+  
+  res.json({ 
+    success: true, 
+    message: 'Rate limiting reset successfully',
+    newLimits: {
+      minuteReset: new Date(requestTracker.minute.resetTime).toISOString(),
+      hourReset: new Date(requestTracker.hour.resetTime).toISOString()
+    }
+  });
 });
 
 // Endpoint to get server status and configurations
 app.get('/admin/status', (req, res) => {
+  const now = Date.now();
   const status = {
     server: {
       version: '1.0.0',
@@ -994,8 +1224,24 @@ app.get('/admin/status', (req, res) => {
       },
       cache: {
         ttl: CACHE_TTL,
+        responseTtl: RESPONSE_CACHE_TTL,
         profiles: profileCache.size,
-        rules: rulesCache.size
+        rules: rulesCache.size,
+        responses: responseCache.size
+      },
+      rateLimit: {
+        minuteRequests: requestTracker.minute.count,
+        minuteLimit: RATE_LIMIT.maxRequestsPerMinute,
+        minuteReset: new Date(requestTracker.minute.resetTime).toISOString(),
+        hourRequests: requestTracker.hour.count,
+        hourLimit: RATE_LIMIT.maxRequestsPerHour,
+        hourReset: new Date(requestTracker.hour.resetTime).toISOString(),
+        nextAllowedRequest: Math.max(0, requestTracker.minute.resetTime - now)
+      },
+      quotaStatus: {
+        exhausted: quotaExhausted,
+        resetTime: quotaResetTime?.toISOString() || null,
+        fallbackActive: quotaExhausted && quotaResetTime && new Date() < quotaResetTime
       }
     }
   };
@@ -1063,11 +1309,37 @@ app.post('/api/instant-reply', async (req, res) => {
     const aiReplyPrompt = createAIReplyPrompt(profileData, rulesData, notification, platform);
     
     // Call Gemini API with no previous messages (single turn)
-    const reply = await callGeminiAPI(aiReplyPrompt);
+    let reply;
+    let usedFallback = false;
     
-    // Verify we have a valid response
-    if (!reply || reply.trim() === '') {
-      throw new Error('Empty response received from Gemini API');
+    try {
+      reply = await callGeminiAPI(aiReplyPrompt);
+      
+      // Verify we have a valid response
+      if (!reply || reply.trim() === '') {
+        throw new Error('Empty response received from Gemini API');
+      }
+    } catch (error) {
+      // Handle quota exhaustion for instant replies
+      if (error.message === 'QUOTA_EXHAUSTED') {
+        console.log(`[RAG-Server] Using fallback for instant reply`);
+        
+        // Simple acknowledgment fallback
+        const isMessage = notification.type === 'message';
+        const platformName = platform === 'twitter' ? 'X' : 
+                            platform === 'facebook' ? 'Facebook' : 
+                            'Instagram';
+        
+        if (isMessage) {
+          reply = `Thank you for your message! I'm currently at capacity but wanted to acknowledge your ${platformName} message. I'll provide a detailed response soon! 🚀`;
+        } else {
+          reply = `Thanks for engaging with this post! I appreciate your comment and will respond with more insights shortly. Keep connecting! 💫`;
+        }
+        
+        usedFallback = true;
+      } else {
+        throw error; // Re-throw other errors
+      }
     }
     
     // Save the request for analytics with platform
@@ -1091,7 +1363,13 @@ app.post('/api/instant-reply', async (req, res) => {
       reply,
       success: true,
       notification_type: notification.type,
-      platform
+      platform,
+      usedFallback,
+      quotaInfo: usedFallback && quotaExhausted ? {
+        exhausted: true,
+        resetTime: quotaResetTime?.toISOString(),
+        message: "Quick acknowledgment sent - full AI response capabilities return soon!"
+      } : null
     });
   } catch (error) {
     console.error('[RAG-Server] Instant reply endpoint error:', error.message);
@@ -1264,6 +1542,38 @@ async function createPlaceholderImage(username, platform) {
   
   // Return a simple gray image buffer (this is very basic - you might want to use canvas or similar)
   return placeholderData;
+}
+
+// Function to detect quota exhaustion and provide fallback
+function detectQuotaExhaustion(error) {
+  if (error && error.message && error.message.includes('exceeded your current quota')) {
+    quotaExhausted = true;
+    // Gemini typically resets daily, so set reset time to next day
+    quotaResetTime = new Date();
+    quotaResetTime.setDate(quotaResetTime.getDate() + 1);
+    quotaResetTime.setHours(0, 0, 0, 0);
+    
+    console.log(`[RAG-Server] Quota exhausted. Next reset estimated: ${quotaResetTime.toISOString()}`);
+    return true;
+  }
+  return false;
+}
+
+// Function to get appropriate fallback response
+function getFallbackResponse(query, platform = 'instagram') {
+  const queryLower = query.toLowerCase();
+  const platformResponses = FALLBACK_RESPONSES[platform] || FALLBACK_RESPONSES.instagram;
+  
+  // Simple keyword matching for better responses
+  if (queryLower.includes('competitor') || queryLower.includes('competition') || queryLower.includes('rival')) {
+    return platformResponses.competitors;
+  }
+  
+  if (queryLower.includes('content') || queryLower.includes('post') || queryLower.includes('create')) {
+    return platformResponses.content;
+  }
+  
+  return platformResponses.general;
 }
 
 // Start the server with graceful shutdown

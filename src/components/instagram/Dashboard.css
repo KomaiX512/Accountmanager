@@ -376,6 +376,61 @@ h2 {
   margin-left: auto;
 }
 
+/* New content badge styles */
+.content-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #ff6b6b, #ff8e53);
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(255, 107, 107, 0.4);
+  border: 1px solid rgba(255, 107, 107, 0.6);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-left: auto;
+  min-width: auto;
+  white-space: nowrap;
+}
+
+.content-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.6);
+}
+
+.content-badge.viewed {
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+  border-color: rgba(76, 175, 80, 0.6);
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.4);
+  cursor: default;
+}
+
+.content-badge.viewed:hover {
+  transform: none;
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.4);
+}
+
+.badge-icon {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.badge-count {
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.badge-text {
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
 .notification-list,
 .post-list,
 .strategy-list {
@@ -838,4 +893,168 @@ h2 {
   align-items: center;
   gap: 10px;
   margin-left: auto;
+}
+
+/* Facebook Post Scheduler Styles */
+.schedule-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 255, 204, 0.1);
+}
+
+.caption-input {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(0, 255, 204, 0.3);
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: #e0e0ff;
+  font-size: 0.9rem;
+  outline: none;
+  resize: vertical;
+  min-height: 100px;
+  font-family: inherit;
+}
+
+.caption-input:focus {
+  border-color: #00ffcc;
+  box-shadow: 0 0 10px rgba(0, 255, 204, 0.4);
+}
+
+.file-input {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(0, 255, 204, 0.3);
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: #e0e0ff;
+  font-size: 0.9rem;
+  outline: none;
+  cursor: pointer;
+}
+
+.file-input:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(0, 255, 204, 0.5);
+}
+
+.schedule-input {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(0, 255, 204, 0.3);
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: #e0e0ff;
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.schedule-input:focus {
+  border-color: #00ffcc;
+  box-shadow: 0 0 10px rgba(0, 255, 204, 0.4);
+}
+
+.schedule-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.schedule-submit-btn {
+  background: linear-gradient(135deg, #1877f2, #4267b2);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(24, 119, 242, 0.3);
+}
+
+.schedule-submit-btn:hover {
+  background: linear-gradient(135deg, #166fe5, #365caa);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(24, 119, 242, 0.4);
+}
+
+.schedule-cancel-btn {
+  background: rgba(255, 255, 255, 0.05);
+  color: #e0e0ff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.schedule-cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Error banner styles */
+.error-banner {
+  background: linear-gradient(135deg, rgba(255, 68, 68, 0.2), rgba(255, 102, 102, 0.1));
+  border: 1px solid rgba(255, 68, 68, 0.4);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #ff6b6b;
+  font-size: 0.9rem;
+}
+
+.error-banner button {
+  background: none;
+  border: none;
+  color: #ff6b6b;
+  font-size: 1.2rem;
+  cursor: pointer;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.3s ease;
+}
+
+.error-banner button:hover {
+  opacity: 1;
+}
+
+/* Connection container styles */
+.connection-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  padding: 40px 20px;
+}
+
+.connection-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(0, 255, 204, 0.2);
+  border-radius: 16px;
+  padding: 40px;
+  text-align: center;
+  max-width: 500px;
+  width: 100%;
+}
+
+.connection-card h2 {
+  margin-bottom: 16px;
+  color: #00ffcc;
+  font-size: 1.8rem;
+}
+
+.connection-card p {
+  margin-bottom: 32px;
+  color: #b0b0e0;
+  font-size: 1.1rem;
+  line-height: 1.6;
 }

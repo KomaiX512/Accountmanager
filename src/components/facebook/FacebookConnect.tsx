@@ -15,7 +15,7 @@ const FacebookConnect: React.FC<FacebookConnectProps> = ({ onConnected, classNam
   const [username, setUsername] = useState<string | null>(null);
   const { currentUser } = useAuth();
   const isStoringConnectionRef = useRef(false);
-  const connectionDataRef = useRef<{ facebook_user_id: string; username?: string } | null>(null);
+  const connectionDataRef = useRef<{ facebook_user_id: string; facebook_page_id: string; username?: string; access_token: string } | null>(null);
   
   useEffect(() => {
     // Check for existing Facebook connection when component mounts
@@ -24,12 +24,12 @@ const FacebookConnect: React.FC<FacebookConnectProps> = ({ onConnected, classNam
       
       try {
         const response = await axios.get(`http://localhost:3000/facebook-connection/${currentUser.uid}`);
-        if (response.data.facebook_user_id) {
-          setFacebookId(response.data.facebook_user_id);
+        if (response.data.facebook_page_id) {
+          setFacebookId(response.data.facebook_page_id);
           setUsername(response.data.username || null);
           setIsConnected(true);
           console.log(`[${new Date().toISOString()}] Restored Facebook connection:`, {
-            facebookId: response.data.facebook_user_id,
+            facebookId: response.data.facebook_page_id,
             username: response.data.username
           });
         }
@@ -59,13 +59,15 @@ const FacebookConnect: React.FC<FacebookConnectProps> = ({ onConnected, classNam
         // Check if we're already storing this data to avoid duplicate requests
         const isEqualToCurrentData = 
           connectionDataRef.current && 
-          connectionDataRef.current.facebook_user_id === event.data.facebookId;
+          connectionDataRef.current.facebook_page_id === event.data.facebookId;
         
         // Store in backend for persistence across devices, but only if not already storing
         if (currentUser?.uid && !isStoringConnectionRef.current && !isEqualToCurrentData) {
           const connectionData = {
-            facebook_user_id: event.data.facebookId,
-            username: event.data.username || event.data.facebookId
+            facebook_user_id: event.data.userId || event.data.facebookId, // User ID (may be same as page ID for now)
+            facebook_page_id: event.data.facebookId, // Page ID (this is what OAuth sends as facebookId)
+            username: event.data.username || event.data.facebookId,
+            access_token: event.data.accessToken || 'temp-token' // Temporary token for now
           };
           
           // Update ref to prevent duplicate requests
@@ -111,9 +113,9 @@ const FacebookConnect: React.FC<FacebookConnectProps> = ({ onConnected, classNam
     }
     
     // Facebook OAuth configuration
-    const appId = process.env.REACT_APP_FACEBOOK_APP_ID || 'YOUR_FACEBOOK_APP_ID';
-    const redirectUri = process.env.REACT_APP_FACEBOOK_REDIRECT_URI || 'https://a0ee-121-52-146-243.ngrok-free.app/facebook/callback';
-    const scope = 'pages_manage_posts,pages_read_engagement,pages_show_list,business_management';
+    const appId = '581584257679639';
+    const redirectUri = 'https://84e7-121-52-146-243.ngrok-free.app/facebook/callback';
+    const scope = 'pages_messaging,pages_show_list,pages_manage_posts,pages_manage_metadata,pages_manage_engagement,pages_read_engagement,pages_read_user_content,instagram_manage_messages,instagram_content_publish,instagram_manage_comments,instagram_manage_insights';
     
     const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code&state=${currentUser.uid}`;
 

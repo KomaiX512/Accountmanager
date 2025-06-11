@@ -19,6 +19,9 @@ import { TwitterProvider } from './context/TwitterContext';
 import { FacebookProvider } from './context/FacebookContext';
 import axios from 'axios';
 import { syncInstagramConnection, isInstagramDisconnected } from './utils/instagramSessionManager';
+import ChatModal from './components/instagram/ChatModal';
+import type { ChatMessage as ChatModalMessage } from './components/instagram/ChatModal';
+import QuotaStatusToast from './components/common/QuotaStatusToast';
 
 
 // Main App component with AuthProvider
@@ -41,12 +44,132 @@ const AppContent: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { currentUser } = useAuth();
-  const [accountHolder, setAccountHolder] = useState('');
-  const [competitors, setCompetitors] = useState<string[]>([]);
-  const [accountType, setAccountType] = useState<'branding' | 'non-branding'>('branding');
+  
+  // State from URL state or default values
+  const [accountHolder, setAccountHolder] = useState<string>(location.state?.accountHolder || '');
+  const [competitors, setCompetitors] = useState<string[]>(location.state?.competitors || []);
+  const [accountType, setAccountType] = useState<'branding' | 'non-branding'>(location.state?.accountType || 'branding');
   const [userId, setUserId] = useState<string | undefined>(undefined);
   const [isLoadingUserData, setIsLoadingUserData] = useState(false);
   
+  // Chat modal state for MessagesPopup integration
+  const [chatModalData, setChatModalData] = useState<{
+    isOpen: boolean;
+    messages: ChatModalMessage[];
+    platform: 'instagram' | 'twitter' | 'facebook';
+    quotaInfo?: {
+      exhausted: boolean;
+      resetTime?: string;
+      message: string;
+    } | null;
+    usingFallbackProfile?: boolean;
+  }>({
+    isOpen: false,
+    messages: [],
+    platform: 'instagram',
+    quotaInfo: null,
+    usingFallbackProfile: false
+  });
+
+  // Function to handle opening chat from MessagesPopup
+  const handleOpenChatFromMessages = (messageContent: string, platform?: string) => {
+    // Use the platform passed from component, or fall back to current platform
+    const targetPlatform = platform || (currentPlatform as 'instagram' | 'twitter' | 'facebook') || 'instagram';
+    
+    console.log(`[App] Opening chat for ${targetPlatform}/${accountHolder}`);
+    console.log(`[App] Platform source: ${platform ? 'passed from component' : 'detected from URL'}`);
+    console.log(`[App] Current URL: ${location.pathname}`);
+    console.log(`[App] Message: "${messageContent}"`);
+    
+    if (messageContent.trim() === '') {
+      // Start a new conversation - just load existing history without adding a new message
+      import('./services/RagService').then(({ default: RagService }) => {
+        RagService.loadConversations(accountHolder, targetPlatform)
+          .then((existingMessages: any[]) => {
+            // Convert RagService messages to ChatModalMessage format
+            const convertedMessages: ChatModalMessage[] = existingMessages.map(msg => ({
+              role: (msg.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+              content: msg.content
+            }));
+            
+            setChatModalData({
+              isOpen: true,
+              messages: convertedMessages,
+              platform: targetPlatform as 'instagram' | 'twitter' | 'facebook',
+              quotaInfo: null,
+              usingFallbackProfile: false
+            });
+          })
+          .catch((err: any) => {
+            console.error('Error loading conversation history:', err);
+            // Start fresh conversation
+            setChatModalData({
+              isOpen: true,
+              messages: [],
+              platform: targetPlatform as 'instagram' | 'twitter' | 'facebook',
+              quotaInfo: null,
+              usingFallbackProfile: false
+            });
+          });
+      });
+    } else {
+      // Opening from a specific AI insight - load conversation and add the insight
+      import('./services/RagService').then(({ default: RagService }) => {
+        RagService.loadConversations(accountHolder, targetPlatform)
+          .then((existingMessages: any[]) => {
+            // Convert RagService messages to ChatModalMessage format
+            const convertedMessages: ChatModalMessage[] = existingMessages.map(msg => ({
+              role: (msg.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+              content: msg.content
+            }));
+            
+            const assistantMessage: ChatModalMessage = {
+              role: 'assistant',
+              content: messageContent
+            };
+            
+            // Append the new message to existing conversation
+            const allMessages = [...convertedMessages, assistantMessage];
+            
+            setChatModalData({
+              isOpen: true,
+              messages: allMessages,
+              platform: targetPlatform as 'instagram' | 'twitter' | 'facebook',
+              quotaInfo: null,
+              usingFallbackProfile: false
+            });
+          })
+          .catch((err: any) => {
+            console.error('Error loading conversation history:', err);
+            // Fallback to just the new message if loading fails
+            const assistantMessage: ChatModalMessage = {
+              role: 'assistant',
+              content: messageContent
+            };
+            
+            setChatModalData({
+              isOpen: true,
+              messages: [assistantMessage],
+              platform: targetPlatform as 'instagram' | 'twitter' | 'facebook',
+              quotaInfo: null,
+              usingFallbackProfile: false
+            });
+          });
+      });
+    }
+  };
+
+  // Function to close chat modal
+  const handleCloseChatModal = () => {
+    setChatModalData({
+      isOpen: false,
+      messages: [],
+      platform: 'instagram',
+      quotaInfo: null,
+      usingFallbackProfile: false
+    });
+  };
+
   // Memoize location state extraction to prevent infinite re-renders
   const locationStateValues = useMemo(() => {
     const state = location.state || {};
@@ -65,10 +188,35 @@ const AppContent: React.FC = () => {
   const isEntryPage = location.pathname.includes('/setup') || location.pathname.includes('/connect') || location.pathname.includes('/entry');
   const shouldHideLeftBar = isLoginPage || isAccountPage || isEntryPage;
 
-  // Determine current platform based on route
-  const currentPlatform = location.pathname.includes('twitter') ? 'twitter' : 
-                         location.pathname.includes('facebook') ? 'facebook' : 
-                         'instagram';
+  // Determine current platform based on route with more robust detection
+  const getCurrentPlatform = (): 'instagram' | 'twitter' | 'facebook' => {
+    const path = location.pathname;
+    
+    // Exact matches first (most reliable)
+    if (path === '/facebook' || path === '/facebook-dashboard' || path === '/facebook-non-branding-dashboard') {
+      return 'facebook';
+    }
+    if (path === '/twitter' || path === '/twitter-dashboard' || path === '/twitter-non-branding-dashboard') {
+      return 'twitter';
+    }
+    if (path === '/instagram' || path === '/dashboard' || path === '/non-branding-dashboard') {
+      return 'instagram';
+    }
+    
+    // Fallback to includes check with proper order (more specific first)
+    if (path.includes('facebook')) return 'facebook';
+    if (path.includes('twitter')) return 'twitter';
+    
+    // Default to instagram for any other case
+    return 'instagram';
+  };
+  
+  const currentPlatform = getCurrentPlatform();
+  
+  // Add debugging to track platform detection
+  useEffect(() => {
+    console.log(`[App] Platform detection: path="${location.pathname}" -> platform="${currentPlatform}"`);
+  }, [location.pathname, currentPlatform]);
 
   // Update state when location state changes - now with stable dependencies
   useEffect(() => {
@@ -188,7 +336,7 @@ const AppContent: React.FC = () => {
     <div className="App">
       <TopBar />
       <div className="main-content">
-        {!shouldHideLeftBar && <LeftBar accountHolder={accountHolder} userId={userId} platform={currentPlatform} />}
+        {!shouldHideLeftBar && <LeftBar accountHolder={accountHolder} userId={userId} platform={currentPlatform} onOpenChat={handleOpenChatFromMessages} />}
         <div className={`content-area ${shouldHideLeftBar ? 'full-width' : ''}`}>
           <Routes>
             <Route path="/login" element={<Login />} />
@@ -239,7 +387,8 @@ const AppContent: React.FC = () => {
                   <Dashboard 
                     accountHolder={accountHolder} 
                     competitors={competitors} 
-                    accountType={accountType || 'branding'} 
+                    accountType={accountType || 'branding'}
+                    onOpenChat={handleOpenChatFromMessages}
                   />
                 </PrivateRoute>
               }
@@ -251,7 +400,8 @@ const AppContent: React.FC = () => {
                   <Dashboard 
                     accountHolder={accountHolder} 
                     competitors={competitors} 
-                    accountType="non-branding" 
+                    accountType="non-branding"
+                    onOpenChat={handleOpenChatFromMessages}
                   />
                 </PrivateRoute>
               }
@@ -265,6 +415,7 @@ const AppContent: React.FC = () => {
                     competitors={competitors} 
                     accountType={accountType || 'branding'}
                     platform="twitter"
+                    onOpenChat={handleOpenChatFromMessages}
                   />
                 </PrivateRoute>
               }
@@ -278,6 +429,7 @@ const AppContent: React.FC = () => {
                     competitors={competitors} 
                     accountType="non-branding"
                     platform="twitter"
+                    onOpenChat={handleOpenChatFromMessages}
                   />
                 </PrivateRoute>
               }
@@ -291,6 +443,7 @@ const AppContent: React.FC = () => {
                     competitors={competitors} 
                     accountType={accountType || 'branding'}
                     platform="facebook"
+                    onOpenChat={handleOpenChatFromMessages}
                   />
                 </PrivateRoute>
               }
@@ -304,6 +457,7 @@ const AppContent: React.FC = () => {
                     competitors={competitors} 
                     accountType="non-branding"
                     platform="facebook"
+                    onOpenChat={handleOpenChatFromMessages}
                   />
                 </PrivateRoute>
               }
@@ -312,6 +466,65 @@ const AppContent: React.FC = () => {
           </Routes>
         </div>
       </div>
+              {chatModalData.isOpen && (
+          <ChatModal
+            open={chatModalData.isOpen}
+            onClose={handleCloseChatModal}
+            messages={chatModalData.messages}
+            username={`${accountHolder} (${chatModalData.platform.charAt(0).toUpperCase() + chatModalData.platform.slice(1)})`}
+            platform={chatModalData.platform}
+            onSendMessage={(message: string) => {
+              if (!message.trim() || !accountHolder) return;
+              
+              // Load RagService dynamically
+              import('./services/RagService').then(({ default: RagService }) => {
+                RagService.sendDiscussionQuery(accountHolder, message, chatModalData.messages, chatModalData.platform)
+                  .then((response: { 
+                    response: string; 
+                    usedFallback?: boolean; 
+                    usingFallbackProfile?: boolean;
+                    quotaInfo?: { 
+                      exhausted: boolean; 
+                      resetTime?: string; 
+                      message: string; 
+                    } 
+                  }) => {
+                    const updatedMessages = [
+                      ...chatModalData.messages,
+                      { role: 'user' as const, content: message },
+                      { role: 'assistant' as const, content: response.response }
+                    ];
+                    
+                    setChatModalData(prev => ({
+                      ...prev,
+                      messages: updatedMessages,
+                      quotaInfo: response.quotaInfo || null,
+                      usingFallbackProfile: response.usingFallbackProfile || false
+                    }));
+                    
+                    // Save conversation with platform context
+                    RagService.saveConversation(accountHolder, updatedMessages, chatModalData.platform)
+                      .catch((err: any) => console.error('Error saving conversation:', err));
+                  })
+                  .catch((error: any) => {
+                    console.error('Error with chat message:', error);
+                  });
+              });
+            }}
+          />
+        )}
+        
+        {/* Quota Status Toast */}
+        <QuotaStatusToast
+          quotaInfo={chatModalData.quotaInfo}
+          usingFallbackProfile={chatModalData.usingFallbackProfile}
+          platform={chatModalData.platform}
+          onClose={() => setChatModalData(prev => ({
+            ...prev,
+            quotaInfo: null,
+            usingFallbackProfile: false
+          }))}
+        />
     </div>
   );
 };

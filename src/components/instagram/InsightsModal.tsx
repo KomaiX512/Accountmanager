@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 import { useInstagram } from '../../context/InstagramContext';
+import { useFacebook } from '../../context/FacebookContext';
 import { useAuth } from '../../context/AuthContext';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
@@ -46,10 +47,15 @@ interface ProfitAnalysisData {
 }
 
 const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform = 'instagram' }) => {
-  // Get userId from context if not provided as prop
-  const { userId: contextUserId, isConnected } = useInstagram();
+  // Get userId from platform-specific context if not provided as prop
+  const { userId: igUserId, isConnected: isInstagramConnected } = useInstagram();
+  const { userId: facebookId, isConnected: isFacebookConnected } = useFacebook();
   const { currentUser } = useAuth();
-  const userIdFromContext = isConnected ? contextUserId : null;
+  
+  // Use platform-specific context
+  const platformUserId = platform === 'facebook' ? facebookId : igUserId;
+  const platformConnected = platform === 'facebook' ? isFacebookConnected : isInstagramConnected;
+  const userIdFromContext = platformConnected ? platformUserId : null;
   const userIdToUse = userId || userIdFromContext;
 
   const [insights, setInsights] = useState<InsightData | null>(null);
@@ -69,11 +75,15 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
       try {
         const statusEndpoint = platform === 'twitter' 
           ? `http://localhost:3000/user-twitter-status/${currentUser.uid}`
+          : platform === 'facebook'
+          ? `http://localhost:3000/user-facebook-status/${currentUser.uid}`
           : `http://localhost:3000/user-instagram-status/${currentUser.uid}`;
         
         const response = await axios.get(statusEndpoint);
         const username = platform === 'twitter' 
           ? response.data.twitter_username 
+          : platform === 'facebook'
+          ? response.data.facebook_username
           : response.data.instagram_username;
         
         if (username) {
@@ -124,13 +134,13 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
       }
 
       try {
-        console.log(`[${new Date().toISOString()}] Fetching insights for user ${userIdToUse}`);
-        const response = await axios.get(`http://localhost:3000/insights/${userIdToUse}`);
+        console.log(`[${new Date().toISOString()}] Fetching ${platform} insights for user ${userIdToUse}`);
+        const response = await axios.get(`http://localhost:3000/insights/${userIdToUse}?platform=${platform}`);
         setInsights(response.data);
-        console.log(`[${new Date().toISOString()}] Insights fetched:`, response.data);
+        console.log(`[${new Date().toISOString()}] ${platform} insights fetched:`, response.data);
       } catch (err: any) {
-        console.error(`[${new Date().toISOString()}] Error fetching insights:`, err);
-        setError(err.response?.data?.error || 'Failed to load insights.');
+        console.error(`[${new Date().toISOString()}] Error fetching ${platform} insights:`, err);
+        setError(err.response?.data?.error || `Failed to load ${platform} insights.`);
       } finally {
         setLoading(false);
       }
@@ -324,7 +334,7 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
       return (
         <div className="insights-error">
           {!accountUsername 
-            ? `Please set up your ${platform === 'instagram' ? 'Instagram' : 'Twitter'} account to view profit analysis.`
+            ? `Please set up your ${platform === 'instagram' ? 'Instagram' : platform === 'twitter' ? 'Twitter' : 'Facebook'} account to view profit analysis.`
             : 'No profit analysis data available for this account.'
           }
         </div>
@@ -336,7 +346,7 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
         <div className="analysis-header">
           <h2>STATISTICAL ANALYSIS</h2>
           <p className="analysis-subtitle">
-            Comprehensive insights for @{accountUsername} on {platform === 'instagram' ? 'Instagram' : 'Twitter'}
+            Comprehensive insights for @{accountUsername} on {platform === 'instagram' ? 'Instagram' : platform === 'twitter' ? 'Twitter' : 'Facebook'}
           </p>
         </div>
         
@@ -351,7 +361,7 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
       <div className="connection-required">
         <div className="connection-icon">🔗</div>
         <h3>Platform Connection Required</h3>
-        <p>Please connect your {platform === 'instagram' ? 'Instagram' : 'Twitter'} account to view these detailed insights.</p>
+        <p>Please connect your {platform === 'instagram' ? 'Instagram' : platform === 'twitter' ? 'Twitter' : 'Facebook'} account to view these detailed insights.</p>
         <div className="connection-benefits">
           <h4>What you'll get after connecting:</h4>
           <ul>
@@ -383,7 +393,7 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
         onClick={(e) => e.stopPropagation()}
       >
         <button className="insights-close-btn" onClick={onClose}>×</button>
-        <h2>{platform === 'instagram' ? 'Instagram' : 'Twitter'} Insights</h2>
+        <h2>{platform === 'instagram' ? 'Instagram' : platform === 'twitter' ? 'Twitter' : 'Facebook'} Insights</h2>
         
         <div className="insights-tabs">
           <button
@@ -411,7 +421,7 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
           
           {activeTab === 'reach' && (
             <>
-              {!isConnected ? renderConnectionRequired() : (
+              {!platformConnected ? renderConnectionRequired() : (
                 <>
                   {loading && <div className="insights-loading">Loading insights...</div>}
                   {error && <div className="insights-error">{error}</div>}
@@ -432,7 +442,7 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
           
           {activeTab === 'other' && (
             <>
-              {!isConnected ? renderConnectionRequired() : (
+              {!platformConnected ? renderConnectionRequired() : (
                 <>
                   {loading && <div className="insights-loading">Loading insights...</div>}
                   {error && <div className="insights-error">{error}</div>}

@@ -9,10 +9,11 @@ interface MessagesPopupProps {
   username: string;
   onClose: () => void;
   setHasNewMessages: (value: boolean) => void;
-  onOpenChat?: (messageContent: string) => void;
+  onOpenChat?: (messageContent: string, platform?: string) => void;
+  platform?: 'instagram' | 'twitter' | 'facebook';
 }
 
-const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHasNewMessages, onOpenChat }) => {
+const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHasNewMessages, onOpenChat, platform = 'instagram' }) => {
   const [recentResponses, setRecentResponses] = useState<{ key: string; data: any }[]>([]);
   const [viewedKeys, setViewedKeys] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -21,12 +22,16 @@ const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHas
   const [isFeedbackOpen, setIsFeedbackOpen] = useState<string | null>(null);
   const [feedbackText, setFeedbackText] = useState('');
 
+  const platformName = platform === 'twitter' ? 'X (Twitter)' : 
+                      platform === 'facebook' ? 'Facebook' : 
+                      'Instagram';
+
   useEffect(() => {
     const fetchResponses = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await axios.get(`http://localhost:3000/responses/${username}`);
+        const response = await axios.get(`http://localhost:3000/responses/${username}?platform=${platform}`);
         const responses = response.data;
         if (responses.length > 0) {
           const sorted = responses
@@ -48,7 +53,7 @@ const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHas
           setRecentResponses([]);
           setHasNewMessages(false);
         } else {
-          setError('Failed to fetch responses.');
+          setError('Failed to fetch AI insights.');
           setRecentResponses([]);
           setHasNewMessages(false);
         }
@@ -57,7 +62,7 @@ const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHas
       }
     };
     fetchResponses();
-  }, [username, viewedKeys, setHasNewMessages]);
+  }, [username, viewedKeys, setHasNewMessages, platform]);
 
   useEffect(() => {
     if (toastMessage) {
@@ -80,9 +85,18 @@ const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHas
     handleViewResponse(response.key);
     // Close the messages popup
     onClose();
-    // Trigger chat modal with the response content
+    // Trigger chat modal with the response content and platform information
     if (onOpenChat) {
-      onOpenChat(response.data.response);
+      onOpenChat(response.data.response, platform);
+    }
+  };
+
+  const handleStartNewDiscussion = () => {
+    // Close the messages popup
+    onClose();
+    // Open chat with empty content to start a new discussion
+    if (onOpenChat) {
+      onOpenChat('', platform);
     }
   };
 
@@ -133,85 +147,171 @@ const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHas
           transition={{ duration: 0.3 }}
           onClick={(e) => e.stopPropagation()}
         >
-          <h2>Manager's Insights for {username}</h2>
+          <div className="manager-chat-header">
+            <svg 
+              className="ai-chat-icon"
+              xmlns="http://www.w3.org/2000/svg" 
+              width="32" 
+              height="32" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="#00ffcc" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+            >
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              <path d="M8 9h8"/>
+              <path d="M8 13h6"/>
+            </svg>
+            <h2>AI Manager Chat for {username} ({platformName})</h2>
+          </div>
+          
           <div className="messages-list">
             {isLoading ? (
-              <div className="loading">Loading messages...</div>
+              <div className="loading">Loading AI insights...</div>
             ) : error ? (
               <p className="error">{error}</p>
             ) : recentResponses.length === 0 ? (
-              <p className="no-messages">No new insights yet for {username}. Your manager wisdom is on the way!</p>
-            ) : (
-              recentResponses.map((res) => (
-                <motion.div
-                  key={res.key}
-                  className="message-card"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                  onClick={() => handleOpenChat(res)}
+              <div className="no-insights-container">
+                <div className="ai-avatar">
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    width="48" 
+                    height="48" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="#00ffcc" 
+                    strokeWidth="1.5" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="5"/>
+                    <path d="m9 9 1.5 1.5L16 6"/>
+                    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                    <path d="M3 5v14c0 1.1.9 2 2 2h14c0-1.1-.9-2-2-2V5"/>
+                  </svg>
+                </div>
+                <h3>Ready to strategize your {platformName} success!</h3>
+                <p className="ai-intro">
+                  Your AI manager is here to help you create winning strategies, optimize content, 
+                  and boost engagement on {platformName}. Let's start building your path to success!
+                </p>
+                <motion.button
+                  className="start-discussion-btn"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleStartNewDiscussion}
                 >
-                  <div className="message-header">
-                    <span className="message-id">
-                      Response #{res.key.match(/response_(\d+)\.json$/)?.[1]}
-                    </span>
-                    <span className="message-timestamp">
-                      {formatTimestamp(res.data.timestamp)}
-                    </span>
-                  </div>
-                  <div className="message-content-wrapper">
-                    <p className="message-intro">
-                      Your strategy is poised for brilliance - here is how to elevate it:
-                    </p>
-                    <p className="message-content">{res.data.response}</p>
-                  </div>
-                  <div className="message-actions">
-                    <motion.button
-                      className="like-button"
-                      whileHover={{ scale: 1.2 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={() => handleLike(res.key)}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="24"
-                        height="24"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#00ffcc"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    width="20" 
+                    height="20" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                  >
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    <path d="M12 7v6"/>
+                    <path d="M9 10h6"/>
+                  </svg>
+                  Start AI Discussion
+                </motion.button>
+              </div>
+            ) : (
+              <>
+                <div className="recent-insights-header">
+                  <h3>Recent AI Insights</h3>
+                  <motion.button
+                    className="new-discussion-btn"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleStartNewDiscussion}
+                  >
+                    New Discussion
+                  </motion.button>
+                </div>
+                {recentResponses.map((res) => (
+                  <motion.div
+                    key={res.key}
+                    className="message-card"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                    onClick={() => handleOpenChat(res)}
+                  >
+                    <div className="message-header">
+                      <span className="message-id">
+                        AI Insight #{res.key.match(/response_(\d+)\.json$/)?.[1]}
+                      </span>
+                      <span className="message-timestamp">
+                        {formatTimestamp(res.data.timestamp)}
+                      </span>
+                    </div>
+                    <div className="message-content-wrapper">
+                      <p className="message-intro">
+                        Your strategy is poised for brilliance - here's how to elevate it:
+                      </p>
+                      <p className="message-content">{res.data.response}</p>
+                    </div>
+                    <div className="message-actions">
+                      <motion.button
+                        className="like-button"
+                        whileHover={{ scale: 1.2 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleLike(res.key);
+                        }}
                       >
-                        <path d="M7 22v-9h3V7a3 3 0 0 1 3-3h2l3 3v6h3l-8 8-6-6h3z" />
-                      </svg>
-                    </motion.button>
-                    <motion.button
-                      className="dislike-button"
-                      whileHover={{ scale: 1.2 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={() => handleDislike(res.key)}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="24"
-                        height="24"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#ff4444"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="24"
+                          height="24"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#00ffcc"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M7 22v-9h3V7a3 3 0 0 1 3-3h2l3 3v6h3l-8 8-6-6h3z" />
+                        </svg>
+                      </motion.button>
+                      <motion.button
+                        className="dislike-button"
+                        whileHover={{ scale: 1.2 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDislike(res.key);
+                        }}
                       >
-                        <path d="M17 2v9h-3v6a3 3 0 0 1-3 3h-2l-3-3v-6h-3l8-8 6 6h-3z" />
-                      </svg>
-                    </motion.button>
-                  </div>
-                  {!viewedKeys.includes(res.key) && <span className="new-badge">New</span>}
-                </motion.div>
-              ))
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="24"
+                          height="24"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#ff4444"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M17 2v9h-3v6a3 3 0 0 1-3 3h-2l-3-3v-6h-3l8-8 6 6h-3z" />
+                        </svg>
+                      </motion.button>
+                    </div>
+                    {!viewedKeys.includes(res.key) && <span className="new-badge">New</span>}
+                  </motion.div>
+                ))}
+              </>
             )}
           </div>
+          
           {isFeedbackOpen && (
             <motion.div
               className="feedback-canvas"
@@ -224,7 +324,7 @@ const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHas
               <textarea
                 value={feedbackText}
                 onChange={(e) => setFeedbackText(e.target.value)}
-                placeholder="What did not resonate with this insight?"
+                placeholder="What didn't resonate with this AI insight?"
                 className="feedback-textarea"
               />
               <div className="feedback-actions">
@@ -248,6 +348,7 @@ const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHas
               </div>
             </motion.div>
           )}
+          
           <motion.button
             className="close-button"
             whileHover={{ scale: 1.1 }}
@@ -256,6 +357,7 @@ const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHas
           >
             Close
           </motion.button>
+          
           {toastMessage && (
             <motion.div
               className="messages-toast"

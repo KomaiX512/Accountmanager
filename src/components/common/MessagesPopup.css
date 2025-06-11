@@ -25,12 +25,124 @@
     flex-direction: column;
   }
   
+  /* AI Chat Header */
+  .manager-chat-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid rgba(0, 255, 204, 0.3);
+  }
+  
+  .ai-chat-icon {
+    filter: drop-shadow(0 0 8px rgba(0, 255, 204, 0.6));
+    animation: pulse-glow 2s infinite;
+  }
+  
+  @keyframes pulse-glow {
+    0%, 100% { filter: drop-shadow(0 0 8px rgba(0, 255, 204, 0.6)); }
+    50% { filter: drop-shadow(0 0 15px rgba(0, 255, 204, 0.9)); }
+  }
+  
   .messages-popup-content h2 {
     color: #00ffcc;
     font-size: 1.8rem;
-    margin-bottom: 20px;
-    text-align: center;
+    margin: 0;
     text-shadow: 0 0 8px rgba(0, 255, 204, 0.5);
+  }
+  
+  /* No Insights Container */
+  .no-insights-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 40px 20px;
+    height: 100%;
+  }
+  
+  .ai-avatar {
+    background: rgba(0, 255, 204, 0.1);
+    border-radius: 50%;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 2px solid rgba(0, 255, 204, 0.3);
+    animation: avatar-float 3s ease-in-out infinite;
+  }
+  
+  @keyframes avatar-float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+  }
+  
+  .no-insights-container h3 {
+    color: #00ffcc;
+    font-size: 1.6rem;
+    margin-bottom: 15px;
+    text-shadow: 0 0 10px rgba(0, 255, 204, 0.5);
+  }
+  
+  .ai-intro {
+    color: #e0e0ff;
+    font-size: 1.1rem;
+    line-height: 1.6;
+    margin-bottom: 30px;
+    max-width: 500px;
+  }
+  
+  .start-discussion-btn {
+    background: linear-gradient(135deg, #00ffcc, #007bff);
+    border: none;
+    border-radius: 25px;
+    padding: 15px 30px;
+    color: #1a1a3a;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 4px 15px rgba(0, 255, 204, 0.4);
+  }
+  
+  .start-discussion-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 255, 204, 0.6);
+  }
+  
+  /* Recent Insights Header */
+  .recent-insights-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(0, 255, 204, 0.2);
+  }
+  
+  .recent-insights-header h3 {
+    color: #00ffcc;
+    font-size: 1.4rem;
+    margin: 0;
+  }
+  
+  .new-discussion-btn {
+    background: rgba(0, 255, 204, 0.2);
+    border: 1px solid rgba(0, 255, 204, 0.5);
+    border-radius: 20px;
+    padding: 8px 16px;
+    color: #00ffcc;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  
+  .new-discussion-btn:hover {
+    background: rgba(0, 255, 204, 0.3);
+    border-color: #00ffcc;
   }
   
   .messages-list {
@@ -48,6 +160,7 @@
     border: 1px solid rgba(0, 255, 204, 0.3);
     box-shadow: 0 2px 10px rgba(0, 255, 204, 0.2);
     transition: transform 0.2s;
+    cursor: pointer;
   }
   
   .message-card:hover {
@@ -122,15 +235,15 @@
     box-shadow: 0 0 8px rgba(255, 68, 68, 0.8);
   }
   
-  .no-messages {
-    color: #a0a0cc;
-    font-size: 1.1rem;
+  .loading {
+    color: #00ffcc;
+    font-size: 1rem;
     text-align: center;
     margin-top: 50px;
   }
   
-  .loading {
-    color: #00ffcc;
+  .error {
+    color: #ff4444;
     font-size: 1rem;
     text-align: center;
     margin-top: 50px;
@@ -192,91 +305,75 @@
   }
   
   .submit-feedback-button {
-    background: linear-gradient(90deg, #007bff, #00ffcc);
+    background: linear-gradient(135deg, #00ffcc, #007bff);
     border: none;
     border-radius: 8px;
     padding: 10px 20px;
-    color: #e0e0ff;
-    font-size: 1rem;
+    color: #1a1a3a;
+    font-weight: bold;
     cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0, 255, 204, 0.4);
-  }
-  
-  .submit-feedback-button:hover {
-    box-shadow: 0 4px 15px rgba(0, 255, 204, 0.6);
+    transition: all 0.2s;
   }
   
   .submit-feedback-button:disabled {
     background: #4a4a6a;
+    color: #888;
     cursor: not-allowed;
-    box-shadow: none;
   }
   
   .cancel-feedback-button {
-    background: linear-gradient(90deg, #ff4444, #cc0000);
-    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
     border-radius: 8px;
     padding: 10px 20px;
-    color: white;
-    font-size: 1rem;
+    color: #e0e0ff;
     cursor: pointer;
-    box-shadow: 0 2px 8px rgba(255, 68, 68, 0.4);
+    transition: all 0.2s;
   }
   
   .cancel-feedback-button:hover {
-    box-shadow: 0 4px 15px rgba(255, 68, 68, 0.6);
+    background: rgba(255, 255, 255, 0.2);
   }
   
   .close-button {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background: linear-gradient(90deg, #ff4444, #cc0000);
-    border: none;
-    border-radius: 6px;
-    padding: 8px 16px;
-    color: white;
+    background: rgba(255, 68, 68, 0.2);
+    border: 1px solid rgba(255, 68, 68, 0.5);
+    border-radius: 8px;
+    padding: 12px 24px;
+    color: #ff4444;
+    font-size: 1rem;
     cursor: pointer;
-    font-size: 0.9rem;
+    transition: all 0.2s;
+    margin-top: 15px;
   }
   
   .close-button:hover {
-    box-shadow: 0 0 15px rgba(255, 68, 68, 0.5);
+    background: rgba(255, 68, 68, 0.3);
+    border-color: #ff4444;
   }
   
   .messages-toast {
-    position: absolute;
+    position: fixed;
     bottom: 20px;
     right: 20px;
     background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
+    border: 1px solid rgba(0, 255, 204, 0.4);
     border-radius: 8px;
-    padding: 10px 20px;
+    padding: 12px 16px;
     color: #e0e0ff;
     font-size: 0.9rem;
     display: flex;
     align-items: center;
-    gap: 10px;
-    box-shadow: 0 4px 15px rgba(0, 255, 204, 0.4);
-    border: 1px solid rgba(0, 255, 204, 0.3);
+    gap: 8px;
+    box-shadow: 0 4px 15px rgba(0, 255, 204, 0.3);
     z-index: 2100;
-    animation: slide-in-toast 0.3s ease-out, pulse-glow 1.5s infinite;
   }
   
   .toast-icon {
     flex-shrink: 0;
   }
   
-  @keyframes slide-in-toast {
-    from { opacity: 0; transform: translateX(100px); }
-    to { opacity: 1; transform: translateX(0); }
-  }
-  
-  @keyframes pulse-glow {
-    0%, 100% { box-shadow: 0 0 8px rgba(0, 255, 204, 0.3); }
-    50% { box-shadow: 0 0 15px rgba(0, 255, 204, 0.6); }
-  }
-  
   @keyframes glow-pulse {
-    0%, 100% { box-shadow: 0 8px 30px rgba(0, 255, 204, 0.4); }
-    50% { box-shadow: 0 8px 30px rgba(0, 255, 204, 0.6); }
+    0%, 100% { box-shadow: 0 8px 30px rgba(0, 255, 204, 0.6); }
+    50% { box-shadow: 0 8px 30px rgba(0, 255, 204, 0.8); }
   }

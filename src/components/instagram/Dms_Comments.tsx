@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './Dms_Comments.css';
 import { useInstagram } from '../../context/InstagramContext';
 import { useTwitter } from '../../context/TwitterContext';
+import { useFacebook } from '../../context/FacebookContext';
 import { Notification } from '../../types/notifications';
 
 interface DmsCommentsProps {
@@ -14,6 +15,7 @@ interface DmsCommentsProps {
   refreshKey: number;
   igBusinessId?: string | null;
   twitterId?: string | null;
+  facebookPageId?: string | null;
   aiRepliesRefreshKey?: number;
   onAIRefresh?: () => void;
   aiProcessingNotifications?: Record<string, boolean>;
@@ -32,6 +34,7 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
   refreshKey, 
   igBusinessId: propIgBusinessId, 
   twitterId: propTwitterId,
+  facebookPageId: propFacebookPageId,
   aiRepliesRefreshKey = 0, 
   onAIRefresh,
   aiProcessingNotifications = {},
@@ -47,6 +50,8 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
   const { userId: contextIgBusinessId, isConnected: isInstagramConnected } = useInstagram();
   const igBusinessId = propIgBusinessId || contextIgBusinessId;
   const { userId: twitterId } = useTwitter();
+  const { userId: facebookUserId, isConnected: isFacebookConnected } = useFacebook();
+  const facebookPageId = propFacebookPageId || facebookUserId;
 
   const formatTimestamp = (timestamp: number) => {
     const date = new Date(timestamp);
@@ -96,6 +101,13 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
       return (
         <div className="not-connected-message">
           Please connect your Twitter account to view notifications
+        </div>
+      );
+    }
+    if (platform === 'facebook' && !isFacebookConnected) {
+      return (
+        <div className="not-connected-message">
+          Please connect your Facebook account to view notifications
         </div>
       );
     }

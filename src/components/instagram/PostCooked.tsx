@@ -6,8 +6,10 @@ import ErrorBoundary from '../ErrorBoundary';
 import CanvasEditor from '../common/CanvasEditor';
 import InstagramRequiredButton from '../common/InstagramRequiredButton';
 import TwitterRequiredButton from '../common/TwitterRequiredButton';
+import FacebookRequiredButton from '../common/FacebookRequiredButton';
 import { useInstagram } from '../../context/InstagramContext';
 import { useTwitter } from '../../context/TwitterContext';
+import { useFacebook } from '../../context/FacebookContext';
 import axios from 'axios';
 import {
   Avatar,
@@ -39,6 +41,8 @@ import CloseIcon from '@mui/icons-material/Close';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { BsLightbulb } from 'react-icons/bs';
+import { FaBell } from 'react-icons/fa';
 // Missing modules - comment out until they're available
 // import EditCaption from '../common/EditCaption';
 // import { ScheduleItem } from '../../types/schedule';
@@ -73,10 +77,11 @@ const API_BASE_URL = 'http://localhost:3000';
 const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts = [], userId: propUserId, platform = 'instagram' }) => {
   const { isConnected: isInstagramConnected, userId: instagramUserId } = useInstagram();
   const { isConnected: isTwitterConnected, userId: twitterUserId } = useTwitter();
+  const { isConnected: isFacebookConnected, userId: facebookUserId } = useFacebook();
   
   // Determine platform-specific values
-  const isConnected = platform === 'twitter' ? isTwitterConnected : isInstagramConnected;
-  const contextUserId = platform === 'twitter' ? twitterUserId : instagramUserId;
+  const isConnected = platform === 'twitter' ? isTwitterConnected : platform === 'facebook' ? isFacebookConnected : isInstagramConnected;
+  const contextUserId = platform === 'twitter' ? twitterUserId : platform === 'facebook' ? facebookUserId : instagramUserId;
   const userId = propUserId || (isConnected ? (contextUserId ?? undefined) : undefined);
 
   const [localPosts, setLocalPosts] = useState<typeof posts>([]);
@@ -108,10 +113,61 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   const [postDialogOpen, setPostDialogOpen] = useState(false);
   const [dialogPostKey, setDialogPostKey] = useState<string | null>(null);
   const [interval, setInterval] = useState<number>(180);
-  const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
-  const [feedback, setFeedback] = useState('');
 
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  // Viewed posts tracking with localStorage persistence 
+  const getViewedStorageKey = () => `viewed_posts_${platform}_${username}`;
+  
+  const [viewedPosts, setViewedPosts] = useState<Set<string>>(() => {
+    const stored = localStorage.getItem(getViewedStorageKey());
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  });
+
+  // Helper function to get unseen count
+  const getUnseenPostsCount = () => {
+    return localPosts.filter(post => !viewedPosts.has(post.key)).length;
+  };
+
+  // Function to mark posts as viewed
+  const markPostsAsViewed = () => {
+    const newViewedPosts = new Set(localPosts.map(p => p.key));
+    setViewedPosts(newViewedPosts);
+    localStorage.setItem(getViewedStorageKey(), JSON.stringify(Array.from(newViewedPosts)));
+  };
+
+  // Auto-mark posts as viewed when container is in view
+  useEffect(() => {
+    if (localPosts.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
+            setTimeout(() => {
+              if (entry.isIntersecting && getUnseenPostsCount() > 0) {
+                markPostsAsViewed();
+              }
+            }, 3000); // Mark as viewed after 3 seconds of viewing
+          }
+        });
+      },
+      { threshold: 0.5 }
+    );
+
+    const container = document.querySelector('.post-cooked-container');
+    if (container) {
+      observer.observe(container);
+    }
+
+    return () => observer.disconnect();
+  }, [localPosts, viewedPosts]);
+
+  // Update viewed set when new posts arrive
+  useEffect(() => {
+    const currentViewed = localStorage.getItem(getViewedStorageKey());
+    if (currentViewed) {
+      setViewedPosts(new Set(JSON.parse(currentViewed)));
+    }
+  }, [localPosts]);
 
   useEffect(() => {
     console.log('Posts prop in PostCooked:', posts);
@@ -590,6 +646,49 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         console.error(`[Schedule] Error scheduling tweet for ${selectedPostKey}:`, err.message);
         setToastMessage(`Error scheduling tweet: ${err.response?.data?.error || err.message}`);
       }
+    } else if (platform === 'facebook') {
+      // Facebook scheduling supports optional image
+      const caption = post.data.post?.caption || '';
+      console.log(`[Schedule] Scheduling Facebook post for ${selectedPostKey}`);
+      try {
+        const formData = new FormData();
+        formData.append('caption', caption);
+        formData.append('scheduleDate', scheduleTime.toISOString());
+        formData.append('platform', 'facebook');
+
+        // Attempt to add image if available
+        let imageBlob: Blob | null = null;
+        let filename = '';
+        if (post.data.image_url) {
+          try {
+            const proxyUrl = `${API_BASE_URL}/api/proxy-image?url=${encodeURIComponent(post.data.image_url)}`;
+            const imgRes = await fetch(proxyUrl);
+            imageBlob = await imgRes.blob();
+            filename = `post_${selectedPostKey}.jpg`;
+          } catch (imgErr) {
+            console.warn('[Schedule] Unable to fetch image for Facebook post, proceeding with text-only');
+          }
+        }
+        if (imageBlob) {
+          formData.append('image', imageBlob, filename);
+        }
+
+        const resp = await fetch(`${API_BASE_URL}/schedule-post/${userId}`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!resp.ok) {
+          const errData = await resp.json().catch(() => ({}));
+          console.error('[Schedule] Facebook schedule failed:', errData.error || resp.statusText);
+          setToastMessage(`Failed to schedule Facebook post: ${errData.error || 'Unknown error'}`);
+        } else {
+          setToastMessage('Your Facebook post is on schedule!');
+        }
+      } catch (err: any) {
+        console.error('[Schedule] Error scheduling Facebook post:', err.message);
+        setToastMessage(`Error scheduling Facebook post: ${err.message}`);
+      }
     } else {
       // Instagram scheduling logic (existing)
       let imageKey = '';
@@ -646,8 +745,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       formData.append('caption', caption);
       formData.append('scheduleDate', scheduleTime.toISOString());
       try {
-        console.log(`[Schedule] Sending schedule request for post ${selectedPostKey} to /api/schedule-post/${userId}`);
-        const resp = await fetch(`${API_BASE_URL}/api/schedule-post/${userId}`, {
+        console.log(`[Schedule] Sending schedule request for post ${selectedPostKey} to /schedule-post/${userId}`);
+        const resp = await fetch(`${API_BASE_URL}/schedule-post/${userId}`, {
           method: 'POST',
           body: formData,
         });
@@ -841,7 +940,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       console.log('[AutoSchedule] Final interval determined:', delayHours, 'hours');
       setAutoScheduleProgress(`Scheduling ${platform === 'twitter' ? 'tweets' : 'posts'} every ${delayHours} hours...`);
       
-      let now = new Date();
+      const now = new Date();
       
       for (let i = 0; i < localPosts.length; i++) {
         const post = localPosts[i];
@@ -915,6 +1014,61 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
               setToastMessage(`Error scheduling tweet ${i + 1}: ${err.response?.data?.error || err.message}`);
             }
           }
+        } else if (platform === 'facebook') {
+          // Facebook auto-scheduling logic (supports optional images)
+          const caption = post.data.post?.caption || '';
+          console.log(`[AutoSchedule] Facebook post #${i + 1} caption:`, caption);
+          
+          let scheduleDate;
+          if (i === 0) {
+            const nowPlusBuffer = new Date(Date.now() + 60 * 1000);
+            scheduleDate = nowPlusBuffer;
+          } else {
+            const prevDate = new Date(Date.now() + 60 * 1000 + (i * delayHours * 60 * 60 * 1000));
+            scheduleDate = prevDate;
+          }
+          
+          console.log(`[AutoSchedule] Scheduling Facebook post #${i + 1} at:`, scheduleDate.toISOString());
+          
+          try {
+            const formData = new FormData();
+            formData.append('caption', caption);
+            formData.append('scheduleDate', scheduleDate.toISOString());
+            formData.append('platform', 'facebook');
+
+            // Attempt to add image if available
+            let imageBlob: Blob | null = null;
+            if (post.data.image_url) {
+              try {
+                const proxyUrl = `${API_BASE_URL}/api/proxy-image?url=${encodeURIComponent(post.data.image_url)}`;
+                const imgRes = await fetch(proxyUrl);
+                imageBlob = await imgRes.blob();
+                const filename = `auto_facebook_post_${i + 1}.jpg`;
+                formData.append('image', imageBlob, filename);
+                console.log(`[AutoSchedule] Added image to Facebook post #${i + 1}`);
+              } catch (imgErr) {
+                console.warn(`[AutoSchedule] Unable to fetch image for Facebook post #${i + 1}, proceeding with text-only`);
+              }
+            }
+
+            const resp = await fetch(`${API_BASE_URL}/schedule-post/${userId}`, {
+              method: 'POST',
+              body: formData,
+            });
+
+            if (!resp.ok) {
+              const errData = await resp.json().catch(() => ({}));
+              console.error(`[AutoSchedule] Failed to schedule Facebook post #${i + 1}:`, errData.error || resp.statusText);
+              setToastMessage(`Failed to schedule Facebook post ${i + 1}: ${errData.error || 'Unknown error'}`);
+            } else {
+              const respData = await resp.json().catch(() => ({}));
+              console.log(`[AutoSchedule] Scheduled Facebook post #${i + 1} successfully:`, respData);
+              setToastMessage(`Scheduled Facebook post ${i + 1} successfully!`);
+            }
+          } catch (err: any) {
+            console.error(`[AutoSchedule] Error scheduling Facebook post #${i + 1}:`, err.message);
+            setToastMessage(`Error scheduling Facebook post ${i + 1}: ${err.message}`);
+          }
         } else {
           // Instagram auto-scheduling logic (existing)
           let imageKey = '';
@@ -983,8 +1137,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
           formData.append('caption', caption);
           formData.append('scheduleDate', scheduleDate.toISOString());
           try {
-            console.log(`[AutoSchedule] Sending schedule request for post #${i + 1} to /api/schedule-post/${userId}`);
-            const resp = await fetch(`${API_BASE_URL}/api/schedule-post/${userId}`, {
+            console.log(`[AutoSchedule] Sending schedule request for post #${i + 1} to /schedule-post/${userId}`);
+            const resp = await fetch(`${API_BASE_URL}/schedule-post/${userId}`, {
               method: 'POST',
               body: formData,
             });
@@ -1106,7 +1260,23 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     <ErrorBoundary>
       <div className="post-cooked-container">
         <div className="post-cooked-header">
-          <h2>Cooked Posts</h2>
+          <h2>
+            <div className="section-header">
+              <BsLightbulb className="section-icon" />
+              <span>Cooked Posts</span>
+              {getUnseenPostsCount() > 0 ? (
+                <div className="content-badge" onClick={markPostsAsViewed}>
+                  <FaBell className="badge-icon" />
+                  <span className="badge-count">{getUnseenPostsCount()}</span>
+                </div>
+              ) : (
+                <div className="content-badge viewed">
+                  <FaBell className="badge-icon" />
+                  <span className="badge-text">Viewed</span>
+                </div>
+              )}
+            </div>
+          </h2>
           <button 
             className="refresh-button"
             onClick={handleRefreshPosts}
@@ -1151,6 +1321,24 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             >
               {autoScheduling ? 'Auto-Scheduling...' : 'Auto-Schedule All'}
             </TwitterRequiredButton>
+          ) : platform === 'facebook' ? (
+            <FacebookRequiredButton
+              isConnected={isConnected}
+              onClick={() => setShowIntervalModal(true)}
+              className="facebook-btn connect"
+              disabled={!filteredPosts.length || autoScheduling}
+              style={{ 
+                background: 'linear-gradient(90deg, #3b5998, #4267b2)', 
+                color: '#ffffff', 
+                cursor: filteredPosts.length ? 'pointer' : 'not-allowed', 
+                borderRadius: 8, 
+                padding: '8px 16px', 
+                border: '1px solid #3b5998',
+                opacity: filteredPosts.length ? 1 : 0.5
+              }}
+            >
+              {autoScheduling ? 'Auto-Scheduling...' : 'Auto-Schedule All'}
+            </FacebookRequiredButton>
           ) : (
             <InstagramRequiredButton
               isConnected={isConnected}
@@ -1420,6 +1608,43 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                         </svg>
                         Schedule
                       </TwitterRequiredButton>
+                    ) : platform === 'facebook' ? (
+                      <FacebookRequiredButton
+                        isConnected={isConnected}
+                        onClick={() => handleScheduleClick(post.key)}
+                        className="schedule-button"
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '5px', 
+                          backgroundColor: '#3b5998', 
+                          color: '#ffffff',
+                          border: 'none',
+                          padding: '8px 12px',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          fontWeight: 'bold',
+                          transition: 'all 0.2s ease'
+                        }}
+                        notificationPosition="bottom"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#ffffff"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <circle cx="12" cy="12" r="10" />
+                          <polyline points="12 6 12 12 16 14" />
+                        </svg>
+                        Schedule
+                      </FacebookRequiredButton>
                     ) : (
                       <InstagramRequiredButton
                         isConnected={isConnected}

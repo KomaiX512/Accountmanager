@@ -587,6 +587,7 @@
   position: relative;
   overflow: hidden;
   min-height: 60px;
+  gap: 16px;
 }
 
 .platform-row:hover {
@@ -609,6 +610,7 @@
   cursor: pointer;
   flex: 1;
   transition: transform 0.2s ease;
+  gap: 16px;
 }
 
 .clickable-area:hover {
@@ -619,7 +621,6 @@
   width: 42px;
   height: 42px;
   flex-shrink: 0;
-  margin-right: 16px;
 }
 
 .platform-icon img {
@@ -630,17 +631,19 @@
   filter: drop-shadow(0 0 5px rgba(0, 255, 204, 0.5));
 }
 
-.platform-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
 .platform-name {
   font-size: 1.1rem;
   font-weight: 500;
   color: #e0e0ff;
   margin-bottom: 4px;
+}
+
+.platform-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-left: auto;
+  align-items: flex-end;
 }
 
 .status-indicators {
@@ -703,36 +706,34 @@
   background: rgba(255, 152, 0, 0.25);
 }
 
-/* Fix #2: Notifications Display - Tiny and Non-intrusive */
+/* Enhanced notification badge styling with consistent theme */
 .notification-badge-container {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 100;
+  margin-left: 12px;
+  display: flex;
+  align-items: center;
 }
 
 .notification-badge {
   display: flex;
   align-items: center;
   gap: 4px;
-  background: linear-gradient(135deg, #ff6b6b, #ff8e53);
-  border-radius: 12px;
-  padding: 4px 8px;
-  font-size: 0.7rem;
+  background: rgba(0, 255, 204, 0.15);
+  border: 1px solid rgba(0, 255, 204, 0.3);
+  border-radius: 16px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.75rem;
   font-weight: 600;
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(255, 107, 107, 0.4);
-  border: 1px solid rgba(255, 107, 107, 0.6);
+  color: #00ffcc;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   white-space: nowrap;
   min-width: auto;
-  max-width: 120px;
 }
 
 .notification-badge:hover {
+  background: rgba(0, 255, 204, 0.25);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.6);
+  box-shadow: 0 4px 12px rgba(0, 255, 204, 0.4);
 }
 
 .notification-bell-icon {
@@ -741,8 +742,12 @@
   flex-shrink: 0;
 }
 
+.notification-bell-icon path {
+  fill: #00ffcc;
+}
+
 .notification-number {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 700;
   line-height: 1;
 }

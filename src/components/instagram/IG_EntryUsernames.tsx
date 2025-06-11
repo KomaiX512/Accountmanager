@@ -269,6 +269,9 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
           localStorage.setItem(`instagram_account_type_${currentUser.uid}`, accountType);
         }
         
+        // Store username for notification counting in main dashboard
+        localStorage.setItem(`instagram_username_${currentUser.uid}`, username.trim());
+        
         // Mark Instagram as acquired after successful submission
         if (markPlatformAccessed) {
           markPlatformAccessed('instagram');

@@ -40,12 +40,12 @@ export const FacebookProvider: React.FC<FacebookProviderProps> = ({ children }) 
       console.log(`[${new Date().toISOString()}] Checking for existing Facebook connection for user ${currentUser.uid}`);
       const response = await axios.get(`http://localhost:3000/facebook-connection/${currentUser.uid}`);
       
-      if (response.data.facebook_user_id) {
-        setUserId(response.data.facebook_user_id);
+      if (response.data.facebook_page_id) {
+        setUserId(response.data.facebook_page_id); // Use page ID for Facebook operations
         setUsername(response.data.username || null);
         setIsConnected(true);
         console.log(`[${new Date().toISOString()}] Restored Facebook connection:`, {
-          userId: response.data.facebook_user_id,
+          userId: response.data.facebook_page_id, // Page ID is the correct userId for Facebook
           username: response.data.username
         });
       } else {

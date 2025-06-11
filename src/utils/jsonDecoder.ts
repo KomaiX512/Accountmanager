@@ -255,7 +255,7 @@ class JSONDecoder {
    */
   private applyTextFormatting(text: string): (string | React.ReactElement)[] {
     const elements: (string | React.ReactElement)[] = [];
-    let currentIndex = 0;
+    const currentIndex = 0;
     
     // Process text with various formatting patterns
     const patterns = [

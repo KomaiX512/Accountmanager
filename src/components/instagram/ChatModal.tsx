@@ -134,7 +134,10 @@ const ChatModal: React.FC<ChatModalProps> = ({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="chat-modal-header">
-              <h2>{username}</h2>
+              <div className="chat-modal-title">
+                <h2>{username}</h2>
+                <span className="platform-indicator">{platformConfig.name} AI Manager</span>
+              </div>
               <button className="chat-modal-close" onClick={onClose}>
                 ✕
               </button>

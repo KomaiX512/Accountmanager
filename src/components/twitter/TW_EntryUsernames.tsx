@@ -2,7 +2,7 @@ import React, { useState, ChangeEvent, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import '../instagram/IG_EntryUsernames.css'; // Reuse the same styles
 import { motion } from 'framer-motion';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 interface TW_EntryUsernamesProps {
@@ -278,6 +278,9 @@ const TW_EntryUsernames: React.FC<TW_EntryUsernamesProps> = ({
             localStorage.setItem(`twitter_account_type_${currentUser.uid}`, accountType);
           }
         }
+
+        // Store username for notification counting in main dashboard
+        localStorage.setItem(`twitter_username_${currentUser.uid}`, username.trim());
 
         // Mark Twitter as acquired after successful submission
         if (markPlatformAccessed) {

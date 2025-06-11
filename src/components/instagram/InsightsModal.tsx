@@ -427,11 +427,26 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
                   {error && <div className="insights-error">{error}</div>}
                   {insights && (
                     <div className="insights-grid">
-                      {renderChart(insights.reach.daily, 'Daily Reach')}
-                      {insights.reach.daily.length === 0 && (
-                        <div className="insights-note">
-                          <p>Your account is new, so reach data may be limited. Continue posting to generate more reach.</p>
+                      {(insights as any).limitations && (
+                        <div className="insights-error" style={{ marginBottom: '20px' }}>
+                          <h4>📊 Insights Information</h4>
+                          <p>{(insights as any).limitations}</p>
+                          {(insights as any).followerCount !== undefined && (
+                            <p style={{ marginTop: '10px', color: '#8a8aaa' }}>
+                              Current follower count: {(insights as any).followerCount}
+                            </p>
+                          )}
                         </div>
+                      )}
+                      
+                      {insights.reach.daily.length > 0 && insights.reach.daily.some(d => d.value > 0) ? (
+                        renderChart(insights.reach.daily, 'Daily Reach')
+                      ) : (
+                        !(insights as any).limitations && (
+                          <div className="insights-note">
+                            <p>Your account is new, so reach data may be limited. Continue posting to generate more reach.</p>
+                          </div>
+                        )
                       )}
                     </div>
                   )}
@@ -448,13 +463,35 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
                   {error && <div className="insights-error">{error}</div>}
                   {insights && (
                     <div className="insights-grid">
-                      {renderChart(insights.impressions.daily, 'Daily Impressions')}
-                      {renderChart(insights.online_followers.daily, 'Daily Online Followers')}
-                      {renderChart(insights.accounts_engaged.daily, 'Daily Accounts Engaged')}
-                      {renderChart(insights.total_interactions.daily, 'Daily Total Interactions')}
+                      {(insights as any).limitations && (
+                        <div className="insights-error" style={{ marginBottom: '20px' }}>
+                          <h4>📊 Insights Information</h4>
+                          <p>{(insights as any).limitations}</p>
+                          {(insights as any).followerCount !== undefined && (
+                            <p style={{ marginTop: '10px', color: '#8a8aaa' }}>
+                              Current follower count: {(insights as any).followerCount}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      
+                      {insights.impressions.daily.length > 0 && insights.impressions.daily.some(d => d.value > 0) && 
+                        renderChart(insights.impressions.daily, 'Daily Impressions')}
+                      
+                      {insights.online_followers.daily.length > 0 && insights.online_followers.daily.some(d => d.value > 0) && 
+                        renderChart(insights.online_followers.daily, 'Daily Online Followers')}
+                      
+                      {insights.accounts_engaged.daily.length > 0 && insights.accounts_engaged.daily.some(d => d.value > 0) && 
+                        renderChart(insights.accounts_engaged.daily, 'Daily Accounts Engaged')}
+                      
+                      {insights.total_interactions.daily.length > 0 && insights.total_interactions.daily.some(d => d.value > 0) && 
+                        renderChart(insights.total_interactions.daily, 'Daily Total Interactions')}
+                      
                       {Object.keys(insights.follower_demographics.lifetime).length > 0 &&
                         renderDemographicsChart(insights.follower_demographics.lifetime, 'Follower Demographics')}
-                      {insights.impressions.daily.length === 0 &&
+                      
+                      {!(insights as any).limitations && 
+                        insights.impressions.daily.length === 0 &&
                         insights.online_followers.daily.length === 0 &&
                         insights.accounts_engaged.daily.length === 0 &&
                         insights.total_interactions.daily.length === 0 &&

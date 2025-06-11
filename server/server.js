@@ -3158,7 +3158,7 @@ app.post('/user-instagram-status/:userId', async (req, res) => {
     console.error(`Error updating user Instagram status for ${userId}:`, error);
     res.status(500).json({ error: 'Failed to update user Instagram status' });
   }
-  });
+});
 
 // Instagram connection endpoints (GET endpoint was missing)
 app.get('/instagram-connection/:userId', async (req, res) => {
@@ -3803,8 +3803,8 @@ async function fetchFacebookInsights(pageId, accessToken) {
     let isBusinessPage = false;
     
     try {
-      // Try page-specific fields first
-      pageInfoResponse = await axios.get(`https://graph.facebook.com/v18.0/${pageId}`, {
+      // Try page-specific fields first - using latest API version v23.0
+      pageInfoResponse = await axios.get(`https://graph.facebook.com/v23.0/${pageId}`, {
         params: {
           fields: 'id,name,category,followers_count,fan_count',
           access_token: accessToken
@@ -3814,224 +3814,163 @@ async function fetchFacebookInsights(pageId, accessToken) {
       console.log(`[${new Date().toISOString()}] Detected Facebook business page: ${pageId}`);
     } catch (pageError) {
       // If page fields fail, try user fields
-      pageInfoResponse = await axios.get(`https://graph.facebook.com/v18.0/${pageId}`, {
-        params: {
-          fields: 'id,name',
-          access_token: accessToken
-        }
-      });
-      isBusinessPage = false;
-      console.log(`[${new Date().toISOString()}] Detected Facebook personal account: ${pageId}`);
+      try {
+        pageInfoResponse = await axios.get(`https://graph.facebook.com/v23.0/${pageId}`, {
+          params: {
+            fields: 'id,name',
+            access_token: accessToken
+          }
+        });
+        isBusinessPage = false;
+        console.log(`[${new Date().toISOString()}] Detected Facebook personal account: ${pageId}`);
+      } catch (userError) {
+        console.error(`[${new Date().toISOString()}] Error fetching page/user info:`, userError.response?.data || userError.message);
+        throw new Error('Unable to access Facebook account information');
+      }
     }
     
-    if (isBusinessPage) {
-      // This is a business page - fetch full insights
+        if (isBusinessPage) {
+      // This is a business page - fetch available insights (some metrics were deprecated)
       console.log(`[${new Date().toISOString()}] Fetching insights for Facebook business page ${pageId}`);
       
-      const baseUrl = `https://graph.facebook.com/v18.0/${pageId}/insights`;
+      const baseUrl = `https://graph.facebook.com/v23.0/${pageId}/insights`;
       
-      // Fetch page impressions and reach
-      const metricsResponse = await axios.get(baseUrl, {
-        params: {
-          metric: 'page_impressions,page_reach,page_engaged_users,page_post_engagements',
-          period: 'day',
-          since: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Last 30 days
-          until: new Date().toISOString().split('T')[0],
-          access_token: accessToken
-        }
-      });
-
-      // Process Facebook insights data
-      if (metricsResponse.data && metricsResponse.data.data) {
-        metricsResponse.data.data.forEach(metric => {
-          if (metric.name === 'page_impressions' && metric.values) {
-            insights.impressions.daily = metric.values.map(v => ({
-              date: v.end_time,
-              value: v.value || 0
-            }));
-          } else if (metric.name === 'page_reach' && metric.values) {
-            insights.reach.daily = metric.values.map(v => ({
-              date: v.end_time,
-              value: v.value || 0
-            }));
-          } else if (metric.name === 'page_engaged_users' && metric.values) {
-            insights.accounts_engaged.daily = metric.values.map(v => ({
-              date: v.end_time,
-              value: v.value || 0
-            }));
-          } else if (metric.name === 'page_post_engagements' && metric.values) {
-            insights.total_interactions.daily = metric.values.map(v => ({
-              date: v.end_time,
-              value: v.value || 0
-            }));
-          }
-        });
-      }
-
+      // Check if page has 100+ likes (required for insights)
       const followerCount = pageInfoResponse.data.followers_count || pageInfoResponse.data.fan_count || 0;
-      // Mock online followers data (Facebook doesn't provide real-time online follower data)
-      insights.online_followers.daily = insights.reach.daily.map(item => ({
-        date: item.date,
-        value: Math.floor(followerCount * 0.1 * Math.random()) // Estimate 10% of followers online
-      }));
+      
+      if (followerCount < 100) {
+        console.log(`[${new Date().toISOString()}] Page has less than 100 likes (${followerCount}), insights not available`);
+        
+        // Return structure with zero/empty data and explanation
+        const last30Days = Array.from({ length: 30 }, (_, i) => {
+          const date = new Date();
+          date.setDate(date.getDate() - (29 - i));
+          return date.toISOString().split('T')[0] + 'T00:00:00.000Z';
+        });
 
-      console.log(`[${new Date().toISOString()}] Successfully fetched Facebook page insights for ${pageId}`);
-    } else {
-      // This is a personal account - get whatever insights we can from Facebook API
-      console.log(`[${new Date().toISOString()}] Detected personal Facebook account ${pageId} - fetching available user insights`);
+        insights.reach.daily = last30Days.map(date => ({ date, value: 0 }));
+        insights.impressions.daily = last30Days.map(date => ({ date, value: 0 }));
+        insights.accounts_engaged.daily = last30Days.map(date => ({ date, value: 0 }));
+        insights.total_interactions.daily = last30Days.map(date => ({ date, value: 0 }));
+        insights.online_followers.daily = last30Days.map(date => ({ date, value: 0 }));
+        
+        insights.isNewPage = true;
+        insights.followerCount = followerCount;
+        insights.limitations = `Facebook Page Insights require at least 100 likes. This page currently has ${followerCount} likes. Once you reach 100 likes, detailed insights will become available.`;
+        
+        return insights;
+      }
       
       try {
-        // Get basic user information that is available for personal accounts
-        const userInfoResponse = await axios.get(`https://graph.facebook.com/v18.0/${pageId}`, {
+        // Use only the metrics that are still available according to v23.0 documentation
+        const metricsResponse = await axios.get(baseUrl, {
           params: {
-            fields: 'id,name,friends,posts',
+            metric: 'page_impressions_unique,page_post_engagements,page_daily_follows,page_daily_unfollows_unique',
+            period: 'day',
+            since: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Last 30 days
+            until: new Date().toISOString().split('T')[0],
             access_token: accessToken
           }
         });
+
+        // Process Facebook insights data with available metrics
+        if (metricsResponse.data && metricsResponse.data.data) {
+          metricsResponse.data.data.forEach(metric => {
+            if (metric.name === 'page_impressions_unique' && metric.values) {
+              // Use page_impressions_unique for both reach and impressions since page_reach was deprecated
+              const impressionsData = metric.values.map(v => ({
+                date: v.end_time,
+                value: v.value || 0
+              }));
+              insights.impressions.daily = impressionsData;
+              // For reach, use a portion of impressions as an estimate
+              insights.reach.daily = impressionsData.map(item => ({
+                date: item.date,
+                value: Math.floor(item.value * 0.7) // Estimate reach as 70% of impressions
+              }));
+            } else if (metric.name === 'page_post_engagements' && metric.values) {
+              insights.total_interactions.daily = metric.values.map(v => ({
+                date: v.end_time,
+                value: v.value || 0
+              }));
+            } else if (metric.name === 'page_daily_follows' && metric.values) {
+              insights.accounts_engaged.daily = metric.values.map(v => ({
+                date: v.end_time,
+                value: v.value || 0
+              }));
+            }
+          });
+        }
+
+        // Calculate online followers estimate based on follower count
+        insights.online_followers.daily = insights.reach.daily.map(item => ({
+          date: item.date,
+          value: Math.floor(followerCount * 0.05 * (0.5 + Math.random())) // Estimate 2.5-7.5% of followers online
+        }));
+
+        console.log(`[${new Date().toISOString()}] Successfully fetched Facebook page insights for ${pageId} (${followerCount} followers)`);
+      } catch (insightsError) {
+        console.error(`[${new Date().toISOString()}] Error fetching insights for business page:`, insightsError.response?.data || insightsError.message);
         
-        const friendsCount = userInfoResponse.data.friends?.summary?.total_count || 0;
-        
-        // Try to get posts for recent activity estimation
-        const postsResponse = await axios.get(`https://graph.facebook.com/v18.0/${pageId}/posts`, {
-          params: {
-            fields: 'id,created_time,likes.summary(true),comments.summary(true),shares',
-            limit: 30,
-            access_token: accessToken
-          }
-        });
-        
-        // Process real post data for insights
-        const posts = postsResponse.data.data || [];
+        // If specific insights fail, return zero data with explanation
         const last30Days = Array.from({ length: 30 }, (_, i) => {
           const date = new Date();
           date.setDate(date.getDate() - (29 - i));
-          return date.toISOString().split('T')[0];
+          return date.toISOString().split('T')[0] + 'T00:00:00.000Z';
         });
 
-        // Calculate real engagement from posts
-        const dailyEngagement = {};
-        posts.forEach(post => {
-          const postDate = new Date(post.created_time).toISOString().split('T')[0];
-          if (!dailyEngagement[postDate]) {
-            dailyEngagement[postDate] = {
-              likes: 0,
-              comments: 0,
-              shares: 0,
-              posts: 0
-            };
-          }
-          dailyEngagement[postDate].likes += post.likes?.summary?.total_count || 0;
-          dailyEngagement[postDate].comments += post.comments?.summary?.total_count || 0;
-          dailyEngagement[postDate].shares += post.shares?.count || 0;
-          dailyEngagement[postDate].posts += 1;
-        });
-
-        // Generate insights based on real data where available
-        insights.reach.daily = last30Days.map(date => {
-          const engagement = dailyEngagement[date];
-          // Estimate reach based on engagement (rough estimation)
-          const estimatedReach = engagement ? 
-            Math.max(engagement.likes + engagement.comments + engagement.shares * 3, 10) : 
-            Math.floor(Math.random() * 20) + 5;
-          return {
-            date: date + 'T00:00:00.000Z',
-            value: estimatedReach
-          };
-        });
-
-        insights.impressions.daily = last30Days.map(date => {
-          const engagement = dailyEngagement[date];
-          // Estimate impressions as 2-5x reach
-          const reach = insights.reach.daily.find(r => r.date.startsWith(date))?.value || 10;
-          return {
-            date: date + 'T00:00:00.000Z',
-            value: Math.floor(reach * (2 + Math.random() * 3))
-          };
-        });
-
-        insights.accounts_engaged.daily = last30Days.map(date => {
-          const engagement = dailyEngagement[date];
-          return {
-            date: date + 'T00:00:00.000Z',
-            value: engagement ? engagement.likes + engagement.comments : Math.floor(Math.random() * 5)
-          };
-        });
-
-        insights.total_interactions.daily = last30Days.map(date => {
-          const engagement = dailyEngagement[date];
-          return {
-            date: date + 'T00:00:00.000Z',
-            value: engagement ? 
-              engagement.likes + engagement.comments + engagement.shares : 
-              Math.floor(Math.random() * 8) + 1
-          };
-        });
-
-        insights.online_followers.daily = last30Days.map(date => ({
-          date: date + 'T00:00:00.000Z',
-          value: Math.floor(friendsCount * 0.03 * (0.5 + Math.random())) // 1.5-4.5% of friends estimated online
-        }));
-
-        console.log(`[${new Date().toISOString()}] Generated insights based on real Facebook data for personal account ${pageId}`);
+        insights.reach.daily = last30Days.map(date => ({ date, value: 0 }));
+        insights.impressions.daily = last30Days.map(date => ({ date, value: 0 }));
+        insights.accounts_engaged.daily = last30Days.map(date => ({ date, value: 0 }));
+        insights.total_interactions.daily = last30Days.map(date => ({ date, value: 0 }));
+        insights.online_followers.daily = last30Days.map(date => ({ date, value: 0 }));
         
-      } catch (personalApiError) {
-        console.log(`[${new Date().toISOString()}] Limited API access for personal account, using estimated data`);
-        
-        // Fallback to estimated data if personal API calls fail
-        const last30Days = Array.from({ length: 30 }, (_, i) => {
-          const date = new Date();
-          date.setDate(date.getDate() - (29 - i));
-          return date.toISOString().split('T')[0];
-        });
-
-        insights.reach.daily = last30Days.map(date => ({
-          date: date + 'T00:00:00.000Z',
-          value: Math.floor(Math.random() * 30) + 10 // Estimated reach 10-40
-        }));
-
-        insights.impressions.daily = last30Days.map(date => ({
-          date: date + 'T00:00:00.000Z',
-          value: Math.floor(Math.random() * 80) + 20 // Estimated impressions 20-100
-        }));
-
-        insights.accounts_engaged.daily = last30Days.map(date => ({
-          date: date + 'T00:00:00.000Z',
-          value: Math.floor(Math.random() * 10) + 2 // Estimated engagements 2-12
-        }));
-
-        insights.total_interactions.daily = last30Days.map(date => ({
-          date: date + 'T00:00:00.000Z',
-          value: Math.floor(Math.random() * 15) + 3 // Estimated interactions 3-18
-        }));
-
-        insights.online_followers.daily = last30Days.map(date => ({
-          date: date + 'T00:00:00.000Z',
-          value: Math.floor(Math.random() * 20) + 5 // Estimated online users 5-25
-        }));
+        insights.followerCount = followerCount;
+        insights.apiError = true;
+        insights.limitations = "Unable to fetch insights data. This could be due to insufficient permissions, recent API changes, or the page not meeting Facebook's insights requirements.";
       }
+        } else {
+      // This is a personal account - limited insights available
+      console.log(`[${new Date().toISOString()}] Detected personal Facebook account ${pageId} - very limited insights available`);
+      
+      const last30Days = Array.from({ length: 30 }, (_, i) => {
+        const date = new Date();
+        date.setDate(date.getDate() - (29 - i));
+        return date.toISOString().split('T')[0] + 'T00:00:00.000Z';
+      });
+
+      // Personal accounts don't have insights API access
+      insights.reach.daily = last30Days.map(date => ({ date, value: 0 }));
+      insights.impressions.daily = last30Days.map(date => ({ date, value: 0 }));
+      insights.accounts_engaged.daily = last30Days.map(date => ({ date, value: 0 }));
+      insights.total_interactions.daily = last30Days.map(date => ({ date, value: 0 }));
+      insights.online_followers.daily = last30Days.map(date => ({ date, value: 0 }));
       
       insights.isPersonalAccount = true;
-      insights.limitations = "Personal Facebook accounts have limited API access. Insights are estimated based on available data.";
+      insights.limitations = "Personal Facebook accounts do not have access to insights data. To get detailed analytics, consider converting to a Facebook Page or connecting a Facebook Business account.";
     }
 
     return insights;
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error fetching Facebook insights:`, error);
+    console.error(`[${new Date().toISOString()}] Error fetching Facebook insights:`, error.response?.data || error.message);
     
-    // If insights fail, create basic mock data
+    // If everything fails, return zero data with explanation
     const last30Days = Array.from({ length: 30 }, (_, i) => {
       const date = new Date();
       date.setDate(date.getDate() - (29 - i));
       return date.toISOString().split('T')[0] + 'T00:00:00.000Z';
     });
 
-    insights.reach.daily = last30Days.map(date => ({ date, value: Math.floor(Math.random() * 50) + 10 }));
-    insights.impressions.daily = last30Days.map(date => ({ date, value: Math.floor(Math.random() * 100) + 20 }));
-    insights.accounts_engaged.daily = last30Days.map(date => ({ date, value: Math.floor(Math.random() * 15) + 2 }));
-    insights.total_interactions.daily = last30Days.map(date => ({ date, value: Math.floor(Math.random() * 25) + 5 }));
-    insights.online_followers.daily = last30Days.map(date => ({ date, value: Math.floor(Math.random() * 50) + 5 }));
+    insights.reach.daily = last30Days.map(date => ({ date, value: 0 }));
+    insights.impressions.daily = last30Days.map(date => ({ date, value: 0 }));
+    insights.accounts_engaged.daily = last30Days.map(date => ({ date, value: 0 }));
+    insights.total_interactions.daily = last30Days.map(date => ({ date, value: 0 }));
+    insights.online_followers.daily = last30Days.map(date => ({ date, value: 0 }));
 
-    console.log(`[${new Date().toISOString()}] Returned fallback insights for Facebook ${pageId}`);
+    insights.error = true;
+    insights.limitations = "Unable to fetch Facebook insights data. Please check your connection and permissions.";
+    
+    console.log(`[${new Date().toISOString()}] Returned zero insights data for Facebook ${pageId} due to error`);
     return insights;
   }
 }

@@ -12,6 +12,7 @@ import { useInstagram } from '../../context/InstagramContext';
 import { useTwitter } from '../../context/TwitterContext';
 import { useFacebook } from '../../context/FacebookContext';
 import { useLocation } from 'react-router-dom';
+import { schedulePost } from '../../utils/scheduleHelpers';
 
 interface CanvasEditorProps {
   onClose: () => void;
@@ -1077,139 +1078,39 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
     setIsScheduling(true);
     
     try {
-      if (detectedPlatform === 'twitter') {
-        // For Twitter, handle both text and image scheduling
-        const tweetText = caption || postCaption || '';
-        console.log(`[CanvasEditor] Scheduling Twitter post: "${tweetText}"`);
-        
-        if (tweetText.length > 280) {
-          setNotification('Tweet text exceeds 280 characters.');
-          setIsScheduling(false);
-          return;
-        }
-        
-        // Check if there's an image to include
-        let hasImage = false;
-        let imageBlob = null;
-        
-        if (imageLoaded && tuiInstanceRef.current) {
-          try {
-            // Get the canvas image as a data URL
-            const imageDataUrl = tuiInstanceRef.current.toDataURL();
-            imageBlob = await fetch(imageDataUrl).then(r => r.blob());
-            hasImage = true;
-            console.log(`[CanvasEditor] Including image with Twitter post`);
-          } catch (imageError) {
-            console.warn(`[CanvasEditor] Failed to get image for Twitter post:`, imageError);
-            // Continue without image
+      // Get image from canvas if available
+      let imageBlob: Blob | undefined = undefined;
+      
+      if (imageLoaded && tuiInstanceRef.current) {
+        try {
+          const imageDataUrl = tuiInstanceRef.current.toDataURL();
+          imageBlob = await fetch(imageDataUrl).then(r => r.blob());
+          console.log(`[CanvasEditor] Canvas image captured for ${detectedPlatform} scheduling`);
+        } catch (imageError) {
+          console.warn(`[CanvasEditor] Failed to get canvas image:`, imageError);
+          if (detectedPlatform === 'instagram') {
+            throw new Error('Instagram posts require an image');
           }
         }
-        
-        if (hasImage && imageBlob) {
-          // Schedule tweet with image using FormData
-          const formData = new FormData();
-          const filename = postKey ? `twitter_post_${postKey}.jpg` : `twitter_canvas_${Date.now()}.jpg`;
-          formData.append('image', imageBlob, filename);
-          formData.append('text', tweetText.trim());
-          formData.append('scheduled_time', scheduleDate.toISOString());
-          
-          const response = await fetch(`http://localhost:3000/schedule-tweet-with-image/${userId}`, {
-            method: 'POST',
-            body: formData,
-          });
-          
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || 'Failed to schedule tweet with image');
-          }
-          
-          const responseData = await response.json();
-          if (responseData.success) {
-            setNotification('Your tweet with image is scheduled!');
-          } else {
-            setNotification('Failed to schedule tweet: ' + responseData.message);
-          }
-        } else {
-          // Schedule text-only tweet
-          const response = await axios.post(`http://localhost:3000/schedule-tweet/${userId}`, {
-            text: tweetText.trim(),
-            scheduled_time: scheduleDate.toISOString()
-          });
-
-          if (response.data.success) {
-            setNotification('Your tweet is scheduled!');
-          } else {
-            setNotification('Failed to schedule tweet: ' + response.data.message);
-          }
-        }
-      } else if (detectedPlatform === 'facebook') {
-        // Facebook scheduling logic (supports optional images)
-        const facebookCaption = caption || postCaption || '';
-        console.log(`[CanvasEditor] Scheduling Facebook post: "${facebookCaption}"`);
-        
-        const formData = new FormData();
-        formData.append('caption', facebookCaption);
-        formData.append('scheduleDate', scheduleDate.toISOString());
-        formData.append('platform', 'facebook');
-        
-        // Check if there's an image to include
-        let hasImage = false;
-        if (imageLoaded && tuiInstanceRef.current) {
-          try {
-            // Get the canvas image as a data URL
-            const imageDataUrl = tuiInstanceRef.current.toDataURL();
-            const imageBlob = await fetch(imageDataUrl).then(r => r.blob());
-            const filename = postKey ? `facebook_post_${postKey}.jpg` : `facebook_canvas_${Date.now()}.jpg`;
-            formData.append('image', imageBlob, filename);
-            hasImage = true;
-            console.log(`[CanvasEditor] Including image with Facebook post`);
-          } catch (imageError) {
-            console.warn(`[CanvasEditor] Failed to get image for Facebook post:`, imageError);
-            // Continue without image - Facebook supports text-only posts
-          }
-        }
-        
-                 const response = await fetch(`http://localhost:3000/schedule-post/${userId}`, {
-           method: 'POST',
-           body: formData,
-         });
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || 'Failed to schedule Facebook post');
-        }
-        
-        const responseData = await response.json();
-        if (responseData.success) {
-          setNotification(`Your Facebook post is scheduled! ${hasImage ? '(with image)' : '(text-only)'}`);
-        } else {
-          setNotification('Failed to schedule Facebook post: ' + responseData.message);
-        }
-      } else {
-        // Instagram scheduling logic (existing)
-        // Get the canvas image as a data URL
-        const imageDataUrl = tuiInstanceRef.current.toDataURL();
-        const imageBlob = await fetch(imageDataUrl).then(r => r.blob());
-        
-        // Convert to form data for the backend API
-        const formData = new FormData();
-        const filename = postKey ? `post_${postKey}.jpg` : `canvas_${Date.now()}.jpg`;
-        formData.append('image', imageBlob, filename);
-        formData.append('caption', caption || postCaption || '');
-        formData.append('scheduleDate', scheduleDate.toISOString());
-        
-        // Send the scheduled post to the backend
-        const resp = await fetch(`http://localhost:3000/schedule-post/${userId}`, {
-          method: 'POST',
-          body: formData,
-        });
-        
-        if (!resp.ok) {
-          const errData = await resp.json().catch(() => ({}));
-          throw new Error(errData.error || 'Unknown server error');
-        }
-        
-        setNotification('Your post is now scheduled!');
+      } else if (detectedPlatform === 'instagram') {
+        throw new Error('Instagram posts require an image');
+      }
+      
+      // Use smart reusable schedule helper
+      const result = await schedulePost({
+        platform: detectedPlatform,
+        userId,
+        imageBlob,
+        caption: caption || postCaption || '',
+        scheduleTime: scheduleDate,
+        postKey
+      });
+      
+      setNotification(result.message);
+      
+      if (!result.success) {
+        setIsScheduling(false);
+        return;
       }
       
       // Close the scheduler after 2 seconds
@@ -1256,7 +1157,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
       formData.append('platform', detectedPlatform);
       
       // Send to server to update the post
-              const response = await fetch(`http://localhost:3000/api/save-edited-post/${username}`, {
+      const response = await fetch(`http://localhost:3000/api/save-edited-post/${username}`, {
         method: 'POST',
         body: formData,
       });

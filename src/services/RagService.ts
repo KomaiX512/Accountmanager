@@ -223,7 +223,7 @@ class RagService {
   }
   
   /**
-   * Sends a discussion query to the RAG server directly
+   * Sends a discussion query to the RAG server directly with enhanced platform session handling
    */
   static async sendDiscussionQuery(
     username: string, 
@@ -239,40 +239,62 @@ class RagService {
       message: string; 
     } 
   }> {
-    // Create cache key for deduplication (shorter key for performance)
+    // Platform-specific cache key to maintain separate sessions
     const queryHash = btoa(query).substring(0, 10);
-    const cacheKey = `discuss_${username}_${platform}_${queryHash}_${previousMessages.length}`;
+    const cacheKey = `discuss_${platform}_${username}_${queryHash}_${previousMessages.length}`;
     
     return await this.deduplicatedRequest(
       cacheKey,
       async () => {
-    try {
+        try {
           if (this.VERBOSE_LOGGING) {
-      console.log(`[RagService] Sending discussion query for ${platform}/${username}: "${query}"`);
+            console.log(`[RagService] Sending discussion query for ${platform}/${username}: "${query}"`);
           }
-      
-      return await this.tryServerUrls(`/api/discussion`, (url) => 
-        axios.post(url, {
-          username,
-          query,
-          previousMessages,
-          platform
-        }, {
+          
+          // Add platform context to request for better session management
+          return await this.tryServerUrls(`/api/discussion`, (url) => 
+            axios.post(url, {
+              username,
+              query,
+              previousMessages,
+              platform,
+              sessionId: `${platform}_${username}_${Date.now()}`, // Unique session per platform
+              timestamp: new Date().toISOString()
+            }, {
               timeout: 120000, // 2 minute timeout to handle request queuing
-          withCredentials: false, // Disable sending cookies
-          headers: {
-            'Content-Type': 'application/json'
-          }
+              withCredentials: false, // Disable sending cookies
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Platform': platform,
+                'X-Username': username
+              }
             }), this.RAG_SERVER_URLS
-      ).then(response => {
-                    // Completely silent - no logging
-        return response.data;
-      });
-      
-    } catch (error: any) {
-      console.error('[RagService] Discussion query error:', error.response?.data || error.message);
-      throw new Error(error.response?.data?.error || 'Failed to process discussion query');
-    }
+          ).then(response => {
+            if (this.VERBOSE_LOGGING) {
+              console.log(`[RagService] Received response for ${platform}/${username}`);
+            }
+            return response.data;
+          });
+          
+        } catch (error: any) {
+          console.error('[RagService] Discussion query error:', error.response?.data || error.message);
+          
+          // Enhanced error handling for content filtering
+          if (error.response?.data?.error?.includes('content filtering') || 
+              error.response?.data?.error?.includes('Empty response')) {
+            console.log(`[RagService] Content filtering detected, using safe fallback for ${platform}`);
+            return {
+              response: `I'm here to help with your ${platform === 'facebook' ? 'Facebook' : platform === 'twitter' ? 'X (Twitter)' : 'Instagram'} strategy! I'm currently optimizing my responses. Could you try asking about specific topics like content planning, engagement strategies, or growth techniques?`,
+              usedFallback: true,
+              quotaInfo: {
+                exhausted: false,
+                message: "Optimizing responses for better assistance"
+              }
+            };
+          }
+          
+          throw new Error(error.response?.data?.error || 'Failed to process discussion query');
+        }
       },
       false // Don't cache discussion responses as they're context-sensitive
     );

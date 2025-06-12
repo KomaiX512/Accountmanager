@@ -34,7 +34,7 @@ interface PostGenerationResponse {
 
 // Configure axios for CORS requests
 axios.defaults.headers.common['Accept'] = 'application/json';
-axios.defaults.timeout = 15000; // Reduced from 30 seconds to 15 seconds
+axios.defaults.timeout = 90000; // Increased to 90 seconds to handle request queuing
 
 // Extend axios config type to include metadata
 declare module 'axios' {
@@ -46,13 +46,13 @@ declare module 'axios' {
   }
 }
 
-// Add a request interceptor for better error handling
+// Add a request interceptor for better error handling (NO LOGGING)
 axios.interceptors.request.use(
   config => {
-    // Log each request with a request ID to track infinite loops
+    // COMPLETELY DISABLED LOGGING to prevent console spam
+    
     const requestId = Math.random().toString(36).substr(2, 9);
     config.metadata = { requestId, startTime: Date.now() };
-    console.log(`[Axios][${requestId}] Sending ${config.method?.toUpperCase()} request to ${config.url}`);
     
     // Ensure content type is set for all POST requests
     if (config.method === 'post') {
@@ -72,35 +72,36 @@ axios.interceptors.request.use(
     return config;
   },
   error => {
-    console.error('[Axios] Request error:', error);
+    // Only log actual errors
+    console.error('[Axios] Request error:', error?.message || error);
     return Promise.reject(error);
   }
 );
 
-// Add a response interceptor for better error handling
+// Add a response interceptor for better error handling (NO LOGGING)
 axios.interceptors.response.use(
   response => {
-    const requestId = response.config.metadata?.requestId || 'unknown';
-    const duration = Date.now() - (response.config.metadata?.startTime || Date.now());
-    console.log(`[Axios][${requestId}] Received ${response.status} response from ${response.config.url} (${duration}ms)`);
+    // COMPLETELY DISABLED SUCCESS LOGGING to prevent console spam
     return response;
   },
   error => {
+    // Only log critical errors (CORS, timeouts) once per request ID
     const requestId = error.config?.metadata?.requestId || 'unknown';
-    const duration = Date.now() - (error.config?.metadata?.startTime || Date.now());
     
     if (error.code === 'ECONNABORTED') {
-      console.error(`[Axios][${requestId}] Request timeout after ${duration}ms:`, error.message);
-    } else if (error.code === 'ERR_NETWORK') {
-      console.error(`[Axios][${requestId}] Network error after ${duration}ms:`, error.message);
-    } else {
-      console.error(`[Axios][${requestId}] Response error after ${duration}ms:`, error.message);
+      console.error(`[Network] Request timeout: ${error.config?.url}`);
+    } else if (error.code === 'ERR_NETWORK' && !error.config?.url?.includes('logged')) {
+      // Only log network errors once to prevent spam
+      console.error(`[Network] Connection failed: ${error.config?.url}`);
     }
     return Promise.reject(error);
   }
 );
 
 class RagService {
+  // Enable/disable verbose logging (set to false to reduce console spam)
+  private static readonly VERBOSE_LOGGING = false;
+  
   // Accept both localhost and 127.0.0.1 to handle different browser security policies
   // Use port 3001 for RAG server (not port 3000 which is the main server)
   private static readonly RAG_SERVER_URLS = [
@@ -109,34 +110,115 @@ class RagService {
   ];
   
   private static readonly MAIN_SERVER_URLS = [
-    'http://127.0.0.1:3000',  // Main server on port 3000
-    'http://localhost:3000'   // Main server on port 3000
+    'http://127.0.0.1:3002',  // Main server on port 3002 (image proxy server)
+    'http://localhost:3002'   // Main server on port 3002 (image proxy server)
   ];
   
+  // Request deduplication to prevent multiple identical requests
+  private static readonly pendingRequests = new Map<string, Promise<any>>();
+  private static readonly requestCache = new Map<string, { data: any; timestamp: number }>();
+  private static readonly CACHE_DURATION = 30000; // 30 seconds cache
+  
   /**
-   * Try to send a request to one of the server URLs
+   * Deduplicated request handler to prevent multiple identical requests
+   */
+  private static async deduplicatedRequest<T>(
+    cacheKey: string,
+    requestFn: () => Promise<T>,
+    useCache: boolean = true
+  ): Promise<T> {
+    // Check cache first if enabled
+    if (useCache && this.requestCache.has(cacheKey)) {
+      const { data, timestamp } = this.requestCache.get(cacheKey)!;
+      if (Date.now() - timestamp < this.CACHE_DURATION) {
+        if (this.VERBOSE_LOGGING) {
+          console.log(`[RagService] Using cached response for ${cacheKey}`);
+        }
+        return data;
+      }
+      this.requestCache.delete(cacheKey);
+    }
+    
+    // Check if request is already pending
+    if (this.pendingRequests.has(cacheKey)) {
+      if (this.VERBOSE_LOGGING) {
+        console.log(`[RagService] Waiting for pending request: ${cacheKey}`);
+      }
+      return await this.pendingRequests.get(cacheKey)!;
+    }
+    
+    // Create new request
+    const requestPromise = (async () => {
+      try {
+        const result = await requestFn();
+        
+        // Cache the result if enabled
+        if (useCache) {
+          this.requestCache.set(cacheKey, {
+            data: result,
+            timestamp: Date.now()
+          });
+        }
+        
+        return result;
+      } finally {
+        // Clean up pending request
+        this.pendingRequests.delete(cacheKey);
+      }
+    })();
+    
+    // Store pending request
+    this.pendingRequests.set(cacheKey, requestPromise);
+    
+    return await requestPromise;
+  }
+  
+  /**
+   * Try to send a request to one of the server URLs with exponential backoff
    */
   private static async tryServerUrls<T>(
     endpoint: string, 
     requestFn: (url: string) => Promise<T>,
-    serverUrlList: string[] = this.MAIN_SERVER_URLS
+    serverUrlList: string[] = this.MAIN_SERVER_URLS,
+    retries: number = 2
   ): Promise<T> {
-    // Try each URL in order until one works
     let lastError: any = null;
     
     for (const baseUrl of serverUrlList) {
+      for (let attempt = 0; attempt <= retries; attempt++) {
       try {
         const fullUrl = `${baseUrl}${endpoint}`;
-        console.log(`[RagService] Attempting request to ${fullUrl}`);
+          // Completely silent operation - no logging
+          
         return await requestFn(fullUrl);
       } catch (error: any) {
-        console.warn(`[RagService] Failed with ${baseUrl}, trying next URL:`, error.message);
         lastError = error;
+          
+          // Check if this is a network/CORS error that should trigger immediate retry
+          const isNetworkError = error.code === 'ERR_NETWORK' || 
+                                 error.message?.includes('Network Error') ||
+                                 error.message?.includes('CORS');
+          
+          if (isNetworkError && attempt < retries) {
+            const delay = Math.min(1000 * Math.pow(2, attempt), 5000); // Cap at 5 seconds
+            // Silent retry - no logging to prevent spam
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          }
+          
+          // Silent failure - only log if verbose logging is enabled
+          if (this.VERBOSE_LOGGING && attempt === retries) {
+            console.warn(`[RagService] Failed ${endpoint} after ${retries + 1} attempts:`, error.message);
+          }
+          break; // Try next URL
+        }
       }
     }
     
-    // If we get here, all URLs failed
-    console.error('[RagService] All server URLs failed:', lastError);
+    // If we get here, all URLs failed - only log if verbose logging is enabled
+    if (this.VERBOSE_LOGGING) {
+      console.error('[RagService] All servers failed for:', endpoint, lastError?.message);
+    }
     throw lastError;
   }
   
@@ -157,8 +239,17 @@ class RagService {
       message: string; 
     } 
   }> {
+    // Create cache key for deduplication (shorter key for performance)
+    const queryHash = btoa(query).substring(0, 10);
+    const cacheKey = `discuss_${username}_${platform}_${queryHash}_${previousMessages.length}`;
+    
+    return await this.deduplicatedRequest(
+      cacheKey,
+      async () => {
     try {
+          if (this.VERBOSE_LOGGING) {
       console.log(`[RagService] Sending discussion query for ${platform}/${username}: "${query}"`);
+          }
       
       return await this.tryServerUrls(`/api/discussion`, (url) => 
         axios.post(url, {
@@ -167,14 +258,14 @@ class RagService {
           previousMessages,
           platform
         }, {
-          timeout: 20000, // 20 second timeout - reduced for faster fallback
+              timeout: 120000, // 2 minute timeout to handle request queuing
           withCredentials: false, // Disable sending cookies
           headers: {
             'Content-Type': 'application/json'
           }
-        }        ), this.RAG_SERVER_URLS
+            }), this.RAG_SERVER_URLS
       ).then(response => {
-        console.log(`[RagService] Discussion response:`, response.data);
+                    // Completely silent - no logging
         return response.data;
       });
       
@@ -182,6 +273,9 @@ class RagService {
       console.error('[RagService] Discussion query error:', error.response?.data || error.message);
       throw new Error(error.response?.data?.error || 'Failed to process discussion query');
     }
+      },
+      false // Don't cache discussion responses as they're context-sensitive
+    );
   }
   
   /**
@@ -195,10 +289,10 @@ class RagService {
     let lastError: any = null;
     
     try {
+      if (this.VERBOSE_LOGGING) {
       console.log(`[RagService] Starting post generation for ${platform}/${username}: "${query}"`);
-      
-      // Update UI with initial status
       console.log(`[RagService] Step 1/4: Initiating request to RAG server`);
+      }
       
       const response = await this.tryServerUrls(`/api/post-generator`, (url) => 
         axios.post(url, {
@@ -206,7 +300,7 @@ class RagService {
           query,
           platform
         }, {
-          timeout: 60000, // 60 second timeout for image generation
+          timeout: 180000, // 3 minute timeout for image generation + queueing
           withCredentials: false, // Disable sending cookies
           headers: {
             'Content-Type': 'application/json'
@@ -215,7 +309,9 @@ class RagService {
       );
       
       // Process the result
+      if (this.VERBOSE_LOGGING) {
       console.log(`[RagService] Post generation completed successfully`);
+      }
       
       // Format the response for easier use by the UI
       const postData: PostData = {
@@ -236,7 +332,9 @@ class RagService {
           }
         });
         window.dispatchEvent(newPostEvent);
+        if (this.VERBOSE_LOGGING) {
         console.log(`[RagService] Emitted newPostCreated event for ${platform}/${username}`);
+        }
       } catch (eventError) {
         console.warn('[RagService] Failed to emit newPostCreated event:', eventError);
       }
@@ -260,7 +358,9 @@ class RagService {
       // If this is a network error that might happen after the server already started
       // generating the image, we can provide a more optimistic message
       if (isNetworkErrorAfterProcessingStarted) {
+        if (this.VERBOSE_LOGGING) {
         console.log('[RagService] Network error occurred, but the server may still be processing the request');
+        }
         return {
           success: false,
           error: 'Connection interrupted, but the post may still be processing. Please check the Posts section.',
@@ -384,7 +484,9 @@ class RagService {
 
     for (const baseUrl of urls) {
       try {
+        if (this.VERBOSE_LOGGING) {
         console.log(`[RagService] Trying to send instant ${platform} AI reply via ${baseUrl}/rag-instant-reply/${username}`);
+        }
         
         // Add validation headers to ensure the request is properly handled
         const response = await axios.post(
@@ -405,7 +507,9 @@ class RagService {
         }
 
         // Log successful response
+        if (this.VERBOSE_LOGGING) {
         console.log(`[RagService] Successfully received ${platform} response from ${baseUrl}`);
+        }
         return response.data;
       } catch (error: any) {
         console.error(`[RagService] Failed with ${baseUrl}, trying next URL:`, error.message || 'Unknown error');

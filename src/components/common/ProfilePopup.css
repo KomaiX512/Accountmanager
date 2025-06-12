@@ -507,24 +507,54 @@
   font-size: 0.9rem;
 }
 
+/* Disconnect Instagram button styling */
 .disconnect-instagram-button {
-  background-color: #d13535;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #e4405f, #c13584);
   color: white;
   border: none;
-  padding: 10px 16px;
-  border-radius: 4px;
+  border-radius: 8px;
   cursor: pointer;
-  font-weight: 500;
-  transition: background-color 0.2s ease;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 10px rgba(228, 64, 95, 0.3);
 }
 
 .disconnect-instagram-button:hover {
-  background-color: #e74c4c;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(228, 64, 95, 0.4);
 }
 
 .disconnect-instagram-button:disabled {
-  background-color: #5a3636;
+  opacity: 0.6;
   cursor: not-allowed;
+  transform: none;
+}
+
+/* Platform-agnostic disconnect button styling */
+.disconnect-platform-button {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #e4405f, #c13584);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 10px rgba(228, 64, 95, 0.3);
+}
+
+.disconnect-platform-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(228, 64, 95, 0.4);
+}
+
+.disconnect-platform-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .toast-message {

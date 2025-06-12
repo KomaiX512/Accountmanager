@@ -5,13 +5,18 @@ import axios from 'axios';
 import ErrorBoundary from '../ErrorBoundary';
 import { useAuth } from '../../context/AuthContext';
 import { disconnectInstagramAccount, isInstagramConnected } from '../../utils/instagramSessionManager';
+import { disconnectFacebookAccount, isFacebookConnected } from '../../utils/facebookSessionManager';
+import { disconnectTwitterAccount, isTwitterConnected } from '../../utils/twitterSessionManager';
+import { useFacebook } from '../../context/FacebookContext';
+import { useTwitter } from '../../context/TwitterContext';
 
 interface ProfilePopupProps {
   username: string;
   onClose: () => void;
+  platform?: 'instagram' | 'twitter' | 'facebook';
 }
 
-const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose }) => {
+const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose, platform = 'instagram' }) => {
   const [activeTab, setActiveTab] = useState<'Rules' | 'Billing Method' | 'Name' | 'Account'>('Rules');
   const [rules, setRules] = useState<string | null>(null);
   const [savedRules, setSavedRules] = useState<string | null>(null);
@@ -21,8 +26,19 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose }) => {
   const [isEditingRules, setIsEditingRules] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const maxRulesLength = 1000;
+  
+  // Platform-specific connection states
   const [isConnectedToInstagram, setIsConnectedToInstagram] = useState(false);
+  const [isConnectedToFacebook, setIsConnectedToFacebook] = useState(false);
+  const [isConnectedToTwitter, setIsConnectedToTwitter] = useState(false);
   const { currentUser } = useAuth();
+  const { isConnected: isFacebookConnectedContext, disconnectFacebook } = useFacebook();
+  const { isConnected: isTwitterConnectedContext, disconnectTwitter } = useTwitter();
+
+  // Get platform display name
+  const platformName = platform === 'twitter' ? 'X (Twitter)' : 
+                      platform === 'facebook' ? 'Facebook' : 
+                      'Instagram';
 
   useEffect(() => {
     if (activeTab === 'Rules') {
@@ -30,7 +46,8 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose }) => {
         setIsLoading(true);
         setError(null);
         try {
-          const response = await axios.get(`http://localhost:3000/rules/${username}`);
+          // Make platform-aware request to server
+          const response = await axios.get(`http://localhost:3000/rules/${username}?platform=${platform}`);
           setRules(response.data.rules || '');
           setSavedRules(response.data.rules || '');
           setIsEditingRules(false);
@@ -53,7 +70,7 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose }) => {
       };
       fetchRules();
     }
-  }, [activeTab, username]);
+  }, [activeTab, username, platform]);
 
   useEffect(() => {
     if (toastMessage) {
@@ -62,13 +79,25 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose }) => {
     }
   }, [toastMessage]);
 
-  // Check if Instagram is connected on component mount
+  // Check platform-specific connection status using session managers for consistency
   useEffect(() => {
     if (currentUser?.uid) {
-      const connected = isInstagramConnected(currentUser.uid);
-      setIsConnectedToInstagram(connected);
+      if (platform === 'instagram') {
+        const connected = isInstagramConnected(currentUser.uid);
+        setIsConnectedToInstagram(connected);
+      } else if (platform === 'facebook') {
+        // Use both session manager and context for consistency
+        const connectedSession = isFacebookConnected(currentUser.uid);
+        const connectedContext = isFacebookConnectedContext;
+        setIsConnectedToFacebook(connectedSession || connectedContext);
+      } else if (platform === 'twitter') {
+        // Use both session manager and context for consistency
+        const connectedSession = isTwitterConnected(currentUser.uid);
+        const connectedContext = isTwitterConnectedContext;
+        setIsConnectedToTwitter(connectedSession || connectedContext);
+      }
     }
-  }, [currentUser]);
+  }, [currentUser, platform, isFacebookConnectedContext, isTwitterConnectedContext]);
 
   const handleSubmitRules = async () => {
     if (!rules?.trim()) {
@@ -79,11 +108,12 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose }) => {
     setIsLoading(true);
     setError(null);
     try {
-      await axios.post(`http://localhost:3000/rules/${username}`, { rules });
+      // Make platform-aware request to server
+      await axios.post(`http://localhost:3000/rules/${username}?platform=${platform}`, { rules });
       setSavedRules(rules);
       setIsEditingRules(false);
       setShowPreview(true);
-      setToastMessage('Rules saved successfully!');
+      setToastMessage(`${platformName} rules saved successfully!`);
     } catch (err) {
       setError('Failed to save rules.');
     } finally {
@@ -110,8 +140,8 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose }) => {
 
   const isDirty = rules !== savedRules;
 
-  // Handle Instagram disconnect
-  const handleDisconnectInstagram = async () => {
+  // Handle platform-specific disconnection using session managers
+  const handleDisconnectPlatform = async () => {
     if (!currentUser?.uid) {
       setError('No authenticated user found');
       return;
@@ -121,21 +151,53 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose }) => {
     setError(null);
     
     try {
-      await disconnectInstagramAccount(currentUser.uid);
-      setToastMessage('Instagram account disconnected successfully!');
-      setIsConnectedToInstagram(false);
+      if (platform === 'instagram') {
+        await disconnectInstagramAccount(currentUser.uid);
+        setToastMessage('Instagram account disconnected successfully!');
+        setIsConnectedToInstagram(false);
+      } else if (platform === 'facebook') {
+        // Use session manager for consistency
+        await disconnectFacebookAccount(currentUser.uid);
+        // Also call context disconnect for UI updates
+        disconnectFacebook();
+        setToastMessage('Facebook account disconnected successfully!');
+        setIsConnectedToFacebook(false);
+      } else if (platform === 'twitter') {
+        // Use session manager for consistency
+        await disconnectTwitterAccount(currentUser.uid);
+        // Also call context disconnect for UI updates
+        disconnectTwitter();
+        setToastMessage('X (Twitter) account disconnected successfully!');
+        setIsConnectedToTwitter(false);
+      }
       
       // Refresh the page after a brief delay to update the UI
       setTimeout(() => {
         window.location.reload();
       }, 1500);
     } catch (error: any) {
-      console.error('Error disconnecting Instagram:', error);
-      setError('Failed to disconnect Instagram account');
+      console.error(`Error disconnecting ${platformName}:`, error);
+      setError(`Failed to disconnect ${platformName} account`);
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Get current platform connection status
+  const getCurrentPlatformConnectionStatus = () => {
+    switch (platform) {
+      case 'instagram':
+        return isConnectedToInstagram;
+      case 'facebook':
+        return isConnectedToFacebook;
+      case 'twitter':
+        return isConnectedToTwitter;
+      default:
+        return false;
+    }
+  };
+
+  const isConnectedToPlatform = getCurrentPlatformConnectionStatus();
 
   return (
     <ErrorBoundary>
@@ -198,7 +260,7 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose }) => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.4 }}
                 >
-                  <h3>Manager Rules for {username}</h3>
+                  <h3>{platformName} Manager Rules for {username}</h3>
                   {rules && rules.trim() && !isEditingRules && (
                     <motion.button
                       className="edit-rules-button"
@@ -220,7 +282,7 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose }) => {
                     transition={{ duration: 0.5 }}
                   >
                     <p className="no-rules-text">
-                      No rules set yet. Define how your manager should operate!
+                      No {platformName} rules set yet. Define how your manager should operate on {platformName}!
                     </p>
                     <motion.button
                       className="add-rules-button"
@@ -228,7 +290,7 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose }) => {
                       whileTap={{ scale: 0.95 }}
                       onClick={handleAddOrEditRules}
                     >
-                      Add Rules
+                      Add {platformName} Rules
                     </motion.button>
                   </motion.div>
                 ) : isEditingRules ? (
@@ -242,7 +304,7 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose }) => {
                       <textarea
                         value={rules || ''}
                         onChange={(e) => setRules(e.target.value)}
-                        placeholder="Enter rules for manager behavior (e.g., What things should not discussed in DM with anyone and tone etc.)..."
+                        placeholder={`Enter rules for ${platformName} manager behavior (e.g., What things should not be discussed in DMs, tone, content guidelines, etc.)...`}
                         className="rules-textarea"
                         maxLength={maxRulesLength}
                       />
@@ -259,7 +321,7 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose }) => {
                         onClick={handleSubmitRules}
                         disabled={isLoading || !rules?.trim() || !isDirty}
                       >
-                        {isLoading ? 'Saving...' : 'Save Rules'}
+                        {isLoading ? 'Saving...' : `Save ${platformName} Rules`}
                       </motion.button>
                       <motion.button
                         className="clear-button"
@@ -333,27 +395,27 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose }) => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.4 }}
                 >
-                  <h3>Account Settings for {username}</h3>
+                  <h3>{platformName} Account Settings for {username}</h3>
                 </motion.div>
                 
                 <div className="account-options">
                   <div className="account-option">
-                    <h4>Instagram Connection</h4>
-                    {isConnectedToInstagram ? (
+                    <h4>{platformName} Connection</h4>
+                    {isConnectedToPlatform ? (
                       <>
-                        <p>Your Instagram account is connected. You can disconnect it at any time.</p>
+                        <p>Your {platformName} account is connected. You can disconnect it at any time.</p>
                         <motion.button
-                          className="disconnect-instagram-button"
+                          className="disconnect-platform-button"
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
-                          onClick={handleDisconnectInstagram}
+                          onClick={handleDisconnectPlatform}
                           disabled={isLoading}
                         >
-                          {isLoading ? 'Disconnecting...' : 'Disconnect Instagram'}
+                          {isLoading ? 'Disconnecting...' : `Disconnect ${platformName}`}
                         </motion.button>
                       </>
                     ) : (
-                      <p>No Instagram account connected. You can connect your Instagram account from the dashboard.</p>
+                      <p>No {platformName} account connected. You can connect your {platformName} account from the dashboard.</p>
                     )}
                   </div>
                 </div>

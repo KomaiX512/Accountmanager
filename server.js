@@ -988,7 +988,17 @@ app.options('/api/r2-image/:username/:imageKey', (req, res) => {
 });
 
 // Get posts for a user - essential for PostCooked module refresh
+// Add both /posts/ and /api/posts/ for compatibility
+app.get('/posts/:username', async (req, res) => {
+  return handlePostsEndpoint(req, res);
+});
+
 app.get('/api/posts/:username', async (req, res) => {
+  return handlePostsEndpoint(req, res);
+});
+
+// Combined handler for posts endpoint
+async function handlePostsEndpoint(req, res) {
   const { username } = req.params;
   const platform = req.query.platform || 'instagram';
   const forceRefresh = req.query.forceRefresh === 'true';
@@ -1134,7 +1144,7 @@ app.get('/api/posts/:username', async (req, res) => {
       details: error.message 
     });
   }
-});
+}
 
 // Configure multer for memory storage
 const upload = multer({ 

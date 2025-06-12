@@ -85,7 +85,11 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
         ))}
       </div>
       {showProfilePopup && (
-        <ProfilePopup username={accountHolder} onClose={() => setShowProfilePopup(false)} />
+        <ProfilePopup 
+          username={accountHolder} 
+          onClose={() => setShowProfilePopup(false)} 
+          platform={platform}
+        />
       )}
       {showMessagesPopup && (
         <MessagesPopup

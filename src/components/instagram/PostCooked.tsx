@@ -113,9 +113,12 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   const [postDialogOpen, setPostDialogOpen] = useState(false);
   const [dialogPostKey, setDialogPostKey] = useState<string | null>(null);
   const [interval, setInterval] = useState<number>(180);
+  const [showPostNowModal, setShowPostNowModal] = useState(false);
+  const [selectedPostForPosting, setSelectedPostForPosting] = useState<any>(null);
+  const [isPosting, setIsPosting] = useState(false);
 
   // Viewed posts tracking with localStorage persistence 
-  const getViewedStorageKey = () => `viewed_posts_${platform}_${username}`;
+  const getViewedStorageKey = () => `${platform}_viewed_posts_${username}`;
   
   const [viewedPosts, setViewedPosts] = useState<Set<string>>(() => {
     const stored = localStorage.getItem(getViewedStorageKey());
@@ -1243,6 +1246,119 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     }
   };
 
+  const handlePostNow = (post: any) => {
+    if (!isConnected || !userId) {
+      setToastMessage('Please connect your Instagram account first.');
+      return;
+    }
+    
+    setSelectedPostForPosting(post);
+    setShowPostNowModal(true);
+  };
+
+  const handleConfirmPostNow = async () => {
+    if (!selectedPostForPosting || !userId) return;
+    
+    setIsPosting(true);
+    
+    try {
+      const post = selectedPostForPosting;
+      const caption = post.data.post?.caption || '';
+      
+      // Get image blob with fresh signed URL and robust error handling
+      let imageBlob: Blob | null = null;
+      if (post.data.image_url) {
+        try {
+          // Use direct R2 endpoint instead of signed URLs for reliability
+          let imageUrl = post.data.image_url;
+          
+          if (imageUrl.includes('X-Amz-Signature') && imageUrl.includes('r2.cloudflarestorage.com')) {
+            // This is a signed R2 URL, convert to direct R2 endpoint
+            const pathMatch = imageUrl.match(/ready_post\/instagram\/([^\/]+)\/([^?]+)/);
+            if (pathMatch) {
+              const [, username, imageKey] = pathMatch;
+              imageUrl = `${API_BASE_URL}/api/r2-image/${username}/${imageKey}?platform=instagram`;
+              console.log(`[PostNow] Using direct R2 endpoint for ${imageKey}`);
+            }
+          }
+          
+          const proxyUrl = `${API_BASE_URL}/api/proxy-image?url=${encodeURIComponent(imageUrl)}`;
+          const imgRes = await fetch(proxyUrl);
+          
+          // Check if response is actually an image
+          const contentType = imgRes.headers.get('content-type') || '';
+          if (!imgRes.ok || !contentType.startsWith('image/')) {
+            // Try to get error details if it's JSON
+            let errorMsg = `Failed to fetch image via proxy (${imgRes.status})`;
+            try {
+              const errorData = await imgRes.json();
+              errorMsg = errorData.error || errorMsg;
+            } catch (e) {
+              // Not JSON, check if it's a common error
+              if (imgRes.status === 403) {
+                errorMsg = 'Image URL expired or access denied';
+              } else if (imgRes.status === 404) {
+                errorMsg = 'Image not found';
+              }
+            }
+            throw new Error(errorMsg);
+          }
+          
+          imageBlob = await imgRes.blob();
+          console.log(`[PostNow] Successfully fetched image blob: ${imageBlob.size} bytes, type: ${imageBlob.type}`);
+        } catch (imgErr: any) {
+          console.error('Failed to fetch image for posting:', imgErr);
+          setToastMessage(`Failed to fetch image: ${imgErr.message || 'Unknown error'}`);
+          setIsPosting(false);
+          return;
+        }
+      }
+      
+      if (!imageBlob) {
+        setToastMessage('No image found for this post.');
+        setIsPosting(false);
+        return;
+      }
+      
+      const formData = new FormData();
+      formData.append('image', imageBlob, 'post_image.jpg');
+      formData.append('caption', caption);
+      
+      console.log(`[PostNow] Posting to Instagram for user ${userId}`);
+      
+      const response = await fetch(`${API_BASE_URL}/post-instagram-now/${userId}`, {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('[PostNow] Failed to post:', errorData);
+        setToastMessage(`Failed to post: ${errorData.error || 'Unknown error'}`);
+      } else {
+        const resultData = await response.json();
+        console.log('[PostNow] Posted successfully:', resultData);
+        setToastMessage('🎉 Posted to Instagram successfully!');
+        
+        // Update post status to posted (visual feedback)
+        setLocalPosts(prev => 
+          prev.map(p => 
+            p.key === selectedPostForPosting.key 
+              ? { ...p, data: { ...p.data, status: 'posted' } }
+              : p
+          )
+        );
+      }
+    } catch (error: any) {
+      console.error('[PostNow] Error posting:', error);
+      setToastMessage(`Error posting: ${error.message}`);
+    } finally {
+      setIsPosting(false);
+      setShowPostNowModal(false);
+      setSelectedPostForPosting(null);
+    }
+  };
+
   if (!username) {
     return (
       <ErrorBoundary>
@@ -1705,6 +1821,44 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                       </svg>
                       Edit
                     </motion.button>
+                    {platform === 'instagram' && isConnected && (
+                      <motion.button
+                        className="post-now-button"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => handlePostNow(post)}
+                        style={{
+                          background: 'linear-gradient(45deg, #405DE6, #5851DB, #833AB4, #C13584, #E1306C, #FD1D1D)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '8px',
+                          padding: '8px 16px',
+                          fontSize: '12px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          marginLeft: '8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <line x1="22" y1="2" x2="11" y2="13"></line>
+                          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                        Post Now
+                      </motion.button>
+                    )}
                     <motion.button
                       className="reject-button"
                       whileHover={{ scale: 1.02 }}
@@ -1869,6 +2023,92 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
               <path d="M20 6L9 17l-5-5" />
             </svg>
             {toastMessage}
+          </motion.div>
+        )}
+        
+        {/* Post Now Confirmation Modal */}
+        {showPostNowModal && selectedPostForPosting && (
+          <motion.div
+            className="modal-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setShowPostNowModal(false)}
+          >
+            <motion.div
+              className="modal-content"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+                border: '1px solid #00ffcc',
+                borderRadius: '16px',
+                padding: '24px',
+                maxWidth: '500px',
+                width: '90%',
+                position: 'relative'
+              }}
+            >
+              <h3 style={{ color: '#00ffcc', marginBottom: '16px', textAlign: 'center' }}>
+                🚀 Post to Instagram Now?
+              </h3>
+              
+              <div style={{ marginBottom: '16px', textAlign: 'center', color: '#e0e0ff' }}>
+                <p>This will immediately post to your connected Instagram account:</p>
+                <div style={{
+                  background: 'rgba(0, 255, 204, 0.1)',
+                  border: '1px solid rgba(0, 255, 204, 0.3)',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  margin: '12px 0',
+                  maxHeight: '100px',
+                  overflow: 'auto'
+                }}>
+                  <strong>Caption:</strong> {selectedPostForPosting.data.post?.caption || 'No caption'}
+                </div>
+                <p style={{ fontSize: '14px', color: '#888' }}>
+                  ⚠️ This action cannot be undone. The post will be live on Instagram.
+                </p>
+              </div>
+              
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                <button
+                  onClick={() => setShowPostNowModal(false)}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid #666',
+                    color: '#e0e0ff',
+                    padding: '10px 20px',
+                    borderRadius: '8px',
+                    cursor: 'pointer'
+                  }}
+                  disabled={isPosting}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmPostNow}
+                  disabled={isPosting}
+                  style={{
+                    background: isPosting 
+                      ? 'linear-gradient(45deg, #666, #777)' 
+                      : 'linear-gradient(45deg, #405DE6, #5851DB, #833AB4, #C13584, #E1306C, #FD1D1D)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '10px 20px',
+                    borderRadius: '8px',
+                    cursor: isPosting ? 'not-allowed' : 'pointer',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  {isPosting ? '🔄 Posting...' : '📤 Yes, Post Now!'}
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </div>

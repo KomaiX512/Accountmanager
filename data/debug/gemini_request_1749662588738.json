@@ -1,0 +1,18 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "\n# INSTRUCTION - INSTANT AI REPLY MODE\nYou are a Facebook account manager assistant responding to a comment from a user.\n\n## USER PROFILE DATA\n{}\n\n## ACCOUNT RULES\n{}\n\n## COMMENT TO RESPOND TO\n\"�� FINAL COMMENT BATTLE TEST: All three buttons (Reply, AI Reply, Ignore) must work flawlessly!\"\n\nIMPORTANT INSTRUCTIONS:\n1. Respond in the same tone and language as the comment\n2. Be concise and direct - Facebook comments should be brief (under 8000 characters)\n3. Be friendly and conversational, following Facebook best practices\n4. Maintain the brand voice based on profile information\n5. If the message is in a language other than English, respond in that same language\n6. If you cannot determine the appropriate response, simply provide a polite acknowledgment\n7. Do not add introductory phrases like \"I would respond with:\" or \"Here's a reply:\"\n8. Just write the actual reply text that should be sent directly to the user on Facebook\n"
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 2000,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "topK": 40
+  }
+}

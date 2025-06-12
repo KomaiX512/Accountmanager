@@ -1,0 +1,17 @@
+{
+  "username": "Sentient ai",
+  "platform": "facebook",
+  "timestamp": "2025-06-11T17:23:40.210Z",
+  "notification": {
+    "type": "comment",
+    "text": "🔥 ULTIMATE COMMENT: All three buttons must be functional!",
+    "platform": "facebook",
+    "sender_id": "ai_generated",
+    "comment_id": "ultimate_comment_battle_001",
+    "timestamp": 1749662619973,
+    "received_at": "2025-06-11T17:23:39.973Z",
+    "status": "pending"
+  },
+  "reply": "Got it! Thanks for the heads up! 👍\n",
+  "mode": "instant"
+}

@@ -3,7 +3,8 @@ import { useAuth } from './AuthContext';
 import { 
   getInstagramConnection, 
   isInstagramConnected, 
-  isInstagramDisconnected 
+  isInstagramDisconnected,
+  syncInstagramConnection
 } from '../utils/instagramSessionManager';
 
 interface InstagramContextType {
@@ -56,7 +57,15 @@ export const InstagramProvider: React.FC<InstagramProviderProps> = ({ children }
         return;
       }
 
-      // Check if Instagram is connected
+      // Sync with backend to ensure connection is available for API calls
+      try {
+        await syncInstagramConnection(currentUser.uid);
+        console.log(`[${new Date().toISOString()}] Instagram connection sync completed for user ${currentUser.uid}`);
+      } catch (error) {
+        console.error(`[${new Date().toISOString()}] Error syncing Instagram connection:`, error);
+      }
+
+      // Check if Instagram is connected (after sync)
       const connected = isInstagramConnected(currentUser.uid);
       setIsConnected(connected);
 

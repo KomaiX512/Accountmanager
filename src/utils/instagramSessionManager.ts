@@ -321,7 +321,7 @@ export const syncInstagramConnection = async (authUserId: string): Promise<void>
     // First check local storage
     const localConnection = getInstagramConnection(authUserId);
     
-    // Then check backend
+    // Then check backend connection metadata
     try {
       const response = await axios.get(`http://localhost:3000/instagram-connection/${authUserId}`);
       const backendConnection = response.data;
@@ -354,6 +354,23 @@ export const syncInstagramConnection = async (authUserId: string): Promise<void>
           console.log(`[${new Date().toISOString()}] User has disconnected Instagram, not updating local storage`);
         }
       }
+
+      // Verify that the backend also has token data for API calls
+      if (backendConnection.instagram_graph_id) {
+        try {
+          const tokenCheckResponse = await axios.get(`http://localhost:3000/instagram-token-check/${backendConnection.instagram_graph_id}`);
+          if (tokenCheckResponse.status === 200) {
+            console.log(`[${new Date().toISOString()}] Verified Instagram token exists for graph ID ${backendConnection.instagram_graph_id}`);
+          }
+        } catch (tokenError: any) {
+          if (tokenError.response?.status === 404) {
+            console.warn(`[${new Date().toISOString()}] Instagram connection exists but no token found for graph ID ${backendConnection.instagram_graph_id}. User may need to reconnect.`);
+          } else {
+            console.error(`[${new Date().toISOString()}] Error checking Instagram token:`, tokenError);
+          }
+        }
+      }
+      
     } catch (error: any) {
       // 404 is expected if no connection exists in backend
       if (error.response?.status !== 404) {

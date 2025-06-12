@@ -210,50 +210,66 @@
   position: fixed;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(8px);
-  z-index: 2000;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.8);
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 20px;
+  z-index: 99999;
+  backdrop-filter: blur(5px);
+  overflow-y: auto;
 }
 
 .modal-content {
-  background: linear-gradient(135deg, #1a1a3a, #2e2e5e);
-  border-radius: 16px;
-  padding: 24px;
-  width: 100%;
-  max-width: 700px;
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 255, 204, 0.3);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
+  color: #ffffff;
+  width: 90%;
+  max-width: 600px;
   max-height: 90vh;
   overflow-y: auto;
-  border: 1px solid rgba(0, 255, 204, 0.4);
-  box-shadow: 0 10px 40px rgba(0, 255, 204, 0.3);
-  color: #e0e0ff;
   position: relative;
-  animation: modalAppear 0.3s ease-out;
+  margin: 1rem;
 }
 
-@keyframes modalAppear {
-  from {
-    opacity: 0;
-    transform: scale(0.9) translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem 1rem 2rem;
+  border-bottom: 1px solid rgba(0, 255, 204, 0.2);
+  margin-bottom: 1rem;
 }
 
-.modal-content h3 {
-  margin: 0 0 20px 0;
+.modal-header h3 {
+  margin: 0;
   color: #00ffcc;
-  text-align: center;
-  font-size: 1.4rem;
-  font-weight: 600;
-  text-shadow: 0 0 8px rgba(0, 255, 204, 0.5);
+  font-size: 1.5rem;
+}
+
+.modal-close-btn {
+  background: none;
+  border: none;
+  color: #ffffff;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 50%;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.modal-close-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #ff6b6b;
 }
 
 .modal-content h4 {
@@ -265,69 +281,155 @@
 
 /* Platform selection */
 .platform-selection {
+  padding: 0 2rem;
   margin-bottom: 1.5rem;
+}
+
+.connected-platforms-section,
+.disconnected-platforms-section {
+  margin-bottom: 1rem;
+}
+
+.section-title {
+  margin-bottom: 0.8rem;
+  padding: 0.5rem 0;
   border-bottom: 1px solid rgba(0, 255, 204, 0.2);
-  padding-bottom: 1.5rem;
+}
+
+.section-title .status-indicator {
+  font-size: 0.9rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.section-title .status-indicator.connected {
+  color: #00ffcc;
+}
+
+.section-title .status-indicator.disconnected {
+  color: #ffaa00;
 }
 
 .platform-checkboxes {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.platform-checkboxes.disabled .platform-checkbox {
+  opacity: 0.6;
+  cursor: pointer;
 }
 
 .platform-checkbox {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
-  padding: 8px 12px;
+  padding: 1rem;
+  border-radius: 12px;
+  border: 2px solid rgba(0, 255, 204, 0.3);
+  background: rgba(0, 255, 204, 0.05);
   cursor: pointer;
   transition: all 0.15s ease;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  min-width: 140px;
+  text-align: center;
 }
 
 .platform-checkbox:hover {
-  background: rgba(255, 255, 255, 0.08);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  border-color: rgba(0, 255, 204, 0.6);
+  background: rgba(0, 255, 204, 0.1);
 }
 
 .platform-checkbox:active {
   transform: translateY(0);
-  transition: all 0.05s ease;
 }
 
 .platform-checkbox.selected {
-  background: rgba(0, 255, 204, 0.1);
-  border-color: rgba(0, 255, 204, 0.4);
+  border-color: #00ffcc;
+  background: rgba(0, 255, 204, 0.15);
+  box-shadow: 0 0 15px rgba(0, 255, 204, 0.3);
+}
+
+.platform-checkbox.disabled {
+  border-color: rgba(255, 170, 0, 0.3);
+  background: rgba(255, 170, 0, 0.05);
+}
+
+.platform-checkbox.disabled:hover {
+  border-color: rgba(255, 170, 0, 0.6);
+  background: rgba(255, 170, 0, 0.1);
 }
 
 .platform-checkbox img {
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  margin-bottom: 0.5rem;
 }
 
 .platform-checkbox span {
-  font-size: 0.9rem;
+  font-weight: 500;
   color: #e0e0ff;
+  margin-bottom: 0.3rem;
+}
+
+.platform-requirements {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-bottom: 0.5rem;
+  min-height: 2rem;
+}
+
+.platform-requirements .requirement {
+  font-size: 0.75rem;
+  color: #ffaa00;
+  background: rgba(255, 170, 0, 0.1);
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 170, 0, 0.3);
+}
+
+.platform-requirements .char-limit {
+  font-size: 0.75rem;
+  color: #a0a0cc;
+  background: rgba(160, 160, 204, 0.1);
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+}
+
+.connect-hint {
+  font-size: 0.75rem;
+  color: #ffaa00;
+  background: rgba(255, 170, 0, 0.1);
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 170, 0, 0.3);
+  margin-top: 0.3rem;
 }
 
 .checkbox-indicator {
-  width: 18px;
-  height: 18px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0, 255, 204, 0.2);
+  border: 2px solid #00ffcc;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-left: auto;
 }
 
 .checkbox-indicator svg {
-  width: 16px;
-  height: 16px;
+  width: 12px;
+  height: 12px;
   fill: #00ffcc;
 }
 
@@ -377,6 +479,7 @@
 
 /* Post content section */
 .post-content-section {
+  padding: 0 2rem;
   margin-bottom: 1.5rem;
 }
 
@@ -411,6 +514,7 @@
 
 /* Image upload section */
 .image-upload-section {
+  padding: 0 2rem;
   margin-bottom: 1.5rem;
 }
 
@@ -496,6 +600,9 @@
 }
 
 .modal-buttons {
+  padding: 1rem 2rem 2rem 2rem;
+  border-top: 1px solid rgba(0, 255, 204, 0.2);
+  margin-top: 1rem;
   display: flex;
   justify-content: flex-end;
   gap: 1rem;
@@ -1023,6 +1130,7 @@
 
 /* Schedule section */
 .schedule-section {
+  padding: 0 2rem;
   margin-bottom: 1.5rem;
   border-bottom: 1px solid rgba(0, 255, 204, 0.2);
   padding-bottom: 1.5rem;

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './TwitterConnect.css';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
+import { useTwitter } from '../../context/TwitterContext';
 
 interface TwitterConnectProps {
   onConnected?: (twitterId: string, username: string) => void;
@@ -13,6 +14,7 @@ const TwitterConnect: React.FC<TwitterConnectProps> = ({ onConnected, className 
   const [isConnected, setIsConnected] = useState(false);
   const [twitterUsername, setTwitterUsername] = useState<string>('');
   const { currentUser } = useAuth();
+  const { connectTwitter, refreshConnection } = useTwitter();
   const isStoringConnectionRef = useRef(false);
   const connectionDataRef = useRef<{ twitter_user_id: string; username?: string } | null>(null);
   
@@ -65,6 +67,9 @@ const TwitterConnect: React.FC<TwitterConnectProps> = ({ onConnected, className 
             setTwitterUsername(event.data.username);
             setIsConnecting(false);
             
+            // Update Twitter context
+            connectTwitter(event.data.userId, event.data.username);
+            
             if (onConnected) {
               onConnected(event.data.userId, event.data.username);
             }
@@ -81,6 +86,9 @@ const TwitterConnect: React.FC<TwitterConnectProps> = ({ onConnected, className 
           setIsConnected(true);
           setTwitterUsername(event.data.username);
           setIsConnecting(false);
+          
+          // Update Twitter context
+          connectTwitter(event.data.userId, event.data.username);
           
           if (onConnected) {
             onConnected(event.data.userId, event.data.username);

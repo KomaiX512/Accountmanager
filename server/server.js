@@ -2616,6 +2616,29 @@ app.get('/events-list/:userId', async (req, res) => {
   }
 });
 
+// Instagram notification helper functions
+async function fetchInstagramDMs(userId) {
+  try {
+    // TODO: Implement actual Instagram API calls
+    // For now, return empty array to prevent crashes (reduced logging)
+    return [];
+  } catch (error) {
+    console.error('Error fetching Instagram DMs:', error);
+    return [];
+  }
+}
+
+async function fetchInstagramComments(userId) {
+  try {
+    // TODO: Implement actual Instagram API calls
+    // For now, return empty array to prevent crashes (reduced logging)
+    return [];
+  } catch (error) {
+    console.error('Error fetching Instagram comments:', error);
+    return [];
+  }
+}
+
 async function fetchInstagramNotifications(userId) {
   try {
     // Fetch Instagram DMs
@@ -2706,9 +2729,8 @@ async function fetchTwitterNotifications(userId) {
 // Twitter notification helper functions (placeholder implementations)
 async function fetchTwitterDMs(userId) {
   try {
-    console.log(`[${new Date().toISOString()}] Fetching Twitter DMs for user ${userId}`);
     // TODO: Implement actual Twitter API calls
-    // For now, return empty array to prevent crashes
+    // For now, return empty array to prevent crashes (reduced logging)
     return [];
   } catch (error) {
     console.error('Error fetching Twitter DMs:', error);
@@ -2718,9 +2740,8 @@ async function fetchTwitterDMs(userId) {
 
 async function fetchTwitterMentions(userId) {
   try {
-    console.log(`[${new Date().toISOString()}] Fetching Twitter mentions for user ${userId}`);
     // TODO: Implement actual Twitter API calls
-    // For now, return empty array to prevent crashes
+    // For now, return empty array to prevent crashes (reduced logging)
     return [];
   } catch (error) {
     console.error('Error fetching Twitter mentions:', error);
@@ -2730,10 +2751,8 @@ async function fetchTwitterMentions(userId) {
 
 async function sendTwitterDMReply(userId, senderId, text, messageId) {
   try {
-    console.log(`[${new Date().toISOString()}] Sending Twitter DM reply from ${userId} to ${senderId}: ${text}`);
     // TODO: Implement actual Twitter API calls
-    // For now, just log the action
-    console.log(`[${new Date().toISOString()}] Twitter DM reply would be sent (placeholder implementation)`);
+    // For now, just return success (reduced logging)
     return { success: true, message: 'Twitter DM reply sent (placeholder)' };
   } catch (error) {
     console.error('Error sending Twitter DM reply:', error);
@@ -2743,10 +2762,8 @@ async function sendTwitterDMReply(userId, senderId, text, messageId) {
 
 async function sendTwitterMentionReply(userId, commentId, text) {
   try {
-    console.log(`[${new Date().toISOString()}] Sending Twitter mention reply from ${userId} to comment ${commentId}: ${text}`);
     // TODO: Implement actual Twitter API calls
-    // For now, just log the action
-    console.log(`[${new Date().toISOString()}] Twitter mention reply would be sent (placeholder implementation)`);
+    // For now, just return success (reduced logging)
     return { success: true, message: 'Twitter mention reply sent (placeholder)' };
   } catch (error) {
     console.error('Error sending Twitter mention reply:', error);
@@ -2756,13 +2773,11 @@ async function sendTwitterMentionReply(userId, commentId, text) {
 
 // Facebook notification helper functions
 async function fetchFacebookNotifications(userId) {
-  console.log(`[${new Date().toISOString()}] Fetching Facebook notifications for user ${userId}`);
-  
   try {
     // Get Facebook access token
     const tokenData = await getFacebookTokenData(userId);
     if (!tokenData) {
-      console.log(`[${new Date().toISOString()}] No Facebook token found for user ${userId}`);
+      // No token found, return empty array (reduced logging)
       return [];
     }
 
@@ -2784,8 +2799,6 @@ async function fetchFacebookNotifications(userId) {
 }
 
 async function fetchFacebookDMs(userId) {
-  console.log(`[${new Date().toISOString()}] Fetching Facebook DMs for user ${userId}`);
-  
   try {
     // Get Facebook access token
     const tokenData = await getFacebookTokenData(userId);
@@ -5968,7 +5981,7 @@ class PlatformSchemaManager {
 // Twitter OAuth 2.0 credentials
 const TWITTER_CLIENT_ID = 'cVNYR3UxVm5jQ3d5UWw0UHFqUTI6MTpjaQ';
 const TWITTER_CLIENT_SECRET = 'Wr8Kewh92NVB-035hAvpQeQ1Azc7chre3PUTgDoEltjO57mxzO';
-const TWITTER_REDIRECT_URI = 'https://a257-121-52-146-243.ngrok-free.app/twitter/callback';
+const TWITTER_REDIRECT_URI = 'https://84e7-121-52-146-243.ngrok-free.app/twitter/callback';
 
 // Debug logging for OAuth 2.0
 console.log(`[${new Date().toISOString()}] Twitter OAuth 2.0 Configuration:`);

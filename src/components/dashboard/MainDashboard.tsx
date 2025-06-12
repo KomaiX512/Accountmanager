@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import DatePicker from 'react-datepicker';
@@ -6,9 +7,11 @@ import 'react-datepicker/dist/react-datepicker.css';
 import './MainDashboard.css';
 import { useInstagram } from '../../context/InstagramContext';
 import { useTwitter } from '../../context/TwitterContext';
+import { useFacebook } from '../../context/FacebookContext';
 import { useAuth } from '../../context/AuthContext';
 import PostScheduler from '../instagram/PostScheduler';
 import TwitterCompose from '../twitter/TwitterCompose';
+import { schedulePost } from '../../utils/scheduleHelpers';
 
 interface PlatformData {
   id: string;
@@ -43,7 +46,8 @@ const MainDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'overview' | 'usage'>('overview');
   const { isConnected: isInstagramConnected, userId: instagramUserId, hasAccessed: hasAccessedInstagram = false } = useInstagram();
-  const { isConnected: isTwitterConnected, userId: twitterUserId, hasAccessed: hasAccessedTwitter = false } = useTwitter();
+  const { isConnected: isTwitterConnected, userId: twitterUserId, hasAccessed: hasAccessedTwitter = false, refreshConnection: refreshTwitterConnection } = useTwitter();
+  const { isConnected: isFacebookConnected, userId: facebookUserId, hasAccessed: hasAccessedFacebook = false } = useFacebook();
   const { currentUser } = useAuth();
   const [userName, setUserName] = useState<string>('');
   const [showInstantPostModal, setShowInstantPostModal] = useState<boolean>(false);
@@ -86,10 +90,6 @@ const MainDashboard: React.FC = () => {
   }, [currentUser]);
 
   // Check localStorage for platform access status for platforms not managed by contexts
-  const hasAccessedFacebook = currentUser?.uid 
-    ? localStorage.getItem(`facebook_accessed_${currentUser.uid}`) === 'true'
-    : false;
-    
   const hasAccessedLinkedIn = currentUser?.uid
     ? localStorage.getItem(`linkedin_accessed_${currentUser.uid}`) === 'true'
     : false;
@@ -205,13 +205,16 @@ const MainDashboard: React.FC = () => {
 
   // Effect to fetch real-time notifications on mount and when connections change
   useEffect(() => {
-    fetchRealTimeNotifications();
-    
-    // Set up interval to refresh every 30 seconds
-    const interval = setInterval(fetchRealTimeNotifications, 30000);
-    
-    return () => clearInterval(interval);
-  }, [currentUser?.uid, instagramUserId, twitterUserId, isInstagramConnected, isTwitterConnected]);
+    // Only fetch if user is authenticated and has connected platforms
+    if (currentUser?.uid && (isInstagramConnected || isTwitterConnected || isFacebookConnected)) {
+      fetchRealTimeNotifications();
+      
+      // Set up interval to refresh every 5 minutes to reduce server load
+      const interval = setInterval(fetchRealTimeNotifications, 300000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [currentUser?.uid, instagramUserId, twitterUserId, isInstagramConnected, isTwitterConnected, isFacebookConnected]);
 
   // Claimed platforms - based on whether user has accessed the platform dashboard
   // Connected platforms - based on whether user has connected their social media account
@@ -261,7 +264,7 @@ const MainDashboard: React.FC = () => {
       name: 'Facebook',
       icon: '/icons/facebook.svg',
       claimed: hasAccessedFacebook,
-      connected: false, // No context for Facebook yet
+      connected: isFacebookConnected,
       notifications: {
         total: 0, // Will be updated by real-time data
         breakdown: {
@@ -301,44 +304,43 @@ const MainDashboard: React.FC = () => {
   // Get only connected platforms
   const connectedPlatforms = platforms.filter(p => p.connected);
 
-  // Effect to update connection status and real-time notification counts
+  // Effect to update connection status and real-time notification counts - more responsive
   useEffect(() => {
     setPlatforms(prev => 
       prev.map(platform => {
         const platformNotificationCount = realTimeNotifications[platform.id] || 0;
+        const platformNotificationData = {
+          total: platformNotificationCount,
+          breakdown: { cs_analysis: 0, our_strategies: 0, dms_comments: 0, cooked_posts: 0 }
+        };
         
-        if (platform.id === 'instagram') {
-          return { 
-            ...platform, 
-            connected: isInstagramConnected,
-            notifications: {
-              ...platform.notifications,
-              total: platform.claimed ? platformNotificationCount : 0
-            }
-          };
-        }
-        if (platform.id === 'twitter') {
-          return { 
-            ...platform, 
-            connected: isTwitterConnected,
-            notifications: {
-              ...platform.notifications,
-              total: platform.claimed ? platformNotificationCount : 0
-            }
-          };
+        let connectionStatus = false;
+        
+        switch (platform.id) {
+          case 'instagram':
+            connectionStatus = isInstagramConnected && Boolean(instagramUserId);
+            break;
+          case 'twitter':
+            connectionStatus = isTwitterConnected && Boolean(twitterUserId);
+            break;
+          case 'facebook':
+            connectionStatus = isFacebookConnected && Boolean(facebookUserId);
+            break;
+          default:
+            connectionStatus = platform.connected; // Keep existing status for others
         }
         
-        // For Facebook and LinkedIn, use real-time counts if claimed
-        return {
-          ...platform,
-          notifications: {
-            ...platform.notifications,
-            total: platform.claimed ? platformNotificationCount : 0
+        return { 
+          ...platform, 
+          connected: connectionStatus,
+          notifications: platform.claimed ? platformNotificationData : {
+            total: 0,
+            breakdown: { cs_analysis: 0, our_strategies: 0, dms_comments: 0, cooked_posts: 0 }
           }
         };
       })
     );
-  }, [isInstagramConnected, isTwitterConnected, realTimeNotifications]);
+  }, [isInstagramConnected, isTwitterConnected, isFacebookConnected, instagramUserId, twitterUserId, facebookUserId, realTimeNotifications]);
 
   // Add an effect to recheck localStorage on focus, this helps when returning from platform pages
   useEffect(() => {
@@ -349,6 +351,9 @@ const MainDashboard: React.FC = () => {
         const twitterAccessed = localStorage.getItem(`twitter_accessed_${currentUser.uid}`) === 'true';
         const facebookAccessed = localStorage.getItem(`facebook_accessed_${currentUser.uid}`) === 'true';
         const linkedinAccessed = localStorage.getItem(`linkedin_accessed_${currentUser.uid}`) === 'true';
+        
+        // Refresh connection statuses to ensure accurate data
+        refreshTwitterConnection();
         
         // Update platforms with fresh localStorage values and refresh notifications
         setPlatforms(prev => 
@@ -385,7 +390,7 @@ const MainDashboard: React.FC = () => {
     return () => {
       window.removeEventListener('focus', handleFocus);
     };
-  }, [currentUser?.uid, realTimeNotifications]);
+  }, [currentUser?.uid, realTimeNotifications, refreshTwitterConnection]);
 
   // Sort platforms so claimed ones appear first
   const sortedPlatforms = [...platforms].sort((a, b) => {
@@ -461,15 +466,15 @@ const MainDashboard: React.FC = () => {
 
   const handleConnectionButtonClick = (platform: PlatformData) => {
     if (!platform.connected) {
-      // Navigate to connection page for this platform
+      // Navigate to platform dashboard, not connection page
       if (platform.id === 'instagram') {
-        navigate('/instagram/connect');
+        navigate('/dashboard');
       } else if (platform.id === 'twitter') {
-        navigate('/twitter/connect');
+        navigate('/twitter-dashboard');
       } else if (platform.id === 'facebook') {
-        navigate('/facebook');
+        navigate('/facebook-dashboard');
       } else if (platform.id === 'linkedin') {
-        navigate('/linkedin');
+        navigate('/linkedin-dashboard');
       }
     }
   };
@@ -546,8 +551,8 @@ const MainDashboard: React.FC = () => {
     setShowInstantPostModal(true);
   };
   
-  // Handle instant post submission by routing to appropriate platform-specific schedulers
-  const handleInstantPost = () => {
+  // Enhanced instant post handler that leverages existing schedule functionality
+  const handleInstantPost = async () => {
     // Verify post has content
     if (postContent.text.trim() === '' && postContent.images.length === 0) {
       alert("Please enter some text or add an image for your post.");
@@ -566,48 +571,118 @@ const MainDashboard: React.FC = () => {
       return;
     }
     
+    // Validate Instagram has images if selected
+    const hasInstagram = selectedPlatforms.some(p => p.id === 'instagram');
+    if (hasInstagram && postContent.images.length === 0) {
+      alert("Instagram posts require at least one image. Please add an image for Instagram or uncheck Instagram.");
+      return;
+    }
+    
     // Close the instant post modal first
     setShowInstantPostModal(false);
     
-    // Process each selected platform
-    selectedPlatforms.forEach(platform => {
-      switch(platform.id) {
-        case 'instagram':
-          if (instagramUserId) {
-            console.log('Scheduling post to Instagram');
-            // Only schedule if there's an image (Instagram requires an image)
+    // Determine schedule time (immediate or scheduled)
+    const scheduleTime = postContent.scheduleDate || new Date(Date.now() + 60 * 1000); // Default to 1 minute from now for immediate posting
+    
+    // Process all selected platforms simultaneously
+    const results: Array<{platform: string, success: boolean, message: string}> = [];
+    
+    for (const platform of selectedPlatforms) {
+      try {
+        let userId: string | null = null;
+        let imageBlob: Blob | undefined = undefined;
+        
+        // Get platform-specific user ID
+        switch(platform.id) {
+          case 'instagram':
+            userId = instagramUserId;
+            // Instagram requires an image, use the first one
             if (postContent.images.length > 0) {
-              setShowInstagramScheduler(true);
-            } else {
-              alert("Instagram posts require at least one image. Please add an image for Instagram.");
+              imageBlob = postContent.images[0];
             }
-          } else {
-            console.error('Instagram userId is missing, cannot schedule post');
-          }
-          break;
-          
-        case 'twitter':
-          if (twitterUserId) {
-            console.log('Scheduling post to Twitter');
-            setShowTwitterComposer(true);
-          } else {
-            console.error('Twitter userId is missing, cannot schedule post');
-          }
-          break;
-          
-        case 'facebook':
-          console.log('Facebook posting not yet implemented');
-          alert("Facebook integration is not yet available.");
-          break;
-          
-        case 'linkedin':
-          console.log('LinkedIn posting not yet implemented');
-          alert("LinkedIn integration is not yet available.");
-          break;
-          
-        default:
-          console.log(`No specific handler for ${platform.name} yet`);
+            break;
+          case 'twitter':
+            userId = twitterUserId;
+            // Twitter images are optional, use first one if available
+            if (postContent.images.length > 0) {
+              imageBlob = postContent.images[0];
+            }
+            break;
+          case 'facebook':
+            userId = facebookUserId;
+            // Facebook images are optional, use first one if available
+            if (postContent.images.length > 0) {
+              imageBlob = postContent.images[0];
+            }
+            break;
+          case 'linkedin':
+            // LinkedIn not implemented yet
+            results.push({
+              platform: platform.name,
+              success: false,
+              message: 'LinkedIn integration not yet available'
+            });
+            continue;
+        }
+        
+        if (!userId) {
+          results.push({
+            platform: platform.name,
+            success: false,
+            message: `${platform.name} user ID not found`
+          });
+          continue;
+        }
+        
+        // Schedule the post using the reusable helper
+        const result = await schedulePost({
+          platform: platform.id as 'instagram' | 'twitter' | 'facebook',
+          userId,
+          imageBlob,
+          caption: postContent.text.trim(),
+          scheduleTime,
+          postKey: `instant_post_${Date.now()}`
+        });
+        
+        results.push({
+          platform: platform.name,
+          success: result.success,
+          message: result.message
+        });
+        
+      } catch (error) {
+        console.error(`Error posting to ${platform.name}:`, error);
+        results.push({
+          platform: platform.name,
+          success: false,
+          message: `Failed to post to ${platform.name}: ${error instanceof Error ? error.message : 'Unknown error'}`
+        });
       }
+    }
+    
+    // Show consolidated results
+    const successfulPosts = results.filter(r => r.success);
+    const failedPosts = results.filter(r => !r.success);
+    
+    let alertMessage = '';
+    
+    if (successfulPosts.length > 0) {
+      const action = postContent.scheduleDate ? 'scheduled' : 'posted';
+      alertMessage += `✅ Successfully ${action} to: ${successfulPosts.map(r => r.platform).join(', ')}\n`;
+    }
+    
+    if (failedPosts.length > 0) {
+      alertMessage += `❌ Failed to post to: ${failedPosts.map(r => `${r.platform} (${r.message})`).join(', ')}`;
+    }
+    
+    alert(alertMessage);
+    
+    // Reset the post content
+    setPostContent({
+      text: '',
+      images: [],
+      platformIds: [],
+      scheduleDate: null
     });
   };
 
@@ -753,176 +828,6 @@ const MainDashboard: React.FC = () => {
               ))}
             </div>
             
-            {showInstantPostModal && (
-              <div className="modal-overlay">
-                <div className="modal-content">
-                  <h3>Post to Your Platforms</h3>
-                  
-                  {/* Platform Selection */}
-                  <div className="platform-selection">
-                    <h4>Select platforms:</h4>
-                    <div className="platform-checkboxes">
-                      {platforms
-                        .filter(platform => platform.connected)
-                        .map(platform => (
-                          <div 
-                            key={platform.id} 
-                            className={`platform-checkbox ${postContent.platformIds.includes(platform.id) ? 'selected' : ''}`}
-                            onClick={() => togglePlatformSelection(platform.id)}
-                          >
-                            <img 
-                              src={platform.icon} 
-                              alt={platform.name}
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.onerror = null;
-                                target.src = "/icons/default.svg";
-                              }}
-                            />
-                            <span>{platform.name}</span>
-                            <div className="checkbox-indicator">
-                              {postContent.platformIds.includes(platform.id) && (
-                                <svg viewBox="0 0 24 24">
-                                  <path d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z" />
-                                </svg>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                    
-                    {platforms.filter(p => p.connected).length === 0 && (
-                      <div className="no-connected-platforms">
-                        <p>No connected platforms. Your post will be saved as draft.</p>
-                        <div className="connect-platforms-actions">
-                          <button 
-                            className="connect-platform-button"
-                            onClick={() => {
-                              setShowInstantPostModal(false);
-                              navigate('/instagram/connect');
-                            }}
-                          >
-                            Connect Instagram
-                          </button>
-                          <button 
-                            className="connect-platform-button"
-                            onClick={() => {
-                              setShowInstantPostModal(false);
-                              navigate('/twitter/connect');
-                            }}
-                          >
-                            Connect Twitter
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Text Content */}
-                  <div className="post-content-section">
-                    <textarea 
-                      placeholder="What would you like to share?" 
-                      className="instant-post-textarea"
-                      rows={5}
-                      value={postContent.text}
-                      onChange={(e) => setPostContent(prev => ({...prev, text: e.target.value}))}
-                    ></textarea>
-                    
-                    {getRemainingCharacters() !== null && (
-                      <div className={`character-counter ${getRemainingCharacters()! < 20 ? 'warning' : ''}`}>
-                        {getRemainingCharacters()} characters remaining
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Schedule Options */}
-                  <div className="schedule-section">
-                    <h4>When to post:</h4>
-                    <div className="date-picker-wrapper">
-                      <DatePicker
-                        selected={postContent.scheduleDate}
-                        onChange={handleScheduleDateChange}
-                        showTimeSelect
-                        dateFormat="Pp"
-                        minDate={new Date()}
-                        placeholderText="Schedule for later (optional)"
-                        className="schedule-datepicker"
-                      />
-                      {postContent.scheduleDate && (
-                        <button 
-                          className="clear-date-btn"
-                          onClick={() => handleScheduleDateChange(null)}
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
-                    <div className="schedule-note">
-                      {postContent.scheduleDate 
-                        ? `Your post will be scheduled for ${postContent.scheduleDate.toLocaleString()}`
-                        : "Your post will be published immediately"}
-                    </div>
-                  </div>
-                  
-                  {/* Image Upload */}
-                  <div className="image-upload-section">
-                    <div className="upload-button" onClick={handleImageUploadClick}>
-                      <svg viewBox="0 0 24 24">
-                        <path d="M4,4H7L9,2H15L17,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M12,7A5,5 0 0,0 7,12A5,5 0 0,0 12,17A5,5 0 0,0 17,12A5,5 0 0,0 12,7M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9Z" />
-                      </svg>
-                      <span>Add Images</span>
-                    </div>
-                    
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      multiple
-                      accept="image/*"
-                      style={{ display: 'none' }}
-                      onChange={handleFileChange}
-                    />
-                    
-                    {postContent.images.length > 0 && (
-                      <div className="image-previews">
-                        {postContent.images.map((image, index) => (
-                          <div key={index} className="image-preview">
-                            <img src={URL.createObjectURL(image)} alt={`Preview ${index}`} />
-                            <button 
-                              className="remove-image" 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeImage(index);
-                              }}
-                            >
-                              <svg viewBox="0 0 24 24">
-                                <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" />
-                              </svg>
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="modal-buttons">
-                    <button 
-                      className="cancel-button"
-                      onClick={() => setShowInstantPostModal(false)}
-                    >
-                      Cancel
-                    </button>
-                    <button 
-                      className="post-button"
-                      disabled={postContent.text.trim() === '' && postContent.images.length === 0}
-                      onClick={handleInstantPost}
-                    >
-                      {postContent.scheduleDate ? 'Schedule Post' : 'Post Now'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-            
             {/* Platform-specific post components */}
             {showInstagramScheduler && instagramUserId && (
               <PostScheduler 
@@ -1009,6 +914,235 @@ const MainDashboard: React.FC = () => {
           </div>
         )}
       </motion.div>
+      
+      {/* Render modal using Portal - completely independent of wrapper */}
+      {showInstantPostModal && ReactDOM.createPortal(
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3>Post to Your Platforms</h3>
+              <button 
+                className="modal-close-btn"
+                onClick={() => setShowInstantPostModal(false)}
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+            
+            {/* Platform Selection */}
+            <div className="platform-selection">
+              <h4>Select platforms to post to:</h4>
+              
+              {/* Connected Platforms */}
+              {platforms.filter(platform => platform.connected).length > 0 && (
+                <div className="connected-platforms-section">
+                  <div className="section-title">
+                    <span className="status-indicator connected">✓ Connected Platforms</span>
+                  </div>
+                  <div className="platform-checkboxes">
+                    {platforms
+                      .filter(platform => platform.connected)
+                      .map(platform => (
+                        <div 
+                          key={platform.id} 
+                          className={`platform-checkbox ${postContent.platformIds.includes(platform.id) ? 'selected' : ''}`}
+                          onClick={() => togglePlatformSelection(platform.id)}
+                        >
+                          <img 
+                            src={platform.icon} 
+                            alt={platform.name}
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.onerror = null;
+                              target.src = "/icons/default.svg";
+                            }}
+                          />
+                          <span>{platform.name}</span>
+                          <div className="platform-requirements">
+                            {platform.id === 'instagram' && <span className="requirement">Requires image</span>}
+                            {platform.characterLimit && (
+                              <span className="char-limit">Max {platform.characterLimit} chars</span>
+                            )}
+                          </div>
+                          <div className="checkbox-indicator">
+                            {postContent.platformIds.includes(platform.id) && (
+                              <svg viewBox="0 0 24 24">
+                                <path d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z" />
+                              </svg>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Disconnected Platforms */}
+              {platforms.filter(platform => !platform.connected && platform.claimed).length > 0 && (
+                <div className="disconnected-platforms-section">
+                  <div className="section-title">
+                    <span className="status-indicator disconnected">⚠ Not Connected (Connect to post)</span>
+                  </div>
+                  <div className="platform-checkboxes disabled">
+                    {platforms
+                      .filter(platform => !platform.connected && platform.claimed)
+                      .map(platform => (
+                        <div 
+                          key={platform.id} 
+                          className="platform-checkbox disabled"
+                          onClick={() => handleConnectionButtonClick(platform)}
+                          title={`Click to connect your ${platform.name} account`}
+                        >
+                          <img 
+                            src={platform.icon} 
+                            alt={platform.name}
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.onerror = null;
+                              target.src = "/icons/default.svg";
+                            }}
+                          />
+                          <span>{platform.name}</span>
+                          <div className="connect-hint">Click to connect</div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+              
+              {platforms.filter(p => p.connected).length === 0 && (
+                <div className="no-connected-platforms">
+                  <p>No connected platforms. Connect your accounts to start posting.</p>
+                  <div className="connect-platforms-actions">
+                    <button 
+                      className="connect-platform-button"
+                      onClick={() => {
+                        setShowInstantPostModal(false);
+                        navigate('/dashboard');
+                      }}
+                    >
+                      Go to Instagram
+                    </button>
+                    <button 
+                      className="connect-platform-button"
+                      onClick={() => {
+                        setShowInstantPostModal(false);
+                        navigate('/twitter-dashboard');
+                      }}
+                    >
+                      Go to Twitter
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Text Content */}
+            <div className="post-content-section">
+              <textarea 
+                placeholder="What would you like to share?" 
+                className="instant-post-textarea"
+                rows={5}
+                value={postContent.text}
+                onChange={(e) => setPostContent(prev => ({...prev, text: e.target.value}))}
+              ></textarea>
+              
+              {getRemainingCharacters() !== null && (
+                <div className={`character-counter ${getRemainingCharacters()! < 20 ? 'warning' : ''}`}>
+                  {getRemainingCharacters()} characters remaining
+                </div>
+              )}
+            </div>
+            
+            {/* Schedule Options */}
+            <div className="schedule-section">
+              <h4>When to post:</h4>
+              <div className="date-picker-wrapper">
+                <DatePicker
+                  selected={postContent.scheduleDate}
+                  onChange={handleScheduleDateChange}
+                  showTimeSelect
+                  dateFormat="Pp"
+                  minDate={new Date()}
+                  placeholderText="Schedule for later (optional)"
+                  className="schedule-datepicker"
+                />
+                {postContent.scheduleDate && (
+                  <button 
+                    className="clear-date-btn"
+                    onClick={() => handleScheduleDateChange(null)}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+              <div className="schedule-note">
+                {postContent.scheduleDate 
+                  ? `Your post will be scheduled for ${postContent.scheduleDate.toLocaleString()}`
+                  : "Your post will be published immediately"}
+              </div>
+            </div>
+            
+            {/* Image Upload */}
+            <div className="image-upload-section">
+              <div className="upload-button" onClick={handleImageUploadClick}>
+                <svg viewBox="0 0 24 24">
+                  <path d="M4,4H7L9,2H15L17,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M12,7A5,5 0 0,0 7,12A5,5 0 0,0 12,17A5,5 0 0,0 17,12A5,5 0 0,0 12,7M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9Z" />
+                </svg>
+                <span>Add Images</span>
+              </div>
+              
+              <input
+                type="file"
+                ref={fileInputRef}
+                multiple
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={handleFileChange}
+              />
+              
+              {postContent.images.length > 0 && (
+                <div className="image-previews">
+                  {postContent.images.map((image, index) => (
+                    <div key={index} className="image-preview">
+                      <img src={URL.createObjectURL(image)} alt={`Preview ${index}`} />
+                      <button 
+                        className="remove-image" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeImage(index);
+                        }}
+                      >
+                        <svg viewBox="0 0 24 24">
+                          <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <div className="modal-buttons">
+              <button 
+                className="cancel-button"
+                onClick={() => setShowInstantPostModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="post-button"
+                disabled={postContent.text.trim() === '' && postContent.images.length === 0}
+                onClick={handleInstantPost}
+              >
+                {postContent.scheduleDate ? 'Schedule Post' : 'Post Now'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };

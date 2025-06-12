@@ -9,6 +9,7 @@ interface TwitterContextType {
   hasAccessed: boolean;
   connectTwitter: (twitterId: string, username: string) => void;
   disconnectTwitter: () => void;
+  refreshConnection: () => void;
 }
 
 const TwitterContext = createContext<TwitterContextType | undefined>(undefined);
@@ -108,6 +109,12 @@ export const TwitterProvider: React.FC<TwitterProviderProps> = ({ children }) =>
     console.log(`[${new Date().toISOString()}] Twitter disconnected via context`);
   }, []);
 
+  const refreshConnection = useCallback(() => {
+    if (currentUser?.uid) {
+      checkExistingConnection();
+    }
+  }, [currentUser?.uid, checkExistingConnection]);
+
   const value: TwitterContextType = useMemo(() => ({
     userId,
     username,
@@ -115,7 +122,8 @@ export const TwitterProvider: React.FC<TwitterProviderProps> = ({ children }) =>
     hasAccessed,
     connectTwitter,
     disconnectTwitter,
-  }), [userId, username, isConnected, hasAccessed, connectTwitter, disconnectTwitter]);
+    refreshConnection,
+  }), [userId, username, isConnected, hasAccessed, connectTwitter, disconnectTwitter, refreshConnection]);
 
   return (
     <TwitterContext.Provider value={value}>

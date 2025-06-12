@@ -1,0 +1,6 @@
+data: {"type":"connection","message":"Connected to events for 612940588580162","timestamp":1749661837755,"connectionId":"4cf771c4-7747-4b6e-a177-9b617798439e"}
+
+data: {"event":"comment","data":{"type":"comment","platform":"facebook","page_id":"612940588580162","comment_id":"555555555_666666666","text":"🎉 FINAL REAL-TIME TEST! This should appear instantly on the dashboard!","timestamp":1749424200000,"received_at":"2025-06-11T17:10:47.354Z","username":"Sentient ai","status":"pending"},"timestamp":1749661849384}
+
+data: {"type":"heartbeat","timestamp":1749661850835}
+

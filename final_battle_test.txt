@@ -1,0 +1,12 @@
+data: {"type":"connection","message":"Connected to events for 612940588580162","timestamp":1749662377793,"connectionId":"5cc87bcb-7f00-4c65-b003-a4c82b193093"}
+
+data: {"type":"ping","timestamp":1749662382477,"message":"Connection check"}
+
+data: {"type":"heartbeat","timestamp":1749662382483}
+
+data: {"event":"facebook_message","data":{"type":"message","platform":"facebook","page_id":"612940588580162","facebook_page_id":"612940588580162","sender_id":"FINAL_DM_USER","message_id":"final_battle_dm_001","text":"�� FINAL DM BATTLE TEST: Reply, AI Reply, and Ignore buttons should all work perfectly!","timestamp":1749663600,"received_at":"2025-06-11T17:19:48.870Z","username":"Unknown User","status":"pending"},"timestamp":1749662390806}
+
+data: {"event":"facebook_comment","data":{"type":"comment","platform":"facebook","page_id":"612940588580162","facebook_page_id":"612940588580162","sender_id":"FINAL_COMMENT_USER","comment_id":"final_battle_comment_001","text":"🔥 FINAL COMMENT BATTLE TEST: All three buttons (Reply, AI Reply, Ignore) must work flawlessly!","timestamp":1749663300000,"received_at":"2025-06-11T17:19:53.745Z","username":"Final Battle Commenter","status":"pending"},"timestamp":1749662395748}
+
+data: {"type":"heartbeat","timestamp":1749662397485}
+

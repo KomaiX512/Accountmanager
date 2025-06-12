@@ -4,6 +4,8 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import axios from 'axios';
 import cors from 'cors';
 import multer from 'multer';
+import fs from 'fs';
+import path from 'path';
 const upload = multer({ storage: multer.memoryStorage() });
 import puppeteer from 'puppeteer';
 import * as fileType from 'file-type';
@@ -16,6 +18,9 @@ import OAuth from 'oauth-1.0a';
 import FormData from 'form-data';
 const app = express();
 const port = 3000;
+
+// Serve temporary images for Instagram access
+app.use('/temp-images', express.static(path.join(process.cwd(), 'server', 'temp-images')));
 
 /**
  * ============= R2 SCHEMA DOCUMENTATION =============
@@ -3227,6 +3232,274 @@ app.post('/instagram-connection/:userId', async (req, res) => {
   } catch (error) {
     console.error(`Error storing Instagram connection for ${userId}:`, error);
     res.status(500).json({ error: 'Failed to store Instagram connection' });
+  }
+});
+
+// Instagram token check endpoint
+app.get('/instagram-token-check/:graphId', async (req, res) => {
+  setCorsHeaders(res);
+  
+  const { graphId } = req.params;
+  
+  try {
+    const key = `InstagramTokens/${graphId}/token.json`;
+    
+    try {
+      const headCommand = new HeadObjectCommand({
+        Bucket: 'tasks',
+        Key: key,
+      });
+      await s3Client.send(headCommand);
+      
+      // Token exists
+      res.json({ exists: true, message: 'Instagram token found' });
+    } catch (error) {
+      if (error.name === 'NotFound' || error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+        return res.status(404).json({ exists: false, message: 'No Instagram token found' });
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error(`Error checking Instagram token for graph ID ${graphId}:`, error);
+    res.status(500).json({ error: 'Failed to check Instagram token' });
+  }
+});
+
+// Real-time Instagram posting endpoint
+app.post('/post-instagram-now/:userId', upload.single('image'), async (req, res) => {
+  setCorsHeaders(res);
+  
+  const { userId } = req.params;
+  const { caption } = req.body;
+  const file = req.file;
+
+  console.log(`[${new Date().toISOString()}] Real-time Instagram post request for user ${userId}: image=${!!file}, caption=${!!caption}`);
+
+  if (!file) {
+    return res.status(400).json({ error: 'Image is required for Instagram posts' });
+  }
+
+  if (!caption || caption.trim() === '') {
+    return res.status(400).json({ error: 'Caption is required for Instagram posts' });
+  }
+
+  try {
+    // Get Instagram token data - the userId could be either instagram_user_id or instagram_graph_id
+    let tokenData = null;
+    
+    // First try to get token data using userId as graph_id
+    try {
+      tokenData = await getTokenData(userId);
+    } catch (error) {
+      // If that fails, search by instagram_user_id
+      console.log(`[${new Date().toISOString()}] Token not found using ${userId} as graph_id, searching by user_id...`);
+      
+      const listCommand = new ListObjectsV2Command({
+        Bucket: 'tasks',
+        Prefix: `InstagramTokens/`,
+      });
+      const { Contents } = await s3Client.send(listCommand);
+
+      if (Contents) {
+        for (const obj of Contents) {
+          if (obj.Key.endsWith('/token.json')) {
+            const getCommand = new GetObjectCommand({
+              Bucket: 'tasks',
+              Key: obj.Key,
+            });
+            const data = await s3Client.send(getCommand);
+            const json = await data.Body.transformToString();
+            const token = JSON.parse(json);
+            if (token.instagram_user_id === userId) {
+              tokenData = token;
+              console.log(`[${new Date().toISOString()}] Found token by instagram_user_id: ${userId}`);
+              break;
+            }
+          }
+        }
+      }
+    }
+    
+    if (!tokenData) {
+      console.log(`[${new Date().toISOString()}] No Instagram token found for user ${userId} (tried both graph_id and user_id)`);
+      return res.status(404).json({ error: 'No Instagram access token found for this account. Please reconnect Instagram.' });
+    }
+
+    const { access_token, instagram_graph_id } = tokenData;
+    
+    console.log(`[${new Date().toISOString()}] Posting to Instagram with graph ID: ${instagram_graph_id}`);
+
+    // Step 1: Upload image to Instagram
+    let imageBuffer = file.buffer;
+    
+    // Detect actual image format from file content (magic bytes)
+    let actualFormat = 'unknown';
+    let mimeType = file.mimetype;
+    
+    if (imageBuffer.length >= 4) {
+      // Check for JPEG signature (FF D8)
+      if (imageBuffer[0] === 0xFF && imageBuffer[1] === 0xD8) {
+        actualFormat = 'jpeg';
+        mimeType = 'image/jpeg';
+      }
+      // Check for PNG signature (89 50 4E 47)
+      else if (imageBuffer[0] === 0x89 && imageBuffer[1] === 0x50 && 
+               imageBuffer[2] === 0x4E && imageBuffer[3] === 0x47) {
+        actualFormat = 'png';
+        mimeType = 'image/png';
+      }
+      // Check for WebP signature (RIFF + WEBP) and convert to JPEG
+      else if (imageBuffer.length >= 12 &&
+               imageBuffer.toString('ascii', 0, 4) === 'RIFF' &&
+               imageBuffer.toString('ascii', 8, 12) === 'WEBP') {
+        actualFormat = 'webp';
+        console.log(`[${new Date().toISOString()}] WebP image detected, converting to JPEG...`);
+        
+        try {
+          // Convert WebP to JPEG using sharp
+          imageBuffer = await sharp(imageBuffer)
+            .jpeg({ 
+              quality: 85, // High quality JPEG
+              progressive: true 
+            })
+            .toBuffer();
+          
+          // Update format and mimetype after conversion
+          actualFormat = 'jpeg';
+          mimeType = 'image/jpeg';
+          
+          console.log(`[${new Date().toISOString()}] WebP successfully converted to JPEG (${imageBuffer.length} bytes)`);
+        } catch (conversionError) {
+          console.error(`[${new Date().toISOString()}] WebP conversion failed:`, conversionError);
+          return res.status(400).json({ 
+            error: 'Failed to convert WebP image to JPEG format.',
+            details: 'There was an issue converting your WebP image. Please try with a JPEG or PNG image instead.'
+          });
+        }
+      }
+    }
+    
+    // Validate that we detected a supported format
+    if (!['jpeg', 'png'].includes(actualFormat)) {
+      return res.status(400).json({ 
+        error: `Unsupported image format detected. Instagram API only supports JPEG and PNG images.`,
+        details: `Detected format: ${actualFormat}. Reported mimetype: ${file.mimetype}`
+      });
+    }
+    
+    // Validate image size (Instagram requires minimum 320px and max 8MB)
+    if (imageBuffer.length > 8 * 1024 * 1024) {
+      return res.status(400).json({ error: 'Image too large. Maximum file size is 8MB for Instagram posts.' });
+    }
+    
+    const imageBase64 = imageBuffer.toString('base64');
+    
+    console.log(`[${new Date().toISOString()}] Uploading ${mimeType} image to Instagram (${imageBuffer.length} bytes)...`);
+    
+    // Save image temporarily to local file system and serve via express
+    
+    // Create temp directory if it doesn't exist
+    const tempDir = path.join(process.cwd(), 'server', 'temp-images');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+    
+    const imageFilename = `${Date.now()}-${Math.random().toString(36).substring(7)}.${actualFormat}`;
+    const imagePath = path.join(tempDir, imageFilename);
+    
+    // Write image to local temp file
+    fs.writeFileSync(imagePath, imageBuffer);
+    
+    // Construct public URL for the locally served image (production-ready with ngrok)
+    const baseUrl = process.env.PUBLIC_URL || 'https://84e7-121-52-146-243.ngrok-free.app';
+    const publicImageUrl = `${baseUrl}/temp-images/${imageFilename}`;
+    
+    console.log(`[${new Date().toISOString()}] Image saved locally for Instagram access: ${publicImageUrl}`);
+    
+    // Upload image and create media object using public URL
+    const mediaResponse = await axios.post(`https://graph.instagram.com/v22.0/${instagram_graph_id}/media`, {
+      image_url: publicImageUrl,
+      caption: caption.trim(),
+      access_token: access_token
+    }, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const mediaId = mediaResponse.data.id;
+    console.log(`[${new Date().toISOString()}] Instagram media created with ID: ${mediaId}`);
+
+    // Step 2: Publish the media
+    console.log(`[${new Date().toISOString()}] Publishing Instagram media...`);
+    
+    const publishResponse = await axios.post(`https://graph.instagram.com/v22.0/${instagram_graph_id}/media_publish`, {
+      creation_id: mediaId,
+      access_token: access_token
+    }, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const postId = publishResponse.data.id;
+    console.log(`[${new Date().toISOString()}] Instagram post published successfully with ID: ${postId}`);
+
+    // Step 3: Store post record for tracking
+    const postKey = `InstagramPosts/${userId}/${postId}.json`;
+    const postData = {
+      id: postId,
+      userId,
+      platform: 'instagram',
+      caption: caption.trim(),
+      media_id: mediaId,
+      instagram_graph_id,
+      posted_at: new Date().toISOString(),
+      status: 'published',
+      type: 'real_time_post'
+    };
+
+    await s3Client.send(new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: postKey,
+      Body: JSON.stringify(postData, null, 2),
+      ContentType: 'application/json',
+    }));
+
+    console.log(`[${new Date().toISOString()}] Instagram post record stored at ${postKey}`);
+
+    // Clean up temporary image from local storage
+    try {
+      fs.unlinkSync(imagePath);
+      console.log(`[${new Date().toISOString()}] Temporary image cleaned up: ${imageFilename}`);
+    } catch (cleanupError) {
+      console.warn(`[${new Date().toISOString()}] Failed to cleanup temporary image: ${cleanupError.message}`);
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Instagram post published successfully!',
+      post_id: postId,
+      media_id: mediaId,
+      posted_at: postData.posted_at
+    });
+
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error posting to Instagram:`, error.response?.data || error.message);
+    
+    let errorMessage = 'Failed to post to Instagram';
+    if (error.response?.data?.error?.message) {
+      errorMessage = error.response.data.error.message;
+    } else if (error.response?.data?.error) {
+      errorMessage = error.response.data.error;
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
+    res.status(500).json({ 
+      error: errorMessage,
+      details: error.response?.data || error.message 
+    });
   }
 });
 

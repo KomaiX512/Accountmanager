@@ -72,8 +72,11 @@ interface ImageErrorState {
   retryCount: number;
 }
 
-// Base URL for all API requests
-const API_BASE_URL = 'http://localhost:3000';
+// Base URL for all API requests (updated to match running server)
+const API_BASE_URL = 'http://localhost:3002';
+
+// Debug flag - set to true to enable verbose logging
+const DEBUG_LOGGING = false;
 
 const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts = [], userId: propUserId, platform = 'instagram' }) => {
   const { isConnected: isInstagramConnected, userId: instagramUserId } = useInstagram();
@@ -117,6 +120,47 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   const [showPostNowModal, setShowPostNowModal] = useState(false);
   const [selectedPostForPosting, setSelectedPostForPosting] = useState<any>(null);
   const [isPosting, setIsPosting] = useState(false);
+
+  // Request deduplication to prevent multiple simultaneous API calls
+  const requestCache = useRef<Map<string, { promise: Promise<any>; timestamp: number }>>(new Map());
+  const CACHE_DURATION = 30000; // 30 seconds
+  
+  // Debounced request function to prevent duplicate API calls
+  const deduplicatedRequest = useCallback(async (
+    cacheKey: string,
+    requestFn: () => Promise<any>,
+    useCache: boolean = true
+  ): Promise<any> => {
+    // Check cache first if enabled
+    if (useCache && requestCache.current.has(cacheKey)) {
+      const { promise, timestamp } = requestCache.current.get(cacheKey)!;
+      if (Date.now() - timestamp < CACHE_DURATION) {
+        // Only log cache hits if needed for debugging (comment out to reduce spam)
+        // console.log(`[PostCooked] Using cached request for ${cacheKey}`);
+        return await promise;
+      }
+      requestCache.current.delete(cacheKey);
+    }
+    
+    // Create new request
+    const requestPromise = (async () => {
+      try {
+        const result = await requestFn();
+        return result;
+      } finally {
+        // Clean up cache entry after completion
+        requestCache.current.delete(cacheKey);
+      }
+    })();
+    
+    // Store the promise in cache
+    requestCache.current.set(cacheKey, {
+      promise: requestPromise,
+      timestamp: Date.now()
+    });
+    
+    return await requestPromise;
+  }, []);
 
   // Viewed posts tracking with localStorage persistence 
   const getViewedStorageKey = () => `${platform}_viewed_posts_${username}`;
@@ -191,41 +235,49 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
          let refreshInterval: number;
      let lastPostCount = localPosts.length;
 
-     // Check for new posts every 3 seconds when in active use
+     // Check for new posts every 30 seconds (increased from 10s to reduce API spam)
      const checkForNewPosts = async () => {
+       const cacheKey = `check_posts_${username}_${platform}`;
+       
        try {
-         const response = await axios.get(`${API_BASE_URL}/posts/${username}?platform=${platform}&nocache=${Date.now()}`, {
-           headers: {
-             'Cache-Control': 'no-cache, no-store, must-revalidate',
-             'Pragma': 'no-cache'
-           },
-           timeout: 5000 // Quick timeout for background checks
-         });
+         const response = await deduplicatedRequest(
+           cacheKey,
+           () => axios.get(`${API_BASE_URL}/posts/${username}?platform=${platform}&nocache=${Date.now()}`, {
+             headers: {
+               'Cache-Control': 'no-cache, no-store, must-revalidate',
+               'Pragma': 'no-cache'
+             },
+             timeout: 8000 // Increased timeout for better reliability
+           }),
+           false // Don't cache background checks
+         );
 
          const newPostCount = response.data.length;
          
          // If we have new posts, update immediately
          if (newPostCount > lastPostCount) {
-           console.log(`[PostCooked] AUTO-REFRESH: New posts detected! ${lastPostCount} → ${newPostCount}`);
+           if (DEBUG_LOGGING) {
+             console.log(`[PostCooked] NEW POSTS: ${lastPostCount} → ${newPostCount}`);
+           }
            setLocalPosts(response.data);
            setToastMessage('✨ New post arrived! PostCooked module refreshed automatically.');
            lastPostCount = newPostCount;
          }
        } catch (error: any) {
-         // Silently handle errors for background refresh to avoid spam
-         console.log('[PostCooked] Background refresh failed (silent):', error.message);
+         // Silently handle errors for background refresh to avoid spam (no logging)
        }
      };
 
-     // Start periodic checking
-     refreshInterval = window.setInterval(checkForNewPosts, 3000);
+     // Start periodic checking with reduced frequency (30 seconds to minimize API spam)
+     refreshInterval = window.setInterval(checkForNewPosts, 30000);
 
     // Also listen for custom events from post creation
     const handleNewPostEvent = (event: CustomEvent) => {
       const { username: eventUsername, platform: eventPlatform } = event.detail;
       
       if (eventUsername === username && eventPlatform === platform) {
-        console.log('[PostCooked] NEW POST EVENT: Refreshing immediately');
+        // Only log if needed for debugging
+        // console.log('[PostCooked] NEW POST EVENT: Refreshing immediately');
         setTimeout(() => handleRefreshPosts(), 1000); // Small delay to allow server processing
       }
     };
@@ -248,7 +300,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       const { postKey, platform: updatedPlatform, timestamp } = event.detail;
       
       if (updatedPlatform === platform) {
-        console.log(`[PostCooked] INSTANT UPDATE for ${postKey}`);
+        // console.log(`[PostCooked] INSTANT UPDATE for ${postKey}`); // Uncomment for debugging
         setToastMessage('✅ Image updated instantly!');
         
         // INSTANT METHOD: Force all images to reload with cache busting
@@ -282,7 +334,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
           // Force React re-render
           setImageRefreshKey(now);
           
-          console.log(`[PostCooked] ⚡ INSTANT REFRESH: ${freshUrl}`);
+          // console.log(`[PostCooked] ⚡ INSTANT REFRESH: ${freshUrl}`); // Uncomment for debugging
         }
       }
     };
@@ -1118,15 +1170,20 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     try {
       const platformParam = platform ? `&platform=${platform}` : '';
       const realTimeTimestamp = Date.now();
+      const cacheKey = `refresh_posts_${username}_${platform}_${realTimeTimestamp}`;
       
       // REAL-TIME REQUEST: Always bypass cache with multiple parameters
-      const response = await axios.get(`${API_BASE_URL}/posts/${username}?forceRefresh=true${platformParam}&realtime=${realTimeTimestamp}&nocache=1&v=${Math.random()}`, {
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
-      });
+      const response = await deduplicatedRequest(
+        cacheKey,
+        () => axios.get(`${API_BASE_URL}/posts/${username}?forceRefresh=true${platformParam}&realtime=${realTimeTimestamp}&nocache=1&v=${Math.random()}`, {
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        }),
+        false // Don't cache forced refresh requests
+      );
       
       setLocalPosts(response.data);
       setToastMessage('Posts refreshed successfully!');

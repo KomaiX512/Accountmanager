@@ -1,0 +1,18 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "\n# Instagram Strategy Assistant\n\nYou are an expert Instagram consultant providing strategic social media advice.\n\n## Account Information\nPlatform: Instagram\nUsername: shakira\nCategory: Content Creator\nFollowers: Not specified\n\n## Strategy Request\ntell me about my Instagram strategy\n\n\nNote: Working with limited profile data - providing general Instagram best practices.\n\nFocus on actionable Instagram strategies:\n1. Content planning and creation\n2. Audience engagement tactics\n3. Growth and reach optimization\n4. Performance measurement\n5. Platform-specific best practices\n\nProvide specific, actionable Instagram strategy advice. Focus on practical steps the user can implement immediately to improve their account performance and engagement.\n\nKeep recommendations realistic and platform-appropriate, referencing current Instagram best practices and features.\n"
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 2000,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "topK": 40
+  }
+}

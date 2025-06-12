@@ -115,7 +115,16 @@ function shouldUseCache(prefix) {
     // Increment cache hit counter
     const hits = cacheHits.get(prefix) || 0;
     cacheHits.set(prefix, hits + 1);
-    console.log(`[${new Date().toISOString()}] Cache HIT for ${prefix} (age: ${Math.round(cacheAge/1000)}s, TTL: ${Math.round(cacheConfig.TTL/1000)}s)`);
+    
+    // Reduce cache hit logging frequency (only log every 50 hits or every 5 minutes)
+    const lastLogKey = `lastCacheHitLog_${prefix}`;
+    const lastLogTime = global[lastLogKey] || 0;
+    const shouldLog = (hits % 50 === 0) || (Date.now() - lastLogTime > 300000);
+    
+    if (shouldLog) {
+      console.log(`[${new Date().toISOString()}] Cache HIT for ${prefix} (${hits} hits, age: ${Math.round(cacheAge/1000)}s, TTL: ${Math.round(cacheConfig.TTL/1000)}s)`);
+      global[lastLogKey] = Date.now();
+    }
     return true;
   }
   
@@ -123,7 +132,16 @@ function shouldUseCache(prefix) {
   if (cache.has(prefix)) {
     const misses = cacheMisses.get(prefix) || 0;
     cacheMisses.set(prefix, misses + 1);
-    console.log(`[${new Date().toISOString()}] Cache EXPIRED for ${prefix} (age: ${Math.round(cacheAge/1000)}s, TTL: ${Math.round(cacheConfig.TTL/1000)}s)`);
+    
+    // Reduce cache expiration logging frequency (only log every 10 misses or every 10 minutes)
+    const lastExpireLogKey = `lastCacheExpireLog_${prefix}`;
+    const lastExpireLogTime = global[lastExpireLogKey] || 0;
+    const shouldLogExpire = (misses % 10 === 0) || (Date.now() - lastExpireLogTime > 600000);
+    
+    if (shouldLogExpire) {
+      console.log(`[${new Date().toISOString()}] Cache EXPIRED for ${prefix} (${misses} misses, age: ${Math.round(cacheAge/1000)}s, TTL: ${Math.round(cacheConfig.TTL/1000)}s)`);
+      global[lastExpireLogKey] = Date.now();
+    }
   }
   
   return false;
@@ -321,7 +339,19 @@ app.use((req, res, next) => {
 });
 
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  // Reduce repetitive request logging for better server performance
+  const requestKey = `${req.method}_${req.url}`;
+  const lastLogTime = global[`lastReqLog_${requestKey}`] || 0;
+  const now = Date.now();
+  
+  // Log GET requests less frequently (every 30 seconds for same endpoint)
+  // Always log non-GET requests (POST, PUT, DELETE are important)
+  const shouldLog = req.method !== 'GET' || (now - lastLogTime > 30000);
+  
+  if (shouldLog) {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    global[`lastReqLog_${requestKey}`] = now;
+  }
   next();
 });
 
@@ -478,7 +508,13 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
       return cache.get(prefix);
     }
 
-    console.log(`[${new Date().toISOString()}] Fetching fresh ${platform} data from R2 for prefix: ${prefix}`);
+    // Reduce repetitive "fetching fresh data" logging 
+    const fetchLogKey = `lastFetchLog_${prefix}`;
+    const lastFetchLogTime = global[fetchLogKey] || 0;
+    if (Date.now() - lastFetchLogTime > 120000) { // Log every 2 minutes per prefix
+      console.log(`[${new Date().toISOString()}] Fetching fresh ${platform} data from R2 for prefix: ${prefix}`);
+      global[fetchLogKey] = Date.now();
+    }
     const listCommand = new ListObjectsV2Command({
       Bucket: 'tasks',
       Prefix: prefix,
@@ -1067,12 +1103,24 @@ app.get('/retrieve-account-info/:username', async (req, res) => {
     
     // Check if we should use cache
     if (shouldUseCache(prefix)) {
+      // Reduce repetitive account info cache hit logging
+    const accountLogKey = `lastAccountCacheLog_${prefix}`;
+    const lastAccountLogTime = global[accountLogKey] || 0;
+    if (Date.now() - lastAccountLogTime > 300000) { // Log every 5 minutes per prefix
       console.log(`[${new Date().toISOString()}] Cache hit for account info: ${prefix}`);
+      global[accountLogKey] = Date.now();
+    }
       const cachedData = cache.get(prefix);
       data = cachedData?.find(item => item.key === key)?.data;
       
       if (data) {
-        console.log(`[${new Date().toISOString()}] Returning cached account info for ${normalizedUsername}`);
+        // Reduce repetitive "returning cached account info" logging
+    const returnLogKey = `lastReturnLog_${normalizedUsername}`;
+    const lastReturnLogTime = global[returnLogKey] || 0;
+    if (Date.now() - lastReturnLogTime > 300000) { // Log every 5 minutes per username
+      console.log(`[${new Date().toISOString()}] Returning cached account info for ${normalizedUsername}`);
+      global[returnLogKey] = Date.now();
+    }
         return res.json(data);
       }
     }
@@ -1151,7 +1199,13 @@ app.get('/posts/:username', async (req, res) => {
     const lastFetch = cacheTimestamps.get(prefix) || 0;
 
     if (!forceRefresh && cache.has(prefix)) {
+      // Reduce repetitive posts cache hit logging
+    const postsLogKey = `lastPostsCacheLog_${prefix}`;
+    const lastPostsLogTime = global[postsLogKey] || 0;
+    if (Date.now() - lastPostsLogTime > 300000) { // Log every 5 minutes per prefix
       console.log(`Cache hit for ${platform} posts: ${prefix}`);
+      global[postsLogKey] = Date.now();
+    }
       return res.json(cache.get(prefix));
     }
 
@@ -8013,9 +8067,9 @@ app.post('/save-goal/:username', async (req, res) => {
     
     // Parse platform from query params
     const platform = (req.query.platform || 'instagram').toLowerCase();
-    if (!['instagram', 'twitter'].includes(platform)) {
+    if (!['instagram', 'twitter', 'facebook'].includes(platform)) {
       return res.status(400).json({ 
-        error: 'Invalid platform. Must be instagram or twitter.' 
+        error: 'Invalid platform. Must be instagram, twitter, or facebook.' 
       });
     }
 
@@ -8117,9 +8171,9 @@ app.get('/goal-summary/:username', async (req, res) => {
     
     // Parse platform from query params
     const platform = (req.query.platform || 'instagram').toLowerCase();
-    if (!['instagram', 'twitter'].includes(platform)) {
+    if (!['instagram', 'twitter', 'facebook'].includes(platform)) {
       return res.status(400).json({ 
-        error: 'Invalid platform. Must be instagram or twitter.' 
+        error: 'Invalid platform. Must be instagram, twitter, or facebook.' 
       });
     }
     
@@ -8207,9 +8261,9 @@ app.get('/campaign-posts-count/:username', async (req, res) => {
     
     // Parse platform from query params
     const platform = (req.query.platform || 'instagram').toLowerCase();
-    if (!['instagram', 'twitter'].includes(platform)) {
+    if (!['instagram', 'twitter', 'facebook'].includes(platform)) {
       return res.status(400).json({ 
-        error: 'Invalid platform. Must be instagram or twitter.' 
+        error: 'Invalid platform. Must be instagram, twitter, or facebook.' 
       });
     }
     
@@ -8278,9 +8332,9 @@ app.get('/engagement-metrics/:username', async (req, res) => {
     
     // Parse platform from query params
     const platform = (req.query.platform || 'instagram').toLowerCase();
-    if (!['instagram', 'twitter'].includes(platform)) {
+    if (!['instagram', 'twitter', 'facebook'].includes(platform)) {
       return res.status(400).json({ 
-        error: 'Invalid platform. Must be instagram or twitter.' 
+        error: 'Invalid platform. Must be instagram, twitter, or facebook.' 
       });
     }
     
@@ -8333,9 +8387,9 @@ app.get('/generated-content-summary/:username', async (req, res) => {
     
     // Parse platform from query params
     const platform = (req.query.platform || 'instagram').toLowerCase();
-    if (!['instagram', 'twitter'].includes(platform)) {
+    if (!['instagram', 'twitter', 'facebook'].includes(platform)) {
       return res.status(400).json({ 
-        error: 'Invalid platform. Must be instagram or twitter.' 
+        error: 'Invalid platform. Must be instagram, twitter, or facebook.' 
       });
     }
     
@@ -8437,9 +8491,9 @@ app.get('/campaign-status/:username', async (req, res) => {
     
     // Parse platform from query params
     const platform = (req.query.platform || 'instagram').toLowerCase();
-    if (!['instagram', 'twitter'].includes(platform)) {
+    if (!['instagram', 'twitter', 'facebook'].includes(platform)) {
       return res.status(400).json({ 
-        error: 'Invalid platform. Must be instagram or twitter.' 
+        error: 'Invalid platform. Must be instagram, twitter, or facebook.' 
       });
     }
     
@@ -8497,9 +8551,9 @@ app.delete('/stop-campaign/:username', async (req, res) => {
     
     // Parse platform from query params
     const platform = (req.query.platform || 'instagram').toLowerCase();
-    if (!['instagram', 'twitter'].includes(platform)) {
+    if (!['instagram', 'twitter', 'facebook'].includes(platform)) {
       return res.status(400).json({ 
-        error: 'Invalid platform. Must be instagram or twitter.' 
+        error: 'Invalid platform. Must be instagram, twitter, or facebook.' 
       });
     }
     
@@ -8591,9 +8645,9 @@ app.get('/generated-content-timeline/:username', async (req, res) => {
     
     // Parse platform from query params
     const platform = (req.query.platform || 'instagram').toLowerCase();
-    if (!['instagram', 'twitter'].includes(platform)) {
+    if (!['instagram', 'twitter', 'facebook'].includes(platform)) {
       return res.status(400).json({ 
-        error: 'Invalid platform. Must be instagram or twitter.' 
+        error: 'Invalid platform. Must be instagram, twitter, or facebook.' 
       });
     }
     

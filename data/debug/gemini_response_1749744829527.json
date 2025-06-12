@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Okay, here's an overview of your Facebook account and some tailored suggestions based on the data provided:\n\n**Overall Account Performance:**\n\n*   **High Engagement:** Your posts generally receive a significant number of likes, comments, and shares, indicating a highly engaged audience.\n*   **Strong Video Presence:** You frequently use video content (Reels and regular videos), which tends to perform well on Facebook.\n*   **Tour Promotion:** A large portion of your recent content is focused on promoting your \"Las Mujeres Ya No Lloran\" (LMYNL) World Tour.\n*   **Collaboration:** You often collaborate with other artists, which can help expand your reach.\n*   **New Product Promotion:** You are promoting your new hair product line, @isima.\n\n**Specific Observations & Recommendations:**\n\n1.  **Leverage Reels for Reach:** Your Reels are performing exceptionally well in terms of views. Continue to prioritize short, engaging video content in the Reels format.\n    *   *Action:* Brainstorm creative Reel ideas that showcase your music, dance, behind-the-scenes tour moments, and your new hair product line.\n2.  **Cross-Promote @isima:** You've launched your hair product line, @isima.\n    *   *Action:* Create more content that directly showcases the product, its benefits, and how it ties into your personal brand. Consider running targeted Facebook ads to reach potential customers interested in hair care.\n3.  **Encourage Email Sign-Ups:** In one post, you asked fans to DM their email addresses. This is good for lead generation, but DMs can be hard to manage at scale.\n    *   *Action:* Create a dedicated landing page on your website for email sign-ups and promote it in your posts. Consider offering an incentive (e.g., exclusive content, a discount code) for signing up.\n4.  **Optimize Video Captions:** While your videos often have auto-generated captions in multiple languages, ensure these are accurate and well-timed.\n    *   *Action:* Review and edit the auto-generated captions for your videos, especially in languages other than English and Spanish.\n5.  **Continue Collaborations:** Your collaborations with other artists (e.g., Alejandro Sanz, Bizarrap, Ozuna) drive significant engagement.\n    *   *Action:* Seek out opportunities to collaborate with other artists, influencers, or brands that align with your target audience.\n6.  **Engage in Comments:** While you have high comment volume, there's no data on whether you actively engage in the comments section.\n    *   *Action:* Dedicate time to respond to comments, ask questions, and foster a sense of community on your page.\n7.  **Monitor Ad Library:** The data indicates your page's ad library is inactive.\n    *   *Action:* If you're not currently running paid ads, consider allocating a budget to promote your tour, music, or @isima to a wider audience.\n\n**General Facebook Best Practices:**\n\n*   **Post Consistently:** Maintain a regular posting schedule to keep your audience engaged.\n*   **Use High-Quality Visuals:** Ensure your photos and videos are visually appealing and well-produced.\n*   **Optimize Post Timing:** Experiment with different posting times to see when your audience is most active.\n*   **Track Your Analytics:** Regularly review your Facebook Insights to understand what content is performing well and adjust your strategy accordingly.\n\nBy implementing these strategies, you can further enhance your Facebook presence, increase engagement, and achieve your goals.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.2763243769832335
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 534907,
+    "candidatesTokenCount": 746,
+    "totalTokenCount": 535653,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 534907
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 746
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "q_xKaKKLHvSbhMIP253NSQ"
+}

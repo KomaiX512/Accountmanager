@@ -2891,8 +2891,10 @@ async function fetchFacebookComments(userId) {
 
 async function getFacebookTokenData(userId) {
   try {
+    console.log(`[${new Date().toISOString()}] getFacebookTokenData called with userId: ${userId}`);
     // Check Facebook connection for this user first - more efficient approach
     const connectionKey = `FacebookConnection/${userId}/connection.json`;
+    console.log(`[${new Date().toISOString()}] Looking for connection at key: ${connectionKey}`);
     try {
       const getCommand = new GetObjectCommand({
         Bucket: 'tasks',
@@ -2900,6 +2902,7 @@ async function getFacebookTokenData(userId) {
       });
       const data = await s3Client.send(getCommand);
       const connectionData = JSON.parse(await data.Body.transformToString());
+      console.log(`[${new Date().toISOString()}] Found connection data for ${userId}:`, { hasToken: !!connectionData.access_token, pageId: connectionData.facebook_page_id });
       
       if (connectionData.access_token && connectionData.facebook_page_id) {
         // Return token data from connection - this is more efficient than separate storage
@@ -3992,132 +3995,7 @@ app.options('/facebook-connection/:userId', (req, res) => {
 
 // ============= POST SCHEDULING ENDPOINTS =============
 
-// Schedule post endpoint with multi-platform support
-app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
-  setCorsHeaders(res);
-  
-  const { userId } = req.params;
-  const { caption, scheduleDate, platform = 'instagram' } = req.body;
-  const file = req.file;
-
-  console.log(`[${new Date().toISOString()}] Received schedule-post request for ${platform} user ${userId}: image=${!!file}, caption=${!!caption}, scheduleDate=${scheduleDate}`);
-
-  if (!scheduleDate) {
-    return res.status(400).json({ error: 'Schedule date is required' });
-  }
-
-  const scheduledTime = new Date(scheduleDate);
-  if (scheduledTime <= new Date()) {
-    return res.status(400).json({ error: 'Schedule date must be in the future' });
-  }
-
-  try {
-    if (platform === 'facebook') {
-      // Facebook post scheduling
-      const tokenData = await getFacebookTokenData(userId);
-      if (!tokenData) {
-        return res.status(404).json({ error: 'No Facebook token found for this user' });
-      }
-
-      const scheduleId = `facebook_${userId}_${Date.now()}`;
-      const scheduleData = {
-        id: scheduleId,
-        userId,
-        platform: 'facebook',
-        caption: caption || '',
-        scheduledTime: scheduledTime.toISOString(),
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-        facebook_page_id: tokenData.page_id,
-        access_token: tokenData.access_token
-      };
-
-      // If image is provided, store it
-      if (file) {
-        const imageKey = `FacebookScheduled/${userId}/${scheduleId}_image.jpg`;
-        await s3Client.send(new PutObjectCommand({
-          Bucket: 'tasks',
-          Key: imageKey,
-          Body: file.buffer,
-          ContentType: file.mimetype || 'image/jpeg',
-        }));
-        scheduleData.imageKey = imageKey;
-      }
-
-      // Store schedule data
-      const scheduleKey = `FacebookScheduled/${userId}/${scheduleId}.json`;
-      await s3Client.send(new PutObjectCommand({
-        Bucket: 'tasks',
-        Key: scheduleKey,
-        Body: JSON.stringify(scheduleData, null, 2),
-        ContentType: 'application/json',
-      }));
-
-      console.log(`[${new Date().toISOString()}] Scheduled Facebook post stored with ID ${scheduleId}`);
-      
-      res.json({ 
-        success: true, 
-        message: 'Facebook post scheduled successfully',
-        schedule_id: scheduleId,
-        scheduled_time: scheduledTime.toISOString()
-      });
-    } else {
-      // Instagram post scheduling (existing logic)
-      if (!file) {
-        return res.status(400).json({ error: 'Image is required for Instagram posts' });
-      }
-
-      const tokenData = await getTokenData(userId);
-      if (!tokenData) {
-        return res.status(404).json({ error: 'No Instagram token found for this user' });
-      }
-
-      const scheduleId = `instagram_${userId}_${Date.now()}`;
-      const scheduleData = {
-        id: scheduleId,
-        userId,
-        platform: 'instagram',
-        caption: caption || '',
-        scheduledTime: scheduledTime.toISOString(),
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-        instagram_graph_id: tokenData.instagram_graph_id,
-        access_token: tokenData.access_token
-      };
-
-      // Store image
-      const imageKey = `InstagramScheduled/${userId}/${scheduleId}_image.jpg`;
-      await s3Client.send(new PutObjectCommand({
-        Bucket: 'tasks',
-        Key: imageKey,
-        Body: file.buffer,
-        ContentType: file.mimetype || 'image/jpeg',
-      }));
-      scheduleData.imageKey = imageKey;
-
-      // Store schedule data
-      const scheduleKey = `InstagramScheduled/${userId}/${scheduleId}.json`;
-      await s3Client.send(new PutObjectCommand({
-        Bucket: 'tasks',
-        Key: scheduleKey,
-        Body: JSON.stringify(scheduleData, null, 2),
-        ContentType: 'application/json',
-      }));
-
-      console.log(`[${new Date().toISOString()}] Scheduled Instagram post stored with ID ${scheduleId}`);
-      
-      res.json({ 
-        success: true, 
-        message: 'Instagram post scheduled successfully',
-        schedule_id: scheduleId,
-        scheduled_time: scheduledTime.toISOString()
-      });
-    }
-  } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error scheduling ${platform} post:`, error);
-    res.status(500).json({ error: `Failed to schedule ${platform} post` });
-  }
-});
+// DUPLICATE ENDPOINT REMOVED - Using the comprehensive one above with WebP auto-conversion and better error handling
 
 // Get scheduled posts for a user
 app.get('/scheduled-posts/:userId', async (req, res) => {
@@ -6804,11 +6682,13 @@ function startFacebookScheduler() {
       // Get all scheduled Facebook posts
       const listCommand = new ListObjectsV2Command({
         Bucket: 'tasks',
-        Prefix: 'FacebookScheduled/'
+        Prefix: 'scheduled_posts/facebook/'
       });
       
       const listResponse = await s3Client.send(listCommand);
       const files = listResponse.Contents || [];
+      
+      console.log(`[${new Date().toISOString()}] Found ${files.length} Facebook scheduled files in 'scheduled_posts/facebook/'`);
       
       const now = new Date();
       
@@ -6824,7 +6704,8 @@ function startFacebookScheduler() {
           const data = await s3Client.send(getCommand);
           const scheduledPost = JSON.parse(await streamToString(data.Body));
           
-          const scheduledTime = new Date(scheduledPost.scheduledTime);
+          const scheduledTime = new Date(scheduledPost.scheduleDate || scheduledPost.scheduledTime);
+          console.log(`[${new Date().toISOString()}] Facebook post ${scheduledPost.id}: scheduled for ${scheduledTime.toISOString()}, status: ${scheduledPost.status}, current time: ${now.toISOString()}`);
           
           // Check if post is due (within 1 minute tolerance)
           if (scheduledTime <= now && (scheduledPost.status === 'pending' || scheduledPost.status === 'scheduled')) {
@@ -6832,10 +6713,13 @@ function startFacebookScheduler() {
             
             try {
               // Get Facebook access token
+              console.log(`[${new Date().toISOString()}] Looking for Facebook token for userId: ${scheduledPost.userId}`);
               const tokenData = await getFacebookTokenData(scheduledPost.userId);
               if (!tokenData) {
+                console.log(`[${new Date().toISOString()}] No Facebook token found for user ${scheduledPost.userId}`);
                 throw new Error('No Facebook token found for user');
               }
+              console.log(`[${new Date().toISOString()}] Found Facebook token for page_id: ${tokenData.page_id}`);
 
               // Verify this is a business page (since we now only support Pages)
               let isBusinessPage = true;
@@ -6900,6 +6784,7 @@ function startFacebookScheduler() {
                 // For business pages, proceed with normal posting
                 let postUrl = `https://graph.facebook.com/v18.0/${tokenData.page_id}/feed`;
                 let postData = { message: scheduledPost.caption };
+                let postResponse;
 
                 // If image is provided, upload it first
                 if (scheduledPost.imageKey) {
@@ -6924,7 +6809,7 @@ function startFacebookScheduler() {
                   // Post with image using photo endpoint
                   postUrl = `https://graph.facebook.com/v18.0/${tokenData.page_id}/photos`;
                   
-                  const postResponse = await axios.post(postUrl, formData, {
+                  postResponse = await axios.post(postUrl, formData, {
                     params: {
                       access_token: tokenData.access_token
                     },
@@ -6936,7 +6821,7 @@ function startFacebookScheduler() {
                   console.log(`[${new Date().toISOString()}] Facebook post with image published successfully: ${postResponse.data.id}`);
                 } else {
                   // Post text-only message
-                  const postResponse = await axios.post(postUrl, postData, {
+                  postResponse = await axios.post(postUrl, postData, {
                     params: {
                       access_token: tokenData.access_token
                     }
@@ -6944,6 +6829,9 @@ function startFacebookScheduler() {
 
                   console.log(`[${new Date().toISOString()}] Facebook text post published successfully: ${postResponse.data.id}`);
                 }
+                
+                // Store the post ID for tracking
+                scheduledPost.facebook_post_id = postResponse.data.id;
               }
 
               // Update status to completed

@@ -644,9 +644,8 @@ async function callGeminiAPIDirect(prompt, messages = [], retries = 2) {
       const generatedText = response.data.candidates[0].content.parts[0].text;
       
       if (!generatedText || generatedText.trim() === '') {
-        console.log('[RAG-Server] Empty text generated - this may be due to content filtering');
-        // Don't immediately assume quota exhaustion - could be content filtering
-        throw new Error('API_ERROR: Empty response - possibly filtered content');
+        console.log('[RAG-Server] Empty text generated - this indicates content filtering');
+        throw new Error('API_ERROR: Empty response - content filtering detected');
       }
       
       // Save successful response for debugging
@@ -728,69 +727,159 @@ async function callGeminiAPI(prompt, messages = [], retries = 2) {
   return await queuedGeminiAPICall(prompt, messages, retries);
 }
 
-// Create the instruction prompt for RAG with profile and rules
+// Create REAL RAG prompt using actual scraped profile data - NO FALLBACKS
 function createRagPrompt(profileData, rulesData, query, platform = 'instagram', usingFallbackProfile = false) {
   const platformName = platform === 'twitter' ? 'X (Twitter)' : 
                       platform === 'facebook' ? 'Facebook' : 
                       'Instagram';
   
-  // Content filtering bypass - sanitize potentially problematic phrases
-  let sanitizedQuery = query;
-  const queryLower = query.toLowerCase();
+  // Extract REAL profile insights from scraped data
+  let profileInsights = '';
+  let accountMetrics = '';
+  let contentStrategy = '';
   
-  if (queryLower.includes('tell me about my account') || queryLower.includes('about my account')) {
-    sanitizedQuery = `Provide a strategic overview for this ${platformName} account including optimization recommendations`;
-    console.log(`[RAG-Server] Sanitized content-filtered query for better processing`);
+  if (profileData && !usingFallbackProfile) {
+    console.log(`[RAG-Server] DEBUG: Profile data type: ${typeof profileData}, isArray: ${Array.isArray(profileData)}`);
+    console.log(`[RAG-Server] DEBUG: Profile data keys: ${Object.keys(profileData).slice(0, 10).join(', ')}`);
+    
+    // REAL STRUCTUREDB PROFILE EXTRACTION
+    let profile = null;
+    
+    if (Array.isArray(profileData)) {
+      // For Twitter: Array of tweets, extract profile from first tweet's author
+      if (profileData.length > 0 && profileData[0].author) {
+        profile = profileData[0].author;
+        console.log(`[RAG-Server] ✅ EXTRACTED Twitter profile from tweet author: ${profile.userName || profile.name}`);
+      } else {
+        profile = profileData[0];
+      }
+    } else if (profileData.data && Array.isArray(profileData.data)) {
+      // Handle nested data array
+      if (profileData.data.length > 0 && profileData.data[0].author) {
+        profile = profileData.data[0].author;
+        console.log(`[RAG-Server] ✅ EXTRACTED profile from nested data author: ${profile.userName || profile.name}`);
+      } else {
+        profile = profileData.data[0];
+      }
+    } else if (profileData.username || profileData.name || profileData.userName) {
+      // Direct profile object (Instagram format)
+      profile = profileData;
+      console.log(`[RAG-Server] ✅ DIRECT profile object: ${profile.username || profile.userName || profile.name}`);
+    } else {
+      // Fallback to first available object
+      profile = profileData;
+    }
+    
+    console.log(`[RAG-Server] DEBUG: Final extracted profile - username: ${profile?.username || profile?.userName}, followers: ${profile?.followersCount || profile?.followers}`);
+    
+    if (profile) {
+      // Extract key metrics and insights with REAL STRUCTUREDB field mapping
+      const username = profile.username || profile.userName || profile.name || 'N/A';
+      const fullName = profile.fullName || profile.full_name || profile.display_name || profile.name || 'N/A';
+      const followers = profile.followersCount || profile.followers_count || profile.followers || 'N/A';
+      const following = profile.followsCount || profile.following_count || profile.following || 'N/A';
+      const posts = profile.postsCount || profile.posts_count || profile.statusesCount || 'N/A';
+      const verified = profile.verified || profile.is_verified || profile.isVerified || profile.isBlueVerified || false;
+      const business = profile.isBusinessAccount || profile.is_business_account || false;
+      const category = profile.businessCategoryName || profile.category || 'N/A';
+      const bio = profile.biography || profile.bio || profile.description || '';
+      
+      console.log(`[RAG-Server] ✅ REAL METRICS EXTRACTED: ${username} - ${followers} followers, ${following} following, ${posts} posts`);
+      
+      accountMetrics = `
+ACCOUNT METRICS:
+- Username: ${username}
+- Full Name: ${fullName}
+- Followers: ${followers}
+- Following: ${following}
+- Posts: ${posts}
+- Verified: ${verified ? 'Yes' : 'No'}
+- Business Account: ${business ? 'Yes' : 'No'}
+- Category: ${category}`;
+
+      // Extract bio and content insights
+      if (bio) {
+        profileInsights = `
+BIO ANALYSIS:
+"${bio}"
+
+CONTENT THEMES IDENTIFIED:
+${extractContentThemes(bio)}`;
+      }
+
+      // Extract related profiles for competitive insights
+      if (profile.relatedProfiles && profile.relatedProfiles.length > 0) {
+        const competitors = profile.relatedProfiles.slice(0, 5).map(p => p.username).join(', ');
+        contentStrategy = `
+COMPETITIVE LANDSCAPE:
+Related accounts: ${competitors}
+This indicates the account operates in a competitive space with these key players.`;
+      }
+
+      // Extract external links for business insights
+      if (profile.externalUrls && profile.externalUrls.length > 0) {
+        const businessLinks = profile.externalUrls.map(url => url.title || url.url).join(', ');
+        contentStrategy += `
+BUSINESS INTEGRATION:
+External links: ${businessLinks}
+This shows strong e-commerce/business integration.`;
+      }
+    }
+  }
+
+  // Create content-filter-safe query
+  let safeQuery = query
+    .replace(/\btell me about my account\b/gi, 'analyze this account performance')
+    .replace(/\bmy account\b/gi, 'this account')
+    .replace(/\bmy\b/gi, 'this')
+    .replace(/\bme\b/gi, 'the account');
+
+  console.log(`[RAG-Server] Real RAG query: "${safeQuery}"`);
+
+  // REAL RAG PROMPT using actual scraped data
+  return `You are analyzing a ${platformName} account. Use the provided data to give specific insights.
+
+${accountMetrics}
+${profileInsights}
+${contentStrategy}
+
+QUERY: ${safeQuery}
+
+Based on the ACTUAL account data above, provide specific recommendations that reference:
+1. The account's current metrics and performance
+2. Content themes from the bio
+3. Competitive positioning 
+4. Business integration opportunities
+5. Platform-specific growth tactics
+
+Give actionable advice based on this real data, not generic tips.`;
+}
+
+// Helper function to extract content themes from bio
+function extractContentThemes(bio) {
+  if (!bio) return 'No bio content to analyze';
+  
+  const themes = [];
+  const bioLower = bio.toLowerCase();
+  
+  // Beauty/Fashion themes
+  if (bioLower.includes('beauty') || bioLower.includes('makeup') || bioLower.includes('cosmetics')) {
+    themes.push('Beauty & Cosmetics');
+  }
+  if (bioLower.includes('fashion') || bioLower.includes('style')) {
+    themes.push('Fashion & Style');
+  }
+  if (bioLower.includes('shop') || bioLower.includes('buy') || bioLower.includes('store')) {
+    themes.push('E-commerce & Shopping');
+  }
+  if (bioLower.includes('cruelty free') || bioLower.includes('sustainable')) {
+    themes.push('Ethical & Sustainable');
+  }
+  if (bioLower.includes('tag') || bioLower.includes('#')) {
+    themes.push('User-Generated Content');
   }
   
-  // Detect query type for better response structuring
-  const isAccountAnalysis = queryLower.includes('account') || queryLower.includes('profile') || queryLower.includes('overview');
-  const isStrategyQuery = queryLower.includes('strategy') || queryLower.includes('improve') || queryLower.includes('grow');
-  
-  const profileNote = usingFallbackProfile ? 
-    `\nNote: Working with limited profile data - providing general ${platformName} best practices.` : 
-    `\nReference the profile data for personalized recommendations.`;
-  
-  let responseStructure = '';
-  if (isAccountAnalysis) {
-    responseStructure = `
-Structure your response to cover:
-1. Account optimization opportunities
-2. Content strategy recommendations  
-3. Growth tactics specific to ${platformName}
-4. Engagement improvement methods
-5. Next immediate action steps`;
-  } else if (isStrategyQuery) {
-    responseStructure = `
-Focus on actionable ${platformName} strategies:
-1. Content planning and creation
-2. Audience engagement tactics
-3. Growth and reach optimization
-4. Performance measurement
-5. Platform-specific best practices`;
-  }
-  
-  return `
-# ${platformName} Strategy Assistant
-
-You are an expert ${platformName} consultant providing strategic social media advice.
-
-## Account Information
-Platform: ${platformName}
-Username: ${profileData.username || 'Account'}
-Category: ${profileData.category || 'Content Creator'}
-Followers: ${profileData.followers_count || 'Not specified'}
-
-## Strategy Request
-${sanitizedQuery}
-
-${profileNote}
-${responseStructure}
-
-Provide specific, actionable ${platformName} strategy advice. Focus on practical steps the user can implement immediately to improve their account performance and engagement.
-
-Keep recommendations realistic and platform-appropriate, referencing current ${platformName} best practices and features.
-`;
+  return themes.length > 0 ? themes.join(', ') : 'Lifestyle & General Content';
 }
 
 // API endpoint for discussion mode
@@ -839,43 +928,8 @@ app.post('/api/discussion', async (req, res) => {
       rulesData = {};
     }
     
-    // Check if this is a follow-up message
-    const isFollowUp = previousMessages && previousMessages.length > 0;
-    
-    // Create RAG prompt
-    let ragPrompt;
-    if (isFollowUp) {
-      const platformName = platform === 'twitter' ? 'X (Twitter)' : 
-                          platform === 'facebook' ? 'Facebook' : 
-                          'Instagram';
-      
-      // For follow-up messages, include a special instruction to handle context
-      ragPrompt = `
-# INSTRUCTION A - DISCUSSION MODE (FOLLOW-UP)
-You are a ${platformName} Manager Assistant having a conversation with a user about their social media strategy.
-
-## USER PROFILE DATA
-${JSON.stringify(profileData, null, 2)}
-
-## ACCOUNT RULES
-${JSON.stringify(rulesData, null, 2)}
-
-## CONVERSATION HISTORY
-The user has been asking about their ${platformName} strategy. You've been answering their questions.
-Review the conversation history provided separately to maintain context.
-
-## CURRENT QUERY
-${query}
-
-Please respond in a helpful, direct, and actionable manner that provides specific advice for the ${platformName} account.
-Maintain continuity with the previous parts of the conversation.
-Keep your response concise but informative, with specific references to the user's account details when relevant.
-Focus on ${platformName}-specific best practices and strategies.
-`;
-    } else {
-      // For initial messages, use the standard prompt
-      ragPrompt = createRagPrompt(profileData, rulesData, query, platform, usingFallbackProfile);
-    }
+    // Always use the enhanced RAG prompt with real data
+    const ragPrompt = createRagPrompt(profileData, rulesData, query, platform, usingFallbackProfile);
     
     // Call Gemini API
     let response;
@@ -886,73 +940,7 @@ Focus on ${platformName}-specific best practices and strategies.
       
       // Verify we have a valid response
       if (!response || response.trim() === '') {
-        console.log(`[RAG-Server] Empty response detected - attempting content filtering bypass`);
-        
-        // EMERGENCY BYPASS: Use ultra-safe prompt for content filtering issues
-        const safePrompt = `
-You are a ${platformName} strategy consultant. 
-
-Account: ${profileData.username || 'Account'}
-Platform: ${platformName}
-Request: ${sanitizedQuery || 'Account strategy advice'}
-
-Provide 3-5 specific ${platformName} best practices for:
-1. Content optimization
-2. Engagement improvement  
-3. Growth strategies
-4. Performance tracking
-
-Keep advice practical and platform-specific.
-`;
-        
-        console.log(`[RAG-Server] Trying emergency safe prompt bypass`);
-        response = await callGeminiAPI(safePrompt, []);
-        
-      if (!response || response.trim() === '') {
-        // Try fallback approach for follow-ups - simplify by ignoring context
-        if (isFollowUp) {
-          console.log(`[RAG-Server] Empty response received for follow-up, trying fallback approach`);
-          
-          const platformName = platform === 'twitter' ? 'X (Twitter)' : 
-                              platform === 'facebook' ? 'Facebook' : 
-                              'Instagram';
-          
-          // Create a simplified prompt that doesn't rely on conversation history
-          const fallbackPrompt = `
-# INSTRUCTION A - DISCUSSION MODE (FALLBACK)
-You are a ${platformName} Manager Assistant helping with social media strategy.
-
-## USER PROFILE DATA
-${JSON.stringify(profileData, null, 2)}
-
-## ACCOUNT RULES
-${JSON.stringify(rulesData, null, 2)}
-
-## CONTEXT
-The user has been asking about their ${platformName} strategy.
-Their latest question is: "${query}"
-
-Please respond directly to this question without requiring previous context.
-Be helpful, direct, and actionable, providing specific advice for the ${platformName} account.
-Focus on ${platformName}-specific best practices and strategies.
-`;
-          
-          // Call Gemini API without previous messages
-          const fallbackResponse = await callGeminiAPI(fallbackPrompt, []);
-          
-          if (!fallbackResponse || fallbackResponse.trim() === '') {
-            throw new Error('Failed to generate response even with fallback approach');
-          }
-          
-          response = fallbackResponse;
-          usedFallback = true;
-        } else {
-          throw new Error('Empty response received from Gemini API');
-          }
-        } else {
-          console.log(`[RAG-Server] Emergency bypass successful - generated response`);
-          usedFallback = true;
-        }
+        throw new Error('Empty response received from Gemini API');
       }
     } catch (error) {
       // Handle quota exhaustion with graceful fallback
@@ -1247,7 +1235,7 @@ function safelyReadJsonFile(filePath) {
   }
 }
 
-// API endpoint to get conversation history
+// API endpoint to get conversation history with enhanced platform session management
 app.get('/api/conversations/:username', async (req, res) => {
   const { username } = req.params;
   const platform = req.query.platform || 'instagram';
@@ -1255,7 +1243,7 @@ app.get('/api/conversations/:username', async (req, res) => {
   try {
     console.log(`[RAG-Server] Fetching conversation history for ${platform}/${username}`);
     
-    // First try to get conversations from R2
+    // First try to get conversations from R2 with platform-specific path
     try {
       const data = await tasksS3.listObjects({
         Bucket: 'tasks',
@@ -1263,29 +1251,46 @@ app.get('/api/conversations/:username', async (req, res) => {
       }).promise();
       
       if (data.Contents && data.Contents.length > 0) {
-        // Sort by key in descending order (newest first) and take the latest one
-        const latestKey = data.Contents
-          .sort((a, b) => b.Key.localeCompare(a.Key))[0].Key;
+        // Get ALL conversation files and build complete history
+        const conversationFiles = data.Contents
+          .filter(obj => obj.Key.endsWith('.json'))
+          .sort((a, b) => a.Key.localeCompare(b.Key)); // Sort chronologically
         
-        const conversationData = await tasksS3.getObject({
-          Bucket: 'tasks',
-          Key: latestKey
-        }).promise();
-        
-        const parsedData = JSON.parse(conversationData.Body.toString());
-        
-        // Convert to chat message format
         const messages = [];
-        if (parsedData.query && parsedData.response) {
-          messages.push({ role: 'user', content: parsedData.query });
-          messages.push({ role: 'assistant', content: parsedData.response });
+        
+        // Process each conversation file to build complete history
+        for (const file of conversationFiles) {
+          try {
+            const conversationData = await tasksS3.getObject({
+              Bucket: 'tasks',
+              Key: file.Key
+            }).promise();
+            
+            const parsedData = JSON.parse(conversationData.Body.toString());
+            
+            // Add previous messages first if they exist
+            if (parsedData.previousMessages && Array.isArray(parsedData.previousMessages)) {
+              parsedData.previousMessages.forEach(msg => {
+                // Avoid duplicates by checking if message already exists
+                if (!messages.some(existingMsg => 
+                  existingMsg.content === msg.content && existingMsg.role === msg.role
+                )) {
+                  messages.push(msg);
+                }
+              });
+            }
+            
+            // Add current query and response
+            if (parsedData.query && parsedData.response) {
+              messages.push({ role: 'user', content: parsedData.query });
+              messages.push({ role: 'assistant', content: parsedData.response });
+            }
+          } catch (fileError) {
+            console.warn(`[RAG-Server] Error processing conversation file ${file.Key}:`, fileError.message);
+          }
         }
         
-        if (parsedData.previousMessages && Array.isArray(parsedData.previousMessages)) {
-          // Add previous messages at the beginning
-          parsedData.previousMessages.forEach(msg => messages.unshift(msg));
-        }
-        
+        console.log(`[RAG-Server] Loaded ${messages.length} messages from ${conversationFiles.length} files for ${platform}/${username}`);
         return res.json({ messages });
       }
     } catch (error) {
@@ -1298,8 +1303,10 @@ app.get('/api/conversations/:username', async (req, res) => {
     if (fs.existsSync(conversationFile)) {
       const data = fs.readFileSync(conversationFile, 'utf8');
       const messages = JSON.parse(data);
+      console.log(`[RAG-Server] Loaded ${messages.length} messages from local file for ${platform}/${username}`);
       res.json({ messages });
     } else {
+      console.log(`[RAG-Server] No conversation history found for ${platform}/${username}`);
       res.json({ messages: [] });
     }
   } catch (error) {

@@ -1,0 +1,18 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "You are a social media marketing expert. Provide 5 actionable Instagram tips for: how to grow a Instagram\n\nFocus on:\n- Content optimization\n- Engagement strategies  \n- Growth techniques\n- Performance improvement\n- Platform best practices\n\nKeep advice practical and Instagram-specific."
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 2000,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "topK": 40
+  }
+}

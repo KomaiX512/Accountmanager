@@ -2021,7 +2021,7 @@ app.post('/webhook/facebook', async (req, res) => {
 });
 
 // Helper function to get token data
-async function getTokenData(instagram_graph_id) {
+async function getTokenData(userIdOrGraphId) {
   const listCommand = new ListObjectsV2Command({
     Bucket: 'tasks',
     Prefix: `InstagramTokens/`,
@@ -2039,15 +2039,19 @@ async function getTokenData(instagram_graph_id) {
         const data = await s3Client.send(getCommand);
         const json = await data.Body.transformToString();
         const token = JSON.parse(json);
-        if (token.instagram_graph_id === instagram_graph_id) {
+        
+        // Search by BOTH instagram_graph_id AND instagram_user_id
+        if (token.instagram_graph_id === userIdOrGraphId || 
+            token.instagram_user_id === userIdOrGraphId) {
           tokenData = token;
+          console.log(`[${new Date().toISOString()}] Found token for ${userIdOrGraphId}: graph_id=${token.instagram_graph_id}, user_id=${token.instagram_user_id}`);
           break;
         }
       }
     }
   }
   if (!tokenData) {
-    throw new Error(`No token found for instagram_graph_id ${instagram_graph_id}`);
+    throw new Error(`No token found for user_id/graph_id ${userIdOrGraphId}`);
   }
   return tokenData;
 }
@@ -3499,6 +3503,152 @@ app.post('/post-instagram-now/:userId', upload.single('image'), async (req, res)
     res.status(500).json({ 
       error: errorMessage,
       details: error.response?.data || error.message 
+    });
+  }
+});
+
+// ============= INSTAGRAM SCHEDULING ENDPOINT =============
+
+// Schedule Instagram post endpoint - matches our successful real-time implementation
+app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
+  setCorsHeaders(res);
+  
+  const { userId } = req.params;
+  const { caption, scheduleDate, platform = 'instagram' } = req.body;
+  const file = req.file;
+
+  console.log(`[${new Date().toISOString()}] Schedule post request for user ${userId}: image=${!!file}, caption=${!!caption}, scheduleDate=${scheduleDate}`);
+
+  if (!file || !caption || !scheduleDate) {
+    return res.status(400).json({ error: 'Missing required fields: image, caption, or scheduleDate' });
+  }
+
+  try {
+    // Validate schedule date
+    const scheduledTime = new Date(scheduleDate);
+    const now = new Date();
+    const maxFutureDate = new Date(now.getTime() + 75 * 24 * 60 * 60 * 1000); // 75 days max
+
+    if (scheduledTime <= now) {
+      return res.status(400).json({ error: 'Schedule date must be in the future' });
+    }
+
+    if (scheduledTime > maxFutureDate) {
+      return res.status(400).json({ error: 'Schedule date cannot be more than 75 days in the future' });
+    }
+
+    // Use the same image processing logic as our successful real-time posting
+    let imageBuffer = file.buffer;
+    
+    // Detect actual image format from file content (magic bytes)
+    let actualFormat = 'unknown';
+    let mimeType = file.mimetype;
+    
+    if (imageBuffer.length >= 4) {
+      // Check for JPEG signature (FF D8)
+      if (imageBuffer[0] === 0xFF && imageBuffer[1] === 0xD8) {
+        actualFormat = 'jpeg';
+        mimeType = 'image/jpeg';
+      }
+      // Check for PNG signature (89 50 4E 47)
+      else if (imageBuffer[0] === 0x89 && imageBuffer[1] === 0x50 && 
+               imageBuffer[2] === 0x4E && imageBuffer[3] === 0x47) {
+        actualFormat = 'png';
+        mimeType = 'image/png';
+      }
+      // Check for WebP signature (RIFF + WEBP) and convert to JPEG
+      else if (imageBuffer.length >= 12 &&
+               imageBuffer.toString('ascii', 0, 4) === 'RIFF' &&
+               imageBuffer.toString('ascii', 8, 12) === 'WEBP') {
+        actualFormat = 'webp';
+        console.log(`[${new Date().toISOString()}] WebP image detected in scheduled post, converting to JPEG...`);
+        
+        try {
+          // Convert WebP to JPEG using sharp
+          imageBuffer = await sharp(imageBuffer)
+            .jpeg({ 
+              quality: 85, // High quality JPEG
+              progressive: true 
+            })
+            .toBuffer();
+          
+          // Update format and mimetype after conversion
+          actualFormat = 'jpeg';
+          mimeType = 'image/jpeg';
+          
+          console.log(`[${new Date().toISOString()}] WebP successfully converted to JPEG for scheduled post (${imageBuffer.length} bytes)`);
+        } catch (conversionError) {
+          console.error(`[${new Date().toISOString()}] WebP conversion failed for scheduled post:`, conversionError);
+          return res.status(400).json({ 
+            error: 'Failed to convert WebP image to JPEG format.',
+            details: 'There was an issue converting your WebP image. Please try with a JPEG or PNG image instead.'
+          });
+        }
+      }
+    }
+    
+    // Validate that we detected a supported format
+    if (!['jpeg', 'png'].includes(actualFormat)) {
+      return res.status(400).json({ 
+        error: `Unsupported image format detected. Instagram API only supports JPEG and PNG images.`,
+        details: `Detected format: ${actualFormat}. Reported mimetype: ${file.mimetype}`
+      });
+    }
+    
+    // Validate image size (Instagram requirements)
+    if (imageBuffer.length > 8 * 1024 * 1024) {
+      return res.status(400).json({ error: 'Image too large. Maximum file size is 8MB for Instagram posts.' });
+    }
+
+    // Generate unique keys for storage
+    const scheduleId = `schedule_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    const imageKey = `scheduled_posts/${platform}/${userId}/${scheduleId}.${actualFormat}`;
+    const scheduleKey = `scheduled_posts/${platform}/${userId}/${scheduleId}.json`;
+
+    // Store image in R2
+    await s3Client.send(new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: imageKey,
+      Body: imageBuffer,
+      ContentType: mimeType,
+    }));
+
+    // Store schedule data
+    const scheduleData = {
+      id: scheduleId,
+      userId,
+      platform,
+      caption: caption.trim(),
+      scheduleDate: scheduledTime.toISOString(),
+      imageKey,
+      imageFormat: actualFormat,
+      status: 'scheduled',
+      createdAt: new Date().toISOString(),
+      attempts: 0
+    };
+
+    await s3Client.send(new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: scheduleKey,
+      Body: JSON.stringify(scheduleData, null, 2),
+      ContentType: 'application/json',
+    }));
+
+    console.log(`[${new Date().toISOString()}] Post scheduled successfully: ${scheduleId} for ${scheduledTime.toISOString()}`);
+
+    res.json({ 
+      success: true, 
+      message: 'Post scheduled successfully!',
+      scheduleId,
+      scheduledFor: scheduledTime.toISOString(),
+      imageFormat: actualFormat
+    });
+
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error scheduling post:`, error.message);
+    res.status(500).json({ 
+      error: 'Failed to schedule post',
+      details: error.message 
     });
   }
 });
@@ -7121,6 +7271,207 @@ function startTwitterScheduler() {
   }, 60000); // Check every minute
 }
 
+// ============= INSTAGRAM POST SCHEDULER =============
+
+// Instagram scheduler worker - checks for due Instagram posts every minute  
+function startInstagramScheduler() {
+  console.log(`[${new Date().toISOString()}] Starting Instagram post scheduler...`);
+  
+  setInterval(async () => {
+    try {
+      await processScheduledInstagramPosts();
+    } catch (error) {
+      console.error(`[${new Date().toISOString()}] Instagram scheduler error:`, error);
+    }
+  }, 60000); // Check every minute
+}
+
+async function processScheduledInstagramPosts() {
+  try {
+    // List all scheduled posts
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: 'scheduled_posts/instagram/',
+      MaxKeys: 100
+    });
+    
+    const response = await s3Client.send(listCommand);
+    const now = new Date();
+    
+    if (response.Contents) {
+      for (const object of response.Contents) {
+        if (!object.Key?.endsWith('.json')) continue;
+        
+        try {
+          // Get schedule data
+          const getCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: object.Key
+          });
+          
+          const scheduleResponse = await s3Client.send(getCommand);
+          const scheduleDataStr = await streamToString(scheduleResponse.Body);
+          const scheduleData = JSON.parse(scheduleDataStr);
+          
+          // Check if it's time to post
+          const scheduleTime = new Date(scheduleData.scheduleDate);
+          
+          if (scheduleData.status === 'scheduled' && scheduleTime <= now) {
+            console.log(`[${new Date().toISOString()}] Processing scheduled post: ${scheduleData.id}`);
+            await executeScheduledPost(scheduleData);
+          }
+          
+        } catch (itemError) {
+          console.error(`[${new Date().toISOString()}] Error processing scheduled item ${object.Key}:`, itemError.message);
+        }
+      }
+    }
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error in processScheduledInstagramPosts:`, error.message);
+  }
+}
+
+async function executeScheduledPost(scheduleData) {
+  try {
+    // Update status to processing
+    scheduleData.status = 'processing';
+    scheduleData.attempts = (scheduleData.attempts || 0) + 1;
+    scheduleData.lastAttempt = new Date().toISOString();
+    
+    // Save processing status
+    const scheduleKey = `scheduled_posts/${scheduleData.platform}/${scheduleData.userId}/${scheduleData.id}.json`;
+    await s3Client.send(new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: scheduleKey,
+      Body: JSON.stringify(scheduleData, null, 2),
+      ContentType: 'application/json',
+    }));
+    
+    // Get the image from R2
+    const imageResponse = await s3Client.send(new GetObjectCommand({
+      Bucket: 'tasks',
+      Key: scheduleData.imageKey
+    }));
+    
+    const imageBuffer = await streamToBuffer(imageResponse.Body);
+    
+    // Get Instagram token data - now handles both user ID and graph ID automatically
+    const tokenData = await getTokenData(scheduleData.userId);
+    
+    const { access_token, instagram_graph_id } = tokenData;
+    
+    // Use the same successful posting logic as real-time posting
+    const tempDir = path.join(process.cwd(), 'server', 'temp-images');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+    
+    const imageFilename = `${Date.now()}-${scheduleData.id}.${scheduleData.imageFormat}`;
+    const imagePath = path.join(tempDir, imageFilename);
+    
+    // Write image to local temp file
+    fs.writeFileSync(imagePath, imageBuffer);
+    
+    // Construct public URL for Instagram access (same as real-time posting)
+    const baseUrl = process.env.PUBLIC_URL || 'https://84e7-121-52-146-243.ngrok-free.app';
+    const publicImageUrl = `${baseUrl}/temp-images/${imageFilename}`;
+    
+    console.log(`[${new Date().toISOString()}] Executing scheduled post via: ${publicImageUrl}`);
+    
+    // Upload image and create media object using Instagram API
+    const mediaResponse = await axios.post(`https://graph.instagram.com/v22.0/${instagram_graph_id}/media`, {
+      image_url: publicImageUrl,
+      caption: scheduleData.caption,
+      access_token: access_token
+    }, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const mediaId = mediaResponse.data.id;
+    console.log(`[${new Date().toISOString()}] Instagram media created for scheduled post: ${mediaId}`);
+
+    // Publish the media
+    const publishResponse = await axios.post(`https://graph.instagram.com/v22.0/${instagram_graph_id}/media_publish`, {
+      creation_id: mediaId,
+      access_token: access_token
+    }, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const postId = publishResponse.data.id;
+    console.log(`[${new Date().toISOString()}] Scheduled Instagram post published successfully: ${postId}`);
+
+    // Update schedule status to completed
+    scheduleData.status = 'completed';
+    scheduleData.completedAt = new Date().toISOString();
+    scheduleData.postId = postId;
+    scheduleData.mediaId = mediaId;
+    
+    await s3Client.send(new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: scheduleKey,
+      Body: JSON.stringify(scheduleData, null, 2),
+      ContentType: 'application/json',
+    }));
+
+    // Store post record for tracking (same as real-time posting)
+    const postKey = `InstagramPosts/${scheduleData.userId}/${postId}.json`;
+    const postData = {
+      id: postId,
+      userId: scheduleData.userId,
+      platform: 'instagram',
+      caption: scheduleData.caption,
+      media_id: mediaId,
+      instagram_graph_id,
+      posted_at: new Date().toISOString(),
+      status: 'published',
+      type: 'scheduled_post',
+      schedule_id: scheduleData.id
+    };
+
+    await s3Client.send(new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: postKey,
+      Body: JSON.stringify(postData, null, 2),
+      ContentType: 'application/json',
+    }));
+
+    // Clean up temporary image
+    try {
+      fs.unlinkSync(imagePath);
+      console.log(`[${new Date().toISOString()}] Scheduled post temporary image cleaned up: ${imageFilename}`);
+    } catch (cleanupError) {
+      console.warn(`[${new Date().toISOString()}] Failed to cleanup scheduled post image: ${cleanupError.message}`);
+    }
+
+    console.log(`[${new Date().toISOString()}] Scheduled post executed successfully: ${scheduleData.id} -> ${postId}`);
+
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error executing scheduled post ${scheduleData.id}:`, error.message);
+    
+    // Update status to failed if max attempts reached
+    if (scheduleData.attempts >= 3) {
+      scheduleData.status = 'failed';
+      scheduleData.failedAt = new Date().toISOString();
+      scheduleData.error = error.message;
+    } else {
+      scheduleData.status = 'scheduled'; // Retry later
+    }
+    
+    const scheduleKey = `scheduled_posts/${scheduleData.platform}/${scheduleData.userId}/${scheduleData.id}.json`;
+    await s3Client.send(new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: scheduleKey,
+      Body: JSON.stringify(scheduleData, null, 2),
+      ContentType: 'application/json',
+    }));
+  }
+}
+
 // ============= DEBUG/UTILITY ENDPOINTS =============
 
 // Get Facebook posting capabilities (utility endpoint)
@@ -7324,9 +7675,95 @@ app.post('/sync-facebook-tokens/:userId', async (req, res) => {
   }
 });
 
-// Start the Twitter scheduler
+// Start the schedulers  
 startTwitterScheduler();
 startFacebookScheduler();
+startInstagramScheduler();
+
+// Debug endpoint to check Instagram token mapping
+app.get('/debug/instagram-tokens', async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  try {
+    console.log(`[${new Date().toISOString()}] Debug: Listing Instagram tokens...`);
+    
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: 'InstagramTokens/'
+    });
+    
+    const listResponse = await s3Client.send(listCommand);
+    const files = listResponse.Contents || [];
+    
+    const tokens = [];
+    
+    for (const file of files) {
+      if (file.Key.endsWith('/token.json')) {
+        try {
+          const getCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: file.Key
+          });
+          const data = await s3Client.send(getCommand);
+          const tokenData = JSON.parse(await streamToString(data.Body));
+          
+          tokens.push({
+            key: file.Key,
+            instagram_user_id: tokenData.instagram_user_id,
+            instagram_graph_id: tokenData.instagram_graph_id,
+            username: tokenData.username,
+            stored_at: tokenData.timestamp
+          });
+        } catch (error) {
+          console.error(`Error reading token file ${file.Key}:`, error);
+        }
+      }
+    }
+    
+    // Also check connections
+    const connListCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: 'InstagramConnection/'
+    });
+    
+    const connResponse = await s3Client.send(connListCommand);
+    const connFiles = connResponse.Contents || [];
+    
+    const connections = [];
+    
+    for (const file of connFiles) {
+      if (file.Key.endsWith('/connection.json')) {
+        try {
+          const getCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: file.Key
+          });
+          const data = await s3Client.send(getCommand);
+          const connData = JSON.parse(await streamToString(data.Body));
+          
+          connections.push({
+            key: file.Key,
+            uid: connData.uid,
+            instagram_graph_id: connData.instagram_graph_id,
+            username: connData.username
+          });
+        } catch (error) {
+          console.error(`Error reading connection file ${file.Key}:`, error);
+        }
+      }
+    }
+    
+    console.log(`[${new Date().toISOString()}] Found ${tokens.length} tokens and ${connections.length} connections`);
+    res.json({ tokens, connections });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error listing Instagram data:`, error);
+    res.status(500).json({ 
+      error: 'Failed to list Instagram data', 
+      details: error.message 
+    });
+  }
+});
 
 // Debug endpoint to list connected Twitter users
 app.get('/debug/twitter-users', async (req, res) => {

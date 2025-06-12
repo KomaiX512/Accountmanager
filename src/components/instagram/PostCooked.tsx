@@ -10,6 +10,7 @@ import FacebookRequiredButton from '../common/FacebookRequiredButton';
 import { useInstagram } from '../../context/InstagramContext';
 import { useTwitter } from '../../context/TwitterContext';
 import { useFacebook } from '../../context/FacebookContext';
+import { schedulePost, fetchImageFromR2, extractImageKey } from '../../utils/scheduleHelpers';
 import axios from 'axios';
 import {
   Avatar,
@@ -624,149 +625,40 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       setToastMessage('Network error marking post as scheduled, but attempting to schedule anyway.');
     }
 
-    if (platform === 'twitter') {
-      // For Twitter, handle text-only scheduling
-      const caption = post.data.post?.caption || '';
-      console.log(`[Schedule] Scheduling Twitter post for ${selectedPostKey}: "${caption}"`);
-      
-      if (caption.length > 280) {
-        setToastMessage('Tweet text exceeds 280 characters.');
-        return;
-      }
-      
-      try {
-        const response = await axios.post(`${API_BASE_URL}/api/schedule-tweet/${userId}`, {
-          text: caption.trim(),
-          scheduled_time: scheduleTime.toISOString()
-        });
-
-        if (response.data.success) {
-          setToastMessage('Your tweet is scheduled!');
-        } else {
-          setToastMessage('Failed to schedule tweet: ' + response.data.message);
+    // Use smart reusable schedule helper for all platforms
+    const caption = post.data.post?.caption || '';
+    let imageBlob: Blob | null = null;
+    
+    // Fetch image for platforms that support it
+    if (platform !== 'twitter' || (platform === 'twitter' && post.data.image_url)) {
+      const imageKey = extractImageKey(post);
+      if (imageKey) {
+        imageBlob = await fetchImageFromR2(username, imageKey, platform);
+        if (!imageBlob) {
+          setToastMessage('Failed to fetch image for post.');
+          return;
         }
-      } catch (err: any) {
-        console.error(`[Schedule] Error scheduling tweet for ${selectedPostKey}:`, err.message);
-        setToastMessage(`Error scheduling tweet: ${err.response?.data?.error || err.message}`);
-      }
-    } else if (platform === 'facebook') {
-      // Facebook scheduling supports optional image
-      const caption = post.data.post?.caption || '';
-      console.log(`[Schedule] Scheduling Facebook post for ${selectedPostKey}`);
-      try {
-        const formData = new FormData();
-        formData.append('caption', caption);
-        formData.append('scheduleDate', scheduleTime.toISOString());
-        formData.append('platform', 'facebook');
-
-        // Attempt to add image if available
-        let imageBlob: Blob | null = null;
-        let filename = '';
-        if (post.data.image_url) {
-          try {
-            const proxyUrl = `${API_BASE_URL}/api/proxy-image?url=${encodeURIComponent(post.data.image_url)}`;
-            const imgRes = await fetch(proxyUrl);
-            imageBlob = await imgRes.blob();
-            filename = `post_${selectedPostKey}.jpg`;
-          } catch (imgErr) {
-            console.warn('[Schedule] Unable to fetch image for Facebook post, proceeding with text-only');
-          }
-        }
-        if (imageBlob) {
-          formData.append('image', imageBlob, filename);
-        }
-
-        const resp = await fetch(`${API_BASE_URL}/schedule-post/${userId}`, {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!resp.ok) {
-          const errData = await resp.json().catch(() => ({}));
-          console.error('[Schedule] Facebook schedule failed:', errData.error || resp.statusText);
-          setToastMessage(`Failed to schedule Facebook post: ${errData.error || 'Unknown error'}`);
-        } else {
-          setToastMessage('Your Facebook post is on schedule!');
-        }
-      } catch (err: any) {
-        console.error('[Schedule] Error scheduling Facebook post:', err.message);
-        setToastMessage(`Error scheduling Facebook post: ${err.message}`);
-      }
-    } else {
-      // Instagram scheduling logic (existing)
-      let imageKey = '';
-      if (post.data.image_url && post.data.image_url.includes('/ready_post/')) {
-        const match = post.data.image_url.match(/ready_post\/[\w-]+\/(image_\d+\.jpg)/);
-        if (match) imageKey = match[1];
-      }
-      if (!imageKey && post.key.match(/ready_post_\d+\.json$/)) {
-        const postIdMatch = post.key.match(/ready_post_(\d+)\.json$/);
-        if (postIdMatch) imageKey = `image_${postIdMatch[1]}.jpg`;
-      }
-      if (!imageKey) {
-        setToastMessage('Could not determine image for post.');
+      } else if (platform === 'instagram') {
+        setToastMessage('Could not determine image for Instagram post.');
         return;
-      }
-      let signedImageUrl = '';
-      try {
-        const signedUrlRes = await fetch(`${API_BASE_URL}/api/signed-image-url/${username}/${imageKey}`);
-        const signedUrlData = await signedUrlRes.json();
-        signedImageUrl = signedUrlData.url;
-        if (!signedImageUrl) throw new Error('No signed URL returned');
-        console.log(`[Schedule] Got signed URL for post ${selectedPostKey}:`, signedImageUrl);
-      } catch (err: any) {
-        console.error(`[Schedule] Failed to get signed URL for post ${selectedPostKey}:`, err);
-        setToastMessage('Failed to get image for post.');
-        return;
-      }
-      let imageBlob: Blob | null = null;
-      try {
-        const proxyUrl = `${API_BASE_URL}/api/proxy-image?url=${encodeURIComponent(signedImageUrl)}`;
-        const imgRes = await fetch(proxyUrl);
-        imageBlob = await imgRes.blob();
-        console.log(`[Schedule] Image fetched for post ${selectedPostKey} via proxy`);
-      } catch (e: any) {
-        console.error(`[Schedule] Failed to fetch image for post ${selectedPostKey}:`, e);
-        setToastMessage('Failed to fetch image for post.');
-        return;
-      }
-      if (!['image/jpeg', 'image/png'].includes(imageBlob.type)) {
-        console.error(`[Schedule] Image is not a valid JPEG/PNG, got: ${imageBlob.type}`);
-        setToastMessage('Image is not a valid JPEG/PNG.');
-        return;
-      }
-      let caption = post.data.post?.caption || '';
-      console.log(`[Schedule] Original caption length: ${caption.length} chars`);
-      if (caption.length > 2150) {
-        console.warn(`[Schedule] Caption too long, truncating to 2150 chars.`);
-        caption = caption.slice(0, 2150);
-      }
-      console.log(`[Schedule] Caption length after truncation: ${caption.length} chars`);
-      const filename = `post_${selectedPostKey}.jpg`;
-      const formData = new FormData();
-      formData.append('image', imageBlob, filename);
-      formData.append('caption', caption);
-      formData.append('scheduleDate', scheduleTime.toISOString());
-      try {
-        console.log(`[Schedule] Sending schedule request for post ${selectedPostKey} to /schedule-post/${userId}`);
-        const resp = await fetch(`${API_BASE_URL}/schedule-post/${userId}`, {
-          method: 'POST',
-          body: formData,
-        });
-        if (!resp.ok) {
-          const errData = await resp.json().catch(() => ({}));
-          console.error(`[Schedule] Failed to schedule post ${selectedPostKey}:`, errData.error || resp.statusText);
-          setToastMessage(`Failed to schedule post: ${errData.error || 'Unknown server error'}`);
-        } else {
-          const respData = await resp.json().catch(() => ({}));
-          console.log(`[Schedule] Scheduled post ${selectedPostKey} successfully:`, respData);
-          setToastMessage('Your post is on schedule!');
-        }
-      } catch (err: any) {
-        console.error(`[Schedule] Error scheduling post ${selectedPostKey}:`, err.message);
-        setToastMessage(`Error scheduling post: ${err.message}`);
       }
     }
+    
+    // Truncate caption for Instagram
+    const finalCaption = platform === 'instagram' && caption.length > 2150 
+      ? caption.slice(0, 2150) 
+      : caption;
+    
+    const result = await schedulePost({
+      platform,
+      userId,
+      imageBlob: imageBlob || undefined,
+      caption: finalCaption,
+      scheduleTime,
+      postKey: selectedPostKey
+    });
+    
+    setToastMessage(result.message);
     
     setShowScheduleModal(false);
     setSelectedPostKey(null);

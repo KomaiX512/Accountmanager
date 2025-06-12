@@ -5,6 +5,7 @@ import 'react-datepicker/dist/react-datepicker.css';
 import axios from 'axios';
 import './PostScheduler.css';
 import { useInstagram } from '../../context/InstagramContext';
+import { schedulePost } from '../../utils/scheduleHelpers';
 
 interface PostSchedulerProps {
   userId: string;
@@ -37,7 +38,7 @@ const PostScheduler: React.FC<PostSchedulerProps> = ({ userId, onClose, platform
         const aspectRatio = width / height;
         const validAspectRatio = aspectRatio >= 0.8 && aspectRatio <= 1.91;
         const validResolution = width >= 320 && width <= 1080;
-        const validType = ['image/jpeg', 'image/png'].includes(file.type);
+        const validType = ['image/jpeg', 'image/png', 'image/webp'].includes(file.type);
         const validSize = file.size <= 8 * 1024 * 1024;
         resolve(validAspectRatio && validResolution && validType && validSize);
         URL.revokeObjectURL(img.src);
@@ -64,27 +65,35 @@ const PostScheduler: React.FC<PostSchedulerProps> = ({ userId, onClose, platform
       return;
     }
 
+    // Enhanced validation with WebP support (auto-conversion)
     const isValidImage = await validateImage(file);
     if (!isValidImage) {
-      setError('Invalid image. Must be JPEG/PNG, 320-1080px width, aspect ratio 0.8-1.91, max 8MB.');
+      setError('Invalid image. Must be JPEG/PNG/WebP, 320-1080px width, aspect ratio 0.8-1.91, max 8MB.');
       return;
     }
 
-    const formData = new FormData();
-    formData.append('image', file);
-    formData.append('caption', data.caption);
-    formData.append('scheduleDate', scheduleDate.toISOString());
-
     setIsSubmitting(true);
     try {
-      await axios.post(`http://localhost:3000/schedule-post/${userIdToUse}`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+      // Use smart reusable schedule helper
+      const result = await schedulePost({
+        platform,
+        userId: userIdToUse,
+        imageBlob: file,
+        caption: data.caption,
+        scheduleTime: scheduleDate,
+        postKey: undefined
       });
-      console.log(`[${new Date().toISOString()}] Post scheduled successfully for user ${userIdToUse}`);
-      onClose();
+      
+      if (result.success) {
+        console.log(`[${new Date().toISOString()}] Post scheduled successfully for user ${userIdToUse} on ${platform}`);
+        setError(null);
+        onClose();
+      } else {
+        setError(result.message);
+      }
     } catch (err: any) {
-      console.error(`[${new Date().toISOString()}] Post scheduling failed:`, err.response?.data || err.message);
-      setError(err.response?.data?.error || 'Failed to schedule post.');
+      console.error(`[${new Date().toISOString()}] Post scheduling failed:`, err);
+      setError('Failed to schedule post due to unexpected error.');
     } finally {
       setIsSubmitting(false);
     }
@@ -108,10 +117,10 @@ const PostScheduler: React.FC<PostSchedulerProps> = ({ userId, onClose, platform
         ) : (
           <form onSubmit={handleSubmit(onSubmit)}>
             <div className="form-group">
-              <label className="form-label">Image (JPEG/PNG, 1080x1080 recommended)</label>
+              <label className="form-label">Image (JPEG/PNG/WebP, 1080x1080 recommended)</label>
               <input
                 type="file"
-                accept="image/jpeg,image/png"
+                accept="image/jpeg,image/png,image/webp"
                 {...register('image', { required: 'Image is required' })}
                 className="form-input"
               />

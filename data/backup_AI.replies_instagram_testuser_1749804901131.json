@@ -1,0 +1,18 @@
+{
+  "username": "testuser",
+  "platform": "instagram",
+  "timestamp": "2025-06-13T08:55:01.131Z",
+  "notification": {
+    "type": "message",
+    "message_id": "test_1749804900394",
+    "text": "Love your latest post!",
+    "username": "curious_user",
+    "timestamp": 1749804900394,
+    "platform": "instagram"
+  },
+  "reply": "Hey! 👋 I'm testuser. I'm just navigating life and sharing my experiences along the way. I enjoy connecting with people and learning new things! 😊 What about you?",
+  "mode": "instant",
+  "usedFallback": false,
+  "hasProfileData": false,
+  "hasConversationHistory": false
+}

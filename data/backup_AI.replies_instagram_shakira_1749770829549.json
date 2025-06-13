@@ -1,0 +1,16 @@
+{
+  "username": "shakira",
+  "platform": "instagram",
+  "timestamp": "2025-06-12T23:27:09.549Z",
+  "notification": {
+    "type": "message",
+    "message_id": "122098031894908442_1241828124263415",
+    "text": "Great",
+    "timestamp": 1749770827081,
+    "received_at": "2025-06-12T23:27:07.081Z",
+    "status": "pending",
+    "platform": "facebook"
+  },
+  "reply": "Awesome! 😎\n",
+  "mode": "instant"
+}

@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Hey! 👋 Sure, I can help. What kind of growth tips are you looking for? Like, content ideas, engagement, or something else? ✨\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.2471712827682495
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 204,
+    "candidatesTokenCount": 32,
+    "totalTokenCount": 236,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 204
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 32
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "ktBLaPIS-vf81Q-5w5-QCA"
+}

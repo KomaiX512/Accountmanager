@@ -1,0 +1,20 @@
+{
+  "username": "testuser",
+  "platform": "instagram",
+  "timestamp": "2025-06-13T07:17:47.727Z",
+  "notification": {
+    "type": "message",
+    "facebook_user_id": "test_fb_123",
+    "facebook_page_id": "page_123",
+    "sender_id": "fb_user_789",
+    "message_id": "fb_msg_1749799052068",
+    "text": "Hi there! Looking for Facebook marketing advice.",
+    "timestamp": 1749799052068,
+    "received_at": "2025-06-13T07:17:32.068Z",
+    "username": "facebook_test",
+    "status": "pending",
+    "platform": "facebook"
+  },
+  "reply": "Hey! 👋 Sure, I can help. What kind of growth tips are you looking for? Like, content ideas, engagement, or something else? ✨\n",
+  "mode": "instant"
+}

@@ -1,0 +1,18 @@
+{
+  "username": "testuser",
+  "platform": "instagram",
+  "timestamp": "2025-06-13T08:56:50.476Z",
+  "notification": {
+    "type": "message",
+    "message_id": "test_advice",
+    "text": "How can I get more Instagram followers?",
+    "username": "growth_seeker",
+    "timestamp": 1234567891,
+    "platform": "instagram"
+  },
+  "reply": "Hey there! 👋 Growing your Instagram following can take some work, but here are a few tips that have helped me:\n\n*   **Post consistently:** Try to stick to a regular schedule so people know when to expect new content.\n*   **Engage with others:** Like and comment on other people's posts, and reply to comments you receive.\n*   **Use relevant hashtags:** Research popular hashtags in your niche and use them in your posts.\n*   **Create high-quality content:** Make sure your photos and videos are well-lit and visually appealing.\n*   **Collaborate with other accounts:** Partner with other creators to reach a wider audience.\n\nHope this helps! Good luck! ✨",
+  "mode": "instant",
+  "usedFallback": false,
+  "hasProfileData": false,
+  "hasConversationHistory": false
+}

@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption:\n🚨 NEW DROP ALERT 🚨 Get ready to GLOW UP, besties! ✨ We're dropping something HUGE that's gonna change your makeup game forever. Stay tuned for the reveal… you DON'T wanna miss this! 😉\n\nHashtags:\n#FentyBeauty #NewDrop #MakeupLover #GlowUp #ComingSoon #Rihanna #BeautyHacks #MakeupObsessed #FentyGlow #Beauty\n\nCall to Action:\nGuess what it is in the comments below! 👇\n\nVisual Description for Image:\nThe image should be a close-up, highly stylized and glamorous shot focusing on a model's face. The model should have flawless, glowing skin, showcasing a subtle, dewy makeup look. The lighting should be soft and diffused, creating a halo effect around the face. The background should be blurred and out of focus, with hints of shimmering gold and rose gold particles floating in the air, creating a luxurious and ethereal feel. The model's eyes should be partially closed, with long, dramatic lashes. Focus should be on the cheekbones, highlighted with a radiant, pearlescent highlighter. The overall mood should be mysterious and alluring, hinting at the new product without fully revealing it. The image should have a high-fashion editorial feel, with a touch of playfulness and intrigue. The color palette should be warm and inviting, dominated by golds, bronzes, and soft pinks. The composition should be asymmetrical, with the model's face slightly off-center to create visual interest. The image should evoke a sense of anticipation and excitement for the upcoming product launch.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.3480109361723471
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 264,
+    "candidatesTokenCount": 331,
+    "totalTokenCount": 595,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 264
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 331
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "BWFLaNLZOcWWgLUPvdCV6AU"
+}

@@ -1,0 +1,10 @@
+{
+  "username": "test_user",
+  "platform": "instagram",
+  "timestamp": "2025-06-13T13:32:55.362Z",
+  "query": "Test query 1 - tell me about social media strategy",
+  "response": "Okay, I've analyzed the provided Instagram data and have formulated the following social media strategy recommendations:\n\n**Account Overview & Current Performance:**\n\nBased on the provided data, I lack the actual data to provide specific recommendations. To provide specific recommendations, I need the actual data.\n",
+  "previousMessages": [],
+  "usedFallback": false,
+  "quotaExhausted": false
+}

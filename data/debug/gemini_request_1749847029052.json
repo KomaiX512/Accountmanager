@@ -1,0 +1,18 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Professional Instagram Business Consultation\n\nBusiness Profile Data:\n\n\nContent Strategy Insights:\n\n\nGrowth Analysis:\n\n\nBusiness Question: what makes this business profile unique\n\nPlease provide professional business recommendations:\n• Growth strategy development\n• Audience engagement tactics  \n• Content performance optimization\n• Platform-specific best practices\n\nFocus on data-driven business insights."
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 2000,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "topK": 40
+  }
+}

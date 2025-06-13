@@ -1,0 +1,18 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Social media growth analysis for Facebook:\n\n\n\n\n\nTask: tell account about the strategy\n\nProvide growth recommendations:\n- Follower acquisition strategies\n- Content performance optimization  \n- Engagement rate improvements\n- Best practices implementation\n\nFocus on data-driven actionable advice."
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 2000,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "topK": 40
+  }
+}

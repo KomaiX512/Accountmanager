@@ -825,15 +825,8 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       const data = await response.json();
       console.log(`[${new Date().toISOString()}] Received ${data.length} ${platform} notifications`);
 
-      const aiRepliesResponse = await fetch(`http://localhost:3000/ai-replies/${accountHolder}?platform=${platform}`);
-      let aiReplies: any[] = [];
-      
-      if (aiRepliesResponse.ok) {
-        aiReplies = await aiRepliesResponse.json();
-        console.log(`[${new Date().toISOString()}] Received ${aiReplies.length} ${platform} AI replies`);
-      } else {
-        console.error(`[${new Date().toISOString()}] Failed to fetch ${platform} AI replies: ${aiRepliesResponse.status}`);
-      }
+      const aiReplies = await RagService.fetchAIReplies(accountHolder, platform);
+      console.log(`[${new Date().toISOString()}] Received ${aiReplies.length} ${platform} AI replies`);
       
       const processedNotifications = data.map((notif: any) => {
         const matchingAiReply = aiReplies.find(pair => {

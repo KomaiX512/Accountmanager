@@ -1,0 +1,18 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "You are analyzing a X (Twitter) account. Use the provided REAL scraped data to give specific, data-driven insights.\n\n\nACCOUNT METRICS:\n- Username: elonmusk\n- Full Name: Elon Musk\n- Followers: 220243049\n- Following: 1140\n- Posts: 79481\n- Verified: Yes\n- Business Account: No\n- Category: N/A\n\n\nRECENT POST ANALYSIS (98 posts analyzed):\nDiverse content mix across various topics\n\nTOP PERFORMING CONTENT:\nImage posts (avg 2648595 engagement)\n\nENGAGEMENT PATTERNS:\nHigh-performing posts average 0 hashtags, Average engagement per post: 2648595, Top post engagement: 5115542\n\nOPTIMAL POSTING STRATEGY:\nMaintain consistent posting and engage with audience\n\n\nQUERY: tell the account about this high engaging posts\n\nBased on the ACTUAL account data above, provide specific recommendations that reference:\n1. The account's current metrics and performance trends\n2. Content themes from bio AND actual post analysis\n3. Top-performing content types from post data\n4. Engagement patterns and optimal strategies\n5. Competitive positioning and business opportunities\n6. Platform-specific growth tactics aligned with proven performance\n\n**CRITICAL**: Use ONLY the real data provided above. Reference specific numbers, themes, and patterns from the analysis. Format your response with **bold** for key points and bullet points for actionable recommendations.\n\nGive actionable advice based on this actual performance data, not generic tips."
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 2000,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "topK": 40
+  }
+}

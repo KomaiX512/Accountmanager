@@ -1408,6 +1408,70 @@ const deadlockDetector = setInterval(() => {
 
 deadlockDetector.unref();
 
+// AI Replies endpoint for Dashboard
+app.get('/ai-replies/:username', async (req, res) => {
+  const { username } = req.params;
+  const platform = req.query.platform || 'instagram';
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [AI-REPLIES] Fetching AI replies for ${platform}/${username}`);
+    
+    // Get AI replies from R2 storage
+    const listParams = {
+      Bucket: 'tasks',
+      Prefix: `AI.replies/${platform}/${username}/`,
+      MaxKeys: 50 // Limit to last 50 replies
+    };
+    
+    const data = await s3Client.listObjects(listParams).promise();
+    
+    if (!data.Contents || data.Contents.length === 0) {
+      console.log(`[${new Date().toISOString()}] [AI-REPLIES] No AI replies found for ${platform}/${username}`);
+      return res.json({ replies: [] });
+    }
+    
+    // Sort by last modified and get the most recent replies
+    const sortedObjects = data.Contents
+      .sort((a, b) => new Date(b.LastModified) - new Date(a.LastModified))
+      .slice(0, 20); // Get last 20 replies
+    
+    const replies = [];
+    
+    // Fetch each reply data
+    for (const obj of sortedObjects) {
+      try {
+        const replyData = await s3Client.getObject({
+          Bucket: 'tasks',
+          Key: obj.Key
+        }).promise();
+        
+        const reply = JSON.parse(replyData.Body.toString());
+        replies.push({
+          id: obj.Key.split('/').pop().replace('.json', ''),
+          timestamp: reply.timestamp,
+          notification: reply.notification,
+          reply: reply.reply,
+          mode: reply.mode || 'instant',
+          usedFallback: reply.usedFallback || false,
+          platform: reply.platform || platform
+        });
+      } catch (error) {
+        console.warn(`[${new Date().toISOString()}] [AI-REPLIES] Error fetching reply ${obj.Key}:`, error.message);
+      }
+    }
+    
+    console.log(`[${new Date().toISOString()}] [AI-REPLIES] Found ${replies.length} AI replies for ${platform}/${username}`);
+    res.json({ replies });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [AI-REPLIES] Error fetching AI replies:`, error);
+    res.status(500).json({ 
+      error: 'Failed to fetch AI replies',
+      details: error.message 
+    });
+  }
+});
+
 app.listen(port, '0.0.0.0', () => {
   console.log(`Server running at http://localhost:${port}`);
   console.log('Ready to receive hierarchical data at POST /scrape');

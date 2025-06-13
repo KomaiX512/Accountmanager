@@ -314,15 +314,8 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
       console.log(`[${new Date().toISOString()}] Received ${data.length} notifications`);
 
       // Now fetch AI replies separately to merge them
-      const aiRepliesResponse = await fetch(`http://localhost:3000/ai-replies/${accountHolder}`);
-      let aiReplies: any[] = [];
-      
-      if (aiRepliesResponse.ok) {
-        aiReplies = await aiRepliesResponse.json();
-        console.log(`[${new Date().toISOString()}] Received ${aiReplies.length} AI replies`);
-      } else {
-        console.error(`[${new Date().toISOString()}] Failed to fetch AI replies: ${aiRepliesResponse.status}`);
-      }
+      const aiReplies = await RagService.fetchAIReplies(accountHolder, 'instagram');
+      console.log(`[${new Date().toISOString()}] Received ${aiReplies.length} AI replies`);
       
       // Process notifications to include AI replies
       const processedNotifications = data.map((notif: any) => {

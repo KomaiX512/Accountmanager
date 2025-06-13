@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Okay, I need the actual scraped Instagram account data to provide a data-driven analysis and recommendations. Please provide the data, and I will analyze it and provide a response formatted as requested. I will focus on:\n\n*   **Referencing specific numbers, themes, and patterns from the data.**\n*   **Using bold for key points and bullet points for actionable recommendations.**\n*   **Avoiding generic tips and focusing on actionable advice based on the actual performance data.**\n\nOnce you provide the data, I will deliver a comprehensive analysis and recommendations.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.3023369993482317
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 160,
+    "candidatesTokenCount": 112,
+    "totalTokenCount": 272,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 160
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 112
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "qoRMaPbzF8OU3NoP4uugmQ4"
+}

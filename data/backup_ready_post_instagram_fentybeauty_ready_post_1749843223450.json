@@ -1,0 +1,27 @@
+{
+  "post": {
+    "caption": "Glow up, buttercup! ✨ We're serving up serious radiance with our Eaze Drop Blurring Skin Tint. It's your everyday filter in a bottle, giving you that effortlessly flawless Fenty Face. Ready to unlock your best skin yet? 😉",
+    "hashtags": [
+      "#FentyBeauty",
+      "#EazeDrop",
+      "#BlurringSkinTint",
+      "#Makeup",
+      "#GlowUp",
+      "#Rihanna",
+      "#Beauty",
+      "#SkinTint",
+      "#NoMakeupMakeup",
+      "#FentyFace"
+    ],
+    "call_to_action": "Tap the link in bio to shop Eaze Drop and find your perfect shade!",
+    "image_prompt": "A close-up shot focusing on a model's face, showcasing the natural, blurred effect of Fenty Beauty's Eaze Drop Blurring Skin Tint. The model has a light-medium skin tone with a healthy, dewy glow. The lighting is soft and diffused, creating a flattering and ethereal feel. The background is a blurred, warm beige color, keeping the focus entirely on the model's skin. The model is wearing minimal makeup, just a touch of mascara and a nude lip gloss, emphasizing the \"no-makeup makeup\" look achieved with Eaze Drop. Her hair is styled in loose, effortless waves, framing her face. The composition is slightly asymmetrical, with the model's face angled slightly to the left. The overall mood is confident, radiant, and approachable. The image should feel high-quality and aspirational, yet still relatable and achievable for everyday wear. A subtle, almost imperceptible, Fenty Beauty logo is placed in the bottom right corner. The image should evoke a feeling of effortless beauty and healthy, glowing skin."
+  },
+  "timestamp": 1749843223450,
+  "image_path": "ready_post/instagram/fentybeauty/image_1749843223450.jpg",
+  "image_url": "http://127.0.0.1:3002/fix-image/fentybeauty/image_1749843223450.jpg?platform=instagram",
+  "r2_image_url": "http://127.0.0.1:3002/fix-image/fentybeauty/image_1749843223450.jpg?platform=instagram",
+  "generated_at": "2025-06-13T19:33:43.450Z",
+  "queryUsed": "create next post which are more likely to engaging and theme aligned",
+  "status": "new",
+  "platform": "instagram"
+}

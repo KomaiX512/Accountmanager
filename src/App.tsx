@@ -57,6 +57,7 @@ const AppContent: React.FC = () => {
     isOpen: boolean;
     messages: ChatModalMessage[];
     platform: 'instagram' | 'twitter' | 'facebook';
+    isProcessing?: boolean;
     quotaInfo?: {
       exhausted: boolean;
       resetTime?: string;
@@ -67,6 +68,7 @@ const AppContent: React.FC = () => {
     isOpen: false,
     messages: [],
     platform: 'instagram',
+    isProcessing: false,
     quotaInfo: null,
     usingFallbackProfile: false
   });
@@ -165,6 +167,7 @@ const AppContent: React.FC = () => {
       isOpen: false,
       messages: [],
       platform: 'instagram',
+      isProcessing: false,
       quotaInfo: null,
       usingFallbackProfile: false
     });
@@ -473,8 +476,17 @@ const AppContent: React.FC = () => {
             messages={chatModalData.messages}
             username={`${accountHolder} (${chatModalData.platform.charAt(0).toUpperCase() + chatModalData.platform.slice(1)})`}
             platform={chatModalData.platform}
+            isProcessing={chatModalData.isProcessing}
             onSendMessage={(message: string) => {
               if (!message.trim() || !accountHolder) return;
+              
+              // Show loading state immediately
+              const userMessage: ChatModalMessage = { role: 'user', content: message };
+              setChatModalData(prev => ({
+                ...prev,
+                messages: [...prev.messages, userMessage],
+                isProcessing: true
+              }));
               
               // Load RagService dynamically
               import('./services/RagService').then(({ default: RagService }) => {
@@ -489,15 +501,17 @@ const AppContent: React.FC = () => {
                       message: string; 
                     } 
                   }) => {
+                    const assistantMessage: ChatModalMessage = { role: 'assistant', content: response.response };
                     const updatedMessages = [
                       ...chatModalData.messages,
-                      { role: 'user' as const, content: message },
-                      { role: 'assistant' as const, content: response.response }
+                      userMessage,
+                      assistantMessage
                     ];
                     
                     setChatModalData(prev => ({
                       ...prev,
                       messages: updatedMessages,
+                      isProcessing: false,
                       quotaInfo: response.quotaInfo || null,
                       usingFallbackProfile: response.usingFallbackProfile || false
                     }));
@@ -508,6 +522,11 @@ const AppContent: React.FC = () => {
                   })
                   .catch((error: any) => {
                     console.error('Error with chat message:', error);
+                    // Remove loading state on error
+                    setChatModalData(prev => ({
+                      ...prev,
+                      isProcessing: false
+                    }));
                   });
               });
             }}

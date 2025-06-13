@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Okay, I need you to provide me with the Instagram account data you want me to analyze. Please share the following information:\n\n*   **Account Bio:** The exact text of the account's bio.\n*   **Key Metrics:**\n    *   Follower Count\n    *   Engagement Rate (average likes and comments per post, divided by follower count)\n    *   Reach (average number of unique accounts reached per post)\n    *   Impressions (average total number of times posts have been seen)\n    *   Website Clicks (if applicable)\n    *   Story Views (average views per story)\n    *   Demographics (age, gender, location of followers - if available)\n*   **Content Performance:**\n    *   Examples of top-performing posts (based on likes, comments, shares, saves) and their themes.\n    *   Examples of underperforming posts and their themes.\n    *   Types of content posted (e.g., photos, videos, Reels, carousels, stories, lives).\n    *   Frequency of posting.\n*   **Competitor Information:**\n    *   Names of key competitor accounts.\n    *   What are they doing well?\n    *   Where are they lacking?\n*   **Business Integration:**\n    *   What products or services does the account promote?\n    *   How does the account currently integrate its business (e.g., link in bio, product tags, shopping features)?\n\nOnce you provide this data, I can give you specific and actionable recommendations for your Instagram strategy.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.12981438996928696
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 95,
+    "candidatesTokenCount": 331,
+    "totalTokenCount": 426,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 95
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 331
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "2YRMaLSaFa6ThMIPypif-QU"
+}

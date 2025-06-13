@@ -238,7 +238,7 @@
   padding: 20px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
   overflow-y: auto;
-  max-height: 600px;
+  max-height: 680px;
   border: 1px solid rgba(0, 255, 204, 0.4);
 }
 
@@ -248,7 +248,7 @@
   border-radius: 16px;
   padding: 20px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-  max-height: 600px;
+  max-height: 680px;
   overflow-y: auto;
   border: 1px solid rgba(0, 255, 204, 0.4);
 }

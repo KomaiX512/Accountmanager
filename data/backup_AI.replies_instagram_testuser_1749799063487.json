@@ -1,0 +1,19 @@
+{
+  "username": "testuser",
+  "platform": "instagram",
+  "timestamp": "2025-06-13T07:17:43.487Z",
+  "notification": {
+    "type": "message",
+    "twitter_user_id": "test_twitter_123",
+    "sender_id": "twitter_user_456",
+    "message_id": "tweet_msg_1749799052068",
+    "text": "Hey! What are the best Twitter engagement strategies?",
+    "timestamp": 1749799052068,
+    "received_at": "2025-06-13T07:17:32.068Z",
+    "username": "twitter_test",
+    "status": "pending",
+    "platform": "twitter"
+  },
+  "reply": "Hey! 👋 Sure, I can help. What kind of growth tips are you looking for? Like, content ideas, engagement, or something else? ✨\n",
+  "mode": "instant"
+}

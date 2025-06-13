@@ -1,0 +1,18 @@
+{
+  "username": "testuser",
+  "platform": "instagram",
+  "timestamp": "2025-06-13T08:53:39.028Z",
+  "notification": {
+    "type": "message",
+    "message_id": "test_1749804804108",
+    "text": "Tell me about yourself?",
+    "username": "curious_user",
+    "timestamp": 1749804804108,
+    "platform": "instagram"
+  },
+  "reply": "Hey @curious_user! 👋 Hmm, where to start? I'm testuser, and I'm just navigating life and sharing my experiences along the way. I don't really have a specific niche, just posting about things that interest me! 😊",
+  "mode": "instant",
+  "usedFallback": false,
+  "hasProfileData": false,
+  "hasConversationHistory": false
+}

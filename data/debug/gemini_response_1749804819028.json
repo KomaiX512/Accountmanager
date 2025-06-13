@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Hey @curious_user! 👋 Hmm, where to start? I'm testuser, and I'm just navigating life and sharing my experiences along the way. I don't really have a specific niche, just posting about things that interest me! 😊\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.262003916281241
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 350,
+    "candidatesTokenCount": 54,
+    "totalTokenCount": 404,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 350
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 54
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "EudLaMn4B_r3_NUPucOfkAg"
+}

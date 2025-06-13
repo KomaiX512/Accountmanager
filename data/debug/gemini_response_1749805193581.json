@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Hola! It seems like you're asking who you're talking to. 😉 You're talking with Shakira! It's a pleasure to connect with you. ✨\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.2656836774614122
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 145,
+    "candidatesTokenCount": 36,
+    "totalTokenCount": 181,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 145
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 36
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "iOhLaKz4OsODsbQPouV4"
+}

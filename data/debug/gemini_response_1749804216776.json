@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Hey! 👋 Thanks for reaching out! 😊\n\nEngagement can be tricky, but here are a few things that have helped me:\n\n*   **High-Quality Content:** Make sure your photos/videos are clear, well-lit, and visually appealing.\n*   **Captions that Spark Conversation:** Ask questions, tell a story, or share something personal to encourage comments.\n*   **Engage Back:** Respond to comments and DMs promptly. People appreciate knowing you're listening!\n*   **Use Relevant Hashtags:** Research popular hashtags in your niche to reach a wider audience.\n*   **Post Consistently:** Regular posting keeps you top-of-mind.\n\nHope these help! Let me know if you have any other questions! 👍\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.16467703542401713
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 652,
+    "candidatesTokenCount": 155,
+    "totalTokenCount": 807,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 652
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 155
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "tuRLaN6NOtrD1PIPkKS2oAw"
+}

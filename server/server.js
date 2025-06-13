@@ -2670,6 +2670,67 @@ app.get('/events-list/:userId', async (req, res) => {
   }
 });
 
+// Helper function to filter out handled/replied/ignored notifications
+async function filterHandledNotifications(notifications, userId, platform) {
+  if (!notifications || notifications.length === 0) {
+    return notifications;
+  }
+
+  const eventPrefix = platform === 'twitter' ? 'TwitterEvents' : 
+                     platform === 'facebook' ? 'FacebookEvents' :
+                     'InstagramEvents';
+
+  const filteredNotifications = [];
+
+  for (const notification of notifications) {
+    const notificationId = notification.message_id || notification.comment_id;
+    if (!notificationId) {
+      // If no ID, keep the notification
+      filteredNotifications.push(notification);
+      continue;
+    }
+
+    try {
+      // Check if this notification has been handled
+      const fileKey = notification.message_id 
+        ? `${eventPrefix}/${userId}/${notification.message_id}.json`
+        : `${eventPrefix}/${userId}/comment_${notification.comment_id}.json`;
+
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: fileKey,
+      });
+
+      const data = await s3Client.send(getCommand);
+      const storedNotification = JSON.parse(await data.Body.transformToString());
+
+      // Skip notifications that are already handled, replied, or ignored
+      if (storedNotification.status && 
+          ['replied', 'ignored', 'ai_handled', 'handled'].includes(storedNotification.status)) {
+        continue; // Skip this notification
+      }
+
+      // Include notification with updated status if available
+      filteredNotifications.push({
+        ...notification,
+        status: storedNotification.status || 'pending'
+      });
+
+    } catch (error) {
+      if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+        // No stored status, include as pending
+        filteredNotifications.push(notification);
+      } else {
+        // Log error but include notification to avoid data loss
+        console.error(`[${new Date().toISOString()}] Error checking ${platform} notification status for ${notificationId}:`, error.message);
+        filteredNotifications.push(notification);
+      }
+    }
+  }
+
+  return filteredNotifications;
+}
+
 // Instagram notification helper functions
 async function fetchInstagramDMs(userId) {
   try {
@@ -2702,7 +2763,7 @@ async function fetchInstagramNotifications(userId) {
     const comments = await fetchInstagramComments(userId);
     
     // Combine and format notifications
-    const notifications = [
+    let notifications = [
       ...dms.map(dm => ({
         type: 'message',
         instagram_user_id: userId,
@@ -2730,6 +2791,9 @@ async function fetchInstagramNotifications(userId) {
       }))
     ];
 
+    // Filter out handled/replied/ignored notifications
+    notifications = await filterHandledNotifications(notifications, userId, 'instagram');
+
     return notifications;
   } catch (error) {
     console.error('Error fetching Instagram notifications:', error);
@@ -2746,7 +2810,7 @@ async function fetchTwitterNotifications(userId) {
     const mentions = await fetchTwitterMentions(userId);
     
     // Combine and format notifications
-    const notifications = [
+    let notifications = [
       ...dms.map(dm => ({
         type: 'message',
         twitter_user_id: userId,
@@ -2772,6 +2836,9 @@ async function fetchTwitterNotifications(userId) {
         platform: 'twitter'
       }))
     ];
+
+    // Filter out handled/replied/ignored notifications
+    notifications = await filterHandledNotifications(notifications, userId, 'twitter');
 
     return notifications;
   } catch (error) {
@@ -2845,7 +2912,10 @@ async function fetchFacebookNotifications(userId) {
     const comments = await fetchFacebookComments(userId);
     notifications.push(...comments);
     
-    return notifications.sort((a, b) => b.timestamp - a.timestamp);
+    // Filter out handled/replied/ignored notifications
+    const filteredNotifications = await filterHandledNotifications(notifications, userId, 'facebook');
+    
+    return filteredNotifications.sort((a, b) => b.timestamp - a.timestamp);
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Error fetching Facebook notifications for ${userId}:`, error.message);
     return [];
@@ -3085,7 +3155,7 @@ async function sendFacebookCommentReply(userId, commentId, text) {
   }
 }
 
-app.post('/send-dm-reply/:userId', async (req, res) => {
+app.post('/store-instagram-connection/:userId', async (req, res) => {
   const { userId } = req.params;
   const { instagram_user_id, instagram_graph_id, username } = req.body;
   
@@ -5598,7 +5668,15 @@ app.post('/mark-notification-handled/:userId', async (req, res) => {
     console.log(`[${new Date().toISOString()}] Marking ${platform} notification ${notification_id} as handled by ${handled_by || 'AI'}`);
     
     // Build the key for the notification in storage
-    const eventPrefix = platform === 'twitter' ? 'TwitterEvents' : 'InstagramEvents';
+    let eventPrefix;
+    if (platform === 'twitter') {
+      eventPrefix = 'TwitterEvents';
+    } else if (platform === 'facebook') {
+      eventPrefix = 'FacebookEvents';
+    } else {
+      eventPrefix = 'InstagramEvents'; // Default to Instagram
+    }
+    
     const notificationKey = type === 'message' 
       ? `${eventPrefix}/${userId}/${notification_id}.json`
       : `${eventPrefix}/${userId}/comment_${notification_id}.json`;

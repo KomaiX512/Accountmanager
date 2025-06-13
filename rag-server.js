@@ -543,18 +543,19 @@ async function callGeminiAPIDirect(prompt, messages = [], retries = 2) {
   // Check rate limiting
   checkRateLimit();
   
-  // Create a more comprehensive cache key that includes more of the prompt and messages
-  const cacheKey = Buffer.from(`${prompt}_${JSON.stringify(messages)}`).toString('base64').substring(0, 100);
+  // Create cache key with the actual user message to ensure different questions get different responses
+  const userMessage = messages.length > 0 ? messages[messages.length - 1].parts[0].text : '';
+  const cacheKey = Buffer.from(`${prompt}_${userMessage}`).toString('base64').substring(0, 100);
   
-  // Check response cache first
-  if (responseCache.has(cacheKey)) {
-    const { data, timestamp } = responseCache.get(cacheKey);
-    if (Date.now() - timestamp < RESPONSE_CACHE_TTL) {
-      console.log('[RAG-Server] Using cached AI response');
-      return data;
-    }
-    responseCache.delete(cacheKey);
-  }
+  // Disable caching for instant replies to ensure fresh responses for each question
+  // if (responseCache.has(cacheKey)) {
+  //   const { data, timestamp } = responseCache.get(cacheKey);
+  //   if (Date.now() - timestamp < RESPONSE_CACHE_TTL) {
+  //     console.log('[RAG-Server] Using cached AI response');
+  //     return data;
+  //   }
+  //   responseCache.delete(cacheKey);
+  // }
   
   // Check for duplicate requests in progress
   const duplicateKey = `inprogress_${cacheKey}`;
@@ -588,9 +589,15 @@ async function callGeminiAPIDirect(prompt, messages = [], retries = 2) {
       if (messages && messages.length > 0) {
         for (const msg of messages) {
           const geminiRole = msg.role === 'assistant' ? 'model' : 'user';
+          // Handle both direct text and nested text structure
+          const messageText = msg.parts ? msg.parts[0].text : 
+                             msg.content ? msg.content :
+                             msg.text ? msg.text : 
+                             String(msg);
+          
           formattedMessages.push({
             role: geminiRole,
-            parts: [{ text: msg.content }]
+            parts: [{ text: messageText }]
           });
         }
       }
@@ -1546,8 +1553,72 @@ app.get('/admin/status', (req, res) => {
   res.json(status);
 });
 
-// Create the instruction prompt for instant AI replies
-function createAIReplyPrompt(profileData, rulesData, notification, platform = 'instagram') {
+// Load conversation history for context
+async function loadConversationHistory(username, platform) {
+  try {
+    // Try to load conversation history from R2 storage
+    const historyKey = `conversation_history/${platform}/${username}/recent.json`;
+    
+    const getCommand = new GetObjectCommand({
+      Bucket: 'tasks',
+      Key: historyKey,
+    });
+    
+    const response = await s3Client.send(getCommand);
+    if (response.Body) {
+      const historyString = await streamToString(response.Body);
+      const history = JSON.parse(historyString);
+      return Array.isArray(history) ? history : [];
+    }
+  } catch (error) {
+    // History doesn't exist yet, return empty array
+    return [];
+  }
+  
+  return [];
+}
+
+// Save conversation turn to history
+async function saveConversationTurn(username, platform, userMessage, assistantReply) {
+  try {
+    // Load existing history
+    const history = await loadConversationHistory(username, platform);
+    
+    // Add new conversation turn
+    const timestamp = new Date().toISOString();
+    history.push({
+      timestamp,
+      role: 'user',
+      content: userMessage
+    });
+    
+    history.push({
+      timestamp,
+      role: 'assistant', 
+      content: assistantReply
+    });
+    
+    // Keep only last 50 messages (25 turns) for context
+    const recentHistory = history.slice(-50);
+    
+    // Save updated history
+    const historyKey = `conversation_history/${platform}/${username}/recent.json`;
+    const putCommand = new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: historyKey,
+      Body: JSON.stringify(recentHistory, null, 2),
+      ContentType: 'application/json',
+    });
+    
+    await s3Client.send(putCommand);
+    console.log(`[RAG-Server] Saved conversation turn for ${platform}/${username}`);
+  } catch (error) {
+    console.error(`[RAG-Server] Error saving conversation history: ${error.message}`);
+  }
+}
+
+// Create the advanced RAG-based instruction prompt for instant AI replies
+function createAIReplyPrompt(profileData, rulesData, notification, platform = 'instagram', usingFallbackProfile = false) {
   const isMessage = notification.type === 'message';
   const platformName = platform === 'twitter' ? 'X (Twitter)' : 
                       platform === 'facebook' ? 'Facebook' : 
@@ -1562,29 +1633,45 @@ function createAIReplyPrompt(profileData, rulesData, notification, platform = 'i
   const characterLimit = platform === 'twitter' ? 280 : 
                         platform === 'instagram' ? 2200 : 
                         8000; // Facebook DM limit
+
+  // Extract account holder information for personality mimicking
+  const accountName = profileData?.name || profileData?.username || 'the account owner';
+  const accountBio = profileData?.bio || profileData?.description || '';
+  const accountType = profileData?.account_type || 'personal';
+  const accountIndustry = profileData?.industry || profileData?.niche || '';
   
+  // Extract communication style from rules
+  const communicationStyle = rulesData?.communication_style || rulesData?.tone || 'friendly and professional';
+  const brandVoice = rulesData?.brand_voice || rulesData?.personality || '';
+  const responseGuidelines = rulesData?.response_guidelines || rulesData?.rules || [];
+  
+  // Determine if account holder should act as themselves or as a manager
+  const shouldActAsAccountHolder = rulesData?.act_as_account_holder !== false; // Default to true
+  
+  const roleDescription = shouldActAsAccountHolder ? 
+    `You ARE ${accountName}, the actual account owner` : 
+    `You are the professional account manager for ${accountName}`;
+
   return `
-# INSTRUCTION - INSTANT AI REPLY MODE
-You are a ${platformName} account manager assistant responding to a ${messageType} ${senderInfo}.
+REPLY AS ${accountName} TO: "${notification.text}"
 
-## USER PROFILE DATA
-${JSON.stringify(profileData, null, 2)}
+You are ${accountName}. Someone just said: "${notification.text}"
 
-## ACCOUNT RULES
-${JSON.stringify(rulesData, null, 2)}
+${accountBio ? `About you: ${accountBio}` : ''}
+Your style: ${communicationStyle}
+Your voice: ${brandVoice}
 
-## ${messageType.toUpperCase()} TO RESPOND TO
-"${notification.text}"
+ANALYZE THE MESSAGE AND RESPOND APPROPRIATELY:
 
-IMPORTANT INSTRUCTIONS:
-1. Respond in the same tone and language as the ${messageType}
-2. Be concise and direct - ${platformName} ${messageType}s should be brief (under ${characterLimit} characters)
-3. Be friendly and conversational, following ${platformName} best practices
-4. Maintain the brand voice based on profile information
-5. If the message is in a language other than English, respond in that same language
-6. If you cannot determine the appropriate response, simply provide a polite acknowledgment
-7. Do not add introductory phrases like "I would respond with:" or "Here's a reply:"
-8. Just write the actual reply text that should be sent directly to the user on ${platformName}
+"${notification.text}" 
+
+What type of message is this?
+- Personal question about you? → Answer about yourself personally
+- Request for advice/tips? → Give helpful advice in your style  
+- Compliment on your content? → Thank them authentically
+- General question? → Answer naturally as yourself
+
+Your response (under ${characterLimit} chars, natural ${platformName} style):
 `;
 }
 
@@ -1598,39 +1685,136 @@ app.post('/api/instant-reply', async (req, res) => {
 
   try {
     // Fetch profile and rules data with platform
-    console.log(`[RAG-Server] Processing instant reply for ${platform}/${username}: "${notification.text}"`);
-    const profileData = await getProfileData(username, platform).catch(() => ({}));
-    const rulesData = await getRulesData(username, platform).catch(() => ({}));
+    console.log(`[RAG-Server] Processing advanced AI reply for ${platform}/${username}: "${notification.text.substring(0, 50)}..."`);
     
-    // Create AI reply prompt
-    const aiReplyPrompt = createAIReplyPrompt(profileData, rulesData, notification, platform);
+    let profileData = {};
+    let rulesData = {};
+    let usingFallbackProfile = false;
     
-    // Call Gemini API with no previous messages (single turn)
+    try {
+      profileData = await getProfileData(username, platform);
+      console.log(`[RAG-Server] Retrieved profile data for ${platform}/${username}`);
+    } catch (error) {
+      console.log(`[RAG-Server] No profile data found for ${platform}/${username}, using defaults`);
+      usingFallbackProfile = true;
+      // Create basic profile structure
+      profileData = {
+        username: username,
+        name: username,
+        bio: '',
+        account_type: 'personal',
+        industry: 'general'
+      };
+    }
+    
+    try {
+      rulesData = await getRulesData(username, platform);
+      console.log(`[RAG-Server] Retrieved rules data for ${platform}/${username}`);
+    } catch (error) {
+      console.log(`[RAG-Server] No rules found for ${platform}/${username}, using defaults`);
+      rulesData = {
+        communication_style: 'friendly and professional',
+        brand_voice: 'conversational',
+        act_as_account_holder: true,
+        response_guidelines: [
+          'Be helpful and informative',
+          'Maintain a positive tone',
+          'Provide value in every interaction',
+          'Be authentic and genuine'
+        ]
+      };
+    }
+    
+    // Fetch conversation history for better context
+    let conversationHistory = [];
+    try {
+      // Load recent conversation history to understand context
+      conversationHistory = await loadConversationHistory(username, platform);
+      if (conversationHistory.length > 0) {
+        console.log(`[RAG-Server] Loaded ${conversationHistory.length} messages from conversation history`);
+      }
+    } catch (error) {
+      console.log(`[RAG-Server] No conversation history found for ${platform}/${username}`);
+    }
+    
+    // Create advanced AI reply prompt with full context
+    const aiReplyPrompt = createAIReplyPrompt(profileData, rulesData, notification, platform, usingFallbackProfile);
+    
+    // For instant replies, use minimal conversation context to avoid repetitive responses
+    const messages = [];
+    
+    // Only add the current notification - no conversation history for instant replies
+    // This ensures each reply is fresh and contextual to the specific question
+    messages.push({
+      role: 'user',
+      parts: [{ text: notification.text }]
+    });
+    
+    // Call Gemini API with conversation context
     let reply;
     let usedFallback = false;
     
     try {
-      reply = await callGeminiAPI(aiReplyPrompt);
+      // Use queued API call for better reliability
+      reply = await queuedGeminiAPICall(aiReplyPrompt, messages);
       
       // Verify we have a valid response
       if (!reply || reply.trim() === '') {
         throw new Error('Empty response received from Gemini API');
       }
+      
+      // Clean up the response
+      reply = reply.trim();
+      
+      // Remove any unwanted prefixes that might slip through
+      const unwantedPrefixes = [
+        'I would respond with:',
+        'Here\'s a reply:',
+        'Response:',
+        'Reply:',
+        'I would say:',
+        'My response:',
+        'As the account holder:',
+        'As the account manager:'
+      ];
+      
+      for (const prefix of unwantedPrefixes) {
+        if (reply.toLowerCase().startsWith(prefix.toLowerCase())) {
+          reply = reply.substring(prefix.length).trim();
+        }
+      }
+      
+      console.log(`[RAG-Server] Generated AI reply: "${reply.substring(0, 100)}..."`);
+      
     } catch (error) {
-      // Handle quota exhaustion for instant replies
-      if (error.message === 'QUOTA_EXHAUSTED') {
-        console.log(`[RAG-Server] Using fallback for instant reply`);
+      console.error(`[RAG-Server] AI generation error: ${error.message}`);
+      
+      // Handle different error types
+      if (error.message === 'QUOTA_EXHAUSTED' || detectQuotaExhaustion(error)) {
+        console.log(`[RAG-Server] Using smart fallback for instant reply`);
         
-        // Simple acknowledgment fallback
+        // Create a more intelligent fallback based on account data
+        const accountName = profileData?.name || profileData?.username || username;
         const isMessage = notification.type === 'message';
         const platformName = platform === 'twitter' ? 'X' : 
                             platform === 'facebook' ? 'Facebook' : 
                             'Instagram';
         
+        // Create contextual fallback responses
         if (isMessage) {
-          reply = `Thank you for your message! I'm currently at capacity but wanted to acknowledge your ${platformName} message. I'll provide a detailed response soon! 🚀`;
+          const fallbacks = [
+            `Hey! Thanks for reaching out. I'm currently handling a lot of messages but wanted to acknowledge yours personally. I'll get back to you with a detailed response soon! 💫`,
+            `Hi there! I see your message and appreciate you connecting. I'm a bit swamped right now but will respond with more insights shortly. Thanks for your patience! 🚀`,
+            `Thank you for your message! I'm temporarily at capacity but didn't want to leave you hanging. Expect a thoughtful response from me soon! ✨`
+          ];
+          reply = fallbacks[Math.floor(Math.random() * fallbacks.length)];
         } else {
-          reply = `Thanks for engaging with this post! I appreciate your comment and will respond with more insights shortly. Keep connecting! 💫`;
+          const fallbacks = [
+            `Thanks for engaging with this post! I love seeing interactions like this. I'll respond with more detailed thoughts shortly! 💭`,
+            `Great comment! I appreciate you taking the time to engage. I'll share some more insights on this topic soon! 🔥`,
+            `Love this interaction! Thanks for commenting. I'll get back with a more detailed response in a bit! 🎯`
+          ];
+          reply = fallbacks[Math.floor(Math.random() * fallbacks.length)];
         }
         
         usedFallback = true;
@@ -1646,7 +1830,10 @@ app.post('/api/instant-reply', async (req, res) => {
       timestamp: new Date().toISOString(),
       notification,
       reply,
-      mode: 'instant'
+      mode: 'instant',
+      usedFallback,
+      hasProfileData: !usingFallbackProfile,
+      hasConversationHistory: conversationHistory.length > 0
     };
     
     // Save to R2 storage with platform (but don't wait for it to complete)
@@ -1655,6 +1842,13 @@ app.post('/api/instant-reply', async (req, res) => {
       console.error(`[RAG-Server] Error saving instant reply to R2: ${err.message}`);
     });
     
+    // Save conversation turn for future context (don't wait for completion)
+    if (!usedFallback) {
+      saveConversationTurn(username, platform, notification.text, reply).catch(err => {
+        console.error(`[RAG-Server] Error saving conversation turn: ${err.message}`);
+      });
+    }
+    
     // Return response immediately
     res.json({ 
       reply,
@@ -1662,14 +1856,166 @@ app.post('/api/instant-reply', async (req, res) => {
       notification_type: notification.type,
       platform,
       usedFallback,
+      hasProfileData: !usingFallbackProfile,
+      hasConversationHistory: conversationHistory.length > 0,
       quotaInfo: usedFallback && quotaExhausted ? {
         exhausted: true,
         resetTime: quotaResetTime?.toISOString(),
-        message: "Quick acknowledgment sent - full AI response capabilities return soon!"
+        message: "Smart fallback response - full AI capabilities return soon!"
       } : null
     });
   } catch (error) {
     console.error('[RAG-Server] Instant reply endpoint error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API endpoint for auto-reply to multiple notifications with rate limiting
+app.post('/api/auto-reply-all', async (req, res) => {
+  const { username, notifications, platform = 'instagram' } = req.body;
+  
+  if (!username || !Array.isArray(notifications) || notifications.length === 0) {
+    return res.status(400).json({ error: 'Username and notifications array are required' });
+  }
+
+  try {
+    console.log(`[RAG-Server] Processing auto-reply for ${notifications.length} notifications on ${platform}/${username}`);
+    
+    let profileData = {};
+    let rulesData = {};
+    
+    try {
+      profileData = await getProfileData(username, platform);
+      rulesData = await getRulesData(username, platform);
+    } catch (error) {
+      console.log(`[RAG-Server] Using default profile/rules for auto-reply`);
+      profileData = { username, name: username, bio: '', account_type: 'personal' };
+      rulesData = { 
+        communication_style: 'friendly and professional',
+        act_as_account_holder: true,
+        response_guidelines: ['Be helpful', 'Be authentic', 'Provide value']
+      };
+    }
+
+    const results = [];
+    let successCount = 0;
+    let errorCount = 0;
+
+    // Process each notification individually
+    for (let i = 0; i < notifications.length; i++) {
+      const notification = notifications[i];
+      const notificationId = notification.message_id || notification.comment_id || `unknown_${i}`;
+
+      try {
+        console.log(`[RAG-Server] Auto-replying to notification ${i + 1}/${notifications.length}: ${notificationId}`);
+        
+        // Generate AI reply
+        const aiReplyPrompt = createAIReplyPrompt(profileData, rulesData, notification, platform);
+        
+        // Load conversation history for this specific user
+        let conversationHistory = [];
+        try {
+          conversationHistory = await loadConversationHistory(username, platform);
+        } catch (error) {
+          // No history available
+        }
+
+        // Prepare messages with context
+        const messages = [];
+        if (conversationHistory.length > 0) {
+          const recentMessages = conversationHistory.slice(-5); // Less history for auto-reply
+          messages.push(...recentMessages.map(msg => ({
+            role: msg.role === 'user' ? 'user' : 'model',
+            parts: [{ text: msg.content }]
+          })));
+        }
+
+        messages.push({
+          role: 'user',
+          parts: [{ text: notification.text }]
+        });
+
+        // Generate reply
+        const reply = await queuedGeminiAPICall(aiReplyPrompt, messages);
+        
+        if (!reply || reply.trim() === '') {
+          throw new Error('Empty reply generated');
+        }
+
+        // Clean up reply
+        let cleanReply = reply.trim();
+        const unwantedPrefixes = [
+          'I would respond with:', 'Here\'s a reply:', 'Response:', 'Reply:',
+          'I would say:', 'My response:', 'As the account holder:', 'As the account manager:'
+        ];
+        
+        for (const prefix of unwantedPrefixes) {
+          if (cleanReply.toLowerCase().startsWith(prefix.toLowerCase())) {
+            cleanReply = cleanReply.substring(prefix.length).trim();
+          }
+        }
+
+        // Save conversation turn
+        try {
+          await saveConversationTurn(username, platform, notification.text, cleanReply);
+        } catch (error) {
+          console.error(`[RAG-Server] Error saving conversation turn: ${error.message}`);
+        }
+
+        results.push({
+          notificationId,
+          success: true,
+          reply: cleanReply,
+          notification
+        });
+
+        successCount++;
+
+        console.log(`[RAG-Server] Successfully generated auto-reply for ${notificationId}: "${cleanReply.substring(0, 50)}..."`);
+
+      } catch (error) {
+        console.error(`[RAG-Server] Error auto-replying to ${notificationId}: ${error.message}`);
+        
+        results.push({
+          notificationId,
+          success: false,
+          error: error.message,
+          notification
+        });
+
+        errorCount++;
+      }
+    }
+
+    // Save auto-reply session analytics
+    const sessionData = {
+      username,
+      platform,
+      timestamp: new Date().toISOString(),
+      totalNotifications: notifications.length,
+      successCount,
+      errorCount,
+      results,
+      mode: 'auto-reply-all'
+    };
+
+    const sessionKey = `AI.auto-replies/${platform}/${username}/${Date.now()}.json`;
+    saveToR2(sessionData, sessionKey).catch(err => {
+      console.error(`[RAG-Server] Error saving auto-reply session: ${err.message}`);
+    });
+
+    console.log(`[RAG-Server] Auto-reply completed: ${successCount} successful, ${errorCount} failed`);
+
+    res.json({
+      success: true,
+      totalProcessed: notifications.length,
+      successCount,
+      errorCount,
+      results
+    });
+
+  } catch (error) {
+    console.error('[RAG-Server] Auto-reply endpoint error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });

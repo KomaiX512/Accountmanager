@@ -21,6 +21,7 @@ interface DmsCommentsProps {
   aiProcessingNotifications?: Record<string, boolean>;
   onSendAIReply?: (notification: Notification) => void;
   onIgnoreAIReply?: (notification: Notification) => void;
+  onAutoReplyAll?: (notifications: Notification[]) => void;
   platform?: 'instagram' | 'twitter' | 'facebook';
 }
 
@@ -40,12 +41,15 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
   aiProcessingNotifications = {},
   onSendAIReply,
   onIgnoreAIReply,
+  onAutoReplyAll,
   platform = 'instagram'
 }) => {
   const [replyText, setReplyText] = useState<Record<string, string>>({});
   const [showReplyInput, setShowReplyInput] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isAutoReplying, setIsAutoReplying] = useState(false);
+  const [autoReplyProgress, setAutoReplyProgress] = useState<{ current: number; total: number; currentMessage: string } | null>(null);
 
   const { userId: contextIgBusinessId, isConnected: isInstagramConnected } = useInstagram();
   const igBusinessId = propIgBusinessId || contextIgBusinessId;
@@ -89,6 +93,78 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
     onIgnoreAIReply(notification);
   };
 
+  const handleAutoReplyAll = async () => {
+    if (!onAutoReplyAll || isAutoReplying) return;
+    
+    // Filter notifications that can be auto-replied (not already replied/ignored)
+    const pendingNotifications = notifications.filter(notif => 
+      !notif.status || notif.status === 'pending'
+    );
+    
+    if (pendingNotifications.length === 0) {
+      setError('No pending notifications to reply to');
+      return;
+    }
+
+    try {
+      setIsAutoReplying(true);
+      setAutoReplyProgress({ current: 0, total: pendingNotifications.length, currentMessage: 'Starting auto-reply...' });
+      setError(null);
+
+      // Process notifications with intelligent rate limiting
+      for (let i = 0; i < pendingNotifications.length; i++) {
+        const notification = pendingNotifications[i];
+        const notificationId = notification.message_id || notification.comment_id || '';
+        
+        setAutoReplyProgress({ 
+          current: i + 1, 
+          total: pendingNotifications.length, 
+          currentMessage: `Replying to ${notification.username || 'user'}...` 
+        });
+
+        try {
+          // Generate and send AI reply for this notification
+          await onAutoReplyAll([notification]);
+          
+          // Rate limiting: Wait between requests to avoid platform limits
+          if (i < pendingNotifications.length - 1) {
+            const delay = platform === 'twitter' ? 90000 : // 1.5 minutes for Twitter (strict limits)
+                         platform === 'facebook' ? 60000 : // 1 minute for Facebook  
+                         45000; // 45 seconds for Instagram
+            
+            setAutoReplyProgress({ 
+              current: i + 1, 
+              total: pendingNotifications.length, 
+              currentMessage: `Waiting ${delay/1000}s before next reply...` 
+            });
+            
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        } catch (error) {
+          console.error(`Error auto-replying to notification ${notificationId}:`, error);
+          // Continue with next notification even if one fails
+        }
+      }
+
+      setAutoReplyProgress({ 
+        current: pendingNotifications.length, 
+        total: pendingNotifications.length, 
+        currentMessage: 'Auto-reply complete!' 
+      });
+
+      // Clear progress after 3 seconds
+      setTimeout(() => {
+        setAutoReplyProgress(null);
+      }, 3000);
+
+    } catch (error) {
+      setError('Auto-reply failed. Please try again.');
+      console.error('Auto-reply error:', error);
+    } finally {
+      setIsAutoReplying(false);
+    }
+  };
+
   const renderNotConnectedMessage = () => {
     if (platform === 'instagram' && !isInstagramConnected) {
       return (
@@ -121,6 +197,40 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
   return (
     <div className="dms-comments-container">
       {error && <div className="error-message">{error}</div>}
+      
+      {/* Auto-Reply Progress */}
+      {autoReplyProgress && (
+        <div className="auto-reply-progress">
+          <div className="progress-header">
+            <span>Auto-Reply Progress</span>
+            <span>{autoReplyProgress.current}/{autoReplyProgress.total}</span>
+          </div>
+          <div className="progress-bar">
+            <div 
+              className="progress-fill" 
+              style={{ width: `${(autoReplyProgress.current / autoReplyProgress.total) * 100}%` }}
+            />
+          </div>
+          <div className="progress-message">{autoReplyProgress.currentMessage}</div>
+        </div>
+      )}
+
+      {/* Auto-Reply Button */}
+      {notifications.length > 0 && onAutoReplyAll && (
+        <div className="auto-reply-section">
+          <button 
+            onClick={handleAutoReplyAll}
+            disabled={isAutoReplying || isLoading}
+            className="auto-reply-all-btn"
+          >
+            {isAutoReplying ? 'Auto-Replying...' : `Auto-Reply All (${notifications.filter(n => !n.status || n.status === 'pending').length})`}
+          </button>
+          <span className="auto-reply-info">
+            AI will reply to all pending notifications with intelligent rate limiting
+          </span>
+        </div>
+      )}
+
       {notifications.length === 0 ? (
         <div className="no-notifications">No new notifications</div>
       ) : (

@@ -1,0 +1,17 @@
+{
+  "username": "shakira",
+  "platform": "instagram",
+  "timestamp": "2025-06-13T06:49:19.002Z",
+  "notification": {
+    "type": "message",
+    "sender_id": "23878882825079209",
+    "message_id": "m_g_9x8VIgjQnA8M17XV3sNpE8vyy9h9mABHv7K4EYLxoKbSfaMUGC7hRi1eUk8qPMEf841rE91okBVgDXHHlplQ",
+    "text": "Hey! how can I learned about you?",
+    "timestamp": 1749797356329,
+    "received_at": "2025-06-13T06:49:16.329Z",
+    "status": "pending",
+    "platform": "facebook"
+  },
+  "reply": "Hey! You can learn more about us on our website [link to website] or check out our latest posts! 😊\n",
+  "mode": "instant"
+}

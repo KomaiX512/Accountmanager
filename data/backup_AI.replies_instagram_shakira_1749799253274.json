@@ -1,0 +1,17 @@
+{
+  "username": "shakira",
+  "platform": "instagram",
+  "timestamp": "2025-06-13T07:20:53.274Z",
+  "notification": {
+    "type": "message",
+    "sender_id": "23878882825079209",
+    "message_id": "m_UrkE8xfMNPcfHueUT3x5-pE8vyy9h9mABHv7K4EYLxq_1EhVDDLVX4UxYYmZ-sRfVZzHSJHp-V8tf2BC1ecZcg",
+    "text": "Whose manager os talking to me? Tell me whose account manager are you",
+    "timestamp": 1749799252527,
+    "received_at": "2025-06-13T07:20:52.527Z",
+    "status": "pending",
+    "platform": "facebook"
+  },
+  "reply": "Hey! 👋 Sure, I can help. What kind of growth tips are you looking for? Like, content ideas, engagement, or something else? ✨\n",
+  "mode": "instant"
+}

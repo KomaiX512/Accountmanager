@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Hey there! That's a fun question! 😊 I'd say my personality is a mix of creative, curious, and helpful. I love exploring new ideas in the world of digital marketing and sharing what I learn with my 1000+ followers. I'm passionate about helping small businesses grow their online presence through engaging content and smart strategies. I try to keep things positive and approachable, so hopefully, that comes across! ✨\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.2521082490355104
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 145,
+    "candidatesTokenCount": 91,
+    "totalTokenCount": 236,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 145
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 91
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "QgxMaN6_Fvr3_NUPucOfkAg"
+}

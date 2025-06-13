@@ -578,7 +578,9 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const handleSendAIReply = async (notification: any) => {
     if (!notification.aiReply || !notification.sender_id) return;
     
-    const currentUserId = platform === 'twitter' ? twitterId : igUserId;
+    const currentUserId = platform === 'twitter' ? twitterId : 
+                         platform === 'facebook' ? facebookId :
+                         igUserId;
     if (!currentUserId) return;
     
     const notifId = notification.message_id || notification.comment_id;
@@ -734,6 +736,75 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     } catch (error) {
       console.error(`[${new Date().toISOString()}] Error ignoring ${platform} AI reply:`, error);
       fetchNotifications();
+    }
+  };
+
+  // Handle auto-reply to all notifications  
+  const handleAutoReplyAll = async (notifications: any[]) => {
+    const currentUserId = platform === 'twitter' ? twitterId : 
+                         platform === 'facebook' ? facebookId :
+                         igUserId;
+    if (!currentUserId || !accountHolder) return;
+
+    try {
+      console.log(`[${new Date().toISOString()}] Starting ${platform} auto-reply for ${notifications.length} notifications`);
+      
+      for (const notification of notifications) {
+        try {
+          // Generate AI reply using the enhanced RAG server
+          const response = await axios.post('http://localhost:3001/api/instant-reply', {
+            username: accountHolder,
+            notification: {
+              type: notification.type,
+              message_id: notification.message_id,
+              comment_id: notification.comment_id,
+              text: notification.text,
+              username: notification.username,
+              timestamp: notification.timestamp,
+              platform: platform
+            },
+            platform: platform
+          });
+
+          if (response.data.success && response.data.reply) {
+            // Send the generated reply
+            const endpoint = notification.type === 'message' ? 'send-dm-reply' : 'send-comment-reply';
+            
+            await axios.post(`http://localhost:3000/${endpoint}/${currentUserId}`, {
+              sender_id: notification.sender_id,
+              text: response.data.reply,
+              message_id: notification.message_id,
+              comment_id: notification.comment_id,
+              platform: platform
+            });
+
+            // Mark notification as handled permanently
+            await axios.post(`http://localhost:3000/mark-notification-handled/${currentUserId}`, {
+              notification_id: notification.message_id || notification.comment_id,
+              type: notification.type,
+              handled_by: 'ai_auto_reply',
+              platform: platform
+            });
+
+            // Update notification status locally
+            setNotifications(prev => 
+              prev.filter(notif => 
+                !((notif.message_id && notif.message_id === notification.message_id) ||
+                  (notif.comment_id && notif.comment_id === notification.comment_id))
+              )
+            );
+
+            console.log(`[${new Date().toISOString()}] ${platform} auto-reply sent and marked as handled for ${notification.message_id || notification.comment_id}`);
+          }
+        } catch (notificationError) {
+          console.error(`[${new Date().toISOString()}] Error processing ${platform} auto-reply for notification:`, notificationError);
+          // Continue with next notification even if one fails
+        }
+      }
+
+    } catch (error: any) {
+      console.error(`[${new Date().toISOString()}] Error in ${platform} auto-reply:`, error);
+      setError(`Auto-reply failed for some ${platform} notifications`);
     }
   };
 
@@ -1642,13 +1713,18 @@ Image Description: ${response.post.image_prompt}
                 notifications={notifications} 
                 onReply={handleReply} 
                 onIgnore={handleIgnore} 
-                onRefresh={() => setRefreshKey(prev => prev + 1)} 
+                onRefresh={() => {
+                  setRefreshKey(prev => prev + 1);
+                  fetchNotifications(1, 3);
+                }} 
                 onReplyWithAI={handleReplyWithAI}
+                onAutoReplyAll={handleAutoReplyAll}
                 username={accountHolder}
                 onIgnoreAIReply={handleIgnoreAIReply}
                 refreshKey={refreshKey}
                 igBusinessId={platform === 'instagram' ? igUserId : undefined}
                 twitterId={platform === 'twitter' ? twitterId : undefined}
+                facebookPageId={platform === 'facebook' ? facebookId : undefined}
                 aiRepliesRefreshKey={refreshKey}
                 onAIRefresh={() => setRefreshKey(prev => prev + 1)}
                 aiProcessingNotifications={aiProcessingNotifications}

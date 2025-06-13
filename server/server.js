@@ -2131,48 +2131,108 @@ app.post('/send-dm-reply/:userId', async (req, res) => {
   console.log(`[${new Date().toISOString()}] Processing ${platform} DM reply for user ${userId}`);
 
   try {
+    if (platform === 'twitter') {
+      // Handle Twitter DM reply
+      try {
+        const result = await sendTwitterDMReply(userId, sender_id, text, message_id);
+        
+        // Update message status in Twitter events
+        const messageKey = `TwitterEvents/${userId}/${message_id}.json`;
+        try {
+          const getCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: messageKey,
+          });
+          const data = await s3Client.send(getCommand);
+          const messageData = JSON.parse(await data.Body.transformToString());
+          messageData.status = 'replied';
+          messageData.updated_at = new Date().toISOString();
+
+          await s3Client.send(new PutObjectCommand({
+            Bucket: 'tasks',
+            Key: messageKey,
+            Body: JSON.stringify(messageData, null, 2),
+            ContentType: 'application/json',
+          }));
+          
+          // Invalidate cache
+          cache.delete(`TwitterEvents/${userId}`);
+          
+          // Broadcast status update
+          const statusUpdate = {
+            type: 'message_status',
+            message_id,
+            status: 'replied',
+            updated_at: messageData.updated_at,
+            timestamp: Date.now(),
+            platform: 'twitter'
+          };
+          
+          broadcastUpdate(userId, { event: 'status_update', data: statusUpdate });
+        } catch (error) {
+          console.error(`[${new Date().toISOString()}] Error updating Twitter message status:`, error);
+        }
+        
+        return res.json({ success: true, message_id: result.message_id });
+      } catch (error) {
+        console.error(`[${new Date().toISOString()}] Error sending Twitter DM reply:`, error.response?.data || error.message);
+        if (error.message && error.message.includes('access token')) {
+          return res.status(404).json({ error: 'No access token found for this Twitter account' });
+        }
+        return res.status(500).json({ error: 'Error sending Twitter DM reply', details: error.message });
+      }
+    }
+    
     if (platform === 'facebook') {
       // Handle Facebook DM reply
-      const result = await sendFacebookDMReply(userId, sender_id, text, message_id);
-      
-      // Update message status in Facebook events
-      const messageKey = `FacebookEvents/${userId}/${message_id}.json`;
       try {
-        const getCommand = new GetObjectCommand({
-          Bucket: 'tasks',
-          Key: messageKey,
-        });
-        const data = await s3Client.send(getCommand);
-        const messageData = JSON.parse(await data.Body.transformToString());
-        messageData.status = 'replied';
-        messageData.updated_at = new Date().toISOString();
+        const result = await sendFacebookDMReply(userId, sender_id, text, message_id);
+        
+        // Update message status in Facebook events
+        const messageKey = `FacebookEvents/${userId}/${message_id}.json`;
+        try {
+          const getCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: messageKey,
+          });
+          const data = await s3Client.send(getCommand);
+          const messageData = JSON.parse(await data.Body.transformToString());
+          messageData.status = 'replied';
+          messageData.updated_at = new Date().toISOString();
 
-        await s3Client.send(new PutObjectCommand({
-          Bucket: 'tasks',
-          Key: messageKey,
-          Body: JSON.stringify(messageData, null, 2),
-          ContentType: 'application/json',
-        }));
+          await s3Client.send(new PutObjectCommand({
+            Bucket: 'tasks',
+            Key: messageKey,
+            Body: JSON.stringify(messageData, null, 2),
+            ContentType: 'application/json',
+          }));
+          
+          // Invalidate cache
+          cache.delete(`FacebookEvents/${userId}`);
+          
+          // Broadcast status update
+          const statusUpdate = {
+            type: 'message_status',
+            message_id,
+            status: 'replied',
+            updated_at: messageData.updated_at,
+            timestamp: Date.now(),
+            platform: 'facebook'
+          };
+          
+          broadcastUpdate(userId, { event: 'status_update', data: statusUpdate });
+        } catch (error) {
+          console.error(`[${new Date().toISOString()}] Error updating Facebook message status:`, error);
+        }
         
-        // Invalidate cache
-        cache.delete(`FacebookEvents/${userId}`);
-        
-        // Broadcast status update
-        const statusUpdate = {
-          type: 'message_status',
-          message_id,
-          status: 'replied',
-          updated_at: messageData.updated_at,
-          timestamp: Date.now(),
-          platform: 'facebook'
-        };
-        
-        broadcastUpdate(userId, { event: 'status_update', data: statusUpdate });
+        return res.json({ success: true, message_id: result.message_id });
       } catch (error) {
-        console.error(`[${new Date().toISOString()}] Error updating Facebook message status:`, error);
+        console.error(`[${new Date().toISOString()}] Error sending Facebook DM reply:`, error.response?.data || error.message);
+        if (error.message && error.message.includes('token')) {
+          return res.status(404).json({ error: 'No access token found for this Facebook account' });
+        }
+        return res.status(500).json({ error: 'Error sending Facebook DM reply', details: error.message });
       }
-      
-      return res.json({ success: true, message_id: result.message_id });
     }
     
     // Handle Instagram DM reply (existing logic)
@@ -2381,48 +2441,108 @@ app.post('/send-comment-reply/:userId', async (req, res) => {
   console.log(`[${new Date().toISOString()}] Processing ${platform} comment reply for user ${userId}`);
 
   try {
+    if (platform === 'twitter') {
+      // Handle Twitter mention reply (comments = mentions on Twitter)
+      try {
+        const result = await sendTwitterMentionReply(userId, comment_id, text);
+        
+        // Update mention status in Twitter events
+        const commentKey = `TwitterEvents/${userId}/comment_${comment_id}.json`;
+        try {
+          const getCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: commentKey,
+          });
+          const data = await s3Client.send(getCommand);
+          const commentData = JSON.parse(await data.Body.transformToString());
+          commentData.status = 'replied';
+          commentData.updated_at = new Date().toISOString();
+
+          await s3Client.send(new PutObjectCommand({
+            Bucket: 'tasks',
+            Key: commentKey,
+            Body: JSON.stringify(commentData, null, 2),
+            ContentType: 'application/json',
+          }));
+          
+          // Invalidate cache
+          cache.delete(`TwitterEvents/${userId}`);
+          
+          // Broadcast status update
+          const statusUpdate = {
+            type: 'comment_status',
+            comment_id,
+            status: 'replied',
+            updated_at: commentData.updated_at,
+            timestamp: Date.now(),
+            platform: 'twitter'
+          };
+          
+          broadcastUpdate(userId, { event: 'status_update', data: statusUpdate });
+        } catch (error) {
+          console.error(`[${new Date().toISOString()}] Error updating Twitter mention status:`, error);
+        }
+        
+        return res.json({ success: true, reply_id: result.tweet_id });
+      } catch (error) {
+        console.error(`[${new Date().toISOString()}] Error sending Twitter mention reply:`, error.response?.data || error.message);
+        if (error.message && error.message.includes('access token')) {
+          return res.status(404).json({ error: 'No access token found for this Twitter account' });
+        }
+        return res.status(500).json({ error: 'Error sending Twitter mention reply', details: error.message });
+      }
+    }
+    
     if (platform === 'facebook') {
       // Handle Facebook comment reply
-      const result = await sendFacebookCommentReply(userId, comment_id, text);
-      
-      // Update comment status in Facebook events
-      const commentKey = `FacebookEvents/${userId}/comment_${comment_id}.json`;
       try {
-        const getCommand = new GetObjectCommand({
-          Bucket: 'tasks',
-          Key: commentKey,
-        });
-        const data = await s3Client.send(getCommand);
-        const commentData = JSON.parse(await data.Body.transformToString());
-        commentData.status = 'replied';
-        commentData.updated_at = new Date().toISOString();
+        const result = await sendFacebookCommentReply(userId, comment_id, text);
+        
+        // Update comment status in Facebook events
+        const commentKey = `FacebookEvents/${userId}/comment_${comment_id}.json`;
+        try {
+          const getCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: commentKey,
+          });
+          const data = await s3Client.send(getCommand);
+          const commentData = JSON.parse(await data.Body.transformToString());
+          commentData.status = 'replied';
+          commentData.updated_at = new Date().toISOString();
 
-        await s3Client.send(new PutObjectCommand({
-          Bucket: 'tasks',
-          Key: commentKey,
-          Body: JSON.stringify(commentData, null, 2),
-          ContentType: 'application/json',
-        }));
+          await s3Client.send(new PutObjectCommand({
+            Bucket: 'tasks',
+            Key: commentKey,
+            Body: JSON.stringify(commentData, null, 2),
+            ContentType: 'application/json',
+          }));
+          
+          // Invalidate cache
+          cache.delete(`FacebookEvents/${userId}`);
+          
+          // Broadcast status update
+          const statusUpdate = {
+            type: 'comment_status',
+            comment_id,
+            status: 'replied',
+            updated_at: commentData.updated_at,
+            timestamp: Date.now(),
+            platform: 'facebook'
+          };
+          
+          broadcastUpdate(userId, { event: 'status_update', data: statusUpdate });
+        } catch (error) {
+          console.error(`[${new Date().toISOString()}] Error updating Facebook comment status:`, error);
+        }
         
-        // Invalidate cache
-        cache.delete(`FacebookEvents/${userId}`);
-        
-        // Broadcast status update
-        const statusUpdate = {
-          type: 'comment_status',
-          comment_id,
-          status: 'replied',
-          updated_at: commentData.updated_at,
-          timestamp: Date.now(),
-          platform: 'facebook'
-        };
-        
-        broadcastUpdate(userId, { event: 'status_update', data: statusUpdate });
+        return res.json({ success: true, reply_id: result.comment_id });
       } catch (error) {
-        console.error(`[${new Date().toISOString()}] Error updating Facebook comment status:`, error);
+        console.error(`[${new Date().toISOString()}] Error sending Facebook comment reply:`, error.response?.data || error.message);
+        if (error.message && error.message.includes('token')) {
+          return res.status(404).json({ error: 'No access token found for this Facebook account' });
+        }
+        return res.status(500).json({ error: 'Error sending Facebook comment reply', details: error.message });
       }
-      
-      return res.json({ success: true, reply_id: result.comment_id });
     }
     
     // Handle Instagram comment reply (existing logic)
@@ -2616,9 +2736,18 @@ app.post('/ignore-notification/:userId', async (req, res) => {
       }));
       console.log(`[${new Date().toISOString()}] Updated ${platform} notification status to ignored at ${fileKey}`);
       
-      // Invalidate cache
+      // Comprehensive cache invalidation for ignore functionality
       cache.delete(`${eventPrefix}/${userId}`);
-      if (username) cache.delete(`${eventPrefix}/${username}`);
+      cache.delete(`events-list/${userId}`);
+      cache.delete(`events-list/${userId}?platform=${platform}`);
+      if (username) {
+        cache.delete(`${eventPrefix}/${username}`);
+        cache.delete(`events-list/${username}`);
+      }
+      
+      // Clear data module caches to force refresh
+      const dataModuleCacheKey = `data_${username || userId}_events_${platform}`;
+      cache.delete(dataModuleCacheKey);
       
       // Broadcast status update
       const statusUpdate = {
@@ -2652,8 +2781,20 @@ app.post('/ignore-notification/:userId', async (req, res) => {
 app.get('/events-list/:userId', async (req, res) => {
   const { userId } = req.params;
   const platform = req.query.platform || 'instagram';
+  const forceRefresh = req.query.forceRefresh === 'true';
 
   try {
+    // Clear cache if force refresh is requested
+    if (forceRefresh) {
+      const eventPrefix = platform === 'twitter' ? 'TwitterEvents' : 
+                         platform === 'facebook' ? 'FacebookEvents' :
+                         'InstagramEvents';
+      cache.delete(`${eventPrefix}/${userId}`);
+      cache.delete(`events-list/${userId}`);
+      cache.delete(`events-list/${userId}?platform=${platform}`);
+      console.log(`[${new Date().toISOString()}] Force refreshing ${platform} notifications cache for ${userId}`);
+    }
+
     let notifications = [];
     if (platform === 'instagram') {
       notifications = await fetchInstagramNotifications(userId);
@@ -2704,13 +2845,14 @@ async function filterHandledNotifications(notifications, userId, platform) {
       const data = await s3Client.send(getCommand);
       const storedNotification = JSON.parse(await data.Body.transformToString());
 
-      // Skip notifications that are already handled, replied, or ignored
+      // PERMANENTLY FILTER OUT: Skip notifications that are already handled, replied, ignored, or ai_handled
       if (storedNotification.status && 
-          ['replied', 'ignored', 'ai_handled', 'handled'].includes(storedNotification.status)) {
-        continue; // Skip this notification
+          ['replied', 'ignored', 'ai_handled', 'handled', 'sent'].includes(storedNotification.status)) {
+        console.log(`[${new Date().toISOString()}] Filtering out ${platform} notification ${notificationId} with status: ${storedNotification.status}`);
+        continue; // Skip this notification completely
       }
 
-      // Include notification with updated status if available
+      // Include notification with updated status if available (only for pending/unhandled)
       filteredNotifications.push({
         ...notification,
         status: storedNotification.status || 'pending'
@@ -2728,6 +2870,7 @@ async function filterHandledNotifications(notifications, userId, platform) {
     }
   }
 
+  console.log(`[${new Date().toISOString()}] Filtered ${platform} notifications: ${notifications.length} -> ${filteredNotifications.length}`);
   return filteredNotifications;
 }
 

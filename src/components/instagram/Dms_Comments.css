@@ -43,39 +43,6 @@
   gap: 12px;
 }
 
-.auto-reply-all-btn {
-  background: linear-gradient(135deg, #007AFF, #5856D6);
-  color: white;
-  border: none;
-  border-radius: 12px;
-  padding: 16px 24px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 16px rgba(0, 122, 255, 0.3);
-  position: relative;
-  overflow: hidden;
-}
-
-.auto-reply-all-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0, 122, 255, 0.4);
-}
-
-.auto-reply-all-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.auto-reply-info {
-  color: #8e8e93;
-  font-size: 14px;
-  text-align: center;
-  font-style: italic;
-}
-
 /* Auto-Reply Progress */
 .auto-reply-progress {
   background: linear-gradient(135deg, rgba(52, 199, 89, 0.1), rgba(48, 176, 199, 0.1));
@@ -180,8 +147,6 @@
   border-radius: 12px;
   border-left: 3px solid #007aff;
 }
-
-
 
 /* Error and Status Messages */
 .error-message {
@@ -443,3 +408,60 @@
 .ignore-ai-reply-btn:active {
   animation: buttonPress 0.1s ease;
 }
+
+/* Header row for notifications with inline tiny refresh */
+.notifications-header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+  padding-left: 4px;
+}
+
+.notifications-header-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 0.2px;
+}
+
+.notifications-count-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  background: #ff3b30;
+  border-radius: 50%;
+  margin-left: 6px;
+  margin-right: 2px;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.15);
+}
+
+.tiny-refresh-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0 0 0 2px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: background 0.15s;
+}
+.tiny-refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.tiny-refresh-btn:hover:not(:disabled) {
+  background: rgba(0,122,255,0.08);
+}
+.tiny-refresh-btn svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+/* Remove old refresh section styles if present */
+.refresh-section, .refresh-notifications-btn { display: none !important; }

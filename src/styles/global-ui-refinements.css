@@ -316,4 +316,9 @@ button:active,
 .popup-content::-webkit-scrollbar-thumb:hover,
 .modal-content::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 255, 204, 0.8) !important;
+}
+
+.canvas-editor-container {
+  max-width: 1200px !important;
+  max-height: 90vh !important;
 } 

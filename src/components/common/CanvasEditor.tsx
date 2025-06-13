@@ -302,9 +302,6 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
                 'common.bisize.height': '0',
                 'common.backgroundColor': '#151521',
                 'common.border': '0px',
-                'downloadButton.backgroundColor': '#007bff',
-                'downloadButton.border': '1px solidrgb(63, 167, 149)',
-                'downloadButton.color': '#fff',
                 'menu.normalIcon.path': '',
                 'menu.normalIcon.name': '',
                 'menu.activeIcon.path': '',
@@ -323,7 +320,6 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
                 'submenu.activeLabel.color': '#fff',
                 'checkbox.border': '1px solid #ccc',
                 'checkbox.backgroundColor': '#fff',
-                // Enhanced color picker styling
                 'colorpicker.button.border': '1px solid #ddd',
                 'colorpicker.title.color': '#fff',
                 'colorpicker.primary.color': '#00ffcc'
@@ -332,11 +328,11 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
               initMenu: 'filter',
               menuBarPosition: 'left',
               uiSize: {
-                width: '100%',
+                width: '1000px',
                 height: '100%'
               },
             },
-            cssMaxWidth: 700,
+            cssMaxWidth: 1000,
             cssMaxHeight: 500,
             selectionStyle: {
               cornerSize: 20,

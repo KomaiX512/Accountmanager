@@ -197,6 +197,22 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
   return (
     <div className="dms-comments-container">
       {error && <div className="error-message">{error}</div>}
+      {/* Header Row with Notification Count and Tiny Refresh Icon */}
+      <div className="notifications-header-row">
+        <span className="notifications-header-title">Notifications</span>
+        <span className="notifications-count-dot" />
+        <button
+          className="tiny-refresh-btn"
+          onClick={onRefresh}
+          disabled={isLoading}
+          title="Reload notifications"
+        >
+          <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4.93 4.93a8 8 0 1 1-2.34 5.66" stroke="#007AFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <polyline points="1 1 1 7 7 7" stroke="#007AFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+      </div>
       
       {/* Auto-Reply Progress */}
       {autoReplyProgress && (
@@ -226,7 +242,7 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
             {isAutoReplying ? 'Auto-Replying...' : `Auto-Reply All (${notifications.filter(n => !n.status || n.status === 'pending').length})`}
           </button>
           <span className="auto-reply-info">
-            AI will reply to all pending notifications with intelligent rate limiting
+            AI will reply to all pending Comments and Dms based on rule set and according to yours personalization.
           </span>
         </div>
       )}

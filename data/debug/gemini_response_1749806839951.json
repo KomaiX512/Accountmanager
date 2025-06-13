@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Hey! Glad you think so! 😊 Is there anything specific you're referring to? Just curious!\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.2109118808399547
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 130,
+    "candidatesTokenCount": 22,
+    "totalTokenCount": 152,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 130
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 22
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "9-5LaP_qGLaSsbQP_d6Q4Ao"
+}

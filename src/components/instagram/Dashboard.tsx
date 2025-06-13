@@ -1021,6 +1021,63 @@ Image Description: ${response.post.image_prompt}
     }
   };
 
+  // Handle auto-reply to all notifications
+  const handleAutoReplyAll = async (notifications: Notification[]) => {
+    if (!igBusinessId || !accountHolder) return;
+
+    try {
+      console.log(`[${new Date().toISOString()}] Starting Instagram auto-reply for ${notifications.length} notifications`);
+      
+      for (const notification of notifications) {
+        // Generate AI reply using the RAG server
+        const response = await axios.post('http://localhost:3001/api/instant-reply', {
+          username: accountHolder,
+          notification: {
+            type: notification.type,
+            message_id: notification.message_id,
+            comment_id: notification.comment_id,
+            text: notification.text,
+            username: notification.username,
+            timestamp: notification.timestamp,
+            platform: 'instagram'
+          },
+          platform: 'instagram'
+        });
+
+        if (response.data.success && response.data.reply) {
+          // Send the generated reply
+          if (notification.type === 'message' && notification.sender_id) {
+            await axios.post(`http://localhost:3000/send-dm-reply/${igBusinessId}`, {
+              sender_id: notification.sender_id,
+              text: response.data.reply,
+              message_id: notification.message_id,
+            });
+          } else if (notification.type === 'comment' && notification.comment_id) {
+            await axios.post(`http://localhost:3000/send-comment-reply/${igBusinessId}`, {
+              comment_id: notification.comment_id,
+              text: response.data.reply,
+            });
+          }
+
+          // Update notification status locally
+          setNotifications(prev => 
+            prev.map(notif => 
+              (notif.message_id === notification.message_id || notif.comment_id === notification.comment_id)
+                ? { ...notif, status: 'replied' as const }
+                : notif
+            )
+          );
+
+          console.log(`[${new Date().toISOString()}] Instagram auto-reply sent for ${notification.message_id || notification.comment_id}`);
+        }
+      }
+
+    } catch (error: any) {
+      console.error(`[${new Date().toISOString()}] Error in Instagram auto-reply:`, error);
+      setError('Auto-reply failed for some notifications');
+    }
+  };
+
   const refreshAllData = async () => {
     if (!accountHolder) {
       setError('No account holder specified.');
@@ -1636,8 +1693,14 @@ Image Description: ${response.post.image_prompt}
               notifications={notifications} 
               onReply={handleReply} 
               onIgnore={handleIgnore} 
-              onRefresh={() => setRefreshKey(prev => prev + 1)} 
+              onRefresh={() => {
+                setRefreshKey(prev => prev + 1);
+                if (igBusinessId) {
+                  fetchNotifications(igBusinessId, 1, 3);
+                }
+              }} 
               onReplyWithAI={handleReplyWithAI}
+              onAutoReplyAll={handleAutoReplyAll}
               username={accountHolder}
               onIgnoreAIReply={handleIgnoreAIReply}
               refreshKey={refreshKey}

@@ -1,0 +1,15 @@
+{
+  "username": "komail_nah",
+  "platform": "instagram",
+  "timestamp": "2025-06-13T09:44:42.505Z",
+  "notification": {
+    "text": "Hey tell me about your self?",
+    "type": "message",
+    "platform": "instagram"
+  },
+  "reply": "Hey! 👋 I'm Komail, a friendly AI assistant. I love helping people with writing, brainstorming, and finding information. I'm still learning and growing every day! What are you working on? Maybe I can help! 😊",
+  "mode": "instant",
+  "usedFallback": false,
+  "hasProfileData": false,
+  "hasConversationHistory": false
+}

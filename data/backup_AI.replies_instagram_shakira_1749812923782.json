@@ -1,0 +1,20 @@
+{
+  "username": "shakira",
+  "platform": "instagram",
+  "timestamp": "2025-06-13T11:08:43.782Z",
+  "notification": {
+    "type": "message",
+    "sender_id": "23878882825079209",
+    "message_id": "m_zFAV5hlhk0Zzfi1mWc0FHZE8vyy9h9mABHv7K4EYLxq8ZFt4eMheb2pTbq7YWrc7rV-cKEdFDxcJctkaut3OIA",
+    "text": "Hey Who are you? And what you do?",
+    "timestamp": 1749812921448,
+    "received_at": "2025-06-13T11:08:41.448Z",
+    "status": "pending",
+    "platform": "facebook"
+  },
+  "reply": "Hi there! 👋 I'm so glad you asked! I'm [Your Name], and I run this Instagram account where I [briefly describe what your account focuses on, e.g., share my travel adventures, post about my passion for baking, showcase my artwork, offer marketing tips for small businesses]. I'm passionate about [mention your passion related to your account] and love connecting with others who share similar interests. I currently have around [your follower count, or say \"a growing community of\"] awesome followers, and I'm always looking for new ways to inspire and engage! What about you? What are you interested in? 😊",
+  "mode": "instant",
+  "usedFallback": false,
+  "hasProfileData": false,
+  "hasConversationHistory": false
+}

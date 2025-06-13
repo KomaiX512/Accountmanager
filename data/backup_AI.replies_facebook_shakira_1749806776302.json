@@ -1,0 +1,18 @@
+{
+  "username": "shakira",
+  "platform": "facebook",
+  "timestamp": "2025-06-13T09:26:16.302Z",
+  "notification": {
+    "type": "message",
+    "message_id": "m_JYbAPS7WXyRxXepIK86_hZE8vyy9h9mABHv7K4EYLxr7CogP6xmGE0wjG9SgxMPAyIo5TH8u0p-mbVD5LmL4Eg",
+    "text": "Hi",
+    "username": "Muhammad Komail",
+    "timestamp": 1749658150000,
+    "platform": "facebook"
+  },
+  "reply": "Hi there! 👋 Just wanted to acknowledge your message. How can I help you today? 😊",
+  "mode": "instant",
+  "usedFallback": false,
+  "hasProfileData": true,
+  "hasConversationHistory": false
+}

@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Hey there! 👋 As FENTY BEAUTY BY RIHANNA, with over 13 million followers who love a good glow-up, I'm happy to point you in the right direction! While we focus on makeup to enhance your natural beauty, skincare is the perfect base.\n\nFor personalized skincare advice, I recommend checking out our retail partners like Sephora and Ulta Beauty. Their beauty experts can assess your skin type and recommend products perfect for you. You can also find tons of helpful skincare tips and routines on their websites! ✨\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.18392452624959682
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 328,
+    "candidatesTokenCount": 109,
+    "totalTokenCount": 437,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 328
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 109
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "XAhMaIfoGtrD1PIPkKS2oAw"
+}

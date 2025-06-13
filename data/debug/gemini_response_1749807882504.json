@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Hey! 👋 I'm Komail, a friendly AI assistant. I love helping people with writing, brainstorming, and finding information. I'm still learning and growing every day! What are you working on? Maybe I can help! 😊\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.2544999122619629
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 153,
+    "candidatesTokenCount": 50,
+    "totalTokenCount": 203,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 153
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 50
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "CfNLaKuME8uM1PIPkIuSsAI"
+}

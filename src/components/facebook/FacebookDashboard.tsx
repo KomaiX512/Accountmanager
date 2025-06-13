@@ -42,16 +42,19 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ onClose }) => {
     FacebookNotificationService.getInstance()
   );
 
-  // Fetch Facebook notifications
-  const fetchNotifications = async () => {
+  // Fetch Facebook notifications with proper refresh handling
+  const fetchNotifications = async (forceRefresh = false) => {
     if (!facebookPageId || !currentUser?.uid) return;
     
     setIsLoadingNotifications(true);
     setError(null);
     
     try {
-      console.log(`[${new Date().toISOString()}] Fetching Facebook notifications for page ${facebookPageId}`);
-      const response = await axios.get(`http://localhost:3000/events-list/${facebookPageId}?platform=facebook`);
+      if (forceRefresh) {
+        console.log(`[${new Date().toISOString()}] Force refreshing Facebook notifications...`);
+      }
+      
+      const response = await axios.get(`http://localhost:3000/events-list/${facebookPageId}?platform=facebook${forceRefresh ? '&forceRefresh=true' : ''}`);
       
       if (response.data && Array.isArray(response.data)) {
         const facebookNotifications = response.data.map((notif: any) => ({
@@ -62,10 +65,14 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ onClose }) => {
         
         setNotifications(facebookNotifications);
         console.log(`[${new Date().toISOString()}] Loaded ${facebookNotifications.length} Facebook notifications`);
+        
+        // Clear any previous errors on successful fetch
+        setError(null);
       }
     } catch (error: any) {
       console.error(`[${new Date().toISOString()}] Error fetching Facebook notifications:`, error);
       setError('Failed to load Facebook notifications');
+      setNotifications([]);
     } finally {
       setIsLoadingNotifications(false);
     }
@@ -181,7 +188,7 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ onClose }) => {
     }
   };
 
-  // Handle ignore notification
+  // Handle ignore notification - permanently remove
   const handleIgnore = async (notification: Notification) => {
     if (!facebookPageId) return;
     
@@ -192,23 +199,38 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ onClose }) => {
         platform: 'facebook'
       });
 
-      // Update notification status
-      setNotifications(prev => 
-        prev.map(notif => 
-          notif.message_id === notification.message_id || notif.comment_id === notification.comment_id
-            ? { ...notif, status: 'ignored' as const }
-            : notif
+      // PERMANENTLY REMOVE ignored notifications from UI
+      setNotifications(prev => prev.filter(notif =>
+        !(
+          (notification.message_id && notif.message_id === notification.message_id) ||
+          (notification.comment_id && notif.comment_id === notification.comment_id)
         )
-      );
+      ));
       
-      console.log(`[${new Date().toISOString()}] Facebook notification ignored`);
+      console.log(`[${new Date().toISOString()}] Facebook notification permanently ignored and removed`);
     } catch (error: any) {
       console.error(`[${new Date().toISOString()}] Error ignoring Facebook notification:`, error);
       setError('Failed to ignore notification');
     }
   };
 
-  // Handle AI reply generation
+  // Create AI ready notification helper
+  const createAIReadyNotification = (notification: Notification, reply: string): Notification => {
+    return {
+      ...notification,
+      status: 'ai_reply_ready' as const,
+      aiReply: {
+        reply,
+        replyKey: `ai_${Date.now()}`,
+        reqKey: `req_${Date.now()}`,
+        timestamp: Date.now(),
+        generated_at: new Date().toISOString(),
+        sendStatus: undefined
+      }
+    };
+  };
+
+  // Handle AI reply generation with preview
   const handleReplyWithAI = async (notification: Notification) => {
     const notifId = notification.message_id || notification.comment_id || '';
     if (!notifId) return;
@@ -216,19 +238,236 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ onClose }) => {
     setAiProcessingNotifications(prev => ({ ...prev, [notifId]: true }));
 
     try {
-      await axios.post(`http://localhost:3000/generate-ai-reply/${facebookPageId}`, {
-        notification_id: notifId,
-        notification_text: notification.text,
-        notification_type: notification.type,
+      console.log(`[${new Date().toISOString()}] Generating Facebook AI reply for ${notifId}`);
+      
+      // Use enhanced RAG service for instant reply generation
+      const message = notification.text || '';
+      const conversation = [{
+        role: "user",
+        content: message
+      }];
+      
+      // Call the RAG service directly for instant reply
+      const response = await axios.post('http://localhost:3001/api/instant-reply', {
+        username: currentUser?.uid || facebookUsername,
+        notification: {
+          type: notification.type,
+          message_id: notification.message_id,
+          comment_id: notification.comment_id,
+          text: notification.text,
+          username: notification.username,
+          timestamp: notification.timestamp,
+          platform: 'facebook'
+        },
         platform: 'facebook'
       });
 
-      console.log(`[${new Date().toISOString()}] Facebook AI reply generation started for ${notifId}`);
+      if (response.data && response.data.success) {
+        console.log(`[${new Date().toISOString()}] Successfully generated Facebook AI reply:`, 
+          response.data.reply?.substring(0, 50) + '...'
+        );
+        
+        // Remove original notification and add AI reply preview
+        setNotifications(prev => prev.filter(n => 
+          !((n.message_id && n.message_id === notification.message_id) || 
+            (n.comment_id && n.comment_id === notification.comment_id))
+        ));
+        
+        // Add as AI reply ready notification for preview
+        setNotifications(prev => [...prev, createAIReadyNotification(notification, response.data.reply)]);
+        
+        // Mark notification as handled to prevent re-appearance
+        try {
+          await axios.post(`http://localhost:3000/mark-notification-handled/${facebookPageId}`, {
+            notification_id: notifId,
+            type: notification.type,
+            handled_by: 'ai',
+            platform: 'facebook'
+          });
+        } catch (markError) {
+          console.warn(`[${new Date().toISOString()}] Could not mark Facebook notification as handled:`, markError);
+        }
+        
+      } else {
+        throw new Error(response.data?.error || 'No reply generated');
+      }
+
     } catch (error: any) {
       console.error(`[${new Date().toISOString()}] Error generating Facebook AI reply:`, error);
-      setError('Failed to generate AI reply');
+      setError(`Failed to generate AI reply: ${error.response?.data?.error || error.message}`);
     } finally {
       setAiProcessingNotifications(prev => ({ ...prev, [notifId]: false }));
+    }
+  };
+
+  // Handle sending AI reply preview
+  const handleSendAIReply = async (notification: Notification) => {
+    if (!notification.aiReply || !notification.sender_id || !facebookPageId) return;
+    
+    const notifId = notification.message_id || notification.comment_id;
+    if (!notifId) return;
+    
+    console.log(`[${new Date().toISOString()}] Sending Facebook AI reply for ${notifId}`);
+    
+    // Update sendStatus to sending
+    setNotifications(prev => prev.map(n => {
+      if ((n.message_id && n.message_id === notification.message_id) || 
+          (n.comment_id && n.comment_id === notification.comment_id)) {
+        return {
+          ...n,
+          aiReply: {
+            ...n.aiReply!,
+            sendStatus: 'sending'
+          }
+        };
+      }
+      return n;
+    }));
+    
+    try {
+      const endpoint = notification.type === 'message' ? 'send-dm-reply' : 'send-comment-reply';
+      
+      const sendResponse = await fetch(`http://localhost:3000/${endpoint}/${facebookPageId}`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Origin': window.location.origin
+        },
+        body: JSON.stringify({
+          sender_id: notification.sender_id,
+          text: notification.aiReply.reply,
+          message_id: notification.message_id,
+          comment_id: notification.comment_id,
+          platform: 'facebook'
+        }),
+      });
+      
+      const responseData = await sendResponse.json();
+      
+      if (sendResponse.ok) {
+        console.log(`[${new Date().toISOString()}] Successfully sent Facebook AI reply for ${notifId}`);
+        
+        // Remove notification after successful send
+        setNotifications(prev => prev.filter(n => 
+          !((n.message_id && n.message_id === notification.message_id) || 
+            (n.comment_id && n.comment_id === notification.comment_id))
+        ));
+        
+        console.log(`Facebook AI reply sent successfully!`);
+        
+      } else {
+        console.error(`[${new Date().toISOString()}] Server error sending Facebook AI reply:`, responseData);
+        
+        // Update status to error
+        setNotifications(prev => prev.map(n => {
+          if ((n.message_id && n.message_id === notification.message_id) || 
+              (n.comment_id && n.comment_id === notification.comment_id)) {
+            return {
+              ...n,
+              aiReply: {
+                ...n.aiReply!,
+                sendStatus: 'error'
+              }
+            };
+          }
+          return n;
+        }));
+        
+        setError(`Failed to send Facebook reply: ${responseData.error || 'Unknown error'}`);
+      }
+      
+    } catch (error: any) {
+      console.error(`[${new Date().toISOString()}] Error sending Facebook AI reply:`, error);
+      
+      // Update status to error
+      setNotifications(prev => prev.map(n => {
+        if ((n.message_id && n.message_id === notification.message_id) || 
+            (n.comment_id && n.comment_id === notification.comment_id)) {
+          return {
+            ...n,
+            aiReply: {
+              ...n.aiReply!,
+              sendStatus: 'error'
+            }
+          };
+        }
+        return n;
+      }));
+      
+      setError(`Error sending Facebook AI reply: ${error.message}`);
+    }
+  };
+
+  // Handle ignoring AI reply preview
+  const handleIgnoreAIReply = async (notification: Notification) => {
+    if (!notification.aiReply) return;
+    
+    try {
+      // Simply remove the notification from the list
+      setNotifications(prev => prev.filter(n => 
+        !((n.message_id && n.message_id === notification.message_id) || 
+          (n.comment_id && n.comment_id === notification.comment_id))
+      ));
+      
+      console.log(`[${new Date().toISOString()}] Ignored Facebook AI reply preview`);
+      
+    } catch (error) {
+      console.error(`[${new Date().toISOString()}] Error ignoring Facebook AI reply:`, error);
+    }
+  };
+
+  // Handle auto-reply to all notifications
+  const handleAutoReplyAll = async (notifications: Notification[]) => {
+    if (!facebookPageId || !currentUser?.uid) return;
+
+    try {
+      console.log(`[${new Date().toISOString()}] Starting Facebook auto-reply for ${notifications.length} notifications`);
+      
+      for (const notification of notifications) {
+        // Generate AI reply using the RAG server
+        const response = await axios.post('http://localhost:3001/api/instant-reply', {
+          username: currentUser.uid,
+          notification: {
+            type: notification.type,
+            message_id: notification.message_id,
+            comment_id: notification.comment_id,
+            text: notification.text,
+            username: notification.username,
+            timestamp: notification.timestamp,
+            platform: 'facebook'
+          },
+          platform: 'facebook'
+        });
+
+        if (response.data.success && response.data.reply) {
+          // Send the generated reply
+          const endpoint = notification.type === 'message' ? 'send-dm-reply' : 'send-comment-reply';
+          
+          await axios.post(`http://localhost:3000/${endpoint}/${facebookPageId}`, {
+            sender_id: notification.sender_id,
+            text: response.data.reply,
+            message_id: notification.message_id,
+            comment_id: notification.comment_id,
+            platform: 'facebook'
+          });
+
+          // Update notification status locally
+          setNotifications(prev => 
+            prev.map(notif => 
+              (notif.message_id === notification.message_id || notif.comment_id === notification.comment_id)
+                ? { ...notif, status: 'replied' as const }
+                : notif
+            )
+          );
+
+          console.log(`[${new Date().toISOString()}] Facebook auto-reply sent for ${notification.message_id || notification.comment_id}`);
+        }
+      }
+
+    } catch (error: any) {
+      console.error(`[${new Date().toISOString()}] Error in Facebook auto-reply:`, error);
+      setError('Auto-reply failed for some notifications');
     }
   };
 
@@ -322,7 +561,10 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ onClose }) => {
             </button>
             
             <button 
-              onClick={() => setRefreshKey(prev => prev + 1)}
+              onClick={() => {
+                setRefreshKey(prev => prev + 1);
+                fetchNotifications(true);
+              }}
               className="dashboard-btn refresh-btn"
               disabled={isLoadingNotifications}
             >
@@ -386,13 +628,19 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ onClose }) => {
             notifications={notifications}
             onReply={handleReply}
             onIgnore={handleIgnore}
-            onRefresh={() => setRefreshKey(prev => prev + 1)}
+            onRefresh={() => {
+              setRefreshKey(prev => prev + 1);
+              fetchNotifications(true);
+            }}
             onReplyWithAI={handleReplyWithAI}
+            onAutoReplyAll={handleAutoReplyAll}
             username={facebookUsername || ''}
             refreshKey={refreshKey}
             facebookPageId={facebookPageId}
             aiRepliesRefreshKey={aiRepliesRefreshKey}
             aiProcessingNotifications={aiProcessingNotifications}
+            onSendAIReply={handleSendAIReply}
+            onIgnoreAIReply={handleIgnoreAIReply}
             platform="facebook"
           />
         </div>

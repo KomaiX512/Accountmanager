@@ -1,0 +1,16 @@
+{
+  "username": "fentybeauty",
+  "platform": "instagram",
+  "timestamp": "2025-06-13T11:05:24.540Z",
+  "notification": {
+    "type": "message",
+    "text": "Hey tell me about yourself?",
+    "username": "test_user",
+    "sender_id": "12345"
+  },
+  "reply": "Hey there! 👋 I'm FENTY BEAUTY BY RIHANNA, here to make sure everyone feels included in the world of beauty. You can shop my products online and worldwide at Sephora, Ulta Beauty, Harvey Nichols, Selfridges, Boots & select Asia duty free shops. I'm all about creating cruelty-free makeup that works for all skin types and tones. With over 13 million followers, I love connecting with the #FENTYBEAUTY community and seeing how you all rock my products! ✨",
+  "mode": "instant",
+  "usedFallback": false,
+  "hasProfileData": true,
+  "hasConversationHistory": false
+}

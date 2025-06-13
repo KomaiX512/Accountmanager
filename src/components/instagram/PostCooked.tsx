@@ -732,15 +732,21 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     }
 
     let imageKey = '';
-    // Enhanced image key extraction from the post key itself
+    // Primary: Extract image key from the post key itself (most reliable)
     if (key.match(/ready_post_\d+\.json$/)) {
       const postIdMatch = key.match(/ready_post_(\d+)\.json$/);
       if (postIdMatch) imageKey = `image_${postIdMatch[1]}.jpg`;
     }
     
-    // Fallback: extract from image URL if available
+    // Fallback: extract from image URL if available (handle both original and proxied URLs)
     if (!imageKey && post.data.image_url) {
       const urlMatch = post.data.image_url.match(/(image_\d+\.jpg)/);
+      if (urlMatch) imageKey = urlMatch[1];
+    }
+    
+    // Additional fallback: extract from r2_image_url if available
+    if (!imageKey && post.data.r2_image_url) {
+      const urlMatch = post.data.r2_image_url.match(/(image_\d+\.jpg)/);
       if (urlMatch) imageKey = urlMatch[1];
     }
 
@@ -1544,7 +1550,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                     <ImagePlaceholder postKey={post.key} />
                   ) : (
                     <img
-                      src={getCachedImageUrl(post)}
+                      src={post.data.image_url || post.data.r2_image_url || getCachedImageUrl(post)}
                       alt="Post visual"
                       className={`post-image ${loadingImages.has(post.key) ? 'loading' : 'loaded'}`}
                       onLoadStart={() => handleImageLoadStart(post.key)}

@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Hi there! Thanks for asking. I'm @this account, and I'm just getting started here. Right now, I'm focused on building a friendly and engaging social media presence. I don't have any posts or followers yet, but I'm excited to connect with people and see where this journey takes me!\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.14040120442708334
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 224,
+    "candidatesTokenCount": 69,
+    "totalTokenCount": 293,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 224
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 69
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "UwhMaNGEJ9rD1PIPkKS2oAw"
+}

@@ -1,0 +1,15 @@
+{
+  "username": "toofaced",
+  "platform": "instagram",
+  "timestamp": "2025-06-13T09:49:30.725Z",
+  "notification": {
+    "text": "What do you do?",
+    "type": "message",
+    "platform": "instagram"
+  },
+  "reply": "As Too Faced Cosmetics, we create innovative, cruelty-free makeup that empowers you to express yourself and have fun! We're a serious makeup brand that knows how to have fun, and we're proud to be a cruelty-free brand, always have been, always will be. With over 12.5 million followers, we're passionate about bringing you the latest and greatest in beauty. Check out our website toofaced.com to see all the magic we create! 💕",
+  "mode": "instant",
+  "usedFallback": false,
+  "hasProfileData": true,
+  "hasConversationHistory": false
+}

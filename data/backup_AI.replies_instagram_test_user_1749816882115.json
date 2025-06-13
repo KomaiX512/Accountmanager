@@ -1,0 +1,18 @@
+{
+  "username": "test_user",
+  "platform": "instagram",
+  "timestamp": "2025-06-13T12:14:42.115Z",
+  "notification": {
+    "type": "message",
+    "message_id": "ai_test_instagram_1749816880229",
+    "text": "📸 INSTAGRAM TEST: All buttons must work flawlessly! [ai_test]",
+    "username": "test_user",
+    "timestamp": 1749816880229,
+    "platform": "instagram"
+  },
+  "reply": "Hey! Thanks for the heads up! I'm always trying to make sure everything's running smoothly. Appreciate you letting me know! 😊 Is there anything specific you noticed that wasn't working right?",
+  "mode": "instant",
+  "usedFallback": false,
+  "hasProfileData": false,
+  "hasConversationHistory": false
+}

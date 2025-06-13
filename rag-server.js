@@ -1634,14 +1634,103 @@ function createAIReplyPrompt(profileData, rulesData, notification, platform = 'i
                         platform === 'instagram' ? 2200 : 
                         8000; // Facebook DM limit
 
-  // Extract account holder information for personality mimicking
-  const accountName = profileData?.name || profileData?.username || 'the account owner';
-  const accountBio = profileData?.bio || profileData?.description || '';
-  const accountType = profileData?.account_type || 'personal';
-  const accountIndustry = profileData?.industry || profileData?.niche || '';
+  // Enhanced profile data analysis with intelligent personality detection
+  let realProfileData = null;
+  let hasRealProfileData = false;
+  let intelligentPersonality = null;
+  
+  if (profileData && !usingFallbackProfile) {
+    console.log(`[RAG-Server] DEBUG: Profile data type: ${typeof profileData}, isArray: ${Array.isArray(profileData)}`);
+    
+    // Handle different scraped data structures  
+    if (Array.isArray(profileData) && profileData.length > 0) {
+      // Twitter format: Array of tweets with author data
+      realProfileData = profileData[0].author || profileData[0];
+      intelligentPersonality = analyzePostsForPersonality(profileData, platform);
+    } else if (profileData.data && Array.isArray(profileData.data) && profileData.data.length > 0) {
+      // Instagram format: Nested data array
+      realProfileData = profileData.data[0];
+      intelligentPersonality = analyzePostsForPersonality(profileData.data, platform);
+    } else if (profileData.username || profileData.name || profileData.fullName) {
+      // Direct profile object
+      realProfileData = profileData;
+    } else if (Array.isArray(profileData)) {
+      // Array of posts without author data (Facebook style)
+      intelligentPersonality = analyzePostsForPersonality(profileData, platform);
+      realProfileData = { 
+        name: profileData[0]?.user?.name || 'Account Holder',
+        username: profileData[0]?.user?.name || 'account'
+      };
+    }
+    
+    // Check if we have REAL profile information (not just basic post user data)
+    if (realProfileData && (
+      realProfileData.biography || realProfileData.bio || realProfileData.description ||
+      realProfileData.followersCount || realProfileData.followers_count || realProfileData.followers ||
+      realProfileData.isBusinessAccount || realProfileData.businessCategoryName || realProfileData.category ||
+      realProfileData.verified || realProfileData.is_verified || realProfileData.isVerified
+    )) {
+      hasRealProfileData = true;
+      console.log(`[RAG-Server] Found real profile data for account with bio, followers, or business info`);
+    } else if (intelligentPersonality) {
+      hasRealProfileData = true; // We have intelligent personality analysis
+      console.log(`[RAG-Server] Using intelligent personality analysis from posts data`);
+    } else {
+      console.log(`[RAG-Server] Only basic user data found (name/profileUrl) - will use natural response approach`);
+      realProfileData = null;
+    }
+  }
+
+  // Extract REAL account information from scraped data
+  const accountName = realProfileData?.fullName || realProfileData?.name || realProfileData?.username || 'the account holder';
+  const accountUsername = realProfileData?.username || realProfileData?.userName || 'this account';
+  const accountBio = realProfileData?.biography || realProfileData?.bio || realProfileData?.description || '';
+  const followersCount = realProfileData?.followersCount || realProfileData?.followers_count || realProfileData?.followers || 0;
+  const followingCount = realProfileData?.followsCount || realProfileData?.following_count || realProfileData?.following || 0;
+  const postsCount = realProfileData?.postsCount || realProfileData?.posts_count || realProfileData?.statusesCount || 0;
+  const isVerified = realProfileData?.verified || realProfileData?.is_verified || realProfileData?.isVerified || false;
+  const isBusiness = realProfileData?.isBusinessAccount || realProfileData?.is_business_account || false;
+  const businessCategory = realProfileData?.businessCategoryName || realProfileData?.category || '';
+  const externalUrls = realProfileData?.externalUrls || realProfileData?.external_urls || [];
+  
+  // Build account context from REAL scraped data or intelligent analysis
+  let accountContext = '';
+  if (hasRealProfileData) {
+    if (accountBio || followersCount > 0 || isBusiness) {
+      // Full profile data available
+      accountContext = `You are ${accountName} (@${accountUsername}).
+
+REAL ACCOUNT DATA:
+- Full Name: ${accountName}
+- Username: @${accountUsername}
+- Followers: ${followersCount > 0 ? followersCount.toLocaleString() : 'Growing community'}
+- Following: ${followingCount > 0 ? followingCount.toLocaleString() : 'Various accounts'}
+- Posts: ${postsCount > 0 ? postsCount.toLocaleString() : 'Regular content'}
+- Verified: ${isVerified ? 'Yes' : 'No'}
+- Business Account: ${isBusiness ? 'Yes' : 'No'}${businessCategory ? `\n- Category: ${businessCategory}` : ''}${externalUrls.length > 0 ? `\n- Website: ${externalUrls[0].url}` : ''}
+
+YOUR BIO:
+"${accountBio}"
+
+PERSONALITY TRAITS (from bio analysis):
+${accountBio ? extractPersonalityFromBio(accountBio) : 'Friendly and engaging social media presence'}`;
+    } else if (intelligentPersonality) {
+      // Use intelligent personality analysis from posts
+      accountContext = `You are ${accountName} (@${accountUsername}).
+
+ACCOUNT ANALYSIS FROM YOUR POSTS:
+${intelligentPersonality}
+
+PERSONALITY TRAITS:
+${intelligentPersonality.includes('personality') ? intelligentPersonality : `Based on your posts, you have a ${intelligentPersonality}`}`;
+    }
+  } else {
+    // When no real profile data, use a more natural approach
+    accountContext = `You are the account holder of @${accountUsername} on ${platformName}.`;
+  }
   
   // Extract communication style from rules
-  const communicationStyle = rulesData?.communication_style || rulesData?.tone || 'friendly and professional';
+  const communicationStyle = rulesData?.communication_style || rulesData?.tone || 'friendly and authentic';
   const brandVoice = rulesData?.brand_voice || rulesData?.personality || '';
   const responseGuidelines = rulesData?.response_guidelines || rulesData?.rules || [];
   
@@ -1649,30 +1738,203 @@ function createAIReplyPrompt(profileData, rulesData, notification, platform = 'i
   const shouldActAsAccountHolder = rulesData?.act_as_account_holder !== false; // Default to true
   
   const roleDescription = shouldActAsAccountHolder ? 
-    `You ARE ${accountName}, the actual account owner` : 
+    `You ARE ${accountName}, responding as yourself` : 
     `You are the professional account manager for ${accountName}`;
 
-  return `
-REPLY AS ${accountName} TO: "${notification.text}"
+  // Create sophisticated prompt that uses real data when available
+  if (hasRealProfileData) {
+    // Use real profile data or intelligent analysis for authentic responses
+    return `${accountContext}
 
-You are ${accountName}. Someone just said: "${notification.text}"
+COMMUNICATION STYLE: ${communicationStyle}
+BRAND VOICE: ${brandVoice}
+ROLE: ${roleDescription}
 
-${accountBio ? `About you: ${accountBio}` : ''}
-Your style: ${communicationStyle}
-Your voice: ${brandVoice}
+A user just messaged you: "${notification.text}"
 
-ANALYZE THE MESSAGE AND RESPOND APPROPRIATELY:
+ANALYZE THE MESSAGE TYPE:
+${getMessageAnalysis(notification.text)}
 
-"${notification.text}" 
+RESPOND AS ${accountName} WOULD:
+- Use YOUR actual personality and voice from the analysis above
+- Be completely authentic - respond as if you're actually ${accountName} personally replying
+- Reference YOUR real content themes and style when relevant
+- Keep under ${characterLimit} characters
+- NEVER use placeholder text, templates, or indicate this is an AI
+- Make the response feel completely natural and human
+- Use casual, authentic language that matches your personality
+- If asked about yourself, draw from the personality analysis provided above
+- Stay true to your authentic voice and communication style
 
-What type of message is this?
-- Personal question about you? → Answer about yourself personally
-- Request for advice/tips? → Give helpful advice in your style  
-- Compliment on your content? → Thank them authentically
-- General question? → Answer naturally as yourself
+Your natural, authentic response as ${accountName}:`;
+  } else {
+    // When no profile data, still be authentic but more conservative
+    return `${accountContext}
 
-Your response (under ${characterLimit} chars, natural ${platformName} style):
-`;
+COMMUNICATION STYLE: ${communicationStyle}
+BRAND VOICE: ${brandVoice}
+
+A user just messaged you: "${notification.text}"
+
+MESSAGE ANALYSIS: ${getMessageAnalysis(notification.text)}
+
+CRITICAL INSTRUCTIONS:
+- Respond naturally as a real person who owns this account
+- Be authentic, friendly, and conversational
+- Keep under ${characterLimit} characters
+- NEVER use placeholder text, templates, or robotic language
+- NEVER indicate this is automated or AI-generated
+- Sound completely human and genuine
+- If you don't have specific details, give a warm but honest response
+- Focus on being helpful and engaging while staying authentic
+- Use natural speech patterns and casual language
+
+Your genuine, human response:`;
+  }
+}
+
+// Enhanced function to analyze posts for personality traits
+function analyzePostsForPersonality(posts, platform) {
+  if (!posts || posts.length === 0) return null;
+  
+  let personalityTraits = [];
+  let contentThemes = [];
+  let communicationStyle = [];
+  
+  // Analyze post content for patterns
+  posts.slice(0, 10).forEach(post => { // Analyze up to 10 recent posts
+    const text = post.text || post.caption || post.content || '';
+    const hashtags = text.match(/#\w+/g) || [];
+    
+    // Detect content themes
+    if (text.toLowerCase().includes('makeup') || text.toLowerCase().includes('beauty') || hashtags.some(h => h.toLowerCase().includes('beauty'))) {
+      contentThemes.push('beauty');
+    }
+    if (text.toLowerCase().includes('fitness') || text.toLowerCase().includes('workout') || hashtags.some(h => h.toLowerCase().includes('fit'))) {
+      contentThemes.push('fitness');
+    }
+    if (text.toLowerCase().includes('food') || text.toLowerCase().includes('recipe') || hashtags.some(h => h.toLowerCase().includes('food'))) {
+      contentThemes.push('food');
+    }
+    if (text.toLowerCase().includes('music') || text.toLowerCase().includes('song') || hashtags.some(h => h.toLowerCase().includes('music'))) {
+      contentThemes.push('music');
+    }
+    if (text.toLowerCase().includes('travel') || text.toLowerCase().includes('vacation') || hashtags.some(h => h.toLowerCase().includes('travel'))) {
+      contentThemes.push('travel');
+    }
+    if (text.toLowerCase().includes('business') || text.toLowerCase().includes('entrepreneur') || hashtags.some(h => h.toLowerCase().includes('business'))) {
+      contentThemes.push('business');
+    }
+    
+    // Detect communication style
+    if (text.includes('!') || text.includes('😍') || text.includes('❤️')) {
+      communicationStyle.push('enthusiastic');
+    }
+    if (text.includes('?') || text.includes('what do you think')) {
+      communicationStyle.push('engaging');
+    }
+    if (text.length > 0 && text.split(' ').length > 20) {
+      communicationStyle.push('detailed');
+    }
+    if (hashtags.length > 3) {
+      communicationStyle.push('hashtag-savvy');
+    }
+  });
+  
+  // Build personality description
+  const uniqueThemes = [...new Set(contentThemes)];
+  const uniqueStyles = [...new Set(communicationStyle)];
+  
+  let personality = '';
+  
+  if (uniqueThemes.length > 0) {
+    personality += `You're passionate about ${uniqueThemes.slice(0, 3).join(', ')}. `;
+  }
+  
+  if (uniqueStyles.includes('enthusiastic')) {
+    personality += `You have an enthusiastic and positive communication style. `;
+  }
+  
+  if (uniqueStyles.includes('engaging')) {
+    personality += `You love engaging with your audience and asking questions. `;
+  }
+  
+  if (uniqueStyles.includes('detailed')) {
+    personality += `You tend to share thoughtful, detailed content. `;
+  }
+  
+  if (uniqueStyles.includes('hashtag-savvy')) {
+    personality += `You're social media savvy and use hashtags effectively. `;
+  }
+  
+  // Default personality if we can't detect specific traits
+  if (personality === '') {
+    personality = `You're a genuine content creator who shares authentic experiences and connects with your community. You have a friendly, approachable personality and enjoy meaningful interactions. `;
+  }
+  
+  personality += `Your responses should reflect this natural personality and communication style.`;
+  
+  return personality.trim();
+}
+
+// Helper function to extract personality from bio
+function extractPersonalityFromBio(bio) {
+  if (!bio) return 'Friendly and engaging';
+  
+  const traits = [];
+  
+  // Business/professional indicators
+  if (bio.match(/\b(shop|store|business|brand|company|official)\b/i)) {
+    traits.push('Professional brand focused on products/services');
+  }
+  
+  // Personality indicators
+  if (bio.match(/\b(love|passion|excited|inspire|create)\b/i)) {
+    traits.push('Passionate and enthusiastic');
+  }
+  
+  if (bio.match(/\b(help|support|community|together)\b/i)) {
+    traits.push('Community-oriented and supportive');
+  }
+  
+  if (bio.match(/\b(beauty|makeup|skincare|fashion|style)\b/i)) {
+    traits.push('Beauty and style expert');
+  }
+  
+  if (bio.match(/\b(music|artist|creative|art)\b/i)) {
+    traits.push('Creative and artistic');
+  }
+  
+  if (bio.match(/\b(entrepreneur|founder|ceo|business)\b/i)) {
+    traits.push('Business-minded entrepreneur');
+  }
+  
+  return traits.length > 0 ? traits.join(', ') : 'Authentic and engaging personality';
+}
+
+// Helper function to analyze message type
+function getMessageAnalysis(text) {
+  if (text.match(/\b(tell me about|about you|who are you|yourself)\b/i)) {
+    return 'Personal introduction request - Share authentic details about your account, bio, and what you do';
+  }
+  
+  if (text.match(/\b(advice|help|how|tips|recommend)\b/i)) {
+    return 'Advice/help request - Provide helpful guidance based on your expertise area';
+  }
+  
+  if (text.match(/\b(love|amazing|great|awesome|fan)\b/i)) {
+    return 'Compliment/appreciation - Respond with genuine gratitude and engagement';
+  }
+  
+  if (text.match(/\b(collaborate|work together|partnership)\b/i)) {
+    return 'Business inquiry - Respond professionally about collaboration opportunities';
+  }
+  
+  if (text.match(/\?(.*)?$/)) {
+    return 'Question - Answer directly and helpfully based on your expertise';
+  }
+  
+  return 'General message - Respond naturally and authentically as yourself';
 }
 
 // API endpoint for instant AI replies to DMs and comments
@@ -1737,6 +1999,31 @@ app.post('/api/instant-reply', async (req, res) => {
       console.log(`[RAG-Server] No conversation history found for ${platform}/${username}`);
     }
     
+    // Check if we have real profile data (not just basic post user data)
+    let hasRealProfileData = false;
+    if (profileData && !usingFallbackProfile) {
+      let realProfileData = null;
+      
+      // Handle different scraped data structures  
+      if (Array.isArray(profileData) && profileData.length > 0) {
+        realProfileData = profileData[0].author || profileData[0];
+      } else if (profileData.data && Array.isArray(profileData.data) && profileData.data.length > 0) {
+        realProfileData = profileData.data[0];
+      } else if (profileData.username || profileData.name || profileData.fullName) {
+        realProfileData = profileData;
+      }
+      
+      // Check if we have REAL profile information
+      if (realProfileData && (
+        realProfileData.biography || realProfileData.bio || realProfileData.description ||
+        realProfileData.followersCount || realProfileData.followers_count || realProfileData.followers ||
+        realProfileData.isBusinessAccount || realProfileData.businessCategoryName || realProfileData.category ||
+        realProfileData.verified || realProfileData.is_verified || realProfileData.isVerified
+      )) {
+        hasRealProfileData = true;
+      }
+    }
+
     // Create advanced AI reply prompt with full context
     const aiReplyPrompt = createAIReplyPrompt(profileData, rulesData, notification, platform, usingFallbackProfile);
     
@@ -1832,7 +2119,7 @@ app.post('/api/instant-reply', async (req, res) => {
       reply,
       mode: 'instant',
       usedFallback,
-      hasProfileData: !usingFallbackProfile,
+      hasProfileData: hasRealProfileData,
       hasConversationHistory: conversationHistory.length > 0
     };
     
@@ -1856,7 +2143,7 @@ app.post('/api/instant-reply', async (req, res) => {
       notification_type: notification.type,
       platform,
       usedFallback,
-      hasProfileData: !usingFallbackProfile,
+      hasProfileData: hasRealProfileData,
       hasConversationHistory: conversationHistory.length > 0,
       quotaInfo: usedFallback && quotaExhausted ? {
         exhausted: true,

@@ -1,0 +1,15 @@
+{
+  "username": "shakira",
+  "platform": "facebook",
+  "timestamp": "2025-06-13T11:15:32.556Z",
+  "notification": {
+    "type": "message",
+    "text": "Hi! Tell me about yourself",
+    "username": "fan_user"
+  },
+  "reply": "Hi there! Thanks for asking. I'm @this account, and I'm just getting started here. Right now, I'm focused on building a friendly and engaging social media presence. I don't have any posts or followers yet, but I'm excited to connect with people and see where this journey takes me!",
+  "mode": "instant",
+  "usedFallback": false,
+  "hasProfileData": true,
+  "hasConversationHistory": false
+}

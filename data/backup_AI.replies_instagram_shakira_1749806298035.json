@@ -1,0 +1,18 @@
+{
+  "username": "shakira",
+  "platform": "instagram",
+  "timestamp": "2025-06-13T09:18:18.035Z",
+  "notification": {
+    "type": "message",
+    "message_id": "test_1749806295486_instagram",
+    "text": "Tell me about yourself",
+    "username": "test_user_instagram",
+    "timestamp": 1749806295486,
+    "platform": "instagram"
+  },
+  "reply": "Hola! Well, I'm Shakira, a singer, songwriter, dancer, and record producer from Barranquilla, Colombia! Music is my passion, and I love exploring different sounds and cultures in my songs. I'm also deeply committed to education through my Pies Descalzos Foundation. Family is everything to me, and I'm always striving to learn and grow. Waka waka! 😉",
+  "mode": "instant",
+  "usedFallback": false,
+  "hasProfileData": false,
+  "hasConversationHistory": false
+}

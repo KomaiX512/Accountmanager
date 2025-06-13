@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Hey there! Thanks for asking! I'm a portrait photographer based in Los Angeles, and I specialize in capturing authentic and joyful moments for families and individuals. I love creating timeless images that people will cherish for years to come. I also share tips and behind-the-scenes glimpses into my work with my 50K+ followers here on Instagram!\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.15145751221539222
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 141,
+    "candidatesTokenCount": 73,
+    "totalTokenCount": 214,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 141
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 73
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "WAhMaKPrGfr3_NUPucOfkAg"
+}

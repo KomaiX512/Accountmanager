@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Hey there! 👋 Thanks for asking!\n\nWell, as the owner of this account, I'm passionate about [mention your account's focus/niche - e.g., helping people learn about sustainable living, sharing delicious recipes, showcasing my photography, etc.]. I've been [mention how long you've been doing it - e.g., doing this for a few years now, always been interested in this, etc.] and I really enjoy [mention what you enjoy about it - e.g., connecting with people, learning new things, being creative, etc.].\n\nOutside of this, I'm [mention a few personal details - e.g., a big fan of hiking, love spending time with my family, always up for a good book, etc.].\n\nIs there anything specific you'd like to know? Happy to share more! 😊\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.1701975618855337
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 142,
+    "candidatesTokenCount": 178,
+    "totalTokenCount": 320,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 142
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 178
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "5-xLaPGtK8uM1PIPkIuSsAI"
+}

@@ -1,0 +1,18 @@
+{
+  "username": "shakira",
+  "platform": "facebook",
+  "timestamp": "2025-06-13T09:18:34.678Z",
+  "notification": {
+    "type": "message",
+    "message_id": "test_1749806299000_facebook",
+    "text": "Tell me about yourself",
+    "username": "test_user_facebook",
+    "timestamp": 1749806299000,
+    "platform": "facebook"
+  },
+  "reply": "Hey there! 👋 Thanks for asking!\n\nWell, as the owner of this account, I'm passionate about [mention your account's focus/niche - e.g., helping people learn about sustainable living, sharing delicious recipes, showcasing my photography, etc.]. I've been [mention how long you've been doing it - e.g., doing this for a few years now, always been interested in this, etc.] and I really enjoy [mention what you enjoy about it - e.g., connecting with people, learning new things, being creative, etc.].\n\nOutside of this, I'm [mention a few personal details - e.g., a big fan of hiking, love spending time with my family, always up for a good book, etc.].\n\nIs there anything specific you'd like to know? Happy to share more! 😊",
+  "mode": "instant",
+  "usedFallback": false,
+  "hasProfileData": true,
+  "hasConversationHistory": false
+}

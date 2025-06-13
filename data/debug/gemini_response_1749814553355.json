@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Hey there! I'm so glad you asked! My name is [Your Name], and I'm a [Your Profession/Title]. I help [Your Target Audience] with [What You Help Them With] through [Your Services/Products]. I love connecting with my [Number] followers here on Instagram and sharing tips, inspiration, and behind-the-scenes glimpses into my work. Let me know if you have any other questions!\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.20439818665221499
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 151,
+    "candidatesTokenCount": 91,
+    "totalTokenCount": 242,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 151
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 91
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "GA1MaK3-E8uM1PIPkIuSsAI"
+}

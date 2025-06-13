@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Hey there! Thanks for asking! 😊 I'm [Your Name], and this is my Instagram account where I share [briefly describe what you share - e.g., my photography, my journey as a baker, tips on sustainable living, my artwork, etc.]. I'm passionate about [mention your passion - e.g., capturing beautiful moments, creating delicious treats, protecting the environment, expressing myself through art, etc.]. I've been building this community of over [your follower count, or say \"a wonderful group of\"] followers for [time period - e.g., a few years, a while now] and love connecting with people who are interested in [mention your niche again - e.g., photography, baking, sustainability, art, etc.]. You can learn more about me by checking out my posts, stories, and highlights! I also sometimes do Q&As, so feel free to ask anything! ✨\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.2338869783890809
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 151,
+    "candidatesTokenCount": 191,
+    "totalTokenCount": 342,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 151
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 191
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "igNMaNP1Kvr3_NUPucOfkAg"
+}

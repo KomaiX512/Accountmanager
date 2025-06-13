@@ -1,0 +1,18 @@
+{
+  "username": "shakira",
+  "platform": "facebook",
+  "timestamp": "2025-06-13T09:28:28.514Z",
+  "notification": {
+    "type": "comment",
+    "comment_id": "122098071662908442_1722454045059265",
+    "text": "Great",
+    "username": "Muhammad Komail",
+    "timestamp": 1749656797000,
+    "platform": "facebook"
+  },
+  "reply": "Hey! Glad you think so! 😊 Is there anything specific you were thinking of? Just curious!",
+  "mode": "instant",
+  "usedFallback": false,
+  "hasProfileData": true,
+  "hasConversationHistory": false
+}

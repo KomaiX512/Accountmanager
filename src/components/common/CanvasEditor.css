@@ -14,8 +14,8 @@
 .canvas-editor-container {
   background-color: #151521;
   border-radius: 12px;
-  width: 90%;
-  max-width: 1200px;
+  width: 100%;
+  max-width: 2000px;
   height: 85vh;
   display: flex;
   flex-direction: column;
@@ -77,10 +77,13 @@
 
 .tui-image-editor-container {
   flex: 1;
-  width: 100%;
+  width: 1000px;
+  max-width: 100%;
   height: 100%;
   position: relative;
   overflow: hidden;
+  min-height: 600px;
+  border-radius: 8px;
 }
 
 .canvas-editor-footer {
@@ -210,8 +213,8 @@
 }
 
 /* TUI Image Editor Customizations */
-.tui-image-editor-header-logo {
-  display: none;
+.tui-image-editor-header {
+  display: none !important;
 }
 
 .tui-image-editor-container .tui-image-editor-main {

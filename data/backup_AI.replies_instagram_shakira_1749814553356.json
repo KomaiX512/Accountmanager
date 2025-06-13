@@ -1,0 +1,20 @@
+{
+  "username": "shakira",
+  "platform": "instagram",
+  "timestamp": "2025-06-13T11:35:53.356Z",
+  "notification": {
+    "type": "message",
+    "sender_id": "23878882825079209",
+    "message_id": "m_LBF47F3EfQmbmfSZ9pZ_-ZE8vyy9h9mABHv7K4EYLxq-BnXHBJAfyUhP55J_jZXPcEXqWjkbSKgaeQRdeK96tg",
+    "text": "What is your name.and what you do?",
+    "timestamp": 1749814551244,
+    "received_at": "2025-06-13T11:35:51.244Z",
+    "status": "pending",
+    "platform": "facebook"
+  },
+  "reply": "Hey there! I'm so glad you asked! My name is [Your Name], and I'm a [Your Profession/Title]. I help [Your Target Audience] with [What You Help Them With] through [Your Services/Products]. I love connecting with my [Number] followers here on Instagram and sharing tips, inspiration, and behind-the-scenes glimpses into my work. Let me know if you have any other questions!",
+  "mode": "instant",
+  "usedFallback": false,
+  "hasProfileData": false,
+  "hasConversationHistory": false
+}

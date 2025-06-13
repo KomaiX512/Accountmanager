@@ -102,6 +102,34 @@ class RagService {
   // Enable/disable verbose logging (set to false to reduce console spam)
   private static readonly VERBOSE_LOGGING = false;
   
+  /**
+   * Process markdown formatting in RAG responses
+   * Converts markdown syntax to HTML for display
+   */
+  private static processMarkdownFormatting(text: string): string {
+    if (!text) return text;
+    
+    let processed = text;
+    
+    // Convert **bold** to <strong>bold</strong>
+    processed = processed.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    
+    // Convert *italic* and _italic_ to <em>italic</em>
+    processed = processed.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    processed = processed.replace(/_(.*?)_/g, '<em>$1</em>');
+    
+    // Convert bullet points (lines starting with • or -)
+    processed = processed.replace(/^[•\-]\s+(.+)$/gm, '<li>$1</li>');
+    
+    // Wrap consecutive <li> items in <ul>
+    processed = processed.replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>');
+    
+    // Convert line breaks to <br> tags
+    processed = processed.replace(/\n/g, '<br>');
+    
+    return processed;
+  }
+  
   // Accept both localhost and 127.0.0.1 to handle different browser security policies
   // Use port 3001 for RAG server (not port 3000 which is the main server)
   private static readonly RAG_SERVER_URLS = [
@@ -112,6 +140,11 @@ class RagService {
   private static readonly MAIN_SERVER_URLS = [
     'http://127.0.0.1:3002',  // Main server on port 3002 (image proxy server)
     'http://localhost:3002'   // Main server on port 3002 (image proxy server)
+  ];
+  
+  private static readonly AI_REPLIES_URLS = [
+    'http://127.0.0.1:3002',  // AI replies on port 3002
+    'http://localhost:3002'   // AI replies on port 3002
   ];
   
   // Request deduplication to prevent multiple identical requests
@@ -273,6 +306,12 @@ class RagService {
             if (this.VERBOSE_LOGGING) {
               console.log(`[RagService] Received response for ${platform}/${username}`);
             }
+            
+            // Process markdown formatting in the response
+            if (response.data && response.data.response) {
+              response.data.response = this.processMarkdownFormatting(response.data.response);
+            }
+            
             return response.data;
           });
           
@@ -289,6 +328,20 @@ class RagService {
               quotaInfo: {
                 exhausted: false,
                 message: "Optimizing responses for better assistance"
+              }
+            };
+          }
+          
+          // Handle array access errors specifically
+          if (error.response?.data?.error?.includes('Cannot read properties of undefined') ||
+              error.response?.data?.error?.includes('reading \'0\'')) {
+            console.log(`[RagService] Array access error detected, using fallback for ${platform}`);
+            return {
+              response: `I'm temporarily optimizing my system for better ${platform === 'facebook' ? 'Facebook' : platform === 'twitter' ? 'X (Twitter)' : 'Instagram'} insights. Please try your query again in a moment, or ask about specific topics like content strategy, audience engagement, or growth planning.`,
+              usedFallback: true,
+              quotaInfo: {
+                exhausted: false,
+                message: "System optimization in progress - please retry"
               }
             };
           }
@@ -458,6 +511,47 @@ class RagService {
     }
   }
   
+  /**
+   * Fetches AI replies for a user from the main server
+   */
+  static async fetchAIReplies(
+    username: string,
+    platform: string = 'instagram'
+  ): Promise<any[]> {
+    const cacheKey = `ai_replies_${platform}_${username}`;
+    
+    return await this.deduplicatedRequest(
+      cacheKey,
+      async () => {
+        try {
+          if (this.VERBOSE_LOGGING) {
+            console.log(`[RagService] Fetching AI replies for ${platform}/${username}`);
+          }
+          
+          return await this.tryServerUrls(`/ai-replies/${username}?platform=${platform}`, (url) => 
+            axios.get(url, {
+              timeout: 10000,
+              withCredentials: false,
+              headers: {
+                'Accept': 'application/json'
+              }
+            }), this.AI_REPLIES_URLS
+          ).then(response => {
+            if (this.VERBOSE_LOGGING) {
+              console.log(`[RagService] Retrieved ${response.data.replies?.length || 0} AI replies for ${platform}/${username}`);
+            }
+            return response.data.replies || [];
+          });
+          
+        } catch (error: any) {
+          console.error('[RagService] Failed to fetch AI replies:', error.response?.data || error.message);
+          return [];
+        }
+      },
+      true // Use cache for AI replies
+    );
+  }
+
   /**
    * Sends an instant AI reply request directly to the main server
    * This bypasses the proxy server to reduce CORS issues

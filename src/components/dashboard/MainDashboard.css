@@ -1278,4 +1278,343 @@
   visibility: visible;
   transform: translateY(0);
   pointer-events: auto;
+}
+
+/* AI Manager Preview Section */
+.ai-manager-preview-section {
+  margin-bottom: 2rem;
+}
+
+.ai-manager-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, rgba(0, 255, 204, 0.08), rgba(0, 123, 255, 0.05));
+  border: 1px solid rgba(0, 255, 204, 0.2);
+  border-radius: 12px;
+  padding: 1.5rem 2rem;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.ai-manager-preview::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(0, 255, 204, 0.1), transparent);
+  animation: shimmer 3s infinite;
+}
+
+.ai-manager-preview:hover {
+  border-color: rgba(0, 255, 204, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 255, 204, 0.15);
+}
+
+.ai-manager-content {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  gap: 1rem;
+}
+
+.ai-manager-icon {
+  width: 48px;
+  height: 48px;
+  color: #00ffcc;
+  flex-shrink: 0;
+}
+
+.ai-manager-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+  filter: drop-shadow(0 2px 8px rgba(0, 255, 204, 0.3));
+}
+
+.ai-manager-text h3 {
+  margin: 0 0 0.5rem 0;
+  color: #00ffcc;
+  font-size: 1.3rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.ai-manager-text p {
+  margin: 0;
+  color: #a0a0cc;
+  font-size: 1rem;
+  line-height: 1.4;
+  font-style: italic;
+}
+
+.wishlist-button {
+  background: linear-gradient(135deg, #00ffcc, #007bff);
+  color: #1a1a3a;
+  border: none;
+  border-radius: 8px;
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 255, 204, 0.2);
+  min-width: 160px;
+  text-align: center;
+}
+
+.wishlist-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 255, 204, 0.3);
+}
+
+.wishlist-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.wishlist-button.added {
+  background: linear-gradient(135deg, #28a745, #20c997);
+  cursor: default;
+}
+
+.wishlist-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+/* Platform Row Updates */
+.platform-icon.reduced {
+  width: 32px !important;
+  height: 32px !important;
+  margin-right: 12px;
+}
+
+.platform-icon.reduced img {
+  width: 100%;
+  height: 100%;
+}
+
+/* Harmonized Status Indicators */
+.status-indicators.aligned {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 200px;
+  justify-content: flex-end;
+}
+
+.status-indicator,
+.connection-indicator {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  min-width: 80px;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.status-indicator.claimed {
+  background: rgba(40, 167, 69, 0.2);
+  color: #28a745;
+  border: 1px solid rgba(40, 167, 69, 0.3);
+}
+
+.status-indicator.unclaimed {
+  background: rgba(108, 117, 125, 0.2);
+  color: #6c757d;
+  border: 1px solid rgba(108, 117, 125, 0.3);
+}
+
+.connection-indicator.connected {
+  background: rgba(0, 123, 255, 0.2);
+  color: #007bff;
+  border: 1px solid rgba(0, 123, 255, 0.3);
+}
+
+.connection-indicator.disconnected {
+  background: rgba(220, 53, 69, 0.2);
+  color: #dc3545;
+  border: 1px solid rgba(220, 53, 69, 0.3);
+  cursor: pointer;
+}
+
+.connection-indicator.disconnected:hover {
+  background: rgba(220, 53, 69, 0.3);
+  transform: translateY(-1px);
+}
+
+.connection-indicator.coming-soon {
+  background: rgba(255, 193, 7, 0.2);
+  color: #ffc107;
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  cursor: default !important;
+  position: relative;
+}
+
+.connection-indicator.coming-soon:hover {
+  background: rgba(255, 193, 7, 0.2);
+  transform: none;
+}
+
+/* Usage Statistics Updates */
+.stat-icon.api {
+  background: linear-gradient(135deg, #6f42c1, #e83e8c);
+}
+
+.stat-icon.ai.inactive {
+  background: linear-gradient(135deg, #6c757d, #495057);
+  opacity: 0.6;
+}
+
+/* Dynamic Chart Styles */
+.dynamic-chart {
+  position: relative;
+  height: 300px;
+  display: flex;
+  align-items: flex-end;
+  padding: 20px;
+}
+
+.chart-bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  width: 100%;
+  height: 100%;
+  gap: 20px;
+}
+
+.chart-bar-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  height: 100%;
+}
+
+.chart-bar-wrapper {
+  display: flex;
+  align-items: flex-end;
+  height: calc(100% - 30px);
+  width: 60px;
+  margin-bottom: 10px;
+}
+
+.chart-bar {
+  width: 100%;
+  border-radius: 6px 6px 0 0;
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 8px;
+  transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 20px;
+}
+
+.chart-bar.instagram {
+  background: linear-gradient(135deg, #e4405f, #c13584);
+  box-shadow: 0 -4px 15px rgba(228, 64, 95, 0.3);
+}
+
+.chart-bar.twitter {
+  background: linear-gradient(135deg, #1da1f2, #0d7db8);
+  box-shadow: 0 -4px 15px rgba(29, 161, 242, 0.3);
+}
+
+.chart-bar.facebook {
+  background: linear-gradient(135deg, #1877f2, #166fe5);
+  box-shadow: 0 -4px 15px rgba(24, 119, 242, 0.3);
+}
+
+.chart-bar.linkedin {
+  background: linear-gradient(135deg, #0077b5, #005885);
+  box-shadow: 0 -4px 15px rgba(0, 119, 181, 0.3);
+}
+
+.bar-value {
+  color: white;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.chart-label {
+  color: #e0e0ff;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-align: center;
+  text-transform: capitalize;
+}
+
+.chart-y-axis {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%) rotate(-90deg);
+  transform-origin: center;
+}
+
+.y-axis-label {
+  color: #a0a0cc;
+  font-size: 0.9rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Enhanced shimmer animation */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+/* Additional responsive adjustments for new features */
+@media (max-width: 768px) {
+  .ai-manager-preview {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+    padding: 1rem;
+  }
+
+  .ai-manager-content {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .wishlist-button {
+    width: 100%;
+    max-width: 200px;
+  }
+
+  .status-indicators.aligned {
+    min-width: auto;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .platform-icon.reduced {
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  .dynamic-chart {
+    height: 200px;
+    padding: 10px;
+  }
+
+  .chart-bar-wrapper {
+    width: 40px;
+  }
+
+  .chart-bars {
+    gap: 10px;
+  }
 } 

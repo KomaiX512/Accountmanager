@@ -10,11 +10,14 @@ import Facebook from './pages/Facebook';
 import Dashboard from './components/instagram/Dashboard';
 import PlatformDashboard from './components/dashboard/PlatformDashboard';
 import MainDashboard from './components/dashboard/MainDashboard';
+import Homepage from './components/homepage/Homepage';
+import PrivacyPolicy from './components/legal/PrivacyPolicy';
 import Login from './components/auth/Login';
 import PrivateRoute from './components/auth/PrivateRoute';
-import AuthRoute from './components/auth/AuthRoute';
+import PricingPage from './components/pricing/PricingPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { InstagramProvider } from './context/InstagramContext';
+import { UsageProvider } from './context/UsageContext';
 import { TwitterProvider } from './context/TwitterContext';
 import { FacebookProvider } from './context/FacebookContext';
 import axios from 'axios';
@@ -22,12 +25,14 @@ import { syncInstagramConnection, isInstagramDisconnected } from './utils/instag
 import ChatModal from './components/instagram/ChatModal';
 import type { ChatMessage as ChatModalMessage } from './components/instagram/ChatModal';
 import QuotaStatusToast from './components/common/QuotaStatusToast';
+import AdminPanel from './components/admin/AdminPanel';
 
 
 // Main App component with AuthProvider
 const App: React.FC = () => {
   return (
     <AuthProvider>
+      <UsageProvider>
       <InstagramProvider>
         <TwitterProvider>
           <FacebookProvider>
@@ -35,6 +40,7 @@ const App: React.FC = () => {
           </FacebookProvider>
         </TwitterProvider>
       </InstagramProvider>
+      </UsageProvider>
     </AuthProvider>
   );
 };
@@ -72,6 +78,9 @@ const AppContent: React.FC = () => {
     quotaInfo: null,
     usingFallbackProfile: false
   });
+
+  // Admin panel state
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
 
   // Function to handle opening chat from MessagesPopup
   const handleOpenChatFromMessages = (messageContent: string, platform?: string) => {
@@ -189,7 +198,13 @@ const AppContent: React.FC = () => {
   const isLoginPage = location.pathname === '/login';
   const isAccountPage = location.pathname === '/account';
   const isEntryPage = location.pathname.includes('/setup') || location.pathname.includes('/connect') || location.pathname.includes('/entry');
-  const shouldHideLeftBar = isLoginPage || isAccountPage || isEntryPage;
+  const isHomePage = location.pathname === '/' || location.pathname === '/home';
+  const isPricingPage = location.pathname === '/pricing';
+  const isPrivacyPage = location.pathname === '/privacy';
+  const isPlatformDashboard = location.pathname.includes('dashboard') && !isAccountPage;
+  
+  // Only show LeftBar on platform dashboards
+  const shouldHideLeftBar = !isPlatformDashboard;
 
   // Determine current platform based on route with more robust detection
   const getCurrentPlatform = (): 'instagram' | 'twitter' | 'facebook' => {
@@ -220,6 +235,48 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     console.log(`[App] Platform detection: path="${location.pathname}" -> platform="${currentPlatform}"`);
   }, [location.pathname, currentPlatform]);
+
+  // Admin panel secret access with keyboard shortcut
+  useEffect(() => {
+    const handleKeyPress = (event: KeyboardEvent) => {
+      // Secret key combination: Ctrl + Shift + A + D + M + I + N
+      if (event.ctrlKey && event.shiftKey && event.code === 'KeyA') {
+        const sequence = ['KeyD', 'KeyM', 'KeyI', 'KeyN'];
+        let currentIndex = 0;
+        
+        const checkSequence = (e: KeyboardEvent) => {
+          if (e.code === sequence[currentIndex]) {
+            currentIndex++;
+            if (currentIndex === sequence.length) {
+              setShowAdminPanel(true);
+              document.removeEventListener('keydown', checkSequence);
+            }
+          } else {
+            currentIndex = 0;
+            document.removeEventListener('keydown', checkSequence);
+          }
+        };
+        
+        document.addEventListener('keydown', checkSequence);
+        
+        // Remove listener after 5 seconds
+        setTimeout(() => {
+          document.removeEventListener('keydown', checkSequence);
+        }, 5000);
+      }
+    };
+
+    // Also check for URL-based admin access
+    if (location.search.includes('admin=sentientai')) {
+      setShowAdminPanel(true);
+    }
+
+    document.addEventListener('keydown', handleKeyPress);
+    
+    return () => {
+      document.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [location.search]);
 
   // Update state when location state changes - now with stable dependencies
   useEffect(() => {
@@ -260,12 +317,7 @@ const AppContent: React.FC = () => {
     }
   }, [currentUser?.uid, syncUserConnection]);
 
-  // Redirect logged in users to account page
-  useEffect(() => {
-    if (currentUser && location.pathname === '/') {
-      navigate('/account');
-    }
-  }, [currentUser, location.pathname, navigate]);
+  // Note: Removed automatic redirect to allow users to stay on homepage
 
   // Try to load user data if logged in but no account info
   useEffect(() => {
@@ -345,11 +397,15 @@ const AppContent: React.FC = () => {
             <Route path="/login" element={<Login />} />
             <Route
               path="/"
-              element={
-                <AuthRoute>
-                  <MainDashboard />
-                </AuthRoute>
-              }
+              element={<Homepage />}
+            />
+            <Route
+              path="/home"
+              element={<Homepage />}
+            />
+            <Route
+              path="/privacy"
+              element={<PrivacyPolicy />}
             />
             <Route
               path="/account"
@@ -465,6 +521,14 @@ const AppContent: React.FC = () => {
                 </PrivateRoute>
               }
             />
+            <Route
+              path="/pricing"
+              element={
+                <PrivateRoute>
+                  <PricingPage />
+                </PrivateRoute>
+              }
+            />
 
           </Routes>
         </div>
@@ -544,6 +608,14 @@ const AppContent: React.FC = () => {
             usingFallbackProfile: false
           }))}
         />
+
+        {/* Admin Panel */}
+        {showAdminPanel && (
+          <AdminPanel
+            isOpen={showAdminPanel}
+            onClose={() => setShowAdminPanel(false)}
+          />
+        )}
     </div>
   );
 };

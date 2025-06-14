@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption: Glowing skin, unlocked! ✨ We're spilling our secrets to a radiant complexion with this simple yet effective skincare routine. Ready to ditch the dullness and embrace your inner glow? Let's get started! 💖\n\nHashtags: #glowingskin #skincareroutine #beautybrand #skincare #beauty #healthyskin #glowup #selfcare #skinhealth #beautytips\n\nCall to Action: Double tap if you're ready for glowing skin and tell us your favorite skincare step in the comments! 👇\n\nVisual Description for Image: A flat lay image showcasing a curated skincare routine on a clean, light pink marble surface. The lighting is soft and diffused, creating a bright and airy feel. Key products are arranged artfully: a cleanser in a frosted glass bottle with a pump, a serum in a small amber dropper bottle, a moisturizer in a sleek white jar, and a tube of sunscreen. A jade roller and a soft, white washcloth are also included. Small sprigs of fresh lavender are scattered around the products to add a touch of natural beauty and a calming aesthetic. The composition is balanced, with the products arranged in a visually pleasing order, suggesting the steps of a skincare routine. The overall mood is luxurious, clean, and inviting, emphasizing the idea of self-care and achieving radiant skin. The style is modern and minimalist, with a focus on high-quality product presentation. The background is slightly blurred to draw attention to the skincare items. The color palette is primarily pastel pink, white, and amber, creating a cohesive and aesthetically pleasing image.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.2918999025327133
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 267,
+    "candidatesTokenCount": 323,
+    "totalTokenCount": 590,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 267
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 323
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "xVNNaLfNKcuM1PIPkIuSsAI"
+}

@@ -1,0 +1,393 @@
+.access-control-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.access-control-popup {
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 480px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  animation: slideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(255, 215, 0, 0.2);
+}
+
+.popup-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(0, 0, 0, 0.1);
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #666;
+  font-size: 18px;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.popup-close:hover {
+  background: rgba(0, 0, 0, 0.2);
+  color: #333;
+  transform: scale(1.1);
+}
+
+.popup-header {
+  padding: 32px 24px 16px;
+  text-align: center;
+  border-bottom: 1px solid #f0f0f0;
+  position: relative;
+}
+
+.feature-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
+}
+
+.popup-header h3 {
+  margin: 0 0 8px 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a1a1a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.popup-content {
+  padding: 24px;
+}
+
+.upgrade-message {
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.upgrade-message p {
+  font-size: 16px;
+  color: #555;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.usage-info {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 24px;
+  border-left: 4px solid #ffd700;
+}
+
+.usage-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.usage-bar {
+  width: 100%;
+  height: 8px;
+  background: #e9ecef;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.usage-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #28a745, #ffc107, #dc3545);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.premium-benefits {
+  background: linear-gradient(135deg, #fff8e1, #f3e5f5);
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid rgba(255, 215, 0, 0.2);
+}
+
+.premium-benefits h4 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a1a1a;
+  text-align: center;
+}
+
+.premium-benefits ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.premium-benefits li {
+  padding: 8px 0;
+  font-size: 14px;
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.popup-actions {
+  padding: 0 24px 24px;
+  display: flex;
+  gap: 12px;
+  justify-content: stretch;
+}
+
+.popup-actions button {
+  flex: 1;
+  padding: 14px 20px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #ffd700, #ffb300);
+  color: #1a1a1a;
+  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ffed4e, #ffc107);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 215, 0, 0.4);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  background: #f8f9fa;
+  color: #333;
+  border: 1px solid #dee2e6;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #e9ecef;
+  border-color: #adb5bd;
+}
+
+.popup-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.popup-footer {
+  padding: 0 24px 24px;
+  text-align: center;
+}
+
+.popup-footer p {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+  font-style: italic;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .access-control-popup {
+    width: 95%;
+    margin: 20px;
+    border-radius: 16px;
+  }
+  
+  .popup-header {
+    padding: 24px 20px 16px;
+  }
+  
+  .feature-icon {
+    font-size: 40px;
+  }
+  
+  .popup-header h3 {
+    font-size: 20px;
+  }
+  
+  .popup-content {
+    padding: 20px;
+  }
+  
+  .popup-actions {
+    padding: 0 20px 20px;
+    flex-direction: column;
+  }
+  
+  .popup-actions button {
+    font-size: 14px;
+    padding: 12px 16px;
+  }
+}
+
+/* Dark theme support */
+@media (prefers-color-scheme: dark) {
+  .access-control-popup {
+    background: #1a1a1a;
+    border-color: rgba(255, 160, 0, 0.2);
+    color: #ffffff;
+  }
+  
+  .popup-header {
+    border-bottom-color: #333;
+  }
+  
+  .popup-header h3 {
+    color: #ffffff;
+  }
+  
+  .upgrade-message p {
+    color: #ccc;
+  }
+  
+  .usage-info {
+    background: #2a2a2a;
+    border-left-color: #ffa000;
+  }
+  
+  .usage-label {
+    color: #ffffff;
+  }
+  
+  .usage-bar {
+    background: #444;
+  }
+  
+  .premium-benefits {
+    background: linear-gradient(135deg, #2a2a1a, #2a1a2a);
+    border-color: rgba(255, 160, 0, 0.2);
+  }
+  
+  .premium-benefits h4 {
+    color: #ffffff;
+  }
+  
+  .premium-benefits li {
+    color: #ccc;
+  }
+  
+  .btn-secondary {
+    background: #333;
+    color: #ffffff;
+    border-color: #555;
+  }
+  
+  .btn-secondary:hover:not(:disabled) {
+    background: #444;
+    border-color: #666;
+  }
+  
+  .popup-footer p {
+    color: #888;
+  }
+  
+  .popup-close {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ccc;
+  }
+  
+  .popup-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .access-control-popup {
+    border: 2px solid #000;
+  }
+  
+  .btn-primary {
+    border: 2px solid #000;
+  }
+  
+  .btn-secondary {
+    border: 2px solid #000;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .access-control-overlay,
+  .access-control-popup,
+  .popup-actions button,
+  .spinner {
+    animation: none;
+    transition: none;
+  }
+  
+  .popup-actions button:hover:not(:disabled) {
+    transform: none;
+  }
+} 

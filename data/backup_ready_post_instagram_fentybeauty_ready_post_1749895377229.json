@@ -1,0 +1,27 @@
+{
+  "post": {
+    "caption": "Glow up, glow getter! ✨ Ever wondered which Fenty Beauty foundation is *your* perfect match? 🤔 We're breaking down the formulas, finishes, and coverage levels so you can find your flawless filter IRL. Get ready to #FindYourFentyFace!",
+    "hashtags": [
+      "#FentyBeauty",
+      "#FoundationRoutine",
+      "#MakeupTutorial",
+      "#ComplexionPerfection",
+      "#BeautyTips",
+      "#Rihanna",
+      "#FentyFace",
+      "#MakeupGuide",
+      "#FlawlessSkin",
+      "#BeautyHacks"
+    ],
+    "call_to_action": "Head to the link in bio for our ultimate foundation finder quiz! 💖",
+    "image_prompt": "A split-screen image, clean and brightly lit. On the left side, a close-up of three Fenty Beauty foundation bottles: Pro Filt'r Soft Matte Longwear Foundation (matte black bottle), Pro Filt'r Hydrating Longwear Foundation (light blue bottle), and Eaze Drop Blurring Skin Tint (nude bottle). Each bottle is slightly angled to show the product name clearly. The background is a soft, diffused white. On the right side, three diverse models are shown, each wearing one of the foundations. The first model (top right) has oily skin and is wearing the Soft Matte foundation, showcasing a matte, shine-free finish. The second model (middle right) has dry skin and is wearing the Hydrating foundation, demonstrating a dewy, radiant complexion. The third model (bottom right) has normal skin and is wearing the Eaze Drop, highlighting a natural, blurred effect. Each model is smiling confidently and looking directly at the camera. The overall aesthetic is clean, modern, and inclusive, reflecting the Fenty Beauty brand. The lighting is soft and flattering, emphasizing the skin's texture and the foundation's finish. The composition is balanced and visually appealing, drawing the viewer's eye to both the products and the models."
+  },
+  "timestamp": 1749895377229,
+  "image_path": "ready_post/instagram/fentybeauty/image_1749895377229.jpg",
+  "image_url": "http://127.0.0.1:3002/fix-image/fentybeauty/image_1749895377229.jpg?platform=instagram",
+  "r2_image_url": "http://127.0.0.1:3002/fix-image/fentybeauty/image_1749895377229.jpg?platform=instagram",
+  "generated_at": "2025-06-14T10:02:57.229Z",
+  "queryUsed": "create next post for me which likely be informative from our current strategies and engagaing accoridng to our whole history of posts and above all post ",
+  "status": "new",
+  "platform": "instagram"
+}

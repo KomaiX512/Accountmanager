@@ -346,6 +346,19 @@ class RagService {
             };
           }
           
+          // Handle rate limiting with auto-queue
+          if (error.response?.data?.error?.includes('RATE_LIMITED_AUTO_QUEUE')) {
+            console.log(`[RagService] Request auto-queued due to rate limiting for ${platform}`);
+            return {
+              response: `Your request is being processed! Due to high demand, it's been automatically queued. Please wait a moment for your ${platform === 'facebook' ? 'Facebook' : platform === 'twitter' ? 'X (Twitter)' : 'Instagram'} insights.`,
+              usedFallback: true,
+              quotaInfo: {
+                exhausted: false,
+                message: "Request queued - processing shortly"
+              }
+            };
+          }
+          
           throw new Error(error.response?.data?.error || 'Failed to process discussion query');
         }
       },

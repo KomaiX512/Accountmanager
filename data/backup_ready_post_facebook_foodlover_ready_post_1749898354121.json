@@ -1,0 +1,22 @@
+{
+  "post": {
+    "caption": "Fuel your body and kickstart your day with these delicious & healthy breakfast recipes! ☀️ From vibrant smoothie bowls to protein-packed overnight oats, we've got something for everyone. What's your go-to healthy breakfast? Let us know in the comments! 👇",
+    "hashtags": [
+      "#HealthyBreakfast",
+      "#BreakfastRecipes",
+      "#HealthyEating",
+      "#FoodLover",
+      "#MorningMotivation"
+    ],
+    "call_to_action": "Share your favorite healthy breakfast recipe in the comments below!",
+    "image_prompt": "A bright and airy flat lay featuring three different healthy breakfast options. In the top left corner, a vibrant pink smoothie bowl topped with fresh berries (strawberries, blueberries, raspberries), chia seeds, shredded coconut, and a drizzle of honey. The bowl is ceramic, light pink, and slightly textured. In the center, overnight oats in a clear glass jar, layered with rolled oats, almond milk, chia seeds, sliced bananas, and chopped walnuts. A spoon rests against the jar. In the bottom right corner, a slice of whole-wheat toast topped with avocado, a fried egg (yolk runny), and a sprinkle of red pepper flakes. The toast sits on a small wooden cutting board. The background is a clean, white marble surface. Natural light streams in from the top left, creating soft shadows. Scattered around the breakfast items are a few sprigs of fresh mint and a small bowl of mixed nuts. The overall mood is fresh, inviting, and healthy. The image should be high-resolution and visually appealing, suitable for a food-focused Facebook page. The style should be modern and slightly minimalist, emphasizing the natural colors and textures of the food."
+  },
+  "timestamp": 1749898354121,
+  "image_path": "ready_post/facebook/foodlover/image_1749898354121.jpg",
+  "image_url": "http://localhost:3002/fix-image/foodlover/image_1749898354121.jpg?platform=facebook",
+  "r2_image_url": "http://localhost:3002/fix-image/foodlover/image_1749898354121.jpg?platform=facebook",
+  "generated_at": "2025-06-14T10:52:34.121Z",
+  "queryUsed": "Post about healthy breakfast recipes",
+  "status": "new",
+  "platform": "facebook"
+}

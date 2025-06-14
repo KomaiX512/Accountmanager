@@ -4,6 +4,7 @@ import '../instagram/IG_EntryUsernames.css'; // Reuse the same styles
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import ProcessingLoadingState from '../common/ProcessingLoadingState';
 
 interface TW_EntryUsernamesProps {
   onSubmitSuccess: (username: string, competitors: string[], accountType: 'branding' | 'non-branding') => void;
@@ -21,6 +22,7 @@ const TW_EntryUsernames: React.FC<TW_EntryUsernamesProps> = ({
   const [postingStyle, setPostingStyle] = useState<string>('');
   const [competitors, setCompetitors] = useState<string[]>(['', '', '']);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
   const [message, setMessage] = useState<string>('');
   const [messageType, setMessageType] = useState<'info' | 'success' | 'error'>('info');
@@ -230,6 +232,64 @@ const TW_EntryUsernames: React.FC<TW_EntryUsernamesProps> = ({
     setTimeout(() => setMessage(''), 5000);
   };
 
+  const handleProcessingComplete = () => {
+    // Check if this was a pending platform to be marked as acquired
+    if (currentUser?.uid) {
+      const pendingKey = `mark_twitter_pending_${currentUser.uid}`;
+      if (localStorage.getItem(pendingKey)) {
+        // Clear the pending flag
+        localStorage.removeItem(pendingKey);
+        // Mark as acquired
+        localStorage.setItem(`twitter_accessed_${currentUser.uid}`, 'true');
+        // Save account type for routing purposes
+        localStorage.setItem(`twitter_account_type_${currentUser.uid}`, accountType);
+      }
+    }
+
+    // Store username for notification counting in main dashboard
+    localStorage.setItem(`twitter_username_${currentUser?.uid}`, username.trim());
+
+    // Mark Twitter as acquired after successful submission
+    if (markPlatformAccessed) {
+      markPlatformAccessed('twitter');
+    } else {
+      // Fallback if function not provided - update localStorage directly
+      if (currentUser?.uid) {
+        localStorage.setItem(`twitter_accessed_${currentUser.uid}`, 'true');
+        // Save account type for routing purposes
+        localStorage.setItem(`twitter_account_type_${currentUser.uid}`, accountType);
+      }
+    }
+
+    const finalCompetitors = competitors.map(comp => comp.trim());
+    
+    onSubmitSuccess(
+      username,
+      finalCompetitors,
+      accountType as 'branding' | 'non-branding'
+    );
+    
+    if (accountType === 'branding') {
+      navigate('/twitter-dashboard', { 
+        state: { 
+          accountHolder: username, 
+          competitors: finalCompetitors,
+          accountType: 'branding',
+          platform: 'twitter'
+        } 
+      });
+    } else {
+      navigate('/twitter-non-branding-dashboard', { 
+        state: { 
+          accountHolder: username,
+          competitors: finalCompetitors,
+          accountType: 'non-branding',
+          platform: 'twitter'
+        } 
+      });
+    }
+  };
+
   const submitData = async () => {
     if (!isValidForSubmission()) {
       showMessage('Please fill in all required fields correctly', 'error');
@@ -295,34 +355,10 @@ const TW_EntryUsernames: React.FC<TW_EntryUsernamesProps> = ({
         }
 
         showMessage('Submission successful', 'success');
-        resetForm();
-        setTimeout(() => {
-          onSubmitSuccess(
-            username,
-            payload.competitors, // Always pass competitors
-            accountType as 'branding' | 'non-branding'
-          );
-          
-          if (accountType === 'branding') {
-            navigate('/twitter-dashboard', { 
-              state: { 
-                accountHolder: username, 
-                competitors: payload.competitors,
-                accountType: 'branding',
-                platform: 'twitter'
-              } 
-            });
-          } else {
-            navigate('/twitter-non-branding-dashboard', { 
-              state: { 
-                accountHolder: username,
-                competitors: payload.competitors, // Always pass competitors
-                accountType: 'non-branding',
-                platform: 'twitter'
-              } 
-            });
-          }
-        }, 1000);
+        
+        // Start the 5-minute processing phase
+        setIsLoading(false);
+        setIsProcessing(true);
       }
     } catch (error: any) {
       console.error('Error submitting data:', error);
@@ -341,6 +377,16 @@ const TW_EntryUsernames: React.FC<TW_EntryUsernamesProps> = ({
           <h1 className="title">Loading...</h1>
         </div>
       </div>
+    );
+  }
+
+  if (isProcessing) {
+    return (
+      <ProcessingLoadingState
+        platform="twitter"
+        username={username}
+        onComplete={handleProcessingComplete}
+      />
     );
   }
 

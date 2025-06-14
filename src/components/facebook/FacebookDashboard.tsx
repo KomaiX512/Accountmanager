@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useFacebook } from '../../context/FacebookContext';
+import useFeatureTracking from '../../hooks/useFeatureTracking';
 import Dms_Comments from '../instagram/Dms_Comments';
 import FacebookConnect from './FacebookConnect';
 import InsightsModal from '../instagram/InsightsModal';
@@ -14,6 +15,7 @@ interface FacebookDashboardProps {
 }
 
 const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ onClose }) => {
+  const { trackPost, trackDiscussion, trackAIReply, isFeatureBlocked } = useFeatureTracking();
   const { currentUser } = useAuth();
   const { userId: facebookPageId, username: facebookUsername, isConnected } = useFacebook();
   
@@ -171,6 +173,9 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ onClose }) => {
         comment_id: notification.comment_id,
         platform: 'facebook'
       });
+
+      // Track discussion usage
+      trackDiscussion('facebook', `${notification.type}_reply_sent`);
 
       // Update notification status
       setNotifications(prev => 
@@ -348,6 +353,9 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ onClose }) => {
       if (sendResponse.ok) {
         console.log(`[${new Date().toISOString()}] Successfully sent Facebook AI reply for ${notifId}`);
         
+        // Track AI reply usage
+        trackAIReply('facebook', 'ai_reply_sent');
+        
         // Remove notification after successful send
         setNotifications(prev => prev.filter(n => 
           !((n.message_id && n.message_id === notification.message_id) || 
@@ -490,6 +498,9 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ onClose }) => {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
+      // Track post usage
+      trackPost('facebook', 'post_scheduled');
+
       // Reset form
       setScheduleForm({ caption: '', scheduleDate: '', image: null });
       setIsSchedulerOpen(false);
@@ -506,7 +517,14 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ onClose }) => {
     return (
       <div className="dashboard-container">
         <div className="dashboard-header">
-          <h1>Facebook Account Manager</h1>
+          <div className="header-logo">
+            <img 
+              src="/Logo/logo.png" 
+              alt="Logo" 
+              className="dashboard-logo"
+            />
+            <h1>Facebook Dashboard</h1>
+          </div>
           {onClose && (
             <button onClick={onClose} className="close-button">×</button>
           )}

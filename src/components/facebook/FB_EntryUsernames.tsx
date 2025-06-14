@@ -4,6 +4,7 @@ import './FB_EntryUsernames.css';
 import { motion } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import ProcessingLoadingState from '../common/ProcessingLoadingState';
 
 interface FB_EntryUsernamesProps {
   onSubmitSuccess: (username: string, competitors: string[], accountType: 'branding' | 'non-branding') => void;
@@ -21,6 +22,7 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
   const [postingStyle, setPostingStyle] = useState<string>('');
   const [competitors, setCompetitors] = useState<string[]>(['', '', '']);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
   const [message, setMessage] = useState<string>('');
   const [messageType, setMessageType] = useState<'info' | 'success' | 'error'>('info');
@@ -238,6 +240,60 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
     setTimeout(() => setMessage(''), 5000);
   };
 
+  const handleProcessingComplete = () => {
+    // Check if this was a pending platform to be marked as acquired
+    if (currentUser?.uid) {
+      const pendingKey = `mark_facebook_pending_${currentUser.uid}`;
+      if (localStorage.getItem(pendingKey)) {
+        // Clear the pending flag
+        localStorage.removeItem(pendingKey);
+        // Mark as acquired
+        localStorage.setItem(`facebook_accessed_${currentUser.uid}`, 'true');
+        // Save account type for routing purposes
+        localStorage.setItem(`facebook_account_type_${currentUser.uid}`, accountType);
+      }
+    }
+
+    // Store username for notification counting in main dashboard
+    localStorage.setItem(`facebook_username_${currentUser?.uid}`, username.trim());
+
+    // Mark Facebook as acquired after successful submission
+    if (markPlatformAccessed) {
+      markPlatformAccessed('facebook');
+    } else {
+      // Fallback if function not provided - update localStorage directly
+      if (currentUser?.uid) {
+        localStorage.setItem(`facebook_accessed_${currentUser.uid}`, 'true');
+        // Save account type for routing purposes
+        localStorage.setItem(`facebook_account_type_${currentUser.uid}`, accountType);
+      }
+    }
+    
+    const finalCompetitors = competitors.filter(comp => comp.trim() !== '');
+    
+    onSubmitSuccess(username, finalCompetitors, accountType as 'branding' | 'non-branding');
+    
+    if (accountType === 'branding') {
+      navigate('/facebook-dashboard', { 
+        state: { 
+          accountHolder: username, 
+          competitors: finalCompetitors,
+          accountType: 'branding',
+          platform: 'facebook'
+        } 
+      });
+    } else {
+      navigate('/facebook-non-branding-dashboard', { 
+        state: { 
+          accountHolder: username,
+          competitors: finalCompetitors,
+          accountType: 'non-branding',
+          platform: 'facebook'
+        } 
+      });
+    }
+  };
+
   const submitData = async () => {
     console.log('Form submission attempt:', {
       username: username.trim(),
@@ -285,37 +341,9 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
 
         showMessage('Facebook account information saved successfully!', 'success');
         
-        // Check if this was a pending platform to be marked as acquired
-        if (currentUser?.uid) {
-          const pendingKey = `mark_facebook_pending_${currentUser.uid}`;
-          if (localStorage.getItem(pendingKey)) {
-            // Clear the pending flag
-            localStorage.removeItem(pendingKey);
-            // Mark as acquired
-            localStorage.setItem(`facebook_accessed_${currentUser.uid}`, 'true');
-            // Save account type for routing purposes
-            localStorage.setItem(`facebook_account_type_${currentUser.uid}`, accountType);
-          }
-        }
-
-        // Store username for notification counting in main dashboard
-        localStorage.setItem(`facebook_username_${currentUser.uid}`, username.trim());
-
-        // Mark Facebook as acquired after successful submission
-        if (markPlatformAccessed) {
-          markPlatformAccessed('facebook');
-        } else {
-          // Fallback if function not provided - update localStorage directly
-          if (currentUser?.uid) {
-            localStorage.setItem(`facebook_accessed_${currentUser.uid}`, 'true');
-            // Save account type for routing purposes
-            localStorage.setItem(`facebook_account_type_${currentUser.uid}`, accountType);
-          }
-        }
-        
-        setTimeout(() => {
-          onSubmitSuccess(username, competitors.filter(comp => comp.trim() !== ''), accountType as 'branding' | 'non-branding');
-        }, 1000);
+        // Start the 5-minute processing phase
+        setIsLoading(false);
+        setIsProcessing(true);
       }
     } catch (error: any) {
       console.error('Error submitting Facebook data:', error);
@@ -339,6 +367,16 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
           <p>Loading your Facebook account...</p>
         </motion.div>
       </div>
+    );
+  }
+
+  if (isProcessing) {
+    return (
+      <ProcessingLoadingState
+        platform="facebook"
+        username={username}
+        onComplete={handleProcessingComplete}
+      />
     );
   }
 

@@ -1,0 +1,27 @@
+{
+  "post": {
+    "caption": "Flawless filter? Nah, that's just Fenty Beauty! ✨ We've been working on something special to make sure your feed is always poppin' with the perfect lighting. Let us know what you think of this new vibe! 👇",
+    "hashtags": [
+      "#FentyBeauty",
+      "#Rihanna",
+      "#Makeup",
+      "#Beauty",
+      "#GlowUp",
+      "#FlawlessSkin",
+      "#NewDrop",
+      "#Cosmetics",
+      "#MakeupLover",
+      "#BeautyHacks"
+    ],
+    "call_to_action": "Drop a 💖 if you're feeling this vibe!",
+    "image_prompt": "The image is a close-up studio shot of a diverse model with radiant, dewy skin, showcasing a subtle, natural makeup look created with Fenty Beauty products. The model has a light skin tone with warm undertones and is wearing a nude lip gloss, a touch of highlighter on her cheekbones, and a soft, smoky eye. The background is a clean, bright white, almost ethereal, creating a soft and diffused light that highlights the model's features. The lighting is even and flattering, minimizing shadows and emphasizing the skin's natural texture. The composition is focused on the model's face, with her eyes slightly averted, creating a sense of effortless beauty. The overall mood is fresh, clean, and aspirational. The image should have a high-quality, professional feel, reminiscent of a magazine beauty editorial. The style is minimalist and modern, with an emphasis on natural beauty and flawless skin. The model's hair is styled in loose waves, framing her face and adding to the overall softness of the image. The focus is sharp on the model's face, with a slight blur in the background to draw the viewer's attention to her features."
+  },
+  "timestamp": 1749900920971,
+  "image_path": "ready_post/instagram/fentybeauty/image_1749900920971.jpg",
+  "image_url": "http://localhost:3002/fix-image/fentybeauty/image_1749900920971.jpg?platform=instagram",
+  "r2_image_url": "http://localhost:3002/api/r2-image/fentybeauty/image_1749900920971.jpg?platform=instagram",
+  "generated_at": "2025-06-14T11:35:20.971Z",
+  "queryUsed": "Create a final test post to validate the white image fix",
+  "status": "new",
+  "platform": "instagram"
+}

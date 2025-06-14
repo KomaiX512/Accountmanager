@@ -106,7 +106,11 @@ const TopBar: React.FC = () => {
       
       {!isPlatformPage && (
         <div className="logo" onClick={() => navigate('/')}>
-          <span>Account Manager</span>
+          <img 
+            src="/Logo/logo.png" 
+            alt="Logo" 
+            className="logo-image"
+          />
         </div>
       )}
       
@@ -118,33 +122,35 @@ const TopBar: React.FC = () => {
       
       {showNavLinks && (
         <div className="nav-links">
+          {currentUser && (
+            <motion.a
+              href="#"
+              className={`nav-link ${location.pathname === '/account' ? 'active' : ''}`}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={(e) => {
+                e.preventDefault();
+                navigate('/account');
+              }}
+            >
+              Dashboard
+            </motion.a>
+          )}
           <motion.a
             href="#"
-            className={`nav-link ${location.pathname === '/account' ? 'active' : ''}`}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={(e) => {
-              e.preventDefault();
-              navigate('/account');
-            }}
-          >
-            Dashboard
-          </motion.a>
-          <motion.a
-            href="#"
-            className="nav-link"
+            className={`nav-link ${location.pathname === '/pricing' ? 'active' : ''}`}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
             onClick={(e) => {
               e.preventDefault();
-              // No functionality for now
+              navigate('/pricing');
             }}
           >
             Pricing
           </motion.a>
           <motion.a
             href="#"
-            className={`nav-link ${location.pathname === '/' ? 'active' : ''}`}
+            className={`nav-link ${location.pathname === '/' || location.pathname === '/home' ? 'active' : ''}`}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
             onClick={(e) => {
@@ -153,6 +159,18 @@ const TopBar: React.FC = () => {
             }}
           >
             Home
+          </motion.a>
+          <motion.a
+            href="#"
+            className={`nav-link ${location.pathname === '/privacy' ? 'active' : ''}`}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={(e) => {
+              e.preventDefault();
+              navigate('/privacy');
+            }}
+          >
+            Privacy Policy
           </motion.a>
         </div>
       )}
@@ -169,13 +187,13 @@ const TopBar: React.FC = () => {
             transition={{ delay: 0.3 }}
             onClick={(e) => {
               e.preventDefault();
-              navigate('/account');
+              navigate('/');
             }}
           >
             <svg viewBox="0 0 24 24">
               <path d="M10,20V14H14V20H19V12H22L12,3L2,12H5V20H10Z" />
             </svg>
-            <span>Main Dashboard</span>
+            <span>Home</span>
           </motion.a>
         )}
       

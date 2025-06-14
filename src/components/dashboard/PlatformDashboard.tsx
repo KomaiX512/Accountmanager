@@ -33,6 +33,7 @@ import { BsLightningChargeFill, BsBinoculars, BsLightbulb } from 'react-icons/bs
 import { IoMdAnalytics } from 'react-icons/io';
 import { TbTargetArrow } from 'react-icons/tb';
 import { GiSpy } from 'react-icons/gi';
+import useFeatureTracking from '../../hooks/useFeatureTracking';
 
 // Define RagService compatible ChatMessage
 interface RagChatMessage {
@@ -170,12 +171,14 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const maxImageRetryAttempts = 3;
   const [aiRepliesRefreshKey, setAiRepliesRefreshKey] = useState(0);
   const [processingNotifications, setProcessingNotifications] = useState<Record<string, boolean>>({});
+  const [isAutoReplying, setIsAutoReplying] = useState(false);
   const [isTwitterSchedulerOpen, setIsTwitterSchedulerOpen] = useState(false);
   const [isTwitterInsightsOpen, setIsTwitterInsightsOpen] = useState(false);
   const [isTwitterComposeOpen, setIsTwitterComposeOpen] = useState(false);
   const [isFacebookSchedulerOpen, setIsFacebookSchedulerOpen] = useState(false);
   const [isFacebookInsightsOpen, setIsFacebookInsightsOpen] = useState(false);
   const [isFacebookComposeOpen, setIsFacebookComposeOpen] = useState(false);
+  const { trackRealDiscussion, trackRealAIReply, trackRealPostCreation, canUseFeature } = useFeatureTracking();
 
   // Helper function to get unseen count for each section
   const getUnseenStrategiesCount = () => {
@@ -426,29 +429,18 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     };
   };
 
-  const handleReplyWithAI = async (notification: any) => {
-    if (!notification || !accountHolder) return;
-    
-    const notifId = notification.message_id || notification.comment_id;
-    if (!notifId) return;
-    
-    if (aiProcessingNotifications[notifId]) {
-      console.log(`[${new Date().toISOString()}] Skipping duplicate AI reply request for ${notifId}`);
+  const handleReplyWithAI = async (notification: Notification, notifId: string) => {
+    if (!notification.text) {
+      console.warn('No message text found for AI reply');
       return;
     }
     
-    setAiProcessingNotifications(prev => ({...prev, [notifId]: true}));
-    setToast(`Generating AI reply for ${notification.username || 'user'}...`);
-    
-    console.log(`[${new Date().toISOString()}] Generating AI reply for ${platform} notification:`, 
-      JSON.stringify({
-        id: notifId,
-        sender_id: notification.sender_id,
-        text: notification.text?.substring(0, 50) + '...',
-        type: notification.type,
-        platform: platform
-      })
-    );
+    // ✅ PRE-ACTION CHECK: Verify AI reply limits before proceeding
+    const aiReplyAccessCheck = canUseFeature('aiReplies');
+    if (!aiReplyAccessCheck.allowed) {
+      setToast(aiReplyAccessCheck.reason || 'AI Replies feature is not available');
+      return;
+    }
     
     try {
       const message = notification.text || '';
@@ -464,7 +456,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
                                platform === 'facebook' ? facebookId :
                                igUserId;
         const response = await RagService.sendInstantAIReply(
-          currentUserId || notification.twitter_user_id || notification.instagram_user_id || notification.facebook_user_id,
+          currentUserId || notification.twitter_user_id || notification.instagram_user_id || notification.facebook_page_id || 'unknown',
           accountHolder,
           conversation,
           {
@@ -478,100 +470,34 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           response.reply?.substring(0, 50) + '...'
         );
         
+        // ✅ REAL USAGE TRACKING: Track actual AI reply generation
+        const trackingSuccess = await trackRealAIReply(platform, {
+          type: notification.type === 'message' ? 'dm' : 'comment',
+          mode: 'instant'
+        });
+        
+        if (trackingSuccess) {
+          console.log(`[PlatformDashboard] ✅ AI Reply tracked: ${platform} ${notification.type} reply`);
+        } else {
+          console.warn(`[PlatformDashboard] ⚠️ AI Reply tracking failed for ${platform}`);
+        }
+        
         setToast(`AI reply generated for ${notification.username || 'user'}`);
         
-        try {
-          console.log(`[${new Date().toISOString()}] Marking ${platform} notification ${notifId} as handled permanently`);
-          
-          await axios.post(`http://localhost:3000/mark-notification-handled/${currentUserId || notification.twitter_user_id || notification.instagram_user_id}`, {
-            notification_id: notifId,
-            type: notification.type,
-            handled_by: 'ai',
-            platform: platform
-          }, {
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            }
-          });
-          
-          console.log(`[${new Date().toISOString()}] Successfully marked ${platform} notification as handled`);
-          
-          setNotifications(prev => prev.filter(n => 
-            !((n.message_id && n.message_id === notification.message_id) || 
-              (n.comment_id && n.comment_id === notification.comment_id))
-          ));
-          
-          if (notification.type === 'message' && notification.sender_id && currentUserId) {
-            try {
-              console.log(`[${new Date().toISOString()}] Auto-sending ${platform} AI reply immediately`);
-              
-              const sendResponse = await fetch(`http://localhost:3000/send-dm-reply/${currentUserId}`, {
-                method: 'POST',
-                headers: { 
-                  'Content-Type': 'application/json',
-                  'Accept': 'application/json',
-                  'Origin': window.location.origin
-                },
-                body: JSON.stringify({
-                  sender_id: notification.sender_id,
-                  text: response.reply,
-                  message_id: notifId,
-                  platform: platform
-                }),
-              });
-              
-              if (sendResponse.ok) {
-                console.log(`[${new Date().toISOString()}] Successfully sent ${platform} AI DM immediately`);
-                setToast(`AI reply sent to ${notification.username || 'user'}`);
-              } else {
-                const responseData = await sendResponse.json();
-                console.warn(`[${new Date().toISOString()}] Could not auto-send ${platform} reply immediately:`, responseData);
-                setNotifications(prev => [...prev, createAIReadyNotification(notification, response.reply)]);
-              }
-            } catch (autoSendError) {
-              console.error(`[${new Date().toISOString()}] Error auto-sending ${platform} AI reply:`, autoSendError);
-              setNotifications(prev => [...prev, createAIReadyNotification(notification, response.reply)]);
-            }
-          } else if (notification.type === 'comment') {
-            setNotifications(prev => [...prev, createAIReadyNotification(notification, response.reply)]);
-          }
-          
-        } catch (markError) {
-          console.error(`[${new Date().toISOString()}] Error marking ${platform} notification as handled:`, markError);
-          setNotifications(prev => prev.filter(n => 
-            !((n.message_id && n.message_id === notification.message_id) || 
-              (n.comment_id && n.comment_id === notification.comment_id))
-          ));
-          setNotifications(prev => [...prev, createAIReadyNotification(notification, response.reply)]);
-        }
+        // Remove the original notification to prevent duplicates
+        setNotifications(prev => prev.filter(n => 
+          !((n.message_id && n.message_id === notification.message_id) || 
+            (n.comment_id && n.comment_id === notification.comment_id))
+        ));
         
-        setRefreshKey(prev => prev + 1);
-        
-      } catch (error: any) {
-        let errorMessage = 'Unknown error';
-        
-        if (error.response?.data?.error) {
-          errorMessage = error.response.data.error;
-          if (error.response.data.details) {
-            console.error(`[${new Date().toISOString()}] Error details:`, error.response.data.details);
-          }
-        } else if (error.message) {
-          errorMessage = error.message;
-        }
-        
-        console.error(`[${new Date().toISOString()}] Error using RAG service for instant ${platform} reply: ${errorMessage}`, error);
-        setToast(`Failed to generate AI reply: ${errorMessage}`);
+      } catch (ragError: any) {
+        console.error(`[${new Date().toISOString()}] RAG service error for ${platform}:`, ragError);
+        setToast('Failed to generate AI reply via RAG service');
       }
+      
     } catch (error: any) {
-      console.error(`[${new Date().toISOString()}] Unexpected error in handle${platform}ReplyWithAI:`, error);
-      setToast(`Error generating AI reply: ${error.message || 'Unknown error'}`);
-    } finally {
-      setAiProcessingNotifications(prev => {
-        const newState = {...prev};
-        delete newState[notifId];
-        return newState;
-      });
+      console.error(`[${new Date().toISOString()}] Error in handleReplyWithAI for ${platform}:`, error);
+      setToast('Failed to generate AI reply');
     }
   };
 
@@ -740,72 +666,95 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   };
 
   // Handle auto-reply to all notifications  
-  const handleAutoReplyAll = async (notifications: any[]) => {
+  const handleAutoReplyAll = async () => {
+    if (notifications.length === 0) {
+      setToast('No notifications to auto-reply to');
+      return;
+    }
+    
+    // ✅ PRE-ACTION CHECK: Verify AI reply limits before proceeding
+    const aiReplyAccessCheck = canUseFeature('aiReplies');
+    if (!aiReplyAccessCheck.allowed) {
+      setToast(aiReplyAccessCheck.reason || 'AI Replies feature is not available');
+      return;
+    }
+    
+    setIsAutoReplying(true);
+    let successCount = 0;
+    let failCount = 0;
+    
     const currentUserId = platform === 'twitter' ? twitterId : 
                          platform === 'facebook' ? facebookId :
                          igUserId;
-    if (!currentUserId || !accountHolder) return;
-
-    try {
-      console.log(`[${new Date().toISOString()}] Starting ${platform} auto-reply for ${notifications.length} notifications`);
+    
+    for (const notification of notifications) {
+      if (!notification.text) continue;
       
-      for (const notification of notifications) {
-        try {
-          // Generate AI reply using the enhanced RAG server
-          const response = await axios.post('http://localhost:3001/api/instant-reply', {
-            username: accountHolder,
-            notification: {
-              type: notification.type,
-              message_id: notification.message_id,
-              comment_id: notification.comment_id,
-              text: notification.text,
-              username: notification.username,
-              timestamp: notification.timestamp,
-              platform: platform
-            },
+      try {
+        // Generate AI reply using the enhanced RAG server
+        const response = await axios.post('http://localhost:3001/api/instant-reply', {
+          username: accountHolder,
+          notification: {
+            type: notification.type,
+            message_id: notification.message_id,
+            comment_id: notification.comment_id,
+            text: notification.text,
+            username: notification.username,
+            timestamp: notification.timestamp,
+            platform: platform
+          },
+          platform: platform
+        });
+
+        if (response.data.success && response.data.reply) {
+          // Send the generated reply
+          const endpoint = notification.type === 'message' ? 'send-dm-reply' : 'send-comment-reply';
+          
+          await axios.post(`http://localhost:3000/${endpoint}/${currentUserId}`, {
+            sender_id: notification.sender_id,
+            text: response.data.reply,
+            message_id: notification.message_id,
+            comment_id: notification.comment_id,
             platform: platform
           });
 
-          if (response.data.success && response.data.reply) {
-            // Send the generated reply
-            const endpoint = notification.type === 'message' ? 'send-dm-reply' : 'send-comment-reply';
-            
-            await axios.post(`http://localhost:3000/${endpoint}/${currentUserId}`, {
-              sender_id: notification.sender_id,
-              text: response.data.reply,
-              message_id: notification.message_id,
-              comment_id: notification.comment_id,
-              platform: platform
-            });
+          // Mark notification as handled permanently
+          await axios.post(`http://localhost:3000/mark-notification-handled/${currentUserId}`, {
+            notification_id: notification.message_id || notification.comment_id,
+            type: notification.type,
+            handled_by: 'ai_auto_reply',
+            platform: platform
+          });
 
-            // Mark notification as handled permanently
-            await axios.post(`http://localhost:3000/mark-notification-handled/${currentUserId}`, {
-              notification_id: notification.message_id || notification.comment_id,
-              type: notification.type,
-              handled_by: 'ai_auto_reply',
-              platform: platform
-            });
-
-            // Update notification status locally
-            setNotifications(prev => 
-              prev.filter(notif => 
-                !((notif.message_id && notif.message_id === notification.message_id) ||
-                  (notif.comment_id && notif.comment_id === notification.comment_id))
-              )
-            );
-
-            console.log(`[${new Date().toISOString()}] ${platform} auto-reply sent and marked as handled for ${notification.message_id || notification.comment_id}`);
+          // ✅ REAL USAGE TRACKING: Track actual auto-reply generation and sending
+          const trackingSuccess = await trackRealAIReply(platform, {
+            type: notification.type === 'message' ? 'dm' : 'comment',
+            mode: 'auto'
+          });
+          
+          if (trackingSuccess) {
+            console.log(`[PlatformDashboard] ✅ Auto AI Reply tracked: ${platform} ${notification.type}`);
+          } else {
+            console.warn(`[PlatformDashboard] ⚠️ Auto AI Reply tracking failed for ${platform}`);
           }
-        } catch (notificationError) {
-          console.error(`[${new Date().toISOString()}] Error processing ${platform} auto-reply for notification:`, notificationError);
-          // Continue with next notification even if one fails
-        }
-      }
 
-    } catch (error: any) {
-      console.error(`[${new Date().toISOString()}] Error in ${platform} auto-reply:`, error);
-      setError(`Auto-reply failed for some ${platform} notifications`);
+          successCount++;
+        } else {
+          failCount++;
+        }
+      } catch (error) {
+        console.error(`Error auto-replying to ${notification.type}:`, error);
+        failCount++;
+      }
     }
+    
+    setIsAutoReplying(false);
+    setToast(`Auto-reply completed: ${successCount} sent, ${failCount} failed`);
+    
+    // Refresh notifications
+    setTimeout(() => {
+      setRefreshKey(prev => prev + 1);
+    }, 2000);
   };
 
   const fetchNotifications = async (attempt = 1, maxAttempts = 3) => {
@@ -1014,14 +963,21 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   };
 
   const handleSendQuery = async () => {
-    if (!accountHolder || !query.trim()) return;
+    if (!query.trim()) return;
     
     setIsProcessing(true);
-    setResult('');
     setError(null);
     
     try {
       if (chatMode === 'discussion') {
+        // ✅ PRE-ACTION CHECK: Verify discussion limits before proceeding
+        const discussionAccessCheck = canUseFeature('discussions');
+        if (!discussionAccessCheck.allowed) {
+          setError(discussionAccessCheck.reason || 'Discussions feature is not available');
+          setIsProcessing(false);
+          return;
+        }
+        
         console.log(`Sending ${platform} discussion query to RAG for ${accountHolder}: ${query}`);
         const response = await RagService.sendDiscussionQuery(accountHolder, query, chatMessages, platform);
         
@@ -1042,6 +998,18 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         
         setChatMessages(updatedMessages);
         
+        // ✅ REAL USAGE TRACKING: Track actual discussion engagement
+        const trackingSuccess = await trackRealDiscussion(platform, {
+          messageCount: updatedMessages.length,
+          type: 'chat'
+        });
+        
+        if (trackingSuccess) {
+          console.log(`[PlatformDashboard] ✅ Discussion tracked: ${platform} chat engagement`);
+        } else {
+          console.warn(`[PlatformDashboard] ⚠️ Discussion tracking failed for ${platform}`);
+        }
+        
         try {
           await RagService.saveConversation(accountHolder, [...chatMessages, userMessage, assistantMessage], platform);
         } catch (saveErr) {
@@ -1054,21 +1022,27 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         const urlPattern = platform === 'twitter' 
           ? /https:\/\/twitter\.com\/([A-Za-z0-9_]+)/g
           : /https:\/\/instagram\.com\/([A-Za-z0-9_.-]+)/g;
-          
-        if (response.response.match(urlPattern)) {
-          const matches = response.response.match(urlPattern);
-          if (matches?.length) {
-            setLinkedAccounts(matches.map(url => ({
-              url,
-              username: url.replace(config.baseUrl, '')
-            })));
-          }
+        
+        const matches = [...response.response.matchAll(urlPattern)];
+        if (matches.length > 0) {
+          const newLinkedAccounts = matches.map(match => ({
+            username: match[1],
+            platform: platform as 'twitter' | 'instagram',
+            addedAt: new Date().toISOString()
+          }));
+          setLinkedAccounts(prev => [...prev, ...newLinkedAccounts]);
         }
         
-        setIsChatModalOpen(true);
-        
       } else if (chatMode === 'post') {
-        console.log(`Sending ${platform} post generation query to RAG for ${accountHolder}: ${query}`);
+        // ✅ PRE-ACTION CHECK: Verify post limits before proceeding
+        const postAccessCheck = canUseFeature('posts');
+        if (!postAccessCheck.allowed) {
+          setError(postAccessCheck.reason || 'Posts feature is not available');
+          setIsProcessing(false);
+          return;
+        }
+        
+        console.log(`Generating ${platform} post for ${accountHolder}: ${query}`);
         const response = await RagService.sendPostQuery(accountHolder, query, platform);
         
         if (response.success && response.post) {
@@ -1101,6 +1075,19 @@ Image Description: ${response.post.image_prompt}
           
           setChatMessages(updatedMessages);
           
+          // ✅ REAL USAGE TRACKING: Track actual post generation
+          const trackingSuccess = await trackRealPostCreation(platform, {
+            scheduled: false,
+            immediate: false,
+            type: 'ai_generated_content'
+          });
+          
+          if (trackingSuccess) {
+            console.log(`[PlatformDashboard] ✅ Post generation tracked: ${platform} AI content`);
+          } else {
+            console.warn(`[PlatformDashboard] ⚠️ Post generation tracking failed for ${platform}`);
+          }
+          
           // TRIGGER POST REFRESH: Notify PostCooked component about new post
           const newPostEvent = new CustomEvent('newPostCreated', {
             detail: {
@@ -1114,29 +1101,17 @@ Image Description: ${response.post.image_prompt}
           
           // DON'T OPEN POPUP FOR POST MODE: Just show success message via toast
           setToast('Post generated successfully! Check the Cooked Posts section.');
+          
         } else {
-          setError(response.error || `Failed to generate ${platform} post`);
+          setError('Failed to generate post. Please try again.');
         }
       }
-      
-      setQuery('');
-    } catch (error: unknown) {
-      console.error(`Error with ${platform} RAG query:`, error);
-      setToast(`Failed to process your ${platform} request.`);
-      
-      if (error && typeof error === 'object' && 'response' in error && 
-          error.response && typeof error.response === 'object' && 'data' in error.response) {
-        const errorData = error.response.data;
-        if (errorData && typeof errorData === 'object' && 'error' in errorData) {
-          setError(errorData.error as string || 'Failed to process query.');
-        } else {
-          setError('Failed to process query. Please try again.');
-        }
-      } else {
-        setError('Failed to process query. Please try again.');
-      }
+    } catch (error: any) {
+      console.error(`Error processing ${chatMode} query:`, error);
+      setError(error.message || `Failed to process ${chatMode} query`);
     } finally {
       setIsProcessing(false);
+      setQuery('');
     }
   };
 
@@ -1710,7 +1685,10 @@ Image Description: ${response.post.image_prompt}
                   setRefreshKey(prev => prev + 1);
                   fetchNotifications(1, 3);
                 }} 
-                onReplyWithAI={handleReplyWithAI}
+                onReplyWithAI={(notification: Notification) => {
+                  const notifId = notification.message_id || notification.comment_id || 'unknown';
+                  handleReplyWithAI(notification, notifId);
+                }}
                 onAutoReplyAll={handleAutoReplyAll}
                 username={accountHolder}
                 onIgnoreAIReply={handleIgnoreAIReply}

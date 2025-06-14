@@ -323,7 +323,7 @@ const Login: React.FC = () => {
         whileHover={{ boxShadow: '0 10px 30px rgba(0, 0, 0, 0.15)' }}
       >
         <div className="auth-header">
-          <h1>Welcome to KomX</h1>
+          
           <p>
             {mode === 'login' && 'Sign in to access your dashboard'}
             {mode === 'register' && 'Create a new account to get started'}

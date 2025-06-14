@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption:\nNew year, new glow! ✨ We're dropping something HUGE soon, and you KNOW it's gonna be a game-changer. Get ready to unleash your inner radiance, besties! 😉\n\nHashtags:\n#FentyBeauty #NewDrop #ComingSoon #GlowUp #MakeupLover #BeautySecrets #Rihanna #FentyGlow #MakeupAddict #Beauty\n\nCall to Action:\nTurn on post notifications so you don't miss the reveal! 🔔\n\nVisual Description for Image:\nThe image is a close-up, highly stylized beauty shot focusing on a model's radiant skin. The model has a warm, golden skin tone, reflecting the signature Fenty Glow aesthetic. The lighting is soft and diffused, creating a luminous, almost ethereal effect. The background is a blurred gradient of warm golds, bronzes, and rose golds, adding depth and luxury.\n\nThe model's face is partially obscured by abstract, shimmering gold and bronze liquid textures that appear to be floating and swirling around her face. These textures should have a metallic sheen and catch the light beautifully. The focus is on the texture and the glow it imparts to the skin.\n\nThe model's eyes are closed, conveying a sense of serenity and confidence. Her lips are subtly glossed with a nude shade, enhancing her natural beauty. The overall mood is luxurious, sophisticated, and aspirational. The image should evoke a sense of anticipation and excitement for the new product launch. The style is modern, clean, and visually striking, consistent with Fenty Beauty's brand aesthetic.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.3665747305063101
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 264,
+    "candidatesTokenCount": 325,
+    "totalTokenCount": 589,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 264
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 325
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "2FdNaOCCJebhhMIPiujZKQ"
+}

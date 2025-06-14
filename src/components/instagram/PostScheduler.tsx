@@ -6,6 +6,7 @@ import axios from 'axios';
 import './PostScheduler.css';
 import { useInstagram } from '../../context/InstagramContext';
 import { schedulePost } from '../../utils/scheduleHelpers';
+import useFeatureTracking from '../../hooks/useFeatureTracking';
 
 interface PostSchedulerProps {
   userId: string;
@@ -19,6 +20,8 @@ interface FormData {
 }
 
 const PostScheduler: React.FC<PostSchedulerProps> = ({ userId, onClose, platform = 'instagram' }) => {
+  const { trackRealPostCreation, canUseFeature } = useFeatureTracking();
+  
   // Get userId from context if not provided as prop
   const { userId: contextUserId, isConnected } = useInstagram();
   const userIdFromContext = isConnected ? contextUserId : null;
@@ -50,6 +53,13 @@ const PostScheduler: React.FC<PostSchedulerProps> = ({ userId, onClose, platform
   const onSubmit: SubmitHandler<FormData> = async (data) => {
     if (!userIdToUse) {
       setError('Instagram connection required. Please connect your Instagram account.');
+      return;
+    }
+    
+    // ✅ PRE-ACTION CHECK: Verify post limits before proceeding
+    const postAccessCheck = canUseFeature('posts');
+    if (!postAccessCheck.allowed) {
+      setError(postAccessCheck.reason || 'Posts feature is not available');
       return;
     }
     
@@ -86,6 +96,20 @@ const PostScheduler: React.FC<PostSchedulerProps> = ({ userId, onClose, platform
       
       if (result.success) {
         console.log(`[${new Date().toISOString()}] Post scheduled successfully for user ${userIdToUse} on ${platform}`);
+        
+        // ✅ REAL USAGE TRACKING: Track actual post scheduling
+        const trackingSuccess = trackRealPostCreation(platform, {
+          scheduled: true,
+          immediate: false,
+          type: 'single_platform_scheduled'
+        });
+        
+        if (trackingSuccess) {
+          console.log(`[PostScheduler] ✅ Usage tracked: ${platform} post scheduled`);
+        } else {
+          console.warn(`[PostScheduler] ⚠️ Usage tracking failed for ${platform}, but post was scheduled`);
+        }
+        
         setError(null);
         onClose();
       } else {

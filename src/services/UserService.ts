@@ -5,6 +5,10 @@ class UserService {
     ? 'https://your-domain.com/api' 
     : 'http://localhost:3002/api';
 
+  // Cache for user data to reduce API calls
+  private userCache = new Map<string, { data: User; timestamp: number }>();
+  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
   // Pricing plans configuration
   public readonly PRICING_PLANS: PricingPlan[] = [
     {
@@ -93,9 +97,17 @@ class UserService {
     password: 'Sentiant123@'
   };
 
-  // Get user data from R2
+  // Get user data from R2 with caching
   async getUserData(userId: string): Promise<User | null> {
     try {
+      // Check cache first
+      const cached = this.userCache.get(userId);
+      if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+        console.log('[UserService] Returning cached user data for', userId);
+        return cached.data;
+      }
+
+      console.log('[UserService] Fetching user data from API for', userId);
       const response = await fetch(`${this.API_BASE_URL}/user/${userId}`, {
         method: 'GET',
         headers: {
@@ -111,7 +123,15 @@ class UserService {
         throw new Error(`Failed to fetch user data: ${response.statusText}`);
       }
 
-      return await response.json();
+      const userData = await response.json();
+      
+      // Cache the user data
+      this.userCache.set(userId, {
+        data: userData,
+        timestamp: Date.now()
+      });
+
+      return userData;
     } catch (error) {
       console.error('[UserService] Error getting user data:', error);
       // Fallback to creating a default user
@@ -149,7 +169,7 @@ class UserService {
     }
   }
 
-  // Save user data to R2
+  // Save user data to R2 and update cache
   async saveUserData(userData: User): Promise<void> {
     try {
       const response = await fetch(`${this.API_BASE_URL}/user/${userData.id}`, {
@@ -163,6 +183,14 @@ class UserService {
       if (!response.ok) {
         throw new Error(`Failed to save user data: ${response.statusText}`);
       }
+
+      // Update cache
+      this.userCache.set(userData.id, {
+        data: userData,
+        timestamp: Date.now()
+      });
+
+      console.log('[UserService] User data saved and cached for', userData.id);
     } catch (error) {
       console.error('[UserService] Error saving user data:', error);
       throw error;
@@ -374,71 +402,181 @@ class UserService {
     }
   }
 
-  // Authenticate admin user
-  authenticateAdmin(username: string, password: string): boolean {
-    return username === this.ADMIN_CREDENTIALS.username && 
-           password === this.ADMIN_CREDENTIALS.password;
-  }
 
-  // Upgrade user to admin
-  async upgradeToAdmin(userId: string): Promise<void> {
-    try {
-      const userData = await this.getUserData(userId);
-      if (!userData) {
-        throw new Error('User not found');
-      }
-
-      userData.userType = 'admin';
-      userData.subscription = {
-        planId: 'enterprise',
-        status: 'active',
-        startDate: new Date().toISOString(),
-        limits: {
-          posts: 999999,
-          discussions: 999999,
-          aiReplies: 'unlimited',
-          goalModelDays: 'unlimited',
-          campaigns: 999999,
-          autoSchedule: true,
-          autoReply: true
-        }
-      };
-
-      await this.saveUserData(userData);
-    } catch (error) {
-      console.error('[UserService] Error upgrading to admin:', error);
-      throw error;
-    }
-  }
 
   // Increment usage counter
   async incrementUsage(userId: string, feature: 'posts' | 'discussions' | 'aiReplies' | 'campaigns'): Promise<void> {
     try {
-      const usageStats = await this.getUsageStats(userId);
-      
-      const update: Partial<UsageStats> = {
-        lastUpdated: new Date().toISOString()
-      };
+      // Use new backend endpoint for usage increment
+      const response = await fetch(`${this.API_BASE_URL}/usage/increment/${userId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ feature }),
+      });
 
-      switch (feature) {
-        case 'posts':
-          update.postsUsed = usageStats.postsUsed + 1;
-          break;
-        case 'discussions':
-          update.discussionsUsed = usageStats.discussionsUsed + 1;
-          break;
-        case 'aiReplies':
-          update.aiRepliesUsed = usageStats.aiRepliesUsed + 1;
-          break;
-        case 'campaigns':
-          update.campaignsUsed = usageStats.campaignsUsed + 1;
-          break;
+      if (!response.ok) {
+        console.warn('[UserService] Usage increment failed, but continuing operation');
+      } else {
+        console.log(`[UserService] Successfully incremented ${feature} usage for ${userId}`);
       }
-
-      await this.updateUsageStats(userId, update);
     } catch (error) {
       console.error('[UserService] Error incrementing usage:', error);
       // Don't throw - usage tracking is not critical
+    }
+  }
+
+  // Clear user cache (useful after upgrades/changes)
+  clearUserCache(userId?: string): void {
+    if (userId) {
+      this.userCache.delete(userId);
+      console.log('[UserService] Cleared cache for user', userId);
+    } else {
+      this.userCache.clear();
+      console.log('[UserService] Cleared all user cache');
+    }
+  }
+
+  // Get pricing plans from backend
+  async getPricingPlans(): Promise<PricingPlan[]> {
+    try {
+      const response = await fetch(`${this.API_BASE_URL}/pricing-plans`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch pricing plans: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.plans;
+    } catch (error) {
+      console.error('[UserService] Error fetching pricing plans:', error);
+      // Fallback to local plans
+      return this.PRICING_PLANS;
+    }
+  }
+
+  // Process payment (mock for now, will integrate with real gateway later)
+  async processPayment(userId: string, planId: string, paymentMethod?: any): Promise<{ success: boolean; message: string; subscription?: any }> {
+    try {
+      const response = await fetch(`${this.API_BASE_URL}/process-payment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId, planId, paymentMethod }),
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Payment processing failed');
+      }
+
+      // Clear cache to force refresh of user data
+      this.clearUserCache(userId);
+
+      return result;
+    } catch (error) {
+      console.error('[UserService] Error processing payment:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Payment processing failed'
+      };
+    }
+  }
+
+  // Admin authentication
+  async authenticateAdmin(username: string, password: string): Promise<{ success: boolean; adminToken?: string; message: string }> {
+    try {
+      const response = await fetch(`${this.API_BASE_URL}/admin/authenticate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        return {
+          success: false,
+          message: result.message || 'Authentication failed'
+        };
+      }
+
+      return result;
+    } catch (error) {
+      console.error('[UserService] Error during admin authentication:', error);
+      return {
+        success: false,
+        message: 'Authentication error occurred'
+      };
+    }
+  }
+
+  // Upgrade user to admin
+  async upgradeToAdmin(userId: string, adminToken: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await fetch(`${this.API_BASE_URL}/admin/upgrade-user/${userId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ adminToken }),
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        return {
+          success: false,
+          message: result.message || 'Upgrade failed'
+        };
+      }
+
+      // Clear cache to force refresh of user data
+      this.clearUserCache(userId);
+
+      return result;
+    } catch (error) {
+      console.error('[UserService] Error upgrading user to admin:', error);
+      return {
+        success: false,
+        message: 'Upgrade error occurred'
+      };
+    }
+  }
+
+  // Enhanced access check using new backend
+  async checkAccessNew(userId: string, feature: 'posts' | 'discussions' | 'aiReplies' | 'campaigns' | 'autoSchedule' | 'autoReply' | 'goalModel'): Promise<AccessControlResult> {
+    try {
+      const response = await fetch(`${this.API_BASE_URL}/access-check/${userId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ feature }),
+      });
+
+      if (!response.ok) {
+        console.warn('[UserService] Access check failed, allowing access');
+        return { allowed: true };
+      }
+
+      const result = await response.json();
+      console.log(`[UserService] Access check for ${feature}: ${result.allowed ? 'ALLOWED' : 'DENIED'}`);
+      return result;
+    } catch (error) {
+      console.error('[UserService] Error checking access:', error);
+      // Allow access if there's an error to prevent app breaking
+      return { allowed: true };
     }
   }
 }

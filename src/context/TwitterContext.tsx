@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import axios from 'axios';
 
@@ -32,9 +32,12 @@ export const TwitterProvider: React.FC<TwitterProviderProps> = ({ children }) =>
   const [isConnected, setIsConnected] = useState(false);
   const [hasAccessed, setHasAccessed] = useState(false);
   const { currentUser } = useAuth();
+  const isCheckingRef = useRef(false);
 
   const checkExistingConnection = useCallback(async () => {
-    if (!currentUser?.uid) return;
+    if (!currentUser?.uid || isCheckingRef.current) return;
+    
+    isCheckingRef.current = true;
     
     try {
       console.log(`[${new Date().toISOString()}] Checking for existing Twitter connection for user ${currentUser.uid}`);
@@ -61,6 +64,8 @@ export const TwitterProvider: React.FC<TwitterProviderProps> = ({ children }) =>
       setUserId(null);
       setUsername(null);
       setIsConnected(false);
+    } finally {
+      isCheckingRef.current = false;
     }
   }, [currentUser?.uid]);
 
@@ -85,7 +90,7 @@ export const TwitterProvider: React.FC<TwitterProviderProps> = ({ children }) =>
       setIsConnected(false);
       setHasAccessed(false);
     }
-  }, [currentUser?.uid, checkExistingConnection]);
+  }, [currentUser?.uid]);
 
   const connectTwitter = useCallback((twitterId: string, twitterUsername: string) => {
     setUserId(twitterId);
@@ -110,7 +115,7 @@ export const TwitterProvider: React.FC<TwitterProviderProps> = ({ children }) =>
   }, []);
 
   const refreshConnection = useCallback(() => {
-    if (currentUser?.uid) {
+    if (currentUser?.uid && !isCheckingRef.current) {
       checkExistingConnection();
     }
   }, [currentUser?.uid, checkExistingConnection]);

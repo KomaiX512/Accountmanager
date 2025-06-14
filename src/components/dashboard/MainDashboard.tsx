@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -12,6 +12,7 @@ import { useAuth } from '../../context/AuthContext';
 import PostScheduler from '../instagram/PostScheduler';
 import TwitterCompose from '../twitter/TwitterCompose';
 import UsageDashboard from './UsageDashboard';
+
 import { schedulePost } from '../../utils/scheduleHelpers';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
 
@@ -55,6 +56,7 @@ const MainDashboard: React.FC = () => {
   const [userName, setUserName] = useState<string>('');
   const [showInstantPostModal, setShowInstantPostModal] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isFetchingNotificationsRef = useRef(false);
   
   // Platform-specific modals
   const [showInstagramScheduler, setShowInstagramScheduler] = useState<boolean>(false);
@@ -107,11 +109,27 @@ const MainDashboard: React.FC = () => {
     : false;
 
   // Function to fetch real-time notification counts for all platforms
-  const fetchRealTimeNotifications = async () => {
-    if (!currentUser?.uid) return;
+  const fetchRealTimeNotifications = useCallback(async () => {
+    if (!currentUser?.uid || isFetchingNotificationsRef.current) return;
+    
+    isFetchingNotificationsRef.current = true;
     
     const platforms = ['instagram', 'twitter', 'facebook', 'linkedin'];
     const counts: Record<string, number> = {};
+    
+    // Check if any platforms are actually claimed before making API calls
+    const claimedPlatforms = platforms.filter(platform => 
+      localStorage.getItem(`${platform}_accessed_${currentUser.uid}`) === 'true'
+    );
+    
+    if (claimedPlatforms.length === 0) {
+      // No claimed platforms, set all counts to 0
+      platforms.forEach(platform => {
+        counts[platform] = 0;
+      });
+      setRealTimeNotifications(counts);
+      return;
+    }
     
     for (const platform of platforms) {
       try {
@@ -153,7 +171,7 @@ const MainDashboard: React.FC = () => {
                 totalCount += unseenStrategies.length;
               }
             } catch (err) {
-              // Ignore strategy fetch errors
+              // Ignore strategy fetch errors - don't log to reduce console noise
             }
             
             // Fetch posts count  
@@ -168,7 +186,7 @@ const MainDashboard: React.FC = () => {
                 totalCount += unseenPosts.length;
               }
             } catch (err) {
-              // Ignore posts fetch errors
+              // Ignore posts fetch errors - don't log to reduce console noise
             }
             
             // Fetch competitor analysis count
@@ -191,7 +209,7 @@ const MainDashboard: React.FC = () => {
                 }
               }
             } catch (err) {
-              // Ignore competitor fetch errors
+              // Ignore competitor fetch errors - don't log to reduce console noise
             }
           }
         }
@@ -204,7 +222,8 @@ const MainDashboard: React.FC = () => {
     }
     
     setRealTimeNotifications(counts);
-  };
+    isFetchingNotificationsRef.current = false;
+  }, [currentUser?.uid, instagramUserId, twitterUserId]);
 
   // Effect to fetch real-time notifications on mount and when connections change
   useEffect(() => {
@@ -217,7 +236,7 @@ const MainDashboard: React.FC = () => {
       
       return () => clearInterval(interval);
     }
-  }, [currentUser?.uid, instagramUserId, twitterUserId, isInstagramConnected, isTwitterConnected, isFacebookConnected]);
+  }, [currentUser?.uid, isInstagramConnected, isTwitterConnected, isFacebookConnected, fetchRealTimeNotifications]);
 
   // Claimed platforms - based on whether user has accessed the platform dashboard
   // Connected platforms - based on whether user has connected their social media account
@@ -307,16 +326,10 @@ const MainDashboard: React.FC = () => {
   // Get only connected platforms
   const connectedPlatforms = platforms.filter(p => p.connected);
 
-  // Effect to update connection status and real-time notification counts - more responsive
+  // Effect to update connection status only - separate from notifications
   useEffect(() => {
     setPlatforms(prev => 
       prev.map(platform => {
-        const platformNotificationCount = realTimeNotifications[platform.id] || 0;
-        const platformNotificationData = {
-          total: platformNotificationCount,
-          breakdown: { cs_analysis: 0, our_strategies: 0, dms_comments: 0, cooked_posts: 0 }
-        };
-        
         let connectionStatus = false;
         
         switch (platform.id) {
@@ -333,21 +346,54 @@ const MainDashboard: React.FC = () => {
             connectionStatus = platform.connected; // Keep existing status for others
         }
         
-        return { 
-          ...platform, 
-          connected: connectionStatus,
-          notifications: platform.claimed ? platformNotificationData : {
-            total: 0,
-            breakdown: { cs_analysis: 0, our_strategies: 0, dms_comments: 0, cooked_posts: 0 }
-          }
-        };
+        // Only update if connection status actually changed
+        if (platform.connected !== connectionStatus) {
+          return { 
+            ...platform, 
+            connected: connectionStatus
+          };
+        }
+        
+        return platform;
       })
     );
-  }, [isInstagramConnected, isTwitterConnected, isFacebookConnected, instagramUserId, twitterUserId, facebookUserId, realTimeNotifications]);
+  }, [isInstagramConnected, isTwitterConnected, isFacebookConnected, instagramUserId, twitterUserId, facebookUserId]);
+
+  // Separate effect to update notifications without causing loops
+  useEffect(() => {
+    setPlatforms(prev => 
+      prev.map(platform => {
+        const platformNotificationCount = realTimeNotifications[platform.id] || 0;
+        const currentNotificationCount = platform.notifications.total;
+        
+        // Only update if notification count actually changed
+        if (platform.claimed && currentNotificationCount !== platformNotificationCount) {
+          return {
+            ...platform,
+            notifications: {
+              total: platformNotificationCount,
+              breakdown: { cs_analysis: 0, our_strategies: 0, dms_comments: 0, cooked_posts: 0 }
+            }
+          };
+        }
+        
+        return platform;
+      })
+    );
+  }, [realTimeNotifications]);
 
   // Add an effect to recheck localStorage on focus, this helps when returning from platform pages
   useEffect(() => {
+    let lastFocusTime = 0;
+    const FOCUS_DEBOUNCE_MS = 2000; // Only handle focus events every 2 seconds
+    
     const handleFocus = () => {
+      const now = Date.now();
+      if (now - lastFocusTime < FOCUS_DEBOUNCE_MS) {
+        return; // Skip if too recent
+      }
+      lastFocusTime = now;
+      
       // If user has returned to this page, recheck localStorage for each platform
       if (currentUser?.uid) {
         const instagramAccessed = localStorage.getItem(`instagram_accessed_${currentUser.uid}`) === 'true';
@@ -355,45 +401,69 @@ const MainDashboard: React.FC = () => {
         const facebookAccessed = localStorage.getItem(`facebook_accessed_${currentUser.uid}`) === 'true';
         const linkedinAccessed = localStorage.getItem(`linkedin_accessed_${currentUser.uid}`) === 'true';
         
-        // Refresh connection statuses to ensure accurate data
-        refreshTwitterConnection();
+        // Only refresh Twitter connection if we don't already have one
+        if (!twitterUserId) {
+          refreshTwitterConnection();
+        }
         
-        // Update platforms with fresh localStorage values and refresh notifications
-        setPlatforms(prev => 
-          prev.map(p => {
+        // Update platforms with fresh localStorage values
+        setPlatforms(prev => {
+          let hasChanges = false;
+          const newPlatforms = prev.map(p => {
             const wasClaimedBefore = p.claimed;
             let newClaimed = p.claimed;
             
-            if (p.id === 'instagram' && instagramAccessed) newClaimed = true;
-            if (p.id === 'twitter' && twitterAccessed) newClaimed = true;
-            if (p.id === 'facebook' && facebookAccessed) newClaimed = true;
-            if (p.id === 'linkedin' && linkedinAccessed) newClaimed = true;
+            if (p.id === 'instagram' && instagramAccessed && !newClaimed) {
+              newClaimed = true;
+              hasChanges = true;
+            }
+            if (p.id === 'twitter' && twitterAccessed && !newClaimed) {
+              newClaimed = true;
+              hasChanges = true;
+            }
+            if (p.id === 'facebook' && facebookAccessed && !newClaimed) {
+              newClaimed = true;
+              hasChanges = true;
+            }
+            if (p.id === 'linkedin' && linkedinAccessed && !newClaimed) {
+              newClaimed = true;
+              hasChanges = true;
+            }
             
             return { 
               ...p, 
-              claimed: newClaimed,
-              notifications: {
-                ...p.notifications,
-                total: newClaimed ? realTimeNotifications[p.id] || 0 : 0
-              }
+              claimed: newClaimed
             };
-          })
-        );
+          });
+          
+          // Only update if there are actual changes
+          return hasChanges ? newPlatforms : prev;
+        });
         
-        // Refresh notification counts
-        fetchRealTimeNotifications();
+        // Refresh notification counts only if there are newly claimed platforms
+        const hasNewClaims = [
+          instagramAccessed && !hasAccessedInstagram,
+          twitterAccessed && !hasAccessedTwitter,
+          facebookAccessed && !hasAccessedFacebook,
+          linkedinAccessed && !hasAccessedLinkedIn
+        ].some(Boolean);
+        
+        if (hasNewClaims) {
+          fetchRealTimeNotifications();
+        }
       }
     };
 
-    // Check on initial mount
-    handleFocus();
+    // Check on initial mount with debounce
+    const initialCheckTimer = setTimeout(handleFocus, 100);
     
     // Also check when window regains focus
     window.addEventListener('focus', handleFocus);
     return () => {
+      clearTimeout(initialCheckTimer);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [currentUser?.uid, realTimeNotifications, refreshTwitterConnection]);
+  }, [currentUser?.uid, refreshTwitterConnection, fetchRealTimeNotifications, twitterUserId, hasAccessedInstagram, hasAccessedTwitter, hasAccessedFacebook, hasAccessedLinkedIn]);
 
   // Sort platforms so claimed ones appear first
   const sortedPlatforms = [...platforms].sort((a, b) => {
@@ -603,6 +673,23 @@ const MainDashboard: React.FC = () => {
       try {
         console.log(`[MainDashboard] Processing post for ${platform.name}...`);
         
+        // ✅ REAL USAGE TRACKING: Check limits BEFORE creating the post
+        const trackingSuccess = await trackRealPostCreation(platform.id, {
+          scheduled: isScheduled,
+          immediate: !isScheduled,
+          type: 'multi_platform_post'
+        });
+        
+        if (!trackingSuccess) {
+          console.warn(`[MainDashboard] 🚫 Post creation blocked for ${platform.name} - limit reached`);
+          results.push({
+            platform: platform.name,
+            success: false,
+            message: 'Usage limit reached - upgrade to continue'
+          });
+          continue; // Skip this platform and continue with others
+        }
+        
         // Call the existing schedule functionality
         const result = await schedulePost({
           platform: platform.id as 'instagram' | 'twitter' | 'facebook',
@@ -614,17 +701,6 @@ const MainDashboard: React.FC = () => {
         });
         
         if (result.success) {
-          // ✅ REAL USAGE TRACKING: Track actual post creation/scheduling
-          const trackingSuccess = trackRealPostCreation(platform.id, {
-            scheduled: isScheduled,
-            immediate: !isScheduled,
-            type: 'multi_platform_post'
-          });
-          
-          if (!trackingSuccess) {
-            console.warn(`[MainDashboard] Usage tracking failed for ${platform.name}, but post was created`);
-          }
-          
           console.log(`[MainDashboard] ✅ Post ${isScheduled ? 'scheduled' : 'created'} for ${platform.name} with usage tracking`);
         }
         

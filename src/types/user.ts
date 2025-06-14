@@ -2,7 +2,7 @@ export interface User {
   id: string;
   email: string;
   displayName: string;
-  userType: 'free' | 'premium' | 'admin';
+  userType: 'free' | 'freemium' | 'premium' | 'admin';
   subscription?: Subscription;
   createdAt: string;
   lastLogin: string;

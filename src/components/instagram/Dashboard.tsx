@@ -510,17 +510,19 @@ Image Description: ${response.post.image_prompt}
           message_id: notification.message_id,
         });
         
-        // ✅ REAL USAGE TRACKING: Track actual DM reply
-        const trackingSuccess = trackRealDiscussion('instagram', {
+        // ✅ REAL USAGE TRACKING: Check limits BEFORE sending DM reply
+        const trackingSuccess = await trackRealDiscussion('instagram', {
           messageCount: 1,
           type: 'dm_reply'
         });
         
-        if (trackingSuccess) {
-          console.log(`[Dashboard] ✅ DM reply tracked: Instagram manual reply`);
-        } else {
-          console.warn(`[Dashboard] ⚠️ DM reply tracking failed for Instagram`);
+        if (!trackingSuccess) {
+          console.warn(`[Dashboard] 🚫 DM reply blocked for Instagram - limit reached`);
+          setToast('Discussion limit reached - upgrade to continue');
+          return;
         }
+        
+        console.log(`[Dashboard] ✅ DM reply tracked: Instagram manual reply`);
         
         setReplySentTracker(prev => [
           ...prev, 
@@ -539,17 +541,19 @@ Image Description: ${response.post.image_prompt}
           text: replyText,
         });
         
-        // ✅ REAL USAGE TRACKING: Track actual comment reply
-        const trackingSuccess = trackRealDiscussion('instagram', {
+        // ✅ REAL USAGE TRACKING: Check limits BEFORE sending comment reply
+        const trackingSuccess = await trackRealDiscussion('instagram', {
           messageCount: 1,
           type: 'comment_reply'
         });
         
-        if (trackingSuccess) {
-          console.log(`[Dashboard] ✅ Comment reply tracked: Instagram manual reply`);
-        } else {
-          console.warn(`[Dashboard] ⚠️ Comment reply tracking failed for Instagram`);
+        if (!trackingSuccess) {
+          console.warn(`[Dashboard] 🚫 Comment reply blocked for Instagram - limit reached`);
+          setToast('Discussion limit reached - upgrade to continue');
+          return;
         }
+        
+        console.log(`[Dashboard] ✅ Comment reply tracked: Instagram manual reply`);
         
         setReplySentTracker(prev => [
           ...prev, 

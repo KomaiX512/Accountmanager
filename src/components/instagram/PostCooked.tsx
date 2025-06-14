@@ -359,29 +359,216 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     }
   }, [toastMessage]);
 
-  // CACHE OPTIMIZATION: Get optimized image URL for a post
-  const getCachedImageUrl = useCallback((post: any) => {
+  // Enhanced image URL generation with consistency and reliability
+  const getReliableImageUrl = useCallback((post: any, forceRefresh: boolean = false) => {
     const postKey = post.key;
     let imageId = '';
+    
+    // Extract image ID from post key (most reliable method)
     const match = postKey.match(/ready_post_(\d+)\.json$/);
-    if (match) imageId = match[1];
+    if (match) {
+      imageId = match[1];
+    } else {
+      // Fallback: try to extract from existing URLs
+      const imageUrl = post.data.image_url || post.data.r2_image_url || '';
+      const urlMatch = imageUrl.match(/(image_\d+\.jpg)/);
+      if (urlMatch) {
+        imageId = urlMatch[1].replace(/^image_|\.jpg$/g, '');
+      }
+    }
     
-    // Generate URL with cache busting and platform parameter
-    const cacheBust = imageRefreshKey > 0 
-      ? `&refresh=${imageRefreshKey}&t=${Date.now()}`
-      : `&t=${Date.now()}`;
+    if (!imageId) {
+      console.warn(`[PostCooked] Could not extract image ID for post ${postKey}`);
+      return `${API_BASE_URL}/placeholder.jpg?post=${encodeURIComponent(postKey)}`;
+    }
     
-    return `${API_BASE_URL}/api/r2-image/${username}/image_${imageId}.jpg?platform=${platform}${cacheBust}`;
-  }, [imageRefreshKey, username, platform]);
+    // Create timestamp for cache busting
+    const timestamp = forceRefresh ? Date.now() : Math.floor(Date.now() / 60000); // 1-minute cache
+    
+    // Use our reliable direct R2 endpoint with comprehensive parameters
+    const reliableUrl = `${API_BASE_URL}/api/r2-image/${username}/image_${imageId}.jpg` +
+      `?platform=${platform}&t=${timestamp}&v=${imageRefreshKey}&post=${encodeURIComponent(postKey)}`;
+    
+    return reliableUrl;
+  }, [username, platform, imageRefreshKey]);
 
-  // PERFORMANCE: Handle image load success
-  const handleImageLoad = useCallback((postKey: string) => {
+  // Simplified and more reliable image error handling
+  const handleImageError = useCallback((key: string, imgElement: HTMLImageElement) => {
+    const currentRetries = imageErrors[key]?.retryCount || 0;
+    
+    console.log(`[PostCooked] Image error for ${key}, retry ${currentRetries + 1}/3`);
+    
+    if (currentRetries >= 3) {
+      // Max retries reached - use placeholder
+      console.error(`[PostCooked] Max retries reached for ${key}, using placeholder`);
+      setImageErrors(prev => ({
+        ...prev,
+        [key]: { failed: true, retryCount: currentRetries + 1 }
+      }));
+      
+      imgElement.src = `${API_BASE_URL}/placeholder.jpg?failed=${encodeURIComponent(key)}`;
+      return;
+    }
+    
+    // Increment retry count
+    setImageErrors(prev => ({
+      ...prev,
+      [key]: { failed: false, retryCount: currentRetries + 1 }
+    }));
+    
+    // Get the post and generate a fresh URL
+    const post = localPosts.find(p => p.key === key);
+    if (!post) {
+      imgElement.src = `${API_BASE_URL}/placeholder.jpg?nopost=${encodeURIComponent(key)}`;
+      return;
+    }
+    
+    // Generate fresh URL with force refresh
+    const freshUrl = getReliableImageUrl(post, true);
+    
+    // Add small delay to prevent rapid retries
+    setTimeout(() => {
+      console.log(`[PostCooked] Retrying with fresh URL: ${freshUrl}`);
+      imgElement.src = freshUrl;
+    }, 500 * currentRetries); // Progressive delay
+    
+  }, [imageErrors, localPosts, getReliableImageUrl]);
+
+  // CACHE OPTIMIZATION: Get optimized image URL for a post
+  const getCachedImageUrl = useCallback((post: any) => {
+    // Use the new reliable URL system
+    return getReliableImageUrl(post, false);
+  }, [getReliableImageUrl]);
+
+  // Client-side image validation to prevent white/corrupted images
+  const validateImageOnLoad = useCallback((post: any, imgElement: HTMLImageElement) => {
+    try {
+      // Basic checks first
+      if (!imgElement.naturalWidth || !imgElement.naturalHeight) {
+        console.warn(`[PostCooked] Image has no dimensions for ${post.key}`);
+        handleImageError(post.key, imgElement);
+        return false;
+      }
+      
+      // Minimum size validation (too small might be corrupted)
+      if (imgElement.naturalWidth < 50 || imgElement.naturalHeight < 50) {
+        console.warn(`[PostCooked] Image too small for ${post.key}: ${imgElement.naturalWidth}x${imgElement.naturalHeight}`);
+        handleImageError(post.key, imgElement);
+        return false;
+      }
+      
+      // Create canvas for pixel analysis (detect white/blank images)
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) {
+        console.warn(`[PostCooked] Could not create canvas context for validation`);
+        return true; // Skip validation if canvas not available
+      }
+      
+      // Sample a small area of the image for analysis
+      const sampleSize = Math.min(100, imgElement.naturalWidth, imgElement.naturalHeight);
+      canvas.width = sampleSize;
+      canvas.height = sampleSize;
+      
+      try {
+        // Draw the image to canvas for analysis
+        ctx.drawImage(imgElement, 0, 0, sampleSize, sampleSize);
+        
+        // Get image data for analysis
+        const imageData = ctx.getImageData(0, 0, sampleSize, sampleSize);
+        const pixels = imageData.data;
+        
+        let whitePixels = 0;
+        let totalPixels = 0;
+        let colorVariance = 0;
+        let prevR = 0, prevG = 0, prevB = 0;
+        
+        // Analyze pixels for whiteness and variation
+        for (let i = 0; i < pixels.length; i += 4) {
+          const r = pixels[i];
+          const g = pixels[i + 1];
+          const b = pixels[i + 2];
+          const a = pixels[i + 3];
+          
+          totalPixels++;
+          
+          // Check for white/near-white pixels (RGB > 240)
+          if (r > 240 && g > 240 && b > 240 && a > 200) {
+            whitePixels++;
+          }
+          
+          // Calculate color variance to detect uniform/blank images
+          if (totalPixels > 1) {
+            colorVariance += Math.abs(r - prevR) + Math.abs(g - prevG) + Math.abs(b - prevB);
+          }
+          
+          prevR = r; prevG = g; prevB = b;
+        }
+        
+        const whitePercentage = (whitePixels / totalPixels) * 100;
+        const avgVariance = colorVariance / totalPixels;
+        
+        console.log(`[PostCooked] Image analysis for ${post.key}: ${whitePercentage.toFixed(1)}% white, variance: ${avgVariance.toFixed(1)}`);
+        
+        // Reject if too much white content (likely corrupted/blank)
+        if (whitePercentage > 85) {
+          console.error(`[PostCooked] Image appears to be mostly white (${whitePercentage.toFixed(1)}%) - rejecting`);
+          handleImageError(post.key, imgElement);
+          return false;
+        }
+        
+        // Reject if very low color variance (likely blank/corrupted)
+        if (avgVariance < 5 && whitePercentage > 50) {
+          console.error(`[PostCooked] Image appears to be blank/uniform (variance: ${avgVariance.toFixed(1)}) - rejecting`);
+          handleImageError(post.key, imgElement);
+          return false;
+        }
+        
+        // Image passed validation
+        console.log(`[PostCooked] ✅ Image validation passed for ${post.key}`);
+        return true;
+        
+             } catch (canvasError: any) {
+         console.warn(`[PostCooked] Canvas analysis failed for ${post.key}:`, canvasError?.message || canvasError);
+         return true; // Skip validation on error, don't block valid images
+       }
+       
+     } catch (error: any) {
+       console.warn(`[PostCooked] Image validation error for ${post.key}:`, error?.message || error);
+       return true; // Skip validation on error
+     }
+  }, [handleImageError]);
+
+  // PERFORMANCE: Handle image load success with validation
+  const handleImageLoad = useCallback((postKey: string, imgElement?: HTMLImageElement) => {
+    // Find the post for validation
+    const post = localPosts.find(p => p.key === postKey);
+    
+    // If we have both post and image element, validate the image
+    if (post && imgElement) {
+      const isValid = validateImageOnLoad(post, imgElement);
+      if (!isValid) {
+        // Validation failed, handleImageError was already called
+        return;
+      }
+    }
+    
+    // Image is valid, proceed with normal load handling
     setLoadingImages(prev => {
       const newSet = new Set(prev);
       newSet.delete(postKey);
       return newSet;
     });
-  }, []);
+    
+    // Clear any previous errors for this image
+    setImageErrors(prev => {
+      const newErrors = {...prev};
+      delete newErrors[postKey];
+      return newErrors;
+    });
+    
+  }, [localPosts, validateImageOnLoad]);
 
   // PERFORMANCE: Handle image load start
   const handleImageLoadStart = useCallback((postKey: string) => {
@@ -416,174 +603,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     );
   };
 
-  const handleImageError = (key: string, url: string) => {
-    console.error(`Failed to load image for ${key}: ${url}`);
-    
-    // First check if this is the problematic narsissist image
-    if (url.includes('narsissist') && url.includes('image_1749203937329.jpg')) {
-      console.log(`[ImageError] Detected problematic narsissist image - using direct proxy`);
-      
-      // Update the post to use our direct proxy
-      const postIndex = localPosts.findIndex(p => p.key === key);
-      if (postIndex >= 0) {
-        const updatedPost = {
-          ...localPosts[postIndex],
-          data: {
-            ...localPosts[postIndex].data,
-            image_url: `${API_BASE_URL}/fix-image/narsissist/image_1749203937329.jpg?platform=${platform}`,
-            r2_image_url: `${API_BASE_URL}/fix-image/narsissist/image_1749203937329.jpg?platform=${platform}`
-          }
-        };
-        
-        const updatedPosts = [...localPosts];
-        updatedPosts[postIndex] = updatedPost;
-        setLocalPosts(updatedPosts);
-        
-        // Reset error state for this image
-        const updatedErrors = {...imageErrors};
-        delete updatedErrors[key];
-        setImageErrors(updatedErrors);
-        
-        return;
-      }
-    }
-    
-    // Check if this is any R2 URL that should be proxied
-    const isR2Url = url.includes('r2.cloudflarestorage.com') || 
-                    url.includes('r2.dev') ||
-                    url.includes('tasks.b21d96e73b908d7d7b822d41516ccc64') ||
-                    url.includes('pub-ba72672df3c041a3844f278dd3c32b22');
-    
-    if (isR2Url) {
-      console.log(`[ImageError] Detected R2 URL, using our proxy server`);
-      
-      // Extract filename from URL
-      let filename = '';
-      const urlParts = url.split('/');
-      for (let i = 0; i < urlParts.length; i++) {
-        if (urlParts[i].includes('.jpg')) {
-          filename = urlParts[i].split('?')[0]; // Remove query params
-          break;
-        }
-      }
-      
-      if (filename) {
-        // Update the post to use our proxy
-        const postIndex = localPosts.findIndex(p => p.key === key);
-        if (postIndex >= 0) {
-          const updatedPost = {
-            ...localPosts[postIndex],
-            data: {
-              ...localPosts[postIndex].data,
-              image_url: `${API_BASE_URL}/fix-image/${username}/${filename}?platform=${platform}`,
-              r2_image_url: `${API_BASE_URL}/fix-image/${username}/${filename}?platform=${platform}`
-            }
-          };
-          
-          const updatedPosts = [...localPosts];
-          updatedPosts[postIndex] = updatedPost;
-          setLocalPosts(updatedPosts);
-          
-          // Reset error state for this image
-          const updatedErrors = {...imageErrors};
-          delete updatedErrors[key];
-          setImageErrors(updatedErrors);
-          
-          return;
-        }
-      }
-    }
-    
-    // Try to reload a few times with timestamp before giving up
-    const retryCount = imageErrors[key] ? imageErrors[key].retryCount || 0 : 0;
-    
-    // Use our proxy server for the retry
-    if (retryCount < 3) {
-      // Try again with a cache-busting timestamp
-      const img = new Image();
-      
-      // Create a proxied URL
-      let newUrl = url;
-      if (url.includes('r2.cloudflarestorage.com') || url.includes('r2.dev')) {
-        // Extract filename if possible
-        const parts = url.split('/');
-        const filename = parts[parts.length - 1].split('?')[0];
-        newUrl = `${API_BASE_URL}/fix-image/${username}/${filename}?platform=${platform}&t=${Date.now()}&retry=${retryCount + 1}`;
-      } else {
-        newUrl = `${url}?t=${Date.now()}&retry=${retryCount + 1}`;
-      }
-      
-      img.onload = () => {
-        // Image loaded successfully on retry
-        const updatedErrors = {...imageErrors};
-        delete updatedErrors[key];
-        setImageErrors(updatedErrors);
-        
-        // Force a refresh
-        setLocalPosts(prev => [...prev]);
-      };
-      
-      img.onerror = () => {
-        // Still failing, increment retry count
-        setImageErrors(prev => ({
-          ...prev,
-          [key]: { 
-            failed: true,
-            retryCount: retryCount + 1
-          }
-        }));
-        
-        // Try our backup proxy as last resort
-        if (retryCount === 2) {
-          console.log(`[ImageError] All retries failed, using placeholder for ${key}`);
-          // Update the post to use a placeholder
-          const postIndex = localPosts.findIndex(p => p.key === key);
-          if (postIndex >= 0) {
-            const updatedPost = {
-              ...localPosts[postIndex],
-              data: {
-                ...localPosts[postIndex].data,
-                image_url: `${API_BASE_URL}/placeholder.jpg?src=${encodeURIComponent(url)}`,
-                r2_image_url: undefined
-              }
-            };
-            
-            const updatedPosts = [...localPosts];
-            updatedPosts[postIndex] = updatedPost;
-            setLocalPosts(updatedPosts);
-          }
-        }
-      };
-      
-      img.src = newUrl;
-    } else {
-      // Max retries reached, mark as permanently failed
-      setImageErrors(prev => ({ 
-        ...prev, 
-        [key]: { 
-          failed: true,
-          retryCount: retryCount
-        }
-      }));
-      
-      // Update the post to use a placeholder
-      const postIndex = localPosts.findIndex(p => p.key === key);
-      if (postIndex >= 0) {
-        const updatedPost = {
-          ...localPosts[postIndex],
-          data: {
-            ...localPosts[postIndex].data,
-            image_url: `${API_BASE_URL}/placeholder.jpg?src=${encodeURIComponent(url)}`,
-            r2_image_url: undefined
-          }
-        };
-        
-        const updatedPosts = [...localPosts];
-        updatedPosts[postIndex] = updatedPost;
-        setLocalPosts(updatedPosts);
-      }
-    }
-  };
+  // Legacy error handler - now handled by the new handleImageError callback
 
   // Enhanced image placeholder component
   const ImagePlaceholder: React.FC<{ postKey: string }> = ({ postKey }) => {
@@ -1305,13 +1325,14 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
           type: 'instant_post_now'
         });
         
-        if (trackingSuccess) {
-          console.log(`[PostCooked] ✅ Instant post tracked: ${platform} post published`);
-          setToastMessage('🎉 Posted to Instagram successfully! Usage tracked.');
-        } else {
-          console.warn(`[PostCooked] ⚠️ Post tracking failed for ${platform}, but post was published`);
-          setToastMessage('🎉 Posted to Instagram successfully!');
+        if (!trackingSuccess) {
+          console.warn(`[PostCooked] 🚫 Post publication blocked for ${platform} - limit reached`);
+          setToastMessage('Post limit reached - upgrade to continue');
+          return;
         }
+        
+        console.log(`[PostCooked] ✅ Instant post tracked: ${platform} post published`);
+        setToastMessage('🎉 Posted to Instagram successfully! Usage tracked.');
         
         // Update post status to posted (visual feedback)
         setLocalPosts(prev => 
@@ -1568,61 +1589,20 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                     <ImagePlaceholder postKey={post.key} />
                   ) : (
                     <img
-                      src={post.data.image_url || post.data.r2_image_url || getCachedImageUrl(post)}
+                      src={getReliableImageUrl(post)}
                       alt="Post visual"
                       className={`post-image ${loadingImages.has(post.key) ? 'loading' : 'loaded'}`}
                       onLoadStart={() => {
-                        console.log(`[PostCooked] Image load started for ${post.key}: ${post.data.image_url || post.data.r2_image_url || getCachedImageUrl(post)}`);
+                        console.log(`[PostCooked] Image load started for ${post.key}: ${getReliableImageUrl(post)}`);
                         handleImageLoadStart(post.key);
                       }}
-                      onLoad={() => {
+                      onLoad={(e) => {
                         console.log(`[PostCooked] Image loaded successfully for ${post.key}`);
-                        handleImageLoad(post.key);
+                        handleImageLoad(post.key, e.target as HTMLImageElement);
                       }}
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
-                        console.error(`[PostCooked] Image load error for ${post.key}:`, target.src);
-                        
-                        // Only mark as failed after multiple attempts
-                        const currentRetries = imageErrors[post.key]?.retryCount || 0;
-                        if (currentRetries < 3) {
-                          console.log(`[PostCooked] Retrying image load for ${post.key} (attempt ${currentRetries + 1})`);
-                          
-                          // Try alternative URL on first retry
-                          let nextUrl = target.src;
-                          if (currentRetries === 0 && post.data.r2_image_url && target.src === post.data.image_url) {
-                            // Try r2_image_url as fallback
-                            nextUrl = post.data.r2_image_url;
-                            console.log(`[PostCooked] Trying r2_image_url fallback: ${nextUrl}`);
-                          } else if (currentRetries === 1 && post.data.image_url && target.src !== post.data.image_url) {
-                            // Try image_url as fallback
-                            nextUrl = post.data.image_url;
-                            console.log(`[PostCooked] Trying image_url fallback: ${nextUrl}`);
-                          } else {
-                            // Add cache busting
-                            nextUrl = target.src.includes('?') 
-                              ? `${target.src}&retry=${currentRetries + 1}&t=${Date.now()}`
-                              : `${target.src}?retry=${currentRetries + 1}&t=${Date.now()}`;
-                          }
-                          
-                          // Update retry count but don't mark as failed yet
-                          setImageErrors(prev => ({
-                            ...prev,
-                            [post.key]: { failed: false, retryCount: currentRetries + 1 }
-                          }));
-                          
-                          // Try to reload the image
-                          setTimeout(() => {
-                            target.src = nextUrl;
-                          }, 500);
-                        } else {
-                          // Mark as failed after 3 retries
-                          console.error(`[PostCooked] Image failed after 3 retries for ${post.key}`);
-                          setImageErrors(prev => ({
-                            ...prev,
-                            [post.key]: { failed: true, retryCount: currentRetries + 1 }
-                          }));
-                        }
+                        handleImageError(post.key, target);
                       }}
                       key={`${post.key}-${imageRefreshKey}`} // CACHED key for React
                       style={{

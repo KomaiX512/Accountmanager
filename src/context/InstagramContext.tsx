@@ -70,7 +70,8 @@ export const InstagramProvider: React.FC<InstagramProviderProps> = ({ children }
       setIsConnected(connected);
 
       // In a real app, we would fetch this from the user's profile or preferences
-      // For now, we'll use localStorage to simulate the accessed state
+      // For now, we'll use localStorage to simulate the accessed stateclear
+      
       const hasUserAccessed = localStorage.getItem(`instagram_accessed_${currentUser.uid}`) === 'true';
       setHasAccessed(hasUserAccessed);
 

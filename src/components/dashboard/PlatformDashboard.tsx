@@ -470,18 +470,19 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           response.reply?.substring(0, 50) + '...'
         );
         
-        // ✅ REAL USAGE TRACKING: Track actual AI reply generation
+        // ✅ REAL USAGE TRACKING: Check limits BEFORE generating AI reply
         const trackingSuccess = await trackRealAIReply(platform, {
           type: notification.type === 'message' ? 'dm' : 'comment',
           mode: 'instant'
         });
         
-        if (trackingSuccess) {
-          console.log(`[PlatformDashboard] ✅ AI Reply tracked: ${platform} ${notification.type} reply`);
-        } else {
-          console.warn(`[PlatformDashboard] ⚠️ AI Reply tracking failed for ${platform}`);
+        if (!trackingSuccess) {
+          console.warn(`[PlatformDashboard] 🚫 AI Reply blocked for ${platform} - limit reached`);
+          setToast('AI reply limit reached - upgrade to continue');
+          return; // Exit the function, don't generate reply
         }
         
+        console.log(`[PlatformDashboard] ✅ AI Reply tracked: ${platform} ${notification.type} reply`);
         setToast(`AI reply generated for ${notification.username || 'user'}`);
         
         // Remove the original notification to prevent duplicates
@@ -732,11 +733,13 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
             mode: 'auto'
           });
           
-          if (trackingSuccess) {
-            console.log(`[PlatformDashboard] ✅ Auto AI Reply tracked: ${platform} ${notification.type}`);
-          } else {
-            console.warn(`[PlatformDashboard] ⚠️ Auto AI Reply tracking failed for ${platform}`);
+          if (!trackingSuccess) {
+            console.warn(`[PlatformDashboard] 🚫 Auto AI Reply blocked for ${platform} - limit reached`);
+            failCount++;
+            continue; // Skip to next notification
           }
+          
+          console.log(`[PlatformDashboard] ✅ Auto AI Reply tracked: ${platform} ${notification.type}`);
 
           successCount++;
         } else {
@@ -996,19 +999,21 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           assistantMessage as ChatModalMessage
         ];
         
-        setChatMessages(updatedMessages);
-        
-        // ✅ REAL USAGE TRACKING: Track actual discussion engagement
+        // ✅ REAL USAGE TRACKING: Check limits BEFORE processing discussion
         const trackingSuccess = await trackRealDiscussion(platform, {
           messageCount: updatedMessages.length,
           type: 'chat'
         });
         
-        if (trackingSuccess) {
-          console.log(`[PlatformDashboard] ✅ Discussion tracked: ${platform} chat engagement`);
-        } else {
-          console.warn(`[PlatformDashboard] ⚠️ Discussion tracking failed for ${platform}`);
+        if (!trackingSuccess) {
+          console.warn(`[PlatformDashboard] 🚫 Discussion blocked for ${platform} - limit reached`);
+          setError('Discussion limit reached - upgrade to continue');
+          setIsProcessing(false);
+          return;
         }
+        
+        setChatMessages(updatedMessages);
+        console.log(`[PlatformDashboard] ✅ Discussion tracked: ${platform} chat engagement`);
         
         try {
           await RagService.saveConversation(accountHolder, [...chatMessages, userMessage, assistantMessage], platform);
@@ -1073,20 +1078,22 @@ Image Description: ${response.post.image_prompt}
             assistantMessage as ChatModalMessage
           ];
           
-          setChatMessages(updatedMessages);
-          
-          // ✅ REAL USAGE TRACKING: Track actual post generation
+          // ✅ REAL USAGE TRACKING: Check limits BEFORE creating post
           const trackingSuccess = await trackRealPostCreation(platform, {
             scheduled: false,
             immediate: false,
             type: 'ai_generated_content'
           });
           
-          if (trackingSuccess) {
-            console.log(`[PlatformDashboard] ✅ Post generation tracked: ${platform} AI content`);
-          } else {
-            console.warn(`[PlatformDashboard] ⚠️ Post generation tracking failed for ${platform}`);
+          if (!trackingSuccess) {
+            console.warn(`[PlatformDashboard] 🚫 Post creation blocked for ${platform} - limit reached`);
+            setError('Post creation limit reached - upgrade to continue');
+            setIsProcessing(false);
+            return;
           }
+          
+          setChatMessages(updatedMessages);
+          console.log(`[PlatformDashboard] ✅ Post generation tracked: ${platform} AI content`);
           
           // TRIGGER POST REFRESH: Notify PostCooked component about new post
           const newPostEvent = new CustomEvent('newPostCreated', {
@@ -1767,7 +1774,7 @@ Image Description: ${response.post.image_prompt}
                   className="chat-mode-dropdown"
                 >
                   <option value="discussion">Discussion Mode</option>
-                  <option value="post">Post Mode</option>
+                  <option value="post">Post Creation Mode</option>
                 </select>
               </div>
               <input

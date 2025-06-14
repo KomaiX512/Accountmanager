@@ -2718,42 +2718,42 @@ async function generateImageFromPrompt(imagePrompt, filename, username, platform
       console.log(`[${new Date().toISOString()}] [IMAGE-GEN] Checking job status (attempt ${attempts}/${maxAttempts})`);
       
       try {
-        const checkResponse = await axios.get(
-          `https://stablehorde.net/api/v2/generate/check/${jobId}`,
+      const checkResponse = await axios.get(
+        `https://stablehorde.net/api/v2/generate/check/${jobId}`,
+        {
+          headers: { 'apikey': AI_HORDE_CONFIG.api_key },
+          timeout: 10000
+        }
+      );
+        
+        console.log(`[${new Date().toISOString()}] [IMAGE-GEN] Check response:`, JSON.stringify(checkResponse.data, null, 2));
+      
+      if (checkResponse.data && checkResponse.data.done) {
+        console.log(`[${new Date().toISOString()}] [IMAGE-GEN] Job complete, retrieving result`);
+        
+        const resultResponse = await axios.get(
+          `https://stablehorde.net/api/v2/generate/status/${jobId}`,
           {
             headers: { 'apikey': AI_HORDE_CONFIG.api_key },
             timeout: 10000
           }
         );
-        
-        console.log(`[${new Date().toISOString()}] [IMAGE-GEN] Check response:`, JSON.stringify(checkResponse.data, null, 2));
-        
-        if (checkResponse.data && checkResponse.data.done) {
-          console.log(`[${new Date().toISOString()}] [IMAGE-GEN] Job complete, retrieving result`);
-          
-          const resultResponse = await axios.get(
-            `https://stablehorde.net/api/v2/generate/status/${jobId}`,
-            {
-              headers: { 'apikey': AI_HORDE_CONFIG.api_key },
-              timeout: 10000
-            }
-          );
           
           console.log(`[${new Date().toISOString()}] [IMAGE-GEN] Result response:`, JSON.stringify(resultResponse.data, null, 2));
+        
+        if (resultResponse.data && 
+            resultResponse.data.generations && 
+            resultResponse.data.generations.length > 0 &&
+            resultResponse.data.generations[0].img) {
           
-          if (resultResponse.data && 
-              resultResponse.data.generations && 
-              resultResponse.data.generations.length > 0 &&
-              resultResponse.data.generations[0].img) {
-            
-            imageUrl = resultResponse.data.generations[0].img;
+          imageUrl = resultResponse.data.generations[0].img;
             console.log(`[${new Date().toISOString()}] [IMAGE-GEN] Successfully generated image URL: ${imageUrl}`);
           } else {
             console.log(`[${new Date().toISOString()}] [IMAGE-GEN] No image URL in result response`);
-          }
+        }
         } else if (checkResponse.data && checkResponse.data.faulted) {
           throw new Error('Image generation job faulted');
-        } else {
+      } else {
           console.log(`[${new Date().toISOString()}] [IMAGE-GEN] Job still processing... (queue position: ${checkResponse.data?.queue_position || 'unknown'})`);
         }
       } catch (pollError) {

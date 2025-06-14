@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption: Just dropping in to test out some image display magic! ✨ We're always working behind the scenes to make sure your feed is looking its absolute best. Let us know if you're seeing this post loud and clear! ⬇️\n\nHashtags: #debugtest2 #testing #instagram #tech #socialmedia #behindthescenes #imagequality #instadaily #updates #development\n\nCall to Action: Double tap if you can see this post perfectly! 👍\n\nVisual Description for Image: The image should be a brightly lit, close-up shot of a computer screen displaying a vibrant, abstract geometric pattern. The pattern should consist of interlocking triangles and squares in a variety of bold, contrasting colors like neon pink, electric blue, lime green, and sunshine yellow. The background of the screen should be a deep, saturated purple. The screen should have a slight glare, suggesting it's a modern, high-resolution display. In the foreground, slightly out of focus, should be a hand holding a magnifying glass, partially obscuring a small section of the geometric pattern. The hand should have a clean, modern aesthetic, with a silver ring on one finger. The overall mood should be playful and tech-forward, with a focus on vibrant colors and sharp details. The composition should be slightly asymmetrical, with the hand and magnifying glass positioned on the left side of the frame. The style should be clean and modern, with a hint of abstract art. The lighting should be bright and even, highlighting the colors and textures of the geometric pattern. The image should evoke a sense of curiosity and exploration, inviting viewers to take a closer look.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.3400991291343095
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 267,
+    "candidatesTokenCount": 334,
+    "totalTokenCount": 601,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 267
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 334
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "J1ZNaNHIMebhhMIPiujZKQ"
+}

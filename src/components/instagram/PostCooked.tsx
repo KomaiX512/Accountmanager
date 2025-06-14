@@ -44,6 +44,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { BsLightbulb } from 'react-icons/bs';
 import { FaBell } from 'react-icons/fa';
+import useFeatureTracking from '../../hooks/useFeatureTracking';
 // Missing modules - comment out until they're available
 // import EditCaption from '../common/EditCaption';
 // import { ScheduleItem } from '../../types/schedule';
@@ -82,6 +83,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   const { isConnected: isInstagramConnected, userId: instagramUserId } = useInstagram();
   const { isConnected: isTwitterConnected, userId: twitterUserId } = useTwitter();
   const { isConnected: isFacebookConnected, userId: facebookUserId } = useFacebook();
+  const { trackRealPostCreation, canUseFeature } = useFeatureTracking();
   
   // Determine platform-specific values
   const isConnected = platform === 'twitter' ? isTwitterConnected : platform === 'facebook' ? isFacebookConnected : isInstagramConnected;
@@ -221,6 +223,13 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     console.log('Posts prop in PostCooked:', posts);
     setLocalPosts(posts);
     
+    // Clear any existing image errors when new posts are loaded to prevent white images
+    if (posts && posts.length > 0) {
+      setImageErrors({});
+      setImageRefreshKey(prev => prev + 1); // Force image refresh
+      console.log(`[PostCooked] Cleared image errors and refreshed images for ${posts.length} fresh posts`);
+    }
+    
     // REAL-TIME INITIALIZATION: Auto-refresh on mount to ensure fresh data
     if (username && posts.length === 0) {
       console.log('[PostCooked] Auto-refreshing for real-time data on mount');
@@ -357,10 +366,10 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     const match = postKey.match(/ready_post_(\d+)\.json$/);
     if (match) imageId = match[1];
     
-    // Generate URL with minimal cache busting and platform parameter
+    // Generate URL with cache busting and platform parameter
     const cacheBust = imageRefreshKey > 0 
-      ? `&refresh=${imageRefreshKey}`
-      : '';
+      ? `&refresh=${imageRefreshKey}&t=${Date.now()}`
+      : `&t=${Date.now()}`;
     
     return `${API_BASE_URL}/api/r2-image/${username}/image_${imageId}.jpg?platform=${platform}${cacheBust}`;
   }, [imageRefreshKey, username, platform]);
@@ -1201,9 +1210,11 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     }
   };
 
-  const handlePostNow = (post: any) => {
-    if (!isConnected || !userId) {
-      setToastMessage('Please connect your Instagram account first.');
+  const handlePostNow = async (post: any) => {
+    // ✅ PRE-ACTION CHECK: Verify post limits before proceeding
+    const postAccessCheck = canUseFeature('posts');
+    if (!postAccessCheck.allowed) {
+      alert(postAccessCheck.reason || 'Posts feature is not available');
       return;
     }
     
@@ -1242,29 +1253,22 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
           
           // Check if response is actually an image
           const contentType = imgRes.headers.get('content-type') || '';
-          if (!imgRes.ok || !contentType.startsWith('image/')) {
-            // Try to get error details if it's JSON
-            let errorMsg = `Failed to fetch image via proxy (${imgRes.status})`;
-            try {
-              const errorData = await imgRes.json();
-              errorMsg = errorData.error || errorMsg;
-            } catch (e) {
-              // Not JSON, check if it's a common error
-              if (imgRes.status === 403) {
-                errorMsg = 'Image URL expired or access denied';
-              } else if (imgRes.status === 404) {
-                errorMsg = 'Image not found';
-              }
-            }
-            throw new Error(errorMsg);
+          if (!contentType.startsWith('image/')) {
+            throw new Error(`Invalid content type: ${contentType}`);
+          }
+          
+          if (!imgRes.ok) {
+            throw new Error(`Failed to fetch image: ${imgRes.status} ${imgRes.statusText}`);
           }
           
           imageBlob = await imgRes.blob();
           console.log(`[PostNow] Successfully fetched image blob: ${imageBlob.size} bytes, type: ${imageBlob.type}`);
-        } catch (imgErr: any) {
-          console.error('Failed to fetch image for posting:', imgErr);
-          setToastMessage(`Failed to fetch image: ${imgErr.message || 'Unknown error'}`);
+        } catch (imgError: any) {
+          console.error(`[PostNow] Error fetching image:`, imgError);
+          setToastMessage(`Failed to fetch image: ${imgError.message}`);
           setIsPosting(false);
+          setShowPostNowModal(false);
+          setSelectedPostForPosting(null);
           return;
         }
       }
@@ -1293,7 +1297,21 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       } else {
         const resultData = await response.json();
         console.log('[PostNow] Posted successfully:', resultData);
-        setToastMessage('🎉 Posted to Instagram successfully!');
+        
+        // ✅ REAL USAGE TRACKING: Track actual post publication
+        const trackingSuccess = await trackRealPostCreation(platform, {
+          scheduled: false,
+          immediate: true,
+          type: 'instant_post_now'
+        });
+        
+        if (trackingSuccess) {
+          console.log(`[PostCooked] ✅ Instant post tracked: ${platform} post published`);
+          setToastMessage('🎉 Posted to Instagram successfully! Usage tracked.');
+        } else {
+          console.warn(`[PostCooked] ⚠️ Post tracking failed for ${platform}, but post was published`);
+          setToastMessage('🎉 Posted to Instagram successfully!');
+        }
         
         // Update post status to posted (visual feedback)
         setLocalPosts(prev => 
@@ -1546,17 +1564,71 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                     )}
                     <span className="username">{username}</span>
                   </div>
-                  {post.key in imageErrors || !post.data.image_url ? (
+                  {(post.key in imageErrors && imageErrors[post.key]?.failed && imageErrors[post.key]?.retryCount >= 3) || !post.data.image_url ? (
                     <ImagePlaceholder postKey={post.key} />
                   ) : (
                     <img
                       src={post.data.image_url || post.data.r2_image_url || getCachedImageUrl(post)}
                       alt="Post visual"
                       className={`post-image ${loadingImages.has(post.key) ? 'loading' : 'loaded'}`}
-                      onLoadStart={() => handleImageLoadStart(post.key)}
-                      onLoad={() => handleImageLoad(post.key)}
-                      onError={() => handleImageError(post.key, post.data.r2_image_url || post.data.image_url)}
+                      onLoadStart={() => {
+                        console.log(`[PostCooked] Image load started for ${post.key}: ${post.data.image_url || post.data.r2_image_url || getCachedImageUrl(post)}`);
+                        handleImageLoadStart(post.key);
+                      }}
+                      onLoad={() => {
+                        console.log(`[PostCooked] Image loaded successfully for ${post.key}`);
+                        handleImageLoad(post.key);
+                      }}
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        console.error(`[PostCooked] Image load error for ${post.key}:`, target.src);
+                        
+                        // Only mark as failed after multiple attempts
+                        const currentRetries = imageErrors[post.key]?.retryCount || 0;
+                        if (currentRetries < 3) {
+                          console.log(`[PostCooked] Retrying image load for ${post.key} (attempt ${currentRetries + 1})`);
+                          
+                          // Try alternative URL on first retry
+                          let nextUrl = target.src;
+                          if (currentRetries === 0 && post.data.r2_image_url && target.src === post.data.image_url) {
+                            // Try r2_image_url as fallback
+                            nextUrl = post.data.r2_image_url;
+                            console.log(`[PostCooked] Trying r2_image_url fallback: ${nextUrl}`);
+                          } else if (currentRetries === 1 && post.data.image_url && target.src !== post.data.image_url) {
+                            // Try image_url as fallback
+                            nextUrl = post.data.image_url;
+                            console.log(`[PostCooked] Trying image_url fallback: ${nextUrl}`);
+                          } else {
+                            // Add cache busting
+                            nextUrl = target.src.includes('?') 
+                              ? `${target.src}&retry=${currentRetries + 1}&t=${Date.now()}`
+                              : `${target.src}?retry=${currentRetries + 1}&t=${Date.now()}`;
+                          }
+                          
+                          // Update retry count but don't mark as failed yet
+                          setImageErrors(prev => ({
+                            ...prev,
+                            [post.key]: { failed: false, retryCount: currentRetries + 1 }
+                          }));
+                          
+                          // Try to reload the image
+                          setTimeout(() => {
+                            target.src = nextUrl;
+                          }, 500);
+                        } else {
+                          // Mark as failed after 3 retries
+                          console.error(`[PostCooked] Image failed after 3 retries for ${post.key}`);
+                          setImageErrors(prev => ({
+                            ...prev,
+                            [post.key]: { failed: true, retryCount: currentRetries + 1 }
+                          }));
+                        }
+                      }}
                       key={`${post.key}-${imageRefreshKey}`} // CACHED key for React
+                      style={{
+                        backgroundColor: '#2a2a4a', // Ensure background is visible during loading
+                        minHeight: '450px' // Ensure container has height even if image fails
+                      }}
                     />
                   )}
                   <div className="post-actions">

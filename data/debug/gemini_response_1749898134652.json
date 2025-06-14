@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption: Rise and shine, #testuser fam! ☀️ Ready to conquer the day? We're sharing our top productivity hacks to help you crush your goals and make the most of every morning. Let's get it! 💪 What are your go-to morning rituals? Share them in the comments! 👇\n\nHashtags: #morningmotivation #productivitytips #morningroutine #motivation #productivity #success #goals #inspiration #selfcare #testuser\n\nCall to Action: Tell us your favorite morning productivity tip in the comments below!\n\nVisual Description for Image: A bright and airy flat lay image, shot from directly overhead. The background is a clean, white wooden surface. In the center is a minimalist white desk with a partially open laptop displaying a clean, modern to-do list app. To the left of the laptop is a steaming mug of coffee in a pastel pink ceramic mug. Next to the mug is a small succulent in a geometric concrete pot. To the right of the laptop, there's a stylish planner open to a weekly spread, with a pen resting on top. The planner should have a soft, muted color palette (think blush pinks, light grays, and creams). Scattered around the desk are a few small, aesthetically pleasing items: a pair of wireless headphones in a rose gold color, a small stack of books tied with twine, and a pair of stylish glasses. The lighting is soft and natural, creating a warm and inviting atmosphere. The overall mood is calm, organized, and inspiring. The image should evoke a sense of peaceful productivity and a desire to start the day off right. The style is clean, modern, and minimalist, appealing to a young, aspirational audience.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.28159842354910714
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 267,
+    "candidatesTokenCount": 350,
+    "totalTokenCount": 617,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 267
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 350
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "lFNNaK6EDcuM1PIPkIuSsAI"
+}

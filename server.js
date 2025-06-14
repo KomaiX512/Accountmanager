@@ -41,11 +41,34 @@ const s3ClientPool = Array(S3_POOL_SIZE).fill(null).map(() => new AWS.S3({
   retryDelayOptions: { base: 300 }
 }));
 
+// Admin R2 bucket client using same credentials but for 'admin' bucket
+const adminS3ClientPool = Array(S3_POOL_SIZE).fill(null).map(() => new AWS.S3({
+  endpoint: 'https://b21d96e73b908d7d7b822d41516ccc64.r2.cloudflarestorage.com',
+  accessKeyId: '986718fe67d6790c7fe4eeb78943adba',
+  secretAccessKey: '08fb3b012163cce35bee80b54d83e3a6924f2679f466790a9c7fdd9456bc44fe',
+  s3ForcePathStyle: true,
+  signatureVersion: 'v4',
+  httpOptions: {
+    connectTimeout: 10000,
+    timeout: 15000
+  },
+  maxRetries: 5,
+  retryDelayOptions: { base: 300 }
+}));
+
 // Get S3 client from pool with round-robin selection
 let currentS3ClientIndex = 0;
 function getS3Client() {
   const client = s3ClientPool[currentS3ClientIndex];
   currentS3ClientIndex = (currentS3ClientIndex + 1) % S3_POOL_SIZE;
+  return client;
+}
+
+// Get Admin S3 client from pool
+let currentAdminS3ClientIndex = 0;
+function getAdminS3Client() {
+  const client = adminS3ClientPool[currentAdminS3ClientIndex];
+  currentAdminS3ClientIndex = (currentAdminS3ClientIndex + 1) % S3_POOL_SIZE;
   return client;
 }
 
@@ -481,13 +504,32 @@ app.get('/fix-image/:username/:filename', async (req, res) => {
     
     // Set appropriate headers if they haven't been sent
     if (!res.headersSent) {
-      res.setHeader('Content-Type', 'image/jpeg');
+      // Detect actual image format from the data
+      let contentType = 'image/jpeg'; // Default
+      if (data && data.length > 12) {
+        // Check for WebP signature (RIFF...WEBP)
+        if (data[0] === 0x52 && data[1] === 0x49 && data[2] === 0x46 && data[3] === 0x46 &&
+            data[8] === 0x57 && data[9] === 0x45 && data[10] === 0x42 && data[11] === 0x50) {
+          contentType = 'image/webp';
+        }
+        // Check for JPEG signature (FF D8 FF)
+        else if (data[0] === 0xFF && data[1] === 0xD8 && data[2] === 0xFF) {
+          contentType = 'image/jpeg';
+        }
+        // Check for PNG signature (89 50 4E 47)
+        else if (data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4E && data[3] === 0x47) {
+          contentType = 'image/png';
+        }
+      }
+      
+      res.setHeader('Content-Type', contentType);
       res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
       res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
       res.setHeader('X-Image-Source', source); // For debugging
       res.setHeader('X-Request-ID', requestId); // For tracing
+      res.setHeader('X-Image-Format', contentType.split('/')[1]); // For debugging
       res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Expose-Headers', 'X-Image-Source, X-Request-ID');
+      res.setHeader('Access-Control-Expose-Headers', 'X-Image-Source, X-Request-ID, X-Image-Format');
       
       // Send the image
       res.send(data);
@@ -556,12 +598,31 @@ app.get('/r2-images/:username/:filename', async (req, res) => {
     // Fetch image with all our fallbacks
     const { data, source } = await fetchImageWithFallbacks(key, localFallbackPath, username, filename);
     
+    // Detect actual image format from the data
+    let contentType = 'image/jpeg'; // Default
+    if (data && data.length > 12) {
+      // Check for WebP signature (RIFF...WEBP)
+      if (data[0] === 0x52 && data[1] === 0x49 && data[2] === 0x46 && data[3] === 0x46 &&
+          data[8] === 0x57 && data[9] === 0x45 && data[10] === 0x42 && data[11] === 0x50) {
+        contentType = 'image/webp';
+      }
+      // Check for JPEG signature (FF D8 FF)
+      else if (data[0] === 0xFF && data[1] === 0xD8 && data[2] === 0xFF) {
+        contentType = 'image/jpeg';
+      }
+      // Check for PNG signature (89 50 4E 47)
+      else if (data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4E && data[3] === 0x47) {
+        contentType = 'image/png';
+      }
+    }
+    
     // Set appropriate headers
-    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.setHeader('X-Image-Source', source); // For debugging
-    res.setHeader('Access-Control-Expose-Headers', 'X-Image-Source');
+    res.setHeader('X-Image-Format', contentType.split('/')[1]); // For debugging
+    res.setHeader('Access-Control-Expose-Headers', 'X-Image-Source, X-Image-Format');
     
     // Send the image
     res.send(data);
@@ -867,9 +928,28 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
     const localFallbackPath = path.join(process.cwd(), 'ready_post', platform, username, imageKey);
     const { data, source } = await fetchImageWithFallbacks(r2Key, localFallbackPath, username, imageKey);
     
-    // Set appropriate headers for JPG images
-    res.setHeader('Content-Type', 'image/jpeg');
+    // Detect actual image format from the data
+    let contentType = 'image/jpeg'; // Default
+    if (data && data.length > 12) {
+      // Check for WebP signature (RIFF...WEBP)
+      if (data[0] === 0x52 && data[1] === 0x49 && data[2] === 0x46 && data[3] === 0x46 &&
+          data[8] === 0x57 && data[9] === 0x45 && data[10] === 0x42 && data[11] === 0x50) {
+        contentType = 'image/webp';
+      }
+      // Check for JPEG signature (FF D8 FF)
+      else if (data[0] === 0xFF && data[1] === 0xD8 && data[2] === 0xFF) {
+        contentType = 'image/jpeg';
+      }
+      // Check for PNG signature (89 50 4E 47)
+      else if (data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4E && data[3] === 0x47) {
+        contentType = 'image/png';
+      }
+    }
+    
+    // Set appropriate headers with detected content type
+    res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Length', data.length);
+    res.setHeader('X-Image-Format', contentType.split('/')[1]); // For debugging
     
     // Check if this is a real-time or cache-busting request
     const isRealTime = req.query.realtime || req.query.nocache || req.query.cb || req.query.updated || req.query.v;
@@ -896,7 +976,7 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
     res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', '*');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    res.setHeader('Access-Control-Expose-Headers', 'X-Image-Source, ETag, Last-Modified');
+    res.setHeader('Access-Control-Expose-Headers', 'X-Image-Source, ETag, Last-Modified, X-Image-Format');
     
     // Send the image buffer directly
     res.send(data);
@@ -1471,6 +1551,747 @@ app.get('/ai-replies/:username', async (req, res) => {
     });
   }
 });
+
+// ============================================================
+// COMPREHENSIVE USER MANAGEMENT & PROTECTION LAYER API
+// ============================================================
+
+// Admin credentials for secure access
+const ADMIN_CREDENTIALS = {
+  username: 'sentientai',
+  password: 'Sentiant123@'
+};
+
+// Pricing plans configuration
+const PRICING_PLANS = {
+  basic: {
+    id: 'basic',
+    name: 'Basic',
+    price: 'Free',
+    period: '3-day trial',
+    description: 'Perfect for getting started',
+    features: [
+      '5 Instant Posts',
+      '10 AI Discussions',
+      '2 Days AI Reply Access',
+      'Goal Model (2 days)',
+      'Basic Analytics'
+    ],
+    limits: {
+      posts: 5,
+      discussions: 10,
+      aiReplies: 5,
+      goalModelDays: 2,
+      campaigns: 1,
+      autoSchedule: false,
+      autoReply: false
+    },
+    trialDays: 3
+  },
+  premium: {
+    id: 'premium',
+    name: 'Premium',
+    price: '$29',
+    period: '/month',
+    description: 'For serious content creators',
+    features: [
+      '160 Instant Posts',
+      '200 AI Discussions',
+      'Unlimited AI Replies',
+      '10 Goal Model Campaigns',
+      'Auto Schedule Posts',
+      'Auto Reply with AI',
+      'Advanced Analytics',
+      'Premium Support'
+    ],
+    limits: {
+      posts: 160,
+      discussions: 200,
+      aiReplies: 'unlimited',
+      goalModelDays: 'unlimited',
+      campaigns: 10,
+      autoSchedule: true,
+      autoReply: true
+    },
+    popular: true
+  },
+  enterprise: {
+    id: 'enterprise',
+    name: 'Enterprise',
+    price: 'Custom',
+    period: 'Contact us',
+    description: 'For large organizations',
+    features: [
+      'Unlimited Everything',
+      'Custom Integrations',
+      'Dedicated Support',
+      'Custom Analytics',
+      'White-label Options',
+      'Priority Processing',
+      'Custom AI Models',
+      'SLA Guarantee'
+    ],
+    limits: {
+      posts: 999999,
+      discussions: 999999,
+      aiReplies: 'unlimited',
+      goalModelDays: 'unlimited',
+      campaigns: 999999,
+      autoSchedule: true,
+      autoReply: true
+    },
+    contactUs: true
+  }
+};
+
+// Get user data from admin R2 bucket
+app.get('/api/user/:userId', async (req, res) => {
+  const { userId } = req.params;
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [USER-API] Getting user data for ${userId}`);
+    
+    const params = {
+      Bucket: 'admin',
+      Key: `users/${userId}.json`
+    };
+    
+    const data = await getAdminS3Client().getObject(params).promise();
+    const userData = JSON.parse(data.Body.toString());
+    
+    console.log(`[${new Date().toISOString()}] [USER-API] Found user data for ${userId}`);
+    res.json(userData);
+    
+  } catch (error) {
+    if (error.code === 'NoSuchKey') {
+      console.log(`[${new Date().toISOString()}] [USER-API] User ${userId} not found, creating default`);
+      res.status(404).json({ error: 'User not found' });
+    } else {
+      console.error(`[${new Date().toISOString()}] [USER-API] Error getting user data:`, error);
+      res.status(500).json({ error: 'Failed to get user data' });
+    }
+  }
+});
+
+// Save user data to admin R2 bucket
+app.put('/api/user/:userId', async (req, res) => {
+  const { userId } = req.params;
+  const userData = req.body;
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [USER-API] Saving user data for ${userId}`);
+    
+    const params = {
+      Bucket: 'admin',
+      Key: `users/${userId}.json`,
+      Body: JSON.stringify(userData, null, 2),
+      ContentType: 'application/json'
+    };
+    
+    await getAdminS3Client().putObject(params).promise();
+    
+    console.log(`[${new Date().toISOString()}] [USER-API] Saved user data for ${userId}`);
+    res.json({ success: true });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [USER-API] Error saving user data:`, error);
+    res.status(500).json({ error: 'Failed to save user data' });
+  }
+});
+
+// Get usage stats for current period (no period specified)
+app.get('/api/user/:userId/usage', async (req, res) => {
+  const { userId } = req.params;
+  const currentPeriod = new Date().toISOString().substring(0, 7); // YYYY-MM
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [USER-API] Getting usage stats for ${userId}/${currentPeriod}`);
+    
+    const params = {
+      Bucket: 'admin',
+      Key: `usage/${userId}/${currentPeriod}.json`
+    };
+    
+    const data = await getAdminS3Client().getObject(params).promise();
+    const usageStats = JSON.parse(data.Body.toString());
+    
+    console.log(`[${new Date().toISOString()}] [USER-API] Found usage stats for ${userId}/${currentPeriod}`);
+    res.json(usageStats);
+    
+  } catch (error) {
+    if (error.code === 'NoSuchKey') {
+      // Create default usage stats
+      const defaultStats = {
+        userId,
+        period: currentPeriod,
+        postsUsed: 0,
+        discussionsUsed: 0,
+        aiRepliesUsed: 0,
+        campaignsUsed: 0,
+        lastUpdated: new Date().toISOString()
+      };
+      
+      console.log(`[${new Date().toISOString()}] [USER-API] Creating default usage stats for ${userId}/${currentPeriod}`);
+      res.json(defaultStats);
+    } else {
+      console.error(`[${new Date().toISOString()}] [USER-API] Error getting usage stats:`, error);
+      res.status(500).json({ error: 'Failed to get usage stats' });
+    }
+  }
+});
+
+// Get usage stats for specific period
+app.get('/api/user/:userId/usage/:period', async (req, res) => {
+  const { userId, period } = req.params;
+  const currentPeriod = period || new Date().toISOString().substring(0, 7); // YYYY-MM
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [USER-API] Getting usage stats for ${userId}/${currentPeriod}`);
+    
+    const params = {
+      Bucket: 'admin',
+      Key: `usage/${userId}/${currentPeriod}.json`
+    };
+    
+    const data = await getAdminS3Client().getObject(params).promise();
+    const usageStats = JSON.parse(data.Body.toString());
+    
+    console.log(`[${new Date().toISOString()}] [USER-API] Found usage stats for ${userId}/${currentPeriod}`);
+    res.json(usageStats);
+    
+  } catch (error) {
+    if (error.code === 'NoSuchKey') {
+      // Create default usage stats
+      const defaultStats = {
+        userId,
+        period: currentPeriod,
+        postsUsed: 0,
+        discussionsUsed: 0,
+        aiRepliesUsed: 0,
+        campaignsUsed: 0,
+        lastUpdated: new Date().toISOString()
+      };
+      
+      console.log(`[${new Date().toISOString()}] [USER-API] Creating default usage stats for ${userId}/${currentPeriod}`);
+      res.json(defaultStats);
+    } else {
+      console.error(`[${new Date().toISOString()}] [USER-API] Error getting usage stats:`, error);
+      res.status(500).json({ error: 'Failed to get usage stats' });
+    }
+  }
+});
+
+// Update usage stats
+app.patch('/api/user/:userId/usage', async (req, res) => {
+  const { userId } = req.params;
+  const statsUpdate = req.body;
+  const currentPeriod = new Date().toISOString().substring(0, 7);
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [USER-API] Updating usage stats for ${userId}/${currentPeriod}`);
+    
+    // Get current stats or create default
+    let currentStats;
+    try {
+      const data = await getAdminS3Client().getObject({
+        Bucket: 'admin',
+        Key: `usage/${userId}/${currentPeriod}.json`
+      }).promise();
+      currentStats = JSON.parse(data.Body.toString());
+    } catch (error) {
+      if (error.code === 'NoSuchKey') {
+        currentStats = {
+          userId,
+          period: currentPeriod,
+          postsUsed: 0,
+          discussionsUsed: 0,
+          aiRepliesUsed: 0,
+          campaignsUsed: 0,
+          lastUpdated: new Date().toISOString()
+        };
+      } else {
+        throw error;
+      }
+    }
+    
+    // Update stats
+    const updatedStats = {
+      ...currentStats,
+      ...statsUpdate,
+      lastUpdated: new Date().toISOString()
+    };
+    
+    // Save updated stats
+    const params = {
+      Bucket: 'admin',
+      Key: `usage/${userId}/${currentPeriod}.json`,
+      Body: JSON.stringify(updatedStats, null, 2),
+      ContentType: 'application/json'
+    };
+    
+    await getAdminS3Client().putObject(params).promise();
+    
+    console.log(`[${new Date().toISOString()}] [USER-API] Updated usage stats for ${userId}/${currentPeriod}`);
+    res.json({ success: true });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [USER-API] Error updating usage stats:`, error);
+    res.status(500).json({ error: 'Failed to update usage stats' });
+  }
+});
+
+// Check access for a specific feature
+app.post('/api/access-check/:userId', async (req, res) => {
+  const { userId } = req.params;
+  const { feature } = req.body;
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [ACCESS-CHECK] Checking ${feature} access for ${userId}`);
+    
+    // Get user data and usage stats
+    const [userResponse, usageResponse] = await Promise.allSettled([
+      fetch(`http://localhost:3002/api/user/${userId}`),
+      fetch(`http://localhost:3002/api/user/${userId}/usage`)
+    ]);
+    
+    let userData = null;
+    let usageStats = null;
+    
+    if (userResponse.status === 'fulfilled' && userResponse.value.ok) {
+      userData = await userResponse.value.json();
+    }
+    
+    if (usageResponse.status === 'fulfilled' && usageResponse.value.ok) {
+      usageStats = await usageResponse.value.json();
+    }
+    
+    // If no user data, create default free user
+    if (!userData) {
+      userData = {
+        id: userId,
+        userType: 'free',
+        subscription: {
+          planId: 'basic',
+          status: 'trial',
+          startDate: new Date().toISOString(),
+          endDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+          limits: PRICING_PLANS.basic.limits,
+          trialDaysRemaining: 3
+        },
+        trialEndsAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+        isTrialActive: true
+      };
+      
+      // Save the new user
+      await fetch(`http://localhost:3002/api/user/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData)
+      });
+    }
+    
+    // Default usage stats if not found
+    if (!usageStats) {
+      usageStats = {
+        userId,
+        period: new Date().toISOString().substring(0, 7),
+        postsUsed: 0,
+        discussionsUsed: 0,
+        aiRepliesUsed: 0,
+        campaignsUsed: 0,
+        lastUpdated: new Date().toISOString()
+      };
+    }
+    
+    // Admin users have unlimited access
+    if (userData.userType === 'admin') {
+      console.log(`[${new Date().toISOString()}] [ACCESS-CHECK] Admin user ${userId} has unlimited access`);
+      return res.json({ allowed: true });
+    }
+    
+    const subscription = userData.subscription;
+    if (!subscription) {
+      return res.json({ 
+        allowed: false, 
+        reason: 'No active subscription', 
+        upgradeRequired: true 
+      });
+    }
+    
+    // Check if trial is expired
+    if (subscription.status === 'trial' && userData.trialEndsAt) {
+      const trialEnd = new Date(userData.trialEndsAt);
+      if (new Date() > trialEnd) {
+        return res.json({ 
+          allowed: false, 
+          reason: 'Trial expired', 
+          upgradeRequired: true,
+          redirectToPricing: true 
+        });
+      }
+    }
+    
+    // Check subscription status
+    if (subscription.status === 'cancelled' || subscription.status === 'expired') {
+      return res.json({ 
+        allowed: false, 
+        reason: 'Subscription inactive', 
+        upgradeRequired: true,
+        redirectToPricing: true 
+      });
+    }
+    
+    const limits = subscription.limits;
+    
+    // Check feature-specific access
+    let accessResult = { allowed: true };
+    
+    switch (feature) {
+      case 'posts':
+        if (typeof limits.posts === 'number' && usageStats.postsUsed >= limits.posts) {
+          accessResult = { 
+            allowed: false, 
+            reason: `Post limit reached (${usageStats.postsUsed}/${limits.posts})`, 
+            limitReached: true,
+            upgradeRequired: true 
+          };
+        }
+        break;
+        
+      case 'discussions':
+        if (typeof limits.discussions === 'number' && usageStats.discussionsUsed >= limits.discussions) {
+          accessResult = { 
+            allowed: false, 
+            reason: `Discussion limit reached (${usageStats.discussionsUsed}/${limits.discussions})`, 
+            limitReached: true,
+            upgradeRequired: true 
+          };
+        }
+        break;
+        
+      case 'aiReplies':
+        if (limits.aiReplies !== 'unlimited' && usageStats.aiRepliesUsed >= limits.aiReplies) {
+          accessResult = { 
+            allowed: false, 
+            reason: `AI Reply limit reached (${usageStats.aiRepliesUsed}/${limits.aiReplies})`, 
+            limitReached: true,
+            upgradeRequired: true 
+          };
+        }
+        break;
+        
+      case 'campaigns':
+        if (typeof limits.campaigns === 'number' && usageStats.campaignsUsed >= limits.campaigns) {
+          accessResult = { 
+            allowed: false, 
+            reason: `Campaign limit reached (${usageStats.campaignsUsed}/${limits.campaigns})`, 
+            limitReached: true,
+            upgradeRequired: true 
+          };
+        }
+        break;
+        
+      case 'autoSchedule':
+        if (!limits.autoSchedule) {
+          accessResult = { 
+            allowed: false, 
+            reason: 'Auto Schedule not available in your plan', 
+            upgradeRequired: true 
+          };
+        }
+        break;
+        
+      case 'autoReply':
+        if (!limits.autoReply) {
+          accessResult = { 
+            allowed: false, 
+            reason: 'Auto Reply not available in your plan', 
+            upgradeRequired: true 
+          };
+        }
+        break;
+        
+      case 'goalModel':
+        if (userData.userType !== 'premium' && userData.userType !== 'admin') {
+          const goalModelDays = limits.goalModelDays;
+          if (typeof goalModelDays === 'number' && goalModelDays <= 0) {
+            accessResult = { 
+              allowed: false, 
+              reason: 'Goal Model is a Premium feature', 
+              upgradeRequired: true 
+            };
+          }
+        }
+        break;
+        
+      default:
+        accessResult = { allowed: false, reason: 'Unknown feature' };
+    }
+    
+    console.log(`[${new Date().toISOString()}] [ACCESS-CHECK] ${feature} access for ${userId}: ${accessResult.allowed ? 'ALLOWED' : 'DENIED'}`);
+    res.json(accessResult);
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [ACCESS-CHECK] Error checking access:`, error);
+    // Allow access if there's an error to prevent app breaking
+    res.json({ allowed: true });
+  }
+});
+
+// Admin authentication endpoint
+app.post('/api/admin/authenticate', async (req, res) => {
+  const { username, password } = req.body;
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [ADMIN-AUTH] Authentication attempt for ${username}`);
+    
+    if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
+      console.log(`[${new Date().toISOString()}] [ADMIN-AUTH] Authentication successful for ${username}`);
+      res.json({ 
+        success: true, 
+        message: 'Authentication successful',
+        adminToken: `admin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      });
+    } else {
+      console.log(`[${new Date().toISOString()}] [ADMIN-AUTH] Authentication failed for ${username}`);
+      res.status(401).json({ 
+        success: false, 
+        message: 'Invalid credentials' 
+      });
+    }
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [ADMIN-AUTH] Error during authentication:`, error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Authentication error' 
+    });
+  }
+});
+
+// Upgrade user to admin
+app.post('/api/admin/upgrade-user/:userId', async (req, res) => {
+  const { userId } = req.params;
+  const { adminToken } = req.body;
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [ADMIN-UPGRADE] Upgrading user ${userId} to admin`);
+    
+    // In production, verify adminToken here
+    // For now, we'll trust the request came from authenticated admin
+    
+    // Get current user data or create new
+    let userData;
+    try {
+      const response = await fetch(`http://localhost:3002/api/user/${userId}`);
+      if (response.ok) {
+        userData = await response.json();
+      } else {
+        userData = {
+          id: userId,
+          email: '',
+          displayName: '',
+          createdAt: new Date().toISOString(),
+          lastLogin: new Date().toISOString()
+        };
+      }
+    } catch (error) {
+      userData = {
+        id: userId,
+        email: '',
+        displayName: '',
+        createdAt: new Date().toISOString(),
+        lastLogin: new Date().toISOString()
+      };
+    }
+    
+    // Upgrade to admin
+    userData.userType = 'admin';
+    userData.subscription = {
+      planId: 'enterprise',
+      status: 'active',
+      startDate: new Date().toISOString(),
+      limits: PRICING_PLANS.enterprise.limits
+    };
+    userData.lastLogin = new Date().toISOString();
+    
+    // Save updated user data
+    const response = await fetch(`http://localhost:3002/api/user/${userId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData)
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to save user data');
+    }
+    
+    console.log(`[${new Date().toISOString()}] [ADMIN-UPGRADE] Successfully upgraded user ${userId} to admin`);
+    res.json({ success: true, message: 'User upgraded to admin successfully' });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [ADMIN-UPGRADE] Error upgrading user:`, error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to upgrade user' 
+    });
+  }
+});
+
+// Increment usage counter
+app.post('/api/usage/increment/:userId', async (req, res) => {
+  const { userId } = req.params;
+  const { feature } = req.body;
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [USAGE-INCREMENT] Incrementing ${feature} usage for ${userId}`);
+    
+    // Get current usage stats
+    const response = await fetch(`http://localhost:3002/api/user/${userId}/usage`);
+    let usageStats;
+    
+    if (response.ok) {
+      usageStats = await response.json();
+    } else {
+      const currentPeriod = new Date().toISOString().substring(0, 7);
+      usageStats = {
+        userId,
+        period: currentPeriod,
+        postsUsed: 0,
+        discussionsUsed: 0,
+        aiRepliesUsed: 0,
+        campaignsUsed: 0,
+        lastUpdated: new Date().toISOString()
+      };
+    }
+    
+    // Increment the appropriate counter
+    const update = { lastUpdated: new Date().toISOString() };
+    
+    switch (feature) {
+      case 'posts':
+        update.postsUsed = usageStats.postsUsed + 1;
+        break;
+      case 'discussions':
+        update.discussionsUsed = usageStats.discussionsUsed + 1;
+        break;
+      case 'aiReplies':
+        update.aiRepliesUsed = usageStats.aiRepliesUsed + 1;
+        break;
+      case 'campaigns':
+        update.campaignsUsed = usageStats.campaignsUsed + 1;
+        break;
+      default:
+        console.warn(`[${new Date().toISOString()}] [USAGE-INCREMENT] Unknown feature: ${feature}`);
+        return res.json({ success: true, message: 'Unknown feature, no increment performed' });
+    }
+    
+    // Update usage stats
+    const updateResponse = await fetch(`http://localhost:3002/api/user/${userId}/usage`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(update)
+    });
+    
+    if (!updateResponse.ok) {
+      throw new Error('Failed to update usage stats');
+    }
+    
+    console.log(`[${new Date().toISOString()}] [USAGE-INCREMENT] Successfully incremented ${feature} usage for ${userId}`);
+    res.json({ success: true, newCount: usageStats[feature + 'Used'] + 1 });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [USAGE-INCREMENT] Error incrementing usage:`, error);
+    // Don't fail the request - usage tracking is not critical
+    res.json({ success: true, message: 'Usage tracking error, but operation continued' });
+  }
+});
+
+// Get pricing plans
+app.get('/api/pricing-plans', (req, res) => {
+  console.log(`[${new Date().toISOString()}] [PRICING] Serving pricing plans`);
+  res.json({ plans: Object.values(PRICING_PLANS) });
+});
+
+// Mock payment processing endpoint (for testing)
+app.post('/api/process-payment', async (req, res) => {
+  const { userId, planId, paymentMethod } = req.body;
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [PAYMENT] Processing payment for ${userId} - Plan: ${planId}`);
+    
+    // Simulate payment processing delay
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // For demo/testing, all payments succeed
+    const plan = PRICING_PLANS[planId];
+    if (!plan) {
+      throw new Error('Invalid plan selected');
+    }
+    
+    // Get current user data
+    const userResponse = await fetch(`http://localhost:3002/api/user/${userId}`);
+    let userData = userResponse.ok ? await userResponse.json() : {
+      id: userId,
+      email: '',
+      displayName: '',
+      createdAt: new Date().toISOString(),
+      lastLogin: new Date().toISOString()
+    };
+    
+    // Update subscription
+    userData.userType = planId === 'basic' ? 'free' : planId === 'premium' ? 'premium' : 'enterprise';
+    userData.subscription = {
+      planId,
+      status: 'active',
+      startDate: new Date().toISOString(),
+      endDate: planId === 'basic' ? 
+        new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString() : 
+        new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      limits: plan.limits
+    };
+    userData.lastLogin = new Date().toISOString();
+    
+    if (planId === 'basic') {
+      userData.isTrialActive = true;
+      userData.trialEndsAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+      userData.subscription.trialDaysRemaining = 3;
+    } else {
+      userData.isTrialActive = false;
+      userData.trialEndsAt = null;
+    }
+    
+    // Save updated user data
+    const saveResponse = await fetch(`http://localhost:3002/api/user/${userId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData)
+    });
+    
+    if (!saveResponse.ok) {
+      throw new Error('Failed to save subscription data');
+    }
+    
+    console.log(`[${new Date().toISOString()}] [PAYMENT] Payment processed successfully for ${userId} - Plan: ${planId}`);
+    res.json({ 
+      success: true, 
+      message: 'Payment processed successfully',
+      subscription: userData.subscription 
+    });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [PAYMENT] Payment processing error:`, error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Payment processing failed',
+      error: error.message 
+    });
+  }
+});
+
+// ============================================================
+// END USER MANAGEMENT & PROTECTION LAYER API
+// ============================================================
 
 app.listen(port, '0.0.0.0', () => {
   console.log(`Server running at http://localhost:${port}`);

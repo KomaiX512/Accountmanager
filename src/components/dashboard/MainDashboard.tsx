@@ -11,7 +11,9 @@ import { useFacebook } from '../../context/FacebookContext';
 import { useAuth } from '../../context/AuthContext';
 import PostScheduler from '../instagram/PostScheduler';
 import TwitterCompose from '../twitter/TwitterCompose';
+import UsageDashboard from './UsageDashboard';
 import { schedulePost } from '../../utils/scheduleHelpers';
+import useFeatureTracking from '../../hooks/useFeatureTracking';
 
 interface PlatformData {
   id: string;
@@ -49,6 +51,7 @@ const MainDashboard: React.FC = () => {
   const { isConnected: isTwitterConnected, userId: twitterUserId, hasAccessed: hasAccessedTwitter = false, refreshConnection: refreshTwitterConnection } = useTwitter();
   const { isConnected: isFacebookConnected, userId: facebookUserId, hasAccessed: hasAccessedFacebook = false } = useFacebook();
   const { currentUser } = useAuth();
+  const { trackRealPostCreation, canUseFeature } = useFeatureTracking();
   const [userName, setUserName] = useState<string>('');
   const [showInstantPostModal, setShowInstantPostModal] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -571,6 +574,14 @@ const MainDashboard: React.FC = () => {
       return;
     }
     
+    // Pre-check post usage limits for all selected platforms
+    const postCheckResult = canUseFeature('posts');
+    if (!postCheckResult.allowed) {
+      alert(postCheckResult.reason);
+      setShowInstantPostModal(false);
+      return;
+    }
+    
     // Validate Instagram has images if selected
     const hasInstagram = selectedPlatforms.some(p => p.id === 'instagram');
     if (hasInstagram && postContent.images.length === 0) {
@@ -583,66 +594,39 @@ const MainDashboard: React.FC = () => {
     
     // Determine schedule time (immediate or scheduled)
     const scheduleTime = postContent.scheduleDate || new Date(Date.now() + 60 * 1000); // Default to 1 minute from now for immediate posting
+    const isScheduled = !!postContent.scheduleDate;
     
     // Process all selected platforms simultaneously
     const results: Array<{platform: string, success: boolean, message: string}> = [];
     
     for (const platform of selectedPlatforms) {
       try {
-        let userId: string | null = null;
-        let imageBlob: Blob | undefined = undefined;
+        console.log(`[MainDashboard] Processing post for ${platform.name}...`);
         
-        // Get platform-specific user ID
-        switch(platform.id) {
-          case 'instagram':
-            userId = instagramUserId;
-            // Instagram requires an image, use the first one
-            if (postContent.images.length > 0) {
-              imageBlob = postContent.images[0];
-            }
-            break;
-          case 'twitter':
-            userId = twitterUserId;
-            // Twitter images are optional, use first one if available
-            if (postContent.images.length > 0) {
-              imageBlob = postContent.images[0];
-            }
-            break;
-          case 'facebook':
-            userId = facebookUserId;
-            // Facebook images are optional, use first one if available
-            if (postContent.images.length > 0) {
-              imageBlob = postContent.images[0];
-            }
-            break;
-          case 'linkedin':
-            // LinkedIn not implemented yet
-            results.push({
-              platform: platform.name,
-              success: false,
-              message: 'LinkedIn integration not yet available'
-            });
-            continue;
-        }
-        
-        if (!userId) {
-          results.push({
-            platform: platform.name,
-            success: false,
-            message: `${platform.name} user ID not found`
-          });
-          continue;
-        }
-        
-        // Schedule the post using the reusable helper
+        // Call the existing schedule functionality
         const result = await schedulePost({
           platform: platform.id as 'instagram' | 'twitter' | 'facebook',
-          userId,
-          imageBlob,
-          caption: postContent.text.trim(),
-          scheduleTime,
-          postKey: `instant_post_${Date.now()}`
+          userId: currentUser?.uid || '',
+          imageBlob: postContent.images[0],
+          caption: postContent.text,
+          scheduleTime: scheduleTime,
+          postKey: undefined
         });
+        
+        if (result.success) {
+          // ✅ REAL USAGE TRACKING: Track actual post creation/scheduling
+          const trackingSuccess = trackRealPostCreation(platform.id, {
+            scheduled: isScheduled,
+            immediate: !isScheduled,
+            type: 'multi_platform_post'
+          });
+          
+          if (!trackingSuccess) {
+            console.warn(`[MainDashboard] Usage tracking failed for ${platform.name}, but post was created`);
+          }
+          
+          console.log(`[MainDashboard] ✅ Post ${isScheduled ? 'scheduled' : 'created'} for ${platform.name} with usage tracking`);
+        }
         
         results.push({
           platform: platform.name,
@@ -669,6 +653,7 @@ const MainDashboard: React.FC = () => {
     if (successfulPosts.length > 0) {
       const action = postContent.scheduleDate ? 'scheduled' : 'posted';
       alertMessage += `✅ Successfully ${action} to: ${successfulPosts.map(r => r.platform).join(', ')}\n`;
+      alertMessage += `📊 Usage tracked for ${successfulPosts.length} platform(s)\n`;
     }
     
     if (failedPosts.length > 0) {
@@ -847,68 +832,72 @@ const MainDashboard: React.FC = () => {
         
         {activeTab === 'usage' && (
           <div className="usage-container">
-            <div className="usage-header">
-              <h2>Platform Usage</h2>
-            </div>
+            <UsageDashboard />
             
-            <div className="usage-stats">
-              <div className="usage-stat">
-                <div className="stat-icon claimed">
-                  <svg viewBox="0 0 24 24">
-                    <path d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M11,16.5L18,9.5L16.59,8.09L11,13.67L7.91,10.59L6.5,12L11,16.5Z" />
-                  </svg>
+            <div className="platform-usage-stats">
+              <div className="usage-header">
+                <h2>Platform Usage</h2>
+              </div>
+              
+              <div className="usage-stats">
+                <div className="usage-stat">
+                  <div className="stat-icon claimed">
+                    <svg viewBox="0 0 24 24">
+                      <path d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M11,16.5L18,9.5L16.59,8.09L11,13.67L7.91,10.59L6.5,12L11,16.5Z" />
+                    </svg>
+                  </div>
+                  <div className="stat-details">
+                    <h4>Claimed Platforms</h4>
+                    <p className="stat-value">{platforms.filter(p => p.claimed).length}</p>
+                  </div>
                 </div>
-                <div className="stat-details">
-                  <h4>Claimed Platforms</h4>
-                  <p className="stat-value">{platforms.filter(p => p.claimed).length}</p>
+                
+                <div className="usage-stat">
+                  <div className="stat-icon connected">
+                    <svg viewBox="0 0 24 24">
+                      <path d="M8,3A2,2 0 0,0 6,5V9A2,2 0 0,1 4,11H3V13H4A2,2 0 0,1 6,15V19A2,2 0 0,0 8,21H10V19H8V14A2,2 0 0,0 6,12A2,2 0 0,0 8,10V5H10V3M16,3A2,2 0 0,1 18,5V9A2,2 0 0,0 20,11H21V13H20A2,2 0 0,0 18,15V19A2,2 0 0,1 16,21H14V19H16V14A2,2 0 0,1 18,12A2,2 0 0,1 16,10V5H14V3H16Z" />
+                    </svg>
+                  </div>
+                  <div className="stat-details">
+                    <h4>Connected APIs</h4>
+                    <p className="stat-value">{platforms.filter(p => p.connected).length}</p>
+                  </div>
+                </div>
+                
+                <div className="usage-stat">
+                  <div className="stat-icon posts">
+                    <svg viewBox="0 0 24 24">
+                      <path d="M20,2H4A2,2 0 0,0 2,4V22L6,18H20A2,2 0 0,0 22,16V4A2,2 0 0,0 20,2M6,9H18V11H6M14,14H6V12H14M18,8H6V6H18" />
+                    </svg>
+                  </div>
+                  <div className="stat-details">
+                    <h4>Created Posts</h4>
+                    <p className="stat-value">{
+                      platforms.filter(p => p.claimed).reduce((total, p) => {
+                        return total + p.notifications.breakdown.cooked_posts;
+                      }, 0)
+                    }</p>
+                  </div>
+                </div>
+                
+                <div className="usage-stat">
+                  <div className="stat-icon ai">
+                    <svg viewBox="0 0 24 24">
+                      <path d="M21,15.61L19.59,17.02L17.7,15.13L16.29,16.54L18.17,18.44L16.76,19.85L14.87,17.95L13.46,19.36L15.35,21.25L13.94,22.66L9.17,17.88L17.88,9.17L22.66,13.94L21.25,15.35L19.35,13.46L17.95,14.87L19.84,16.76L18.43,18.17L16.54,16.29L15.13,17.7L17.02,19.59L15.61,21L13.71,19.1L12.3,20.51L14.19,22.41L12.78,23.82L8,19.05V21H3V16L4.95,17.95L6.36,16.54L4.46,14.64L5.87,13.23L7.77,15.13L9.18,13.72L7.28,11.82L8.69,10.41L10.59,12.31L12,10.9L10.1,9L11.51,7.59L13.41,9.49L14.82,8.08L12.92,6.18L14.33,4.77L18.55,9L19.96,7.59L15.75,3.38L17.16,1.97L22.25,7.06L21.26,8.04L19.37,6.15L17.96,7.56L19.85,9.46L18.44,10.87L16.55,8.97L15.14,10.38L17.03,12.28L15.62,13.69L13.73,11.79L12.32,13.2L14.21,15.1L12.8,16.51L10.91,14.61L9.5,16.02L11.39,17.92L9.98,19.33L8.09,17.43L6.68,18.84L8.57,20.74L7.16,22.15L3,18V13H1V8H3V3H8V1H13V3H16.12L21,7.88V15.61Z" />
+                    </svg>
+                  </div>
+                  <div className="stat-details">
+                    <h4>AI Agent Active</h4>
+                    <p className="stat-value">{platforms.some(p => p.claimed) ? "Yes" : "No"}</p>
+                  </div>
                 </div>
               </div>
               
-              <div className="usage-stat">
-                <div className="stat-icon connected">
-                  <svg viewBox="0 0 24 24">
-                    <path d="M8,3A2,2 0 0,0 6,5V9A2,2 0 0,1 4,11H3V13H4A2,2 0 0,1 6,15V19A2,2 0 0,0 8,21H10V19H8V14A2,2 0 0,0 6,12A2,2 0 0,0 8,10V5H10V3M16,3A2,2 0 0,1 18,5V9A2,2 0 0,0 20,11H21V13H20A2,2 0 0,0 18,15V19A2,2 0 0,1 16,21H14V19H16V14A2,2 0 0,1 18,12A2,2 0 0,1 16,10V5H14V3H16Z" />
-                  </svg>
+              <div className="usage-chart-container">
+                <h3>Activity Over Time</h3>
+                <div className="placeholder-chart">
+                  <p>Platform activity chart will be displayed here</p>
                 </div>
-                <div className="stat-details">
-                  <h4>Connected APIs</h4>
-                  <p className="stat-value">{platforms.filter(p => p.connected).length}</p>
-                </div>
-              </div>
-              
-              <div className="usage-stat">
-                <div className="stat-icon posts">
-                  <svg viewBox="0 0 24 24">
-                    <path d="M20,2H4A2,2 0 0,0 2,4V22L6,18H20A2,2 0 0,0 22,16V4A2,2 0 0,0 20,2M6,9H18V11H6M14,14H6V12H14M18,8H6V6H18" />
-                  </svg>
-                </div>
-                <div className="stat-details">
-                  <h4>Created Posts</h4>
-                  <p className="stat-value">{
-                    platforms.filter(p => p.claimed).reduce((total, p) => {
-                      return total + p.notifications.breakdown.cooked_posts;
-                    }, 0)
-                  }</p>
-                </div>
-              </div>
-              
-              <div className="usage-stat">
-                <div className="stat-icon ai">
-                  <svg viewBox="0 0 24 24">
-                    <path d="M21,15.61L19.59,17.02L17.7,15.13L16.29,16.54L18.17,18.44L16.76,19.85L14.87,17.95L13.46,19.36L15.35,21.25L13.94,22.66L9.17,17.88L17.88,9.17L22.66,13.94L21.25,15.35L19.35,13.46L17.95,14.87L19.84,16.76L18.43,18.17L16.54,16.29L15.13,17.7L17.02,19.59L15.61,21L13.71,19.1L12.3,20.51L14.19,22.41L12.78,23.82L8,19.05V21H3V16L4.95,17.95L6.36,16.54L4.46,14.64L5.87,13.23L7.77,15.13L9.18,13.72L7.28,11.82L8.69,10.41L10.59,12.31L12,10.9L10.1,9L11.51,7.59L13.41,9.49L14.82,8.08L12.92,6.18L14.33,4.77L18.55,9L19.96,7.59L15.75,3.38L17.16,1.97L22.25,7.06L21.26,8.04L19.37,6.15L17.96,7.56L19.85,9.46L18.44,10.87L16.55,8.97L15.14,10.38L17.03,12.28L15.62,13.69L13.73,11.79L12.32,13.2L14.21,15.1L12.8,16.51L10.91,14.61L9.5,16.02L11.39,17.92L9.98,19.33L8.09,17.43L6.68,18.84L8.57,20.74L7.16,22.15L3,18V13H1V8H3V3H8V1H13V3H16.12L21,7.88V15.61Z" />
-                  </svg>
-                </div>
-                <div className="stat-details">
-                  <h4>AI Agent Active</h4>
-                  <p className="stat-value">{platforms.some(p => p.claimed) ? "Yes" : "No"}</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="usage-chart-container">
-              <h3>Activity Over Time</h3>
-              <div className="placeholder-chart">
-                <p>Platform activity chart will be displayed here</p>
               </div>
             </div>
           </div>

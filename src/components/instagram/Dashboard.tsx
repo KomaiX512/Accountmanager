@@ -15,6 +15,8 @@ import axios, { AxiosError } from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import InstagramRequiredButton from '../common/InstagramRequiredButton';
 import { useInstagram } from '../../context/InstagramContext';
+import useFeatureTracking from '../../hooks/useFeatureTracking';
+
 import ChatModal from './ChatModal';
 import RagService from '../../services/RagService';
 import type { ChatMessage as ChatModalMessage } from './ChatModal';
@@ -41,6 +43,7 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accountType, onOpenChat }) => {
+  const { trackPost, trackDiscussion, trackAIReply, trackCampaign, isFeatureBlocked, trackRealDiscussion, canUseFeature } = useFeatureTracking();
   const [query, setQuery] = useState('');
   const [toast, setToast] = useState<string | null>(null);
   const [responses, setResponses] = useState<{ key: string; data: any }[]>([]);
@@ -492,6 +495,13 @@ Image Description: ${response.post.image_prompt}
   const handleReply = async (notification: Notification, replyText: string) => {
     if (!igBusinessId || !replyText.trim()) return;
 
+    // ✅ PRE-ACTION CHECK: Verify discussion limits before proceeding
+    const discussionAccessCheck = canUseFeature('discussions');
+    if (!discussionAccessCheck.allowed) {
+      setToast(discussionAccessCheck.reason || 'Discussions feature is not available');
+      return;
+    }
+
     try {
       if (notification.type === 'message' && notification.sender_id && notification.message_id) {
         await axios.post(`http://localhost:3000/send-dm-reply/${igBusinessId}`, {
@@ -499,6 +509,19 @@ Image Description: ${response.post.image_prompt}
           text: replyText,
           message_id: notification.message_id,
         });
+        
+        // ✅ REAL USAGE TRACKING: Track actual DM reply
+        const trackingSuccess = trackRealDiscussion('instagram', {
+          messageCount: 1,
+          type: 'dm_reply'
+        });
+        
+        if (trackingSuccess) {
+          console.log(`[Dashboard] ✅ DM reply tracked: Instagram manual reply`);
+        } else {
+          console.warn(`[Dashboard] ⚠️ DM reply tracking failed for Instagram`);
+        }
+        
         setReplySentTracker(prev => [
           ...prev, 
           {
@@ -515,6 +538,19 @@ Image Description: ${response.post.image_prompt}
           comment_id: notification.comment_id,
           text: replyText,
         });
+        
+        // ✅ REAL USAGE TRACKING: Track actual comment reply
+        const trackingSuccess = trackRealDiscussion('instagram', {
+          messageCount: 1,
+          type: 'comment_reply'
+        });
+        
+        if (trackingSuccess) {
+          console.log(`[Dashboard] ✅ Comment reply tracked: Instagram manual reply`);
+        } else {
+          console.warn(`[Dashboard] ⚠️ Comment reply tracking failed for Instagram`);
+        }
+        
         setReplySentTracker(prev => [
           ...prev, 
           {
@@ -877,6 +913,9 @@ Image Description: ${response.post.image_prompt}
       
       if (sendResponse.ok) {
         console.log(`[${new Date().toISOString()}] Successfully sent AI reply for ${notifId}`, responseData);
+        
+        // Track AI reply usage
+        trackAIReply('instagram', 'ai_reply_sent');
         
         // QUICK FIX 2: Immediately remove the notification on successful send
         setNotifications(prev => prev.filter(n => 
@@ -1337,6 +1376,13 @@ Image Description: ${response.post.image_prompt}
 
   const handleOpenScheduler = () => {
     console.log(`[${new Date().toISOString()}] Opening PostScheduler for user ${igBusinessId}`);
+    
+    // Check if feature is blocked before opening
+    if (isFeatureBlocked('posts')) {
+      setToast('You have reached your post limit. Please upgrade to continue.');
+      return;
+    }
+    
     setIsSchedulerOpen(true);
   };
 
@@ -1350,6 +1396,12 @@ Image Description: ${response.post.image_prompt}
   };
 
   const handleOpenCampaignModal = () => {
+    // Check if feature is blocked before opening
+    if (isFeatureBlocked('campaigns')) {
+      setToast('Campaigns are a premium feature. Please upgrade to access.');
+      return;
+    }
+    
     setIsCampaignModalOpen(true);
   };
 
@@ -1804,6 +1856,8 @@ Image Description: ${response.post.image_prompt}
               </button>
             </div>
           </div>
+
+
         </div>
       </div>
       {toast && (
@@ -1847,6 +1901,7 @@ Image Description: ${response.post.image_prompt}
       {isGoalModalOpen && (
         <GoalModal 
           username={accountHolder} 
+          platform="Instagram"
           onClose={() => setIsGoalModalOpen(false)}
           onSuccess={handleGoalSuccess}
         />

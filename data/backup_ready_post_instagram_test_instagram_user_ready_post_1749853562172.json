@@ -1,0 +1,27 @@
+{
+  "post": {
+    "caption": "You are stronger than you think! 💪 Every drop of sweat, every ache, every early morning is an investment in yourself. Keep pushing, keep believing, and watch yourself transform! ✨",
+    "hashtags": [
+      "#fitnessmotivation",
+      "#healthylifestyle",
+      "#workoutmotivation",
+      "#gymlife",
+      "#fitfam",
+      "#noexcuses",
+      "#transformationtuesday",
+      "#fitnessjourney",
+      "#healthyliving",
+      "#motivation"
+    ],
+    "call_to_action": "Tag a friend who needs some motivation today!",
+    "image_prompt": "A dynamic, high-energy action shot of a woman in her late 20s, mid-workout. She's lifting a barbell overhead in a brightly lit, modern gym. The gym has a clean, minimalist aesthetic with concrete floors and exposed ductwork. She's wearing vibrant athletic wear: a teal sports bra and black high-waisted leggings. Her hair is pulled back in a high ponytail, and she has a determined expression on her face. The barbell is chrome with black weight plates. Focus should be on her strength and power. The lighting is bright and slightly diffused, creating a sense of energy and focus. The background is slightly blurred to emphasize the subject. Include subtle sweat glistening on her forehead and arms. The composition should be slightly angled upwards to emphasize her power and the height of the lift. The overall mood is motivational and empowering. The image should be visually appealing and inspiring, encouraging viewers to pursue their own fitness goals."
+  },
+  "timestamp": 1749853562172,
+  "image_path": "ready_post/instagram/test_instagram_user/image_1749853562172.jpg",
+  "image_url": "http://localhost:3002/fix-image/test_instagram_user/image_1749853562172.jpg?platform=instagram",
+  "r2_image_url": "http://localhost:3002/fix-image/test_instagram_user/image_1749853562172.jpg?platform=instagram",
+  "generated_at": "2025-06-13T22:26:02.173Z",
+  "queryUsed": "Create a motivational post about fitness",
+  "status": "new",
+  "platform": "instagram"
+}

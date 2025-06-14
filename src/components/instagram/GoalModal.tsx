@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import axios from 'axios';
+import useFeatureTracking from '../../hooks/useFeatureTracking';
 
 interface GoalModalProps {
   username: string;
@@ -23,7 +24,13 @@ interface CampaignStatus {
   goalFiles?: number;
 }
 
+interface PlatformSpecificStatus {
+  [key: string]: CampaignStatus;
+}
+
+// Platform-isolated Goal Modal - ensures each platform has independent campaign states
 const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram', onClose, onSuccess }) => {
+  const { trackRealCampaign, canUseFeature } = useFeatureTracking();
   const [form, setForm] = useState<GoalForm>({ persona: '', timeline: '', goal: '', instruction: '' });
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -39,16 +46,36 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
   const checkCampaignStatus = async () => {
     setIsCheckingStatus(true);
     try {
+      console.log(`[GoalModal] Checking campaign status for ${username} on ${platform}`);
       const response = await axios.get(`http://localhost:3000/campaign-status/${username}?platform=${platform.toLowerCase()}`);
-      setCampaignStatus(response.data);
+      const statusData = response.data;
       
-      if (response.data.hasActiveCampaign) {
+      console.log(`[GoalModal] Backend response:`, statusData);
+      
+      // Ensure platform isolation - only consider status for the current platform
+      const platformSpecificStatus = {
+        hasActiveCampaign: statusData.hasActiveCampaign && statusData.platform === platform.toLowerCase(),
+        platform: platform.toLowerCase(),
+        username,
+        goalFiles: statusData.goalFiles
+      };
+      
+      console.log(`[GoalModal] Platform-specific status:`, platformSpecificStatus);
+      
+      setCampaignStatus(platformSpecificStatus);
+      
+      if (platformSpecificStatus.hasActiveCampaign) {
         setShowCampaignButton(true);
       }
     } catch (err: any) {
-      console.error('Error checking campaign status:', err);
-      // If there's an error checking status, assume no active campaign
-      setCampaignStatus({ hasActiveCampaign: false, platform: platform.toLowerCase(), username });
+      console.error(`Error checking campaign status for ${platform}:`, err);
+      // If there's an error checking status, assume no active campaign for this platform
+      setCampaignStatus({ 
+        hasActiveCampaign: false, 
+        platform: platform.toLowerCase(), 
+        username,
+        goalFiles: 0 
+      });
     } finally {
       setIsCheckingStatus(false);
     }
@@ -60,16 +87,28 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
+  // Platform-specific validation - only check campaign status for current platform
+  const isCurrentPlatformBlocked = campaignStatus?.hasActiveCampaign && 
+    campaignStatus?.platform === platform.toLowerCase();
+
   const canSubmit =
     !!form.timeline &&
     !!form.goal.trim() &&
     !!form.instruction.trim() &&
     /^\d+$/.test(form.timeline) &&
-    !campaignStatus?.hasActiveCampaign;
+    !isCurrentPlatformBlocked;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
+    
+    // ✅ PRE-ACTION CHECK: Verify campaign limits before proceeding
+    const campaignAccessCheck = canUseFeature('campaigns');
+    if (!campaignAccessCheck.allowed) {
+      setError(campaignAccessCheck.reason || 'Campaigns feature is not available');
+      return;
+    }
+    
     setIsSubmitting(true);
     setError(null);
     try {
@@ -79,6 +118,18 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
         goal: form.goal,
         instruction: form.instruction,
       });
+      
+      // ✅ REAL USAGE TRACKING: Track actual campaign goal submission
+      const trackingSuccess = trackRealCampaign(platform.toLowerCase(), {
+        action: 'goal_set'
+      });
+      
+      if (trackingSuccess) {
+        console.log(`[GoalModal] ✅ Campaign goal tracked: ${platform} goal submission`);
+      } else {
+        console.warn(`[GoalModal] ⚠️ Campaign tracking failed for ${platform}`);
+      }
+      
       setSuccess(true);
       // Show campaign button after successful submission
       setTimeout(() => {
@@ -91,9 +142,14 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
       }
     } catch (err: any) {
       if (err.response?.status === 409) {
-        // Campaign already active
-        setError('You already have an active campaign. Please stop the current campaign before starting a new one.');
-        setCampaignStatus({ hasActiveCampaign: true, platform: platform.toLowerCase(), username });
+        // Campaign already active for this specific platform
+        setError(`You already have an active ${platform} campaign. Please stop the current ${platform} campaign before starting a new one.`);
+        setCampaignStatus({ 
+          hasActiveCampaign: true, 
+          platform: platform.toLowerCase(), 
+          username,
+          goalFiles: campaignStatus?.goalFiles || 0
+        });
         setShowCampaignButton(true);
       } else {
         setError(err.response?.data?.error || 'Failed to save goal.');
@@ -159,8 +215,20 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
       >
         <h2 style={{ color: '#00ffcc', textAlign: 'center', marginBottom: 10 }}>Set Your Goal</h2>
         
-        {/* Campaign Status Warning */}
-        {campaignStatus?.hasActiveCampaign && (
+        {/* Debug Platform Info */}
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '8px',
+          color: '#666',
+          fontSize: '11px',
+          borderBottom: '1px solid #333',
+          marginBottom: '16px'
+        }}>
+          Platform: {platform} | Status: {campaignStatus?.hasActiveCampaign ? 'Campaign Active' : 'No Campaign'} | Backend Platform: {campaignStatus?.platform}
+        </div>
+        
+        {/* Platform-Specific Campaign Status Warning */}
+        {isCurrentPlatformBlocked && (
           <div style={{
             background: 'rgba(255, 193, 7, 0.1)',
             border: '1px solid #ffc107',
@@ -175,7 +243,7 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
               fontSize: '14px',
               fontWeight: '500'
             }}>
-              ⚠️ Stop the campaign to enable the Goal Button.
+              ⚠️ Stop the {platform} campaign to enable the Goal Button.
             </p>
           </div>
         )}
@@ -191,7 +259,7 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
                 onChange={handleChange}
                 className="form-input"
                 placeholder="Whom should I mimic? (e.g. as Account holder)"
-                disabled={campaignStatus?.hasActiveCampaign}
+                disabled={isCurrentPlatformBlocked}
               />
             </div>
             <div className="form-group">
@@ -204,7 +272,7 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
                 className="form-input"
                 placeholder="Days to accomplish (number only)"
                 required
-                disabled={campaignStatus?.hasActiveCampaign}
+                disabled={isCurrentPlatformBlocked}
               />
             </div>
             <div className="form-group">
@@ -217,7 +285,7 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
                 rows={3}
                 placeholder="What do you want to achieve? (e.g. engagement, reach, followers, etc.)"
                 required
-                disabled={campaignStatus?.hasActiveCampaign}
+                disabled={isCurrentPlatformBlocked}
               />
             </div>
             <div className="form-group">
@@ -230,7 +298,7 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
                 rows={3}
                 placeholder="What should be the theme? What should be avoided?"
                 required
-                disabled={campaignStatus?.hasActiveCampaign}
+                disabled={isCurrentPlatformBlocked}
               />
             </div>
             {error && <div className="form-error">{error}</div>}
@@ -248,13 +316,13 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
                 type="submit"
                 className={`insta-btn connect${!canSubmit || isSubmitting ? ' disabled' : ''}`}
                 disabled={!canSubmit || isSubmitting}
-                style={campaignStatus?.hasActiveCampaign ? { 
+                style={isCurrentPlatformBlocked ? { 
                   opacity: 0.5, 
                   cursor: 'not-allowed',
                   background: '#666' 
                 } : {}}
               >
-                {isSubmitting ? 'Saving...' : campaignStatus?.hasActiveCampaign ? 'Campaign Active' : 'Save Goal'}
+                {isSubmitting ? 'Saving...' : isCurrentPlatformBlocked ? `${platform} Campaign Active` : 'Save Goal'}
               </button>
             </div>
           </form>

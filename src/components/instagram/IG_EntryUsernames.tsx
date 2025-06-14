@@ -4,6 +4,7 @@ import './IG_EntryUsernames.css';
 import { motion } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext'; // Fixed import path
+import ProcessingLoadingState from '../common/ProcessingLoadingState';
 
 interface IG_EntryUsernamesProps {
   onSubmitSuccess: (username: string, competitors: string[], accountType: 'branding' | 'non-branding') => void;
@@ -21,6 +22,7 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
   const [postingStyle, setPostingStyle] = useState<string>('');
   const [competitors, setCompetitors] = useState<string[]>(['', '', '']);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
   const [message, setMessage] = useState<string>('');
   const [messageType, setMessageType] = useState<'info' | 'success' | 'error'>('info');
@@ -220,6 +222,60 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
     setTimeout(() => setMessage(''), 5000);
   };
 
+  const handleProcessingComplete = () => {
+    // Check if this was a pending platform to be marked as acquired
+    const pendingKey = `mark_instagram_pending_${currentUser?.uid}`;
+    if (localStorage.getItem(pendingKey)) {
+      // Clear the pending flag
+      localStorage.removeItem(pendingKey);
+      // Mark as acquired
+      localStorage.setItem(`instagram_accessed_${currentUser?.uid}`, 'true');
+      // Save account type for routing purposes
+      localStorage.setItem(`instagram_account_type_${currentUser?.uid}`, accountType);
+    }
+    
+    // Store username for notification counting in main dashboard
+    localStorage.setItem(`instagram_username_${currentUser?.uid}`, username.trim());
+    
+    // Mark Instagram as acquired after successful submission
+    if (markPlatformAccessed) {
+      markPlatformAccessed('instagram');
+    } else {
+      // Fallback if function not provided - update localStorage directly
+      if (currentUser?.uid) {
+        localStorage.setItem(`instagram_accessed_${currentUser.uid}`, 'true');
+        // Save account type for routing purposes
+        localStorage.setItem(`instagram_account_type_${currentUser.uid}`, accountType);
+      }
+    }
+    
+    const finalCompetitors = competitors.map(comp => comp.trim());
+    
+    onSubmitSuccess(
+      username,
+      finalCompetitors,
+      accountType as 'branding' | 'non-branding'
+    );
+    
+    if (accountType === 'branding') {
+      navigate('/dashboard', { 
+        state: { 
+          accountHolder: username, 
+          competitors: finalCompetitors,
+          accountType: 'branding'
+        } 
+      });
+    } else {
+      navigate('/non-branding-dashboard', { 
+        state: { 
+          accountHolder: username,
+          competitors: finalCompetitors,
+          accountType: 'non-branding'
+        } 
+      });
+    }
+  };
+
   const submitData = async () => {
     if (!isValidForSubmission()) {
       showMessage('Please fill in all required fields correctly', 'error');
@@ -256,59 +312,10 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
         });
         
         showMessage('Submission successful', 'success');
-        resetForm();
-
-        // Check if this was a pending platform to be marked as acquired
-        const pendingKey = `mark_instagram_pending_${currentUser.uid}`;
-        if (localStorage.getItem(pendingKey)) {
-          // Clear the pending flag
-          localStorage.removeItem(pendingKey);
-          // Mark as acquired
-          localStorage.setItem(`instagram_accessed_${currentUser.uid}`, 'true');
-          // Save account type for routing purposes
-          localStorage.setItem(`instagram_account_type_${currentUser.uid}`, accountType);
-        }
         
-        // Store username for notification counting in main dashboard
-        localStorage.setItem(`instagram_username_${currentUser.uid}`, username.trim());
-        
-        // Mark Instagram as acquired after successful submission
-        if (markPlatformAccessed) {
-          markPlatformAccessed('instagram');
-        } else {
-          // Fallback if function not provided - update localStorage directly
-          if (currentUser?.uid) {
-            localStorage.setItem(`instagram_accessed_${currentUser.uid}`, 'true');
-            // Save account type for routing purposes
-            localStorage.setItem(`instagram_account_type_${currentUser.uid}`, accountType);
-          }
-        }
-        
-        setTimeout(() => {
-          onSubmitSuccess(
-            username,
-            payload.competitors,
-            accountType as 'branding' | 'non-branding'
-          );
-          
-          if (accountType === 'branding') {
-            navigate('/dashboard', { 
-              state: { 
-                accountHolder: username, 
-                competitors: payload.competitors,
-                accountType: 'branding'
-              } 
-            });
-          } else {
-            navigate('/non-branding-dashboard', { 
-              state: { 
-                accountHolder: username,
-                competitors: payload.competitors, // Always pass competitors
-                accountType: 'non-branding'
-              } 
-            });
-          }
-        }, 1000);
+        // Start the 5-minute processing phase
+        setIsLoading(false);
+        setIsProcessing(true);
       }
     } catch (error: any) {
       console.error('Error submitting data:', error);
@@ -327,6 +334,16 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
           <h1 className="title">Loading...</h1>
         </div>
       </div>
+    );
+  }
+
+  if (isProcessing) {
+    return (
+      <ProcessingLoadingState
+        platform="instagram"
+        username={username}
+        onComplete={handleProcessingComplete}
+      />
     );
   }
 

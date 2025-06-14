@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption:\nTesting, testing, 1, 2, 3! 📸 We're running a quick image display debug test. Let us know in the comments if you can see this post perfectly! 👇 Your feedback helps us keep things running smoothly. ✨\n\nHashtags:\n#debugtest #imagequality #instagramtest #techtesting #socialmediamarketing #digitalmarketing #instatest #feedbackwelcome #communitysupport #testing123\n\nCall to Action:\nLet us know in the comments if the image looks clear and sharp!\n\nVisual Description for Image:\nThe image should be a visually appealing and slightly abstract representation of a computer screen displaying a colorful test pattern. Imagine a vibrant, high-resolution display with a grid of various colors and shapes. The dominant colors should be a mix of blues, greens, yellows, and reds, arranged in a geometric pattern. The pattern should not be overly complex, but rather clean and modern, resembling a stylized debugging screen.\n\nIn the center of the screen, subtly overlay the \"debugtest\" logo in a semi-transparent white or light grey. The logo should be minimalist and modern, not distracting from the overall color pattern. The lighting should be bright and even, giving the image a clean and professional look. The composition should be slightly angled, as if the viewer is looking at the screen from a slight perspective, adding depth.\n\nThe overall mood should be playful and tech-savvy, hinting at the behind-the-scenes work that goes into ensuring a smooth user experience. Add subtle visual cues like pixelated edges or glitch effects in a very controlled and artistic manner to further emphasize the debugging theme. The image should be high-resolution and optimized for Instagram's display, showcasing clarity and sharpness.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.4288170746018215
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 266,
+    "candidatesTokenCount": 362,
+    "totalTokenCount": 628,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 266
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 362
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "3VVNaNa6Ffr3_NUPucOfkAg"
+}

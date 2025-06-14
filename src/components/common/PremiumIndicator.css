@@ -1,0 +1,217 @@
+.premium-indicator {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: linear-gradient(135deg, #ffd700, #ffb300);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  z-index: 10;
+  overflow: hidden;
+}
+
+.premium-indicator:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(255, 215, 0, 0.4);
+  background: linear-gradient(135deg, #ffed4e, #ffc107);
+}
+
+.premium-indicator:active {
+  transform: translateY(0);
+  transition: transform 0.1s;
+}
+
+.premium-indicator.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Size variants */
+.premium-indicator.small {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  border-radius: 8px;
+}
+
+.premium-indicator.medium {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  border-radius: 10px;
+}
+
+.premium-indicator.large {
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  border-radius: 12px;
+}
+
+/* Position variants */
+.premium-indicator.top-right {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+}
+
+.premium-indicator.top-left {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+}
+
+.premium-indicator.bottom-right {
+  position: absolute;
+  bottom: -8px;
+  right: -8px;
+}
+
+.premium-indicator.bottom-left {
+  position: absolute;
+  bottom: -8px;
+  left: -8px;
+}
+
+.premium-indicator.inline {
+  position: relative;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
+}
+
+/* Icon styles */
+.premium-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2em;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+}
+
+.premium-indicator.small .premium-icon {
+  font-size: 1em;
+}
+
+.premium-indicator.large .premium-icon {
+  font-size: 1.4em;
+}
+
+/* Label styles */
+.premium-label {
+  font-weight: 600;
+  color: #1a1a1a;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+}
+
+.premium-indicator.small .premium-label {
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.premium-indicator.large .premium-label {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+/* Glow effect */
+.premium-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle, rgba(255, 215, 0, 0.3) 0%, transparent 70%);
+  border-radius: inherit;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.premium-indicator:hover .premium-glow {
+  opacity: 1;
+  animation: pulse-glow 2s infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.3;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.1);
+    opacity: 0.6;
+  }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .premium-indicator {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.8rem;
+  }
+  
+  .premium-indicator.small {
+    padding: 0.2rem 0.4rem;
+    font-size: 0.7rem;
+  }
+  
+  .premium-indicator.large {
+    padding: 0.6rem 0.8rem;
+    font-size: 0.9rem;
+  }
+}
+
+/* Dark theme support */
+@media (prefers-color-scheme: dark) {
+  .premium-indicator {
+    background: linear-gradient(135deg, #ffa000, #ff8f00);
+    border-color: rgba(255, 160, 0, 0.3);
+  }
+  
+  .premium-indicator:hover {
+    background: linear-gradient(135deg, #ffb300, #ffa000);
+    box-shadow: 0 8px 25px rgba(255, 160, 0, 0.4);
+  }
+  
+  .premium-label {
+    color: #1a1a1a;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.3);
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .premium-indicator {
+    border-width: 2px;
+    border-color: #000;
+  }
+  
+  .premium-label {
+    text-shadow: none;
+    font-weight: 700;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .premium-indicator,
+  .premium-glow {
+    transition: none;
+  }
+  
+  .premium-indicator:hover {
+    transform: none;
+  }
+  
+  @keyframes pulse-glow {
+    0%, 100% {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 0.5;
+    }
+  }
+} 

@@ -913,92 +913,146 @@ app.get('/api/signed-image-url/:username/:imageKey', async (req, res) => {
   }
 });
 
-// Direct R2 Image Renderer - handles JPG images seamlessly from Cloudflare R2
+// Enhanced R2 Image Renderer with white image prevention
 app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
   const { username, imageKey } = req.params;
   const platform = req.query.platform || 'instagram';
+  const forceRefresh = req.query.t || req.query.v || req.query.refresh;
+  
+  // Generate unique cache key for this specific request
+  const cacheKey = `r2_image_${platform}_${username}_${imageKey}_${forceRefresh || 'default'}`;
   
   try {
     // Construct the R2 key path
     const r2Key = `ready_post/${platform}/${username}/${imageKey}`;
     
-    console.log(`[${new Date().toISOString()}] [R2-IMAGE] Fetching image: ${r2Key}`);
+    console.log(`[${new Date().toISOString()}] [R2-IMAGE] Fetching: ${r2Key} (cache key: ${cacheKey})`);
     
-    // Use our existing fetch mechanism with fallbacks
-    const localFallbackPath = path.join(process.cwd(), 'ready_post', platform, username, imageKey);
-    const { data, source } = await fetchImageWithFallbacks(r2Key, localFallbackPath, username, imageKey);
+    // Use enhanced fetch with all fallbacks and validation
+    const { data, source } = await fetchImageWithFallbacks(r2Key, null, username, imageKey);
     
-    // Detect actual image format from the data
-    let contentType = 'image/jpeg'; // Default
-    if (data && data.length > 12) {
-      // Check for WebP signature (RIFF...WEBP)
-      if (data[0] === 0x52 && data[1] === 0x49 && data[2] === 0x46 && data[3] === 0x46 &&
-          data[8] === 0x57 && data[9] === 0x45 && data[10] === 0x42 && data[11] === 0x50) {
-        contentType = 'image/webp';
-      }
-      // Check for JPEG signature (FF D8 FF)
-      else if (data[0] === 0xFF && data[1] === 0xD8 && data[2] === 0xFF) {
+    // CRITICAL: Validate that we actually have image data (prevent white images)
+    if (!data || data.length === 0) {
+      console.error(`[${new Date().toISOString()}] [R2-IMAGE] No image data returned for ${r2Key}`);
+      throw new Error('Empty image data');
+    }
+    
+    // CRITICAL: Validate image format to prevent corrupted/white images
+    let contentType = 'image/jpeg';
+    let isValidImage = false;
+    
+    if (data.length > 12) {
+      // Comprehensive image format detection and validation
+      const firstBytes = data.slice(0, 12);
+      
+      // JPEG validation (FF D8 FF)
+      if (firstBytes[0] === 0xFF && firstBytes[1] === 0xD8 && firstBytes[2] === 0xFF) {
         contentType = 'image/jpeg';
+        isValidImage = true;
+        
+        // Additional JPEG validation - check for valid marker
+        if (firstBytes[3] === 0xE0 || firstBytes[3] === 0xE1 || firstBytes[3] === 0xDB) {
+          console.log(`[${new Date().toISOString()}] [R2-IMAGE] Valid JPEG detected for ${imageKey}`);
+        }
       }
-      // Check for PNG signature (89 50 4E 47)
-      else if (data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4E && data[3] === 0x47) {
+      // PNG validation (89 50 4E 47)
+      else if (firstBytes[0] === 0x89 && firstBytes[1] === 0x50 && firstBytes[2] === 0x4E && firstBytes[3] === 0x47) {
         contentType = 'image/png';
+        isValidImage = true;
+        console.log(`[${new Date().toISOString()}] [R2-IMAGE] Valid PNG detected for ${imageKey}`);
+      }
+      // WebP validation (RIFF...WEBP)
+      else if (firstBytes[0] === 0x52 && firstBytes[1] === 0x49 && firstBytes[2] === 0x46 && firstBytes[3] === 0x46 &&
+               firstBytes[8] === 0x57 && firstBytes[9] === 0x45 && firstBytes[10] === 0x42 && firstBytes[11] === 0x50) {
+        contentType = 'image/webp';
+        isValidImage = true;
+        console.log(`[${new Date().toISOString()}] [R2-IMAGE] Valid WebP detected for ${imageKey}`);
       }
     }
     
-    // Set appropriate headers with detected content type
+    // CRITICAL: If image validation fails, don't serve potentially corrupted data
+    if (!isValidImage) {
+      console.error(`[${new Date().toISOString()}] [R2-IMAGE] Invalid image format detected for ${imageKey}, first 12 bytes:`, Array.from(data.slice(0, 12)).map(b => b.toString(16).padStart(2, '0')).join(' '));
+      throw new Error('Invalid image format detected');
+    }
+    
+    // Minimum size check (prevent tiny corrupted files)
+    if (data.length < 1024) { // Less than 1KB is suspicious for a real image
+      console.warn(`[${new Date().toISOString()}] [R2-IMAGE] Suspiciously small image for ${imageKey}: ${data.length} bytes`);
+      // Don't fail immediately, but log for monitoring
+    }
+    
+    // Set comprehensive headers with validation info
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Length', data.length);
-    res.setHeader('X-Image-Format', contentType.split('/')[1]); // For debugging
+    res.setHeader('X-Image-Format', contentType.split('/')[1]);
+    res.setHeader('X-Image-Source', source);
+    res.setHeader('X-Image-Valid', 'true');
+    res.setHeader('X-Image-Size', data.length.toString());
     
-    // Check if this is a real-time or cache-busting request
-    const isRealTime = req.query.realtime || req.query.nocache || req.query.cb || req.query.updated || req.query.v;
-    
-    if (isRealTime) {
-      // REAL-TIME MODE: Aggressive no-cache for always fresh content
+    // Cache control based on request type
+    if (forceRefresh) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
-      res.setHeader('Last-Modified', new Date().toUTCString());
-      res.setHeader('X-Real-Time', 'true');
-      console.log(`[${new Date().toISOString()}] [R2-IMAGE] REAL-TIME serving for ${imageKey}`);
+      res.setHeader('X-Cache-Mode', 'force-refresh');
     } else {
-      // Normal caching for regular requests  
       res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.setHeader('X-Cache-Mode', 'normal');
     }
     
-    res.setHeader('ETag', `"${imageKey}-${Date.now()}"`);
+    // ETag with validation info
+    const etag = `"${imageKey}-${data.length}-${Date.now()}"`;
+    res.setHeader('ETag', etag);
     res.setHeader('Last-Modified', new Date().toUTCString());
-    res.setHeader('X-Image-Source', source); // For debugging
     
-    // Enable CORS for cross-origin requests
+    // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', '*');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    res.setHeader('Access-Control-Expose-Headers', 'X-Image-Source, ETag, Last-Modified, X-Image-Format');
+    res.setHeader('Access-Control-Expose-Headers', 'X-Image-Source, X-Image-Format, X-Image-Valid, X-Image-Size, X-Cache-Mode');
     
-    // Send the image buffer directly
+    // Send the validated image buffer
     res.send(data);
     
-    console.log(`[${new Date().toISOString()}] [R2-IMAGE] Successfully served: ${r2Key} (${data.length} bytes) from ${source}`);
+    console.log(`[${new Date().toISOString()}] [R2-IMAGE] ✅ Successfully served valid ${contentType.split('/')[1].toUpperCase()}: ${r2Key} (${data.length} bytes) from ${source}`);
     
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] [R2-IMAGE] Error serving image ${username}/${imageKey}:`, error);
+    console.error(`[${new Date().toISOString()}] [R2-IMAGE] ❌ Error serving ${username}/${imageKey}:`, error.message);
     
-    // Generate and send placeholder
+    // Enhanced error response with debugging info
     try {
-      const placeholderImage = generatePlaceholderImage('Image Error');
+      // Generate better placeholder with error context
+      const placeholderImage = generatePlaceholderImage(`Image Error: ${imageKey}`);
       
       res.setHeader('Content-Type', 'image/jpeg');
-      res.setHeader('Cache-Control', 'no-cache, no-store');
+      res.setHeader('Cache-Control', 'no-cache, no-store, max-age=0');
       res.setHeader('X-Image-Source', 'error-placeholder');
+      res.setHeader('X-Image-Valid', 'false');
+      res.setHeader('X-Error-Type', error.message.substring(0, 100));
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      res.setHeader('Access-Control-Expose-Headers', 'X-Image-Source, X-Image-Valid, X-Error-Type');
       
       res.send(placeholderImage);
+      
+      console.log(`[${new Date().toISOString()}] [R2-IMAGE] 🔄 Served error placeholder for ${imageKey}`);
     } catch (placeholderError) {
-      res.status(500).json({ error: 'Failed to retrieve image and generate placeholder' });
+      console.error(`[${new Date().toISOString()}] [R2-IMAGE] 💥 Failed to generate placeholder:`, placeholderError.message);
+      
+      // Ultimate fallback - send minimal valid JPEG
+      const minimalJpeg = Buffer.from([
+        0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01,
+        0x01, 0x01, 0x00, 0x48, 0x00, 0x48, 0x00, 0x00, 0xFF, 0xD9
+      ]);
+      
+      res.setHeader('Content-Type', 'image/jpeg');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('X-Image-Source', 'minimal-fallback');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      
+      res.send(minimalJpeg);
     }
   }
 });
@@ -1865,11 +1919,11 @@ app.post('/api/access-check/:userId', async (req, res) => {
       usageStats = await usageResponse.value.json();
     }
     
-    // If no user data, create default free user
+    // If no user data, create default freemium user
     if (!userData) {
       userData = {
         id: userId,
-        userType: 'free',
+        userType: 'freemium', // Changed from 'free' to 'freemium'
         subscription: {
           planId: 'basic',
           status: 'trial',
@@ -2240,7 +2294,7 @@ app.post('/api/process-payment', async (req, res) => {
     };
     
     // Update subscription
-    userData.userType = planId === 'basic' ? 'free' : planId === 'premium' ? 'premium' : 'enterprise';
+    userData.userType = planId === 'basic' ? 'freemium' : planId === 'premium' ? 'premium' : 'enterprise';
     userData.subscription = {
       planId,
       status: 'active',

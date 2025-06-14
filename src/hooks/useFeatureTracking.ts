@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { useUsage } from '../context/UsageContext';
+import { useUpgradePopup } from '../context/UpgradePopupContext';
 
 type FeatureType = 'posts' | 'discussions' | 'aiReplies' | 'campaigns';
 
@@ -25,8 +26,9 @@ interface UseFeatureTrackingReturn {
   canUseFeature: (feature: FeatureType) => { allowed: boolean; reason?: string };
 }
 
-export const useFeatureTracking = (): UseFeatureTrackingReturn => {
+const useFeatureTracking = (): UseFeatureTrackingReturn => {
   const { trackFeatureUsage, isFeatureBlocked, getUsageForFeature, getUserLimits } = useUsage();
+  const { showUpgradePopup } = useUpgradePopup();
 
   // Core tracking functions (legacy support)
   const trackPost = useCallback(async (platform: string, action: string = 'post_created') => {
@@ -76,7 +78,10 @@ export const useFeatureTracking = (): UseFeatureTrackingReturn => {
   ): Promise<boolean> => {
     try {
       if (isFeatureBlocked('posts')) {
+        const limits = getUserLimits();
+        const currentUsage = getUsageForFeature('posts');
         console.warn(`[FeatureTracking] 🚫 Post creation blocked for ${platform} - limit reached`);
+        showUpgradePopup('posts', currentUsage, limits.posts);
         return false;
       }
       
@@ -90,7 +95,7 @@ export const useFeatureTracking = (): UseFeatureTrackingReturn => {
       console.error(`[FeatureTracking] ❌ Real post tracking failed:`, error);
       return false;
     }
-  }, [trackFeatureUsage, isFeatureBlocked]);
+  }, [trackFeatureUsage, isFeatureBlocked, getUserLimits, getUsageForFeature, showUpgradePopup]);
 
   const trackRealDiscussion = useCallback(async (
     platform: string, 
@@ -98,7 +103,10 @@ export const useFeatureTracking = (): UseFeatureTrackingReturn => {
   ): Promise<boolean> => {
     try {
       if (isFeatureBlocked('discussions')) {
+        const limits = getUserLimits();
+        const currentUsage = getUsageForFeature('discussions');
         console.warn(`[FeatureTracking] 🚫 Discussion blocked for ${platform} - limit reached`);
+        showUpgradePopup('discussions', currentUsage, limits.discussions);
         return false;
       }
       
@@ -112,7 +120,7 @@ export const useFeatureTracking = (): UseFeatureTrackingReturn => {
       console.error(`[FeatureTracking] ❌ Real discussion tracking failed:`, error);
       return false;
     }
-  }, [trackFeatureUsage, isFeatureBlocked]);
+  }, [trackFeatureUsage, isFeatureBlocked, getUserLimits, getUsageForFeature, showUpgradePopup]);
 
   const trackRealAIReply = useCallback(async (
     platform: string, 
@@ -120,7 +128,10 @@ export const useFeatureTracking = (): UseFeatureTrackingReturn => {
   ): Promise<boolean> => {
     try {
       if (isFeatureBlocked('aiReplies')) {
+        const limits = getUserLimits();
+        const currentUsage = getUsageForFeature('aiReplies');
         console.warn(`[FeatureTracking] 🚫 AI Reply blocked for ${platform} - limit reached`);
+        showUpgradePopup('aiReplies', currentUsage, limits.aiReplies);
         return false;
       }
       
@@ -133,7 +144,7 @@ export const useFeatureTracking = (): UseFeatureTrackingReturn => {
       console.error(`[FeatureTracking] ❌ Real AI reply tracking failed:`, error);
       return false;
     }
-  }, [trackFeatureUsage, isFeatureBlocked]);
+  }, [trackFeatureUsage, isFeatureBlocked, getUserLimits, getUsageForFeature, showUpgradePopup]);
 
   const trackRealCampaign = useCallback(async (
     platform: string, 
@@ -141,7 +152,10 @@ export const useFeatureTracking = (): UseFeatureTrackingReturn => {
   ): Promise<boolean> => {
     try {
       if (isFeatureBlocked('campaigns')) {
+        const limits = getUserLimits();
+        const currentUsage = getUsageForFeature('campaigns');
         console.warn(`[FeatureTracking] 🚫 Campaign blocked for ${platform} - premium feature required`);
+        showUpgradePopup('campaigns', currentUsage, limits.campaigns);
         return false;
       }
       
@@ -154,7 +168,7 @@ export const useFeatureTracking = (): UseFeatureTrackingReturn => {
       console.error(`[FeatureTracking] ❌ Real campaign tracking failed:`, error);
       return false;
     }
-  }, [trackFeatureUsage, isFeatureBlocked]);
+  }, [trackFeatureUsage, isFeatureBlocked, getUserLimits, getUsageForFeature, showUpgradePopup]);
 
   // Pre-action checking
   const canUseFeature = useCallback((feature: FeatureType): { allowed: boolean; reason?: string } => {

@@ -138,6 +138,7 @@ export const useAccessControl = () => {
   const isAdmin = accessState.user?.userType === 'admin';
   const isPremium = accessState.user?.userType === 'premium' || isAdmin;
   const isFree = accessState.user?.userType === 'free' || !accessState.user?.userType;
+  const isFreemium = accessState.user?.userType === 'freemium';
   const isTrialActive = accessState.user?.isTrialActive && accessState.user?.trialEndsAt ? 
     new Date(accessState.user.trialEndsAt) > new Date() : false;
 

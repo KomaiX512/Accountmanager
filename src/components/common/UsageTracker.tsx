@@ -9,7 +9,10 @@ const UsageTracker: React.FC = () => {
   const { currentUser } = useAuth();
   const [showDetails, setShowDetails] = useState(false);
   const [showTestSection, setShowTestSection] = useState(false);
+  const [showDebugSection, setShowDebugSection] = useState(false);
   const [testingFeature, setTestingFeature] = useState<string | null>(null);
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
+  const [realTimeTracking, setRealTimeTracking] = useState<boolean>(true);
 
   const limits = getUserLimits();
 
@@ -41,6 +44,45 @@ const UsageTracker: React.FC = () => {
     }
   };
 
+  // Debug log function
+  const addDebugLog = (message: string) => {
+    const timestamp = new Date().toLocaleTimeString();
+    const logEntry = `[${timestamp}] ${message}`;
+    setDebugLogs(prev => [logEntry, ...prev.slice(0, 19)]); // Keep last 20 logs
+    console.log(`[UsageTracker-Debug] ${message}`);
+  };
+
+  // Real-time tracking monitor
+  useEffect(() => {
+    if (!currentUser?.uid || !realTimeTracking) return;
+
+    const handleUsageUpdate = (event: any) => {
+      addDebugLog(`🔄 Cross-tab usage update detected: ${JSON.stringify(event.detail.usage)}`);
+    };
+
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key?.includes(`usage_${currentUser.uid}`) && event.newValue) {
+        addDebugLog(`📱 LocalStorage usage change: ${event.key} -> ${event.newValue}`);
+      }
+    };
+
+    window.addEventListener('usageUpdated', handleUsageUpdate);
+    window.addEventListener('storage', handleStorageChange);
+    
+    addDebugLog(`🚀 Real-time tracking monitor started for user ${currentUser.uid}`);
+    
+    return () => {
+      window.removeEventListener('usageUpdated', handleUsageUpdate);
+      window.removeEventListener('storage', handleStorageChange);
+      addDebugLog(`🛑 Real-time tracking monitor stopped`);
+    };
+  }, [currentUser?.uid, realTimeTracking]);
+
+  // Monitor usage changes
+  useEffect(() => {
+    addDebugLog(`📊 Usage updated: Posts=${usage.posts}, Discussions=${usage.discussions}, AI Replies=${usage.aiReplies}, Campaigns=${usage.campaigns}`);
+  }, [usage]);
+
   // Test function to validate tracking system
   const testFeatureTracking = async (feature: 'posts' | 'discussions' | 'aiReplies' | 'campaigns') => {
     if (!currentUser?.uid) {
@@ -49,25 +91,64 @@ const UsageTracker: React.FC = () => {
     }
 
     setTestingFeature(feature);
+    addDebugLog(`🧪 Starting ${feature} tracking test...`);
     
     try {
-      console.log(`[UsageTracker] 🧪 Testing ${feature} tracking...`);
+      const beforeUsage = usage[feature];
+      addDebugLog(`📈 Before test: ${feature} = ${beforeUsage}`);
       
       await trackFeatureUsage(feature, 'test_platform', 'manual_test');
       
-      console.log(`[UsageTracker] ✅ ${feature} tracking test successful!`);
+      addDebugLog(`✅ ${feature} tracking API call successful!`);
       
       // Refresh usage to show updated counts
-      setTimeout(() => {
-        refreshUsage();
-      }, 1000);
+      setTimeout(async () => {
+        await refreshUsage();
+        const afterUsage = usage[feature];
+        addDebugLog(`📈 After refresh: ${feature} = ${afterUsage} (Expected: ${beforeUsage + 1})`);
+        
+        if (afterUsage === beforeUsage + 1) {
+          addDebugLog(`🎉 ${feature} tracking test PASSED! Counter incremented correctly.`);
+        } else {
+          addDebugLog(`❌ ${feature} tracking test FAILED! Counter should be ${beforeUsage + 1} but is ${afterUsage}`);
+        }
+      }, 2000);
       
     } catch (error) {
       console.error(`[UsageTracker] ❌ ${feature} tracking test failed:`, error);
+      addDebugLog(`❌ ${feature} tracking test failed: ${error}`);
       alert(`${feature} tracking test failed. Check console for details.`);
     } finally {
       setTestingFeature(null);
     }
+  };
+
+  // Debug backend connection
+  const testBackendConnection = async () => {
+    if (!currentUser?.uid) {
+      addDebugLog('❌ No current user for backend test');
+      return;
+    }
+
+    addDebugLog('🔗 Testing backend connection...');
+    
+    try {
+      const response = await fetch(`http://localhost:3002/api/user/${currentUser.uid}/usage`);
+      if (response.ok) {
+        const backendUsage = await response.json();
+        addDebugLog(`✅ Backend connected! Usage: ${JSON.stringify(backendUsage)}`);
+      } else {
+        addDebugLog(`❌ Backend response error: ${response.status} ${response.statusText}`);
+      }
+    } catch (error) {
+      addDebugLog(`❌ Backend connection failed: ${error}`);
+    }
+  };
+
+  // Clear debug logs
+  const clearDebugLogs = () => {
+    setDebugLogs([]);
+    addDebugLog('🧹 Debug logs cleared');
   };
 
   const features = [
@@ -109,6 +190,17 @@ const UsageTracker: React.FC = () => {
           ✅ Connected to actual platform features - tracking system active!
           {isLoading && <span className="loading-indicator"> 🔄 Syncing...</span>}
         </p>
+        <div className="tracking-status">
+          <span className={`status-indicator ${realTimeTracking ? 'active' : 'inactive'}`}>
+            {realTimeTracking ? '🟢 Real-time ON' : '🔴 Real-time OFF'}
+          </span>
+          <button 
+            className="toggle-tracking-btn"
+            onClick={() => setRealTimeTracking(!realTimeTracking)}
+          >
+            {realTimeTracking ? 'Disable' : 'Enable'} Monitoring
+          </button>
+        </div>
       </div>
 
       <div className="usage-grid">
@@ -196,6 +288,58 @@ const UsageTracker: React.FC = () => {
         >
           {showTestSection ? '🔼 Hide Tests' : '🧪 Test Tracking System'}
         </motion.button>
+
+        <motion.button
+          className="debug-toggle"
+          onClick={() => setShowDebugSection(!showDebugSection)}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          style={{ 
+            background: 'linear-gradient(135deg, #667eea, #764ba2)',
+            marginLeft: '10px'
+          }}
+        >
+          {showDebugSection ? '🔼 Hide Debug' : '🔍 Debug Tracking'}
+        </motion.button>
+
+        <AnimatePresence>
+          {showDebugSection && (
+            <motion.div
+              className="debug-section"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <h4>🔍 Real-Time Tracking Debug Console</h4>
+              <div className="debug-controls">
+                <button onClick={testBackendConnection} className="debug-btn">
+                  🔗 Test Backend Connection
+                </button>
+                <button onClick={clearDebugLogs} className="debug-btn">
+                  🧹 Clear Logs
+                </button>
+                <button onClick={() => refreshUsage()} className="debug-btn">
+                  🔄 Force Refresh Usage
+                </button>
+              </div>
+              <div className="debug-logs">
+                <h5>📋 Debug Logs (Live):</h5>
+                <div className="logs-container">
+                  {debugLogs.length === 0 ? (
+                    <div className="no-logs">No debug logs yet. Perform some actions to see tracking in real-time!</div>
+                  ) : (
+                    debugLogs.map((log, index) => (
+                      <div key={index} className={`log-entry ${log.includes('❌') ? 'error' : log.includes('✅') ? 'success' : 'info'}`}>
+                        {log}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <AnimatePresence>
           {showTestSection && (

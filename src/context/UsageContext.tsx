@@ -148,7 +148,7 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
 
   const getUserLimits = useCallback(() => {
     // Get user type from UserService or localStorage
-    const userType = localStorage.getItem(`userType_${currentUser?.uid}`) || 'free';
+    const userType = localStorage.getItem(`userType_${currentUser?.uid}`) || 'freemium';
     
     switch (userType) {
       case 'premium':
@@ -164,6 +164,13 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
           discussions: -1, // unlimited
           aiReplies: -1, // unlimited
           campaigns: -1 // unlimited
+        };
+      case 'freemium':
+        return {
+          posts: 5,
+          discussions: 10,
+          aiReplies: 5,
+          campaigns: 1
         };
       default: // free
         return {

@@ -51,8 +51,8 @@
 }
 
 @keyframes pulse {
-  0%, 100% { transform: rotate(0deg); opacity: 0.3; }
-  50% { transform: rotate(360deg); opacity: 0.6; }
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.6; }
 }
 
 .welcome-message {
@@ -697,6 +697,14 @@
   gap: 16px;
 }
 
+/* Ensure platform icons never rotate or animate */
+.platform-row .platform-icon,
+.platform-row .platform-icon img {
+  animation: none !important;
+  transform: none !important;
+  transition: none !important;
+}
+
 .platform-row:hover {
   background: rgba(255, 255, 255, 0.08);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
@@ -725,17 +733,25 @@
 }
 
 .platform-icon {
-  width: 42px;
-  height: 42px;
+  width: 60px;
+  height: 60px;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: none !important;
+  transform: none !important;
 }
 
 .platform-icon img {
-  width: 100%;
-  height: 100%;
+  width: 52px;
+  height: 52px;
   object-fit: contain;
-  border-radius: 8px;
+  border-radius: 10px;
   filter: drop-shadow(0 0 5px rgba(0, 255, 204, 0.5));
+  animation: none !important;
+  transform: none !important;
+  transition: none !important;
 }
 
 .platform-name {

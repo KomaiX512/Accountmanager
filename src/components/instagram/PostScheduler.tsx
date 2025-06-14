@@ -84,6 +84,20 @@ const PostScheduler: React.FC<PostSchedulerProps> = ({ userId, onClose, platform
 
     setIsSubmitting(true);
     try {
+      // ✅ REAL USAGE TRACKING: Check limits BEFORE scheduling post
+      const trackingSuccess = await trackRealPostCreation(platform, {
+        scheduled: true,
+        immediate: false,
+        type: 'single_platform_scheduled'
+      });
+      
+      if (!trackingSuccess) {
+        console.warn(`[PostScheduler] 🚫 Post scheduling blocked for ${platform} - limit reached`);
+        setError('Post limit reached - upgrade to continue');
+        setIsSubmitting(false);
+        return;
+      }
+      
       // Use smart reusable schedule helper
       const result = await schedulePost({
         platform,
@@ -96,20 +110,7 @@ const PostScheduler: React.FC<PostSchedulerProps> = ({ userId, onClose, platform
       
       if (result.success) {
         console.log(`[${new Date().toISOString()}] Post scheduled successfully for user ${userIdToUse} on ${platform}`);
-        
-        // ✅ REAL USAGE TRACKING: Track actual post scheduling
-        const trackingSuccess = trackRealPostCreation(platform, {
-          scheduled: true,
-          immediate: false,
-          type: 'single_platform_scheduled'
-        });
-        
-        if (trackingSuccess) {
-          console.log(`[PostScheduler] ✅ Usage tracked: ${platform} post scheduled`);
-        } else {
-          console.warn(`[PostScheduler] ⚠️ Usage tracking failed for ${platform}, but post was scheduled`);
-        }
-        
+        console.log(`[PostScheduler] ✅ Usage tracked: ${platform} post scheduled`);
         setError(null);
         onClose();
       } else {

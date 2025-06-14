@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption:\nTesla's not just a car, it's a rocketship on wheels! 🚀 Huge thanks to @safdar for the incredible work on the latest software update. Driving the future, one line of code at a time. ⚡️\n\nHashtags:\n#Tesla #EV #Innovation\n\nCall to Action:\nWhat's your favorite Tesla feature? Let us know! 👇\n\nVisual Description for Image:\nThe image should be a dynamic, eye-catching shot of a Tesla Model S Plaid accelerating on a winding coastal highway at sunset. The car is a deep crimson red, gleaming under the golden light. The background features the Pacific Ocean, with waves crashing against the rocky shoreline. The sky is a vibrant mix of orange, pink, and purple hues. The camera angle is low and slightly to the side, emphasizing the car's speed and sleek design. Motion blur should be subtly applied to the wheels and background to convey a sense of movement. The overall mood is exhilarating and futuristic. In the foreground, a faint holographic display emanates from the dashboard, showcasing complex data visualizations related to the car's performance. The style should be hyperrealistic with a touch of cinematic flair, reminiscent of a high-budget car commercial. The lighting should be dramatic, with strong contrasts between light and shadow. The composition should be balanced and visually appealing, drawing the viewer's eye to the Tesla as the central focus. The image should evoke feelings of freedom, innovation, and the thrill of driving.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.2909171884145333
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 291,
+    "candidatesTokenCount": 307,
+    "totalTokenCount": 598,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 291
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 307
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "xH1NaK3rLtrD1PIPkKS2oAw"
+}

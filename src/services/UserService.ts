@@ -145,7 +145,7 @@ class UserService {
       id: userId,
       email: '',
       displayName: '',
-      userType: 'free',
+      userType: 'freemium',
       subscription: {
         planId: 'basic',
         status: 'trial',

@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption:\nGlow up, glow getter! ✨ Get ready to unleash your inner radiance with our iconic Killawatt Freestyle Highlighter. What's your go-to shade for that Fenty Face finish? 👇 Tell us in the comments!\n\nHashtags:\n#fentybeauty #killawatt #highlighter #glowup #makeup #beauty #rihanna #fentyface #cosmetics #makeupaddict\n\nCall to Action:\nComment your fave Killawatt shade below! 👇\n\nVisual Description for Image:\nClose-up shot of a woman's face, showcasing a flawless Fenty Face. The focus is on the cheekbones, highlighted with a shimmering Killawatt Freestyle Highlighter in the shade \"Trophy Wife.\" The skin is smooth and radiant, with a natural-looking foundation and subtle contouring. The woman has a warm, golden skin tone. Her eyes are lightly made up with neutral eyeshadows and defined lashes. Her lips are nude and glossy. The background is a soft, blurred gradient of gold and bronze, mimicking the highlighter's shimmer. The lighting is soft and diffused, creating a luminous effect. The overall mood is luxurious, confident, and effortlessly chic. The image should be high-resolution and professionally lit, with a shallow depth of field to keep the focus on the highlighted cheekbone. The composition should be slightly asymmetrical, with the woman's face angled towards the light. The style is modern and glamorous, reflecting the Fenty Beauty brand aesthetic. The image should evoke a sense of aspiration and inspire viewers to recreate the look.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.3028917964200796
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 272,
+    "candidatesTokenCount": 322,
+    "totalTokenCount": 594,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 272
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 322
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "DH1NaJ3OKfr3_NUPucOfkAg"
+}

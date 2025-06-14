@@ -1,0 +1,195 @@
+/* Chat Modal Styles - Real-time Tracking Updates */
+
+.chat-input-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 8px;
+}
+
+.chat-input-footer small {
+  color: #a0a0cc;
+  font-size: 0.75rem;
+}
+
+.real-time-tracking-indicator {
+  color: #00ffcc;
+  font-size: 0.75rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.platform-badge {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.chat-header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chat-header-info h3 {
+  margin: 0;
+  color: #e0e0ff;
+  font-size: 1.1rem;
+}
+
+.chat-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.linked-accounts-toggle {
+  background: rgba(0, 255, 204, 0.1);
+  border: 1px solid rgba(0, 255, 204, 0.3);
+  color: #00ffcc;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.linked-accounts-toggle:hover {
+  background: rgba(0, 255, 204, 0.2);
+  border-color: #00ffcc;
+}
+
+.linked-accounts-panel {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 12px 20px;
+  background: rgba(0, 255, 204, 0.05);
+}
+
+.linked-accounts-panel h4 {
+  margin: 0 0 8px 0;
+  color: #00ffcc;
+  font-size: 0.9rem;
+}
+
+.linked-accounts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.linked-account-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+.account-platform {
+  background: #667eea;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  text-transform: capitalize;
+}
+
+.account-username {
+  color: #e0e0ff;
+  font-weight: 500;
+}
+
+.account-added-at {
+  color: #a0a0cc;
+  margin-left: auto;
+}
+
+.welcome-message {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.welcome-message h4 {
+  color: #00ffcc;
+  margin: 0 0 8px 0;
+  font-size: 1.2rem;
+}
+
+.welcome-message p {
+  color: #a0a0cc;
+  margin: 0 0 16px 0;
+  line-height: 1.5;
+}
+
+.tracking-info {
+  background: rgba(0, 255, 204, 0.1);
+  border: 1px solid rgba(0, 255, 204, 0.3);
+  border-radius: 8px;
+  padding: 12px;
+  color: #00ffcc;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.message.processing .message-content {
+  opacity: 0.8;
+  font-style: italic;
+}
+
+.typing-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: 8px;
+}
+
+.typing-indicator span {
+  width: 4px;
+  height: 4px;
+  background: #00ffcc;
+  border-radius: 50%;
+  animation: typing-pulse 1.4s infinite ease-in-out;
+}
+
+.typing-indicator span:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.typing-indicator span:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes typing-pulse {
+  0%, 80%, 100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.btn-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+} 

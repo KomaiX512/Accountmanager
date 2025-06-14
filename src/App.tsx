@@ -18,6 +18,7 @@ import PricingPage from './components/pricing/PricingPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { InstagramProvider } from './context/InstagramContext';
 import { UsageProvider } from './context/UsageContext';
+import { UpgradePopupProvider } from './context/UpgradePopupContext';
 import { TwitterProvider } from './context/TwitterContext';
 import { FacebookProvider } from './context/FacebookContext';
 import axios from 'axios';
@@ -33,13 +34,15 @@ const App: React.FC = () => {
   return (
     <AuthProvider>
       <UsageProvider>
-      <InstagramProvider>
-        <TwitterProvider>
-          <FacebookProvider>
-            <AppContent />
-          </FacebookProvider>
-        </TwitterProvider>
-      </InstagramProvider>
+        <UpgradePopupProvider>
+          <InstagramProvider>
+            <TwitterProvider>
+              <FacebookProvider>
+                <AppContent />
+              </FacebookProvider>
+            </TwitterProvider>
+          </InstagramProvider>
+        </UpgradePopupProvider>
       </UsageProvider>
     </AuthProvider>
   );
@@ -584,14 +587,19 @@ const AppContent: React.FC = () => {
                     RagService.saveConversation(accountHolder, updatedMessages, chatModalData.platform)
                       .catch((err: any) => console.error('Error saving conversation:', err));
                   })
-                  .catch((error: any) => {
-                    console.error('Error with chat message:', error);
-                    // Remove loading state on error
+                  .catch((err: any) => {
+                    console.error('Error in discussion query:', err);
                     setChatModalData(prev => ({
                       ...prev,
                       isProcessing: false
                     }));
                   });
+              }).catch((err: any) => {
+                console.error('Error loading RagService:', err);
+                setChatModalData(prev => ({
+                  ...prev,
+                  isProcessing: false
+                }));
               });
             }}
           />

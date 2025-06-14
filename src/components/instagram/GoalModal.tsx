@@ -119,16 +119,19 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
         instruction: form.instruction,
       });
       
-      // ✅ REAL USAGE TRACKING: Track actual campaign goal submission
+      // ✅ REAL USAGE TRACKING: Check limits BEFORE setting campaign goal
       const trackingSuccess = trackRealCampaign(platform.toLowerCase(), {
         action: 'goal_set'
       });
       
-      if (trackingSuccess) {
-        console.log(`[GoalModal] ✅ Campaign goal tracked: ${platform} goal submission`);
-      } else {
-        console.warn(`[GoalModal] ⚠️ Campaign tracking failed for ${platform}`);
+      if (!trackingSuccess) {
+        console.warn(`[GoalModal] 🚫 Campaign goal blocked for ${platform} - limit reached`);
+        setError('Campaign limit reached - upgrade to continue');
+        setIsSubmitting(false);
+        return;
       }
+      
+      console.log(`[GoalModal] ✅ Campaign goal tracked: ${platform} goal submission`);
       
       setSuccess(true);
       // Show campaign button after successful submission

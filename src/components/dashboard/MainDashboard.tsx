@@ -15,6 +15,7 @@ import UsageDashboard from './UsageDashboard';
 
 import { schedulePost } from '../../utils/scheduleHelpers';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
+import { useUsage } from '../../context/UsageContext';
 
 interface PlatformData {
   id: string;
@@ -53,6 +54,7 @@ const MainDashboard: React.FC = () => {
   const { isConnected: isFacebookConnected, userId: facebookUserId, hasAccessed: hasAccessedFacebook = false } = useFacebook();
   const { currentUser } = useAuth();
   const { trackRealPostCreation, canUseFeature } = useFeatureTracking();
+  const { usage, getUserLimits } = useUsage();
   const [userName, setUserName] = useState<string>('');
   const [showInstantPostModal, setShowInstantPostModal] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -61,6 +63,17 @@ const MainDashboard: React.FC = () => {
   // Platform-specific modals
   const [showInstagramScheduler, setShowInstagramScheduler] = useState<boolean>(false);
   const [showTwitterComposer, setShowTwitterComposer] = useState<boolean>(false);
+  
+  // AI Autonomous Account Manager wishlist state
+  const [isWishlistAdded, setIsWishlistAdded] = useState<boolean>(false);
+  
+  // Platform time tracking state
+  const [platformTimeData, setPlatformTimeData] = useState<Record<string, number>>({
+    instagram: 0,
+    twitter: 0,
+    facebook: 0,
+    linkedin: 0
+  });
   
   // Real-time notification counts
   const [realTimeNotifications, setRealTimeNotifications] = useState<Record<string, number>>({
@@ -84,7 +97,69 @@ const MainDashboard: React.FC = () => {
     platformIds: [],
     scheduleDate: null
   });
-  
+
+  // Load wishlist state from localStorage
+  useEffect(() => {
+    if (currentUser?.uid) {
+      const wishlistKey = `ai_manager_wishlist_${currentUser.uid}`;
+      const saved = localStorage.getItem(wishlistKey);
+      setIsWishlistAdded(saved === 'true');
+    }
+  }, [currentUser?.uid]);
+
+  // Simulate platform time tracking - in a real app, this would come from actual usage data
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+    
+    const loadPlatformTimeData = () => {
+      const platforms = ['instagram', 'twitter', 'facebook', 'linkedin'];
+      const timeData: Record<string, number> = {};
+      
+      platforms.forEach(platform => {
+        // Get platform access status
+        const isAccessed = localStorage.getItem(`${platform}_accessed_${currentUser.uid}`) === 'true';
+        
+        if (isAccessed) {
+          // Simulate time spent based on platform activity
+          const baseTime = Math.floor(Math.random() * 120) + 30; // 30-150 minutes
+          const storageKey = `platform_time_${platform}_${currentUser.uid}`;
+          
+          // Check if we have stored time, otherwise generate new
+          const storedTime = localStorage.getItem(storageKey);
+          if (storedTime) {
+            timeData[platform] = parseInt(storedTime);
+          } else {
+            timeData[platform] = baseTime;
+            localStorage.setItem(storageKey, baseTime.toString());
+          }
+        } else {
+          timeData[platform] = 0;
+        }
+      });
+      
+      setPlatformTimeData(timeData);
+    };
+    
+    loadPlatformTimeData();
+    
+    // Update time data every minute when platforms are active
+    const interval = setInterval(() => {
+      const platforms = ['instagram', 'twitter', 'facebook', 'linkedin'];
+      platforms.forEach(platform => {
+        const isAccessed = localStorage.getItem(`${platform}_accessed_${currentUser.uid}`) === 'true';
+        if (isAccessed) {
+          const storageKey = `platform_time_${platform}_${currentUser.uid}`;
+          const currentTime = parseInt(localStorage.getItem(storageKey) || '0');
+          const newTime = currentTime + Math.floor(Math.random() * 3); // Add 0-2 minutes randomly
+          localStorage.setItem(storageKey, newTime.toString());
+          setPlatformTimeData(prev => ({ ...prev, [platform]: newTime }));
+        }
+      });
+    }, 60000); // Update every minute
+    
+    return () => clearInterval(interval);
+  }, [currentUser?.uid]);
+
   // Fetch user's name from authentication
   useEffect(() => {
     if (currentUser) {
@@ -771,6 +846,60 @@ const MainDashboard: React.FC = () => {
     }
   };
 
+  // Handle AI Manager wishlist action
+  const handleWishlistClick = () => {
+    if (isWishlistAdded || !currentUser?.uid) return;
+    
+    const wishlistKey = `ai_manager_wishlist_${currentUser.uid}`;
+    localStorage.setItem(wishlistKey, 'true');
+    setIsWishlistAdded(true);
+    
+    // Show confirmation with fade out
+    const confirmation = document.createElement('div');
+    confirmation.textContent = 'Added to wishlist. Thank you!';
+    confirmation.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 255, 204, 0.9);
+      color: #1a1a3a;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 600;
+      z-index: 10000;
+      animation: fadeInOut 3s forwards;
+    `;
+    
+    // Add CSS animation
+    if (!document.getElementById('wishlist-styles')) {
+      const style = document.createElement('style');
+      style.id = 'wishlist-styles';
+      style.textContent = `
+        @keyframes fadeInOut {
+          0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+          20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+          80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+          100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+    
+    document.body.appendChild(confirmation);
+    setTimeout(() => {
+      if (document.body.contains(confirmation)) {
+        document.body.removeChild(confirmation);
+      }
+    }, 3000);
+  };
+
+  // Calculate total API calls for the usage section
+  const getTotalApiCalls = () => {
+    const limits = getUserLimits();
+    return usage.posts + usage.aiReplies + usage.discussions;
+  };
+
   return (
     <div className="dashboard-page">
       <div className="welcome-banner">
@@ -811,7 +940,7 @@ const MainDashboard: React.FC = () => {
               >
                 <div className="instant-post-icon">
                   <svg viewBox="0 0 24 24">
-                    <path d="M18,6V17.5A3.5,3.5 0 0,1 14.5,21A3.5,3.5 0 0,1 11,17.5A3.5,3.5 0 0,1 14.5,14C15,14 15.5,14.1 16,14.3V7.8L8,10V15.5A3.5,3.5 0 0,1 4.5,19A3.5,3.5 0 0,1 1,15.5A3.5,3.5 0 0,1 4.5,12C5,12 5.5,12.1 6,12.3V7L18,4Z" />
+                    <path d="M3,20V4A1,1 0 0,1 4,3H20A1,1 0 0,1 21,4V20A1,1 0 0,1 20,21H4A1,1 0 0,1 3,20M5,19H19V5H5V19M7.5,17L9.5,14L11.5,16.5L14.5,12.5L18.5,17H7.5Z" />
                   </svg>
                 </div>
                 <div className="instant-post-text">
@@ -825,6 +954,30 @@ const MainDashboard: React.FC = () => {
                 )}
               </button>
             </div>
+
+            {/* AI Autonomous Account Manager Preview Section */}
+            <div className="ai-manager-preview-section">
+              <div className="ai-manager-preview">
+                <div className="ai-manager-content">
+                  <div className="ai-manager-icon">
+                    <svg viewBox="0 0 24 24">
+                      <path d="M12,2A2,2 0 0,1 14,4C14,4.74 13.6,5.39 13,5.73V7H14A7,7 0 0,1 21,14H22A1,1 0 0,1 23,15V18A1,1 0 0,1 22,19H21V20A2,2 0 0,1 19,22H5A2,2 0 0,1 3,20V19H2A1,1 0 0,1 1,18V15A1,1 0 0,1 2,14H3A7,7 0 0,1 10,7H11V5.73C10.4,5.39 10,4.74 10,4A2,2 0 0,1 12,2M7.5,13A2.5,2.5 0 0,0 5,15.5A2.5,2.5 0 0,0 7.5,18A2.5,2.5 0 0,0 10,15.5A2.5,2.5 0 0,0 7.5,13M16.5,13A2.5,2.5 0 0,0 14,15.5A2.5,2.5 0 0,0 16.5,18A2.5,2.5 0 0,0 19,15.5A2.5,2.5 0 0,0 16.5,13Z" />
+                    </svg>
+                  </div>
+                  <div className="ai-manager-text">
+                    <h3>AI Autonomous Account Manager</h3>
+                    <p>Delegate campaigns, real-time tasks, or engagement workflows to your AI Manager—seamlessly autonomous.</p>
+                  </div>
+                </div>
+                <button 
+                  className={`wishlist-button ${isWishlistAdded ? 'added' : ''}`}
+                  onClick={handleWishlistClick}
+                  disabled={isWishlistAdded}
+                >
+                  {isWishlistAdded ? '✓ Added to Wishlist' : '+ Add to Wishlist'}
+                </button>
+              </div>
+            </div>
             
             <div className="platforms-container">
               {sortedPlatforms.map(platform => (
@@ -836,7 +989,7 @@ const MainDashboard: React.FC = () => {
                     className="clickable-area"
                     onClick={() => platform.claimed ? navigateToPlatform(platform) : navigateToSetup(platform.id)}
                   >
-                    <div className="platform-icon">
+                    <div className="platform-icon reduced">
                       <img 
                         src={platform.icon} 
                         alt={`${platform.name} icon`}
@@ -855,7 +1008,7 @@ const MainDashboard: React.FC = () => {
                   </div>
                   
                   <div className="platform-info">
-                    <div className="status-indicators">
+                    <div className="status-indicators aligned">
                       <div 
                         className={`status-indicator ${platform.claimed ? 'claimed' : 'unclaimed'}`}
                       >
@@ -863,11 +1016,11 @@ const MainDashboard: React.FC = () => {
                       </div>
                       
                       <div 
-                        className={`connection-indicator ${platform.connected ? 'connected' : 'disconnected'}`}
-                        onClick={() => !platform.connected && handleConnectionButtonClick(platform)}
-                        style={{ cursor: platform.connected ? 'default' : 'pointer' }}
+                        className={`connection-indicator ${platform.connected ? 'connected' : 'disconnected'} ${platform.id === 'linkedin' && !platform.connected ? 'coming-soon' : ''}`}
+                        onClick={() => !platform.connected && platform.id !== 'linkedin' && handleConnectionButtonClick(platform)}
+                        style={{ cursor: platform.connected || platform.id === 'linkedin' ? 'default' : 'pointer' }}
                       >
-                        {platform.connected ? 'Connected' : 'Connect'}
+                        {platform.id === 'linkedin' && !platform.connected ? 'Coming Soon' : platform.connected ? 'Connected' : 'Connect'}
                       </div>
                     </div>
                   </div>
@@ -941,40 +1094,55 @@ const MainDashboard: React.FC = () => {
               </div>
               
               <div className="usage-stat">
-                <div className="stat-icon posts">
+                <div className="stat-icon api">
                   <svg viewBox="0 0 24 24">
-                    <path d="M20,2H4A2,2 0 0,0 2,4V22L6,18H20A2,2 0 0,0 22,16V4A2,2 0 0,0 20,2M6,9H18V11H6M14,14H6V12H14M18,8H6V6H18" />
+                    <path d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.67 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z" />
                   </svg>
                 </div>
                 <div className="stat-details">
-                  <h4>Created Posts</h4>
-                  <p className="stat-value">{
-                    platforms.filter(p => p.claimed).reduce((total, p) => {
-                      return total + p.notifications.breakdown.cooked_posts;
-                    }, 0)
-                  }</p>
+                  <h4>Total API Calls</h4>
+                  <p className="stat-value">{getTotalApiCalls().toLocaleString()}</p>
                 </div>
               </div>
               
               <div className="usage-stat">
-                <div className="stat-icon ai">
+                <div className="stat-icon ai inactive">
                   <svg viewBox="0 0 24 24">
                     <path d="M21,15.61L19.59,17.02L17.7,15.13L16.29,16.54L18.17,18.44L16.76,19.85L14.87,17.95L13.46,19.36L15.35,21.25L13.94,22.66L9.17,17.88L17.88,9.17L22.66,13.94L21.25,15.35L19.35,13.46L17.95,14.87L19.84,16.76L18.43,18.17L16.54,16.29L15.13,17.7L17.02,19.59L15.61,21L13.71,19.1L12.3,20.51L14.19,22.41L12.78,23.82L8,19.05V21H3V16L4.95,17.95L6.36,16.54L4.46,14.64L5.87,13.23L7.77,15.13L9.18,13.72L7.28,11.82L8.69,10.41L10.59,12.31L12,10.9L10.1,9L11.51,7.59L13.41,9.49L14.82,8.08L12.92,6.18L14.33,4.77L18.55,9L19.96,7.59L15.75,3.38L17.16,1.97L22.25,7.06L21.26,8.04L19.37,6.15L17.96,7.56L19.85,9.46L18.44,10.87L16.55,8.97L15.14,10.38L17.03,12.28L15.62,13.69L13.73,11.79L12.32,13.2L14.21,15.1L12.8,16.51L10.91,14.61L9.5,16.02L11.39,17.92L9.98,19.33L8.09,17.43L6.68,18.84L8.57,20.74L7.16,22.15L3,18V13H1V8H3V3H8V1H13V3H16.12L21,7.88V15.61Z" />
                   </svg>
                 </div>
                 <div className="stat-details">
-                  <h4>AI Agent Active</h4>
-                  <p className="stat-value">{platforms.some(p => p.claimed) ? "Yes" : "No"}</p>
+                  <h4>AI Agent (Coming Soon)</h4>
+                  <p className="stat-value">Inactive</p>
                 </div>
               </div>
             </div>
             
             <div className="usage-chart-container">
-              <h3>Activity Over Time</h3>
-              <div className="placeholder-chart">
-                <p>Platform activity chart will be displayed here</p>
+              <h3>Platform Activity Time</h3>
+              <div className="dynamic-chart">
+                <div className="chart-bars">
+                  {Object.entries(platformTimeData).map(([platform, time]) => (
+                    <div key={platform} className="chart-bar-container">
+                      <div className="chart-bar-wrapper">
+                        <div 
+                          className={`chart-bar ${platform}`}
+                          style={{ 
+                            height: `${Math.max((time / Math.max(...Object.values(platformTimeData), 1)) * 100, 2)}%` 
+                          }}
+                        >
+                          <div className="bar-value">{time}min</div>
+                        </div>
+                      </div>
+                      <div className="chart-label">{platform.charAt(0).toUpperCase() + platform.slice(1)}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="chart-y-axis">
+                  <span className="y-axis-label">Time (minutes)</span>
                 </div>
               </div>
+            </div>
             </div>
           </div>
         )}

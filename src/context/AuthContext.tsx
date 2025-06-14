@@ -10,6 +10,7 @@ import {
   resetPassword
 } from '../firebase/config';
 import { clearInstagramConnection, disconnectInstagramAccount } from '../utils/instagramSessionManager';
+import EmailVerificationService from '../services/EmailVerificationService';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -20,6 +21,9 @@ interface AuthContextType {
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string, displayName: string) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
+  sendVerificationEmail: (email: string, userId: string) => Promise<{ success: boolean; message: string; demoMode?: boolean; verificationCode?: string }>;
+  verifyEmailCode: (email: string, code: string, userId: string) => Promise<void>;
+  resendVerificationCode: (email: string, userId: string) => Promise<{ success: boolean; message: string; demoMode?: boolean; verificationCode?: string }>;
   clearError: () => void;
 }
 
@@ -97,6 +101,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const sendVerificationEmail = async (email: string, userId: string): Promise<{ success: boolean; message: string; demoMode?: boolean; verificationCode?: string }> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await EmailVerificationService.sendVerificationEmail(email, userId);
+      return result;
+    } catch (error: any) {
+      setError(error.message || 'Failed to send verification email');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyEmailCode = async (email: string, code: string, userId: string): Promise<void> => {
+    setLoading(true);
+    setError(null);
+    try {
+      await EmailVerificationService.verifyEmailCode(email, code, userId);
+    } catch (error: any) {
+      setError(error.message || 'Failed to verify email code');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resendVerificationCode = async (email: string, userId: string): Promise<{ success: boolean; message: string; demoMode?: boolean; verificationCode?: string }> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await EmailVerificationService.resendVerificationCode(email, userId);
+      return result;
+    } catch (error: any) {
+      setError(error.message || 'Failed to resend verification code');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const signOut = async (): Promise<void> => {
     setLoading(true);
     setError(null);
@@ -138,6 +182,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signInWithEmail,
     signUpWithEmail,
     sendPasswordReset,
+    sendVerificationEmail,
+    verifyEmailCode,
+    resendVerificationCode,
     signOut,
     clearError
   };

@@ -1,12 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  FiTarget,
+  FiClock,
+  FiMessageCircle,
+  FiZap,
+  FiBarChart,
+  FiTrendingUp,
+  FiCamera,
+  FiTwitter,
+  FiUsers,
+  FiChevronLeft,
+  FiChevronRight,
+  FiStar
+} from 'react-icons/fi';
 import './ProcessingLoadingState.css';
 
 interface ProTip {
   id: string;
   title: string;
   description: string;
-  icon: string;
+  icon: React.ReactNode;
 }
 
 interface ProcessingLoadingStateProps {
@@ -29,37 +43,37 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
       id: 'goal-button',
       title: 'Goal Button Power',
       description: 'The Goal button creates AI-powered organic campaigns that automatically optimize your content strategy based on your competitors and audience engagement patterns.',
-      icon: '🎯'
+      icon: <FiTarget size={24} />
     },
     {
       id: 'auto-schedule',
       title: 'Smart Auto-Scheduling',
       description: 'Our AI analyzes your audience activity patterns and competitor posting times to schedule your content when engagement rates are highest for maximum reach.',
-      icon: '⏰'
+      icon: <FiClock size={24} />
     },
     {
       id: 'auto-reply',
       title: 'Intelligent Auto-Replies',
       description: 'AI monitors your comments and DMs, providing contextual responses that match your brand voice while maintaining authentic engagement with your audience.',
-      icon: '💬'
+      icon: <FiMessageCircle size={24} />
     },
     {
       id: 'content-creation',
       title: 'AI Content Generation',
       description: 'Advanced models analyze trending topics, your posting style, and competitor strategies to create engaging posts that resonate with your target audience.',
-      icon: '✨'
+      icon: <FiZap size={24} />
     },
     {
       id: 'profit-analysis',
       title: 'Profit Analytics',
       description: 'Real-time ROI tracking analyzes engagement rates, follower growth, and conversion metrics to optimize your social media investment and maximize returns.',
-      icon: '📊'
+      icon: <FiBarChart size={24} />
     },
     {
       id: 'organic-campaigns',
       title: 'Organic Campaign Automation',
       description: 'Goal-driven campaigns automatically adjust content themes, posting frequency, and engagement strategies to achieve your specific business objectives organically.',
-      icon: '🚀'
+      icon: <FiTrendingUp size={24} />
     }
   ];
 
@@ -120,6 +134,19 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     facebook: 'Facebook'
   };
 
+  const getPlatformIcon = () => {
+    switch (platform) {
+      case 'instagram':
+        return <FiCamera size={32} />;
+      case 'twitter':
+        return <FiTwitter size={32} />;
+      case 'facebook':
+        return <FiUsers size={32} />;
+      default:
+        return <FiCamera size={32} />;
+    }
+  };
+
   return (
     <motion.div
       className="processing-loading-container"
@@ -137,9 +164,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
           transition={{ delay: 0.2 }}
         >
           <div className="platform-icon" style={{ color: platformColors[platform] }}>
-            {platform === 'instagram' && '📸'}
-            {platform === 'twitter' && '🐦'}
-            {platform === 'facebook' && '👥'}
+            {getPlatformIcon()}
           </div>
           <h1 className="processing-title">
             Analyzing Your {platformName[platform]} Account
@@ -198,7 +223,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.6 }}
         >
-          <h2 className="protips-title">💡 Pro Tips</h2>
+          <h2 className="protips-title"><FiStar size={20} /> Pro Tips</h2>
           <p className="protips-subtitle">Learn how to maximize your AI-powered social media management</p>
 
           <div className="protips-carousel">
@@ -224,7 +249,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
                 onClick={prevTip}
                 disabled={timeLeft === 0}
               >
-                ←
+                <FiChevronLeft size={20} />
               </button>
               
               <div className="protips-indicators">
@@ -245,7 +270,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
                 onClick={nextTip}
                 disabled={timeLeft === 0}
               >
-                →
+                <FiChevronRight size={20} />
               </button>
             </div>
           </div>

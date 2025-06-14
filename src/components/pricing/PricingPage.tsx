@@ -3,6 +3,25 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import UserService from '../../services/UserService';
 import { PricingPlan, User } from '../../types/user';
+import { 
+  FiTarget, 
+  FiStar, 
+  FiHome, 
+  FiPackage,
+  FiRepeat,
+  FiZap,
+  FiCpu,
+  FiBarChart,
+  FiLifeBuoy,
+  FiEdit3,
+  FiMessageCircle,
+  FiSettings,
+  FiClock,
+  FiTag,
+  FiShield,
+  FiGift,
+  FiCheck
+} from 'react-icons/fi';
 import './PricingPage.css';
 
 const PricingPage: React.FC = () => {
@@ -62,30 +81,30 @@ const PricingPage: React.FC = () => {
   const getPlanIcon = (planId: string) => {
     switch (planId) {
       case 'basic':
-        return '🎯';
+        return <FiTarget size={24} />;
       case 'premium':
-        return '⭐';
+        return <FiStar size={24} />;
       case 'enterprise':
-        return '🏢';
+        return <FiHome size={24} />;
       default:
-        return '📦';
+        return <FiPackage size={24} />;
     }
   };
 
   const getFeatureIcon = (feature: string) => {
-    if (feature.includes('Unlimited')) return '♾️';
-    if (feature.includes('Auto')) return '🤖';
-    if (feature.includes('AI')) return '🧠';
-    if (feature.includes('Analytics')) return '📊';
-    if (feature.includes('Support')) return '🛟';
-    if (feature.includes('Posts')) return '📝';
-    if (feature.includes('Discussions')) return '💬';
-    if (feature.includes('Campaigns')) return '🎯';
-    if (feature.includes('Custom')) return '⚙️';
-    if (feature.includes('Priority')) return '⚡';
-    if (feature.includes('White-label')) return '🏷️';
-    if (feature.includes('SLA')) return '🛡️';
-    return '✓';
+    if (feature.includes('Unlimited')) return <FiRepeat size={24} />;
+    if (feature.includes('Auto')) return <FiZap size={24} />;
+    if (feature.includes('AI')) return <FiCpu size={24} />;
+    if (feature.includes('Analytics')) return <FiBarChart size={24} />;
+    if (feature.includes('Support')) return <FiLifeBuoy size={24} />;
+    if (feature.includes('Posts')) return <FiEdit3 size={24} />;
+    if (feature.includes('Discussions')) return <FiMessageCircle size={24} />;
+    if (feature.includes('Campaigns')) return <FiTarget size={24} />;
+    if (feature.includes('Custom')) return <FiSettings size={24} />;
+    if (feature.includes('Priority')) return <FiZap size={24} />;
+    if (feature.includes('White-label')) return <FiTag size={24} />;
+    if (feature.includes('SLA')) return <FiShield size={24} />;
+    return <FiCheck size={24} />;
   };
 
   const currentPlan = userData?.subscription?.planId;
@@ -122,7 +141,7 @@ const PricingPage: React.FC = () => {
           
           {isTrialActive && trialDaysRemaining && (
             <div className="trial-badge">
-              <span className="trial-icon">⏰</span>
+              <span className="trial-icon"><FiClock size={16} /></span>
               <span>{trialDaysRemaining} days left in your free trial</span>
             </div>
           )}
@@ -193,7 +212,7 @@ const PricingPage: React.FC = () => {
 
             {plan.trialDays && (
               <div className="trial-info">
-                <small>🎁 {plan.trialDays}-day free trial included</small>
+                <small><FiGift size={14} /> {plan.trialDays}-day free trial included</small>
               </div>
             )}
           </div>

@@ -16,6 +16,7 @@ import crypto from 'crypto';
 import schedule from 'node-schedule';
 import OAuth from 'oauth-1.0a';
 import FormData from 'form-data';
+import nodemailer from 'nodemailer';
 const app = express();
 const port = 3000;
 
@@ -9523,6 +9524,285 @@ app.options('/user-facebook-status/:userId', (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });
+
+// ===============================================================
+
+// ============= EMAIL VERIFICATION SERVICE =============
+
+// Email configuration (using Gmail SMTP for demo - in production use proper email service)
+const emailTransporter = nodemailer.createTransporter({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER || 'accountmanager.demo@gmail.com', // Demo email
+    pass: process.env.EMAIL_PASS || 'demo-password' // Demo password
+  }
+});
+
+// For demo purposes, we'll simulate email sending if credentials are not configured
+const isEmailConfigured = process.env.EMAIL_USER && process.env.EMAIL_PASS && 
+                          process.env.EMAIL_USER !== 'accountmanager.demo@gmail.com';
+
+// Store verification codes temporarily (in production, use Redis or database)
+const verificationCodes = new Map();
+
+// Generate 6-word verification code
+function generateVerificationCode() {
+  const words = [
+    'apple', 'banana', 'cherry', 'dragon', 'eagle', 'forest', 'garden', 'happy',
+    'island', 'jungle', 'kitten', 'lemon', 'magic', 'nature', 'ocean', 'peace',
+    'quiet', 'river', 'sunset', 'tiger', 'unique', 'valley', 'wonder', 'yellow',
+    'zebra', 'bright', 'cloud', 'dream', 'flame', 'grace', 'heart', 'light',
+    'moon', 'night', 'power', 'quick', 'smile', 'trust', 'voice', 'water'
+  ];
+  
+  const selectedWords = [];
+  for (let i = 0; i < 6; i++) {
+    const randomIndex = Math.floor(Math.random() * words.length);
+    selectedWords.push(words[randomIndex]);
+  }
+  
+  return selectedWords.join(' ');
+}
+
+// Send verification email endpoint
+app.post('/api/send-verification-email', async (req, res) => {
+  setCorsHeaders(res);
+  
+  try {
+    const { email, userId } = req.body;
+    
+    if (!email || !userId) {
+      return res.status(400).json({ error: 'Email and userId are required' });
+    }
+    
+    // Generate verification code
+    const verificationCode = generateVerificationCode();
+    
+    // Store code with expiration (5 minutes)
+    verificationCodes.set(email, {
+      code: verificationCode,
+      userId: userId,
+      expires: Date.now() + 5 * 60 * 1000 // 5 minutes
+    });
+    
+    // Email content
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'your-app-email@gmail.com',
+      to: email,
+      subject: 'Account Manager - Email Verification',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: linear-gradient(135deg, #1a1a3a 0%, #2e2e5e 100%); color: #e0e0ff; border-radius: 10px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #00ffcc; font-size: 2rem; margin-bottom: 10px;">Account Manager</h1>
+            <h2 style="color: #e0e0ff; font-size: 1.5rem; margin: 0;">Email Verification</h2>
+          </div>
+          
+          <div style="background: rgba(255, 255, 255, 0.1); padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+            <p style="font-size: 1.1rem; line-height: 1.6; margin-bottom: 20px;">
+              Welcome to Account Manager! Please verify your email address by entering the following 6-word verification code:
+            </p>
+            
+            <div style="background: rgba(0, 255, 204, 0.2); border: 2px solid #00ffcc; border-radius: 10px; padding: 20px; text-align: center; margin: 20px 0;">
+              <h3 style="color: #00ffcc; font-size: 1.8rem; margin: 0; letter-spacing: 2px; font-family: monospace;">
+                ${verificationCode.toUpperCase()}
+              </h3>
+            </div>
+            
+            <p style="font-size: 0.9rem; color: #cccccc; margin-top: 20px;">
+              💡 <strong>Tip:</strong> You can copy and paste all 6 words at once into any input field in the verification form.
+            </p>
+          </div>
+          
+          <div style="background: rgba(255, 193, 7, 0.1); border: 1px solid rgba(255, 193, 7, 0.3); border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+            <p style="margin: 0; font-size: 0.9rem; color: #ffc107;">
+              ⚠️ This code will expire in 5 minutes for security reasons.
+            </p>
+          </div>
+          
+          <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid rgba(224, 224, 255, 0.2);">
+            <p style="font-size: 0.8rem; color: #999; margin: 0;">
+              If you didn't request this verification, please ignore this email.
+            </p>
+            <p style="font-size: 0.8rem; color: #999; margin: 5px 0 0 0;">
+              © 2025 Account Manager - AI-Powered Social Media Management
+            </p>
+          </div>
+        </div>
+      `
+    };
+    
+    // Send email or simulate for demo
+    if (isEmailConfigured) {
+      await emailTransporter.sendMail(mailOptions);
+      console.log(`[${new Date().toISOString()}] Verification email sent to ${email}`);
+    } else {
+      // Demo mode - just log the verification code
+      console.log(`[${new Date().toISOString()}] DEMO MODE - Verification code for ${email}: ${verificationCode}`);
+      console.log(`[${new Date().toISOString()}] In production, configure EMAIL_USER and EMAIL_PASS environment variables`);
+    }
+    
+    res.json({ 
+      success: true, 
+      message: isEmailConfigured ? 'Verification email sent successfully' : 'Demo mode: Check server console for verification code',
+      demoMode: !isEmailConfigured,
+      verificationCode: !isEmailConfigured ? verificationCode : undefined
+    });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error sending verification email:`, error);
+    res.status(500).json({ error: 'Failed to send verification email' });
+  }
+});
+
+// Verify email code endpoint
+app.post('/api/verify-email-code', async (req, res) => {
+  setCorsHeaders(res);
+  
+  try {
+    const { email, code, userId } = req.body;
+    
+    if (!email || !code || !userId) {
+      return res.status(400).json({ error: 'Email, code, and userId are required' });
+    }
+    
+    // Get stored verification data
+    const storedData = verificationCodes.get(email);
+    
+    if (!storedData) {
+      return res.status(400).json({ error: 'No verification code found for this email' });
+    }
+    
+    // Check if code expired
+    if (Date.now() > storedData.expires) {
+      verificationCodes.delete(email);
+      return res.status(400).json({ error: 'Verification code has expired' });
+    }
+    
+    // Check if userId matches
+    if (storedData.userId !== userId) {
+      return res.status(400).json({ error: 'Invalid verification request' });
+    }
+    
+    // Check if code matches (case insensitive)
+    if (storedData.code.toLowerCase() !== code.toLowerCase().trim()) {
+      return res.status(400).json({ error: 'Invalid verification code' });
+    }
+    
+    // Code is valid - remove from storage
+    verificationCodes.delete(email);
+    
+    console.log(`[${new Date().toISOString()}] Email verified successfully for ${email}`);
+    res.json({ success: true, message: 'Email verified successfully' });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error verifying email code:`, error);
+    res.status(500).json({ error: 'Failed to verify email code' });
+  }
+});
+
+// Resend verification code endpoint
+app.post('/api/resend-verification-code', async (req, res) => {
+  setCorsHeaders(res);
+  
+  try {
+    const { email, userId } = req.body;
+    
+    if (!email || !userId) {
+      return res.status(400).json({ error: 'Email and userId are required' });
+    }
+    
+    // Generate new verification code
+    const verificationCode = generateVerificationCode();
+    
+    // Update stored code
+    verificationCodes.set(email, {
+      code: verificationCode,
+      userId: userId,
+      expires: Date.now() + 5 * 60 * 1000 // 5 minutes
+    });
+    
+    // Email content
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'your-app-email@gmail.com',
+      to: email,
+      subject: 'Account Manager - New Verification Code',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: linear-gradient(135deg, #1a1a3a 0%, #2e2e5e 100%); color: #e0e0ff; border-radius: 10px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #00ffcc; font-size: 2rem; margin-bottom: 10px;">Account Manager</h1>
+            <h2 style="color: #e0e0ff; font-size: 1.5rem; margin: 0;">New Verification Code</h2>
+          </div>
+          
+          <div style="background: rgba(255, 255, 255, 0.1); padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+            <p style="font-size: 1.1rem; line-height: 1.6; margin-bottom: 20px;">
+              Here's your new 6-word verification code:
+            </p>
+            
+            <div style="background: rgba(0, 255, 204, 0.2); border: 2px solid #00ffcc; border-radius: 10px; padding: 20px; text-align: center; margin: 20px 0;">
+              <h3 style="color: #00ffcc; font-size: 1.8rem; margin: 0; letter-spacing: 2px; font-family: monospace;">
+                ${verificationCode.toUpperCase()}
+              </h3>
+            </div>
+          </div>
+          
+          <div style="background: rgba(255, 193, 7, 0.1); border: 1px solid rgba(255, 193, 7, 0.3); border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+            <p style="margin: 0; font-size: 0.9rem; color: #ffc107;">
+              ⚠️ This new code will expire in 5 minutes.
+            </p>
+          </div>
+        </div>
+      `
+    };
+    
+    // Send email or simulate for demo
+    if (isEmailConfigured) {
+      await emailTransporter.sendMail(mailOptions);
+      console.log(`[${new Date().toISOString()}] New verification email sent to ${email}`);
+    } else {
+      // Demo mode - just log the verification code
+      console.log(`[${new Date().toISOString()}] DEMO MODE - New verification code for ${email}: ${verificationCode}`);
+    }
+    
+    res.json({ 
+      success: true, 
+      message: isEmailConfigured ? 'New verification code sent successfully' : 'Demo mode: Check server console for new verification code',
+      demoMode: !isEmailConfigured,
+      verificationCode: !isEmailConfigured ? verificationCode : undefined
+    });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error resending verification email:`, error);
+    res.status(500).json({ error: 'Failed to resend verification email' });
+  }
+});
+
+// OPTIONS handlers for email verification endpoints
+app.options('/api/send-verification-email', (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+
+app.options('/api/verify-email-code', (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+
+app.options('/api/resend-verification-code', (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+
+// Clean up expired verification codes every 10 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [email, data] of verificationCodes.entries()) {
+    if (now > data.expires) {
+      verificationCodes.delete(email);
+    }
+  }
+}, 10 * 60 * 1000);
+
+console.log(`[${new Date().toISOString()}] Email verification service initialized`);
 
 // ===============================================================
 

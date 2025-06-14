@@ -5,6 +5,13 @@ import useAccessControl from '../../hooks/useAccessControl';
 import UsageTracker from '../common/UsageTracker';
 import PremiumIndicator from '../common/PremiumIndicator';
 import AccessControlPopup from '../common/AccessControlPopup';
+import { 
+  FiEdit3,
+  FiMessageCircle,
+  FiCpu,
+  FiTarget,
+  FiLock
+} from 'react-icons/fi';
 import './UsageDashboard.css';
 
 interface UsageDashboardProps {
@@ -49,7 +56,7 @@ const UsageDashboard: React.FC<UsageDashboardProps> = ({ className }) => {
     {
       key: 'posts' as const,
       name: 'Posts',
-      icon: '📝',
+      icon: <FiEdit3 size={24} />,
       used: usage.posts,
       limit: userLimits.posts === -1 ? 'unlimited' : userLimits.posts,
       description: 'Create and schedule posts',
@@ -58,7 +65,7 @@ const UsageDashboard: React.FC<UsageDashboardProps> = ({ className }) => {
     {
       key: 'discussions' as const,
       name: 'Discussions',
-      icon: '💬',
+      icon: <FiMessageCircle size={24} />,
       used: usage.discussions,
       limit: userLimits.discussions === -1 ? 'unlimited' : userLimits.discussions,
       description: 'Engage in discussions and comments',
@@ -67,7 +74,7 @@ const UsageDashboard: React.FC<UsageDashboardProps> = ({ className }) => {
     {
       key: 'aiReplies' as const,
       name: 'AI Replies',
-      icon: '🤖',
+      icon: <FiCpu size={24} />,
       used: usage.aiReplies,
       limit: userLimits.aiReplies === -1 ? 'unlimited' : userLimits.aiReplies,
       description: 'AI-powered automatic replies',
@@ -76,7 +83,7 @@ const UsageDashboard: React.FC<UsageDashboardProps> = ({ className }) => {
     {
       key: 'campaigns' as const,
       name: 'Campaigns',
-      icon: '🎯',
+      icon: <FiTarget size={24} />,
       used: usage.campaigns,
       limit: userLimits.campaigns === -1 ? 'unlimited' : userLimits.campaigns,
       description: 'Marketing campaigns and automation',
@@ -166,7 +173,7 @@ const UsageDashboard: React.FC<UsageDashboardProps> = ({ className }) => {
 
                 {isBlocked && (
                   <div className="usage-blocked">
-                    <span className="blocked-icon">🚫</span>
+                    <span className="blocked-icon"><FiLock size={16} /></span>
                     <span className="blocked-text">Limit Reached</span>
                     <button 
                       className="btn-upgrade-card"

@@ -185,9 +185,47 @@
 }
 
 .plan-icon {
-  font-size: 3rem;
+  font-size: 4rem;
   margin-bottom: 1rem;
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 1rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(0, 255, 204, 0.2), rgba(0, 123, 255, 0.2));
+  border: 2px solid rgba(0, 255, 204, 0.3);
+  transition: all 0.3s ease;
+}
+
+.plan-icon svg {
+  width: 60px;
+  height: 60px;
+  color: #00ffcc;
+  filter: drop-shadow(0 0 10px rgba(0, 255, 204, 0.5));
+}
+
+.pricing-card:hover .plan-icon {
+  background: linear-gradient(135deg, rgba(0, 255, 204, 0.3), rgba(0, 123, 255, 0.3));
+  border-color: rgba(0, 255, 204, 0.6);
+  transform: scale(1.1);
+}
+
+.pricing-card:hover .plan-icon svg {
+  color: #00ffcc;
+  filter: drop-shadow(0 0 15px rgba(0, 255, 204, 0.8));
+}
+
+.pricing-card.popular .plan-icon {
+  background: linear-gradient(135deg, rgba(0, 255, 204, 0.4), rgba(0, 123, 255, 0.4));
+  border-color: #00ffcc;
+  box-shadow: 0 0 20px rgba(0, 255, 204, 0.4);
+}
+
+.pricing-card.popular .plan-icon svg {
+  color: #00ffcc;
+  filter: drop-shadow(0 0 20px rgba(0, 255, 204, 1));
 }
 
 .plan-header h3 {
@@ -252,8 +290,25 @@
 
 .feature-icon {
   font-size: 1.2rem;
-  min-width: 24px;
-  text-align: center;
+  min-width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(0, 255, 204, 0.1);
+  border: 1px solid rgba(0, 255, 204, 0.3);
+  color: #00ffcc;
+  margin-right: 1rem;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.plan-features li:hover .feature-icon {
+  background: rgba(0, 255, 204, 0.2);
+  border-color: rgba(0, 255, 204, 0.6);
+  transform: scale(1.1);
+  filter: drop-shadow(0 0 10px rgba(0, 255, 204, 0.5));
 }
 
 .plan-action {

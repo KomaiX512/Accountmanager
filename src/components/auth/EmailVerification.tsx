@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { FiMail, FiRefreshCw, FiX, FiCheck } from 'react-icons/fi';
 import './EmailVerification.css';
 
 interface EmailVerificationProps {
@@ -8,6 +9,7 @@ interface EmailVerificationProps {
   onResendCode: () => void;
   onCancel: () => void;
   isLoading?: boolean;
+  demoVerificationCode?: string | null;
 }
 
 const EmailVerification: React.FC<EmailVerificationProps> = ({
@@ -15,7 +17,8 @@ const EmailVerification: React.FC<EmailVerificationProps> = ({
   onVerificationSuccess,
   onResendCode,
   onCancel,
-  isLoading = false
+  isLoading = false,
+  demoVerificationCode = null
 }) => {
   const [codes, setCodes] = useState<string[]>(['', '', '', '', '', '']);
   const [error, setError] = useState<string>('');
@@ -129,13 +132,27 @@ const EmailVerification: React.FC<EmailVerificationProps> = ({
             animate={{ scale: 1 }}
             transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
           >
-            📧
+            <FiMail size={64} />
           </motion.div>
           <h2>Email Verification</h2>
           <p>
             We've sent a 6-word verification code to<br />
             <strong>{email}</strong>
           </p>
+          
+          {demoVerificationCode && (
+            <motion.div
+              className="demo-code-display"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <div className="demo-badge">Demo Mode</div>
+              <p>Your verification code is:</p>
+              <div className="demo-code">{demoVerificationCode}</div>
+              <small>Copy and paste this code into the fields below</small>
+            </motion.div>
+          )}
         </div>
 
         <div className="verification-form">
@@ -205,7 +222,7 @@ const EmailVerification: React.FC<EmailVerificationProps> = ({
         </div>
 
         <div className="verification-help">
-          <p>💡 <strong>Tip:</strong> You can paste all 6 words at once into any input field</p>
+          <p><FiCheck size={16} /> <strong>Tip:</strong> You can paste all 6 words at once into any input field</p>
         </div>
       </motion.div>
     </motion.div>

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
+import EmailVerification from './EmailVerification';
 import './Auth.css';
 
 interface LocationState {
@@ -13,7 +14,19 @@ interface LocationState {
 type AuthMode = 'login' | 'register' | 'reset';
 
 const Login: React.FC = () => {
-  const { currentUser, signIn, signInWithEmail, signUpWithEmail, sendPasswordReset, error, clearError, loading } = useAuth();
+  const { 
+    currentUser, 
+    signIn, 
+    signInWithEmail, 
+    signUpWithEmail, 
+    sendPasswordReset, 
+    sendVerificationEmail,
+    verifyEmailCode,
+    resendVerificationCode,
+    error, 
+    clearError, 
+    loading 
+  } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -30,6 +43,11 @@ const Login: React.FC = () => {
   const [lockoutTimer, setLockoutTimer] = useState<number>(0);
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  
+  // Email verification state
+  const [showEmailVerification, setShowEmailVerification] = useState<boolean>(false);
+  const [pendingUser, setPendingUser] = useState<{ email: string; userId: string } | null>(null);
+  const [demoVerificationCode, setDemoVerificationCode] = useState<string | null>(null);
 
   // Get the path the user was trying to access before being redirected to login
   const from = (location.state as LocationState)?.from?.pathname || '/';
@@ -137,7 +155,26 @@ const Login: React.FC = () => {
     
     try {
       await signUpWithEmail(email, password, displayName);
-      // Successful registration will redirect automatically
+      
+      // Wait a moment for Firebase to update currentUser, then send verification
+      setTimeout(async () => {
+                  if (currentUser) {
+            setPendingUser({ email, userId: currentUser.uid });
+            try {
+              const result = await sendVerificationEmail(email, currentUser.uid);
+              if (result.demoMode && result.verificationCode) {
+                setDemoVerificationCode(result.verificationCode);
+                setSuccessMessage(`Demo Mode: Your verification code is: ${result.verificationCode}`);
+              }
+              setShowEmailVerification(true);
+            } catch (emailError) {
+              console.error('Failed to send verification email:', emailError);
+              setFormError('Account created but failed to send verification email. Please try logging in.');
+            }
+          } else {
+            setFormError('Account created but verification email could not be sent. Please try logging in.');
+          }
+      }, 1000);
     } catch (error) {
       setLoginAttempts((prev) => prev + 1);
     }
@@ -161,6 +198,44 @@ const Login: React.FC = () => {
     } catch (error) {
       setLoginAttempts((prev) => prev + 1);
     }
+  };
+
+  const handleEmailVerificationSuccess = async (verificationCode: string) => {
+    if (!pendingUser) return;
+    
+    try {
+      await verifyEmailCode(pendingUser.email, verificationCode, pendingUser.userId);
+      setShowEmailVerification(false);
+      setPendingUser(null);
+      setSuccessMessage('Email verified successfully! Welcome to Account Manager.');
+      
+      // Redirect to dashboard after successful verification
+      setTimeout(() => {
+        navigate(from, { replace: true });
+      }, 2000);
+    } catch (error) {
+      console.error('Email verification failed:', error);
+    }
+  };
+
+  const handleResendVerificationCode = async () => {
+    if (!pendingUser) return;
+    
+    try {
+      const result = await resendVerificationCode(pendingUser.email, pendingUser.userId);
+      if (result.demoMode && result.verificationCode) {
+        setDemoVerificationCode(result.verificationCode);
+        setSuccessMessage(`Demo Mode: New verification code is: ${result.verificationCode}`);
+      }
+    } catch (error) {
+      console.error('Failed to resend verification code:', error);
+    }
+  };
+
+  const handleCancelEmailVerification = () => {
+    setShowEmailVerification(false);
+    setPendingUser(null);
+    setMode('login');
   };
 
   const renderForm = () => {
@@ -427,6 +502,18 @@ const Login: React.FC = () => {
           <p>By signing in, you agree to our <a href="/terms">Terms of Service</a> and <a href="/privacy">Privacy Policy</a></p>
         </div>
       </motion.div>
+      
+      {/* Email Verification Modal */}
+      {showEmailVerification && pendingUser && (
+        <EmailVerification
+          email={pendingUser.email}
+          onVerificationSuccess={handleEmailVerificationSuccess}
+          onResendCode={handleResendVerificationCode}
+          onCancel={handleCancelEmailVerification}
+          isLoading={loading}
+          demoVerificationCode={demoVerificationCode}
+        />
+      )}
     </motion.div>
   );
 };

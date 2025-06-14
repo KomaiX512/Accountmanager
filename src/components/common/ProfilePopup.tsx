@@ -9,6 +9,17 @@ import { disconnectFacebookAccount, isFacebookConnected } from '../../utils/face
 import { disconnectTwitterAccount, isTwitterConnected } from '../../utils/twitterSessionManager';
 import { useFacebook } from '../../context/FacebookContext';
 import { useTwitter } from '../../context/TwitterContext';
+import { 
+  FiCreditCard, 
+  FiCalendar, 
+  FiDollarSign, 
+  FiDownload, 
+  FiEdit3, 
+  FiTrash2,
+  FiPlus,
+  FiCheck,
+  FiX
+} from 'react-icons/fi';
 
 interface ProfilePopupProps {
   username: string;
@@ -27,6 +38,10 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose, platform
   const [showPreview, setShowPreview] = useState(false);
   const maxRulesLength = 1000;
   
+  // Billing method states
+  const [showAddPaymentMethod, setShowAddPaymentMethod] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
+  
   // Platform-specific connection states
   const [isConnectedToInstagram, setIsConnectedToInstagram] = useState(false);
   const [isConnectedToFacebook, setIsConnectedToFacebook] = useState(false);
@@ -39,6 +54,62 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose, platform
   const platformName = platform === 'twitter' ? 'X (Twitter)' : 
                       platform === 'facebook' ? 'Facebook' : 
                       'Instagram';
+
+  // Dummy billing data - in production this would come from your payment provider
+  const paymentMethods = [
+    {
+      id: '1',
+      type: 'card',
+      brand: 'Visa',
+      last4: '4242',
+      expiryMonth: 12,
+      expiryYear: 2025,
+      isDefault: true
+    },
+    {
+      id: '2',
+      type: 'card',
+      brand: 'Mastercard',
+      last4: '5555',
+      expiryMonth: 8,
+      expiryYear: 2026,
+      isDefault: false
+    }
+  ];
+
+  const billingHistory = [
+    {
+      id: '1',
+      date: '2024-01-15',
+      amount: 29.99,
+      status: 'paid',
+      plan: 'Premium Plan',
+      invoiceUrl: '#'
+    },
+    {
+      id: '2',
+      date: '2023-12-15',
+      amount: 29.99,
+      status: 'paid',
+      plan: 'Premium Plan',
+      invoiceUrl: '#'
+    },
+    {
+      id: '3',
+      date: '2023-11-15',
+      amount: 29.99,
+      status: 'paid',
+      plan: 'Premium Plan',
+      invoiceUrl: '#'
+    }
+  ];
+
+  const currentSubscription = {
+    plan: 'Premium Plan',
+    status: 'active',
+    nextBillingDate: '2024-02-15',
+    amount: 29.99
+  };
 
   useEffect(() => {
     if (activeTab === 'Rules') {
@@ -199,6 +270,33 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose, platform
 
   const isConnectedToPlatform = getCurrentPlatformConnectionStatus();
 
+  // Billing method handlers
+  const handleAddPaymentMethod = () => {
+    setShowAddPaymentMethod(true);
+  };
+
+  const handleSavePaymentMethod = () => {
+    // In production, this would integrate with Stripe/PayPal/etc.
+    setToastMessage('Payment method added successfully!');
+    setShowAddPaymentMethod(false);
+  };
+
+  const handleSetDefaultPaymentMethod = (methodId: string) => {
+    // In production, this would update the default payment method
+    setSelectedPaymentMethod(methodId);
+    setToastMessage('Default payment method updated!');
+  };
+
+  const handleDeletePaymentMethod = (methodId: string) => {
+    // In production, this would delete the payment method
+    setToastMessage('Payment method removed successfully!');
+  };
+
+  const handleDownloadInvoice = (invoiceUrl: string) => {
+    // In production, this would download the actual invoice
+    setToastMessage('Invoice download started!');
+  };
+
   return (
     <ErrorBoundary>
       <motion.div
@@ -235,12 +333,12 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose, platform
               Account
             </motion.button>
             <motion.button
-              className="sidebar-button"
+              className={`sidebar-button ${activeTab === 'Billing Method' ? 'active' : ''}`}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              disabled
+              onClick={() => setActiveTab('Billing Method')}
             >
-              Billing Method
+              <FiCreditCard size={16} /> Billing Method
             </motion.button>
             <motion.button
               className="sidebar-button"
@@ -421,6 +519,164 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose, platform
                 </div>
                 
                 {error && <p className="error">{error}</p>}
+              </motion.div>
+            ) : activeTab === 'Billing Method' ? (
+              <motion.div
+                className="billing-section"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <motion.div
+                  className="billing-header"
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4 }}
+                >
+                  <h3><FiCreditCard size={20} /> Billing & Subscription Management</h3>
+                  <p>Manage your payment methods and billing information</p>
+                </motion.div>
+
+                {/* Current Subscription */}
+                <div className="subscription-info">
+                  <h4>Current Subscription</h4>
+                  <div className="subscription-card">
+                    <div className="subscription-details">
+                      <div className="plan-info">
+                        <span className="plan-name">{currentSubscription.plan}</span>
+                        <span className={`status ${currentSubscription.status}`}>
+                          <FiCheck size={14} /> {currentSubscription.status.toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="billing-info">
+                        <span className="amount">${currentSubscription.amount}/month</span>
+                        <span className="next-billing">
+                          <FiCalendar size={14} /> Next billing: {currentSubscription.nextBillingDate}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Payment Methods */}
+                <div className="payment-methods">
+                  <div className="section-header">
+                    <h4>Payment Methods</h4>
+                    <motion.button
+                      className="add-payment-btn"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={handleAddPaymentMethod}
+                    >
+                      <FiPlus size={16} /> Add Payment Method
+                    </motion.button>
+                  </div>
+                  
+                  <div className="payment-methods-list">
+                    {paymentMethods.map((method) => (
+                      <div key={method.id} className={`payment-method-card ${method.isDefault ? 'default' : ''}`}>
+                        <div className="payment-method-info">
+                          <FiCreditCard size={20} />
+                          <div className="card-details">
+                            <span className="card-brand">{method.brand} •••• {method.last4}</span>
+                            <span className="card-expiry">Expires {method.expiryMonth}/{method.expiryYear}</span>
+                          </div>
+                          {method.isDefault && <span className="default-badge">Default</span>}
+                        </div>
+                        <div className="payment-method-actions">
+                          {!method.isDefault && (
+                            <button
+                              className="set-default-btn"
+                              onClick={() => handleSetDefaultPaymentMethod(method.id)}
+                            >
+                              Set Default
+                            </button>
+                          )}
+                          <button
+                            className="edit-btn"
+                            onClick={() => setToastMessage('Edit payment method functionality coming soon!')}
+                          >
+                            <FiEdit3 size={14} />
+                          </button>
+                          <button
+                            className="delete-btn"
+                            onClick={() => handleDeletePaymentMethod(method.id)}
+                            disabled={method.isDefault}
+                          >
+                            <FiTrash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Add Payment Method Form */}
+                {showAddPaymentMethod && (
+                  <motion.div
+                    className="add-payment-form"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                  >
+                    <h4>Add New Payment Method</h4>
+                    <div className="form-grid">
+                      <div className="form-group">
+                        <label>Card Number</label>
+                        <input type="text" placeholder="1234 5678 9012 3456" />
+                      </div>
+                      <div className="form-group">
+                        <label>Expiry Date</label>
+                        <input type="text" placeholder="MM/YY" />
+                      </div>
+                      <div className="form-group">
+                        <label>CVC</label>
+                        <input type="text" placeholder="123" />
+                      </div>
+                      <div className="form-group">
+                        <label>Cardholder Name</label>
+                        <input type="text" placeholder="John Doe" />
+                      </div>
+                    </div>
+                    <div className="form-actions">
+                      <button className="save-btn" onClick={handleSavePaymentMethod}>
+                        <FiCheck size={16} /> Save Payment Method
+                      </button>
+                      <button className="cancel-btn" onClick={() => setShowAddPaymentMethod(false)}>
+                        <FiX size={16} /> Cancel
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Billing History */}
+                <div className="billing-history">
+                  <h4>Billing History</h4>
+                  <div className="billing-history-list">
+                    {billingHistory.map((invoice) => (
+                      <div key={invoice.id} className="billing-history-item">
+                        <div className="invoice-info">
+                          <span className="invoice-date">{invoice.date}</span>
+                          <span className="invoice-plan">{invoice.plan}</span>
+                        </div>
+                        <div className="invoice-details">
+                          <span className="invoice-amount">
+                            <FiDollarSign size={14} /> ${invoice.amount}
+                          </span>
+                          <span className={`invoice-status ${invoice.status}`}>
+                            <FiCheck size={14} /> {invoice.status.toUpperCase()}
+                          </span>
+                          <button
+                            className="download-btn"
+                            onClick={() => handleDownloadInvoice(invoice.invoiceUrl)}
+                          >
+                            <FiDownload size={14} /> Download
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </motion.div>
             ) : (
               <div className="placeholder">

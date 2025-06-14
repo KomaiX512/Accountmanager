@@ -2,6 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { 
+  FiCpu, 
+  FiZap, 
+  FiBarChart, 
+  FiClock, 
+  FiMessageCircle, 
+  FiTarget 
+} from 'react-icons/fi';
 import './Homepage.css';
 
 const Homepage: React.FC = () => {
@@ -48,32 +56,32 @@ const Homepage: React.FC = () => {
 
   const features = [
     {
-      icon: '🧠',
+      icon: <FiCpu size={48} />,
       title: 'AI-Powered Intelligence',
       description: 'Advanced machine learning algorithms analyze your audience and optimize content for maximum engagement.'
     },
     {
-      icon: '🚀',
+      icon: <FiZap size={48} />,
       title: 'Multi-Platform Management',
       description: 'Seamlessly manage Instagram, Twitter, Facebook, and LinkedIn from one unified dashboard.'
     },
     {
-      icon: '📊',
+      icon: <FiBarChart size={48} />,
       title: 'Real-Time Analytics',
       description: 'Get instant insights into your performance with comprehensive analytics and reporting.'
     },
     {
-      icon: '⚡',
+      icon: <FiClock size={48} />,
       title: 'Automated Scheduling',
       description: 'Smart scheduling that posts at optimal times for your audience across all platforms.'
     },
     {
-      icon: '💬',
+      icon: <FiMessageCircle size={48} />,
       title: 'Intelligent Conversations',
       description: 'AI-powered chat system that understands context and provides strategic recommendations.'
     },
     {
-      icon: '🎯',
+      icon: <FiTarget size={48} />,
       title: 'Competitor Analysis',
       description: 'Stay ahead with deep competitor insights and market trend analysis.'
     }

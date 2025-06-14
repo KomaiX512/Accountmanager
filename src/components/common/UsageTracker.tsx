@@ -3,6 +3,26 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useUsage } from '../../context/UsageContext';
 import { useAuth } from '../../context/AuthContext';
 import AccessControlPopup from './AccessControlPopup';
+import { 
+  FiRefreshCw,
+  FiActivity,
+  FiEdit3,
+  FiMessageCircle,
+  FiCpu,
+  FiTarget,
+  FiCheck,
+  FiChevronDown,
+  FiChevronUp,
+  FiPause,
+  FiSearch,
+  FiTrash2,
+  FiLink,
+  FiZap,
+  FiShield,
+  FiSettings,
+  FiBarChart,
+  FiLock
+} from 'react-icons/fi';
 import './UsageTracker.css';
 
 const UsageTracker: React.FC = () => {
@@ -64,30 +84,30 @@ const UsageTracker: React.FC = () => {
     if (!currentUser?.uid || !realTimeTracking) return;
 
     const handleUsageUpdate = (event: any) => {
-      addDebugLog(`🔄 Cross-tab usage update detected: ${JSON.stringify(event.detail.usage)}`);
+      addDebugLog(`Cross-tab usage update detected: ${JSON.stringify(event.detail.usage)}`);
     };
 
     const handleStorageChange = (event: StorageEvent) => {
       if (event.key?.includes(`usage_${currentUser.uid}`) && event.newValue) {
-        addDebugLog(`📱 LocalStorage usage change: ${event.key} -> ${event.newValue}`);
+        addDebugLog(`LocalStorage usage change: ${event.key} -> ${event.newValue}`);
       }
     };
 
     window.addEventListener('usageUpdated', handleUsageUpdate);
     window.addEventListener('storage', handleStorageChange);
     
-    addDebugLog(`🚀 Real-time tracking monitor started for user ${currentUser.uid}`);
+    addDebugLog(`Real-time tracking monitor started for user ${currentUser.uid}`);
     
     return () => {
       window.removeEventListener('usageUpdated', handleUsageUpdate);
       window.removeEventListener('storage', handleStorageChange);
-      addDebugLog(`🛑 Real-time tracking monitor stopped`);
+      addDebugLog(`Real-time tracking monitor stopped`);
     };
   }, [currentUser?.uid, realTimeTracking]);
 
   // Monitor usage changes
   useEffect(() => {
-    addDebugLog(`📊 Usage updated: Posts=${usage.posts}, Discussions=${usage.discussions}, AI Replies=${usage.aiReplies}, Campaigns=${usage.campaigns}`);
+    addDebugLog(`Usage updated: Posts=${usage.posts}, Discussions=${usage.discussions}, AI Replies=${usage.aiReplies}, Campaigns=${usage.campaigns}`);
   }, [usage]);
 
   // Test function to validate tracking system
@@ -98,32 +118,32 @@ const UsageTracker: React.FC = () => {
     }
 
     setTestingFeature(feature);
-    addDebugLog(`🧪 Starting ${feature} tracking test...`);
+    addDebugLog(`Starting ${feature} tracking test...`);
     
     try {
       const beforeUsage = usage[feature];
-      addDebugLog(`📈 Before test: ${feature} = ${beforeUsage}`);
+      addDebugLog(`Before test: ${feature} = ${beforeUsage}`);
       
       await trackFeatureUsage(feature, 'test_platform', 'manual_test');
       
-      addDebugLog(`✅ ${feature} tracking API call successful!`);
+      addDebugLog(`${feature} tracking API call successful!`);
       
       // Refresh usage to show updated counts
       setTimeout(async () => {
         await refreshUsage();
         const afterUsage = usage[feature];
-        addDebugLog(`📈 After refresh: ${feature} = ${afterUsage} (Expected: ${beforeUsage + 1})`);
+        addDebugLog(`After refresh: ${feature} = ${afterUsage} (Expected: ${beforeUsage + 1})`);
         
         if (afterUsage === beforeUsage + 1) {
-          addDebugLog(`🎉 ${feature} tracking test PASSED! Counter incremented correctly.`);
+          addDebugLog(`${feature} tracking test PASSED! Counter incremented correctly.`);
         } else {
-          addDebugLog(`❌ ${feature} tracking test FAILED! Counter should be ${beforeUsage + 1} but is ${afterUsage}`);
+          addDebugLog(`${feature} tracking test FAILED! Counter should be ${beforeUsage + 1} but is ${afterUsage}`);
         }
       }, 2000);
       
     } catch (error) {
-      console.error(`[UsageTracker] ❌ ${feature} tracking test failed:`, error);
-      addDebugLog(`❌ ${feature} tracking test failed: ${error}`);
+      console.error(`[UsageTracker] ${feature} tracking test failed:`, error);
+      addDebugLog(`${feature} tracking test failed: ${error}`);
       alert(`${feature} tracking test failed. Check console for details.`);
     } finally {
       setTestingFeature(null);
@@ -133,57 +153,57 @@ const UsageTracker: React.FC = () => {
   // Debug backend connection
   const testBackendConnection = async () => {
     if (!currentUser?.uid) {
-      addDebugLog('❌ No current user for backend test');
+      addDebugLog('No current user for backend test');
       return;
     }
 
-    addDebugLog('🔗 Testing backend connection...');
+    addDebugLog('Testing backend connection...');
     
     try {
       const response = await fetch(`http://localhost:3002/api/user/${currentUser.uid}/usage`);
       if (response.ok) {
         const backendUsage = await response.json();
-        addDebugLog(`✅ Backend connected! Usage: ${JSON.stringify(backendUsage)}`);
+        addDebugLog(`Backend connected! Usage: ${JSON.stringify(backendUsage)}`);
       } else {
-        addDebugLog(`❌ Backend response error: ${response.status} ${response.statusText}`);
+        addDebugLog(`Backend response error: ${response.status} ${response.statusText}`);
       }
     } catch (error) {
-      addDebugLog(`❌ Backend connection failed: ${error}`);
+      addDebugLog(`Backend connection failed: ${error}`);
     }
   };
 
   // Clear debug logs
   const clearDebugLogs = () => {
     setDebugLogs([]);
-    addDebugLog('🧹 Debug logs cleared');
+    addDebugLog('Debug logs cleared');
   };
 
   const features = [
     {
       key: 'posts',
       name: 'Posts',
-      icon: '📝',
+      icon: <FiEdit3 size={20} />,
       description: 'Create and schedule posts across platforms',
       realTimeInfo: 'Tracked when you: Create posts via chat, schedule posts, publish "Post Now", auto-schedule posts'
     },
     {
       key: 'discussions',
       name: 'Discussions',
-      icon: '💬',
+      icon: <FiMessageCircle size={20} />,
       description: 'Engage in AI-powered conversations',
       realTimeInfo: 'Tracked when you: Send chat messages, reply to DMs/comments manually, engage in discussions'
     },
     {
       key: 'aiReplies',
       name: 'AI Replies',
-      icon: '🤖',
+      icon: <FiCpu size={20} />,
       description: 'Generate intelligent responses',
       realTimeInfo: 'Tracked when you: Generate AI replies, send auto-replies, use "Reply with AI" feature'
     },
     {
       key: 'campaigns',
       name: 'Campaigns',
-      icon: '🎯',
+      icon: <FiTarget size={20} />,
       description: 'Advanced marketing campaigns',
       realTimeInfo: 'Tracked when you: Set campaign goals, start campaigns, manage campaign activities'
     }
@@ -193,14 +213,14 @@ const UsageTracker: React.FC = () => {
     <>
       <div className="usage-tracker">
         <div className="usage-header">
-          <h3>🔄 Real-Time Usage Tracking</h3>
+          <h3><FiRefreshCw size={18} /> Real-Time Usage Tracking</h3>
           <p className="usage-subtitle">
-            ✅ Connected to actual platform features - tracking system active!
-            {isLoading && <span className="loading-indicator"> 🔄 Syncing...</span>}
+            <FiCheck size={16} /> Connected to actual platform features - tracking system active!
+            {isLoading && <span className="loading-indicator"> <FiRefreshCw size={14} /> Syncing...</span>}
           </p>
           <div className="tracking-status">
             <span className={`status-indicator ${realTimeTracking ? 'active' : 'inactive'}`}>
-              {realTimeTracking ? '🟢 Real-time ON' : '🔴 Real-time OFF'}
+              {realTimeTracking ? <><FiActivity size={14} /> Real-time ON</> : <><FiPause size={14} /> Real-time OFF</>}
             </span>
             <button 
               className="toggle-tracking-btn"
@@ -261,12 +281,12 @@ const UsageTracker: React.FC = () => {
                 </div>
 
                 <div className="real-time-info">
-                  <small>🔄 {feature.realTimeInfo}</small>
+                  <small><FiRefreshCw size={12} /> {feature.realTimeInfo}</small>
                 </div>
 
                 {isBlocked && (
                   <div className="blocked-overlay">
-                    <span>🚫 {feature.key === 'campaigns' ? 'Premium Feature' : 'Limit Reached'}</span>
+                    <span><FiLock size={16} /> {feature.key === 'campaigns' ? 'Premium Feature' : 'Limit Reached'}</span>
                     <button 
                       className="upgrade-btn"
                       onClick={(e) => {
@@ -291,7 +311,7 @@ const UsageTracker: React.FC = () => {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            {showDetails ? '🔼 Hide Details' : '🔽 How Real-Time Tracking Works'}
+            {showDetails ? <><FiChevronUp size={16} /> Hide Details</> : <><FiChevronDown size={16} /> How Real-Time Tracking Works</>}
           </motion.button>
 
           <motion.button
@@ -304,7 +324,7 @@ const UsageTracker: React.FC = () => {
               marginLeft: '10px'
             }}
           >
-            {showTestSection ? '🔼 Hide Tests' : '🧪 Test Tracking System'}
+            {showTestSection ? <><FiChevronUp size={16} /> Hide Tests</> : <><FiZap size={16} /> Test Tracking System</>}
           </motion.button>
 
           <motion.button
@@ -317,7 +337,7 @@ const UsageTracker: React.FC = () => {
               marginLeft: '10px'
             }}
           >
-            {showDebugSection ? '🔼 Hide Debug' : '🔍 Debug Tracking'}
+            {showDebugSection ? <><FiChevronUp size={16} /> Hide Debug</> : <><FiSearch size={16} /> Debug Tracking</>}
           </motion.button>
 
           <AnimatePresence>
@@ -329,20 +349,20 @@ const UsageTracker: React.FC = () => {
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.3 }}
               >
-                <h4>🔍 Real-Time Tracking Debug Console</h4>
+                <h4><FiSearch size={16} /> Real-Time Tracking Debug Console</h4>
                 <div className="debug-controls">
                   <button onClick={testBackendConnection} className="debug-btn">
-                    🔗 Test Backend Connection
+                    <FiLink size={14} /> Test Backend Connection
                   </button>
                   <button onClick={clearDebugLogs} className="debug-btn">
-                    🧹 Clear Logs
+                    <FiTrash2 size={14} /> Clear Logs
                   </button>
                   <button onClick={() => refreshUsage()} className="debug-btn">
-                    🔄 Force Refresh Usage
+                    <FiRefreshCw size={14} /> Force Refresh Usage
                   </button>
                 </div>
                 <div className="debug-logs">
-                  <h5>📋 Debug Logs (Live):</h5>
+                  <h5><FiBarChart size={14} /> Debug Logs (Live):</h5>
                   <div className="logs-container">
                     {debugLogs.length === 0 ? (
                       <div className="no-logs">No debug logs yet. Perform some actions to see tracking in real-time!</div>
@@ -368,7 +388,7 @@ const UsageTracker: React.FC = () => {
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.3 }}
               >
-                <h4>🧪 Test Real-Time Tracking</h4>
+                <h4><FiZap size={16} /> Test Real-Time Tracking</h4>
                 <p>Click these buttons to test if the tracking system is working properly:</p>
                 <div className="test-buttons">
                   {features.map((feature) => (
@@ -379,7 +399,7 @@ const UsageTracker: React.FC = () => {
                       disabled={testingFeature !== null}
                     >
                       {testingFeature === feature.key ? (
-                        <>🔄 Testing...</>
+                        <><FiRefreshCw size={14} /> Testing...</>
                       ) : (
                         <>Test {feature.icon} {feature.name}</>
                       )}
@@ -388,7 +408,7 @@ const UsageTracker: React.FC = () => {
                 </div>
                 <div className="test-info">
                   <small>
-                    ℹ️ These test buttons will increment your usage counters to verify the tracking system is working.
+                    <FiSettings size={12} /> These test buttons will increment your usage counters to verify the tracking system is working.
                     Watch the usage bars above update in real-time!
                   </small>
                 </div>
@@ -405,29 +425,29 @@ const UsageTracker: React.FC = () => {
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.3 }}
               >
-                <h4>🎯 Professional Usage Tracking</h4>
+                <h4><FiTarget size={16} /> Professional Usage Tracking</h4>
                 <div className="tracking-explanation">
                   <div className="tracking-point">
-                    <strong>📝 Posts:</strong> Tracked when you actually create content through chat mode, schedule posts, publish via "Post Now", or use auto-scheduling features.
+                    <strong><FiEdit3 size={14} /> Posts:</strong> Tracked when you actually create content through chat mode, schedule posts, publish via "Post Now", or use auto-scheduling features.
                   </div>
                   <div className="tracking-point">
-                    <strong>💬 Discussions:</strong> Tracked when you send messages in discussion mode, manually reply to DMs/comments, or engage in AI conversations.
+                    <strong><FiMessageCircle size={14} /> Discussions:</strong> Tracked when you send messages in discussion mode, manually reply to DMs/comments, or engage in AI conversations.
                   </div>
                   <div className="tracking-point">
-                    <strong>🤖 AI Replies:</strong> Tracked when you generate AI responses, use auto-reply features, or send AI-powered replies to notifications.
+                    <strong><FiCpu size={14} /> AI Replies:</strong> Tracked when you generate AI responses, use auto-reply features, or send AI-powered replies to notifications.
                   </div>
                   <div className="tracking-point">
-                    <strong>🎯 Campaigns:</strong> Tracked when you set campaign goals, start marketing campaigns, or manage campaign activities.
+                    <strong><FiTarget size={14} /> Campaigns:</strong> Tracked when you set campaign goals, start marketing campaigns, or manage campaign activities.
                   </div>
                 </div>
                 <div className="tracking-benefits">
-                  <h5>✨ Benefits of Real-Time Tracking:</h5>
+                  <h5><FiZap size={14} /> Benefits of Real-Time Tracking:</h5>
                   <ul>
-                    <li>🔄 Accurate usage monitoring across all platforms</li>
-                    <li>⚡ Instant limit enforcement when features are used</li>
-                    <li>📊 Transparent usage analytics</li>
-                    <li>🛡️ Prevents overuse and ensures fair access</li>
-                    <li>🎯 Seamless integration with actual workflows</li>
+                    <li><FiRefreshCw size={12} /> Accurate usage monitoring across all platforms</li>
+                    <li><FiZap size={12} /> Instant limit enforcement when features are used</li>
+                    <li><FiBarChart size={12} /> Transparent usage analytics</li>
+                    <li><FiShield size={12} /> Prevents overuse and ensures fair access</li>
+                    <li><FiTarget size={12} /> Seamless integration with actual workflows</li>
                   </ul>
                 </div>
               </motion.div>

@@ -219,6 +219,7 @@ const UsageDashboard: React.FC<UsageDashboardProps> = ({ className }) => {
         reason={upgradeReason}
         limitReached={true}
         upgradeRequired={true}
+        redirectToPricing={true}
         currentUsage={{
           used: blockedFeature ? usage[blockedFeature] : 0,
           limit: blockedFeature ? (userLimits[blockedFeature] === -1 ? 'unlimited' : userLimits[blockedFeature]) : 0

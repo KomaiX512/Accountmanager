@@ -34,6 +34,8 @@ import { IoMdAnalytics } from 'react-icons/io';
 import { TbTargetArrow } from 'react-icons/tb';
 import { GiSpy } from 'react-icons/gi';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
+import useUpgradeHandler from '../../hooks/useUpgradeHandler';
+import AccessControlPopup from '../common/AccessControlPopup';
 
 // Define RagService compatible ChatMessage
 interface RagChatMessage {
@@ -179,6 +181,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const [isFacebookInsightsOpen, setIsFacebookInsightsOpen] = useState(false);
   const [isFacebookComposeOpen, setIsFacebookComposeOpen] = useState(false);
   const { trackRealDiscussion, trackRealAIReply, trackRealPostCreation, canUseFeature } = useFeatureTracking();
+  const { showUpgradePopup, blockedFeature, handleFeatureAttempt, closeUpgradePopup, currentUsage } = useUpgradeHandler();
 
   // Helper function to get unseen count for each section
   const getUnseenStrategiesCount = () => {
@@ -968,18 +971,22 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const handleSendQuery = async () => {
     if (!query.trim()) return;
     
+    // Check feature access and show upgrade popup if blocked
+    if (chatMode === 'discussion') {
+      if (!handleFeatureAttempt('discussions')) {
+        return;
+      }
+    } else if (chatMode === 'post') {
+      if (!handleFeatureAttempt('posts')) {
+        return;
+      }
+    }
+    
     setIsProcessing(true);
     setError(null);
     
     try {
       if (chatMode === 'discussion') {
-        // ✅ PRE-ACTION CHECK: Verify discussion limits before proceeding
-        const discussionAccessCheck = canUseFeature('discussions');
-        if (!discussionAccessCheck.allowed) {
-          setError(discussionAccessCheck.reason || 'Discussions feature is not available');
-          setIsProcessing(false);
-          return;
-        }
         
         console.log(`Sending ${platform} discussion query to RAG for ${accountHolder}: ${query}`);
         const response = await RagService.sendDiscussionQuery(accountHolder, query, chatMessages, platform);
@@ -1039,14 +1046,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         }
         
       } else if (chatMode === 'post') {
-        // ✅ PRE-ACTION CHECK: Verify post limits before proceeding
-        const postAccessCheck = canUseFeature('posts');
-        if (!postAccessCheck.allowed) {
-          setError(postAccessCheck.reason || 'Posts feature is not available');
-          setIsProcessing(false);
-          return;
-        }
-        
         console.log(`Generating ${platform} post for ${accountHolder}: ${query}`);
         const response = await RagService.sendPostQuery(accountHolder, query, platform);
         
@@ -1967,6 +1966,18 @@ Image Description: ${response.post.image_prompt}
           onCampaignStopped={handleCampaignStopped}
         />
       )}
+
+      {/* Upgrade Popup */}
+      <AccessControlPopup
+        isOpen={showUpgradePopup}
+        onClose={closeUpgradePopup}
+        feature={blockedFeature || 'posts'}
+        reason={`You've reached your ${blockedFeature || 'feature'} limit`}
+        limitReached={true}
+        upgradeRequired={false}
+        redirectToPricing={true}
+        currentUsage={currentUsage}
+      />
     </motion.div>
   );
 };

@@ -16,6 +16,8 @@ import { useAuth } from '../../context/AuthContext';
 import InstagramRequiredButton from '../common/InstagramRequiredButton';
 import { useInstagram } from '../../context/InstagramContext';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
+import useUpgradeHandler from '../../hooks/useUpgradeHandler';
+import AccessControlPopup from '../common/AccessControlPopup';
 
 import ChatModal from './ChatModal';
 import RagService from '../../services/RagService';
@@ -44,6 +46,7 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accountType, onOpenChat }) => {
   const { trackPost, trackDiscussion, trackAIReply, trackCampaign, isFeatureBlocked, trackRealDiscussion, canUseFeature } = useFeatureTracking();
+  const { showUpgradePopup, blockedFeature, handleFeatureAttempt, closeUpgradePopup, currentUsage } = useUpgradeHandler();
   const [query, setQuery] = useState('');
   const [toast, setToast] = useState<string | null>(null);
   const [responses, setResponses] = useState<{ key: string; data: any }[]>([]);
@@ -362,6 +365,17 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
 
   const handleSendQuery = async () => {
     if (!accountHolder || !query.trim()) return;
+    
+    // Check feature access and show upgrade popup if blocked
+    if (chatMode === 'discussion') {
+      if (!handleFeatureAttempt('discussions')) {
+        return;
+      }
+    } else if (chatMode === 'post') {
+      if (!handleFeatureAttempt('posts')) {
+        return;
+      }
+    }
     
     setIsProcessing(true);
     setResult('');
@@ -1955,6 +1969,18 @@ Image Description: ${response.post.image_prompt}
           platform="instagram"
         />
       )}
+
+      {/* Upgrade Popup */}
+      <AccessControlPopup
+        isOpen={showUpgradePopup}
+        onClose={closeUpgradePopup}
+        feature={blockedFeature || 'posts'}
+        reason={`You've reached your ${blockedFeature || 'feature'} limit`}
+        limitReached={true}
+        upgradeRequired={false}
+        redirectToPricing={true}
+        currentUsage={currentUsage}
+      />
     </motion.div>
   );
 };

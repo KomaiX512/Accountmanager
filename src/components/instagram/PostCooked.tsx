@@ -74,7 +74,7 @@ interface ImageErrorState {
 }
 
 // Base URL for all API requests (updated to match running server)
-const API_BASE_URL = 'http://localhost:3002';
+const API_BASE_URL = 'http://localhost:3000';
 
 // Debug flag - set to true to enable verbose logging
 const DEBUG_LOGGING = false;
@@ -909,127 +909,96 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
 
   const handleAutoSchedule = async (intervalOverride?: number) => {
     if (!userId || !localPosts.length) {
-      setToastMessage('No user ID or posts to schedule.');
+      setToastMessage('❌ No user ID or posts to schedule.');
       return;
     }
+
+    // ✅ PRE-VALIDATION: Check if user is connected for this platform
+    if (!isConnected) {
+      setToastMessage(`❌ Please connect your ${platform === 'twitter' ? 'Twitter' : platform === 'facebook' ? 'Facebook' : 'Instagram'} account first.`);
+      return;
+    }
+
     setAutoScheduling(true);
-    setAutoScheduleProgress('Determining scheduling interval...');
+    setAutoScheduleProgress('🔍 Determining scheduling interval...');
+    
+    let successCount = 0;
+    let failureCount = 0;
     
     try {
-      // Use the enhanced fetchTimeDelay with priority system
+      // Enhanced time delay fetching with better error handling
+      console.log(`[AutoSchedule] 🚀 Starting auto-schedule for ${localPosts.length} ${platform} posts`);
       const delayHours = await fetchTimeDelay(intervalOverride);
       
-      console.log('[AutoSchedule] Final interval determined:', delayHours, 'hours');
-      setAutoScheduleProgress(`Scheduling ${platform === 'twitter' ? 'tweets' : 'posts'} every ${delayHours} hours...`);
+      console.log(`[AutoSchedule] ⏰ Using interval: ${delayHours} hours`);
+      setAutoScheduleProgress(`⏰ Scheduling ${localPosts.length} ${platform === 'twitter' ? 'tweets' : 'posts'} every ${delayHours} hours...`);
       
-      const now = new Date();
-      
+      // ENHANCED SCHEDULING LOOP with better error handling and progress tracking
       for (let i = 0; i < localPosts.length; i++) {
         const post = localPosts[i];
-        setAutoScheduleProgress(`Scheduling ${platform === 'twitter' ? 'tweet' : 'post'} ${i + 1} of ${localPosts.length}...`);
-        console.log(`[AutoSchedule] Preparing ${platform} post #${i + 1}:`, post);
+        const postNumber = i + 1;
         
-        if (platform === 'twitter') {
-          // Twitter auto-scheduling logic
-          const caption = post.data.post?.caption || '';
-          console.log(`[AutoSchedule] Twitter caption for post #${i + 1}: "${caption}"`);
-          
-          if (caption.length > 280) {
-            console.warn(`[AutoSchedule] Tweet text too long for post #${i + 1}, truncating to 280 chars.`);
-            const truncatedCaption = caption.slice(0, 280);
+        setAutoScheduleProgress(`📝 Processing ${platform === 'twitter' ? 'tweet' : 'post'} ${postNumber}/${localPosts.length}...`);
+        
+        // Calculate schedule time for this post
+        const baseTime = Date.now() + 60 * 1000; // Start 1 minute from now
+        const scheduleTime = new Date(baseTime + (i * delayHours * 60 * 60 * 1000));
+        
+        console.log(`[AutoSchedule] 📅 Post ${postNumber} scheduled for: ${scheduleTime.toISOString()}`);
+        
+        try {
+          if (platform === 'twitter') {
+            // ============= TWITTER SCHEDULING =============
+            const caption = post.data.post?.caption || '';
+            const finalCaption = caption.length > 280 ? caption.slice(0, 280) : caption.trim();
             
-            let scheduleDate;
-            if (i === 0) {
-              const nowPlusBuffer = new Date(Date.now() + 60 * 1000);
-              scheduleDate = nowPlusBuffer;
-            } else {
-              const prevDate = new Date(Date.now() + 60 * 1000 + (i * delayHours * 60 * 60 * 1000));
-              scheduleDate = prevDate;
-            }
+            console.log(`[AutoSchedule] 🐦 Twitter post ${postNumber}: "${finalCaption.substring(0, 50)}..."`);
             
-            console.log(`[AutoSchedule] Scheduling tweet #${i + 1} at:`, scheduleDate.toISOString());
-            
-            try {
-              const response = await axios.post(`${API_BASE_URL}/api/schedule-tweet/${userId}`, {
-                text: truncatedCaption,
-                scheduled_time: scheduleDate.toISOString()
-              });
-
-              if (response.data.success) {
-                console.log(`[AutoSchedule] Scheduled tweet #${i + 1} successfully:`, response.data);
-                setToastMessage(`Scheduled tweet ${i + 1} successfully!`);
-              } else {
-                console.error(`[AutoSchedule] Failed to schedule tweet #${i + 1}:`, response.data.message);
-                setToastMessage(`Failed to schedule tweet ${i + 1}: ${response.data.message}`);
+            const response = await axios.post(`${API_BASE_URL}/api/schedule-tweet/${userId}`, {
+              text: finalCaption,
+              scheduled_time: scheduleTime.toISOString()
+            }, {
+              timeout: 10000, // 10 second timeout
+              headers: {
+                'Content-Type': 'application/json'
               }
-            } catch (err: any) {
-              console.error(`[AutoSchedule] Error scheduling tweet #${i + 1}:`, err.message);
-              setToastMessage(`Error scheduling tweet ${i + 1}: ${err.response?.data?.error || err.message}`);
-            }
-          } else {
-            let scheduleDate;
-            if (i === 0) {
-              const nowPlusBuffer = new Date(Date.now() + 60 * 1000);
-              scheduleDate = nowPlusBuffer;
-            } else {
-              const prevDate = new Date(Date.now() + 60 * 1000 + (i * delayHours * 60 * 60 * 1000));
-              scheduleDate = prevDate;
-            }
-            
-            console.log(`[AutoSchedule] Scheduling tweet #${i + 1} at:`, scheduleDate.toISOString());
-            
-            try {
-              const response = await axios.post(`${API_BASE_URL}/api/schedule-tweet/${userId}`, {
-                text: caption.trim(),
-                scheduled_time: scheduleDate.toISOString()
-              });
+            });
 
-              if (response.data.success) {
-                console.log(`[AutoSchedule] Scheduled tweet #${i + 1} successfully:`, response.data);
-                setToastMessage(`Scheduled tweet ${i + 1} successfully!`);
-              } else {
-                console.error(`[AutoSchedule] Failed to schedule tweet #${i + 1}:`, response.data.message);
-                setToastMessage(`Failed to schedule tweet ${i + 1}: ${response.data.message}`);
-              }
-            } catch (err: any) {
-              console.error(`[AutoSchedule] Error scheduling tweet #${i + 1}:`, err.message);
-              setToastMessage(`Error scheduling tweet ${i + 1}: ${err.response?.data?.error || err.message}`);
+            if (response.data.success) {
+              console.log(`[AutoSchedule] ✅ Tweet ${postNumber} scheduled successfully`);
+              successCount++;
+              setToastMessage(`✅ Tweet ${postNumber} scheduled for ${scheduleTime.toLocaleString()}`);
+            } else {
+              throw new Error(response.data.message || 'Unknown Twitter API error');
             }
-          }
-        } else if (platform === 'facebook') {
-          // Facebook auto-scheduling logic (supports optional images)
-          const caption = post.data.post?.caption || '';
-          console.log(`[AutoSchedule] Facebook post #${i + 1} caption:`, caption);
-          
-          let scheduleDate;
-          if (i === 0) {
-            const nowPlusBuffer = new Date(Date.now() + 60 * 1000);
-            scheduleDate = nowPlusBuffer;
-          } else {
-            const prevDate = new Date(Date.now() + 60 * 1000 + (i * delayHours * 60 * 60 * 1000));
-            scheduleDate = prevDate;
-          }
-          
-          console.log(`[AutoSchedule] Scheduling Facebook post #${i + 1} at:`, scheduleDate.toISOString());
-          
-          try {
+            
+          } else if (platform === 'facebook') {
+            // ============= FACEBOOK SCHEDULING =============
+            const caption = post.data.post?.caption || '';
+            console.log(`[AutoSchedule] 📘 Facebook post ${postNumber}: "${caption.substring(0, 50)}..."`);
+            
             const formData = new FormData();
             formData.append('caption', caption);
-            formData.append('scheduleDate', scheduleDate.toISOString());
+            formData.append('scheduleDate', scheduleTime.toISOString());
             formData.append('platform', 'facebook');
 
-            // Attempt to add image if available
-            let imageBlob: Blob | null = null;
+            // Enhanced image handling for Facebook
             if (post.data.image_url) {
               try {
-                const proxyUrl = `${API_BASE_URL}/api/proxy-image?url=${encodeURIComponent(post.data.image_url)}`;
+                setAutoScheduleProgress(`📷 Fetching image for Facebook post ${postNumber}...`);
+                const imageUrl = getReliableImageUrl(post, true); // Force fresh URL
+                const proxyUrl = `${API_BASE_URL}/api/proxy-image?url=${encodeURIComponent(imageUrl)}`;
+                
                 const imgRes = await fetch(proxyUrl);
-                imageBlob = await imgRes.blob();
-                const filename = `auto_facebook_post_${i + 1}.jpg`;
-                formData.append('image', imageBlob, filename);
-                console.log(`[AutoSchedule] Added image to Facebook post #${i + 1}`);
+                if (imgRes.ok) {
+                  const imageBlob = await imgRes.blob();
+                  if (imageBlob.size > 0) {
+                    formData.append('image', imageBlob, `facebook_post_${postNumber}.jpg`);
+                    console.log(`[AutoSchedule] 📷 Image added to Facebook post ${postNumber} (${imageBlob.size} bytes)`);
+                  }
+                }
               } catch (imgErr) {
-                console.warn(`[AutoSchedule] Unable to fetch image for Facebook post #${i + 1}, proceeding with text-only`);
+                console.warn(`[AutoSchedule] ⚠️ Facebook post ${postNumber}: Image fetch failed, posting text-only`);
               }
             }
 
@@ -1040,113 +1009,154 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
 
             if (!resp.ok) {
               const errData = await resp.json().catch(() => ({}));
-              console.error(`[AutoSchedule] Failed to schedule Facebook post #${i + 1}:`, errData.error || resp.statusText);
-              setToastMessage(`Failed to schedule Facebook post ${i + 1}: ${errData.error || 'Unknown error'}`);
-            } else {
-              const respData = await resp.json().catch(() => ({}));
-              console.log(`[AutoSchedule] Scheduled Facebook post #${i + 1} successfully:`, respData);
-              setToastMessage(`Scheduled Facebook post ${i + 1} successfully!`);
+              throw new Error(errData.error || `HTTP ${resp.status}: ${resp.statusText}`);
             }
-          } catch (err: any) {
-            console.error(`[AutoSchedule] Error scheduling Facebook post #${i + 1}:`, err.message);
-            setToastMessage(`Error scheduling Facebook post ${i + 1}: ${err.message}`);
-          }
-        } else {
-          // Instagram auto-scheduling logic (existing)
-          let imageKey = '';
-          if (post.data.image_url && post.data.image_url.includes('/ready_post/')) {
-            const match = post.data.image_url.match(/ready_post\/[\w-]+\/(image_\d+\.jpg)/);
-            if (match) imageKey = match[1];
-          }
-          if (!imageKey && post.key && post.key.match(/ready_post_\d+\.json$/)) {
-            const postIdMatch = post.key.match(/ready_post_(\d+)\.json$/);
-            if (postIdMatch) imageKey = `image_${postIdMatch[1]}.jpg`;
-          }
-          if (!imageKey) {
-            console.error(`[AutoSchedule] Could not determine imageKey for post #${i + 1}`);
-            setToastMessage(`Could not determine image for post ${i + 1}`);
-            continue;
-          }
-          let signedImageUrl = '';
-          try {
-            const signedUrlRes = await fetch(`${API_BASE_URL}/api/signed-image-url/${username}/${imageKey}`);
-            const signedUrlData = await signedUrlRes.json();
-            signedImageUrl = signedUrlData.url;
-            if (!signedImageUrl) throw new Error('No signed URL returned');
-            console.log(`[AutoSchedule] Got fresh signed URL for post #${i + 1}:`, signedImageUrl);
-          } catch (err) {
-            console.error(`[AutoSchedule] Failed to get signed URL for post #${i + 1}:`, err);
-            setToastMessage(`Failed to get image for post ${i + 1}`);
-            continue;
-          }
-          let imageBlob: Blob | null = null;
-          try {
-            const proxyUrl = `${API_BASE_URL}/api/proxy-image?url=${encodeURIComponent(signedImageUrl)}`;
-            console.log(`[AutoSchedule] Fetching image for post #${i + 1} via proxy:`, proxyUrl);
-            const imgRes = await fetch(proxyUrl);
-            imageBlob = await imgRes.blob();
-            console.log(`[AutoSchedule] Image fetched for post #${i + 1} via proxy`);
-          } catch (e) {
-            console.error(`[AutoSchedule] Failed to fetch image for post #${i + 1} via proxy:`, e);
-            setToastMessage(`Failed to fetch image for post ${i + 1}`);
-            continue;
-          }
-          if (!['image/jpeg', 'image/png'].includes(imageBlob.type)) {
-            console.error(`[AutoSchedule] Image for post #${i + 1} is not a valid JPEG/PNG, got: ${imageBlob.type}`);
-            setToastMessage(`Image for post ${i + 1} is not a valid JPEG/PNG, skipping.`);
-            continue;
-          }
-          let caption = post.data.post?.caption || '';
-          console.log(`[AutoSchedule] Original caption length for post #${i + 1}: ${caption.length} chars`);
-          if (caption.length > 2150) {
-            console.warn(`[AutoSchedule] Caption too long for post #${i + 1}, truncating to 2150 chars.`);
-            caption = caption.slice(0, 2150);
-          }
-          console.log(`[AutoSchedule] Caption length after truncation for post #${i + 1}: ${caption.length} chars`);
-          const type = imageBlob.type || 'image/jpeg';
-          const filename = `auto_post_${i + 1}.jpg`;
-          let scheduleDate;
-          if (i === 0) {
-            const nowPlusBuffer = new Date(Date.now() + 60 * 1000);
-            scheduleDate = nowPlusBuffer;
+
+            const respData = await resp.json();
+            console.log(`[AutoSchedule] ✅ Facebook post ${postNumber} scheduled successfully`);
+            successCount++;
+            setToastMessage(`✅ Facebook post ${postNumber} scheduled for ${scheduleTime.toLocaleString()}`);
+            
           } else {
-            const prevDate = new Date(Date.now() + 60 * 1000 + (i * delayHours * 60 * 60 * 1000));
-            scheduleDate = prevDate;
-          }
-          console.log(`[AutoSchedule] Scheduling post #${i + 1} at:`, scheduleDate.toISOString());
-          const formData = new FormData();
-          formData.append('image', imageBlob, filename);
-          formData.append('caption', caption);
-          formData.append('scheduleDate', scheduleDate.toISOString());
-          try {
-            console.log(`[AutoSchedule] Sending schedule request for post #${i + 1} to /schedule-post/${userId}`);
+            // ============= INSTAGRAM SCHEDULING (NATIVE SCHEDULER) =============
+            console.log(`[AutoSchedule] 📸 Instagram post ${postNumber}: Processing...`);
+            
+            // Enhanced image key extraction
+            let imageKey = '';
+            
+            // Method 1: From post key (most reliable)
+            if (post.key && post.key.match(/ready_post_\d+\.json$/)) {
+              const postIdMatch = post.key.match(/ready_post_(\d+)\.json$/);
+              if (postIdMatch) {
+                imageKey = `image_${postIdMatch[1]}.jpg`;
+                console.log(`[AutoSchedule] 🔑 Extracted imageKey from post key: ${imageKey}`);
+              }
+            }
+            
+            // Method 2: From image URL (fallback)
+            if (!imageKey && post.data.image_url) {
+              const urlMatch = post.data.image_url.match(/(image_\d+\.jpg)/);
+              if (urlMatch) {
+                imageKey = urlMatch[1];
+                console.log(`[AutoSchedule] 🔑 Extracted imageKey from URL: ${imageKey}`);
+              }
+            }
+            
+            if (!imageKey) {
+              console.error(`[AutoSchedule] ❌ Could not determine imageKey for post ${postNumber}`);
+              failureCount++;
+              setToastMessage(`❌ Post ${postNumber}: Could not determine image`);
+              continue;
+            }
+
+            // Enhanced image fetching with multiple fallback methods
+            let imageBlob: Blob | null = null;
+            
+            try {
+              setAutoScheduleProgress(`📷 Fetching image for Instagram post ${postNumber}...`);
+              
+              // Try direct R2 image first (most reliable)
+              const directImageUrl = `${API_BASE_URL}/api/r2-image/${username}/${imageKey}?platform=instagram&t=${Date.now()}`;
+              console.log(`[AutoSchedule] 🎯 Trying direct R2 URL: ${directImageUrl}`);
+              
+              let imgRes = await fetch(directImageUrl);
+              
+              if (!imgRes.ok) {
+                console.warn(`[AutoSchedule] ⚠️ Direct R2 failed, trying signed URL...`);
+                
+                // Fallback to signed URL
+                const signedUrlRes = await fetch(`${API_BASE_URL}/api/signed-image-url/${username}/${imageKey}?platform=instagram`);
+                const signedUrlData = await signedUrlRes.json();
+                
+                if (!signedUrlData.url) {
+                  throw new Error('No signed URL returned');
+                }
+                
+                const proxyUrl = `${API_BASE_URL}/api/proxy-image?url=${encodeURIComponent(signedUrlData.url)}`;
+                                 imgRes = await fetch(proxyUrl);
+              }
+              
+              if (!imgRes.ok) {
+                throw new Error(`Image fetch failed: HTTP ${imgRes.status}`);
+              }
+              
+              imageBlob = await imgRes.blob();
+              
+              // Validate image blob
+              if (!imageBlob || imageBlob.size === 0) {
+                throw new Error('Empty image blob received');
+              }
+              
+              if (!['image/jpeg', 'image/png'].includes(imageBlob.type)) {
+                throw new Error(`Invalid image type: ${imageBlob.type}`);
+              }
+              
+              console.log(`[AutoSchedule] ✅ Image fetched for post ${postNumber}: ${imageBlob.size} bytes, type: ${imageBlob.type}`);
+              
+                         } catch (imgError: any) {
+               console.error(`[AutoSchedule] ❌ Image fetch failed for post ${postNumber}:`, imgError);
+               failureCount++;
+               setToastMessage(`❌ Post ${postNumber}: Image fetch failed - ${imgError?.message || 'Unknown error'}`);
+               continue;
+             }
+
+            // Enhanced caption handling
+            let caption = post.data.post?.caption || '';
+            console.log(`[AutoSchedule] 📝 Original caption length: ${caption.length} chars`);
+            
+            if (caption.length > 2150) {
+              console.warn(`[AutoSchedule] ✂️ Truncating caption from ${caption.length} to 2150 chars`);
+              caption = caption.slice(0, 2150);
+            }
+
+            // Submit to our NATIVE Instagram scheduler
+            const formData = new FormData();
+            formData.append('image', imageBlob, `auto_instagram_post_${postNumber}.jpg`);
+            formData.append('caption', caption);
+            formData.append('scheduleDate', scheduleTime.toISOString());
+            formData.append('platform', 'instagram');
+
+            console.log(`[AutoSchedule] 📤 Submitting Instagram post ${postNumber} to NATIVE scheduler...`);
+            
             const resp = await fetch(`${API_BASE_URL}/schedule-post/${userId}`, {
               method: 'POST',
               body: formData,
             });
+
             if (!resp.ok) {
               const errData = await resp.json().catch(() => ({}));
-              console.error(`[AutoSchedule] Failed to schedule post #${i + 1}:`, errData.error || resp.statusText);
-              setToastMessage(`Failed to schedule post ${i + 1}: ${errData.error || 'Unknown server error'}`);
-            } else {
-              const respData = await resp.json().catch(() => ({}));
-              console.log(`[AutoSchedule] Scheduled post #${i + 1} successfully:`, respData);
-              setToastMessage(`Scheduled post ${i + 1} successfully!`);
+              throw new Error(errData.error || `HTTP ${resp.status}: ${resp.statusText}`);
             }
-          } catch (err: any) {
-            console.error(`[AutoSchedule] Error scheduling post #${i + 1}:`, err.message);
-            setToastMessage(`Error scheduling post ${i + 1}: ${err.message}`);
+
+            const respData = await resp.json();
+            console.log(`[AutoSchedule] ✅ Instagram post ${postNumber} scheduled successfully:`, respData.scheduleId);
+            successCount++;
+            setToastMessage(`✅ Instagram post ${postNumber} scheduled for ${scheduleTime.toLocaleString()}`);
           }
+          
+        } catch (postError: any) {
+          console.error(`[AutoSchedule] ❌ Failed to schedule ${platform} post ${postNumber}:`, postError.message);
+          failureCount++;
+          setToastMessage(`❌ Post ${postNumber} failed: ${postError.message}`);
+          
+          // Continue with next post rather than stopping entire process
+          continue;
         }
         
-        await new Promise(res => setTimeout(res, 500));
+        // Small delay between posts to prevent API spam
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
+      
+      // Final results
       setAutoScheduleProgress(null);
-      setToastMessage(`All ${platform === 'twitter' ? 'tweets' : 'posts'} scheduled successfully! Interval: ${delayHours} hours`);
+      const resultMessage = `🎉 Auto-schedule completed! ✅ ${successCount} scheduled, ❌ ${failureCount} failed. Interval: ${delayHours}h`;
+      setToastMessage(resultMessage);
+      console.log(`[AutoSchedule] 🏁 COMPLETED: ${successCount}/${localPosts.length} posts scheduled successfully`);
+      
     } catch (err: any) {
-      console.error('[AutoSchedule] Auto-scheduling failed:', err.message);
+      console.error('[AutoSchedule] 💥 Fatal error during auto-scheduling:', err);
       setAutoScheduleProgress(null);
-      setToastMessage(`Auto-scheduling failed: ${err.message}`);
+      setToastMessage(`💥 Auto-scheduling failed: ${err.message}`);
     } finally {
       setAutoScheduling(false);
     }

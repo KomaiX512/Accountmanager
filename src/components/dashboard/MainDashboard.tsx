@@ -348,8 +348,8 @@ const MainDashboard: React.FC = () => {
         
         // Only update if connection status actually changed
         if (platform.connected !== connectionStatus) {
-          return { 
-            ...platform, 
+        return { 
+          ...platform, 
             connected: connectionStatus
           };
         }
@@ -372,9 +372,9 @@ const MainDashboard: React.FC = () => {
             ...platform,
             notifications: {
               total: platformNotificationCount,
-              breakdown: { cs_analysis: 0, our_strategies: 0, dms_comments: 0, cooked_posts: 0 }
-            }
-          };
+            breakdown: { cs_analysis: 0, our_strategies: 0, dms_comments: 0, cooked_posts: 0 }
+          }
+        };
         }
         
         return platform;
@@ -403,7 +403,7 @@ const MainDashboard: React.FC = () => {
         
         // Only refresh Twitter connection if we don't already have one
         if (!twitterUserId) {
-          refreshTwitterConnection();
+        refreshTwitterConnection();
         }
         
         // Update platforms with fresh localStorage values
@@ -449,7 +449,7 @@ const MainDashboard: React.FC = () => {
         ].some(Boolean);
         
         if (hasNewClaims) {
-          fetchRealTimeNotifications();
+        fetchRealTimeNotifications();
         }
       }
     };
@@ -911,68 +911,68 @@ const MainDashboard: React.FC = () => {
             <UsageDashboard />
             
             <div className="platform-usage-stats">
-              <div className="usage-header">
-                <h2>Platform Usage</h2>
-              </div>
-              
-              <div className="usage-stats">
-                <div className="usage-stat">
-                  <div className="stat-icon claimed">
-                    <svg viewBox="0 0 24 24">
-                      <path d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M11,16.5L18,9.5L16.59,8.09L11,13.67L7.91,10.59L6.5,12L11,16.5Z" />
-                    </svg>
-                  </div>
-                  <div className="stat-details">
-                    <h4>Claimed Platforms</h4>
-                    <p className="stat-value">{platforms.filter(p => p.claimed).length}</p>
-                  </div>
+            <div className="usage-header">
+              <h2>Platform Usage</h2>
+            </div>
+            
+            <div className="usage-stats">
+              <div className="usage-stat">
+                <div className="stat-icon claimed">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M11,16.5L18,9.5L16.59,8.09L11,13.67L7.91,10.59L6.5,12L11,16.5Z" />
+                  </svg>
                 </div>
-                
-                <div className="usage-stat">
-                  <div className="stat-icon connected">
-                    <svg viewBox="0 0 24 24">
-                      <path d="M8,3A2,2 0 0,0 6,5V9A2,2 0 0,1 4,11H3V13H4A2,2 0 0,1 6,15V19A2,2 0 0,0 8,21H10V19H8V14A2,2 0 0,0 6,12A2,2 0 0,0 8,10V5H10V3M16,3A2,2 0 0,1 18,5V9A2,2 0 0,0 20,11H21V13H20A2,2 0 0,0 18,15V19A2,2 0 0,1 16,21H14V19H16V14A2,2 0 0,1 18,12A2,2 0 0,1 16,10V5H14V3H16Z" />
-                    </svg>
-                  </div>
-                  <div className="stat-details">
-                    <h4>Connected APIs</h4>
-                    <p className="stat-value">{platforms.filter(p => p.connected).length}</p>
-                  </div>
-                </div>
-                
-                <div className="usage-stat">
-                  <div className="stat-icon posts">
-                    <svg viewBox="0 0 24 24">
-                      <path d="M20,2H4A2,2 0 0,0 2,4V22L6,18H20A2,2 0 0,0 22,16V4A2,2 0 0,0 20,2M6,9H18V11H6M14,14H6V12H14M18,8H6V6H18" />
-                    </svg>
-                  </div>
-                  <div className="stat-details">
-                    <h4>Created Posts</h4>
-                    <p className="stat-value">{
-                      platforms.filter(p => p.claimed).reduce((total, p) => {
-                        return total + p.notifications.breakdown.cooked_posts;
-                      }, 0)
-                    }</p>
-                  </div>
-                </div>
-                
-                <div className="usage-stat">
-                  <div className="stat-icon ai">
-                    <svg viewBox="0 0 24 24">
-                      <path d="M21,15.61L19.59,17.02L17.7,15.13L16.29,16.54L18.17,18.44L16.76,19.85L14.87,17.95L13.46,19.36L15.35,21.25L13.94,22.66L9.17,17.88L17.88,9.17L22.66,13.94L21.25,15.35L19.35,13.46L17.95,14.87L19.84,16.76L18.43,18.17L16.54,16.29L15.13,17.7L17.02,19.59L15.61,21L13.71,19.1L12.3,20.51L14.19,22.41L12.78,23.82L8,19.05V21H3V16L4.95,17.95L6.36,16.54L4.46,14.64L5.87,13.23L7.77,15.13L9.18,13.72L7.28,11.82L8.69,10.41L10.59,12.31L12,10.9L10.1,9L11.51,7.59L13.41,9.49L14.82,8.08L12.92,6.18L14.33,4.77L18.55,9L19.96,7.59L15.75,3.38L17.16,1.97L22.25,7.06L21.26,8.04L19.37,6.15L17.96,7.56L19.85,9.46L18.44,10.87L16.55,8.97L15.14,10.38L17.03,12.28L15.62,13.69L13.73,11.79L12.32,13.2L14.21,15.1L12.8,16.51L10.91,14.61L9.5,16.02L11.39,17.92L9.98,19.33L8.09,17.43L6.68,18.84L8.57,20.74L7.16,22.15L3,18V13H1V8H3V3H8V1H13V3H16.12L21,7.88V15.61Z" />
-                    </svg>
-                  </div>
-                  <div className="stat-details">
-                    <h4>AI Agent Active</h4>
-                    <p className="stat-value">{platforms.some(p => p.claimed) ? "Yes" : "No"}</p>
-                  </div>
+                <div className="stat-details">
+                  <h4>Claimed Platforms</h4>
+                  <p className="stat-value">{platforms.filter(p => p.claimed).length}</p>
                 </div>
               </div>
               
-              <div className="usage-chart-container">
-                <h3>Activity Over Time</h3>
-                <div className="placeholder-chart">
-                  <p>Platform activity chart will be displayed here</p>
+              <div className="usage-stat">
+                <div className="stat-icon connected">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M8,3A2,2 0 0,0 6,5V9A2,2 0 0,1 4,11H3V13H4A2,2 0 0,1 6,15V19A2,2 0 0,0 8,21H10V19H8V14A2,2 0 0,0 6,12A2,2 0 0,0 8,10V5H10V3M16,3A2,2 0 0,1 18,5V9A2,2 0 0,0 20,11H21V13H20A2,2 0 0,0 18,15V19A2,2 0 0,1 16,21H14V19H16V14A2,2 0 0,1 18,12A2,2 0 0,1 16,10V5H14V3H16Z" />
+                  </svg>
+                </div>
+                <div className="stat-details">
+                  <h4>Connected APIs</h4>
+                  <p className="stat-value">{platforms.filter(p => p.connected).length}</p>
+                </div>
+              </div>
+              
+              <div className="usage-stat">
+                <div className="stat-icon posts">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M20,2H4A2,2 0 0,0 2,4V22L6,18H20A2,2 0 0,0 22,16V4A2,2 0 0,0 20,2M6,9H18V11H6M14,14H6V12H14M18,8H6V6H18" />
+                  </svg>
+                </div>
+                <div className="stat-details">
+                  <h4>Created Posts</h4>
+                  <p className="stat-value">{
+                    platforms.filter(p => p.claimed).reduce((total, p) => {
+                      return total + p.notifications.breakdown.cooked_posts;
+                    }, 0)
+                  }</p>
+                </div>
+              </div>
+              
+              <div className="usage-stat">
+                <div className="stat-icon ai">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M21,15.61L19.59,17.02L17.7,15.13L16.29,16.54L18.17,18.44L16.76,19.85L14.87,17.95L13.46,19.36L15.35,21.25L13.94,22.66L9.17,17.88L17.88,9.17L22.66,13.94L21.25,15.35L19.35,13.46L17.95,14.87L19.84,16.76L18.43,18.17L16.54,16.29L15.13,17.7L17.02,19.59L15.61,21L13.71,19.1L12.3,20.51L14.19,22.41L12.78,23.82L8,19.05V21H3V16L4.95,17.95L6.36,16.54L4.46,14.64L5.87,13.23L7.77,15.13L9.18,13.72L7.28,11.82L8.69,10.41L10.59,12.31L12,10.9L10.1,9L11.51,7.59L13.41,9.49L14.82,8.08L12.92,6.18L14.33,4.77L18.55,9L19.96,7.59L15.75,3.38L17.16,1.97L22.25,7.06L21.26,8.04L19.37,6.15L17.96,7.56L19.85,9.46L18.44,10.87L16.55,8.97L15.14,10.38L17.03,12.28L15.62,13.69L13.73,11.79L12.32,13.2L14.21,15.1L12.8,16.51L10.91,14.61L9.5,16.02L11.39,17.92L9.98,19.33L8.09,17.43L6.68,18.84L8.57,20.74L7.16,22.15L3,18V13H1V8H3V3H8V1H13V3H16.12L21,7.88V15.61Z" />
+                  </svg>
+                </div>
+                <div className="stat-details">
+                  <h4>AI Agent Active</h4>
+                  <p className="stat-value">{platforms.some(p => p.claimed) ? "Yes" : "No"}</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="usage-chart-container">
+              <h3>Activity Over Time</h3>
+              <div className="placeholder-chart">
+                <p>Platform activity chart will be displayed here</p>
                 </div>
               </div>
             </div>

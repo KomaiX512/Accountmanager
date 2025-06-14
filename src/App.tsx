@@ -35,13 +35,13 @@ const App: React.FC = () => {
     <AuthProvider>
       <UsageProvider>
         <UpgradePopupProvider>
-          <InstagramProvider>
-            <TwitterProvider>
-              <FacebookProvider>
-                <AppContent />
-              </FacebookProvider>
-            </TwitterProvider>
-          </InstagramProvider>
+      <InstagramProvider>
+        <TwitterProvider>
+          <FacebookProvider>
+            <AppContent />
+          </FacebookProvider>
+        </TwitterProvider>
+      </InstagramProvider>
         </UpgradePopupProvider>
       </UsageProvider>
     </AuthProvider>

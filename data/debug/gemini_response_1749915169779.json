@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption: Glow up, it's a lifestyle ✨ Get ready to unleash your inner radiance with our NEW Diamond Bomb All-Over Diamond Veil in \"Cognac Candy\"! This shimmering bronze will have you looking like a million bucks. 😉 Shop now at fentybeauty.com and @sephora!\n\nHashtags: #fentybeauty #diamondbomb #glowup #bronze #makeup #rihanna #beauty #shimmer #newrelease #sephora\n\nCall to Action: Tap to shop and tell us what you think of this shade in the comments! 👇\n\nVisual Description for Image: A close-up studio shot focusing on the Fenty Beauty Diamond Bomb All-Over Diamond Veil in the shade \"Cognac Candy.\" The product is displayed in its signature compact, with the lid slightly ajar to reveal the shimmering bronze powder inside. The powder should have a highly reflective, almost wet-looking sheen. The background is a soft, diffused warm brown, mimicking the color of the product. Lighting is dramatic and focused, highlighting the sparkle and texture of the powder. The composition should be clean and modern, with the product centered and taking up most of the frame. The overall mood is luxurious and glamorous. Include subtle glints of light reflecting off the powder to emphasize its diamond-like quality. The Fenty Beauty logo should be subtly visible on the compact. The image should evoke a feeling of warmth, richness, and high-end beauty. The style should be consistent with Fenty Beauty's existing visual aesthetic: bold, inclusive, and effortlessly cool.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.3346106592413003
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 264,
+    "candidatesTokenCount": 317,
+    "totalTokenCount": 581,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 264
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 317
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "H5ZNaITPBcfWnvgPkdH22Ao"
+}

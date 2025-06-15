@@ -149,7 +149,7 @@ export const disconnectTwitterAccount = async (authUserId: string): Promise<void
     
     // Call backend to remove the connection record
     const axios = (await import('axios')).default;
-    await axios.delete(`http://localhost:3000/twitter-connection/${authUserId}`);
+    await axios.delete(`/api/twitter-connection/${authUserId}`);
     
     // Then clear from local storage and mark as disconnected
     clearTwitterConnection(authUserId);

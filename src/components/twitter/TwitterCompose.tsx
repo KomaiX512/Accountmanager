@@ -91,7 +91,7 @@ const TwitterCompose: React.FC<TwitterComposeProps> = ({ userId, onClose }) => {
           formData.append('text', tweetText.trim() || ''); // Always send text field, even if empty
           formData.append('scheduled_time', scheduleDate.toISOString());
 
-          const response = await fetch(`http://localhost:3000/schedule-tweet-with-image/${userIdToUse}`, {
+          const response = await fetch(`/api/schedule-tweet-with-image/${userIdToUse}`, {
             method: 'POST',
             body: formData,
           });
@@ -112,7 +112,7 @@ const TwitterCompose: React.FC<TwitterComposeProps> = ({ userId, onClose }) => {
           }
         } else {
           // Schedule text-only tweet
-          const response = await axios.post(`http://localhost:3000/schedule-tweet/${userIdToUse}`, {
+          const response = await axios.post(`/api/schedule-tweet/${userIdToUse}`, {
             text: tweetText.trim()
           });
 
@@ -133,7 +133,7 @@ const TwitterCompose: React.FC<TwitterComposeProps> = ({ userId, onClose }) => {
           formData.append('image', selectedImage);
           formData.append('text', tweetText.trim() || ''); // Always send text field, even if empty
 
-          const response = await fetch(`http://localhost:3000/post-tweet-with-image/${userIdToUse}`, {
+          const response = await fetch(`/api/post-tweet-with-image/${userIdToUse}`, {
             method: 'POST',
             body: formData,
           });
@@ -154,7 +154,7 @@ const TwitterCompose: React.FC<TwitterComposeProps> = ({ userId, onClose }) => {
           }
         } else {
           // Post text-only tweet
-          const response = await axios.post(`http://localhost:3000/post-tweet/${userIdToUse}`, {
+          const response = await axios.post(`/api/post-tweet/${userIdToUse}`, {
             text: tweetText.trim()
           });
 

@@ -41,7 +41,7 @@ export const TwitterProvider: React.FC<TwitterProviderProps> = ({ children }) =>
     
     try {
       console.log(`[${new Date().toISOString()}] Checking for existing Twitter connection for user ${currentUser.uid}`);
-      const response = await axios.get(`http://localhost:3000/twitter-connection/${currentUser.uid}`);
+      const response = await axios.get(`/api/twitter-connection/${currentUser.uid}`);
       
       if (response.data.twitter_user_id) {
         setUserId(response.data.twitter_user_id);

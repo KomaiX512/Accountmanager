@@ -20,8 +20,8 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
   
   // Construct endpoint with platform parameter
   const baseEndpoint = accountType === 'branding'
-    ? `http://localhost:3000/retrieve-strategies/${normalizedAccountHolder}`
-    : `http://localhost:3000/retrieve-engagement-strategies/${normalizedAccountHolder}`;
+    ? `/api/retrieve-strategies/${normalizedAccountHolder}`
+    : `/api/retrieve-engagement-strategies/${normalizedAccountHolder}`;
   
   const endpoint = `${baseEndpoint}?platform=${platform}`;
 

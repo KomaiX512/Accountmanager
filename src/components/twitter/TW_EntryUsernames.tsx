@@ -38,9 +38,9 @@ const TW_EntryUsernames: React.FC<TW_EntryUsernamesProps> = ({
   const { currentUser } = useAuth();
 
   // Twitter-specific endpoints
-  const apiUrl = 'http://localhost:3000/save-account-info';
-  const statusApiUrl = 'http://localhost:3000/user-twitter-status';
-  const usernameCheckUrl = 'http://localhost:3000/check-username-availability';
+  const apiUrl = '/api/save-account-info';
+const statusApiUrl = '/api/user-twitter-status';
+const usernameCheckUrl = '/api/check-username-availability';
 
   // Twitter username validation regex (alphanumeric and underscores only)
   const twitterUsernameRegex = /^[a-zA-Z0-9_]+$/;

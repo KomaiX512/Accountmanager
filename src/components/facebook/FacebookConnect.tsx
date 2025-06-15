@@ -23,7 +23,7 @@ const FacebookConnect: React.FC<FacebookConnectProps> = ({ onConnected, classNam
       if (!currentUser?.uid) return;
       
       try {
-        const response = await axios.get(`http://localhost:3000/facebook-connection/${currentUser.uid}`);
+        const response = await axios.get(`/api/facebook-connection/${currentUser.uid}`);
         if (response.data.facebook_page_id) {
           setFacebookId(response.data.facebook_page_id);
           setUsername(response.data.username || null);
@@ -74,7 +74,7 @@ const FacebookConnect: React.FC<FacebookConnectProps> = ({ onConnected, classNam
           connectionDataRef.current = connectionData;
           isStoringConnectionRef.current = true;
           
-          axios.post(`http://localhost:3000/facebook-connection/${currentUser.uid}`, connectionData)
+          axios.post(`/api/facebook-connection/${currentUser.uid}`, connectionData)
             .then(() => {
               console.log(`[${new Date().toISOString()}] Successfully stored Facebook connection in backend for user ${currentUser.uid}`);
             })
@@ -147,7 +147,7 @@ const FacebookConnect: React.FC<FacebookConnectProps> = ({ onConnected, classNam
     if (currentUser?.uid && !isStoringConnectionRef.current) {
       isStoringConnectionRef.current = true;
       
-      axios.delete(`http://localhost:3000/facebook-connection/${currentUser.uid}`)
+      axios.delete(`/api/facebook-connection/${currentUser.uid}`)
         .then(() => {
           console.log(`[${new Date().toISOString()}] Successfully removed Facebook connection from backend for user ${currentUser.uid}`);
         })

@@ -45,7 +45,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
 
   const competitorsQuery = localCompetitors.length > 0 ? localCompetitors.join(',') : '';
   const competitorEndpoint = competitorsQuery 
-    ? `http://localhost:3000/retrieve-multiple/${normalizedAccountHolder}?competitors=${competitorsQuery}&platform=${platform}` 
+    ? `/api/retrieve-multiple/${normalizedAccountHolder}?competitors=${competitorsQuery}&platform=${platform}` 
     : '';
   
   const allCompetitorsFetch = useR2Fetch<any[]>(competitorEndpoint);
@@ -76,7 +76,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
       if (now - lastFetchTime < 1800000 && competitorProfiles[competitor]) {
         return;
       }
-      const response = await axios.get(`http://localhost:3000/profile-info/${competitor}?platform=${platform}`);
+      const response = await axios.get(`/api/profile-info/${competitor}?platform=${platform}`);
       console.log(`Profile info for ${platform} competitor ${competitor}:`, response.data);
       setCompetitorProfiles(prev => ({
         ...prev,
@@ -98,7 +98,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
   const fetchAccountInfoWithRetry = useCallback(async (retries = 3, delay = 1000): Promise<string[] | null> => {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
-        const response = await axios.get(`http://localhost:3000/retrieve-account-info/${normalizedAccountHolder}?platform=${platform}`);
+        const response = await axios.get(`/api/retrieve-account-info/${normalizedAccountHolder}?platform=${platform}`);
         const accountInfo: AccountInfo = response.data;
         setError(null);
         setNeedsRefresh(false);
@@ -119,7 +119,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
 
   const updateCompetitors = useCallback(async (updatedCompetitors: string[]) => {
     try {
-      const response = await axios.post(`http://localhost:3000/save-account-info?platform=${platform}`, {
+      const response = await axios.post(`/api/save-account-info?platform=${platform}`, {
         username: normalizedAccountHolder,
         accountType: 'branding',
         postingStyle: 'I post about NewYork lives',

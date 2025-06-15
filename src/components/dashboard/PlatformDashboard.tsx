@@ -349,7 +349,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
 
     try {
       if (notification.type === 'message' && notification.sender_id && notification.message_id) {
-        await axios.post(`http://localhost:3000/send-dm-reply/${currentUserId}`, {
+        await axios.post(`/api/send-dm-reply/${currentUserId}`, {
           sender_id: notification.sender_id,
           text: replyText,
           message_id: notification.message_id,
@@ -367,7 +367,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         setNotifications(prev => prev.filter(n => n.message_id !== notification.message_id));
         setToast(`${platform === 'twitter' ? 'Tweet' : platform === 'facebook' ? 'Facebook message' : 'DM'} reply sent!`);
       } else if (notification.type === 'comment' && notification.comment_id) {
-        await axios.post(`http://localhost:3000/send-comment-reply/${currentUserId}`, {
+        await axios.post(`/api/send-comment-reply/${currentUserId}`, {
           comment_id: notification.comment_id,
           text: replyText,
           platform: platform
@@ -533,7 +533,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     }));
     
     try {
-      const sendResponse = await fetch(`http://localhost:3000/send-dm-reply/${currentUserId}`, {
+      const sendResponse = await fetch(`/api/send-dm-reply/${currentUserId}`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -772,7 +772,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     console.log(`[${new Date().toISOString()}] Fetching ${platform} notifications for ${currentUserId} (attempt ${attempt}/${maxAttempts})`);
     
     try {
-      const response = await fetch(`http://localhost:3000/events-list/${currentUserId}?platform=${platform}`);
+      const response = await fetch(`/events-list/${currentUserId}?platform=${platform}`);
       if (!response.ok) {
         throw new Error(`Failed to fetch ${platform} notifications: ${response.status} ${response.statusText}`);
       }
@@ -825,7 +825,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       eventSourceRef.current = null;
     }
 
-    const eventSource = new EventSource(`http://localhost:3000/events/${userId}?platform=${platform}`);
+    const eventSource = new EventSource(`/events/${userId}?platform=${platform}`);
     eventSourceRef.current = eventSource;
 
     eventSource.onopen = () => {
@@ -866,7 +866,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         const platformParam = `?platform=${platform}`;
         
         if (prefix.startsWith(`queries/${platform}/${accountHolder}/`)) {
-          axios.get(`http://localhost:3000/responses/${accountHolder}${platformParam}`).then(res => {
+          axios.get(`/api/responses/${accountHolder}${platformParam}`).then(res => {
             setResponses(res.data);
             setToast(`New ${platform} response received!`);
           }).catch(err => {
@@ -877,8 +877,8 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         
         if (prefix.startsWith(`recommendations/${platform}/${accountHolder}/`) || prefix.startsWith(`engagement_strategies/${platform}/${accountHolder}/`)) {
           const endpoint = accountType === 'branding' 
-            ? `http://localhost:3000/retrieve-strategies/${accountHolder}${platformParam}`
-            : `http://localhost:3000/retrieve-engagement-strategies/${accountHolder}${platformParam}`;
+            ? `/api/retrieve-strategies/${accountHolder}${platformParam}`
+            : `/api/retrieve-engagement-strategies/${accountHolder}${platformParam}`;
           
           axios.get(endpoint).then(res => {
             setStrategies(res.data);
@@ -890,7 +890,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         }
         
         if (prefix.startsWith(`ready_post/${platform}/${accountHolder}/`)) {
-          axios.get(`http://localhost:3000/posts/${accountHolder}${platformParam}`).then(res => {
+          axios.get(`/api/posts/${accountHolder}${platformParam}`).then(res => {
             setPosts(res.data);
             setToast(`New ${platform} post cooked!`);
           }).catch(err => {
@@ -1131,7 +1131,7 @@ Image Description: ${response.post.image_prompt}
       const platformParam = `?platform=${platform}${forceRefresh ? '&forceRefresh=true' : ''}`;
       
       const [responsesData, strategiesData, postsData, competitorData] = await Promise.all([
-        axios.get(`http://localhost:3000/responses/${accountHolder}${platformParam}`).catch(err => {
+        axios.get(`/api/responses/${accountHolder}${platformParam}`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
@@ -1139,7 +1139,7 @@ Image Description: ${response.post.image_prompt}
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        axios.get(`http://localhost:3000/posts/${accountHolder}${platformParam}`).catch(err => {
+        axios.get(`/api/posts/${accountHolder}${platformParam}`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
@@ -1181,7 +1181,7 @@ Image Description: ${response.post.image_prompt}
     setProfileError(null);
     setImageError(false);
     try {
-      const response = await axios.get(`http://localhost:3000/profile-info/${accountHolder}${platformParam ? `${platformParam}&forceRefresh=true` : '?forceRefresh=true'}`);
+      const response = await axios.get(`/api/profile-info/${accountHolder}${platformParam ? `${platformParam}&forceRefresh=true` : '?forceRefresh=true'}`);
       setProfileInfo(response.data);
       console.log(`${config.name} Profile Info Fetched:`, response.data);
     } catch (err: any) {
@@ -1537,7 +1537,7 @@ Image Description: ${response.post.image_prompt}
                   <>
                     {profileInfo?.profilePicUrlHD && !imageError ? (
                       <img
-                        src={`http://localhost:3000/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}`}
+                        src={`/api/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}`}
                         alt={`${accountHolder}'s profile picture`}
                         className="profile-pic-bar"
                         onError={(e) => {
@@ -1547,7 +1547,7 @@ Image Description: ${response.post.image_prompt}
                             console.log(`Retrying profile picture load, attempt ${imageRetryAttemptsRef.current}/${maxImageRetryAttempts}`);
                             const imgElement = e.target as HTMLImageElement;
                             setTimeout(() => {
-                              imgElement.src = `http://localhost:3000/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}`;
+                              imgElement.src = `/api/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}`;
                             }, 1000);
                           } else {
                             setImageError(true);

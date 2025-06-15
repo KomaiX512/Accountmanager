@@ -22,7 +22,7 @@ const TwitterConnect: React.FC<TwitterConnectProps> = ({ onConnected, className 
     if (!currentUser?.uid) return;
     
     try {
-      const response = await axios.get(`http://localhost:3000/twitter-connection/${currentUser.uid}`);
+      const response = await axios.get(`/api/twitter-connection/${currentUser.uid}`);
       if (response.data?.twitter_user_id) {
         setIsConnected(true);
         setTwitterUsername(response.data.username || 'Twitter User');
@@ -57,7 +57,7 @@ const TwitterConnect: React.FC<TwitterConnectProps> = ({ onConnected, className 
           isStoringConnectionRef.current = true;
           
           // Store connection in backend
-          axios.post(`http://localhost:3000/twitter-connection/${currentUser.uid}`, {
+          axios.post(`/api/twitter-connection/${currentUser.uid}`, {
             twitter_user_id: event.data.userId,
             username: event.data.username
           })
@@ -159,7 +159,7 @@ const TwitterConnect: React.FC<TwitterConnectProps> = ({ onConnected, className 
     if (currentUser?.uid && !isStoringConnectionRef.current) {
       isStoringConnectionRef.current = true;
       
-      axios.delete(`http://localhost:3000/twitter-connection/${currentUser.uid}`)
+      axios.delete(`/api/twitter-connection/${currentUser.uid}`)
         .then(() => {
           console.log(`[${new Date().toISOString()}] Successfully removed Twitter connection from backend for user ${currentUser.uid}`);
           setIsConnected(false);

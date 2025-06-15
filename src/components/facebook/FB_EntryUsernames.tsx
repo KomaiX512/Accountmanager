@@ -36,9 +36,9 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
   const navigate = useNavigate();
   const { currentUser } = useAuth();
 
-  const apiUrl = 'http://localhost:3000/save-account-info';
-  const statusApiUrl = 'http://localhost:3000/user-facebook-status';
-  const usernameCheckUrl = 'http://localhost:3000/check-username-availability';
+  const apiUrl = '/api/save-account-info';
+const statusApiUrl = '/api/user-facebook-status';
+const usernameCheckUrl = '/api/check-username-availability';
 
   // Facebook username validation (letters, numbers, periods only - no underscores for Facebook)
   const facebookUsernameRegex = /^[a-zA-Z0-9.]+$/;

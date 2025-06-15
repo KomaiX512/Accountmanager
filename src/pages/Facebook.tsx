@@ -19,7 +19,7 @@ const Facebook: React.FC = () => {
       }
 
       try {
-        const response = await axios.get(`http://localhost:3000/user-facebook-status/${currentUser.uid}`);
+        const response = await axios.get(`/api/user-facebook-status/${currentUser.uid}`);
         
         if (response.data.hasEnteredFacebookUsername) {
           // User has already entered username, redirect to dashboard

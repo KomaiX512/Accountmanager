@@ -37,9 +37,9 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
   const navigate = useNavigate();
   const { currentUser } = useAuth(); // Get the current user from auth context
 
-  const apiUrl = 'http://localhost:3000/save-account-info';
-  const statusApiUrl = 'http://localhost:3000/user-instagram-status';
-  const usernameCheckUrl = 'http://localhost:3000/check-username-availability';
+  const apiUrl = '/api/save-account-info';
+const statusApiUrl = '/api/user-instagram-status';
+const usernameCheckUrl = '/api/check-username-availability';
 
   // Username validation regex (lowercase letters, numbers, underscores, periods only)
   const instagramUsernameRegex = /^[a-z0-9._]+$/;

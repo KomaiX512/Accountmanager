@@ -31,7 +31,7 @@ const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHas
       setIsLoading(true);
       setError(null);
       try {
-        const response = await axios.get(`http://localhost:3000/responses/${username}?platform=${platform}`);
+        const response = await axios.get(`/api/responses/${username}?platform=${platform}`);
         const responses = response.data;
         if (responses.length > 0) {
           const sorted = responses

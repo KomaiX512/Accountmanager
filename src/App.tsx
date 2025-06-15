@@ -333,10 +333,10 @@ const AppContent: React.FC = () => {
           const isTwitterDashboard = location.pathname.includes('twitter');
           const isFacebookDashboard = location.pathname.includes('facebook');
           const endpoint = isTwitterDashboard 
-            ? `http://localhost:3000/user-twitter-status/${currentUser.uid}`
+            ? `/api/user-twitter-status/${currentUser.uid}`
             : isFacebookDashboard
-            ? `http://localhost:3000/user-facebook-status/${currentUser.uid}`
-            : `http://localhost:3000/user-instagram-status/${currentUser.uid}`;
+            ? `/api/user-facebook-status/${currentUser.uid}`
+            : `/api/user-instagram-status/${currentUser.uid}`;
           
           const response = await axios.get(endpoint);
           

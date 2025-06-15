@@ -27,7 +27,7 @@ const AuthRoute: React.FC<AuthRouteProps> = ({ children }) => {
       }
 
       try {
-        const response = await axios.get(`http://localhost:3000/user-instagram-status/${currentUser.uid}`);
+        const response = await axios.get(`/api/user-instagram-status/${currentUser.uid}`);
         if (response.data.hasEnteredInstagramUsername) {
           setHasCompletedSetup(true);
           setInstagramData({

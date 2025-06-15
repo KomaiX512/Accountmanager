@@ -221,7 +221,7 @@ const MainDashboard: React.FC = () => {
           // Real-time notifications (DMs/comments) - only if connected
           if (userId) {
             try {
-              const response = await fetch(`http://localhost:3000/events-list/${userId}?platform=${platform}`);
+              const response = await fetch(`/events-list/${userId}?platform=${platform}`);
               if (response.ok) {
                 const notifications = await response.json();
                 totalCount += notifications.length;
@@ -236,7 +236,7 @@ const MainDashboard: React.FC = () => {
           if (platformUsername) {
             // Fetch strategies count
             try {
-              const strategiesResponse = await fetch(`http://localhost:3000/retrieve-strategies/${platformUsername}?platform=${platform}`);
+              const strategiesResponse = await fetch(`/api/retrieve-strategies/${platformUsername}?platform=${platform}`);
               if (strategiesResponse.ok) {
                 const strategies = await strategiesResponse.json();
                 // Count unseen strategies
@@ -251,7 +251,7 @@ const MainDashboard: React.FC = () => {
             
             // Fetch posts count  
             try {
-              const postsResponse = await fetch(`http://localhost:3000/posts/${platformUsername}?platform=${platform}`);
+              const postsResponse = await fetch(`/api/posts/${platformUsername}?platform=${platform}`);
               if (postsResponse.ok) {
                 const posts = await postsResponse.json();
                 // Count unseen posts
@@ -266,13 +266,13 @@ const MainDashboard: React.FC = () => {
             
             // Fetch competitor analysis count
             try {
-              const accountInfoResponse = await fetch(`http://localhost:3000/retrieve-account-info/${platformUsername}?platform=${platform}`);
+              const accountInfoResponse = await fetch(`/api/retrieve-account-info/${platformUsername}?platform=${platform}`);
               if (accountInfoResponse.ok) {
                 const accountInfo = await accountInfoResponse.json();
                 const competitors = accountInfo.competitors || [];
                 
                 if (competitors.length > 0) {
-                  const competitorResponse = await fetch(`http://localhost:3000/retrieve-multiple/${platformUsername}?competitors=${competitors.join(',')}&platform=${platform}`);
+                  const competitorResponse = await fetch(`/api/retrieve-multiple/${platformUsername}?competitors=${competitors.join(',')}&platform=${platform}`);
                   if (competitorResponse.ok) {
                     const competitorData = await competitorResponse.json();
                     // Count unseen competitor analysis

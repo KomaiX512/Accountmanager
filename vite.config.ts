@@ -6,9 +6,10 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    host: '0.0.0.0', // Allow external connections
     proxy: {
       '/events': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:3002',
         changeOrigin: true,
         secure: false,
         ws: true, // Support WebSocket-like connections (SSE)

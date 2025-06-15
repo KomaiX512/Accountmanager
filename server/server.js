@@ -9530,7 +9530,7 @@ app.options('/user-facebook-status/:userId', (req, res) => {
 // ============= EMAIL VERIFICATION SERVICE =============
 
 // Email configuration (using Gmail SMTP for demo - in production use proper email service)
-const emailTransporter = nodemailer.createTransporter({
+const emailTransporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER || 'accountmanager.demo@gmail.com', // Demo email

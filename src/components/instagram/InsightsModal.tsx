@@ -74,10 +74,10 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
       
       try {
         const statusEndpoint = platform === 'twitter' 
-          ? `http://localhost:3000/user-twitter-status/${currentUser.uid}`
+          ? `/api/user-twitter-status/${currentUser.uid}`
           : platform === 'facebook'
-          ? `http://localhost:3000/user-facebook-status/${currentUser.uid}`
-          : `http://localhost:3000/user-instagram-status/${currentUser.uid}`;
+          ? `/api/user-facebook-status/${currentUser.uid}`
+          : `/api/user-instagram-status/${currentUser.uid}`;
         
         const response = await axios.get(statusEndpoint);
         const username = platform === 'twitter' 

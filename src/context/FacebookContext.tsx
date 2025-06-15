@@ -38,7 +38,7 @@ export const FacebookProvider: React.FC<FacebookProviderProps> = ({ children }) 
     
     try {
       console.log(`[${new Date().toISOString()}] Checking for existing Facebook connection for user ${currentUser.uid}`);
-      const response = await axios.get(`http://localhost:3000/facebook-connection/${currentUser.uid}`);
+      const response = await axios.get(`/api/facebook-connection/${currentUser.uid}`);
       
       if (response.data.facebook_page_id) {
         setUserId(response.data.facebook_page_id); // Use page ID for Facebook operations

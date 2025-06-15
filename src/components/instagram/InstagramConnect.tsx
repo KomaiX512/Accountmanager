@@ -61,7 +61,7 @@ const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected, classN
           connectionDataRef.current = connectionData;
           isStoringConnectionRef.current = true;
           
-          axios.post(`http://localhost:3000/instagram-connection/${currentUser.uid}`, connectionData)
+          axios.post(`/api/instagram-connection/${currentUser.uid}`, connectionData)
             .then(() => {
               console.log(`[${new Date().toISOString()}] Successfully stored Instagram connection in backend for user ${currentUser.uid}`);
             })
@@ -134,7 +134,7 @@ const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected, classN
     if (currentUser?.uid && !isStoringConnectionRef.current) {
       isStoringConnectionRef.current = true;
       
-      axios.delete(`http://localhost:3000/instagram-connection/${currentUser.uid}`)
+      axios.delete(`/api/instagram-connection/${currentUser.uid}`)
         .then(() => {
           console.log(`[${new Date().toISOString()}] Successfully removed Instagram connection from backend for user ${currentUser.uid}`);
         })

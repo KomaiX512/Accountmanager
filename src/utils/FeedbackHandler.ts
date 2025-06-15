@@ -11,7 +11,7 @@ export const saveFeedback = async (
   feedback: string
 ): Promise<FeedbackResponse> => {
   try {
-    const response = await axios.post(`http://localhost:3000/feedback/${username}`, {
+    const response = await axios.post(`/api/feedback/${username}`, {
       responseKey,
       feedback,
     });

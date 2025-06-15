@@ -975,7 +975,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
       if (!imageUrl) {
         try {
           console.log('[Canvas] Attempting to load image via server proxy');
-          const proxyUrl = `http://localhost:3000/proxy-image?url=${encodeURIComponent(url)}&fallback=pixel`;
+          const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(url)}&fallback=pixel`;
           
           const response = await fetch(proxyUrl);
           if (response.ok) {

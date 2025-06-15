@@ -59,7 +59,7 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ accountHolder, on
         console.log(`[${new Date().toISOString()}] Force refreshing Facebook notifications...`);
       }
       
-      const response = await axios.get(`http://localhost:3000/events-list/${facebookPageId}?platform=facebook${forceRefresh ? '&forceRefresh=true' : ''}`);
+      const response = await axios.get(`/events-list/${facebookPageId}?platform=facebook${forceRefresh ? '&forceRefresh=true' : ''}`);
       
       if (response.data && Array.isArray(response.data)) {
         const facebookNotifications = response.data.map((notif: any) => ({
@@ -464,7 +464,7 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ accountHolder, on
         formData.append('image', scheduleForm.image);
       }
 
-      await axios.post(`http://localhost:3000/schedule-post/${facebookPageId}`, formData, {
+      await axios.post(`/api/schedule-post/${facebookPageId}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 

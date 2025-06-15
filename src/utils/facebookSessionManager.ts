@@ -160,7 +160,7 @@ export const disconnectFacebookAccount = async (authUserId: string): Promise<voi
     
     // Call backend to remove the connection record
     const axios = (await import('axios')).default;
-    await axios.delete(`http://localhost:3000/facebook-connection/${authUserId}`);
+    await axios.delete(`/api/facebook-connection/${authUserId}`);
     
     // Then clear from local storage and mark as disconnected
     clearFacebookConnection(authUserId);

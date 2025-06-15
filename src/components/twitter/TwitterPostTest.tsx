@@ -37,7 +37,7 @@ const TwitterPostTest: React.FC<TwitterPostTestProps> = ({ twitterUserId, classN
     try {
       console.log(`[${new Date().toISOString()}] Posting tweet: "${tweetText}"`);
       
-      const response = await axios.post(`http://localhost:3000/post-tweet/${twitterUserId}`, {
+      const response = await axios.post(`/api/post-tweet/${twitterUserId}`, {
         text: tweetText
       });
 
@@ -104,7 +104,7 @@ const TwitterPostTest: React.FC<TwitterPostTestProps> = ({ twitterUserId, classN
     try {
       console.log(`[${new Date().toISOString()}] Scheduling tweet for ${scheduledDate.toISOString()}: "${tweetText}"`);
       
-      const response = await axios.post(`http://localhost:3000/schedule-tweet/${twitterUserId}`, {
+      const response = await axios.post(`/api/schedule-tweet/${twitterUserId}`, {
         text: tweetText,
         scheduled_time: scheduledDate.toISOString()
       });

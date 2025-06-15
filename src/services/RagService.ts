@@ -581,7 +581,7 @@ class RagService {
       platform?: string;
     }
   ): Promise<any> {
-    const urls = ['http://localhost:3000', 'http://127.0.0.1:3000'];
+    const urls = ['/api'];
     let lastError = null;
 
     const platform = options?.platform || 'instagram';

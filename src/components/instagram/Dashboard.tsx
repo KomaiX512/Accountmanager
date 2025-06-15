@@ -256,7 +256,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
         setProfileLoading(false);
         return;
       }
-      const response = await axios.get(`http://localhost:3000/profile-info/${accountHolder}?forceRefresh=true`);
+      const response = await axios.get(`/api/profile-info/${accountHolder}?forceRefresh=true`);
       setProfileInfo(response.data);
       lastProfilePicRenderTimeRef.current = now;
       imageRetryAttemptsRef.current = 0;
@@ -277,7 +277,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
     if (!accountHolder) return;
     
     try {
-      const response = await axios.get(`http://localhost:3000/profile-info/${accountHolder}`);
+      const response = await axios.get(`/api/profile-info/${accountHolder}`);
       const userId = response.data?.id;
       if (userId && !igBusinessId) {
         if (!isInstagramConnected) {
@@ -311,7 +311,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
     
     try {
       // Fetch notifications
-      const response = await fetch(`http://localhost:3000/events-list/${userId}`);
+      const response = await fetch(`/events-list/${userId}`);
       if (!response.ok) {
         throw new Error(`Failed to fetch notifications: ${response.status} ${response.statusText}`);
       }
@@ -518,7 +518,7 @@ Image Description: ${response.post.image_prompt}
 
     try {
       if (notification.type === 'message' && notification.sender_id && notification.message_id) {
-        await axios.post(`http://localhost:3000/send-dm-reply/${igBusinessId}`, {
+        await axios.post(`/api/send-dm-reply/${igBusinessId}`, {
           sender_id: notification.sender_id,
           text: replyText,
           message_id: notification.message_id,
@@ -550,7 +550,7 @@ Image Description: ${response.post.image_prompt}
         setNotifications(prev => prev.filter(n => n.message_id !== notification.message_id));
         setToast('DM reply sent!');
       } else if (notification.type === 'comment' && notification.comment_id) {
-        await axios.post(`http://localhost:3000/send-comment-reply/${igBusinessId}`, {
+        await axios.post(`/api/send-comment-reply/${igBusinessId}`, {
           comment_id: notification.comment_id,
           text: replyText,
         });
@@ -722,7 +722,7 @@ Image Description: ${response.post.image_prompt}
               console.log(`[${new Date().toISOString()}] Auto-sending AI reply immediately`);
               
               // Send the DM immediately
-              const sendResponse = await fetch(`http://localhost:3000/send-dm-reply/${igBusinessId}`, {
+              const sendResponse = await fetch(`/api/send-dm-reply/${igBusinessId}`, {
                 method: 'POST',
                 headers: { 
                   'Content-Type': 'application/json',
@@ -913,7 +913,7 @@ Image Description: ${response.post.image_prompt}
     
     try {
       // Send the reply
-      const sendResponse = await fetch(`http://localhost:3000/send-dm-reply/${igBusinessId}`, {
+      const sendResponse = await fetch(`/api/send-dm-reply/${igBusinessId}`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -1097,13 +1097,13 @@ Image Description: ${response.post.image_prompt}
         if (response.data.success && response.data.reply) {
           // Send the generated reply
           if (notification.type === 'message' && notification.sender_id) {
-            await axios.post(`http://localhost:3000/send-dm-reply/${igBusinessId}`, {
+            await axios.post(`/api/send-dm-reply/${igBusinessId}`, {
               sender_id: notification.sender_id,
               text: response.data.reply,
               message_id: notification.message_id,
             });
           } else if (notification.type === 'comment' && notification.comment_id) {
-            await axios.post(`http://localhost:3000/send-comment-reply/${igBusinessId}`, {
+            await axios.post(`/api/send-comment-reply/${igBusinessId}`, {
               comment_id: notification.comment_id,
               text: response.data.reply,
             });
@@ -1136,7 +1136,7 @@ Image Description: ${response.post.image_prompt}
     try {
       const forceRefresh = firstLoadRef.current;
       const [responsesData, strategiesData, postsData, competitorData] = await Promise.all([
-        axios.get(`http://localhost:3000/responses/${accountHolder}${forceRefresh ? '?forceRefresh=true' : ''}`).catch(err => {
+        axios.get(`/api/responses/${accountHolder}${forceRefresh ? '?forceRefresh=true' : ''}`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
@@ -1144,7 +1144,7 @@ Image Description: ${response.post.image_prompt}
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        axios.get(`http://localhost:3000/posts/${accountHolder}${forceRefresh ? '?forceRefresh=true' : ''}`).catch(err => {
+        axios.get(`/api/posts/${accountHolder}${forceRefresh ? '?forceRefresh=true' : ''}`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
@@ -1186,7 +1186,7 @@ Image Description: ${response.post.image_prompt}
       eventSourceRef.current = null;
     }
 
-    const eventSource = new EventSource(`http://localhost:3000/events/${userId}`);
+    const eventSource = new EventSource(`/events/${userId}`);
     eventSourceRef.current = eventSource;
 
     eventSource.onopen = () => {
@@ -1225,7 +1225,7 @@ Image Description: ${response.post.image_prompt}
       if (data.type === 'update' && data.prefix) {
         const { prefix } = data;
         if (prefix.startsWith(`queries/${accountHolder}/`)) {
-          axios.get(`http://localhost:3000/responses/${accountHolder}`).then(res => {
+          axios.get(`/api/responses/${accountHolder}`).then(res => {
             setResponses(res.data);
             setToast('New response received!');
           }).catch(err => {
@@ -1235,8 +1235,8 @@ Image Description: ${response.post.image_prompt}
         }
         if (prefix.startsWith(`recommendations/${accountHolder}/`) || prefix.startsWith(`engagement_strategies/${accountHolder}/`)) {
           const endpoint = accountType === 'branding' 
-            ? `http://localhost:3000/retrieve-strategies/${accountHolder}`
-            : `http://localhost:3000/retrieve-engagement-strategies/${accountHolder}`;
+            ? `/api/retrieve-strategies/${accountHolder}`
+            : `/api/retrieve-engagement-strategies/${accountHolder}`;
           
           axios.get(endpoint).then(res => {
             setStrategies(res.data);
@@ -1247,7 +1247,7 @@ Image Description: ${response.post.image_prompt}
           });
         }
         if (prefix.startsWith(`ready_post/${accountHolder}/`)) {
-          axios.get(`http://localhost:3000/posts/${accountHolder}`).then(res => {
+          axios.get(`/api/posts/${accountHolder}`).then(res => {
             setPosts(res.data);
             setToast('New post cooked!');
           }).catch(err => {
@@ -1667,7 +1667,7 @@ Image Description: ${response.post.image_prompt}
                 <div className="profile-bar">
                   {profileInfo?.profilePicUrlHD && !imageError ? (
                     <img
-                      src={`http://localhost:3000/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}`}
+                      src={`/api/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}`}
                       alt={`${accountHolder}'s profile picture`}
                       className="profile-pic-bar"
                       onError={(e) => {
@@ -1676,7 +1676,7 @@ Image Description: ${response.post.image_prompt}
                           imageRetryAttemptsRef.current++;
                           const imgElement = e.target as HTMLImageElement;
                           setTimeout(() => {
-                            imgElement.src = `http://localhost:3000/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}`;
+                            imgElement.src = `/api/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}`;
                           }, 1000);
                         } else {
                           setImageError(true);
@@ -1778,7 +1778,7 @@ Image Description: ${response.post.image_prompt}
           <div className="post-cooked">
             <PostCooked
               username={accountHolder}
-              profilePicUrl={profileInfo?.profilePicUrlHD ? `http://localhost:3000/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}` : ''}
+              profilePicUrl={profileInfo?.profilePicUrlHD ? `/api/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}` : ''}
               posts={posts}
               userId={igBusinessId || undefined}
             />

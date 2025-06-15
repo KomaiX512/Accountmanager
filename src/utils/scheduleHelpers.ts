@@ -59,7 +59,7 @@ export const schedulePost = async (options: ScheduleOptions): Promise<ScheduleRe
         formData.append('text', caption.trim());
         formData.append('scheduled_time', scheduleTime.toISOString());
         
-        const response = await fetch(`http://localhost:3000/schedule-tweet-with-image/${userId}`, {
+        const response = await fetch(`/api/schedule-tweet-with-image/${userId}`, {
           method: 'POST',
           body: formData,
         });
@@ -77,7 +77,7 @@ export const schedulePost = async (options: ScheduleOptions): Promise<ScheduleRe
         };
       } else {
         // Twitter text-only
-        const response = await fetch(`http://localhost:3000/schedule-tweet/${userId}`, {
+        const response = await fetch(`/api/schedule-tweet/${userId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -107,7 +107,7 @@ export const schedulePost = async (options: ScheduleOptions): Promise<ScheduleRe
         formData.append('image', imageBlob, filename);
       }
       
-      const response = await fetch(`http://localhost:3000/schedule-post/${userId}`, {
+      const response = await fetch(`/api/schedule-post/${userId}`, {
         method: 'POST',
         body: formData,
       });

@@ -19,7 +19,7 @@ const Twitter: React.FC = () => {
       }
 
       try {
-        const response = await axios.get(`http://localhost:3000/user-twitter-status/${currentUser.uid}`);
+        const response = await axios.get(`/api/user-twitter-status/${currentUser.uid}`);
         
         if (response.data.hasEnteredTwitterUsername) {
           // User has already entered username, redirect to dashboard

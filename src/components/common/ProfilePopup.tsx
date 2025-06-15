@@ -118,7 +118,7 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose, platform
         setError(null);
         try {
           // Make platform-aware request to server
-          const response = await axios.get(`http://localhost:3000/rules/${username}?platform=${platform}`);
+          const response = await axios.get(`/api/rules/${username}?platform=${platform}`);
           setRules(response.data.rules || '');
           setSavedRules(response.data.rules || '');
           setIsEditingRules(false);
@@ -180,7 +180,7 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose, platform
     setError(null);
     try {
       // Make platform-aware request to server
-      await axios.post(`http://localhost:3000/rules/${username}?platform=${platform}`, { rules });
+      await axios.post(`/api/rules/${username}?platform=${platform}`, { rules });
       setSavedRules(rules);
       setIsEditingRules(false);
       setShowPreview(true);

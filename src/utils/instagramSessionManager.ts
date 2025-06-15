@@ -164,7 +164,7 @@ export const disconnectInstagramAccount = async (authUserId: string): Promise<vo
     }
     
     // Call backend to remove the connection record
-    await axios.delete(`http://localhost:3000/instagram-connection/${authUserId}`);
+    await axios.delete(`/api/instagram-connection/${authUserId}`);
     
     // Then clear from local storage and mark as disconnected
     clearInstagramConnection(authUserId);
@@ -296,7 +296,7 @@ export const getInstagramProfileData = async (authUserId: string): Promise<{
   if (!authUserId) return null;
   
   try {
-    const response = await axios.get(`http://localhost:3000/user-instagram-status/${authUserId}`);
+    const response = await axios.get(`/api/user-instagram-status/${authUserId}`);
     return response.data;
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Error retrieving Instagram profile data:`, error);
@@ -323,13 +323,13 @@ export const syncInstagramConnection = async (authUserId: string): Promise<void>
     
     // Then check backend connection metadata
     try {
-      const response = await axios.get(`http://localhost:3000/instagram-connection/${authUserId}`);
+      const response = await axios.get(`/api/instagram-connection/${authUserId}`);
       const backendConnection = response.data;
       
       if (!backendConnection || !backendConnection.instagram_user_id) {
         // If backend has no connection but we have a local one that's NOT disconnected, push to backend
         if (localConnection) {
-          await axios.post(`http://localhost:3000/instagram-connection/${authUserId}`, {
+          await axios.post(`/api/instagram-connection/${authUserId}`, {
             instagram_user_id: localConnection.instagram_user_id,
             instagram_graph_id: localConnection.instagram_graph_id,
             username: localConnection.username
@@ -380,7 +380,7 @@ export const syncInstagramConnection = async (authUserId: string): Promise<void>
       // If we have local data but backend returned 404 (no connection)
       if (localConnection && error.response?.status === 404) {
         try {
-          await axios.post(`http://localhost:3000/instagram-connection/${authUserId}`, {
+          await axios.post(`/api/instagram-connection/${authUserId}`, {
             instagram_user_id: localConnection.instagram_user_id,
             instagram_graph_id: localConnection.instagram_graph_id,
             username: localConnection.username

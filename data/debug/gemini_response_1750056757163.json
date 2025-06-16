@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption: Craving that effortless, sun-kissed glow? ✨ Our new bronzing collection is here to give you that perfect summer skin, all year round! ☀️ Get ready to turn heads with a natural, healthy-looking radiance.\n\nHashtags: #MACBronzing #SummerSkin #GlowUp #Bronzer #MakeupLover #MACCosmetics #Beauty #SunKissed #MakeupAddict #NewCollection\n\nCall to Action: Shop the collection now at the link in bio and show us your bronzed looks using #MACBronzing!\n\nVisual Description for Image: A close-up, overhead shot showcasing the new MAC bronzing collection. The background is a soft, warm beige color, mimicking sand. The main focus is a selection of bronzing powders in various shades, arranged artfully. One bronzer compact is open, revealing a beautiful, swirling pattern of bronze and gold shimmer. A fluffy, angled bronzer brush rests gently on top of the open compact, lightly dusted with product. Next to the bronzers, there's a tube of MAC's bronzing primer, partially visible. The lighting is soft and diffused, creating a warm, inviting atmosphere. Small seashells and starfish are scattered subtly around the products, adding a beachy, summery vibe. The overall aesthetic is luxurious, natural, and aspirational. The image should have a shallow depth of field, blurring the background slightly to keep the focus on the bronzing products. The style is clean, modern, and high-end, consistent with the MAC brand. The image should evoke feelings of warmth, sunshine, and effortless beauty.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.3185792945953737
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 260,
+    "candidatesTokenCount": 332,
+    "totalTokenCount": 592,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 260
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 332
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "Mr9PaK-iFJbrqsMPiOTvsQI"
+}

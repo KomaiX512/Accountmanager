@@ -73,8 +73,8 @@ interface ImageErrorState {
   retryCount: number;
 }
 
-// Base URL for all API requests (updated to match running server)
-const API_BASE_URL = 'http://localhost:3000';
+// Base URL for all API requests (using relative URLs with Vite proxy)
+const API_BASE_URL = '';
 
 // Debug flag - set to true to enable verbose logging
 const DEBUG_LOGGING = false;

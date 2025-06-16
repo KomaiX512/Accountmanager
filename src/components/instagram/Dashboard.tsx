@@ -1671,14 +1671,26 @@ Image Description: ${response.post.image_prompt}
                       alt={`${accountHolder}'s profile picture`}
                       className="profile-pic-bar"
                       onError={(e) => {
-                        console.error(`Failed to load profile picture for ${accountHolder}`);
+                        console.error(`Failed to load profile picture for ${accountHolder} ${imageRetryAttemptsRef.current + 1}`);
                         if (imageRetryAttemptsRef.current < maxImageRetryAttempts) {
                           imageRetryAttemptsRef.current++;
                           const imgElement = e.target as HTMLImageElement;
-                          setTimeout(() => {
-                            imgElement.src = `/api/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}`;
-                          }, 1000);
+                          
+                          if (imageRetryAttemptsRef.current === 1) {
+                            // First retry: try direct URL without proxy
+                            console.log(`Trying direct URL for profile picture, attempt ${imageRetryAttemptsRef.current}`);
+                            setTimeout(() => {
+                              imgElement.src = profileInfo.profilePicUrlHD;
+                            }, 500);
+                          } else {
+                            // Final retry: try proxy again
+                            console.log(`Final retry with proxy, attempt ${imageRetryAttemptsRef.current}/${maxImageRetryAttempts}`);
+                            setTimeout(() => {
+                              imgElement.src = `/api/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}`;
+                            }, 1000);
+                          }
                         } else {
+                          console.log(`Max retries reached, showing fallback for ${accountHolder}`);
                           setImageError(true);
                         }
                       }}

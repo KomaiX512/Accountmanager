@@ -109,7 +109,7 @@
     "chatbot chatbot chatbot";
   grid-template-columns: 1fr 1.5fr 1fr;
   grid-template-rows: auto auto auto auto;
-  gap: clamp(15px, 3vw, 25px);
+  gap: 20px; /* Consistent gap between all grid items */
 }
 
 .profile-metadata {
@@ -236,7 +236,6 @@
   border-radius: clamp(6px, 2vw, 8px);
   border: 1px solid rgba(0, 255, 204, 0.2);
 }
-
 .notifications {
   grid-area: notifications;
   background: linear-gradient(135deg, #1a1a3a, #2e2e5e);
@@ -244,8 +243,10 @@
   padding: clamp(1rem, 3vw, 20px);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
   overflow-y: auto;
-  max-height: clamp(600px, 80vh, 750px);
+  height: calc(100% - 20px);
+  max-height: unset;
   border: 1px solid rgba(0, 255, 204, 0.4);
+  margin-bottom: 20px;
 }
 
 .post-cooked {
@@ -254,9 +255,11 @@
   border-radius: clamp(12px, 3vw, 16px);
   padding: clamp(1rem, 3vw, 20px);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-  max-height: clamp(600px, 80vh, 750px);
+  height: calc(100% - 20px);
+  max-height: unset;
   overflow-y: auto;
   border: 1px solid rgba(0, 255, 204, 0.4);
+  margin-bottom: 20px;
 }
 
 .strategies {
@@ -266,8 +269,10 @@
   padding: clamp(1rem, 3vw, 20px);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
   overflow-y: auto;
-  max-height: clamp(500px, 70vh, 600px);
+  height: calc(100% - 20px);
+  max-height: unset;
   border: 1px solid rgba(0, 255, 204, 0.4);
+  margin-bottom: 20px;
 }
 
 .competitor-analysis {
@@ -277,8 +282,10 @@
   padding: clamp(1rem, 3vw, 20px);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
   overflow-y: auto;
-  max-height: clamp(500px, 70vh, 600px);
+  height: calc(100% - 50px);
+  max-height: unset;
   border: 1px solid rgba(0, 255, 204, 0.4);
+  margin-top: 20px;
 }
 
 .chatbot {
@@ -290,6 +297,7 @@
   display: flex;
   align-items: center;
   border: 1px solid rgba(0, 255, 204, 0.4);
+  margin-top: 20px;
 }
 
 .chatbot-input-container {
@@ -666,32 +674,39 @@ h2 {
 
 /* Modal overlay and content for popups (Goal, etc.) */
 .popup-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(8px);
-  z-index: 1000;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background: rgba(0, 0, 0, 0.7) !important;
+  backdrop-filter: blur(8px) !important;
+  z-index: 99999 !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  padding: 20px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
 }
 
 .popup-content {
-  background: linear-gradient(135deg, #1a1a3a, #2e2e5e);
-  border-radius: 16px;
-  padding: 24px;
-  width: 100%;
-  max-width: 500px;
-  color: #e0e0ff;
-  box-shadow: 0 8px 30px rgba(0, 255, 204, 0.2);
-  border: 1px solid rgba(0, 255, 204, 0.3);
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-  position: relative;
+  background: linear-gradient(135deg, #1a1a3a, #2e2e5e) !important;
+  border-radius: 16px !important;
+  padding: 24px !important;
+  width: 100% !important;
+  max-width: 500px !important;
+  color: #e0e0ff !important;
+  box-shadow: 0 8px 30px rgba(0, 255, 204, 0.2) !important;
+  border: 1px solid rgba(0, 255, 204, 0.3) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 15px !important;
+  position: relative !important;
+  z-index: 100000 !important;
+  animation: modalAppear 0.2s ease-out !important;
 }
 
 .chat-mode-selector {

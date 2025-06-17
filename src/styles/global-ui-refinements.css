@@ -1,25 +1,31 @@
 /* Global UI Refinements - Platform-wide fixes */
 
-/* Fix #1: Pop-Up Behavior and Theming - Standardized modal positioning and styling */
+/* Fix #1: Pop-Up Behavior and Theming - Standardized modal positioning and sizing */
 .popup-overlay,
 .modal-overlay,
 .insights-modal-overlay,
 .chat-modal-overlay,
 .canvas-editor-overlay,
 .messages-popup-overlay,
-.twitter-compose-overlay {
+.twitter-compose-overlay,
+.profile-popup-overlay {
   position: fixed !important;
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
   background: rgba(0, 0, 0, 0.7) !important;
   backdrop-filter: blur(8px) !important;
-  z-index: 2000 !important;
+  z-index: 99999 !important;
   display: flex !important;
   justify-content: center !important;
   align-items: center !important;
-  padding: 20px !important;
+  padding: clamp(10px, 2vw, 20px) !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  overflow-y: auto !important;
 }
 
 .popup-content,
@@ -28,13 +34,14 @@
 .chat-modal-content,
 .canvas-editor-container,
 .messages-popup-content,
-.twitter-compose-container {
+.twitter-compose-container,
+.profile-popup-content {
   background: linear-gradient(135deg, #1a1a3a, #2e2e5e) !important;
   border-radius: 16px !important;
   padding: 24px !important;
   width: 100% !important;
-  max-width: 700px !important;
-  max-height: 85vh !important;
+  max-width: min(700px, 95vw) !important;
+  max-height: min(85vh, calc(100vh - 40px)) !important;
   overflow-y: auto !important;
   border: 1px solid rgba(0, 255, 204, 0.4) !important;
   box-shadow: 0 10px 40px rgba(0, 255, 204, 0.3) !important;
@@ -42,6 +49,57 @@
   position: relative !important;
   margin: auto !important;
   animation: modalAppear 0.2s ease-out !important;
+  z-index: 100000 !important;
+  box-sizing: border-box !important;
+}
+
+/* Special handling for canvas editor */
+.canvas-editor-container {
+  max-width: min(1400px, 95vw) !important;
+  max-height: min(90vh, calc(100vh - 20px)) !important;
+  padding: 0 !important;
+}
+
+/* Special handling for profile popup */
+.profile-popup-content {
+  width: min(900px, 95vw) !important;
+  height: auto !important;
+  max-height: min(85vh, calc(100vh - 40px)) !important;
+  min-height: min(400px, 70vh) !important;
+  padding: 0 !important;
+  display: flex !important;
+  overflow: hidden !important;
+}
+
+/* Ensure popup main content is scrollable */
+.popup-main,
+.modal-body {
+  overflow-y: auto !important;
+  max-height: 100% !important;
+  padding-right: 8px !important;
+  scrollbar-width: thin !important;
+}
+
+.popup-main::-webkit-scrollbar,
+.modal-body::-webkit-scrollbar {
+  width: 6px !important;
+}
+
+.popup-main::-webkit-scrollbar-track,
+.modal-body::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-radius: 3px !important;
+}
+
+.popup-main::-webkit-scrollbar-thumb,
+.modal-body::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 204, 0.5) !important;
+  border-radius: 3px !important;
+}
+
+.popup-main::-webkit-scrollbar-thumb:hover,
+.modal-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 204, 0.7) !important;
 }
 
 @keyframes modalAppear {
@@ -73,7 +131,7 @@
   gap: 6px !important;
   box-shadow: 0 4px 12px rgba(0, 255, 204, 0.3) !important;
   border: 1px solid rgba(0, 255, 204, 0.4) !important;
-  z-index: 9999 !important;
+  z-index: 999999 !important;
   max-width: 280px !important;
   word-wrap: break-word !important;
   animation: slideInNotification 0.3s ease-out !important;
@@ -90,7 +148,7 @@
   padding: 8px 12px !important;
   border-radius: 8px !important;
   border: 1px solid #00ffcc !important;
-  z-index: 9999 !important;
+  z-index: 999999 !important;
   max-width: 280px !important;
   font-size: 0.8rem !important;
   word-wrap: break-word !important;
@@ -204,15 +262,33 @@ button:active,
 /* Mobile responsiveness for notifications and modals */
 @media (max-width: 768px) {
   .popup-overlay,
-  .modal-overlay {
-    padding: 10px !important;
+  .modal-overlay,
+  .canvas-editor-overlay,
+  .profile-popup-overlay {
+    padding: clamp(5px, 1.5vw, 15px) !important;
   }
   
   .popup-content,
   .modal-content {
-    padding: 16px !important;
-    max-height: 95vh !important;
+    padding: clamp(12px, 3vw, 20px) !important;
+    max-height: min(95vh, calc(100vh - 20px)) !important;
     border-radius: 12px !important;
+    max-width: min(95vw, 600px) !important;
+  }
+
+  .profile-popup-content {
+    width: min(95vw, 800px) !important;
+    height: auto !important;
+    max-height: min(95vh, calc(100vh - 20px)) !important;
+    min-height: min(300px, 60vh) !important;
+    flex-direction: column !important;
+  }
+
+  .canvas-editor-container {
+    width: min(95vw, 1200px) !important;
+    height: auto !important;
+    max-height: min(95vh, calc(100vh - 20px)) !important;
+    min-height: min(400px, 70vh) !important;
   }
   
   .toast-notification,
@@ -238,11 +314,44 @@ button:active,
   }
 }
 
+@media (max-width: 480px) {
+  .popup-overlay,
+  .modal-overlay,
+  .canvas-editor-overlay,
+  .profile-popup-overlay {
+    padding: clamp(3px, 1vw, 10px) !important;
+  }
+  
+  .popup-content,
+  .modal-content {
+    padding: clamp(10px, 2.5vw, 16px) !important;
+    max-height: min(98vh, calc(100vh - 10px)) !important;
+    border-radius: 8px !important;
+    max-width: min(98vw, 500px) !important;
+  }
+
+  .profile-popup-content {
+    width: min(98vw, 600px) !important;
+    height: auto !important;
+    max-height: min(98vh, calc(100vh - 10px)) !important;
+    min-height: min(250px, 50vh) !important;
+  }
+
+  .canvas-editor-container {
+    width: min(98vw, 900px) !important;
+    height: auto !important;
+    max-height: min(98vh, calc(100vh - 10px)) !important;
+    min-height: min(300px, 60vh) !important;
+  }
+}
+
 /* Ensure z-index hierarchy is maintained */
-.popup-overlay { z-index: 2000 !important; }
-.modal-overlay { z-index: 2100 !important; }
-.toast-notification { z-index: 9999 !important; }
-.notification-popup { z-index: 9999 !important; }
+.popup-overlay,
+.profile-popup-overlay { z-index: 99999 !important; }
+.modal-overlay,
+.canvas-editor-overlay { z-index: 99999 !important; }
+.toast-notification,
+.notification-popup { z-index: 999999 !important; }
 .notification-badge-container { z-index: 100 !important; }
 
 /* Prevent notification stacking - ensure only one notification shows at a time */
@@ -316,9 +425,4 @@ button:active,
 .popup-content::-webkit-scrollbar-thumb:hover,
 .modal-content::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 255, 204, 0.8) !important;
-}
-
-.canvas-editor-container {
-  max-width: 1200px !important;
-  max-height: 90vh !important;
 } 

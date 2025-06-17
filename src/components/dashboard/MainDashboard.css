@@ -218,35 +218,59 @@
 
 /* Enhanced Responsive Modal Styling */
 .modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background-color: rgba(0, 0, 0, 0.8);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 99999;
-  backdrop-filter: blur(5px);
-  overflow-y: auto;
-  padding: clamp(5px, 1.5vw, 20px);
-  box-sizing: border-box;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background-color: rgba(0, 0, 0, 0.8) !important;
+  backdrop-filter: blur(8px) !important;
+  z-index: 99999 !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  padding: clamp(5px, 1.5vw, 20px) !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  overflow-y: auto !important;
 }
 
 .modal-content {
-  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-  padding: 0;
-  border-radius: clamp(6px, 1.5vw, 12px);
-  border: 1px solid rgba(0, 255, 204, 0.3);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
-  color: #ffffff;
-  width: min(92vw, 600px);
-  max-height: min(95vh, 800px);
-  overflow-y: auto;
-  position: relative;
-  margin: auto;
-  box-sizing: border-box;
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%) !important;
+  padding: 0 !important;
+  border-radius: clamp(6px, 1.5vw, 12px) !important;
+  border: 1px solid rgba(0, 255, 204, 0.3) !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8) !important;
+  color: #ffffff !important;
+  width: min(92vw, 600px) !important;
+  max-height: min(85vh, calc(100vh - 40px)) !important;
+  overflow-y: auto !important;
+  position: relative !important;
+  margin: auto !important;
+  box-sizing: border-box !important;
+  z-index: 100000 !important;
+  animation: modalAppear 0.2s ease-out !important;
+  scrollbar-width: thin !important;
+}
+
+.modal-content::-webkit-scrollbar {
+  width: 6px !important;
+}
+
+.modal-content::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-radius: 3px !important;
+}
+
+.modal-content::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 204, 0.5) !important;
+  border-radius: 3px !important;
+}
+
+.modal-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 204, 0.7) !important;
 }
 
 .modal-header {

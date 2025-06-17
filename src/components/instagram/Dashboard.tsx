@@ -55,7 +55,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
   const [competitorData, setCompetitorData] = useState<{ key: string; data: any }[]>([]);
   const [news, setNews] = useState<{ key: string; data: any }[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [error, setError] = useState<string | null>(null);
+
   const [profileInfo, setProfileInfo] = useState<ProfileInfo | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -290,7 +290,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
           console.log(`[${new Date().toISOString()}] Retrying fetchIgBusinessId, attempt ${attempt + 1}/${maxAttempts}`);
           setTimeout(() => fetchIgBusinessId(attempt + 1, maxAttempts), 2000);
         } else {
-          setError('Failed to initialize Instagram account after retries.');
+          setToast('Failed to initialize Instagram account after retries.');
         }
       }
     } catch (err) {
@@ -299,7 +299,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
         console.log(`[${new Date().toISOString()}] Retrying fetchIgBusinessId in 2s...`);
         setTimeout(() => fetchIgBusinessId(attempt + 1, maxAttempts), 2000);
       } else {
-        setError('Failed to initialize Instagram account after retries.');
+        setToast('Failed to initialize Instagram account after retries.');
       }
     }
   };
@@ -379,7 +379,6 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
     
     setIsProcessing(true);
     setResult('');
-    setError(null);
     
     try {
       if (chatMode === 'discussion') {
@@ -506,7 +505,7 @@ Image Description: ${response.post.image_prompt}
           setToast('Post generated successfully! Check the Cooked Posts section.');
         } else {
           // Handle error from post generation
-          setError(response.error || 'Failed to generate post');
+          setToast(response.error || 'Failed to generate post');
         }
       }
       
@@ -521,12 +520,12 @@ Image Description: ${response.post.image_prompt}
         // Now TypeScript knows error.response.data exists
         const errorData = error.response.data;
         if (errorData && typeof errorData === 'object' && 'error' in errorData) {
-          setError(errorData.error as string || 'Failed to process query.');
+          setToast(errorData.error as string || 'Failed to process query.');
         } else {
-          setError('Failed to process query. Please try again.');
+          setToast('Failed to process query. Please try again.');
         }
       } else {
-        setError('Failed to process query. Please try again.');
+        setToast('Failed to process query. Please try again.');
       }
     } finally {
       setIsProcessing(false);
@@ -611,7 +610,6 @@ Image Description: ${response.post.image_prompt}
     } catch (error: any) {
       console.error('Error sending reply:', error);
       setToast('Failed to send reply.');
-      setError(error.response?.data?.error || 'Failed to send reply.');
     }
   };
 
@@ -632,7 +630,6 @@ Image Description: ${response.post.image_prompt}
     } catch (error: any) {
       console.error('Error ignoring notification:', error);
       setToast('Failed to ignore notification.');
-      setError(error.response?.data?.error || 'Failed to ignore notification.');
     }
   };
 
@@ -1161,13 +1158,12 @@ Image Description: ${response.post.image_prompt}
 
     } catch (error: any) {
       console.error(`[${new Date().toISOString()}] Error in Instagram auto-reply:`, error);
-      setError('Auto-reply failed for some notifications');
+      setToast('Auto-reply failed for some notifications');
     }
   };
 
   const refreshAllData = async () => {
     if (!accountHolder) {
-      setError('No account holder specified.');
       return;
     }
     try {
@@ -1207,13 +1203,12 @@ Image Description: ${response.post.image_prompt}
       const competitorResponses = competitorData as any[];
       setCompetitorData(competitorResponses.flatMap(res => res.data));
 
-      setError(null);
       if (firstLoadRef.current) {
         firstLoadRef.current = false;
       }
     } catch (error: any) {
       console.error('Error refreshing data:', error);
-      setError(error.response?.data?.error || 'Failed to load dashboard data.');
+      setToast('Failed to load dashboard data.');
     }
   };
 
@@ -1229,7 +1224,6 @@ Image Description: ${response.post.image_prompt}
     eventSource.onopen = () => {
       console.log(`[${new Date().toISOString()}] SSE connection established for ${userId}`);
       reconnectAttempts.current = 0;
-      setError(null);
       fetchNotifications(userId); // Refresh on connect
     };
 
@@ -1267,7 +1261,6 @@ Image Description: ${response.post.image_prompt}
             setToast('New response received!');
           }).catch(err => {
             console.error('Error fetching responses:', err);
-            setError(err.response?.data?.error || 'Failed to fetch responses.');
           });
         }
         if (prefix.startsWith(`recommendations/${accountHolder}/`) || prefix.startsWith(`engagement_strategies/${accountHolder}/`)) {
@@ -1280,7 +1273,6 @@ Image Description: ${response.post.image_prompt}
             setToast('New strategies available!');
           }).catch(err => {
             console.error('Error fetching strategies:', err);
-            setError(err.response?.data?.error || 'Failed to fetch strategies.');
           });
         }
         if (prefix.startsWith(`ready_post/${accountHolder}/`)) {
@@ -1289,7 +1281,6 @@ Image Description: ${response.post.image_prompt}
             setToast('New post cooked!');
           }).catch(err => {
             console.error('Error fetching posts:', err);
-            setError(err.response?.data?.error || 'Failed to fetch posts.');
           });
         }
         if (prefix.startsWith(`competitor_analysis/${accountHolder}/`)) {
@@ -1307,7 +1298,6 @@ Image Description: ${response.post.image_prompt}
             })
             .catch(err => {
               console.error('Error fetching competitor data:', err);
-              setError(err.response?.data?.error || 'Failed to fetch competitor analysis.');
             });
         }
       }
@@ -1354,7 +1344,7 @@ Image Description: ${response.post.image_prompt}
         const delay = baseReconnectDelay * Math.pow(2, reconnectAttempts.current);
         setTimeout(() => setupSSE(userId, attempt + 1), delay);
       } else {
-        setError('Failed to reconnect to server updates. Will try again in 5 minutes.');
+        console.error('Failed to reconnect to server updates after maximum attempts');
       }
     };
   };
@@ -1610,7 +1600,7 @@ Image Description: ${response.post.image_prompt}
   };
 
   if (!accountHolder) {
-    return <div className="error-message">Please specify an account holder to load the dashboard.</div>;
+    return null;
   }
 
   const formatCount = (count: number | undefined) => {
@@ -1700,8 +1690,6 @@ Image Description: ${response.post.image_prompt}
           )}
         </div>
       </div>
-      {error && <div className="error-message">{error}</div>}
-      {profileError && <div className="error-message">{profileError}</div>}
       <div className="modules-container">
         <div className="dashboard-grid">
           <div className="profile-metadata">

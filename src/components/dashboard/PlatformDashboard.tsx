@@ -113,7 +113,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const [competitorData, setCompetitorData] = useState<{ key: string; data: any }[]>([]);
   const [news, setNews] = useState<{ key: string; data: any }[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
-  const [error, setError] = useState<string | null>(null);
+
   const [profileInfo, setProfileInfo] = useState<any | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -387,7 +387,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     } catch (error: any) {
       console.error('Error sending reply:', error);
       setToast('Failed to send reply.');
-      setError(error.response?.data?.error || 'Failed to send reply.');
     }
   };
 
@@ -413,7 +412,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     } catch (error: any) {
       console.error('Error ignoring notification:', error);
       setToast('Failed to ignore notification.');
-      setError(error.response?.data?.error || 'Failed to ignore notification.');
     }
   };
 
@@ -831,7 +829,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     eventSource.onopen = () => {
       console.log(`[${new Date().toISOString()}] ${platform} SSE connection established for ${userId}`);
       reconnectAttempts.current = 0;
-      setError(null);
       fetchNotifications();
     };
 
@@ -871,7 +868,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
             setToast(`New ${platform} response received!`);
           }).catch(err => {
             console.error(`Error fetching ${platform} responses:`, err);
-            setError(err.response?.data?.error || `Failed to fetch ${platform} responses.`);
           });
         }
         
@@ -885,7 +881,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
             setToast(`New ${platform} strategies available!`);
           }).catch(err => {
             console.error(`Error fetching ${platform} strategies:`, err);
-            setError(err.response?.data?.error || `Failed to fetch ${platform} strategies.`);
           });
         }
         
@@ -895,7 +890,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
             setToast(`New ${platform} post cooked!`);
           }).catch(err => {
             console.error(`Error fetching ${platform} posts:`, err);
-            setError(err.response?.data?.error || `Failed to fetch ${platform} posts.`);
           });
         }
         
@@ -914,7 +908,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
             })
             .catch(err => {
               console.error(`Error fetching ${platform} competitor data:`, err);
-              setError(err.response?.data?.error || `Failed to fetch ${platform} competitor analysis.`);
             });
         }
       }
@@ -962,8 +955,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         reconnectAttempts.current += 1;
         const delay = baseReconnectDelay * Math.pow(2, reconnectAttempts.current);
         setTimeout(() => setupSSE(userId, attempt + 1), delay);
-      } else {
-        setError(`Failed to reconnect to ${platform} server updates. Will try again in 5 minutes.`);
       }
     };
   };
@@ -972,7 +963,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     if (!query.trim()) return;
     
     setIsProcessing(true);
-    setError(null);
     
     try {
       if (chatMode === 'discussion') {
@@ -980,7 +970,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         const discussionCheck = canUseFeature('discussions');
         if (!discussionCheck.allowed) {
           console.warn(`[PlatformDashboard] 🚫 Discussion blocked for ${platform} - ${discussionCheck.reason}`);
-          setError(discussionCheck.reason || 'Discussion feature not available');
+          setToast(discussionCheck.reason || 'Discussion feature not available');
           setIsProcessing(false);
           return;
         }
@@ -1045,7 +1035,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         const postCheck = canUseFeature('posts');
         if (!postCheck.allowed) {
           console.warn(`[PlatformDashboard] 🚫 Post creation blocked for ${platform} - ${postCheck.reason}`);
-          setError(postCheck.reason || 'Post creation feature not available');
+          setToast(postCheck.reason || 'Post creation feature not available');
           setIsProcessing(false);
           return;
         }
@@ -1111,12 +1101,12 @@ Image Description: ${response.post.image_prompt}
           setToast('Post generated successfully! Check the Cooked Posts section.');
           
         } else {
-          setError('Failed to generate post. Please try again.');
+          setToast('Failed to generate post. Please try again.');
         }
       }
     } catch (error: any) {
       console.error(`Error processing ${chatMode} query:`, error);
-      setError(error.message || `Failed to process ${chatMode} query`);
+      setToast(error.message || `Failed to process ${chatMode} query`);
     } finally {
       setIsProcessing(false);
       setQuery('');
@@ -1125,7 +1115,6 @@ Image Description: ${response.post.image_prompt}
 
   const refreshAllData = async () => {
     if (!accountHolder) {
-      setError('No account holder specified.');
       return;
     }
     try {
@@ -1167,13 +1156,12 @@ Image Description: ${response.post.image_prompt}
       const competitorResponses = competitorData as any[];
       setCompetitorData(competitorResponses.flatMap(res => res.data));
 
-      setError(null);
       if (firstLoadRef.current) {
         firstLoadRef.current = false;
       }
     } catch (error: any) {
       console.error(`Error refreshing ${platform} data:`, error);
-      setError(error.response?.data?.error || `Failed to load ${platform} dashboard data.`);
+      setToast(`Failed to load ${platform} dashboard data.`);
     }
   };
 
@@ -1335,7 +1323,7 @@ Image Description: ${response.post.image_prompt}
   }, [profileInfo]);
 
   if (!accountHolder) {
-    return <div className="error-message">Please specify an account holder to load the {config.name} dashboard.</div>;
+    return null;
   }
 
   const formatCount = (count: number | undefined) => {
@@ -1526,8 +1514,6 @@ Image Description: ${response.post.image_prompt}
           )}
         </div>
       </div>
-      {error && <div className="error-message">{error}</div>}
-      {profileError && <div className="error-message">{profileError}</div>}
       <div className="modules-container">
         <div className="dashboard-grid">
           <div className="profile-metadata">

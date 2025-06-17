@@ -45,7 +45,7 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accountType, onOpenChat }) => {
-  const { trackPost, trackDiscussion, trackAIReply, trackCampaign, isFeatureBlocked, trackRealDiscussion, canUseFeature } = useFeatureTracking();
+  const { trackPost, trackDiscussion, trackAIReply, trackCampaign, isFeatureBlocked, trackRealDiscussion, trackRealAIReply, trackRealPostCreation, canUseFeature } = useFeatureTracking();
   const { showUpgradePopup, blockedFeature, handleFeatureAttempt, closeUpgradePopup, currentUsage } = useUpgradeHandler();
   const [query, setQuery] = useState('');
   const [toast, setToast] = useState<string | null>(null);
@@ -383,6 +383,19 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
     
     try {
       if (chatMode === 'discussion') {
+        // ✅ REAL USAGE TRACKING: Check limits BEFORE engaging in discussion
+        const trackingSuccess = await trackRealDiscussion('instagram', {
+          messageCount: chatMessages.length + 1,
+          type: 'chat'
+        });
+        
+        if (!trackingSuccess) {
+          console.warn(`[Dashboard] 🚫 Discussion blocked for Instagram - limit reached`);
+          setToast('Discussion limit reached - upgrade to continue');
+          setIsProcessing(false);
+          return;
+        }
+        
         console.log(`Sending discussion query to RAG for ${accountHolder}: ${query}`);
         const response = await RagService.sendDiscussionQuery(accountHolder, query, chatMessages, 'instagram');
         
@@ -429,6 +442,20 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
         setIsChatModalOpen(true);
         
       } else if (chatMode === 'post') {
+        // ✅ REAL USAGE TRACKING: Check limits BEFORE creating post
+        const trackingSuccess = await trackRealPostCreation('instagram', {
+          scheduled: false,
+          immediate: false,
+          type: 'ai_generated_content'
+        });
+        
+        if (!trackingSuccess) {
+          console.warn(`[Dashboard] 🚫 Post creation blocked for Instagram - limit reached`);
+          setToast('Post creation limit reached - upgrade to continue');
+          setIsProcessing(false);
+          return;
+        }
+        
         console.log(`Sending post generation query to RAG for ${accountHolder}: ${query}`);
         const response = await RagService.sendPostQuery(accountHolder, query, 'instagram');
         
@@ -518,12 +545,6 @@ Image Description: ${response.post.image_prompt}
 
     try {
       if (notification.type === 'message' && notification.sender_id && notification.message_id) {
-        await axios.post(`/api/send-dm-reply/${igBusinessId}`, {
-          sender_id: notification.sender_id,
-          text: replyText,
-          message_id: notification.message_id,
-        });
-        
         // ✅ REAL USAGE TRACKING: Check limits BEFORE sending DM reply
         const trackingSuccess = await trackRealDiscussion('instagram', {
           messageCount: 1,
@@ -535,6 +556,12 @@ Image Description: ${response.post.image_prompt}
           setToast('Discussion limit reached - upgrade to continue');
           return;
         }
+        
+        await axios.post(`/api/send-dm-reply/${igBusinessId}`, {
+          sender_id: notification.sender_id,
+          text: replyText,
+          message_id: notification.message_id,
+        });
         
         console.log(`[Dashboard] ✅ DM reply tracked: Instagram manual reply`);
         
@@ -550,11 +577,6 @@ Image Description: ${response.post.image_prompt}
         setNotifications(prev => prev.filter(n => n.message_id !== notification.message_id));
         setToast('DM reply sent!');
       } else if (notification.type === 'comment' && notification.comment_id) {
-        await axios.post(`/api/send-comment-reply/${igBusinessId}`, {
-          comment_id: notification.comment_id,
-          text: replyText,
-        });
-        
         // ✅ REAL USAGE TRACKING: Check limits BEFORE sending comment reply
         const trackingSuccess = await trackRealDiscussion('instagram', {
           messageCount: 1,
@@ -566,6 +588,11 @@ Image Description: ${response.post.image_prompt}
           setToast('Discussion limit reached - upgrade to continue');
           return;
         }
+        
+        await axios.post(`/api/send-comment-reply/${igBusinessId}`, {
+          comment_id: notification.comment_id,
+          text: replyText,
+        });
         
         console.log(`[Dashboard] ✅ Comment reply tracked: Instagram manual reply`);
         
@@ -912,6 +939,18 @@ Image Description: ${response.post.image_prompt}
     }));
     
     try {
+      // ✅ REAL USAGE TRACKING: Check limits BEFORE sending AI reply
+      const trackingSuccess = await trackRealAIReply('instagram', {
+        type: notification.type === 'message' ? 'dm' : 'comment',
+        mode: 'instant'
+      });
+      
+      if (!trackingSuccess) {
+        console.warn(`[Dashboard] 🚫 AI reply blocked for Instagram - limit reached`);
+        setToast('AI Reply limit reached - upgrade to continue');
+        return;
+      }
+      
       // Send the reply
       const sendResponse = await fetch(`/api/send-dm-reply/${igBusinessId}`, {
         method: 'POST',
@@ -931,9 +970,7 @@ Image Description: ${response.post.image_prompt}
       
       if (sendResponse.ok) {
         console.log(`[${new Date().toISOString()}] Successfully sent AI reply for ${notifId}`, responseData);
-        
-        // Track AI reply usage
-        trackAIReply('instagram', 'ai_reply_sent');
+        console.log(`[Dashboard] ✅ AI reply tracked: Instagram AI reply sent`);
         
         // QUICK FIX 2: Immediately remove the notification on successful send
         setNotifications(prev => prev.filter(n => 
@@ -1451,12 +1488,20 @@ Image Description: ${response.post.image_prompt}
       }
     };
 
+    const handleShowUpgradePopup = (event: any) => {
+      const { feature, reason } = event.detail;
+      console.log(`[Dashboard] 🚫 Upgrade needed for ${feature}: ${reason}`);
+      setToast(`${feature} limit reached - upgrade to continue`);
+    };
+
     window.addEventListener('openCampaignModal', handleOpenCampaignEvent);
     window.addEventListener('campaignStopped', handleCampaignStoppedEvent);
+    window.addEventListener('showUpgradePopup', handleShowUpgradePopup);
     
     return () => {
       window.removeEventListener('openCampaignModal', handleOpenCampaignEvent);
       window.removeEventListener('campaignStopped', handleCampaignStoppedEvent);
+      window.removeEventListener('showUpgradePopup', handleShowUpgradePopup);
     };
   }, [accountHolder]);
 

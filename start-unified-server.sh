@@ -61,63 +61,24 @@ start_service() {
   fi
 }
 
-# Start backend services
-echo -e "\n${BLUE}Starting Backend Services...${NC}"
-start_service "Main-Server" "cd server && node server.js" 3000 "main-server-unified.log"
-start_service "RAG-Server" "node rag-server.js" 3001 "rag-server-unified.log"
-
-# Start frontend (Vite dev server)
-echo -e "\n${BLUE}Starting Frontend...${NC}"
+# Start services in order
+start_service "RAG Server" "node rag-server.js" 3001 "rag-server-unified.log"
+start_service "Main Server" "cd server && node server.js" 3000 "main-server-unified.log"
+start_service "Image Server" "node server.js" 3002 "server-unified.log"
 start_service "Frontend" "npm run dev" 5173 "frontend-unified.log"
 
-# Wait for all services to be fully ready
-echo -e "\n${YELLOW}Waiting for all services to be ready...${NC}"
-sleep 3
-
-# Start reverse proxy
-echo -e "\n${BLUE}Starting Reverse Proxy...${NC}"
-start_service "Reverse-Proxy" "node reverse-proxy.cjs" 8080 "reverse-proxy-unified.log"
-
-# Final status check
-echo -e "\n${BLUE}Service Status Check:${NC}"
-echo "========================"
-
-services=("3000:Main Server" "3001:RAG Server" "5173:Frontend" "8080:Reverse Proxy")
-all_running=true
-
-for service in "${services[@]}"; do
-  port="${service%%:*}"
-  name="${service#*:}"
-  
-  if is_port_in_use "$port"; then
-    echo -e "${GREEN}✅ $name - Port $port - Running${NC}"
-  else
-    echo -e "${RED}❌ $name - Port $port - Not Running${NC}"
-    all_running=false
-  fi
-done
-
-if [ "$all_running" = true ]; then
-  echo -e "\n${GREEN}🎉 All services are running successfully!${NC}"
-  echo -e "\n${BLUE}📡 Your unified application is available at:${NC}"
-  echo -e "${GREEN}   Local: http://localhost:8080${NC}"
-  echo -e "\n${YELLOW}🌍 To make it available worldwide, run:${NC}"
-  echo -e "${GREEN}   ngrok http 8080${NC}"
-  echo -e "\n${BLUE}💡 The reverse proxy handles:${NC}"
-  echo "   • Frontend: / (from port 5173)"
-  echo "   • API: /api/* (to port 3000)"
-  echo "   • RAG: /api/rag/* (to port 3001)"
-  echo "   • Webhooks: /webhook/* (to port 3000)"
-  echo "   • Events: /events/* (to port 3000)"
-else
-  echo -e "\n${RED}❌ Some services failed to start. Check the log files for details.${NC}"
-fi
-
-echo -e "\n${BLUE}📊 Monitor logs with:${NC}"
-echo "   tail -f main-server-unified.log"
+echo ""
+echo "✅ All services started successfully!"
+echo ""
+echo "📊 Access your application at:"
+echo "   Frontend:     http://localhost:5173"
+echo "   Health Check: http://localhost:3002/health"
+echo ""
+echo "📝 Monitor logs:"
 echo "   tail -f rag-server-unified.log"
+echo "   tail -f main-server-unified.log"
+echo "   tail -f server-unified.log"
 echo "   tail -f frontend-unified.log"
-echo "   tail -f reverse-proxy-unified.log"
 
 echo -e "\n${BLUE}🛑 To stop all services, run:${NC}"
 echo "   ./stop-unified-server.sh" 

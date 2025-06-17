@@ -18,7 +18,7 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
   markPlatformAccessed
 }) => {
   const [username, setUsername] = useState<string>('');
-  const [accountType, setAccountType] = useState<'branding' | 'non-branding' | ''>('');
+  const [accountType, setAccountType] = useState<'branding' | 'non-branding'>('branding');
   const [postingStyle, setPostingStyle] = useState<string>('');
   const [competitors, setCompetitors] = useState<string[]>(['', '', '']);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -42,6 +42,33 @@ const usernameCheckUrl = '/api/check-username-availability';
 
   // Facebook username validation (letters, numbers, periods only - no underscores for Facebook)
   const facebookUsernameRegex = /^[a-zA-Z0-9.]+$/;
+
+  // Check for existing processing state on mount
+  useEffect(() => {
+    const checkProcessingState = () => {
+      if (!currentUser?.uid) return;
+      
+      const processingKey = `facebook_processing_${currentUser.uid}`;
+      const processingData = localStorage.getItem(processingKey);
+      
+      if (processingData) {
+        const { startTime, duration } = JSON.parse(processingData);
+        const elapsed = Date.now() - startTime;
+        
+        if (elapsed < duration) {
+          // Processing is still active
+          setIsProcessing(true);
+          setIsInitializing(false);
+          return;
+        } else {
+          // Processing has expired, clean up
+          localStorage.removeItem(processingKey);
+        }
+      }
+    };
+
+    checkProcessingState();
+  }, [currentUser?.uid]);
 
   useEffect(() => {
     const checkUserStatus = async () => {
@@ -225,7 +252,7 @@ const usernameCheckUrl = '/api/check-username-availability';
 
   const resetForm = () => {
     setUsername('');
-    setAccountType('');
+    setAccountType('branding');
     setPostingStyle('');
     setCompetitors(['', '', '']);
     setMessage('');
@@ -241,37 +268,16 @@ const usernameCheckUrl = '/api/check-username-availability';
   };
 
   const handleProcessingComplete = () => {
-    // Check if this was a pending platform to be marked as acquired
+    // Clear processing state from localStorage
     if (currentUser?.uid) {
-      const pendingKey = `mark_facebook_pending_${currentUser.uid}`;
-      if (localStorage.getItem(pendingKey)) {
-        // Clear the pending flag
-        localStorage.removeItem(pendingKey);
-        // Mark as acquired
-        localStorage.setItem(`facebook_accessed_${currentUser.uid}`, 'true');
-        // Save account type for routing purposes
-        localStorage.setItem(`facebook_account_type_${currentUser.uid}`, accountType);
-      }
-    }
-
-    // Store username for notification counting in main dashboard
-    localStorage.setItem(`facebook_username_${currentUser?.uid}`, username.trim());
-
-    // Mark Facebook as acquired after successful submission
-    if (markPlatformAccessed) {
-      markPlatformAccessed('facebook');
-    } else {
-      // Fallback if function not provided - update localStorage directly
-      if (currentUser?.uid) {
-        localStorage.setItem(`facebook_accessed_${currentUser.uid}`, 'true');
-        // Save account type for routing purposes
-        localStorage.setItem(`facebook_account_type_${currentUser.uid}`, accountType);
-      }
+      localStorage.removeItem(`facebook_processing_${currentUser.uid}`);
     }
     
     const finalCompetitors = competitors.filter(comp => comp.trim() !== '');
     
-    onSubmitSuccess(username, finalCompetitors, accountType as 'branding' | 'non-branding');
+    if (markPlatformAccessed) {
+      markPlatformAccessed('facebook');
+    }
     
     if (accountType === 'branding') {
       navigate('/facebook-dashboard', { 
@@ -295,53 +301,58 @@ const usernameCheckUrl = '/api/check-username-availability';
   };
 
   const submitData = async () => {
-    console.log('Form submission attempt:', {
-      username: username.trim(),
-      accountType,
-      postingStyle: postingStyle.trim(),
-      competitors: competitors.slice(0, 3),
-      isValid: isValidForSubmission()
-    });
-    
     if (!isValidForSubmission()) {
-      const errors = validationErrors();
-      console.log('Validation errors:', errors);
-      showMessage(`Please fix the following errors: ${errors.join(', ')}`, 'error');
+      showMessage('Please fill in all required fields correctly', 'error');
       return;
     }
 
     if (!currentUser || !currentUser.uid) {
-      showMessage('Authentication error. Please log in again.', 'error');
+      showMessage('You must be logged in to continue', 'error');
       return;
     }
 
     setIsLoading(true);
-    
+
     try {
+      const apiUrl = `${process.env.REACT_APP_API_URL}/account-info/${currentUser.uid}`;
+      const statusApiUrl = `${process.env.REACT_APP_API_URL}/user-status`;
+
+      const finalCompetitors = competitors.filter(comp => comp.trim() !== '');
+
       const payload = {
-        username: username.trim(),
         accountType,
-        postingStyle: postingStyle.trim(),
-        competitors: competitors.filter(comp => comp.trim() !== ''),
+        accountHolder: username.trim(),
+        competitors: finalCompetitors,
+        postingStyle: postingStyle.trim() || 'General posting style',
         platform: 'facebook'
       };
 
-      const response = await axios.post(`${apiUrl}?platform=facebook`, payload, {
+      // Save to account info API
+      const response = await axios.post(apiUrl, payload, {
         headers: { 'Content-Type': 'application/json' },
         timeout: 30000,
       });
 
-      if (response.status === 200 || response.status === 201) {
+      if (response.status === 200) {
         // Now save the user's Facebook username entry state
         await axios.post(`${statusApiUrl}/${currentUser.uid}`, {
           facebook_username: username.trim(),
           accountType,
-          competitors: competitors.filter(comp => comp.trim() !== '')
+          competitors: competitors.map(comp => comp.trim())
         });
-
-        showMessage('Facebook account information saved successfully!', 'success');
         
-        // Start the 5-minute processing phase
+        showMessage('Submission successful', 'success');
+        
+        // Save processing state to localStorage with timestamp
+        const processingData = {
+          startTime: Date.now(),
+          duration: 60000, // 60 seconds in milliseconds
+          username: username.trim(),
+          platform: 'facebook'
+        };
+        localStorage.setItem(`facebook_processing_${currentUser.uid}`, JSON.stringify(processingData));
+        
+        // Start the processing phase
         setIsLoading(false);
         setIsProcessing(true);
       }
@@ -427,7 +438,6 @@ const usernameCheckUrl = '/api/check-username-availability';
                 className="form-select"
                 disabled={isLoading}
               >
-                <option value="">Select account type</option>
                 <option value="branding">Branding Account</option>
                 <option value="non-branding">Non-Branding Account</option>
               </select>

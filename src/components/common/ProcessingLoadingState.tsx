@@ -14,6 +14,7 @@ import {
   FiChevronRight,
   FiStar
 } from 'react-icons/fi';
+import { useAuth } from '../../context/AuthContext';
 import './ProcessingLoadingState.css';
 
 interface ProTip {
@@ -34,9 +35,35 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   username,
   onComplete
 }) => {
-  const [timeLeft, setTimeLeft] = useState(300); // 5 minutes in seconds
+  const { currentUser } = useAuth();
+  const [timeLeft, setTimeLeft] = useState(60); // Default to 60 seconds
+  const [totalDuration, setTotalDuration] = useState(60); // Track original duration
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+
+  // Initialize countdown based on localStorage data
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+    
+    const processingKey = `${platform}_processing_${currentUser.uid}`;
+    const processingData = localStorage.getItem(processingKey);
+    
+    if (processingData) {
+      const { startTime, duration } = JSON.parse(processingData);
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(0, Math.ceil((duration - elapsed) / 1000));
+      const originalDuration = Math.ceil(duration / 1000);
+      
+      setTotalDuration(originalDuration);
+      
+      if (remaining > 0) {
+        setTimeLeft(remaining);
+      } else {
+        // Time has already expired, complete immediately
+        onComplete();
+      }
+    }
+  }, [currentUser?.uid, platform, onComplete]);
 
   const proTips: ProTip[] = [
     {
@@ -202,7 +229,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
                 strokeWidth="8"
                 strokeLinecap="round"
                 strokeDasharray={`${2 * Math.PI * 45}`}
-                strokeDashoffset={`${2 * Math.PI * 45 * (1 - timeLeft / 300)}`}
+                strokeDashoffset={`${2 * Math.PI * 45 * (1 - timeLeft / totalDuration)}`}
                 transform="rotate(-90 50 50)"
               />
             </svg>
@@ -304,11 +331,11 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
             />
           </div>
           <p className="processing-status">
-            {timeLeft > 240 && "Analyzing competitor strategies..."}
-            {timeLeft <= 240 && timeLeft > 180 && "Processing your content patterns..."}
-            {timeLeft <= 180 && timeLeft > 120 && "Optimizing engagement strategies..."}
-            {timeLeft <= 120 && timeLeft > 60 && "Generating personalized recommendations..."}
-            {timeLeft <= 60 && "Finalizing your AI-powered dashboard..."}
+            {timeLeft > 48 && "Analyzing competitor strategies..."}
+            {timeLeft <= 48 && timeLeft > 36 && "Processing your content patterns..."}
+            {timeLeft <= 36 && timeLeft > 24 && "Optimizing engagement strategies..."}
+            {timeLeft <= 24 && timeLeft > 12 && "Generating personalized recommendations..."}
+            {timeLeft <= 12 && "Finalizing your AI-powered dashboard..."}
           </p>
         </motion.div>
       </div>

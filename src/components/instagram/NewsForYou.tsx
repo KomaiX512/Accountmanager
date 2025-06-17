@@ -10,7 +10,7 @@ interface NewsForYouProps {
 }
 
 const NewsForYou: React.FC<NewsForYouProps> = ({ accountHolder, platform = 'instagram' }) => {
-  const endpoint = `http://localhost:3000/news-for-you/${accountHolder}?platform=${platform}`;
+  const endpoint = `/api/news-for-you/${accountHolder}?platform=${platform}`;
   const { data, loading } = useR2Fetch<any[]>(endpoint);
   const [selectedNewsIndex, setSelectedNewsIndex] = useState<number | null>(null);
 

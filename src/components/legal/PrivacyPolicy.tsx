@@ -32,10 +32,10 @@ const PrivacyPolicy: React.FC = () => {
           <section className="privacy-section">
             <h2>1. Introduction</h2>
             <p>
-              Welcome to Sentient AI ("we," "our," or "us"). We are committed to protecting your privacy and ensuring the security of your personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our AI-powered social media management platform and related services.
+              Welcome to Sentient Marketting ("we," "our," or "us"). We are committed to protecting your privacy and ensuring the security of your personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our AI-powered social media management platform and related services.
             </p>
             <p>
-              By using Sentient AI, you agree to the collection and use of information in accordance with this Privacy Policy. If you do not agree with our policies and practices, please do not use our services.
+              By using Sentient Marketting, you agree to the collection and use of information in accordance with this Privacy Policy. If you do not agree with our policies and practices, please do not use our services.
             </p>
           </section>
 
@@ -235,7 +235,7 @@ const PrivacyPolicy: React.FC = () => {
             </p>
             <div className="contact-info">
               <p><strong>Email:</strong> privacy@sentientai.com</p>
-              <p><strong>Address:</strong> Sentient AI Privacy Team<br />
+              <p><strong>Address:</strong> Sentient Marketting Privacy Team<br />
               123 AI Innovation Drive<br />
               Tech Valley, CA 94000<br />
               United States</p>
@@ -249,7 +249,7 @@ const PrivacyPolicy: React.FC = () => {
           <section className="privacy-section">
             <h2>12. Compliance and Certifications</h2>
             <p>
-              Sentient AI is committed to maintaining compliance with applicable privacy laws and regulations, including:
+              Sentient Marketting is committed to maintaining compliance with applicable privacy laws and regulations, including:
             </p>
             <ul>
               <li>General Data Protection Regulation (GDPR)</li>

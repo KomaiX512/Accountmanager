@@ -56,14 +56,14 @@ kill_port 3002 "Main Server"
 
 # Clean up PID files
 echo -e "\n${YELLOW}Cleaning up PID files...${NC}"
-rm -f main-server.pid rag-server.pid frontend.pid reverse-proxy.pid 2>/dev/null
+rm -f main-server.pid rag-server.pid frontend.pid 2>/dev/null
 
 # Clean up ngrok processes if any
 pkill -f ngrok 2>/dev/null && echo -e "${GREEN}✅ Stopped ngrok processes${NC}" || echo -e "${YELLOW}No ngrok processes found${NC}"
 
 echo -e "\n${GREEN}🎉 All services stopped successfully!${NC}"
-echo -e "${BLUE}Log files are preserved for review:${NC}"
+echo -e "${BLUE}📊 Log files (if you need to debug):${NC}"
 echo "   • main-server-unified.log"
 echo "   • rag-server-unified.log"
-echo "   • frontend-unified.log"
-echo "   • reverse-proxy-unified.log" 
+echo "   • server-unified.log"
+echo "   • frontend-unified.log" 

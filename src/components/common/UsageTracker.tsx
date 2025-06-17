@@ -118,35 +118,57 @@ const UsageTracker: React.FC = () => {
     }
 
     setTestingFeature(feature);
-    addDebugLog(`Starting ${feature} tracking test...`);
+    addDebugLog(`🚀 BATTLE TEST: Starting ${feature} tracking test...`);
     
     try {
       const beforeUsage = usage[feature];
-      addDebugLog(`Before test: ${feature} = ${beforeUsage}`);
+      const beforeLimits = getUserLimits();
+      const currentLimit = beforeLimits[feature];
       
-      await trackFeatureUsage(feature, 'test_platform', 'manual_test');
+      addDebugLog(`📊 BEFORE: ${feature} = ${beforeUsage}/${currentLimit === -1 ? '∞' : currentLimit}`);
       
-      addDebugLog(`${feature} tracking API call successful!`);
+      // Check if this would exceed limits
+      if (currentLimit !== -1 && beforeUsage >= currentLimit) {
+        addDebugLog(`🚫 LIMIT REACHED: ${feature} is at limit (${beforeUsage}/${currentLimit})`);
+        addDebugLog(`🔄 This should trigger upgrade popup...`);
+      }
       
-      // Refresh usage to show updated counts
+      // Perform the tracking
+      await trackFeatureUsage(feature, 'battle_test', 'manual_verification_test');
+      
+      addDebugLog(`✅ ${feature} tracking API call completed!`);
+      
+      // Wait for state update and refresh
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      await refreshUsage();
+      
+      // Check results after refresh
       setTimeout(async () => {
-        await refreshUsage();
         const afterUsage = usage[feature];
-        addDebugLog(`After refresh: ${feature} = ${afterUsage} (Expected: ${beforeUsage + 1})`);
+        const expectedUsage = Math.min(beforeUsage + 1, currentLimit === -1 ? beforeUsage + 1 : currentLimit);
         
-        if (afterUsage === beforeUsage + 1) {
-          addDebugLog(`${feature} tracking test PASSED! Counter incremented correctly.`);
+        addDebugLog(`📊 AFTER: ${feature} = ${afterUsage}/${currentLimit === -1 ? '∞' : currentLimit} (Expected: ${expectedUsage})`);
+        
+        if (afterUsage === expectedUsage) {
+          addDebugLog(`✅ BATTLE TEST PASSED! ${feature} tracking working correctly.`);
         } else {
-          addDebugLog(`${feature} tracking test FAILED! Counter should be ${beforeUsage + 1} but is ${afterUsage}`);
+          addDebugLog(`❌ BATTLE TEST FAILED! ${feature} should be ${expectedUsage} but is ${afterUsage}`);
         }
+        
+        // Test limit enforcement
+        if (currentLimit !== -1 && afterUsage >= currentLimit) {
+          addDebugLog(`🚫 LIMIT TEST: ${feature} is now at/over limit - upgrade popup should appear for next usage`);
+        }
+        
+        addDebugLog(`🏁 BATTLE TEST COMPLETE for ${feature}`);
       }, 2000);
       
     } catch (error) {
-      console.error(`[UsageTracker] ${feature} tracking test failed:`, error);
-      addDebugLog(`${feature} tracking test failed: ${error}`);
-      alert(`${feature} tracking test failed. Check console for details.`);
+      console.error(`[UsageTracker] ${feature} battle test failed:`, error);
+      addDebugLog(`❌ ${feature} battle test failed: ${error}`);
+      alert(`${feature} battle test failed. Check console for details.`);
     } finally {
-      setTestingFeature(null);
+      setTimeout(() => setTestingFeature(null), 3000);
     }
   };
 
@@ -160,7 +182,7 @@ const UsageTracker: React.FC = () => {
     addDebugLog('Testing backend connection...');
     
     try {
-      const response = await fetch(`http://localhost:3002/api/user/${currentUser.uid}/usage`);
+      const response = await fetch(`/api/user/${currentUser.uid}/usage`);
       if (response.ok) {
         const backendUsage = await response.json();
         addDebugLog(`Backend connected! Usage: ${JSON.stringify(backendUsage)}`);

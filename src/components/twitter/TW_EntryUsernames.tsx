@@ -18,7 +18,7 @@ const TW_EntryUsernames: React.FC<TW_EntryUsernamesProps> = ({
   markPlatformAccessed 
 }) => {
   const [username, setUsername] = useState<string>('');
-  const [accountType, setAccountType] = useState<'branding' | 'non-branding' | ''>('');
+  const [accountType, setAccountType] = useState<'branding' | 'non-branding' | ''>('branding');
   const [postingStyle, setPostingStyle] = useState<string>('');
   const [competitors, setCompetitors] = useState<string[]>(['', '', '']);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -44,6 +44,33 @@ const usernameCheckUrl = '/api/check-username-availability';
 
   // Twitter username validation regex (alphanumeric and underscores only)
   const twitterUsernameRegex = /^[a-zA-Z0-9_]+$/;
+
+  // Check for existing processing state on mount
+  useEffect(() => {
+    const checkProcessingState = () => {
+      if (!currentUser?.uid) return;
+      
+      const processingKey = `twitter_processing_${currentUser.uid}`;
+      const processingData = localStorage.getItem(processingKey);
+      
+      if (processingData) {
+        const { startTime, duration } = JSON.parse(processingData);
+        const elapsed = Date.now() - startTime;
+        
+        if (elapsed < duration) {
+          // Processing is still active
+          setIsProcessing(true);
+          setIsInitializing(false);
+          return;
+        } else {
+          // Processing has expired, clean up
+          localStorage.removeItem(processingKey);
+        }
+      }
+    };
+
+    checkProcessingState();
+  }, [currentUser?.uid]);
 
   // Check if user has already entered Twitter username
   useEffect(() => {
@@ -218,7 +245,7 @@ const usernameCheckUrl = '/api/check-username-availability';
 
   const resetForm = () => {
     setUsername('');
-    setAccountType('');
+    setAccountType('branding');
     setPostingStyle('');
     setCompetitors(['', '', '']);
     setUsernameAvailable(null);
@@ -233,41 +260,16 @@ const usernameCheckUrl = '/api/check-username-availability';
   };
 
   const handleProcessingComplete = () => {
-    // Check if this was a pending platform to be marked as acquired
+    // Clear processing state from localStorage
     if (currentUser?.uid) {
-      const pendingKey = `mark_twitter_pending_${currentUser.uid}`;
-      if (localStorage.getItem(pendingKey)) {
-        // Clear the pending flag
-        localStorage.removeItem(pendingKey);
-        // Mark as acquired
-        localStorage.setItem(`twitter_accessed_${currentUser.uid}`, 'true');
-        // Save account type for routing purposes
-        localStorage.setItem(`twitter_account_type_${currentUser.uid}`, accountType);
-      }
+      localStorage.removeItem(`twitter_processing_${currentUser.uid}`);
     }
-
-    // Store username for notification counting in main dashboard
-    localStorage.setItem(`twitter_username_${currentUser?.uid}`, username.trim());
-
-    // Mark Twitter as acquired after successful submission
+    
+    const finalCompetitors = competitors.filter(comp => comp.trim() !== '');
+    
     if (markPlatformAccessed) {
       markPlatformAccessed('twitter');
-    } else {
-      // Fallback if function not provided - update localStorage directly
-      if (currentUser?.uid) {
-        localStorage.setItem(`twitter_accessed_${currentUser.uid}`, 'true');
-        // Save account type for routing purposes
-        localStorage.setItem(`twitter_account_type_${currentUser.uid}`, accountType);
-      }
     }
-
-    const finalCompetitors = competitors.map(comp => comp.trim());
-    
-    onSubmitSuccess(
-      username,
-      finalCompetitors,
-      accountType as 'branding' | 'non-branding'
-    );
     
     if (accountType === 'branding') {
       navigate('/twitter-dashboard', { 
@@ -304,16 +306,21 @@ const usernameCheckUrl = '/api/check-username-availability';
     setIsLoading(true);
 
     try {
+      const apiUrl = `${process.env.REACT_APP_API_URL}/account-info/${currentUser.uid}`;
+      const statusApiUrl = `${process.env.REACT_APP_API_URL}/user-status`;
+
+      const finalCompetitors = competitors.filter(comp => comp.trim() !== '');
+
       const payload = {
-        username: username.trim(),
         accountType,
-        postingStyle: postingStyle.trim(),
-        competitors: competitors.map(comp => comp.trim()), // Always include competitors
+        accountHolder: username.trim(),
+        competitors: finalCompetitors,
+        postingStyle: postingStyle.trim() || 'General posting style',
         platform: 'twitter'
       };
 
-      // Save to account info API with platform parameter
-      const response = await axios.post(`${apiUrl}?platform=twitter`, payload, {
+      // Save to account info API
+      const response = await axios.post(apiUrl, payload, {
         headers: { 'Content-Type': 'application/json' },
         timeout: 30000,
       });
@@ -326,37 +333,18 @@ const usernameCheckUrl = '/api/check-username-availability';
           competitors: competitors.map(comp => comp.trim())
         });
         
-        // Check if this was a pending platform to be marked as acquired
-        if (currentUser?.uid) {
-          const pendingKey = `mark_twitter_pending_${currentUser.uid}`;
-          if (localStorage.getItem(pendingKey)) {
-            // Clear the pending flag
-            localStorage.removeItem(pendingKey);
-            // Mark as acquired
-            localStorage.setItem(`twitter_accessed_${currentUser.uid}`, 'true');
-            // Save account type for routing purposes
-            localStorage.setItem(`twitter_account_type_${currentUser.uid}`, accountType);
-          }
-        }
-
-        // Store username for notification counting in main dashboard
-        localStorage.setItem(`twitter_username_${currentUser.uid}`, username.trim());
-
-        // Mark Twitter as acquired after successful submission
-        if (markPlatformAccessed) {
-          markPlatformAccessed('twitter');
-        } else {
-          // Fallback if function not provided - update localStorage directly
-          if (currentUser?.uid) {
-            localStorage.setItem(`twitter_accessed_${currentUser.uid}`, 'true');
-            // Save account type for routing purposes
-            localStorage.setItem(`twitter_account_type_${currentUser.uid}`, accountType);
-          }
-        }
-
         showMessage('Submission successful', 'success');
         
-        // Start the 5-minute processing phase
+        // Save processing state to localStorage with timestamp
+        const processingData = {
+          startTime: Date.now(),
+          duration: 60000, // 60 seconds in milliseconds
+          username: username.trim(),
+          platform: 'twitter'
+        };
+        localStorage.setItem(`twitter_processing_${currentUser.uid}`, JSON.stringify(processingData));
+        
+        // Start the processing phase
         setIsLoading(false);
         setIsProcessing(true);
       }

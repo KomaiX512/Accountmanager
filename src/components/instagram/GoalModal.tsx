@@ -120,7 +120,7 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
       });
       
       // ✅ REAL USAGE TRACKING: Check limits BEFORE setting campaign goal
-      const trackingSuccess = trackRealCampaign(platform.toLowerCase(), {
+      const trackingSuccess = await trackRealCampaign(platform.toLowerCase(), {
         action: 'goal_set'
       });
       

@@ -18,7 +18,7 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
   markPlatformAccessed
 }) => {
   const [username, setUsername] = useState<string>('');
-  const [accountType, setAccountType] = useState<'branding' | 'non-branding' | ''>('');
+  const [accountType, setAccountType] = useState<'branding' | 'non-branding'>('branding');
   const [postingStyle, setPostingStyle] = useState<string>('');
   const [competitors, setCompetitors] = useState<string[]>(['', '', '']);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -91,6 +91,33 @@ const usernameCheckUrl = '/api/check-username-availability';
     
     checkUserStatus();
   }, [currentUser, navigate, onSubmitSuccess, redirectIfCompleted]);
+
+  // Check for existing processing state on mount
+  useEffect(() => {
+    const checkProcessingState = () => {
+      if (!currentUser?.uid) return;
+      
+      const processingKey = `instagram_processing_${currentUser.uid}`;
+      const processingData = localStorage.getItem(processingKey);
+      
+      if (processingData) {
+        const { startTime, duration } = JSON.parse(processingData);
+        const elapsed = Date.now() - startTime;
+        
+        if (elapsed < duration) {
+          // Processing is still active
+          setIsProcessing(true);
+          setIsInitializing(false);
+          return;
+        } else {
+          // Processing has expired, clean up
+          localStorage.removeItem(processingKey);
+        }
+      }
+    };
+
+    checkProcessingState();
+  }, [currentUser?.uid]);
 
   // Debounced username validation
   const checkUsernameAvailability = useCallback(
@@ -208,7 +235,7 @@ const usernameCheckUrl = '/api/check-username-availability';
 
   const resetForm = () => {
     setUsername('');
-    setAccountType('');
+    setAccountType('branding');
     setPostingStyle('');
     setCompetitors(['', '', '']);
     setUsernameAvailable(null);
@@ -223,46 +250,24 @@ const usernameCheckUrl = '/api/check-username-availability';
   };
 
   const handleProcessingComplete = () => {
-    // Check if this was a pending platform to be marked as acquired
-    const pendingKey = `mark_instagram_pending_${currentUser?.uid}`;
-    if (localStorage.getItem(pendingKey)) {
-      // Clear the pending flag
-      localStorage.removeItem(pendingKey);
-      // Mark as acquired
-      localStorage.setItem(`instagram_accessed_${currentUser?.uid}`, 'true');
-      // Save account type for routing purposes
-      localStorage.setItem(`instagram_account_type_${currentUser?.uid}`, accountType);
+    // Clear processing state from localStorage
+    if (currentUser?.uid) {
+      localStorage.removeItem(`instagram_processing_${currentUser.uid}`);
     }
     
-    // Store username for notification counting in main dashboard
-    localStorage.setItem(`instagram_username_${currentUser?.uid}`, username.trim());
+    const finalCompetitors = competitors.filter(comp => comp.trim() !== '');
     
-    // Mark Instagram as acquired after successful submission
     if (markPlatformAccessed) {
       markPlatformAccessed('instagram');
-    } else {
-      // Fallback if function not provided - update localStorage directly
-      if (currentUser?.uid) {
-        localStorage.setItem(`instagram_accessed_${currentUser.uid}`, 'true');
-        // Save account type for routing purposes
-        localStorage.setItem(`instagram_account_type_${currentUser.uid}`, accountType);
-      }
     }
-    
-    const finalCompetitors = competitors.map(comp => comp.trim());
-    
-    onSubmitSuccess(
-      username,
-      finalCompetitors,
-      accountType as 'branding' | 'non-branding'
-    );
     
     if (accountType === 'branding') {
       navigate('/dashboard', { 
         state: { 
           accountHolder: username, 
           competitors: finalCompetitors,
-          accountType: 'branding'
+          accountType: 'branding',
+          platform: 'instagram'
         } 
       });
     } else {
@@ -270,7 +275,8 @@ const usernameCheckUrl = '/api/check-username-availability';
         state: { 
           accountHolder: username,
           competitors: finalCompetitors,
-          accountType: 'non-branding'
+          accountType: 'non-branding',
+          platform: 'instagram'
         } 
       });
     }
@@ -290,11 +296,17 @@ const usernameCheckUrl = '/api/check-username-availability';
     setIsLoading(true);
 
     try {
+      const apiUrl = `${process.env.REACT_APP_API_URL}/account-info/${currentUser.uid}`;
+      const statusApiUrl = `${process.env.REACT_APP_API_URL}/user-status`;
+
+      const finalCompetitors = competitors.filter(comp => comp.trim() !== '');
+
       const payload = {
-        username: username.trim(),
         accountType,
-        postingStyle: postingStyle.trim(),
-        competitors: competitors.map(comp => comp.trim()), // Always include competitors
+        accountHolder: username.trim(),
+        competitors: finalCompetitors,
+        postingStyle: postingStyle.trim() || 'General posting style',
+        platform: 'instagram'
       };
 
       // Save to account info API
@@ -313,7 +325,16 @@ const usernameCheckUrl = '/api/check-username-availability';
         
         showMessage('Submission successful', 'success');
         
-        // Start the 5-minute processing phase
+        // Save processing state to localStorage with timestamp
+        const processingData = {
+          startTime: Date.now(),
+          duration: 60000, // 60 seconds in milliseconds
+          username: username.trim(),
+          platform: 'instagram'
+        };
+        localStorage.setItem(`instagram_processing_${currentUser.uid}`, JSON.stringify(processingData));
+        
+        // Start the processing phase
         setIsLoading(false);
         setIsProcessing(true);
       }

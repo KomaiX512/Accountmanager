@@ -130,21 +130,17 @@ class RagService {
     return processed;
   }
   
-  // Accept both localhost and 127.0.0.1 to handle different browser security policies
-  // Use port 3001 for RAG server (not port 3000 which is the main server)
+  // Use relative URLs to go through vite proxy for proper CORS handling
   private static readonly RAG_SERVER_URLS = [
-    'http://127.0.0.1:3001',  // RAG server on port 3001
-    'http://localhost:3001'   // RAG server on port 3001
+    '',  // Use relative URLs to go through vite proxy
   ];
   
   private static readonly MAIN_SERVER_URLS = [
-    'http://127.0.0.1:3002',  // Main server on port 3002 (image proxy server)
-    'http://localhost:3002'   // Main server on port 3002 (image proxy server)
+    '',  // Use relative URLs to go through vite proxy
   ];
   
   private static readonly AI_REPLIES_URLS = [
-    'http://127.0.0.1:3002',  // AI replies on port 3002
-    'http://localhost:3002'   // AI replies on port 3002
+    '',  // Use relative URLs to go through vite proxy
   ];
   
   // Request deduplication to prevent multiple identical requests
@@ -285,7 +281,7 @@ class RagService {
           }
           
           // Add platform context to request for better session management
-          return await this.tryServerUrls(`/api/discussion`, (url) => 
+          return await this.tryServerUrls(`/api/rag/discussion`, (url) => 
             axios.post(url, {
               username,
               query,
@@ -382,7 +378,7 @@ class RagService {
       console.log(`[RagService] Step 1/4: Initiating request to RAG server`);
       }
       
-      const response = await this.tryServerUrls(`/api/post-generator`, (url) => 
+      const response = await this.tryServerUrls(`/api/rag/post-generator`, (url) => 
         axios.post(url, {
           username,
           query,
@@ -485,7 +481,7 @@ class RagService {
     platform: string = 'instagram'
   ): Promise<ChatMessage[]> {
     try {
-      const response = await this.tryServerUrls(`/api/conversations/${username}?platform=${platform}`, (url) => 
+      const response = await this.tryServerUrls(`/api/rag/conversations/${username}?platform=${platform}`, (url) => 
         axios.get(url, {
           timeout: 10000, // 10 second timeout
           withCredentials: false, // Disable sending cookies
@@ -507,7 +503,7 @@ class RagService {
     platform: string = 'instagram'
   ): Promise<void> {
     try {
-      await this.tryServerUrls(`/api/conversations/${username}`, (url) => 
+      await this.tryServerUrls(`/api/rag/conversations/${username}`, (url) => 
         axios.post(url, {
           messages,
           platform
@@ -581,7 +577,7 @@ class RagService {
       platform?: string;
     }
   ): Promise<any> {
-    const urls = ['/api'];
+    const urls = ['http://localhost:3000'];
     let lastError = null;
 
     const platform = options?.platform || 'instagram';

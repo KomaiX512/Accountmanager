@@ -441,6 +441,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     // ✅ PRE-ACTION CHECK: Verify AI reply limits before proceeding
     const aiReplyAccessCheck = canUseFeature('aiReplies');
     if (!aiReplyAccessCheck.allowed) {
+      console.warn(`[PlatformDashboard] 🚫 AI Reply blocked for ${platform} - ${aiReplyAccessCheck.reason}`);
       setToast(aiReplyAccessCheck.reason || 'AI Replies feature is not available');
       return;
     }
@@ -451,6 +452,17 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         role: "user",
         content: message
       }];
+      
+      // ✅ REAL USAGE TRACKING: Track BEFORE generating AI reply
+      const trackingSuccess = await trackRealAIReply(platform, {
+        type: notification.type === 'message' ? 'dm' : 'comment',
+        mode: 'instant'
+      });
+      
+      if (!trackingSuccess) {
+        console.warn(`[PlatformDashboard] 🚫 AI Reply tracking failed for ${platform} - limit may have been reached`);
+        // Continue with AI reply generation even if tracking fails
+      }
       
       try {
         console.log(`[${new Date().toISOString()}] Calling RAG service for instant ${platform} AI reply`);
@@ -472,18 +484,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         console.log(`[${new Date().toISOString()}] Successfully generated ${platform} AI reply via RAG service:`, 
           response.reply?.substring(0, 50) + '...'
         );
-        
-        // ✅ REAL USAGE TRACKING: Check limits BEFORE generating AI reply
-        const trackingSuccess = await trackRealAIReply(platform, {
-          type: notification.type === 'message' ? 'dm' : 'comment',
-          mode: 'instant'
-        });
-        
-        if (!trackingSuccess) {
-          console.warn(`[PlatformDashboard] 🚫 AI Reply blocked for ${platform} - limit reached`);
-          setToast('AI reply limit reached - upgrade to continue');
-          return; // Exit the function, don't generate reply
-        }
         
         console.log(`[PlatformDashboard] ✅ AI Reply tracked: ${platform} ${notification.type} reply`);
         setToast(`AI reply generated for ${notification.username || 'user'}`);
@@ -971,22 +971,19 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const handleSendQuery = async () => {
     if (!query.trim()) return;
     
-    // Check feature access and show upgrade popup if blocked
-    if (chatMode === 'discussion') {
-      if (!handleFeatureAttempt('discussions')) {
-        return;
-      }
-    } else if (chatMode === 'post') {
-      if (!handleFeatureAttempt('posts')) {
-        return;
-      }
-    }
-    
     setIsProcessing(true);
     setError(null);
     
     try {
       if (chatMode === 'discussion') {
+        // ✅ PRE-ACTION CHECK: Verify discussion limits BEFORE performing action
+        const discussionCheck = canUseFeature('discussions');
+        if (!discussionCheck.allowed) {
+          console.warn(`[PlatformDashboard] 🚫 Discussion blocked for ${platform} - ${discussionCheck.reason}`);
+          setError(discussionCheck.reason || 'Discussion feature not available');
+          setIsProcessing(false);
+          return;
+        }
         
         console.log(`Sending ${platform} discussion query to RAG for ${accountHolder}: ${query}`);
         const response = await RagService.sendDiscussionQuery(accountHolder, query, chatMessages, platform);
@@ -1006,17 +1003,15 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           assistantMessage as ChatModalMessage
         ];
         
-        // ✅ REAL USAGE TRACKING: Check limits BEFORE processing discussion
+        // ✅ REAL USAGE TRACKING: Track actual discussion usage
         const trackingSuccess = await trackRealDiscussion(platform, {
           messageCount: updatedMessages.length,
           type: 'chat'
         });
         
         if (!trackingSuccess) {
-          console.warn(`[PlatformDashboard] 🚫 Discussion blocked for ${platform} - limit reached`);
-          setError('Discussion limit reached - upgrade to continue');
-          setIsProcessing(false);
-          return;
+          console.warn(`[PlatformDashboard] 🚫 Discussion tracking failed for ${platform} - limit may have been reached`);
+          // Don't return here - discussion was already sent successfully
         }
         
         setChatMessages(updatedMessages);
@@ -1046,6 +1041,15 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         }
         
       } else if (chatMode === 'post') {
+        // ✅ PRE-ACTION CHECK: Verify post limits BEFORE performing action
+        const postCheck = canUseFeature('posts');
+        if (!postCheck.allowed) {
+          console.warn(`[PlatformDashboard] 🚫 Post creation blocked for ${platform} - ${postCheck.reason}`);
+          setError(postCheck.reason || 'Post creation feature not available');
+          setIsProcessing(false);
+          return;
+        }
+        
         console.log(`Generating ${platform} post for ${accountHolder}: ${query}`);
         const response = await RagService.sendPostQuery(accountHolder, query, platform);
         
@@ -1077,7 +1081,7 @@ Image Description: ${response.post.image_prompt}
             assistantMessage as ChatModalMessage
           ];
           
-          // ✅ REAL USAGE TRACKING: Check limits BEFORE creating post
+          // ✅ REAL USAGE TRACKING: Track actual post creation
           const trackingSuccess = await trackRealPostCreation(platform, {
             scheduled: false,
             immediate: false,
@@ -1085,10 +1089,8 @@ Image Description: ${response.post.image_prompt}
           });
           
           if (!trackingSuccess) {
-            console.warn(`[PlatformDashboard] 🚫 Post creation blocked for ${platform} - limit reached`);
-            setError('Post creation limit reached - upgrade to continue');
-            setIsProcessing(false);
-            return;
+            console.warn(`[PlatformDashboard] 🚫 Post creation tracking failed for ${platform} - limit may have been reached`);
+            // Don't return here - post was already generated successfully
           }
           
           setChatMessages(updatedMessages);

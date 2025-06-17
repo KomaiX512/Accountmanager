@@ -1218,27 +1218,7 @@ const MainDashboard: React.FC = () => {
               
               {platforms.filter(p => p.connected).length === 0 && (
                 <div className="no-connected-platforms">
-                  <p>No connected platforms. Connect your accounts to start posting.</p>
-                  <div className="connect-platforms-actions">
-                    <button 
-                      className="connect-platform-button"
-                      onClick={() => {
-                        setShowInstantPostModal(false);
-                        navigate('/dashboard');
-                      }}
-                    >
-                      Go to Instagram
-                    </button>
-                    <button 
-                      className="connect-platform-button"
-                      onClick={() => {
-                        setShowInstantPostModal(false);
-                        navigate('/twitter-dashboard');
-                      }}
-                    >
-                      Go to Twitter
-                    </button>
-                  </div>
+                  <p>No connected platforms. Please connect your accounts from the platform dashboards to start posting.</p>
                 </div>
               )}
             </div>

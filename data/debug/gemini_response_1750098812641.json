@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption:\nJust testing the waters! 🌊 We're always experimenting to bring you the best content. Let us know what you think in the comments below! 👇\n\nHashtags:\n#testpost #testing #instagramtest #socialmediamarketing #digitalmarketing #contentcreation #experiment #instatest #newcontent #marketing\n\nCall to Action:\nWhat kind of content would you like to see more of? Tell us in the comments!\n\nVisual Description for Image:\nThe image should be a vibrant and playful flat lay on a light blue background. In the center, there's a white smartphone displaying a simple, clean graphic that reads \"Test Post\" in a bold, sans-serif font. Around the phone, scattered playfully, are various colorful office supplies and creative elements. These include: a bright yellow highlighter, a stack of pastel-colored sticky notes, a few paperclips in rose gold, a small succulent in a terracotta pot, and a couple of colorful markers (one teal, one coral). The lighting should be bright and even, creating a cheerful and optimistic mood. The composition should be balanced and visually appealing, with the items arranged in a way that feels both intentional and slightly random. The overall style should be modern, clean, and inviting, reflecting a creative and innovative brand. The image should evoke a sense of experimentation and playfulness.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.32771855147283696
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 259,
+    "candidatesTokenCount": 281,
+    "totalTokenCount": 540,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 259
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 281
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "emNQaPuOHNGO1PIPrejUyQc"
+}

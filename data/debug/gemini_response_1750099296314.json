@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption:\nQuick poll! 🙋‍♀️ What's your go-to weekend activity: binge-watching your fave show or exploring the great outdoors? Let us know in the comments! 👇 We're curious to see what everyone's up to! ☀️\n\nHashtags:\n#weekendvibes #poll #questionoftheday #activities #fun #lifestyle #community #testbrand #instadaily #weekend\n\nCall to Action:\nComment below with your answer! 👇\n\nVisual Description for Image:\nThe image should be a split-screen collage. On the left side, a cozy living room scene: a plush grey sofa with colorful throw pillows (mustard yellow, teal, and coral), a soft, textured blanket draped over the back, and a large flat-screen TV displaying a popular streaming service interface. The lighting is warm and inviting, with a soft glow emanating from a floor lamp in the corner. A steaming mug of coffee sits on a wooden coffee table. On the right side, a vibrant outdoor scene: a lush green forest path bathed in sunlight, with dappled shadows creating a sense of depth. A person wearing hiking boots and a backpack is partially visible, walking away from the viewer into the forest. The sky is a clear blue with fluffy white clouds. The overall style should be bright, cheerful, and inviting, with a slightly filtered, Instagram-friendly aesthetic. The composition should be balanced and visually appealing, drawing the viewer's eye to both sides of the split screen. The mood is relaxed and aspirational, representing two equally appealing ways to spend a weekend.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.2884146333472129
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 262,
+    "candidatesTokenCount": 326,
+    "totalTokenCount": 588,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 262
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 326
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "XWVQaPaZFqiUsbQPmK3KkQI"
+}

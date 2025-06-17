@@ -8,48 +8,7 @@ export default defineConfig({
     port: 5173,
     host: '0.0.0.0', // Allow external connections
     proxy: {
-      // Events and notifications (port 3000)
-      '/events': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-        secure: false,
-        ws: true, // Support WebSocket-like connections (SSE)
-      },
-      '/events-list': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-        secure: false,
-      },
-      // Posts API (port 3002 - image server)
-      '/api/posts': {
-        target: 'http://localhost:3002',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/posts': {
-        target: 'http://localhost:3002',
-        changeOrigin: true,
-        secure: false,
-      },
-      // Image proxy (port 3000 - main server)
-      '/api/proxy-image': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-        secure: false,
-      },
-      // R2 image endpoints (port 3002 - image server)
-      '/api/r2-image': {
-        target: 'http://localhost:3002',
-        changeOrigin: true,
-        secure: false,
-      },
-      // Main API endpoints (port 3000) - strip /api prefix
-      '/api/save-account-info': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path.replace(/^\/api/, ''),
-      },
+      // User connection and status endpoints (port 3000) - strip /api prefix
       '/api/user-instagram-status': {
         target: 'http://localhost:3000',
         changeOrigin: true,
@@ -68,66 +27,142 @@ export default defineConfig({
         secure: false,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
-      '/api/check-username-availability': {
+      '/api/instagram-connection': {
         target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
-      '/api/profile-info': {
+      '/api/twitter-connection': {
         target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
-      '/api/retrieve-strategies': {
+      '/api/facebook-connection': {
         target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
-      '/api/retrieve-engagement-strategies': {
+      // Events endpoints (port 3000) - no /api prefix needed
+      '/events': {
         target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/api/, ''),
+        ws: true, // Support WebSocket-like connections (SSE)
       },
-      '/api/retrieve-account-info': {
+      '/events-list': {
         target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/api/, ''),
       },
-      '/api/retrieve-multiple': {
+      // Image endpoints (port 3002) - MUST come before general /api rule
+      '/api/r2-image': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/fix-image': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+        secure: false,
+      },
+      // User endpoints (port 3002) - keep /api prefix
+      '/api/user': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api/access-check': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api/usage': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api/insights': {
         target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/api/, ''),
       },
-      '/api/responses': {
+      '/profit-analysis': {
         target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/api/, ''),
       },
-      '/api/send-dm-reply': {
-        target: 'http://localhost:3000',
+      '/ai-replies': {
+        target: 'http://localhost:3002',
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/api/, ''),
       },
-      '/api/send-comment-reply': {
-        target: 'http://localhost:3000',
+      '/api/rag-instant-reply': {
+        target: 'http://localhost:3002',
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/api/, ''),
       },
-      // RAG server endpoints (port 3001)
-      '/api/rag': {
+      // RAG server endpoints (port 3001) - MUST come before general /api rule
+      '/api/rag/post-generator': {
         target: 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace('/api/rag', '/api'),
+      },
+      '/api/rag/discussion': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace('/api/rag', '/api'),
+      },
+      '/api/rag/conversations': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace('/api/rag', '/api'),
+      },
+      '/api/rag/health': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace('/api/rag', ''),
+      },
+      // All other /api endpoints go to main server (port 3000) - strip /api prefix
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+      // Image and file endpoints (port 3002)
+      '/retrieve': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/posts': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/images': {
+        target: 'http://localhost:3002',
         changeOrigin: true,
         secure: false,
       },
     },
+    hmr: {
+      clientPort: 443 // Force HMR through HTTPS
+    },
+    // Allow ngrok domain
+    strictPort: true,
+    allowedHosts: [
+      'localhost',
+      '127.0.0.1',
+      '.ngrok-free.app',
+      '.ngrok.io'
+    ]
   },
 });

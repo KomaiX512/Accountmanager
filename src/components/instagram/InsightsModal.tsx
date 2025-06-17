@@ -108,7 +108,7 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
 
       try {
         console.log(`[${new Date().toISOString()}] Fetching profit analysis for ${platform} user: ${accountUsername}`);
-        const response = await axios.get(`http://localhost:3000/profit-analysis/${accountUsername}?platform=${platform}`);
+        const response = await axios.get(`/profit-analysis/${accountUsername}?platform=${platform}`);
         setProfitAnalysis(response.data);
         console.log(`[${new Date().toISOString()}] Profit analysis fetched:`, response.data);
       } catch (err: any) {
@@ -135,7 +135,7 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
 
       try {
         console.log(`[${new Date().toISOString()}] Fetching ${platform} insights for user ${userIdToUse}`);
-        const response = await axios.get(`http://localhost:3000/insights/${userIdToUse}?platform=${platform}`);
+        const response = await axios.get(`/api/insights/${userIdToUse}?platform=${platform}`);
         setInsights(response.data);
         console.log(`[${new Date().toISOString()}] ${platform} insights fetched:`, response.data);
       } catch (err: any) {

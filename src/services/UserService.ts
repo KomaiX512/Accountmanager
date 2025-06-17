@@ -3,7 +3,7 @@ import { User, UsageStats, AccessControlResult, PricingPlan } from '../types/use
 class UserService {
   private readonly API_BASE_URL = process.env.NODE_ENV === 'production' 
     ? 'https://your-domain.com/api' 
-    : 'http://localhost:3002/api';
+    : '/api';
 
   // Cache for user data to reduce API calls
   private userCache = new Map<string, { data: User; timestamp: number }>();
@@ -401,8 +401,6 @@ class UserService {
       return { allowed: true };
     }
   }
-
-
 
   // Increment usage counter
   async incrementUsage(userId: string, feature: 'posts' | 'discussions' | 'aiReplies' | 'campaigns'): Promise<void> {

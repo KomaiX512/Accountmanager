@@ -54,7 +54,7 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
       console.log(`[UsageContext] 🔄 Refreshing usage for user ${currentUser.uid}`);
       
       // Get usage from backend
-      const response = await fetch(`http://localhost:3002/api/user/${currentUser.uid}/usage`);
+      const response = await fetch(`/api/user/${currentUser.uid}/usage`);
       
       if (response.ok) {
         const backendUsage = await response.json();

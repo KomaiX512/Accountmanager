@@ -355,7 +355,7 @@ async function saveToR2(data, key, retries = 3) {
           if (obj.image_url.includes('.r2.cloudflarestorage.com') || obj.image_url.includes('.r2.dev')) {
             // Extract filename from URL
             const filename = obj.image_url.split('/').pop().split('?')[0];
-            obj.image_url = `http://localhost:3002/fix-image/${username}/${filename}?platform=${platform}`;
+            obj.image_url = `/fix-image/${username}/${filename}?platform=${platform}`;
           }
         }
         
@@ -364,7 +364,7 @@ async function saveToR2(data, key, retries = 3) {
           if (obj.r2_image_url.includes('.r2.cloudflarestorage.com') || obj.r2_image_url.includes('.r2.dev')) {
             // Extract filename from URL
             const filename = obj.r2_image_url.split('/').pop().split('?')[0];
-            obj.r2_image_url = `http://localhost:3002/api/r2-image/${username}/${filename}?platform=${platform}`;
+            obj.r2_image_url = `/api/r2-image/${username}/${filename}?platform=${platform}`;
           }
         }
         
@@ -1505,10 +1505,9 @@ Visual Description for Image: Create a modern, professional ${platformName} stra
       const imageFileName = `image_${timestamp}.jpg`;
       const postFileName = `ready_post_${timestamp}.json`;
       
-      // Use consistent URL format that matches PostCooked expectations
-      const baseUrl = req.get('host') ? `http://${req.get('host').replace('3001', '3002')}` : 'http://localhost:3002';
-      const fixImageUrl = `${baseUrl}/fix-image/${username}/${imageFileName}?platform=${platform}`;
-      const r2ImageUrl = `${baseUrl}/api/r2-image/${username}/${imageFileName}?platform=${platform}`;
+      // Use relative URLs for port forwarding compatibility
+      const fixImageUrl = `/fix-image/${username}/${imageFileName}?platform=${platform}`;
+      const r2ImageUrl = `/api/r2-image/${username}/${imageFileName}?platform=${platform}`;
       
       // Create complete post data with both URL formats for maximum compatibility
       const postData = {

@@ -7,15 +7,19 @@
   background: linear-gradient(to bottom, #2a2a4a, #1e1e2f);
   border-right: 1px solid rgba(255, 255, 255, 0.1);
   z-index: 100;
+  transition: all 0.3s ease;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
 }
 
 .icon-container {
   display: flex;
   flex-direction: column;
-  gap: 30px;
+  gap: clamp(20px, 4vw, 30px);
   width: 100%;
   align-items: center;
-  padding-top: 20px;
+  padding-top: clamp(15px, 3vw, 20px);
+  box-sizing: border-box;
 }
 
 .icon-button {
@@ -26,24 +30,44 @@
   border: none;
   cursor: pointer;
   width: 100%;
-  padding: 10px 0;
-  transition: background-color 0.2s;
+  padding: clamp(8px, 2vw, 10px) 0;
+  transition: all 0.2s ease;
+  border-radius: 8px;
+  margin: 0 clamp(5px, 1vw, 8px);
 }
 
 .icon-button:hover {
   background: rgba(0, 255, 204, 0.1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 255, 204, 0.2);
 }
 
 .icon {
-  width: 40px;
-  height: 40px;
+  width: clamp(32px, 6vw, 40px);
+  height: clamp(32px, 6vw, 40px);
   fill: #00ffcc;
+  transition: all 0.2s ease;
+  filter: drop-shadow(0 2px 4px rgba(0, 255, 204, 0.3));
+}
+
+.icon-button:hover .icon {
+  fill: #00ffcc;
+  filter: drop-shadow(0 4px 8px rgba(0, 255, 204, 0.6));
+  transform: scale(1.1);
 }
 
 .icon-button span {
-  font-size: 14px;
-  margin-top: 8px;
+  font-size: clamp(10px, 2.5vw, 14px);
+  margin-top: clamp(4px, 1vw, 8px);
   color: #e0e0ff;
+  font-weight: 500;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  transition: all 0.2s ease;
+}
+
+.icon-button:hover span {
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(0, 255, 204, 0.8);
 }
 
 .icon-wrapper {
@@ -52,17 +76,130 @@
 
 .notification-dot {
   position: absolute;
-  top: -5px;
-  right: -5px;
-  width: 10px;
-  height: 10px;
+  top: -3px;
+  right: -3px;
+  width: clamp(8px, 2vw, 10px);
+  height: clamp(8px, 2vw, 10px);
   background: #ff4444;
   border-radius: 50%;
   box-shadow: 0 0 8px rgba(255, 68, 68, 0.8);
   animation: pulse-dot 1.5s infinite;
+  border: 1px solid #ffffff;
 }
 
 @keyframes pulse-dot {
   0%, 100% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.2); opacity: 0.7; }
+}
+
+/* Responsive Design for Different Screen Sizes */
+@media (max-width: 1200px) {
+  .left-bar {
+    width: 70px;
+  }
+  
+  .icon {
+    width: clamp(28px, 5vw, 36px);
+    height: clamp(28px, 5vw, 36px);
+  }
+  
+  .icon-button span {
+    font-size: clamp(9px, 2.2vw, 12px);
+  }
+  
+  .icon-container {
+    gap: clamp(18px, 3.5vw, 25px);
+    padding-top: clamp(12px, 2.5vw, 18px);
+  }
+}
+
+@media (max-width: 768px) {
+  .left-bar {
+    width: 60px;
+    top: 70px;
+    height: calc(100vh - 70px);
+  }
+  
+  .icon {
+    width: clamp(24px, 4.5vw, 32px);
+    height: clamp(24px, 4.5vw, 32px);
+  }
+  
+  .icon-button span {
+    font-size: clamp(8px, 2vw, 11px);
+    margin-top: clamp(3px, 0.8vw, 6px);
+  }
+  
+  .icon-container {
+    gap: clamp(15px, 3vw, 20px);
+    padding-top: clamp(10px, 2vw, 15px);
+  }
+  
+  .icon-button {
+    padding: clamp(6px, 1.5vw, 8px) 0;
+    margin: 0 clamp(3px, 0.8vw, 5px);
+  }
+  
+  .notification-dot {
+    width: clamp(6px, 1.5vw, 8px);
+    height: clamp(6px, 1.5vw, 8px);
+    top: -2px;
+    right: -2px;
+  }
+}
+
+@media (max-width: 480px) {
+  .left-bar {
+    width: 50px;
+    top: 70px;
+    height: calc(100vh - 70px);
+  }
+  
+  .icon {
+    width: clamp(20px, 4vw, 28px);
+    height: clamp(20px, 4vw, 28px);
+  }
+  
+  .icon-button span {
+    font-size: clamp(7px, 1.8vw, 10px);
+    margin-top: clamp(2px, 0.6vw, 4px);
+  }
+  
+  .icon-container {
+    gap: clamp(12px, 2.5vw, 18px);
+    padding-top: clamp(8px, 1.8vw, 12px);
+  }
+  
+  .icon-button {
+    padding: clamp(4px, 1.2vw, 6px) 0;
+    margin: 0 clamp(2px, 0.6vw, 4px);
+  }
+  
+  .notification-dot {
+    width: clamp(5px, 1.2vw, 7px);
+    height: clamp(5px, 1.2vw, 7px);
+    top: -1px;
+    right: -1px;
+  }
+}
+
+/* Ultra-small screens */
+@media (max-width: 360px) {
+  .left-bar {
+    width: 45px;
+  }
+  
+  .icon {
+    width: clamp(18px, 3.5vw, 24px);
+    height: clamp(18px, 3.5vw, 24px);
+  }
+  
+  .icon-button span {
+    font-size: clamp(6px, 1.5vw, 9px);
+  }
+  
+  .icon-container {
+    gap: clamp(10px, 2vw, 15px);
+    padding-top: clamp(6px, 1.5vw, 10px);
+  }
 }

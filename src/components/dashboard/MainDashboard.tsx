@@ -16,6 +16,7 @@ import UsageDashboard from './UsageDashboard';
 import { schedulePost } from '../../utils/scheduleHelpers';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
 import { useUsage } from '../../context/UsageContext';
+import GlobalUpgradeHandler from '../common/GlobalUpgradeHandler';
 
 interface PlatformData {
   id: string;
@@ -54,7 +55,7 @@ const MainDashboard: React.FC = () => {
   const { isConnected: isFacebookConnected, userId: facebookUserId, hasAccessed: hasAccessedFacebook = false } = useFacebook();
   const { currentUser } = useAuth();
   const { trackRealPostCreation, canUseFeature } = useFeatureTracking();
-  const { usage, getUserLimits } = useUsage();
+  const { usage, getUserLimits, refreshUsage } = useUsage();
   const [userName, setUserName] = useState<string>('');
   const [showInstantPostModal, setShowInstantPostModal] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -107,6 +108,38 @@ const MainDashboard: React.FC = () => {
     }
   }, [currentUser?.uid]);
 
+  // ✅ PLATFORM STATUS SYNC FIX: Improved platform access tracking
+  const getPlatformAccessStatus = useCallback((platformId: string): boolean => {
+    if (!currentUser?.uid) return false;
+    
+    // Check localStorage for platform access
+    const accessedFromStorage = localStorage.getItem(`${platformId}_accessed_${currentUser.uid}`) === 'true';
+    
+    // Check context status for platforms that have it
+    let accessedFromContext = false;
+    if (platformId === 'instagram') accessedFromContext = hasAccessedInstagram;
+    if (platformId === 'twitter') accessedFromContext = hasAccessedTwitter;
+    if (platformId === 'facebook') accessedFromContext = hasAccessedFacebook;
+    
+    return accessedFromStorage || accessedFromContext;
+  }, [currentUser?.uid, hasAccessedInstagram, hasAccessedTwitter, hasAccessedFacebook]);
+
+  // ✅ PLATFORM CONNECTION SYNC FIX: Improved connection status tracking
+  const getPlatformConnectionStatus = useCallback((platformId: string): boolean => {
+    switch (platformId) {
+      case 'instagram':
+        return isInstagramConnected && Boolean(instagramUserId);
+      case 'twitter':
+        return isTwitterConnected && Boolean(twitterUserId);
+      case 'facebook':
+        return isFacebookConnected && Boolean(facebookUserId);
+      case 'linkedin':
+        return false; // Not yet implemented
+      default:
+        return false;
+    }
+  }, [isInstagramConnected, isTwitterConnected, isFacebookConnected, instagramUserId, twitterUserId, facebookUserId]);
+
   // Simulate platform time tracking - in a real app, this would come from actual usage data
   useEffect(() => {
     if (!currentUser?.uid) return;
@@ -116,8 +149,8 @@ const MainDashboard: React.FC = () => {
       const timeData: Record<string, number> = {};
       
       platforms.forEach(platform => {
-        // Get platform access status
-        const isAccessed = localStorage.getItem(`${platform}_accessed_${currentUser.uid}`) === 'true';
+        // Get platform access status using improved function
+        const isAccessed = getPlatformAccessStatus(platform);
         
         if (isAccessed) {
           // Simulate time spent based on platform activity
@@ -146,7 +179,7 @@ const MainDashboard: React.FC = () => {
     const interval = setInterval(() => {
       const platforms = ['instagram', 'twitter', 'facebook', 'linkedin'];
       platforms.forEach(platform => {
-        const isAccessed = localStorage.getItem(`${platform}_accessed_${currentUser.uid}`) === 'true';
+        const isAccessed = getPlatformAccessStatus(platform);
         if (isAccessed) {
           const storageKey = `platform_time_${platform}_${currentUser.uid}`;
           const currentTime = parseInt(localStorage.getItem(storageKey) || '0');
@@ -158,7 +191,7 @@ const MainDashboard: React.FC = () => {
     }, 60000); // Update every minute
     
     return () => clearInterval(interval);
-  }, [currentUser?.uid]);
+  }, [currentUser?.uid, getPlatformAccessStatus]);
 
   // Fetch user's name from authentication
   useEffect(() => {
@@ -183,7 +216,7 @@ const MainDashboard: React.FC = () => {
     ? localStorage.getItem(`twitter_accessed_${currentUser.uid}`) === 'true'
     : false;
 
-  // Function to fetch real-time notification counts for all platforms
+  // ✅ NOTIFICATION SYNC FIX: Improved notification counting
   const fetchRealTimeNotifications = useCallback(async () => {
     if (!currentUser?.uid || isFetchingNotificationsRef.current) return;
     
@@ -192,10 +225,8 @@ const MainDashboard: React.FC = () => {
     const platforms = ['instagram', 'twitter', 'facebook', 'linkedin'];
     const counts: Record<string, number> = {};
     
-    // Check if any platforms are actually claimed before making API calls
-    const claimedPlatforms = platforms.filter(platform => 
-      localStorage.getItem(`${platform}_accessed_${currentUser.uid}`) === 'true'
-    );
+    // Get actually claimed platforms using improved function
+    const claimedPlatforms = platforms.filter(platform => getPlatformAccessStatus(platform));
     
     if (claimedPlatforms.length === 0) {
       // No claimed platforms, set all counts to 0
@@ -203,6 +234,7 @@ const MainDashboard: React.FC = () => {
         counts[platform] = 0;
       });
       setRealTimeNotifications(counts);
+      isFetchingNotificationsRef.current = false;
       return;
     }
     
@@ -211,11 +243,12 @@ const MainDashboard: React.FC = () => {
         let userId = null;
         if (platform === 'instagram' && instagramUserId) userId = instagramUserId;
         if (platform === 'twitter' && twitterUserId) userId = twitterUserId;
+        if (platform === 'facebook' && facebookUserId) userId = facebookUserId;
         
         let totalCount = 0;
         
         // Only count notifications if platform is claimed (accessed)
-        const isClaimedPlatform = localStorage.getItem(`${platform}_accessed_${currentUser.uid}`) === 'true';
+        const isClaimedPlatform = getPlatformAccessStatus(platform);
         
         if (isClaimedPlatform) {
           // Real-time notifications (DMs/comments) - only if connected
@@ -298,32 +331,18 @@ const MainDashboard: React.FC = () => {
     
     setRealTimeNotifications(counts);
     isFetchingNotificationsRef.current = false;
-  }, [currentUser?.uid, instagramUserId, twitterUserId]);
+  }, [currentUser?.uid, instagramUserId, twitterUserId, facebookUserId, getPlatformAccessStatus]);
 
-  // Effect to fetch real-time notifications on mount and when connections change
-  useEffect(() => {
-    // Only fetch if user is authenticated and has connected platforms
-    if (currentUser?.uid && (isInstagramConnected || isTwitterConnected || isFacebookConnected)) {
-      fetchRealTimeNotifications();
-      
-      // Set up interval to refresh every 5 minutes to reduce server load
-      const interval = setInterval(fetchRealTimeNotifications, 300000);
-      
-      return () => clearInterval(interval);
-    }
-  }, [currentUser?.uid, isInstagramConnected, isTwitterConnected, isFacebookConnected, fetchRealTimeNotifications]);
-
-  // Claimed platforms - based on whether user has accessed the platform dashboard
-  // Connected platforms - based on whether user has connected their social media account
+  // ✅ PLATFORM STATE MANAGEMENT FIX: Improved platform data structure
   const [platforms, setPlatforms] = useState<PlatformData[]>([
     {
       id: 'instagram',
       name: 'Instagram',
       icon: '/icons/instagram.svg',
-      claimed: hasAccessedInstagram || instagramAccessedInLocalStorage, // Check both context and localStorage
-      connected: isInstagramConnected,
+      claimed: false, // Will be updated by useEffect
+      connected: false, // Will be updated by useEffect
       notifications: {
-        total: 0, // Will be updated by real-time data
+        total: 0,
         breakdown: {
           cs_analysis: 0,
           our_strategies: 0,
@@ -340,10 +359,10 @@ const MainDashboard: React.FC = () => {
       id: 'twitter',
       name: 'Twitter',
       icon: '/icons/twitter.svg',
-      claimed: hasAccessedTwitter || twitterAccessedInLocalStorage, // Check both context and localStorage
-      connected: isTwitterConnected,
+      claimed: false, // Will be updated by useEffect
+      connected: false, // Will be updated by useEffect
       notifications: {
-        total: 0, // Will be updated by real-time data
+        total: 0,
         breakdown: {
           cs_analysis: 0,
           our_strategies: 0,
@@ -360,10 +379,10 @@ const MainDashboard: React.FC = () => {
       id: 'facebook',
       name: 'Facebook',
       icon: '/icons/facebook.svg',
-      claimed: hasAccessedFacebook,
-      connected: isFacebookConnected,
+      claimed: false, // Will be updated by useEffect
+      connected: false, // Will be updated by useEffect
       notifications: {
-        total: 0, // Will be updated by real-time data
+        total: 0,
         breakdown: {
           cs_analysis: 0,
           our_strategies: 0,
@@ -380,10 +399,10 @@ const MainDashboard: React.FC = () => {
       id: 'linkedin',
       name: 'LinkedIn',
       icon: '/icons/linkedin.svg',
-      claimed: hasAccessedLinkedIn,
-      connected: false, // No context for LinkedIn yet
+      claimed: false, // Will be updated by useEffect
+      connected: false,
       notifications: {
-        total: 0, // Will be updated by real-time data
+        total: 0,
         breakdown: {
           cs_analysis: 0,
           our_strategies: 0,
@@ -401,55 +420,45 @@ const MainDashboard: React.FC = () => {
   // Get only connected platforms
   const connectedPlatforms = platforms.filter(p => p.connected);
 
-  // Effect to update connection status only - separate from notifications
+  // ✅ UNIFIED PLATFORM STATUS UPDATE: Single effect that handles both claimed and connected status
   useEffect(() => {
     setPlatforms(prev => 
       prev.map(platform => {
-        let connectionStatus = false;
+        const newClaimed = getPlatformAccessStatus(platform.id);
+        const newConnected = getPlatformConnectionStatus(platform.id);
         
-        switch (platform.id) {
-          case 'instagram':
-            connectionStatus = isInstagramConnected && Boolean(instagramUserId);
-            break;
-          case 'twitter':
-            connectionStatus = isTwitterConnected && Boolean(twitterUserId);
-            break;
-          case 'facebook':
-            connectionStatus = isFacebookConnected && Boolean(facebookUserId);
-            break;
-          default:
-            connectionStatus = platform.connected; // Keep existing status for others
-        }
-        
-        // Only update if connection status actually changed
-        if (platform.connected !== connectionStatus) {
-        return { 
-          ...platform, 
-            connected: connectionStatus
+        // Only update if status actually changed
+        if (platform.claimed !== newClaimed || platform.connected !== newConnected) {
+          console.log(`[MainDashboard] 🔄 Platform ${platform.id} status update: claimed=${newClaimed}, connected=${newConnected}`);
+          return { 
+            ...platform, 
+            claimed: newClaimed,
+            connected: newConnected
           };
         }
         
         return platform;
       })
     );
-  }, [isInstagramConnected, isTwitterConnected, isFacebookConnected, instagramUserId, twitterUserId, facebookUserId]);
+  }, [getPlatformAccessStatus, getPlatformConnectionStatus]);
 
-  // Separate effect to update notifications without causing loops
+  // ✅ NOTIFICATION COUNT UPDATE: Separate effect for notification updates
   useEffect(() => {
     setPlatforms(prev => 
       prev.map(platform => {
         const platformNotificationCount = realTimeNotifications[platform.id] || 0;
         const currentNotificationCount = platform.notifications.total;
         
-        // Only update if notification count actually changed
+        // Only update if notification count actually changed and platform is claimed
         if (platform.claimed && currentNotificationCount !== platformNotificationCount) {
+          console.log(`[MainDashboard] 🔔 Platform ${platform.id} notifications: ${platformNotificationCount}`);
           return {
             ...platform,
             notifications: {
               total: platformNotificationCount,
-            breakdown: { cs_analysis: 0, our_strategies: 0, dms_comments: 0, cooked_posts: 0 }
-          }
-        };
+              breakdown: { cs_analysis: 0, our_strategies: 0, dms_comments: 0, cooked_posts: 0 }
+            }
+          };
         }
         
         return platform;
@@ -457,74 +466,34 @@ const MainDashboard: React.FC = () => {
     );
   }, [realTimeNotifications]);
 
-  // Add an effect to recheck localStorage on focus, this helps when returning from platform pages
+  // ✅ PLATFORM STATUS MONITORING: Effect to monitor and refresh platform status
   useEffect(() => {
     let lastFocusTime = 0;
-    const FOCUS_DEBOUNCE_MS = 2000; // Only handle focus events every 2 seconds
+    const FOCUS_DEBOUNCE_MS = 2000;
     
     const handleFocus = () => {
       const now = Date.now();
-      if (now - lastFocusTime < FOCUS_DEBOUNCE_MS) {
-        return; // Skip if too recent
-      }
+      if (now - lastFocusTime < FOCUS_DEBOUNCE_MS) return;
       lastFocusTime = now;
       
-      // If user has returned to this page, recheck localStorage for each platform
       if (currentUser?.uid) {
-        const instagramAccessed = localStorage.getItem(`instagram_accessed_${currentUser.uid}`) === 'true';
-        const twitterAccessed = localStorage.getItem(`twitter_accessed_${currentUser.uid}`) === 'true';
-        const facebookAccessed = localStorage.getItem(`facebook_accessed_${currentUser.uid}`) === 'true';
-        const linkedinAccessed = localStorage.getItem(`linkedin_accessed_${currentUser.uid}`) === 'true';
-        
-        // Only refresh Twitter connection if we don't already have one
+        // Refresh Twitter connection if we don't already have one
         if (!twitterUserId) {
-        refreshTwitterConnection();
+          refreshTwitterConnection();
         }
         
-        // Update platforms with fresh localStorage values
-        setPlatforms(prev => {
-          let hasChanges = false;
-          const newPlatforms = prev.map(p => {
-            const wasClaimedBefore = p.claimed;
-            let newClaimed = p.claimed;
-            
-            if (p.id === 'instagram' && instagramAccessed && !newClaimed) {
-              newClaimed = true;
-              hasChanges = true;
-            }
-            if (p.id === 'twitter' && twitterAccessed && !newClaimed) {
-              newClaimed = true;
-              hasChanges = true;
-            }
-            if (p.id === 'facebook' && facebookAccessed && !newClaimed) {
-              newClaimed = true;
-              hasChanges = true;
-            }
-            if (p.id === 'linkedin' && linkedinAccessed && !newClaimed) {
-              newClaimed = true;
-              hasChanges = true;
-            }
-            
-            return { 
-              ...p, 
-              claimed: newClaimed
-            };
-          });
-          
-          // Only update if there are actual changes
-          return hasChanges ? newPlatforms : prev;
+        // Refresh usage data
+        refreshUsage();
+        
+        // Refresh notification counts for newly claimed platforms
+        const hasNewClaims = platforms.some(platform => {
+          const currentClaimed = getPlatformAccessStatus(platform.id);
+          return currentClaimed && !platform.claimed;
         });
         
-        // Refresh notification counts only if there are newly claimed platforms
-        const hasNewClaims = [
-          instagramAccessed && !hasAccessedInstagram,
-          twitterAccessed && !hasAccessedTwitter,
-          facebookAccessed && !hasAccessedFacebook,
-          linkedinAccessed && !hasAccessedLinkedIn
-        ].some(Boolean);
-        
         if (hasNewClaims) {
-        fetchRealTimeNotifications();
+          console.log('[MainDashboard] 🆕 New platform claims detected, refreshing notifications');
+          fetchRealTimeNotifications();
         }
       }
     };
@@ -538,7 +507,7 @@ const MainDashboard: React.FC = () => {
       clearTimeout(initialCheckTimer);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [currentUser?.uid, refreshTwitterConnection, fetchRealTimeNotifications, twitterUserId, hasAccessedInstagram, hasAccessedTwitter, hasAccessedFacebook, hasAccessedLinkedIn]);
+  }, [currentUser?.uid, refreshTwitterConnection, twitterUserId, refreshUsage, fetchRealTimeNotifications, getPlatformAccessStatus, platforms]);
 
   // Sort platforms so claimed ones appear first
   const sortedPlatforms = [...platforms].sort((a, b) => {
@@ -699,7 +668,7 @@ const MainDashboard: React.FC = () => {
     setShowInstantPostModal(true);
   };
   
-  // Enhanced instant post handler that leverages existing schedule functionality
+  // ✅ INSTANT POST FIX: Enhanced instant post handler with proper tracking
   const handleInstantPost = async () => {
     // Verify post has content
     if (postContent.text.trim() === '' && postContent.images.length === 0) {
@@ -719,9 +688,10 @@ const MainDashboard: React.FC = () => {
       return;
     }
     
-    // Pre-check post usage limits for all selected platforms
+    // ✅ PRE-CHECK: Verify post usage limits for all selected platforms
     const postCheckResult = canUseFeature('posts');
     if (!postCheckResult.allowed) {
+      // This will trigger the upgrade popup via event
       alert(postCheckResult.reason);
       setShowInstantPostModal(false);
       return;
@@ -738,7 +708,7 @@ const MainDashboard: React.FC = () => {
     setShowInstantPostModal(false);
     
     // Determine schedule time (immediate or scheduled)
-    const scheduleTime = postContent.scheduleDate || new Date(Date.now() + 60 * 1000); // Default to 1 minute from now for immediate posting
+    const scheduleTime = postContent.scheduleDate || new Date(Date.now() + 60 * 1000);
     const isScheduled = !!postContent.scheduleDate;
     
     // Process all selected platforms simultaneously
@@ -746,7 +716,7 @@ const MainDashboard: React.FC = () => {
     
     for (const platform of selectedPlatforms) {
       try {
-        console.log(`[MainDashboard] Processing post for ${platform.name}...`);
+        console.log(`[MainDashboard] 📝 Processing post for ${platform.name}...`);
         
         // ✅ REAL USAGE TRACKING: Check limits BEFORE creating the post
         const trackingSuccess = await trackRealPostCreation(platform.id, {
@@ -902,6 +872,8 @@ const MainDashboard: React.FC = () => {
 
   return (
     <div className="dashboard-page">
+      <GlobalUpgradeHandler />
+      
       <div className="welcome-banner">
         <h2>Welcome <span className="user-name">{userName}</span>!</h2>
       </div>

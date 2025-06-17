@@ -1,16 +1,19 @@
 .dashboard-page {
   padding: 80px 20px 20px;
+  min-height: 100vh;
+  box-sizing: border-box;
 }
 
 .welcome-banner {
-  max-width: 1200px;
+  max-width: min(95vw, 1200px);
   margin: 0 auto 20px;
-  padding: 1rem 2rem;
+  padding: clamp(0.5rem, 1.5vw, 2rem);
   text-align: center;
+  box-sizing: border-box;
 }
 
 .welcome-banner h2 {
-  font-size: 1.8rem;
+  font-size: clamp(1rem, 2.5vw, 1.8rem);
   font-weight: 500;
   color: #e0e0ff;
   margin: 0;
@@ -25,17 +28,21 @@
 }
 
 .main-dashboard-wrapper {
-  max-width: 1200px;
+  max-width: min(calc(100vw - 100px), 1200px); /* Account for left bar + padding */
   margin: 0 auto;
-  padding: 2.5rem;
+  padding: clamp(0.8rem, 2.5vw, 2.5rem);
   background: linear-gradient(135deg, #1a1a3a 0%, #2e2e5e 100%);
-  border-radius: 20px;
+  border-radius: clamp(8px, 2vw, 20px);
   box-shadow: 0 10px 40px rgba(0, 255, 204, 0.5), 0 0 20px rgba(0, 255, 204, 0.3);
   position: relative;
   overflow: hidden;
   border: 2px solid rgba(0, 255, 204, 0.4);
   backdrop-filter: blur(15px);
   color: #e0e0ff;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  z-index: 1;
 }
 
 .main-dashboard-wrapper::before {
@@ -56,10 +63,10 @@
 }
 
 .welcome-message {
-  font-size: 1.6rem;
+  font-size: clamp(1rem, 2vw, 1.6rem);
   font-weight: 500;
   color: #e0e0ff;
-  margin-bottom: 1.5rem;
+  margin-bottom: clamp(0.8rem, 1.5vw, 1.5rem);
   text-align: center;
   position: relative;
   z-index: 2;
@@ -77,35 +84,36 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2rem;
+  margin-bottom: clamp(0.8rem, 2vw, 2rem);
   border-bottom: 1px solid rgba(0, 255, 204, 0.3);
-  padding-bottom: 1rem;
+  padding-bottom: clamp(0.4rem, 1.5vw, 1rem);
   position: relative;
 }
 
 .main-dashboard-header h1 {
-  font-size: 2rem;
+  font-size: clamp(1rem, 2.5vw, 2rem);
   font-weight: 600;
   color: #00ffcc;
   margin: 0;
   text-transform: uppercase;
-  letter-spacing: 3px;
+  letter-spacing: clamp(0.5px, 0.2vw, 3px);
   text-shadow: 0 0 10px rgba(0, 255, 204, 0.8);
 }
 
 .tabs {
   display: flex;
-  gap: 2rem;
+  gap: clamp(0.8rem, 2vw, 2rem);
+  flex-wrap: wrap;
 }
 
 .tab {
   background: none;
   border: none;
-  font-size: 1rem;
+  font-size: clamp(0.7rem, 1.8vw, 1rem);
   font-weight: 500;
   color: #a0a0cc;
   cursor: pointer;
-  padding: 0.5rem 0;
+  padding: clamp(0.3rem, 0.8vw, 0.5rem) 0;
   position: relative;
   transition: color 0.3s ease;
 }
@@ -132,7 +140,7 @@
 
 /* Instant post section */
 .instant-post-section {
-  margin-bottom: 2rem;
+  margin-bottom: clamp(0.8rem, 2vw, 2rem);
 }
 
 .instant-post-button {
@@ -140,12 +148,13 @@
   align-items: center;
   background: rgba(0, 255, 204, 0.1);
   border: 1px dashed rgba(0, 255, 204, 0.5);
-  border-radius: 12px;
-  padding: 1.2rem;
+  border-radius: clamp(6px, 1.5vw, 12px);
+  padding: clamp(0.6rem, 1.5vw, 1.2rem);
   width: 100%;
   cursor: pointer;
   transition: all 0.15s ease;
   position: relative;
+  box-sizing: border-box;
 }
 
 .instant-post-button:hover {
@@ -166,10 +175,10 @@
 }
 
 .instant-post-icon {
-  width: 42px;
-  height: 42px;
+  width: clamp(24px, 5vw, 42px);
+  height: clamp(24px, 5vw, 42px);
   flex-shrink: 0;
-  margin-right: 16px;
+  margin-right: clamp(6px, 1.5vw, 16px);
   color: #00ffcc;
 }
 
@@ -181,31 +190,33 @@
 
 .instant-post-text {
   flex: 1;
+  min-width: 0; /* Prevents text overflow */
 }
 
 .instant-post-text h3 {
   margin: 0;
   color: #00ffcc;
-  font-size: 1.2rem;
-  margin-bottom: 0.3rem;
+  font-size: clamp(0.8rem, 1.8vw, 1.2rem);
+  margin-bottom: clamp(0.1rem, 0.4vw, 0.3rem);
 }
 
 .instant-post-text p {
   margin: 0;
   color: #a0a0cc;
-  font-size: 0.9rem;
+  font-size: clamp(0.65rem, 1.3vw, 0.9rem);
 }
 
 .connected-platforms-count {
   background: rgba(0, 255, 204, 0.2);
-  border-radius: 20px;
-  padding: 0.3rem 0.7rem;
-  font-size: 0.8rem;
+  border-radius: clamp(8px, 1.5vw, 20px);
+  padding: clamp(0.15rem, 0.8vw, 0.3rem) clamp(0.3rem, 1.2vw, 0.7rem);
+  font-size: clamp(0.55rem, 1.3vw, 0.8rem);
   color: #00ffcc;
   border: 1px solid rgba(0, 255, 204, 0.3);
+  white-space: nowrap;
 }
 
-/* Global Modal Styling - Centered and Theme-Aligned */
+/* Enhanced Responsive Modal Styling */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -219,48 +230,50 @@
   z-index: 99999;
   backdrop-filter: blur(5px);
   overflow-y: auto;
+  padding: clamp(5px, 1.5vw, 20px);
+  box-sizing: border-box;
 }
 
 .modal-content {
   background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
   padding: 0;
-  border-radius: 12px;
+  border-radius: clamp(6px, 1.5vw, 12px);
   border: 1px solid rgba(0, 255, 204, 0.3);
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
   color: #ffffff;
-  width: 90%;
-  max-width: 600px;
-  max-height: 90vh;
+  width: min(92vw, 600px);
+  max-height: min(95vh, 800px);
   overflow-y: auto;
   position: relative;
-  margin: 1rem;
+  margin: auto;
+  box-sizing: border-box;
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1.5rem 2rem 1rem 2rem;
+  padding: clamp(0.8rem, 2.5vw, 1.5rem) clamp(0.8rem, 3vw, 2rem) clamp(0.4rem, 1.5vw, 1rem) clamp(0.8rem, 3vw, 2rem);
   border-bottom: 1px solid rgba(0, 255, 204, 0.2);
-  margin-bottom: 1rem;
+  margin-bottom: clamp(0.4rem, 1.5vw, 1rem);
 }
 
 .modal-header h3 {
   margin: 0;
   color: #00ffcc;
-  font-size: 1.5rem;
+  font-size: clamp(1rem, 2.5vw, 1.5rem);
 }
 
 .modal-close-btn {
   background: none;
   border: none;
   color: #ffffff;
-  font-size: 1.5rem;
+  font-size: clamp(1rem, 2.5vw, 1.5rem);
   cursor: pointer;
-  padding: 0.5rem;
+  padding: clamp(0.25rem, 0.8vw, 0.5rem);
   border-radius: 50%;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: clamp(1.8rem, 4vw, 2.5rem);
+  height: clamp(1.8rem, 4vw, 2.5rem);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -279,29 +292,29 @@
   font-weight: 500;
 }
 
-/* Platform selection */
+/* Enhanced Platform selection */
 .platform-selection {
-  padding: 0 2rem;
-  margin-bottom: 1.5rem;
+  padding: 0 clamp(0.8rem, 3vw, 2rem);
+  margin-bottom: clamp(0.8rem, 2.5vw, 1.5rem);
 }
 
 .connected-platforms-section,
 .disconnected-platforms-section {
-  margin-bottom: 1rem;
+  margin-bottom: clamp(0.4rem, 1.5vw, 1rem);
 }
 
 .section-title {
-  margin-bottom: 0.8rem;
-  padding: 0.5rem 0;
+  margin-bottom: clamp(0.4rem, 1.5vw, 0.8rem);
+  padding: clamp(0.2rem, 0.8vw, 0.5rem) 0;
   border-bottom: 1px solid rgba(0, 255, 204, 0.2);
 }
 
 .section-title .status-indicator {
-  font-size: 0.9rem;
+  font-size: clamp(0.65rem, 1.8vw, 0.9rem);
   font-weight: 600;
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: clamp(0.2rem, 0.8vw, 0.5rem);
 }
 
 .section-title .status-indicator.connected {
@@ -315,8 +328,8 @@
 .platform-checkboxes {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
-  margin-bottom: 1rem;
+  gap: clamp(0.4rem, 1.5vw, 1rem);
+  margin-bottom: clamp(0.4rem, 1.5vw, 1rem);
 }
 
 .platform-checkboxes.disabled .platform-checkbox {
@@ -328,14 +341,14 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 1rem;
-  border-radius: 12px;
+  padding: clamp(0.6rem, 1.5vw, 1rem);
+  border-radius: clamp(6px, 1.5vw, 12px);
   border: 2px solid rgba(0, 255, 204, 0.3);
   background: rgba(0, 255, 204, 0.05);
   cursor: pointer;
   transition: all 0.15s ease;
   position: relative;
-  min-width: 140px;
+  min-width: clamp(100px, 18vw, 140px);
   text-align: center;
 }
 
@@ -366,41 +379,42 @@
 }
 
 .platform-checkbox img {
-  width: 32px;
-  height: 32px;
+  width: clamp(22px, 4vw, 32px);
+  height: clamp(22px, 4vw, 32px);
   border-radius: 50%;
-  margin-bottom: 0.5rem;
+  margin-bottom: clamp(0.2rem, 0.8vw, 0.5rem);
 }
 
 .platform-checkbox span {
   font-weight: 500;
   color: #e0e0ff;
-  margin-bottom: 0.3rem;
+  margin-bottom: clamp(0.15rem, 0.4vw, 0.3rem);
+  font-size: clamp(0.7rem, 1.8vw, 1rem);
 }
 
 .platform-requirements {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
-  margin-bottom: 0.5rem;
-  min-height: 2rem;
+  gap: clamp(0.08rem, 0.25vw, 0.2rem);
+  margin-bottom: clamp(0.2rem, 0.8vw, 0.5rem);
+  min-height: clamp(1.2rem, 2.5vw, 2rem);
 }
 
 .platform-requirements .requirement {
-  font-size: 0.75rem;
+  font-size: clamp(0.6rem, 1.3vw, 0.75rem);
   color: #ffaa00;
   background: rgba(255, 170, 0, 0.1);
-  padding: 0.2rem 0.4rem;
-  border-radius: 4px;
+  padding: clamp(0.12rem, 0.4vw, 0.2rem) clamp(0.25rem, 0.8vw, 0.4rem);
+  border-radius: clamp(2px, 0.8vw, 4px);
   border: 1px solid rgba(255, 170, 0, 0.3);
 }
 
 .platform-requirements .char-limit {
-  font-size: 0.75rem;
+  font-size: clamp(0.6rem, 1.3vw, 0.75rem);
   color: #a0a0cc;
   background: rgba(160, 160, 204, 0.1);
-  padding: 0.2rem 0.4rem;
-  border-radius: 4px;
+  padding: clamp(0.12rem, 0.4vw, 0.2rem) clamp(0.25rem, 0.8vw, 0.4rem);
+  border-radius: clamp(2px, 0.8vw, 4px);
 }
 
 .connect-hint {
@@ -1052,23 +1066,79 @@
 }
 
 @media (max-width: 768px) {
+  .dashboard-page {
+    padding: 70px 5px 5px;
+    margin-left: 0; /* Remove any left margin that might cause overlap */
+  }
+
+  .welcome-banner {
+    padding: clamp(0.4rem, 1vw, 1rem);
+    margin: 0 auto 10px;
+    max-width: min(calc(100vw - 70px), 1200px); /* Account for left bar */
+  }
+
   .main-dashboard-wrapper {
-    padding: 1.5rem;
-    border-radius: 12px;
+    padding: clamp(0.5rem, 1.5vw, 1.5rem);
+    border-radius: clamp(6px, 1.5vw, 12px);
+    max-width: min(calc(100vw - 70px), 1200px); /* Account for left bar */
+    margin: 0 auto;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .main-dashboard-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 1rem;
+    gap: clamp(0.5rem, 2vw, 1rem);
+    margin-bottom: clamp(0.5rem, 1.5vw, 1.5rem);
+    padding-bottom: clamp(0.3rem, 1vw, 0.8rem);
+  }
+
+  .main-dashboard-header h1 {
+    font-size: clamp(0.9rem, 2.2vw, 1.8rem);
+  }
+
+  .tabs {
+    gap: clamp(0.5rem, 1.5vw, 1.5rem);
+  }
+
+  .tab {
+    font-size: clamp(0.65rem, 1.6vw, 0.9rem);
+    padding: clamp(0.2rem, 0.6vw, 0.4rem) 0;
+  }
+
+  .instant-post-button {
+    padding: clamp(0.5rem, 1.2vw, 1rem);
+    flex-direction: column;
+    text-align: center;
+    gap: clamp(0.3rem, 1vw, 8px);
+  }
+  
+  .instant-post-icon {
+    width: clamp(28px, 6vw, 36px);
+    height: clamp(28px, 6vw, 36px);
+    margin-right: 0;
+  }
+
+  .instant-post-text h3 {
+    font-size: clamp(0.75rem, 1.6vw, 1.1rem);
+  }
+
+  .instant-post-text p {
+    font-size: clamp(0.6rem, 1.2vw, 0.8rem);
+  }
+
+  .connected-platforms-count {
+    font-size: clamp(0.5rem, 1.1vw, 0.7rem);
+    padding: clamp(0.1rem, 0.6vw, 0.25rem) clamp(0.25rem, 1vw, 0.6rem);
   }
 
   .platform-row {
     flex-direction: column;
     align-items: flex-start;
-    gap: 0.8rem;
-    padding: 1.2rem;
-    min-height: 120px;
+    gap: clamp(0.6rem, 1.5vw, 0.8rem);
+    padding: clamp(0.8rem, 2vw, 1.2rem);
+    min-height: auto;
   }
 
   .platform-info {
@@ -1077,10 +1147,12 @@
 
   .status-indicators {
     flex-wrap: wrap;
+    gap: clamp(0.3rem, 1vw, 0.8rem);
   }
 
   .usage-stats {
     grid-template-columns: 1fr;
+    gap: clamp(0.8rem, 2vw, 1.2rem);
   }
   
   /* Notification positioning for mobile - keep absolute positioning */
@@ -1090,57 +1162,177 @@
   }
 
   .modal-overlay {
-    padding: 10px;
+    padding: clamp(3px, 1vw, 10px);
   }
   
   .modal-content {
-    padding: 16px;
-    max-height: 95vh;
-    border-radius: 12px;
+    width: min(96vw, 600px);
+    max-height: min(98vh, 800px);
+    border-radius: clamp(4px, 1.2vw, 12px);
+  }
+
+  .modal-header {
+    padding: clamp(0.6rem, 2vw, 1.2rem) clamp(0.6rem, 2.5vw, 1.5rem) clamp(0.3rem, 1.2vw, 0.8rem) clamp(0.6rem, 2.5vw, 1.5rem);
   }
   
-  .modal-content h3 {
-    font-size: 1.2rem;
-    margin-bottom: 16px;
+  .modal-header h3 {
+    font-size: clamp(0.9rem, 2.2vw, 1.2rem);
+  }
+
+  .platform-selection {
+    padding: 0 clamp(0.6rem, 2.5vw, 1.5rem);
   }
   
   .platform-checkboxes {
     flex-direction: column;
-    gap: 8px;
+    gap: clamp(0.3rem, 1.2vw, 8px);
+  }
+
+  .platform-checkbox {
+    min-width: auto;
+    width: 100%;
+    padding: clamp(0.5rem, 1.2vw, 0.8rem);
+  }
+
+  .platform-checkbox img {
+    width: clamp(20px, 3.5vw, 28px);
+    height: clamp(20px, 3.5vw, 28px);
+  }
+
+  .platform-checkbox span {
+    font-size: clamp(0.65rem, 1.6vw, 0.9rem);
   }
   
   .notification-badge {
-    font-size: 0.65rem;
-    padding: 3px 6px;
-    max-width: 100px;
+    font-size: clamp(0.55rem, 1.3vw, 0.65rem);
+    padding: clamp(2px, 0.8vw, 3px) clamp(4px, 1.2vw, 6px);
+    max-width: clamp(80px, 20vw, 100px);
   }
   
   .notification-bell-icon {
-    width: 10px;
-    height: 10px;
-  }
-  
-  .instant-post-button {
-    padding: 1rem;
-    flex-direction: column;
-    text-align: center;
-    gap: 8px;
-  }
-  
-  .instant-post-icon {
-    width: 36px;
-    height: 36px;
-    margin-right: 0;
+    width: clamp(8px, 2vw, 10px);
+    height: clamp(8px, 2vw, 10px);
   }
   
   .modal-buttons {
     flex-direction: column;
-    gap: 12px;
+    gap: clamp(0.6rem, 2vw, 12px);
+    padding: clamp(0.8rem, 2vw, 1rem) clamp(0.6rem, 2.5vw, 1.5rem) clamp(1.2rem, 3vw, 2rem) clamp(0.6rem, 2.5vw, 1.5rem);
   }
   
   .cancel-button, .post-button {
     width: 100%;
-    padding: 14px 20px;
+    padding: clamp(10px, 3vw, 14px) clamp(16px, 4vw, 20px);
+    font-size: clamp(0.8rem, 1.8vw, 1rem);
+  }
+}
+
+/* Ultra-small screens (phones in portrait mode) */
+@media (max-width: 480px) {
+  .dashboard-page {
+    padding: 70px 2px 2px;
+    margin-left: 0; /* Remove any left margin that might cause overlap */
+  }
+
+  .welcome-banner {
+    padding: clamp(0.3rem, 0.8vw, 0.8rem);
+    max-width: min(calc(100vw - 60px), 1200px); /* Account for smaller left bar */
+  }
+
+  .main-dashboard-wrapper {
+    padding: clamp(0.4rem, 1.2vw, 1rem);
+    max-width: min(calc(100vw - 60px), 1200px); /* Account for smaller left bar */
+    margin: 0 auto;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .main-dashboard-header h1 {
+    font-size: clamp(0.8rem, 2vw, 1.5rem);
+    letter-spacing: clamp(0.3px, 0.15vw, 2px);
+  }
+
+  .tabs {
+    gap: clamp(0.4rem, 1.2vw, 1rem);
+  }
+
+  .tab {
+    font-size: clamp(0.6rem, 1.4vw, 0.8rem);
+  }
+
+  .instant-post-icon {
+    width: clamp(24px, 5vw, 32px);
+    height: clamp(24px, 5vw, 32px);
+  }
+
+  .instant-post-text h3 {
+    font-size: clamp(0.7rem, 1.4vw, 1rem);
+  }
+
+  .instant-post-text p {
+    font-size: clamp(0.55rem, 1.1vw, 0.75rem);
+  }
+
+  .connected-platforms-count {
+    font-size: clamp(0.45rem, 1vw, 0.65rem);
+    padding: clamp(0.08rem, 0.5vw, 0.2rem) clamp(0.2rem, 0.8vw, 0.5rem);
+  }
+
+  .modal-content {
+    width: min(98vw, 600px);
+    border-radius: clamp(3px, 1vw, 8px);
+  }
+
+  .modal-header {
+    padding: clamp(0.5rem, 1.5vw, 1rem) clamp(0.5rem, 2vw, 1.2rem) clamp(0.25rem, 1vw, 0.6rem) clamp(0.5rem, 2vw, 1.2rem);
+  }
+
+  .modal-header h3 {
+    font-size: clamp(0.8rem, 2vw, 1.1rem);
+  }
+
+  .modal-close-btn {
+    width: clamp(1.6rem, 3.5vw, 2rem);
+    height: clamp(1.6rem, 3.5vw, 2rem);
+    font-size: clamp(0.9rem, 2.2vw, 1.3rem);
+  }
+
+  .platform-selection {
+    padding: 0 clamp(0.5rem, 2vw, 1.2rem);
+  }
+
+  .platform-checkbox {
+    padding: clamp(0.4rem, 1vw, 0.7rem);
+  }
+
+  .platform-checkbox img {
+    width: clamp(18px, 3vw, 24px);
+    height: clamp(18px, 3vw, 24px);
+  }
+
+  .platform-checkbox span {
+    font-size: clamp(0.6rem, 1.4vw, 0.8rem);
+  }
+
+  .platform-requirements .requirement,
+  .platform-requirements .char-limit {
+    font-size: clamp(0.55rem, 1.2vw, 0.7rem);
+    padding: clamp(0.1rem, 0.3vw, 0.15rem) clamp(0.2rem, 0.6vw, 0.3rem);
+  }
+
+  .notification-badge {
+    font-size: clamp(0.5rem, 1.2vw, 0.6rem);
+    padding: clamp(1px, 0.6vw, 2px) clamp(3px, 1vw, 4px);
+    max-width: clamp(70px, 18vw, 90px);
+  }
+
+  .modal-buttons {
+    padding: clamp(0.6rem, 1.5vw, 0.8rem) clamp(0.5rem, 2vw, 1.2rem) clamp(1rem, 2.5vw, 1.5rem) clamp(0.5rem, 2vw, 1.2rem);
+  }
+
+  .cancel-button, .post-button {
+    padding: clamp(8px, 2.5vw, 12px) clamp(12px, 3.5vw, 16px);
+    font-size: clamp(0.75rem, 1.6vw, 0.9rem);
   }
 }
 
@@ -1573,6 +1765,17 @@
 @keyframes shimmer {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(200%); }
+}
+
+/* Responsive Design for Different Screen Sizes */
+@media (max-width: 1200px) {
+  .main-dashboard-wrapper {
+    max-width: min(calc(100vw - 80px), 1200px); /* Account for smaller left bar + padding */
+  }
+  
+  .welcome-banner {
+    max-width: min(calc(100vw - 80px), 1200px); /* Account for smaller left bar + padding */
+  }
 }
 
 /* Additional responsive adjustments for new features */

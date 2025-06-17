@@ -1,0 +1,18 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Social media marketing consultation for Instagram.\n\nBusiness profile: fentybeauty with 13,254,688 followers\n\nMarketing question: hey provide information about the posting history concisely\n\nPlease provide professional marketing advice with 3 specific, actionable recommendations for growing engagement and reach on Instagram.\n\nFocus on:\n- Content strategy best practices\n- Audience engagement techniques  \n- Platform-specific growth tactics\n\nResponse format: Provide clear, professional marketing guidance."
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 2000,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "topK": 40
+  }
+}

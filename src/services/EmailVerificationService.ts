@@ -1,5 +1,5 @@
 class EmailVerificationService {
-  private static readonly API_BASE_URL = 'http://localhost:3002/api';
+  private static readonly API_BASE_URL = '/api';
 
   /**
    * Send verification email to user

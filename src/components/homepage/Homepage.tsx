@@ -116,7 +116,7 @@ const Homepage: React.FC = () => {
             animate={{ scale: 1, rotate: 0 }}
             transition={{ duration: 1, type: "spring", stiffness: 100 }}
           >
-            <img src="/Logo/logo.png" alt="Sentient AI" />
+            <img src="/Logo/logo.png" alt="Sentient Marketting" />
           </motion.div>
           
           <motion.h1
@@ -133,7 +133,7 @@ const Homepage: React.FC = () => {
             >
               Introducing
             </motion.span>
-            <span className="title-main">Sentient AI</span>
+            <span className="title-main">Sentient Marketting</span>
             <span className="title-sub">Social Media Intelligence</span>
           </motion.h1>
           
@@ -295,7 +295,7 @@ const Homepage: React.FC = () => {
             viewport={{ once: true }}
           >
             <h2>Ready to Transform Your Social Media?</h2>
-            <p>Join thousands of businesses already using Sentient AI to grow their online presence.</p>
+            <p>Join thousands of businesses already using Sentient Marketting to grow their online presence.</p>
             
             <motion.div
               className="cta-buttons"

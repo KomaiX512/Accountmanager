@@ -1399,13 +1399,13 @@ async function streamToBuffer(stream) {
 // Instagram App Credentials
 const APP_ID = '576296982152813';
 const APP_SECRET = 'd48ddc9eaf0e5c4969d4ddc4e293178c';
-const REDIRECT_URI = 'https://84e7-121-52-146-243.ngrok-free.app/instagram/callback';
+const REDIRECT_URI = 'https://f6e9-121-52-146-243.ngrok-free.app/instagram/callback';
 const VERIFY_TOKEN = 'myInstagramWebhook2025';
 
 // Facebook App Credentials  
 const FB_APP_ID = '581584257679639'; // Your ACTUAL Facebook App ID (NOT Configuration ID)
 const FB_APP_SECRET = 'cdd153955e347e194390333e48cb0480'; // Your actual App Secret
-const FB_REDIRECT_URI = 'https://84e7-121-52-146-243.ngrok-free.app/facebook/callback';
+const FB_REDIRECT_URI = 'https://f6e9-121-52-146-243.ngrok-free.app/facebook/callback';
 const FB_VERIFY_TOKEN = 'myFacebookWebhook2025';
 
 app.get('/instagram/callback', async (req, res) => {
@@ -3699,7 +3699,7 @@ app.post('/post-instagram-now/:userId', upload.single('image'), async (req, res)
     fs.writeFileSync(imagePath, imageBuffer);
     
     // Construct public URL for the locally served image (production-ready with ngrok)
-    const baseUrl = process.env.PUBLIC_URL || 'https://84e7-121-52-146-243.ngrok-free.app';
+    const baseUrl = process.env.PUBLIC_URL || 'https://f6e9-121-52-146-243.ngrok-free.app';
     const publicImageUrl = `${baseUrl}/temp-images/${imageFilename}`;
     
     console.log(`[${new Date().toISOString()}] Image saved locally for Instagram access: ${publicImageUrl}`);
@@ -6257,7 +6257,7 @@ class PlatformSchemaManager {
 // Twitter OAuth 2.0 credentials
 const TWITTER_CLIENT_ID = 'cVNYR3UxVm5jQ3d5UWw0UHFqUTI6MTpjaQ';
 const TWITTER_CLIENT_SECRET = 'Wr8Kewh92NVB-035hAvpQeQ1Azc7chre3PUTgDoEltjO57mxzO';
-const TWITTER_REDIRECT_URI = 'https://84e7-121-52-146-243.ngrok-free.app/twitter/callback';
+const TWITTER_REDIRECT_URI = 'https://f6e9-121-52-146-243.ngrok-free.app/twitter/callback';
 
 // Debug logging for OAuth 2.0
 console.log(`[${new Date().toISOString()}] Twitter OAuth 2.0 Configuration:`);
@@ -7550,7 +7550,7 @@ async function executeScheduledPost(scheduleData) {
     fs.writeFileSync(imagePath, imageBuffer);
     
     // Construct public URL for Instagram access (same as real-time posting)
-    const baseUrl = process.env.PUBLIC_URL || 'https://84e7-121-52-146-243.ngrok-free.app';
+    const baseUrl = process.env.PUBLIC_URL || 'https://f6e9-121-52-146-243.ngrok-free.app';
     const publicImageUrl = `${baseUrl}/temp-images/${imageFilename}`;
     
     console.log(`[${new Date().toISOString()}] Executing scheduled post via: ${publicImageUrl}`);

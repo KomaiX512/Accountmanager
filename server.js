@@ -1226,9 +1226,9 @@ async function handlePostsEndpoint(req, res) {
         }
         
         if (imageKey) {
-          // Use our fix-image endpoint for reliable image serving
-          imageUrl = `http://localhost:3002/fix-image/${username}/${imageKey}?platform=${platform}`;
-          r2ImageUrl = `http://localhost:3002/api/r2-image/${username}/${imageKey}?platform=${platform}`;
+          // Use relative URLs for port forwarding compatibility
+          imageUrl = `/fix-image/${username}/${imageKey}?platform=${platform}`;
+          r2ImageUrl = `/api/r2-image/${username}/${imageKey}?platform=${platform}`;
         }
         
         // Extract and properly structure post data for frontend
@@ -2340,6 +2340,126 @@ app.post('/api/process-payment', async (req, res) => {
       message: 'Payment processing failed',
       error: error.message 
     });
+  }
+});
+
+// ============================================================
+// MISSING API ENDPOINTS FOR COMPATIBILITY
+// ============================================================
+
+// Check username availability endpoint
+app.get('/api/check-username-availability/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+    const platform = req.query.platform || 'instagram'; // Default to Instagram
+    
+    if (!username || username.trim() === '') {
+      return res.status(400).json({ 
+        available: false, 
+        message: 'Username is required' 
+      });
+    }
+    
+    // Normalize the username based on platform
+    const normalizedUsername = platform === 'twitter' ? username.trim() : username.trim().toLowerCase();
+    
+    // Create platform-specific key using new schema: AccountInfo/<platform>/<username>/info.json
+    const key = `AccountInfo/${platform}/${normalizedUsername}/info.json`;
+    
+    try {
+      const result = await s3Client.getObject({
+        Bucket: 'tasks',
+        Key: key,
+      }).promise();
+      
+      // If we get here, the file exists, meaning the username is already in use
+      return res.json({
+        available: false,
+        message: `This ${platform} username is already in use by another account. If you wish to proceed, you may continue, but you will be using an already assigned username.`
+      });
+      
+    } catch (error) {
+      if (error.code === 'NoSuchKey' || error.statusCode === 404) {
+        // Username is available
+        return res.json({
+          available: true,
+          message: `${platform.charAt(0).toUpperCase() + platform.slice(1)} username is available`
+        });
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error(`Error checking username availability:`, error);
+    res.status(500).json({ 
+      error: 'Failed to check username availability', 
+      details: error.message 
+    });
+  }
+});
+
+// User Instagram status endpoints
+app.get('/api/user-instagram-status/:userId', async (req, res) => {
+  const { userId } = req.params;
+  
+  try {
+    const key = `UserInstagramStatus/${userId}/status.json`;
+    
+    try {
+      const result = await s3Client.getObject({
+        Bucket: 'tasks',
+        Key: key,
+      }).promise();
+      
+      const body = result.Body.toString();
+      
+      if (!body || body.trim() === '') {
+        return res.json({ hasEnteredInstagramUsername: false });
+      }
+      
+      const userData = JSON.parse(body);
+      return res.json(userData);
+    } catch (error) {
+      if (error.code === 'NoSuchKey' || error.statusCode === 404) {
+        return res.json({ hasEnteredInstagramUsername: false });
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error(`Error retrieving user Instagram status for ${userId}:`, error);
+    res.status(500).json({ error: 'Failed to retrieve user Instagram status' });
+  }
+});
+
+app.post('/api/user-instagram-status/:userId', async (req, res) => {
+  const { userId } = req.params;
+  const { instagram_username, accountType, competitors } = req.body;
+  
+  if (!instagram_username || !instagram_username.trim()) {
+    return res.status(400).json({ error: 'Instagram username is required' });
+  }
+  
+  try {
+    const key = `UserInstagramStatus/${userId}/status.json`;
+    const userData = {
+      uid: userId,
+      hasEnteredInstagramUsername: true,
+      instagram_username: instagram_username.trim(),
+      accountType: accountType || 'branding',
+      competitors: competitors || [],
+      lastUpdated: new Date().toISOString()
+    };
+    
+    await s3Client.putObject({
+      Bucket: 'tasks',
+      Key: key,
+      Body: JSON.stringify(userData, null, 2),
+      ContentType: 'application/json',
+    }).promise();
+    
+    res.json({ success: true, message: 'User Instagram status updated successfully' });
+  } catch (error) {
+    console.error(`Error updating user Instagram status for ${userId}:`, error);
+    res.status(500).json({ error: 'Failed to update user Instagram status' });
   }
 });
 

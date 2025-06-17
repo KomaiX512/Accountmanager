@@ -1,0 +1,27 @@
+{
+  "post": {
+    "caption": "Quick poll! 🙋‍♀️ What's your go-to weekend activity: binge-watching your fave show or exploring the great outdoors? Let us know in the comments! 👇 We're curious to see what everyone's up to! ☀️",
+    "hashtags": [
+      "#weekendvibes",
+      "#poll",
+      "#questionoftheday",
+      "#activities",
+      "#fun",
+      "#lifestyle",
+      "#community",
+      "#testbrand",
+      "#instadaily",
+      "#weekend"
+    ],
+    "call_to_action": "Comment below with your answer! 👇",
+    "image_prompt": "The image should be a split-screen collage. On the left side, a cozy living room scene: a plush grey sofa with colorful throw pillows (mustard yellow, teal, and coral), a soft, textured blanket draped over the back, and a large flat-screen TV displaying a popular streaming service interface. The lighting is warm and inviting, with a soft glow emanating from a floor lamp in the corner. A steaming mug of coffee sits on a wooden coffee table. On the right side, a vibrant outdoor scene: a lush green forest path bathed in sunlight, with dappled shadows creating a sense of depth. A person wearing hiking boots and a backpack is partially visible, walking away from the viewer into the forest. The sky is a clear blue with fluffy white clouds. The overall style should be bright, cheerful, and inviting, with a slightly filtered, Instagram-friendly aesthetic. The composition should be balanced and visually appealing, drawing the viewer's eye to both sides of the split screen. The mood is relaxed and aspirational, representing two equally appealing ways to spend a weekend."
+  },
+  "timestamp": 1750099296315,
+  "image_path": "ready_post/instagram/test/image_1750099296315.jpg",
+  "image_url": "http://localhost:3002/fix-image/test/image_1750099296315.jpg?platform=instagram",
+  "r2_image_url": "http://localhost:3002/api/r2-image/test/image_1750099296315.jpg?platform=instagram",
+  "generated_at": "2025-06-16T18:41:36.315Z",
+  "queryUsed": "create a quick test post",
+  "status": "new",
+  "platform": "instagram"
+}

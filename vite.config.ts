@@ -67,7 +67,7 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
-      // Connection status endpoints
+      // Connection status endpoints (port 3000) - consolidated and de-duplicated
       '/api/user-instagram-status': {
         target: 'http://localhost:3000',
         changeOrigin: true,
@@ -104,7 +104,7 @@ export default defineConfig({
         secure: false,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
-      // Account info endpoints
+      // Account info endpoints (port 3000)
       '/api/save-account-info': {
         target: 'http://localhost:3000',
         changeOrigin: true,
@@ -112,24 +112,6 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
       '/api/retrieve-account-info': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path.replace(/^\/api/, ''),
-      },
-      '/api/user-instagram-status': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path.replace(/^\/api/, ''),
-      },
-      '/api/user-twitter-status': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path.replace(/^\/api/, ''),
-      },
-      '/api/user-facebook-status': {
         target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,

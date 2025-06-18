@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Fenty Beauty's profile shows a strong follower base of 13.2 million, significantly outweighing the 1,126 accounts they follow. This indicates a popular brand with high authority. The high follower count suggests strong brand recognition and reach. However, without engagement data, it's difficult to fully assess account health. A low following count typically reflects a focus on broadcasting content rather than reciprocal engagement.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.2720039500746616
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 139,
+    "candidatesTokenCount": 86,
+    "totalTokenCount": 225,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 139
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 86
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "fUlRaOqZD5SF_NUPqYHxmAg"
+}

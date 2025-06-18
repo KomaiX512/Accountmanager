@@ -1,0 +1,18 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "You are a helpful Instagram assistant providing brief, direct answers.\n\nAccount: Bio: \"Shop online & worldwide at Sephora, Ulta Beauty, Harvey Nichols, Selfridges, Boots & select Asia duty free shops\n🖤 Tag us #FENTYBEAUTY\n♾️ #CrueltyFree\" | Business: None,Health/beauty\n\nQuestion: \"tell me about the followers\"\n\nPlease provide a concise, helpful answer in 1-2 sentences (maximum 50 words). Be conversational and direct - no bullet points, no lengthy explanations, just a clear answer."
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 100,
+    "temperature": 0.1,
+    "topP": 0.8,
+    "topK": 20
+  }
+}

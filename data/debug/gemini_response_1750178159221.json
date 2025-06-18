@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Okay, let's analyze your Instagram account based on the provided metrics:\n\n**Number of Posts:**\n\n*   You have a substantial number of posts: **15,853**. This indicates a consistent and active presence on Instagram. This high volume suggests you've been posting regularly for a considerable amount of time.\n\n**Most Engaging Post:**\n\n*   I don't have access to your Instagram data to determine your most engaging post. I can only analyze the follower count and the number of posts.\n\nTo find your most engaging post, you'll need to look at your Instagram Insights. Here's how you can typically identify it:\n\n1.  **Instagram Insights:** Access your Instagram Insights (you need a Business or Creator account to do this).\n2.  **Content Tab:** Go to the \"Content\" tab.\n3.  **Filter & Sort:** Filter your posts by metrics like:\n    *   **Reach:** The number of unique accounts that saw your post.\n    *   **Impressions:** The total number of times your post was seen.\n    *   **Likes:** The number of likes the post received.\n    *   **Comments:** The number of comments the post received.\n    *   **Saves:** The number of times people saved your post.\n    *   **Shares:** The number of times people shared your post.\n4.  **Identify Top Performers:** Sort the posts by the metric you're most interested in (e.g., \"Likes\" to find the post with the most likes). The post at the top of the list is your most engaging post based on that metric.\n\n**In summary, I can tell you that you have a high volume of posts, indicating a strong commitment to content creation on Instagram. To find your most engaging post, use Instagram Insights and filter by the engagement metric that matters most to you.**\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.23924775557084518
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 71,
+    "candidatesTokenCount": 396,
+    "totalTokenCount": 467,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 71
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 396
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "a5lRaO-TONGO1PIPrejUyQc"
+}

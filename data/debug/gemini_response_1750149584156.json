@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Okay, so for Insta, snap some bright, fun pics or vids showing off the summer collection in action! Mention key pieces and where to shop in your caption and stories - easy peasy!\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.508478307723999
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 71,
+    "candidatesTokenCount": 40,
+    "totalTokenCount": 111,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 71
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 40
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "zylRaKneG9GO1PIPrejUyQc"
+}

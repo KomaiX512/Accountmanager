@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Okay, let's optimize Fenty Beauty's online presence.\n\nHere's how to boost your business profile:\n\n1.  **Elevate User-Generated Content:** Repost high-quality photos and videos from customers showcasing Fenty Beauty products in diverse settings. This builds trust and expands reach by tapping into existing fan networks.\n2.  **Run Interactive Q&A Sessions:** Host live Q&A sessions with Rihanna or makeup artists on Instagram/TikTok to answer product questions and offer application tips. This fosters direct engagement and builds community.\n3.  **Implement a Consistent Posting Schedule:** Analyze your current engagement data to identify peak performance times and schedule posts accordingly. This ensures maximum visibility and consistent audience interaction.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.37665306961776424
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 170,
+    "candidatesTokenCount": 149,
+    "totalTokenCount": 319,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 170
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 149
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "i0lRaPO8Mf6ShMIPm7P8iAY"
+}

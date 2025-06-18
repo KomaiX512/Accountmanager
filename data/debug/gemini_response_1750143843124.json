@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Hey! To boost engagement, post consistently high-quality content and interact with your followers in the comments and stories.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.3334414561589559
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 116,
+    "candidatesTokenCount": 24,
+    "totalTokenCount": 140,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 116
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 24
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "YhNRaLP0IP6ShMIPm7P8iAY"
+}

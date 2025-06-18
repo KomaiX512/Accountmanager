@@ -1,0 +1,18 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Quick Instagram tip for fentybeauty.\n\nQuestion: \"what about video content specifically?\"\n\nAnswer in 30-50 words maximum. Be helpful and direct. No bullet points or formal structure."
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 100,
+    "temperature": 0.1,
+    "topP": 0.8,
+    "topK": 20
+  }
+}

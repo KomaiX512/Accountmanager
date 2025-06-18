@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Fenty Beauty's profile shows a strong follower base (13.2M) relative to its following count (1.1K). This indicates a healthy account with high authority and appeal. The significantly larger follower count suggests effective content strategy and brand recognition, attracting a broad audience. The low following count implies a focused approach, likely prioritizing engagement with key partners or influencers rather than a broad reciprocal follow strategy.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.3437871251787458
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 136,
+    "candidatesTokenCount": 84,
+    "totalTokenCount": 220,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 136
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 84
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "WEpRaOiOOJSF_NUPqYHxmAg"
+}

@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption: Unleash your inner artist! 🎨 We're obsessed with seeing your unique makeup creations. Show us your boldest looks, your everyday glam, and everything in between using #MACCommunity – you might just get featured! ✨\n\nHashtags: #MACCosmetics #MACMakeup #MakeupInspiration #MakeupLooks #BeautyCommunity #MakeupArtist #BeautyTips #MACAddict #MakeupOfTheDay #MOTD\n\nCall to Action: Tag us in your MAC looks for a chance to be featured!\n\nVisual Description for Image: A vibrant and dynamic flat lay featuring an assortment of MAC Cosmetics products arranged artfully on a clean, light pink background. The products should include a selection of lipsticks in varying shades of red, pink, and nude, arranged in a semi-circle. Scattered around the lipsticks are several eyeshadow palettes with open lids showcasing a range of colorful and neutral eyeshadows. A few MAC brushes with sleek black handles and silver ferrules are strategically placed, some with visible pigment on the bristles. A compact mirror with the MAC logo is subtly reflected in the background. The lighting is bright and even, creating a clean and professional aesthetic. The overall mood is playful, creative, and inviting. The composition should be balanced and visually appealing, encouraging viewers to explore the products and imagine their own makeup creations. A single, fresh pink rose is placed near the top left corner, adding a touch of elegance and femininity. The image should evoke a sense of inspiration and possibility, encouraging viewers to experiment with makeup.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.3864506629205519
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 264,
+    "candidatesTokenCount": 310,
+    "totalTokenCount": 574,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 264
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 310
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "uJ1SaKiKH7PQhMIP372DoQ0"
+}

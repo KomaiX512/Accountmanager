@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "This account is unique because it's the official Fenty Beauty page, showcasing a cruelty-free brand available at a wide range of global retailers.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.23173696764053836
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 115,
+    "candidatesTokenCount": 31,
+    "totalTokenCount": 146,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 115
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 31
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "YBNRaImiO5SF_NUPqYHxmAg"
+}

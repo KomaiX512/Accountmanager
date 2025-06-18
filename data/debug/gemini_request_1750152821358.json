@@ -1,0 +1,18 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Social media marketing consultation for Instagram.\n\nBusiness profile: fentybeauty with 13,254,688 followers\n\nACCOUNT METRICS:\n- Username: fentybeauty\n- Full Name: FENTY BEAUTY BY RIHANNA\n- Followers: 13254688\n- Following: 1126\n- Posts: 11665\n- Verified: Yes\n- Business Account: Yes\n- Category: None,Health/beauty\n\nMarketing question: hey provide business profile analysis\n\nCRITICAL INSTRUCTIONS:\n- Provide CONCISE professional marketing advice with 3 specific, actionable recommendations\n- Focus on content strategy, audience engagement, and platform-specific growth tactics\n- Be direct, focused, and conversational in your tone\n- Each recommendation should be 1-3 sentences only, with a clear action point\n- Avoid redundant explanations, introductions, or conclusions\n- Only include essential information that directly answers the question\n- If this is a follow-up question, refer to previous context and build upon it\n- Total response should be under 150 words\n\nRESPONSE FORMAT:\n- Brief direct answer to the question (1 sentence)\n- 3 numbered, actionable recommendations (each 1-3 sentences max)\n- No unnecessary explanations or repetition"
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 2000,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "topK": 40
+  }
+}

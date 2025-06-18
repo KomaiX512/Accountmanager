@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Focus on quick, engaging tutorials showcasing product application and results. Think before-and-afters, mini-makeovers, and user-generated content. Highlight diverse skin tones and feature trending sounds to maximize reach and engagement. Keep it authentic and relatable!\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.5098258165212778
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 42,
+    "candidatesTokenCount": 52,
+    "totalTokenCount": 94,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 42
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 52
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "jBNRaI9GqdeEwg-HlOHRAw"
+}

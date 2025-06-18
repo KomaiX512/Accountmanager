@@ -1,0 +1,19 @@
+{
+  "username": "fentybeauty",
+  "platform": "instagram",
+  "timestamp": "2025-06-17T07:04:44.862Z",
+  "query": "what about video content specifically?",
+  "response": "Focus on quick, engaging tutorials showcasing product application and results.",
+  "previousMessages": [
+    {
+      "role": "user",
+      "content": "tell me about content strategy"
+    },
+    {
+      "role": "assistant",
+      "content": "We focus on showcasing Fenty Beauty products through user-generated content, highlighting our cruelty-free status, and featuring retailers where yo..."
+    }
+  ],
+  "usedFallback": false,
+  "quotaExhausted": false
+}

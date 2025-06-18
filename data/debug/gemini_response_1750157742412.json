@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "To boost Fenty Beauty's engagement, focus on interactive content and community building.\n\n1.  **User-Generated Content Campaign:** Launch a campaign encouraging customers to share their Fenty looks using a branded hashtag. Reposting the best submissions on your official page will foster community and provide authentic content.\n\n2.  **Interactive Q&A Sessions:** Host live Q&A sessions with makeup artists or Rihanna herself on Instagram or TikTok. This provides real-time engagement and allows followers to directly interact with the brand.\n\n3.  **Behind-the-Scenes Content:** Share exclusive behind-the-scenes glimpses of product development, photoshoots, or Rihanna's creative process. This builds anticipation and provides a more intimate connection with your audience.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.24344649969362744
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 170,
+    "candidatesTokenCount": 153,
+    "totalTokenCount": 323,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 170
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 153
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "rUlRaLLiCdGO1PIPrejUyQc"
+}

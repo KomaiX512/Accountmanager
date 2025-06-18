@@ -21,7 +21,7 @@
 .profile-popup-content {
   background: linear-gradient(135deg, #2a2a4a, #3e3e6e) !important;
   border-radius: 16px !important;
-  width: min(900px, 95vw) !important;
+  width: min(1300px, 95vw) !important;
   height: auto !important;
   max-height: min(85vh, calc(100vh - 40px)) !important;
   min-height: min(400px, 60vh) !important;

@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
+import './NeuralNetworkCSS.css';
 
 interface NeuralNetworkProps {
   mouseX: number;
@@ -14,46 +15,69 @@ const NeuralNetwork: React.FC<NeuralNetworkProps> = ({ mouseX, mouseY }) => {
   const nodesRef = useRef<THREE.Mesh[]>([]);
   const connectionsRef = useRef<THREE.Line[]>([]);
   const particlesRef = useRef<THREE.Points | null>(null);
-  const brainCoreRef = useRef<THREE.Group | null>(null);
-  const frameRef = useRef<number>(0);
+  const [isVisible, setIsVisible] = useState(true);
+  const [performanceMode, setPerformanceMode] = useState<'high' | 'medium' | 'low' | 'css'>('medium');
+  const [useCSSFallback, setUseCSSFallback] = useState(false);
+  
+  // Performance monitoring
+  const frameCountRef = useRef(0);
+  const lastFPSCheckRef = useRef(Date.now());
+  const lowFPSCountRef = useRef(0);
 
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // Enhanced scene setup
-    sceneRef.current = new THREE.Scene();
-    sceneRef.current.fog = new THREE.FogExp2(0x0a0a1a, 0.002);
-    
-    // Professional camera setup
-    const aspect = window.innerWidth / window.innerHeight;
-    cameraRef.current = new THREE.PerspectiveCamera(60, aspect, 0.1, 2000);
-    cameraRef.current.position.set(0, 0, 80);
+    // Check device capabilities for auto-fallback
+    const checkDeviceCapabilities = () => {
+      const canvas = document.createElement('canvas');
+      const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+      
+      if (!gl) {
+        setUseCSSFallback(true);
+        return;
+      }
+      
+      // Check for low-end devices
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const isLowMemory = navigator.hardwareConcurrency && navigator.hardwareConcurrency < 4;
+      
+      if (isMobile || isLowMemory) {
+        setPerformanceMode('low');
+      }
+    };
 
-    // High-quality renderer
+    checkDeviceCapabilities();
+
+    if (useCSSFallback) return; // Skip WebGL initialization for CSS fallback
+
+    // Performance-optimized scene setup
+    sceneRef.current = new THREE.Scene();
+    
+    // Lightweight camera setup
+    const aspect = window.innerWidth / window.innerHeight;
+    cameraRef.current = new THREE.PerspectiveCamera(60, aspect, 0.1, 1000);
+    cameraRef.current.position.set(0, 0, 60);
+
+    // Performance-optimized renderer
     rendererRef.current = new THREE.WebGLRenderer({ 
-      antialias: true, 
+      antialias: false, // Disabled for performance
       alpha: true,
-      powerPreference: "high-performance",
-      preserveDrawingBuffer: true
+      powerPreference: "low-power", // Changed to low-power
+      preserveDrawingBuffer: false // Disabled for performance
     });
-    rendererRef.current.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    rendererRef.current.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // Reduced pixel ratio
     rendererRef.current.setSize(window.innerWidth, window.innerHeight);
     rendererRef.current.setClearColor(0x000000, 0);
-    rendererRef.current.shadowMap.enabled = true;
-    rendererRef.current.shadowMap.type = THREE.PCFSoftShadowMap;
-    rendererRef.current.toneMapping = THREE.ACESFilmicToneMapping;
-    rendererRef.current.toneMappingExposure = 1.2;
+    // Removed shadow mapping for performance
     containerRef.current.appendChild(rendererRef.current.domElement);
 
-    // Professional lighting setup
-    setupLighting();
+    // Minimal lighting setup
+    setupOptimizedLighting();
     
-    // Create the enhanced neural network
-    createBrainCore();
-    createNeuralLayers();
-    createSynapticConnections();
-    createNeuralParticles();
-    createDataStreams();
+    // Create optimized neural network
+    createOptimizedNodes();
+    createOptimizedConnections();
+    createOptimizedParticles();
 
     const handleResize = () => {
       if (!cameraRef.current || !rendererRef.current) return;
@@ -66,248 +90,210 @@ const NeuralNetwork: React.FC<NeuralNetworkProps> = ({ mouseX, mouseY }) => {
       rendererRef.current.setSize(width, height);
     };
 
+    // Visibility API for power saving
+    const handleVisibilityChange = () => {
+      setIsVisible(!document.hidden);
+    };
+
     window.addEventListener('resize', handleResize);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // Professional animation loop
-    const animate = () => {
-      frameRef.current = requestAnimationFrame(animate);
+    // Optimized animation loop with FPS throttling
+    let animationId: number;
+    let lastFrameTime = 0;
+    const targetFPS = performanceMode === 'low' ? 20 : 30; // Even lower for low mode
+    const frameInterval = 1000 / targetFPS;
+    
+    const animate = (currentTime: number) => {
+      animationId = requestAnimationFrame(animate);
       
-      if (!sceneRef.current || !cameraRef.current || !rendererRef.current) return;
+      // Skip frames if not visible
+      if (!isVisible) return;
+      
+      // FPS throttling
+      if (currentTime - lastFrameTime < frameInterval) return;
+      lastFrameTime = currentTime;
+      
+      if (!sceneRef.current || !cameraRef.current || !rendererRef.current) {
+        cancelAnimationFrame(animationId);
+        return;
+      }
 
-      const time = Date.now() * 0.0008;
-      const slowTime = time * 0.3;
-
-      // Subtle scene breathing effect
-      sceneRef.current.rotation.y = Math.sin(time * 0.1) * 0.02;
-      sceneRef.current.rotation.x = Math.cos(time * 0.15) * 0.01;
-
-      // Animate brain core
-      if (brainCoreRef.current) {
-        brainCoreRef.current.rotation.y += 0.002;
-        brainCoreRef.current.rotation.x = Math.sin(slowTime) * 0.1;
+      // Performance monitoring with CSS fallback trigger
+      frameCountRef.current++;
+      if (frameCountRef.current % 60 === 0) {
+        const now = Date.now();
+        const fps = 60000 / (now - lastFPSCheckRef.current);
+        lastFPSCheckRef.current = now;
         
-        brainCoreRef.current.children.forEach((child, index) => {
-          if (child instanceof THREE.Mesh) {
-            const pulse = Math.sin(time * 2 + index * 0.5) * 0.3 + 1;
-            child.scale.setScalar(pulse);
-            
-            if (child.material instanceof THREE.MeshPhongMaterial) {
-              child.material.emissiveIntensity = 0.2 + Math.sin(time * 3 + index) * 0.1;
-            }
+        // Auto-adjust performance mode
+        if (fps < 15) {
+          lowFPSCountRef.current++;
+          if (lowFPSCountRef.current > 3) {
+            setUseCSSFallback(true); // Switch to CSS fallback
+            return;
+          }
+          setPerformanceMode('css');
+        } else if (fps < 20) {
+          setPerformanceMode('low');
+        } else if (fps < 40) {
+          setPerformanceMode('medium');
+        } else {
+          setPerformanceMode('high');
+          lowFPSCountRef.current = 0;
+        }
+      }
+
+      const time = Date.now() * 0.0005; // Slower animation for less processing
+
+      // Simplified scene rotation
+      if (performanceMode !== 'low' && performanceMode !== 'css') {
+        sceneRef.current.rotation.y = Math.sin(time * 0.1) * 0.01;
+      }
+
+      // Optimized node animations (reduced frequency)
+      const updateFrequency = performanceMode === 'low' ? 4 : 2;
+      if (frameCountRef.current % updateFrequency === 0) {
+        nodesRef.current.forEach((node, index) => {
+          if (!node.userData) return;
+          
+          const originalPos = node.userData.originalPosition;
+          const layerIndex = node.userData.layerIndex;
+          const nodeIndex = node.userData.nodeIndex;
+          
+          if (!originalPos) return;
+          
+          // Simplified wave motion
+          const wave = Math.sin(time + layerIndex + nodeIndex * 0.5);
+          node.position.x = originalPos.x + wave * 1.5;
+          node.position.y = originalPos.y + Math.cos(time * 0.8 + nodeIndex) * 1;
+          node.position.z = originalPos.z;
+          
+          // Mouse interaction (reduced influence)
+          node.position.x += mouseX * 0.5;
+          node.position.y += mouseY * 0.5;
+          
+          // Simplified activation
+          const activation = Math.sin(time * 2 + nodeIndex) * 0.5 + 0.5;
+          node.scale.setScalar(0.8 + activation * 0.4);
+          
+          // Optimized material updates (less frequent)
+          if (performanceMode === 'high' && node.material instanceof THREE.MeshBasicMaterial) {
+            node.material.opacity = 0.6 + activation * 0.3;
           }
         });
       }
 
-      // Enhanced node animations
-      nodesRef.current.forEach((node, index) => {
-        const originalPos = node.userData.originalPosition;
-        const layerIndex = node.userData.layerIndex;
-        const nodeIndex = node.userData.nodeIndex;
-        
-        // Organic wave motion
-        const waveX = Math.sin(time * 0.5 + layerIndex * 0.3 + nodeIndex * 0.1) * 2;
-        const waveY = Math.cos(time * 0.7 + layerIndex * 0.2 + nodeIndex * 0.15) * 1.5;
-        const waveZ = Math.sin(time * 0.3 + layerIndex * 0.4 + nodeIndex * 0.2) * 1;
-        
-        node.position.x = originalPos.x + waveX;
-        node.position.y = originalPos.y + waveY;
-        node.position.z = originalPos.z + waveZ;
-        
-        // Mouse interaction with depth
-        const mouseInfluence = 2 + layerIndex * 0.5;
-        node.position.x += mouseX * mouseInfluence;
-        node.position.y += mouseY * mouseInfluence;
-        
-        // Neural activation pulse
-        const activation = Math.sin(time * 4 + nodeIndex * 0.2) * 0.5 + 0.5;
-        const scale = 0.8 + activation * 0.6;
-        node.scale.setScalar(scale);
-        
-        // Dynamic material properties
-        if (node.material instanceof THREE.MeshPhongMaterial) {
-          node.material.emissiveIntensity = activation * 0.8;
-          node.material.opacity = 0.7 + activation * 0.3;
+      // Optimized connections (update less frequently)
+      const connectionUpdateFrequency = performanceMode === 'low' ? 6 : 3;
+      if (frameCountRef.current % connectionUpdateFrequency === 0 && performanceMode !== 'low' && performanceMode !== 'css') {
+        connectionsRef.current.forEach((connection, index) => {
+          if (!connection.userData) return;
           
-          // Color shifting based on activity
-          const hue = (time * 0.1 + nodeIndex * 0.05) % 1;
-          node.material.color.setHSL(
-            0.5 + Math.sin(hue * Math.PI * 2) * 0.2,
-            0.8,
-            0.4 + activation * 0.4
-          );
-        }
-      });
-
-      // Enhanced synaptic connections
-      connectionsRef.current.forEach((connection, index) => {
-        const startNode = connection.userData.startNode;
-        const endNode = connection.userData.endNode;
-        
-        // Update connection geometry
-        const points = [startNode.position, endNode.position];
-        connection.geometry.setFromPoints(points);
-        
-        // Synaptic transmission effect
-        const distance = startNode.position.distanceTo(endNode.position);
-        const transmission = Math.sin(time * 6 + index * 0.3 - distance * 0.1) * 0.5 + 0.5;
-        
-        if (connection.material instanceof THREE.LineBasicMaterial) {
-          const baseOpacity = Math.max(0.1, 1 - distance / 60);
-          connection.material.opacity = baseOpacity * transmission * 0.6;
+          const startNode = connection.userData.startNode;
+          const endNode = connection.userData.endNode;
           
-          // Electric blue to cyan gradient
-          const intensity = transmission * 0.8 + 0.2;
-          connection.material.color.setHSL(0.55, 0.9, intensity);
-        }
-      });
+          if (!startNode || !endNode) return;
+          
+          const points = [startNode.position, endNode.position];
+          connection.geometry.setFromPoints(points);
+          
+          if (connection.material instanceof THREE.LineBasicMaterial) {
+            const transmission = Math.sin(time * 3 + index) * 0.5 + 0.5;
+            connection.material.opacity = transmission * 0.4;
+          }
+        });
+      }
 
-      // Animate neural particles
-      if (particlesRef.current) {
-        particlesRef.current.rotation.y += 0.0003;
-        
+      // Optimized particles (reduced frequency)
+      const particleUpdateFrequency = performanceMode === 'low' ? 8 : 4;
+      if (particlesRef.current && frameCountRef.current % particleUpdateFrequency === 0) {
         const positions = particlesRef.current.geometry.attributes.position.array as Float32Array;
-        const colors = particlesRef.current.geometry.attributes.color.array as Float32Array;
         
-        for (let i = 0; i < positions.length; i += 3) {
-          // Floating motion
-          positions[i + 1] += Math.sin(time + i * 0.01) * 0.008;
-          positions[i] += Math.cos(time * 0.7 + i * 0.01) * 0.005;
-          
-          // Color pulsing
-          const pulse = Math.sin(time * 2 + i * 0.05) * 0.5 + 0.5;
-          colors[i] = 0.2 + pulse * 0.8;     // R
-          colors[i + 1] = 0.8 + pulse * 0.2; // G
-          colors[i + 2] = 0.9 + pulse * 0.1; // B
+        const skipAmount = performanceMode === 'low' ? 15 : 9;
+        for (let i = 0; i < positions.length; i += skipAmount) {
+          positions[i + 1] += Math.sin(time + i * 0.1) * 0.005;
+          positions[i] += Math.cos(time * 0.5 + i * 0.1) * 0.003;
         }
         
         particlesRef.current.geometry.attributes.position.needsUpdate = true;
-        particlesRef.current.geometry.attributes.color.needsUpdate = true;
       }
 
-      // Cinematic camera movement
-      const cameraRadius = 1.5;
-      cameraRef.current.position.x = Math.sin(time * 0.05) * cameraRadius;
-      cameraRef.current.position.y = Math.cos(time * 0.07) * cameraRadius;
-      cameraRef.current.lookAt(0, 0, 0);
+      // Simplified camera movement
+      if (performanceMode === 'high') {
+        cameraRef.current.position.x = Math.sin(time * 0.02) * 0.5;
+        cameraRef.current.position.y = Math.cos(time * 0.03) * 0.3;
+        cameraRef.current.lookAt(0, 0, 0);
+      }
 
       rendererRef.current.render(sceneRef.current, cameraRef.current);
     };
 
-    animate();
+    animate(0);
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      cancelAnimationFrame(frameRef.current);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+      }
       
-      if (rendererRef.current && containerRef.current) {
+      if (rendererRef.current && containerRef.current && containerRef.current.contains(rendererRef.current.domElement)) {
         containerRef.current.removeChild(rendererRef.current.domElement);
       }
       
-      // Cleanup
       cleanup();
     };
-  }, []);
+  }, [mouseX, mouseY, isVisible, useCSSFallback]);
 
-  const setupLighting = () => {
+  const setupOptimizedLighting = () => {
     if (!sceneRef.current) return;
 
-    // Ambient lighting for overall illumination
-    const ambientLight = new THREE.AmbientLight(0x1a1a3a, 0.4);
+    // Minimal lighting setup for performance
+    const ambientLight = new THREE.AmbientLight(0x1a1a3a, 0.6);
     sceneRef.current.add(ambientLight);
 
-    // Key light - cyan
-    const keyLight = new THREE.DirectionalLight(0x00ffcc, 1.2);
-    keyLight.position.set(50, 50, 50);
-    keyLight.castShadow = true;
-    keyLight.shadow.mapSize.width = 2048;
-    keyLight.shadow.mapSize.height = 2048;
-    sceneRef.current.add(keyLight);
-
-    // Fill light - blue
-    const fillLight = new THREE.DirectionalLight(0x007bff, 0.8);
-    fillLight.position.set(-30, 20, 30);
-    sceneRef.current.add(fillLight);
-
-    // Rim light - purple
-    const rimLight = new THREE.DirectionalLight(0x6a5acd, 0.6);
-    rimLight.position.set(0, -50, -50);
-    sceneRef.current.add(rimLight);
-
-    // Point lights for neural activity
-    for (let i = 0; i < 5; i++) {
-      const pointLight = new THREE.PointLight(0x00ffcc, 0.5, 100);
-      pointLight.position.set(
-        (Math.random() - 0.5) * 100,
-        (Math.random() - 0.5) * 100,
-        (Math.random() - 0.5) * 50
-      );
-      sceneRef.current.add(pointLight);
-    }
+    // Single directional light instead of multiple
+    const mainLight = new THREE.DirectionalLight(0x00ffcc, 0.8);
+    mainLight.position.set(30, 30, 30);
+    sceneRef.current.add(mainLight);
   };
 
-  const createBrainCore = () => {
+  const createOptimizedNodes = () => {
     if (!sceneRef.current) return;
 
-    brainCoreRef.current = new THREE.Group();
-    
-    // Central brain core with multiple layers
-    for (let i = 0; i < 3; i++) {
-      const coreGeometry = new THREE.SphereGeometry(2 - i * 0.5, 32, 32);
-      const coreMaterial = new THREE.MeshPhongMaterial({
-        color: new THREE.Color().setHSL(0.55 + i * 0.05, 0.8, 0.3),
-        transparent: true,
-        opacity: 0.6 - i * 0.1,
-        emissive: new THREE.Color().setHSL(0.55 + i * 0.05, 0.8, 0.1),
-        shininess: 100
-      });
-      
-      const core = new THREE.Mesh(coreGeometry, coreMaterial);
-      brainCoreRef.current.add(core);
-    }
-    
-    sceneRef.current.add(brainCoreRef.current);
-  };
-
-  const createNeuralLayers = () => {
-    if (!sceneRef.current) return;
-
-    const layerCount = 6;
-    const nodeGeometry = new THREE.SphereGeometry(0.15, 16, 16);
+    // Reduced number of layers and nodes for performance
+    const layerCount = 4; // Reduced from 6
+    const nodeGeometry = new THREE.SphereGeometry(0.12, 8, 8); // Reduced geometry detail
     
     for (let layer = 0; layer < layerCount; layer++) {
-      const nodesInLayer = 8 + layer * 2;
-      const layerRadius = 15 + layer * 8;
+      const nodesInLayer = 6 + layer; // Reduced nodes per layer
+      const layerRadius = 12 + layer * 6;
       
       for (let node = 0; node < nodesInLayer; node++) {
-        // Enhanced material with better lighting
-        const nodeMaterial = new THREE.MeshPhongMaterial({
-          color: new THREE.Color().setHSL(0.5 + layer * 0.05, 0.8, 0.4),
+        // Use MeshBasicMaterial for better performance
+        const nodeMaterial = new THREE.MeshBasicMaterial({
+          color: new THREE.Color().setHSL(0.5 + layer * 0.1, 0.8, 0.5),
           transparent: true,
-          opacity: 0.8,
-          emissive: new THREE.Color().setHSL(0.5 + layer * 0.05, 0.8, 0.1),
-          shininess: 50,
-          specular: 0x444444
+          opacity: 0.7
         });
         
         const neuron = new THREE.Mesh(nodeGeometry, nodeMaterial);
         
-        // Sophisticated positioning
         const angle = (node / nodesInLayer) * Math.PI * 2;
-        const heightVariation = (Math.random() - 0.5) * 10;
-        const radiusVariation = layerRadius + (Math.random() - 0.5) * 5;
+        const heightVariation = (Math.random() - 0.5) * 6;
         
         const position = new THREE.Vector3(
-          Math.cos(angle) * radiusVariation,
+          Math.cos(angle) * layerRadius,
           heightVariation,
-          Math.sin(angle) * radiusVariation
+          Math.sin(angle) * layerRadius
         );
         
         neuron.position.copy(position);
         neuron.userData = {
           originalPosition: position.clone(),
           layerIndex: layer,
-          nodeIndex: node,
-          activationPhase: Math.random() * Math.PI * 2
+          nodeIndex: node
         };
         
         sceneRef.current.add(neuron);
@@ -316,37 +302,31 @@ const NeuralNetwork: React.FC<NeuralNetworkProps> = ({ mouseX, mouseY }) => {
     }
   };
 
-  const createSynapticConnections = () => {
+  const createOptimizedConnections = () => {
     if (!sceneRef.current) return;
 
-    // Create intelligent connections based on proximity and layer relationships
-    for (let i = 0; i < nodesRef.current.length; i++) {
+    // Reduced number of connections for performance
+    for (let i = 0; i < nodesRef.current.length; i += 2) { // Skip every other node
       const nodeA = nodesRef.current[i];
       
-      for (let j = i + 1; j < nodesRef.current.length; j++) {
+      for (let j = i + 2; j < nodesRef.current.length; j += 3) { // Skip more nodes
         const nodeB = nodesRef.current[j];
         const distance = nodeA.position.distanceTo(nodeB.position);
         
-        // Layer-based connection probability
-        const layerDiff = Math.abs(nodeA.userData.layerIndex - nodeB.userData.layerIndex);
-        const connectionProbability = Math.max(0, 1 - distance / 40) * (1 - layerDiff * 0.2);
-        
-        if (Math.random() < connectionProbability * 0.4) {
+        if (distance < 25 && Math.random() < 0.3) { // Reduced connection probability
           const points = [nodeA.position.clone(), nodeB.position.clone()];
           const connectionGeometry = new THREE.BufferGeometry().setFromPoints(points);
           
           const connectionMaterial = new THREE.LineBasicMaterial({
             color: 0x00aaff,
             transparent: true,
-            opacity: 0.3,
-            linewidth: 1
+            opacity: 0.2
           });
           
           const connection = new THREE.Line(connectionGeometry, connectionMaterial);
           connection.userData = {
             startNode: nodeA,
-            endNode: nodeB,
-            transmissionPhase: Math.random() * Math.PI * 2
+            endNode: nodeB
           };
           
           sceneRef.current.add(connection);
@@ -356,84 +336,48 @@ const NeuralNetwork: React.FC<NeuralNetworkProps> = ({ mouseX, mouseY }) => {
     }
   };
 
-  const createNeuralParticles = () => {
+  const createOptimizedParticles = () => {
     if (!sceneRef.current) return;
 
-    const particleCount = 300;
+    // Reduced particle count for performance
+    const particleCount = 100; // Reduced from 300
     const positions = new Float32Array(particleCount * 3);
-    const colors = new Float32Array(particleCount * 3);
     
     for (let i = 0; i < particleCount; i++) {
-      // Distribute particles in a neural cloud pattern
-      const radius = 20 + Math.random() * 60;
+      const radius = 15 + Math.random() * 30;
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.random() * Math.PI;
       
       positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
       positions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
       positions[i * 3 + 2] = radius * Math.cos(phi);
-      
-      // Varied particle colors
-      colors[i * 3] = 0.2 + Math.random() * 0.8;     // R
-      colors[i * 3 + 1] = 0.8 + Math.random() * 0.2; // G
-      colors[i * 3 + 2] = 0.9 + Math.random() * 0.1; // B
     }
     
     const particleGeometry = new THREE.BufferGeometry();
     particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    particleGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     
     const particleMaterial = new THREE.PointsMaterial({
-      size: 0.3,
+      size: 0.2,
       transparent: true,
-      opacity: 0.6,
-      vertexColors: true,
-      blending: THREE.AdditiveBlending,
-      sizeAttenuation: true
+      opacity: 0.4,
+      color: 0x00ffcc,
+      sizeAttenuation: false // Better performance
     });
     
     particlesRef.current = new THREE.Points(particleGeometry, particleMaterial);
     sceneRef.current.add(particlesRef.current);
   };
 
-  const createDataStreams = () => {
-    if (!sceneRef.current) return;
-
-    // Create flowing data streams between neural layers
-    for (let i = 0; i < 10; i++) {
-      const streamGeometry = new THREE.CylinderGeometry(0.02, 0.02, 50, 8);
-      const streamMaterial = new THREE.MeshPhongMaterial({
-        color: 0x00ffcc,
-        transparent: true,
-        opacity: 0.4,
-        emissive: 0x003333
-      });
-      
-      const stream = new THREE.Mesh(streamGeometry, streamMaterial);
-      stream.position.set(
-        (Math.random() - 0.5) * 100,
-        (Math.random() - 0.5) * 100,
-        (Math.random() - 0.5) * 50
-      );
-      stream.rotation.z = Math.random() * Math.PI * 2;
-      
-      sceneRef.current.add(stream);
-    }
-  };
-
   const cleanup = () => {
-    // Dispose of all geometries and materials
-    nodesRef.current.forEach(node => {
-      node.geometry.dispose();
-      if (node.material instanceof THREE.Material) {
-        node.material.dispose();
-      }
-    });
-    
-    connectionsRef.current.forEach(connection => {
-      connection.geometry.dispose();
-      if (connection.material instanceof THREE.Material) {
-        connection.material.dispose();
+    // Efficient cleanup
+    [...nodesRef.current, ...connectionsRef.current].forEach(object => {
+      if (object.geometry) object.geometry.dispose();
+      if (object.material) {
+        if (Array.isArray(object.material)) {
+          object.material.forEach(mat => mat.dispose());
+        } else {
+          object.material.dispose();
+        }
       }
     });
     
@@ -449,6 +393,60 @@ const NeuralNetwork: React.FC<NeuralNetworkProps> = ({ mouseX, mouseY }) => {
     }
   };
 
+  // CSS Fallback Component
+  const CSSNeuralNetwork = () => (
+    <div className="css-neural-network">
+      <div className="css-neural-background"></div>
+      <div className="css-neural-nodes">
+        {[...Array(20)].map((_, i) => (
+          <div 
+            key={i} 
+            className="css-neural-node" 
+            style={{
+              '--delay': `${i * 0.1}s`,
+              '--x': `${Math.cos((i / 20) * Math.PI * 2) * 40 + 50}%`,
+              '--y': `${Math.sin((i / 20) * Math.PI * 2) * 40 + 50}%`,
+              transform: `translate(${mouseX * 10}px, ${mouseY * 10}px)`
+            } as React.CSSProperties}
+          />
+        ))}
+      </div>
+      <div className="css-neural-particles">
+        {[...Array(30)].map((_, i) => (
+          <div 
+            key={i} 
+            className="css-neural-particle" 
+            style={{
+              '--delay': `${i * 0.2}s`,
+              '--duration': `${3 + Math.random() * 2}s`
+            } as React.CSSProperties}
+          />
+        ))}
+      </div>
+    </div>
+  );
+
+  if (useCSSFallback) {
+    return (
+      <div 
+        ref={containerRef} 
+        style={{ 
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          zIndex: 0,
+          pointerEvents: 'none',
+          background: 'radial-gradient(ellipse at center, #0a0a1a 0%, #000008 100%)',
+          opacity: isVisible ? 1 : 0.3
+        }}
+      >
+        <CSSNeuralNetwork />
+      </div>
+    );
+  }
+
   return (
     <div 
       ref={containerRef} 
@@ -460,7 +458,8 @@ const NeuralNetwork: React.FC<NeuralNetworkProps> = ({ mouseX, mouseY }) => {
         height: '100%',
         zIndex: 0,
         pointerEvents: 'none',
-        background: 'radial-gradient(ellipse at center, #0a0a1a 0%, #000008 100%)'
+        background: 'radial-gradient(ellipse at center, #0a0a1a 0%, #000008 100%)',
+        opacity: isVisible ? 1 : 0.3 // Reduce opacity when not visible
       }} 
     />
   );

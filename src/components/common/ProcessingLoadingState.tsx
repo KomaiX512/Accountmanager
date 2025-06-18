@@ -17,6 +17,13 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import './ProcessingLoadingState.css';
 
+interface ProcessingStage {
+  id: number;
+  name: string;
+  description: string;
+  percentage: number;
+}
+
 interface ProTip {
   id: string;
   title: string;
@@ -30,16 +37,51 @@ interface ProcessingLoadingStateProps {
   onComplete: () => void;
 }
 
+const TOTAL_DURATION = 600; // 10 minutes in seconds
+
 const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   platform,
   username,
   onComplete
 }) => {
   const { currentUser } = useAuth();
-  const [timeLeft, setTimeLeft] = useState(60); // Default to 60 seconds
-  const [totalDuration, setTotalDuration] = useState(60); // Track original duration
+  const [timeLeft, setTimeLeft] = useState(TOTAL_DURATION);
+  const [currentStage, setCurrentStage] = useState(0);
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+
+  const processingStages: ProcessingStage[] = [
+    {
+      id: 1,
+      name: 'Queuing',
+      description: 'Preparing your account data for processing...',
+      percentage: 20
+    },
+    {
+      id: 2,
+      name: 'Data Extraction',
+      description: 'Extracting insights from your social media activity...',
+      percentage: 40
+    },
+    {
+      id: 3,
+      name: 'Analysis',
+      description: 'Analyzing patterns and generating strategies...',
+      percentage: 60
+    },
+    {
+      id: 4,
+      name: 'Generation',
+      description: 'Creating personalized recommendations...',
+      percentage: 80
+    },
+    {
+      id: 5,
+      name: 'Final Processing',
+      description: 'Preparing your dashboard...',
+      percentage: 100
+    }
+  ];
 
   // Initialize countdown based on localStorage data
   useEffect(() => {
@@ -52,18 +94,23 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
       const { startTime, duration } = JSON.parse(processingData);
       const elapsed = Date.now() - startTime;
       const remaining = Math.max(0, Math.ceil((duration - elapsed) / 1000));
-      const originalDuration = Math.ceil(duration / 1000);
-      
-      setTotalDuration(originalDuration);
       
       if (remaining > 0) {
         setTimeLeft(remaining);
       } else {
-        // Time has already expired, complete immediately
         onComplete();
       }
     }
   }, [currentUser?.uid, platform, onComplete]);
+
+  // Update current stage based on time progress
+  useEffect(() => {
+    const progress = ((TOTAL_DURATION - timeLeft) / TOTAL_DURATION) * 100;
+    const newStage = processingStages.findIndex(stage => progress <= stage.percentage);
+    if (newStage !== -1 && newStage !== currentStage) {
+      setCurrentStage(newStage);
+    }
+  }, [timeLeft, currentStage]);
 
   const proTips: ProTip[] = [
     {
@@ -128,6 +175,10 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const calculateProgress = () => {
+    return ((TOTAL_DURATION - timeLeft) / TOTAL_DURATION) * 100;
   };
 
   const handleTipNavigation = (index: number) => {
@@ -201,46 +252,44 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
           </p>
         </motion.div>
 
-        {/* Countdown Timer */}
+        {/* Processing Stages */}
         <motion.div
-          className="countdown-section"
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
+          className="processing-stages"
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.4 }}
         >
-          <div className="countdown-circle">
-            <svg className="countdown-svg" viewBox="0 0 100 100">
-              <circle
-                className="countdown-bg"
-                cx="50"
-                cy="50"
-                r="45"
-                fill="none"
-                stroke="rgba(255, 255, 255, 0.1)"
-                strokeWidth="8"
-              />
-              <circle
-                className="countdown-progress"
-                cx="50"
-                cy="50"
-                r="45"
-                fill="none"
-                stroke={platformColors[platform]}
-                strokeWidth="8"
-                strokeLinecap="round"
-                strokeDasharray={`${2 * Math.PI * 45}`}
-                strokeDashoffset={`${2 * Math.PI * 45 * (1 - timeLeft / totalDuration)}`}
-                transform="rotate(-90 50 50)"
-              />
-            </svg>
-            <div className="countdown-text">
-              <span className="countdown-time">{formatTime(timeLeft)}</span>
-              <span className="countdown-label">remaining</span>
+          <div className="stages-progress">
+            <div 
+              className="progress-bar"
+              style={{ 
+                width: `${calculateProgress()}%`,
+                backgroundColor: platformColors[platform]
+              }}
+            />
+            <div className="stage-markers">
+              {processingStages.map((stage, index) => (
+                <div
+                  key={stage.id}
+                  className={`stage-marker ${index <= currentStage ? 'active' : ''}`}
+                  style={{
+                    left: `${stage.percentage}%`,
+                    backgroundColor: index <= currentStage ? platformColors[platform] : 'rgba(255, 255, 255, 0.3)'
+                  }}
+                >
+                  <span className="stage-label">{stage.name}</span>
+                </div>
+              ))}
             </div>
           </div>
-          <p className="countdown-description">
-            Deep analysis in progress... Please wait while we optimize your strategy
-          </p>
+          <div className="current-stage-info">
+            <h3>{processingStages[currentStage].name}</h3>
+            <p>{processingStages[currentStage].description}</p>
+            <div className="time-remaining">
+              <FiClock size={16} />
+              <span>{formatTime(timeLeft)} remaining</span>
+            </div>
+          </div>
         </motion.div>
 
         {/* Pro Tips Carousel */}
@@ -303,40 +352,28 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
           </div>
         </motion.div>
 
-        {/* Processing Animation */}
+        {/* Processing Animation - Updated */}
         <motion.div
           className="processing-animation"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.8 }}
         >
-          <div className="processing-dots">
+          <div className="processing-pulse">
             <motion.div
-              className="processing-dot"
-              animate={{ scale: [1, 1.2, 1] }}
-              transition={{ duration: 1, repeat: Infinity, delay: 0 }}
-              style={{ backgroundColor: platformColors[platform] }}
-            />
-            <motion.div
-              className="processing-dot"
-              animate={{ scale: [1, 1.2, 1] }}
-              transition={{ duration: 1, repeat: Infinity, delay: 0.2 }}
-              style={{ backgroundColor: platformColors[platform] }}
-            />
-            <motion.div
-              className="processing-dot"
-              animate={{ scale: [1, 1.2, 1] }}
-              transition={{ duration: 1, repeat: Infinity, delay: 0.4 }}
-              style={{ backgroundColor: platformColors[platform] }}
+              className="pulse-ring"
+              animate={{
+                scale: [1, 1.2, 1],
+                opacity: [0.5, 0.8, 0.5]
+              }}
+              transition={{
+                duration: 2,
+                repeat: Infinity,
+                ease: "easeInOut"
+              }}
+              style={{ borderColor: platformColors[platform] }}
             />
           </div>
-          <p className="processing-status">
-            {timeLeft > 48 && "Analyzing competitor strategies..."}
-            {timeLeft <= 48 && timeLeft > 36 && "Processing your content patterns..."}
-            {timeLeft <= 36 && timeLeft > 24 && "Optimizing engagement strategies..."}
-            {timeLeft <= 24 && timeLeft > 12 && "Generating personalized recommendations..."}
-            {timeLeft <= 12 && "Finalizing your AI-powered dashboard..."}
-          </p>
         </motion.div>
       </div>
     </motion.div>

@@ -39,8 +39,8 @@ const TopBar: React.FC = () => {
   // Show navigation links ONLY on main dashboard (not on platform pages)
   const showNavLinks = !isPlatformPage;
   
-  // Show home button ONLY on platform pages
-  const showHomeButton = isPlatformPage;
+  // Show dashboard button ONLY on platform pages
+  const showDashboardButton = isPlatformPage;
 
   const platforms = [
     { icon: 'facebook', path: '/facebook' },
@@ -176,24 +176,24 @@ const TopBar: React.FC = () => {
       )}
       
       <div className="right-controls">
-        {currentUser && showHomeButton && (
+        {currentUser && showDashboardButton && (
           <motion.a
             href="#"
-            className="home-button"
-            whileHover={{ scale: 1.2 }}
-            whileTap={{ scale: 0.9 }}
+            className="dashboard-button"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
             onClick={(e) => {
               e.preventDefault();
-              navigate('/');
+              navigate('/account');
             }}
           >
             <svg viewBox="0 0 24 24">
-              <path d="M10,20V14H14V20H19V12H22L12,3L2,12H5V20H10Z" />
+              <path d="M13,3V9H21V3M13,21H21V11H13M3,21H11V15H3M3,13H11V3H3V13Z" />
             </svg>
-            <span>Home</span>
+            <span>Dashboard</span>
           </motion.a>
         )}
       

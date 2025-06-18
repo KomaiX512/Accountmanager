@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
@@ -31,8 +31,11 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  // Mouse position for neural network
+  // Mouse position for neural network (memoized to prevent unnecessary re-renders)
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  
+  // Memoize mouse position to prevent Neural Network re-renders on every change
+  const memoizedMousePosition = useMemo(() => mousePosition, [mousePosition.x, mousePosition.y]);
   
   // Form state
   const [email, setEmail] = useState<string>('');
@@ -64,16 +67,36 @@ const Login: React.FC = () => {
   }, [currentUser, navigate, from]);
 
   useEffect(() => {
+    let animationFrame: number;
+    let lastUpdate = 0;
+    const THROTTLE_MS = 50; // Increased to 20fps for auth page performance (was causing lag)
+    
     const handleMouseMove = (e: MouseEvent) => {
-      // Normalize mouse position to -1 to 1 range
-      const x = (e.clientX / window.innerWidth) * 2 - 1;
-      const y = -(e.clientY / window.innerHeight) * 2 + 1;
-      setMousePosition({ x: x * 5, y: y * 5 });
+      const now = Date.now();
+      if (now - lastUpdate < THROTTLE_MS) return; // Aggressive throttling for auth page
+      
+      lastUpdate = now;
+      
+      // Cancel previous frame if pending
+      if (animationFrame) {
+        cancelAnimationFrame(animationFrame);
+      }
+      
+      // Use requestAnimationFrame for smooth updates
+      animationFrame = requestAnimationFrame(() => {
+        // Normalize mouse position to -1 to 1 range with reduced sensitivity for auth page
+        const x = (e.clientX / window.innerWidth) * 2 - 1;
+        const y = -(e.clientY / window.innerHeight) * 2 + 1;
+        setMousePosition({ x: x * 2, y: y * 2 }); // Reduced multiplier from 5 to 2 for less intensive calculations
+      });
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
+      if (animationFrame) {
+        cancelAnimationFrame(animationFrame);
+      }
     };
   }, []);
 
@@ -405,8 +428,12 @@ const Login: React.FC = () => {
 
   return (
     <>
-      {/* Fixed Neural Network Background */}
-      <NeuralNetwork mouseX={mousePosition.x} mouseY={mousePosition.y} />
+      {/* Fixed Neural Network Background - CSS fallback for optimal auth page performance */}
+      <NeuralNetwork 
+        mouseX={memoizedMousePosition.x} 
+        mouseY={memoizedMousePosition.y} 
+        forceCSS={true}
+      />
       
       {/* Auth Content Layer */}
       <motion.div

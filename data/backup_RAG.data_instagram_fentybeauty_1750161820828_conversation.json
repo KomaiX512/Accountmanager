@@ -1,0 +1,15 @@
+{
+  "username": "fentybeauty",
+  "platform": "instagram",
+  "timestamp": "2025-06-17T12:03:40.828Z",
+  "previousMessages": [
+    {
+      "role": "user",
+      "content": "tell me our account holder name tell me about accout"
+    },
+    {
+      "role": "assistant",
+      "content": "The account holder is FENTY BEAUTY BY RIHANNA (@fentybeauty)."
+    }
+  ]
+}

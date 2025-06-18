@@ -1,0 +1,18 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "You are a social media marketing expert analyzing a Instagram account.\n\nACCOUNT: @maccosmetics\nFOLLOWERS: 23949264\nPOSTS: 15853\n\nUSER QUERY: \"tell me about my most popular post\"\n\nPlease provide specific, actionable advice based on the account data. Be detailed and professional in your response."
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 2000,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "topK": 40
+  }
+}

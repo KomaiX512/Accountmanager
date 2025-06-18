@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Okay, what would you like to test? Let me know what you need help with regarding FENTY BEAUTY!\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.3888925469439963
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 111,
+    "candidatesTokenCount": 23,
+    "totalTokenCount": 134,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 111
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 23
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "Zh1RaIXjENGO1PIPrejUyQc"
+}

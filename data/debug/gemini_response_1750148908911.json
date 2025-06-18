@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Sun's out, styles out! 😎 Shop our new summer collection for effortless, breezy looks! ☀️\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.252972063810929
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 121,
+    "candidatesTokenCount": 23,
+    "totalTokenCount": 144,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 121
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 23
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "LCdRaK7rFv6ShMIPm7P8iAY"
+}

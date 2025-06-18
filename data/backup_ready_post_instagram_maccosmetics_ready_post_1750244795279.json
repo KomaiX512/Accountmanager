@@ -1,0 +1,27 @@
+{
+  "post": {
+    "caption": "Unleash your inner artist! 🎨 We're obsessed with seeing your unique makeup creations. Show us your boldest looks, your everyday glam, and everything in between using #MACCommunity – you might just get featured! ✨",
+    "hashtags": [
+      "#MACCosmetics",
+      "#MACMakeup",
+      "#MakeupInspiration",
+      "#MakeupLooks",
+      "#BeautyCommunity",
+      "#MakeupArtist",
+      "#BeautyTips",
+      "#MACAddict",
+      "#MakeupOfTheDay",
+      "#MOTD"
+    ],
+    "call_to_action": "Tag us in your MAC looks for a chance to be featured!",
+    "image_prompt": "A vibrant and dynamic flat lay featuring an assortment of MAC Cosmetics products arranged artfully on a clean, light pink background. The products should include a selection of lipsticks in varying shades of red, pink, and nude, arranged in a semi-circle. Scattered around the lipsticks are several eyeshadow palettes with open lids showcasing a range of colorful and neutral eyeshadows. A few MAC brushes with sleek black handles and silver ferrules are strategically placed, some with visible pigment on the bristles. A compact mirror with the MAC logo is subtly reflected in the background. The lighting is bright and even, creating a clean and professional aesthetic. The overall mood is playful, creative, and inviting. The composition should be balanced and visually appealing, encouraging viewers to explore the products and imagine their own makeup creations. A single, fresh pink rose is placed near the top left corner, adding a touch of elegance and femininity. The image should evoke a sense of inspiration and possibility, encouraging viewers to experiment with makeup."
+  },
+  "timestamp": 1750244795279,
+  "image_path": "ready_post/instagram/maccosmetics/image_1750244795279.jpg",
+  "image_url": "/fix-image/maccosmetics/image_1750244795279.jpg?platform=instagram",
+  "r2_image_url": "/api/r2-image/maccosmetics/image_1750244795279.jpg?platform=instagram",
+  "generated_at": "2025-06-18T11:06:35.279Z",
+  "queryUsed": "create next post for me ",
+  "status": "new",
+  "platform": "instagram"
+}

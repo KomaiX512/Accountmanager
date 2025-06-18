@@ -1,0 +1,26 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "You are writing EXACTLY ONE SENTENCE for a social media post on Instagram.\n\nTASK: Write a single engaging sentence about our new summer collection for Instagram.\n\nYOUR RESPONSE MUST BE:\n- EXACTLY ONE SENTENCE (no more, no less)\n- Between 60-120 characters\n- Include 1-2 relevant emojis\n- Sound conversational and authentic\n- Be exciting and attention-grabbing\n- Focus on the main benefit or feature\n\nEXTREMELY IMPORTANT: Respond with ONLY the one sentence. No explanations, introductions, or anything else."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "tell followers in one sentence about our new summer collection"
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 2000,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "topK": 40
+  }
+}

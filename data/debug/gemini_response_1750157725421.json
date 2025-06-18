@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Okay, let's optimize your Instagram bio for Fenty Beauty.\n\nI need to know what your current bio says to give you the best advice. However, assuming it needs improvement, here are three actionable recommendations:\n\n1.  **Highlight your core value proposition.** Clearly state what makes Fenty Beauty unique (e.g., inclusivity, high-performance formulas). Action: Revise the bio to include a concise statement like \"Beauty for All. High-performance makeup designed for every skin tone.\"\n\n2.  **Incorporate a strong call to action.** Drive traffic to your website or a specific campaign. Action: Add a clear CTA like \"Shop Now\" or \"New Collection Out Now\" with a trackable link.\n\n3.  **Use relevant keywords.** Help users discover your brand through search. Action: Include keywords like \"makeup,\" \"beauty,\" \"inclusive beauty,\" and \"cruelty-free\" if applicable.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.2977145298774996
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 169,
+    "candidatesTokenCount": 193,
+    "totalTokenCount": 362,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 169
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 193
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "m0lRaNjHJOqm1PIPwJSz4AI"
+}

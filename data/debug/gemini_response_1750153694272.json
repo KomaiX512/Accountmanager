@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "To boost engagement on Instagram, focus on creating interactive and relatable content.\n\n1.  **Run more Q&A sessions with Rihanna or Fenty Beauty makeup artists.** Use Instagram Stories' Q&A sticker to answer follower questions about product application, skincare routines, or behind-the-scenes insights. This fosters a direct connection and provides valuable content.\n\n2.  **Create interactive polls and quizzes related to beauty trends and product preferences.** Use Instagram Stories' poll and quiz stickers to gather data and spark conversations. This encourages participation and provides valuable insights into your audience's interests.\n\n3.  **Launch a user-generated content (UGC) campaign.** Encourage followers to share their Fenty Beauty looks using a specific hashtag, and then repost the best submissions on your main feed. This builds community and provides authentic content.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.3242087053829396
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 273,
+    "candidatesTokenCount": 169,
+    "totalTokenCount": 442,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 273
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 169
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "3DlRaKa0MOqm1PIPwJSz4AI"
+}

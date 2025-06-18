@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Okay, let's analyze your Instagram account based on the provided metrics:\n\n**Number of Posts Analysis:**\n\n*   **You have a substantial number of posts (15,853).** This indicates a long-term presence and consistent content creation on the platform. It suggests you've been actively building your account over time.\n*   **High post count implies a diverse range of content.** With so many posts, you likely cover a variety of topics, formats (photos, videos, stories, reels), and campaigns.\n\n**Most Engaging Post:**\n\n*   **I don't have access to your specific post-level data.** To determine your most engaging post, I would need information like:\n    *   Likes\n    *   Comments\n    *   Shares\n    *   Saves\n    *   Reach\n    *   Impressions\n\n**To find your most engaging post, you'll need to use Instagram Insights (or a third-party analytics tool).** Here's how you can typically do it:\n\n1.  **Access Instagram Insights:** If you have a Business or Creator account, you can access Insights directly within the Instagram app.\n2.  **Look at Post Performance:** Navigate to the \"Posts\" section of your Insights.\n3.  **Sort and Filter:** You can usually sort your posts by metrics like \"Likes,\" \"Comments,\" \"Reach,\" or \"Engagement Rate.\"\n4.  **Identify the Top Performer:** The post with the highest value in your chosen metric is likely your most engaging post.\n5.  **Analyze Why:** Once you've identified the post, examine *why* it performed so well. Consider:\n    *   **Content Type:** Was it a photo, video, Reel, or carousel?\n    *   **Topic:** What was the subject matter?\n    *   **Caption:** How did you write the caption? Did you ask a question, use a call to action, or tell a story?\n    *   **Hashtags:** Which hashtags did you use?\n    *   **Timing:** When did you post it?\n    *   **Visuals:** How was the quality of the visuals?\n\n**In summary:** You have a large and active Instagram account with a significant number of posts. To find your most engaging post, use Instagram Insights to analyze your post-level data and identify the content that resonates most with your audience. Then, analyze the characteristics of that post to inform your future content strategy.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.2254237286646398
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 71,
+    "candidatesTokenCount": 521,
+    "totalTokenCount": 592,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 71
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 521
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "OptRaOPFKtGO1PIPrejUyQc"
+}

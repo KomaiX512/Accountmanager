@@ -1,0 +1,23 @@
+{
+  "username": "fentybeauty",
+  "platform": "instagram",
+  "timestamp": "2025-06-17T12:05:35.449Z",
+  "previousMessages": [
+    {
+      "role": "user",
+      "content": "tell me our account holder name tell me about accout"
+    },
+    {
+      "role": "assistant",
+      "content": "The account holder is FENTY BEAUTY BY RIHANNA (@fentybeauty)."
+    },
+    {
+      "role": "user",
+      "content": "tell me about my post count and follower and followeing"
+    },
+    {
+      "role": "assistant",
+      "content": "Account metrics for FENTY BEAUTY BY RIHANNA (@fentybeauty): 13,254,688 followers, 1,126 following, and 11,665 posts. This indicates a healthy account with opportunities for engagement and growth."
+    }
+  ]
+}

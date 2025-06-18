@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "\n\nHere are 3 actionable recommendations to leverage your follower base:\n\n1.  **Implement interactive content formats:** Run regular Q&A sessions on Instagram Stories or TikTok Lives to directly address follower questions and build a stronger connection.\n2.  **Run targeted campaigns:** Segment your audience based on demographics and purchase history to deliver personalized content and product recommendations, increasing relevance and conversion rates.\n3.  **Encourage user-generated content:** Launch a branded hashtag campaign and incentivize followers to share their Fenty Beauty looks, amplifying your reach and building social proof.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.36270128447433997
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 256,
+    "candidatesTokenCount": 116,
+    "totalTokenCount": 372,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 256
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 116
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "sUNRaJmZDv6ShMIPm7P8iAY"
+}

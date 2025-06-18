@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Let's optimize your Fenty Beauty online presence.\n\nHere are three actionable recommendations to enhance your business profile details:\n\n1.  **Refine your bio:** Craft a concise, benefit-driven bio highlighting Fenty Beauty's core values (e.g., inclusivity, innovation) and a clear call to action (e.g., \"Shop Now\"). Action: Rewrite your bio within character limits across all platforms.\n\n2.  **Optimize profile visuals:** Ensure consistent, high-quality profile pictures and cover images that reflect current campaigns or product launches. Action: Update visuals quarterly to stay relevant and engaging.\n\n3.  **Utilize story highlights strategically:** Organize Instagram story highlights by product categories, tutorials, or customer testimonials for easy access to valuable content. Action: Create or reorganize highlights with compelling titles and cover images.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.2694715899090434
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 166,
+    "candidatesTokenCount": 172,
+    "totalTokenCount": 338,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 166
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 172
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "CEpRaNKyBNGO1PIPrejUyQc"
+}

@@ -1,0 +1,18 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Digital account analysis.\n\nBusiness: fentybeauty\n\nACCOUNT DATA:\n- Followers: 13254688\n- Following: 1126\n- Content: 11665\n- Category: None,Health/digital presence\n\nAnalysis request: tell this business about the follower\n\nCRITICAL INSTRUCTIONS:\n- Provide a CONCISE analysis of the account metrics shown above\n- Focus specifically on followers and following counts and what they indicate\n- Explain what these numbers suggest about account health and engagement\n- Keep your response under 100 words\n- Be direct and factual about the metrics\n- No unnecessary explanations or repetition"
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 2000,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "topK": 40
+  }
+}

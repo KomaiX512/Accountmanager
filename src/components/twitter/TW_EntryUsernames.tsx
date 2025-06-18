@@ -306,14 +306,14 @@ const usernameCheckUrl = '/api/check-username-availability';
     setIsLoading(true);
 
     try {
-      const apiUrl = `${process.env.REACT_APP_API_URL}/account-info/${currentUser.uid}`;
-      const statusApiUrl = `${process.env.REACT_APP_API_URL}/user-status`;
+      const apiUrl = `/api/save-account-info`;
+      const statusApiUrl = `/api/user-status`;
 
       const finalCompetitors = competitors.filter(comp => comp.trim() !== '');
 
       const payload = {
+        username: username.trim(),
         accountType,
-        accountHolder: username.trim(),
         competitors: finalCompetitors,
         postingStyle: postingStyle.trim() || 'General posting style',
         platform: 'twitter'
@@ -327,7 +327,7 @@ const usernameCheckUrl = '/api/check-username-availability';
 
       if (response.status === 200) {
         // Now save the user's Twitter username entry state
-        await axios.post(`${statusApiUrl}/${currentUser.uid}`, {
+        await axios.post(`/api/user-twitter-status/${currentUser.uid}`, {
           twitter_username: username.trim(),
           accountType,
           competitors: competitors.map(comp => comp.trim())

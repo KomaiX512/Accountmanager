@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Hey! For the best foundation application, try using a damp beauty sponge and stipple (bounce) it onto your skin for a natural, airbrushed finish. You can also use a brush, but make sure to buff it in well!\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.30996889114379883
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 76,
+    "candidatesTokenCount": 50,
+    "totalTokenCount": 126,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 76
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 50
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "2ylRaNGJLqnXhMIPh5Th0QM"
+}

@@ -122,11 +122,23 @@ const TopBar: React.FC = () => {
       
       {showNavLinks && (
         <div className="nav-links">
+          <motion.a
+            href="#"
+            className={`nav-link ${location.pathname === '/' || location.pathname === '/home' ? 'active' : ''}`}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={(e) => {
+              e.preventDefault();
+              navigate('/');
+            }}
+          >
+            Home
+          </motion.a>
           {currentUser && (
             <motion.a
               href="#"
               className={`nav-link ${location.pathname === '/account' ? 'active' : ''}`}
-              whileHover={{ scale: 1.05 }}
+              whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={(e) => {
                 e.preventDefault();
@@ -138,39 +150,27 @@ const TopBar: React.FC = () => {
           )}
           <motion.a
             href="#"
-            className={`nav-link ${location.pathname === '/pricing' ? 'active' : ''}`}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={(e) => {
-              e.preventDefault();
-              navigate('/pricing');
-            }}
-          >
-            Pricing
-          </motion.a>
-          <motion.a
-            href="#"
-            className={`nav-link ${location.pathname === '/' || location.pathname === '/home' ? 'active' : ''}`}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={(e) => {
-              e.preventDefault();
-              navigate('/');
-            }}
-          >
-            Home
-          </motion.a>
-          <motion.a
-            href="#"
             className={`nav-link ${location.pathname === '/privacy' ? 'active' : ''}`}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={(e) => {
               e.preventDefault();
               navigate('/privacy');
             }}
           >
             Privacy Policy
+          </motion.a>
+          <motion.a
+            href="#"
+            className={`nav-link ${location.pathname === '/pricing' ? 'active' : ''}`}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={(e) => {
+              e.preventDefault();
+              navigate('/pricing');
+            }}
+          >
+            Pricing
           </motion.a>
         </div>
       )}

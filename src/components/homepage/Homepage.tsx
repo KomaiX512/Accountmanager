@@ -4,11 +4,17 @@ import { FaBrain, FaRocket, FaChartLine, FaUsers, FaInstagram, FaFacebook, FaTwi
 import './Homepage.css';
 import NeuralNetwork from './NeuralNetwork';
 
+// Feature flag to control neural network rendering
+const ENABLE_NEURAL_NETWORK = false;
+
 const Homepage: React.FC = () => {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [scrollY, setScrollY] = useState(0);
 
   useEffect(() => {
+    // Only add mouse tracking if neural network is enabled
+    if (!ENABLE_NEURAL_NETWORK) return;
+
     const handleMouseMove = (e: MouseEvent) => {
       // Normalize mouse position to -1 to 1 range
       const x = (e.clientX / window.innerWidth) * 2 - 1;
@@ -31,8 +37,12 @@ const Homepage: React.FC = () => {
 
   return (
     <>
-      {/* Fixed Neural Network Background */}
-      <NeuralNetwork mouseX={mousePosition.x} mouseY={mousePosition.y} />
+      {/* Neural Network or Static Background */}
+      {ENABLE_NEURAL_NETWORK ? (
+        <NeuralNetwork mouseX={mousePosition.x} mouseY={mousePosition.y} />
+      ) : (
+        <div className="static-background" />
+      )}
       
       {/* Scrollable Content Layer */}
       <div className="homepage">
@@ -72,11 +82,11 @@ const Homepage: React.FC = () => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 1, delay: 0.9 }}
                 >
-                  <button className="glassy-button btn-primary large">
-                    Start Your AI Journey
-                  </button>
-                  <button className="glassy-button btn-secondary large">
-                    Watch Demo
+                  <button 
+                    className="glassy-button btn-primary large"
+                    onClick={() => window.location.href = '/account'}
+                  >
+                    Feel the Future
                   </button>
                 </motion.div>
               </div>
@@ -288,10 +298,16 @@ const Homepage: React.FC = () => {
                 <h2>Ready to Transform Your Social Media?</h2>
                 <p>Join thousands of brands already leveraging our sentient AI to dominate social media across all platforms. Experience the future of marketing today.</p>
                 <div className="hero-buttons">
-                  <button className="glassy-button btn-primary large">
+                  <button 
+                    className="glassy-button btn-primary large"
+                    onClick={() => window.location.href = '/account'}
+                  >
                     Start Free Trial
                   </button>
-                  <button className="glassy-button btn-secondary large">
+                  <button 
+                    className="glassy-button btn-secondary large"
+                    onClick={() => window.location.href = '/account'}
+                  >
                     Schedule Demo
                   </button>
                 </div>

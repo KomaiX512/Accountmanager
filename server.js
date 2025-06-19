@@ -1951,36 +1951,101 @@ app.get('/api/user/:userId/usage', async (req, res) => {
   try {
     console.log(`[${new Date().toISOString()}] [USER-API] Getting usage stats for ${userId}/${currentPeriod}`);
     
-    const params = {
-      Bucket: 'admin',
-      Key: `usage/${userId}/${currentPeriod}.json`
-    };
-    
-    const data = await getAdminS3Client().getObject(params).promise();
-    const usageStats = JSON.parse(data.Body.toString());
-    
-    console.log(`[${new Date().toISOString()}] [USER-API] Found usage stats for ${userId}/${currentPeriod}`);
-    res.json(usageStats);
-    
-  } catch (error) {
-    if (error.code === 'NoSuchKey') {
-      // Create default usage stats
-      const defaultStats = {
-        userId,
-        period: currentPeriod,
-        postsUsed: 0,
-        discussionsUsed: 0,
-        aiRepliesUsed: 0,
-        campaignsUsed: 0,
-        lastUpdated: new Date().toISOString()
+    // Try R2 first
+    try {
+      console.log(`[${new Date().toISOString()}] [R2-OPERATION] Attempting to get usage stats from R2`);
+      const params = {
+        Bucket: 'admin',
+        Key: `usage/${userId}/${currentPeriod}.json`
       };
       
-      console.log(`[${new Date().toISOString()}] [USER-API] Creating default usage stats for ${userId}/${currentPeriod}`);
-      res.json(defaultStats);
-    } else {
-      console.error(`[${new Date().toISOString()}] [USER-API] Error getting usage stats:`, error);
-      res.status(500).json({ error: 'Failed to get usage stats' });
+      const data = await getAdminS3Client().getObject(params).promise();
+      const usageStats = JSON.parse(data.Body.toString());
+      
+      console.log(`[${new Date().toISOString()}] [USER-API] Found usage stats from R2 for ${userId}/${currentPeriod}`);
+      res.json(usageStats);
+      return;
+    } catch (r2Error) {
+      console.log(`[${new Date().toISOString()}] [R2-OPERATION] Error performing R2 operation: ${r2Error.message}`);
+      
+      if (r2Error.code === 'NoSuchKey' || r2Error.message.includes('does not exist')) {
+        console.log(`[${new Date().toISOString()}] [USER-API] R2 failed for usage stats, trying fallbacks: ${r2Error.message}`);
+        
+        // Try local storage fallback
+        const localStorageDir = path.join(process.cwd(), 'local_storage', 'usage', userId);
+        const localStorageFile = path.join(localStorageDir, `${currentPeriod}.json`);
+        
+        if (fs.existsSync(localStorageFile)) {
+          try {
+            console.log(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Found usage in local storage: ${localStorageFile}`);
+            const localData = JSON.parse(fs.readFileSync(localStorageFile, 'utf8'));
+            res.json(localData);
+            return;
+          } catch (localError) {
+            console.error(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Error reading local usage stats:`, localError);
+          }
+        }
+        
+        // If both R2 and local storage fail, create default stats
+        console.log(`[${new Date().toISOString()}] [USER-API] Using default usage stats for ${userId}/${currentPeriod}`);
+        const defaultStats = {
+          userId,
+          period: currentPeriod,
+          postsUsed: 0,
+          discussionsUsed: 0,
+          aiRepliesUsed: 0,
+          campaignsUsed: 0,
+          lastUpdated: new Date().toISOString()
+        };
+        
+        // Save default stats to local storage
+        try {
+          if (!fs.existsSync(localStorageDir)) {
+            fs.mkdirSync(localStorageDir, { recursive: true });
+          }
+          fs.writeFileSync(localStorageFile, JSON.stringify(defaultStats, null, 2));
+          console.log(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Saved usage to local storage: ${localStorageFile}`);
+        } catch (saveError) {
+          console.error(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Error saving to local storage:`, saveError);
+        }
+        
+        console.log(`[${new Date().toISOString()}] [USER-API] Creating default usage stats for ${userId}/${currentPeriod}`);
+        res.json(defaultStats);
+        return;
+      } else {
+        // For other R2 errors, fall back to local storage if available
+        const localStorageDir = path.join(process.cwd(), 'local_storage', 'usage', userId);
+        const localStorageFile = path.join(localStorageDir, `${currentPeriod}.json`);
+        
+        if (fs.existsSync(localStorageFile)) {
+          try {
+            console.log(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Using local storage due to R2 error: ${localStorageFile}`);
+            const localData = JSON.parse(fs.readFileSync(localStorageFile, 'utf8'));
+            res.json(localData);
+            return;
+          } catch (localError) {
+            console.error(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Error reading local storage:`, localError);
+          }
+        }
+        
+        throw r2Error; // Re-throw if no local fallback available
+      }
     }
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [USER-API] Error getting usage stats:`, error);
+    
+    // Ultimate fallback - return default stats
+    const defaultStats = {
+      userId,
+      period: currentPeriod,
+      postsUsed: 0,
+      discussionsUsed: 0,
+      aiRepliesUsed: 0,
+      campaignsUsed: 0,
+      lastUpdated: new Date().toISOString()
+    };
+    
+    res.json(defaultStats);
   }
 });
 

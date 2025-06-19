@@ -281,7 +281,7 @@ class RagService {
           }
           
           // Add platform context to request for better session management
-          return await this.tryServerUrls(`/api/rag/discussion`, (url) => 
+          return await this.tryServerUrls(`/api/discussion`, (url) => 
             axios.post(url, {
               username,
               query,

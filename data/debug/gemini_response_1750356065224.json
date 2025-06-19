@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": " The post received 8,188 likes and 126 comments, resulting in a total engagement of 8,314.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.16829252243041992
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 968,
+    "candidatesTokenCount": 31,
+    "totalTokenCount": 999,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 968
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 31
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "YFBUaK3SIcbd1PIPvoyZ4Qo"
+}

@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "The most engaging post in the provided data is: \"Get ready to unwrap the secret to your best lashes yet! Our NEW Ribbon Wrapped Lash Extreme Tubing Mascara is almost here!! This mascara delivers extreme length and separation for up to 24 hours for all lash types! No smudging, clumping, or flaking—just stunning lashes that last! Be the first to shop our new mascara when it drops tomorrow!\"\n\nThis post received 4,824 likes and 163 comments, resulting in a total engagement of 4,987.\n\nFrom this, we can learn that posts promoting new mascara products tend to perform well. The caption highlights key benefits like \"extreme length and separation,\" \"24 hours,\" and \"no smudging, clumping, or flaking.\" The call to action, \"Be the first to shop our new mascara when it drops tomorrow!\" also likely contributed to the high engagement.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.0890786166018155
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 726,
+    "candidatesTokenCount": 193,
+    "totalTokenCount": 919,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 726
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 193
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "ulFUaIPrD9aP1PIP6b2fqAs"
+}

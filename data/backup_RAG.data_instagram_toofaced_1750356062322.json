@@ -1,0 +1,35 @@
+{
+  "username": "toofaced",
+  "platform": "instagram",
+  "timestamp": "2025-06-19T18:01:02.322Z",
+  "query": "tell me about my most engaging post in whole data you read and its metrices and what can I learn form it",
+  "response": " The post also includes a call to action, encouraging followers to \"Meet our Ribbon Wrapped Lash Mascara, the ultimate solution for achieving extreme length and dramatic separation\".\n",
+  "previousMessages": [
+    {
+      "role": "user",
+      "content": "tell me about my most engaging post"
+    },
+    {
+      "role": "assistant",
+      "content": "Based on the data provided, your most engaging post is about the \"Meet our Ribbon Wrapped Lash Mascara, the ultimate solution for achieving extreme length and dramatic separation\" with 8,188 likes and 126 comments for a total engagement of 8,314."
+    },
+    {
+      "role": "user",
+      "content": "what about the engagement metrics"
+    },
+    {
+      "role": "assistant",
+      "content": "The post about Ribbon Wrapped Lash Mascara performs exceptionally well with beauty content featuring mascara products and makeup tutorials. It received 8,188 likes and 126 comments."
+    },
+    {
+      "role": "user",
+      "content": "tell me more details about the post"
+    },
+    {
+      "role": "assistant",
+      "content": "The post caption highlights the benefits of the Ribbon Wrapped Lash Mascara, such as \"extreme length and dramatic separation\" and a \"Lash Extension™ Brush\" designed to reach every lash type."
+    }
+  ],
+  "usedFallback": false,
+  "quotaExhausted": false
+}

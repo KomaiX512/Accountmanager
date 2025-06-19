@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption: Digging deep and getting the job done! 💪 Our excavators are built tough for any terrain. Ready to upgrade your fleet? Let's talk! 🤝\n\nHashtags: #excavator #constructionequipment #heavyequipment #excavators #constructionlife #digging #earthmoving #autopulseglobaltradingg #machinery #construction\n\nCall to Action: DM us for a quote and let's get your project moving!\n\nVisual Description for Image: A dynamic, eye-level shot of a bright yellow excavator working on a construction site. The excavator is positioned slightly off-center, facing towards the right of the frame, with its bucket raised and angled as if in mid-dig. The background features a partially constructed building with steel beams and concrete structures, bathed in warm, golden hour sunlight. Dust particles are subtly visible in the air, creating a sense of action and realism. The excavator should appear clean and well-maintained, showcasing its robust design. The overall mood is energetic and productive. The sky is a clear blue with a few wispy clouds. The composition should be balanced, with the excavator as the primary focus, but the background providing context and depth. The image should have a slightly desaturated, industrial aesthetic, with a focus on sharp details and textures. The style should be modern and professional, suitable for showcasing the quality and capability of the equipment. Include the \"autopulseglobaltradingg\" logo subtly in the lower right corner.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.35022973855864564
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 269,
+    "candidatesTokenCount": 301,
+    "totalTokenCount": 570,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 269
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 301
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "Tw1UaNmbO_WXsbQP5PucwQo"
+}

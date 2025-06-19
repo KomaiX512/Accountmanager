@@ -34,6 +34,18 @@ export default defineConfig({
         secure: false,
         rewrite: (path) => path.replace('/api/rag', '/api'),
       },
+      // Direct discussion endpoint (also needs to go to RAG server)
+      '/api/discussion': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false,
+      },
+      // Direct conversations endpoint (also needs to go to RAG server)
+      '/api/conversations': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false,
+      },
       '/api/rag/health': {
         target: 'http://localhost:3001',
         changeOrigin: true,

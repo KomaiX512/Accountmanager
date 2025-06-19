@@ -756,67 +756,98 @@ Performance: ${this.categorizePerformance(engagement.engagementRate)}`;
 
       relevantDocs.forEach(doc => {
         const type = doc.metadata.type;
-        if (groupedDocs[type]) {
+        if (type === 'post') {
+          groupedDocs.posts.push(doc);
+        } else if (groupedDocs[type]) {
           groupedDocs[type].push(doc);
         }
       });
 
-      // Build comprehensive enhanced context with strategic insights
-      let context = `📊 STRATEGIC INTELLIGENCE REPORT FOR @${username} ON ${platform.toUpperCase()}:\n\n`;
+      // Build clean, academic context without triggering language
+      let context = `Profile Analysis Data for ${username} on ${platform}:\n\n`;
 
-      // Profile context with competitive analysis
+      // Profile context - clean format
       if (groupedDocs.profile.length > 0) {
-        context += "🚀 ACCOUNT INTELLIGENCE & COMPETITIVE POSITIONING:\n";
+        context += "Account Information:\n";
         groupedDocs.profile.forEach(doc => {
-          context += `${doc.content}\n\n`;
+          // Clean the content of any business jargon
+          const cleanContent = doc.content
+            .replace(/🚀|📊|💡|🎯|📈|🔥|❤️|📋|✅/g, '')
+            .replace(/STRATEGIC|INTELLIGENCE|COMPETITIVE|VIRAL|HIGH-PERFORMING/gi, '')
+            .replace(/OPPORTUNITIES|BRAND PARTNERSHIPS|MONETIZATION/gi, '')
+            .trim();
+          context += `${cleanContent}\n`;
         });
-        context += "💡 STRATEGIC OPPORTUNITIES: This profile data reveals significant opportunities for brand partnerships, product launches, and audience growth strategies.\n\n";
+        context += "\n";
       }
 
-      // Bio context with brand personality insights
+      // Bio context - simple format
       if (groupedDocs.bio.length > 0) {
-        context += "🎭 BRAND DNA & PERSONALITY MATRIX:\n";
+        context += "Profile Description:\n";
         groupedDocs.bio.forEach(doc => {
-          context += `${doc.content}\n\n`;
+          const cleanContent = doc.content
+            .replace(/🎭|🎯|💡/g, '')
+            .replace(/BRAND DNA|PERSONALITY MATRIX|STRATEGIC/gi, '')
+            .trim();
+          context += `${cleanContent}\n`;
         });
-        context += "🎯 BRAND INSIGHTS: The bio analysis reveals key brand values and messaging strategies that drive audience connection and engagement.\n\n";
+        context += "\n";
       }
 
-      // Post context with viral content analysis
+      // Post context - focus on actual content and metrics
       if (groupedDocs.posts.length > 0) {
-        context += "🔥 VIRAL CONTENT INTELLIGENCE & PERFORMANCE SECRETS:\n";
-        groupedDocs.posts.slice(0, 4).forEach((doc, index) => { // Top 4 most relevant posts for deeper analysis
+        context += "Recent Posts and Engagement:\n";
+        groupedDocs.posts.slice(0, 4).forEach((doc, index) => {
           const performance = doc.metadata.totalEngagement || 0;
           const likes = doc.metadata.likes || 0;
-          const viralScore = performance > 10000 ? "🚀 VIRAL" : performance > 5000 ? "📈 HIGH-PERFORMING" : "📊 STANDARD";
-          context += `${viralScore} | ${doc.content}\n`;
-          if (performance > 0) {
-            context += `💡 ENGAGEMENT BREAKDOWN: ${likes.toLocaleString()} likes | ${(doc.metadata.comments || 0).toLocaleString()} comments | Total: ${performance.toLocaleString()}\n\n`;
-          } else {
-            context += `\n`;
+          const comments = doc.metadata.comments || 0;
+          
+          // Extract the actual post caption from the content
+          let postCaption = '';
+          const contentLines = doc.content.split('\n');
+          const contentLine = contentLines.find(line => line.startsWith('Content:'));
+          if (contentLine) {
+            postCaption = contentLine.replace('Content:', '').trim();
           }
+          
+          context += `Post ${index + 1}: "${postCaption}"\n`;
+          if (performance > 0) {
+            context += `Engagement: ${likes.toLocaleString()} likes, ${comments.toLocaleString()} comments, Total: ${performance.toLocaleString()}\n`;
+          }
+          context += "\n";
         });
-        context += "📈 CONTENT STRATEGY INSIGHTS: These posts reveal successful content patterns and engagement strategies that resonate with the target audience.\n\n";
+        
+        // Find and highlight the most engaging post
+        const mostEngaging = groupedDocs.posts.reduce((max, post) => 
+          (post.metadata.totalEngagement || 0) > (max.metadata.totalEngagement || 0) ? post : max
+        );
+        
+        if (mostEngaging && mostEngaging.metadata.totalEngagement > 0) {
+          const contentLines = mostEngaging.content.split('\n');
+          const contentLine = contentLines.find(line => line.startsWith('Content:'));
+          const caption = contentLine ? contentLine.replace('Content:', '').trim() : '';
+          
+          context += `Most Engaging Post: "${caption}"\n`;
+          context += `Performance: ${mostEngaging.metadata.likes.toLocaleString()} likes, ${mostEngaging.metadata.comments.toLocaleString()} comments\n`;
+          context += `Total Engagement: ${mostEngaging.metadata.totalEngagement.toLocaleString()}\n\n`;
+        }
       }
 
-      // Engagement context with growth projections
+      // Engagement context - just the numbers
       if (groupedDocs.engagement.length > 0) {
-        context += "📈 ENGAGEMENT SCIENCE & GROWTH PROJECTIONS:\n";
+        context += "Engagement Metrics:\n";
         groupedDocs.engagement.forEach(doc => {
-          context += `${doc.content}\n\n`;
+          const cleanContent = doc.content
+            .replace(/📈|📊|💡|🚀/g, '')
+            .replace(/GROWTH PROJECTIONS|ENGAGEMENT SCIENCE/gi, '')
+            .trim();
+          context += `${cleanContent}\n`;
         });
-        context += "📊 GROWTH ANALYSIS: Based on current engagement patterns, this account shows strong potential for significant follower growth with optimized content strategy.\n\n";
+        context += "\n";
       }
 
-      // Enhanced intelligence summary
-      const avgRelevance = (relevantDocs.reduce((sum, doc) => sum + doc.relevance, 0) / relevantDocs.length);
-      const documentTypes = Object.keys(groupedDocs).filter(key => groupedDocs[key].length > 0);
-      
-      context += `📋 ANALYSIS SUMMARY:\n`;
-      context += `🎯 Data Confidence: ${(avgRelevance * 100).toFixed(0)}% (High Quality)\n`;
-      context += `📊 Analysis Depth: ${relevantDocs.length} data points across ${documentTypes.length} strategic categories\n`;
-      context += `🚀 Strategic Focus: ${documentTypes.join(' + ')} = Comprehensive Brand Analysis\n`;
-      context += `💡 Recommendation Level: Professional insights ready for strategic implementation\n\n`;
+      // Simple summary without business jargon
+      context += `Analysis based on ${relevantDocs.length} relevant data points from the ${username} account.\n`;
 
       console.log(`[ChromaDB] Enhanced context created with ${relevantDocs.length} relevant documents`);
       return context;

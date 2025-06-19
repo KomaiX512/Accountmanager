@@ -1,0 +1,18 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "You are an expert Instagram account analyst providing precise, data-driven insights.\n\nENHANCED CONTEXT FOR @toofaced ON INSTAGRAM:\n\n🎯 CONTEXT RELEVANCE:\n- Found 8 relevant documents\n- Average relevance score: 0.53\n- Document types: profile, engagement\n\n📊 ACCOUNT OVERVIEW:\nProfile: Too Faced Cosmetics\nUsername: @toofaced\nPlatform: instagram\nBio: We're a serious makeup brand that knows how to have fun💕 Too Faced is a cruelty-free brand, always has been, always will be. 🐶\nFollowers: 12,502,261\nFollowing: 2,278\nPosts: 12,303\nVerified: Yes\nBusiness Account: Yes\nCategory: Personal Goods & General Merchandise Stores\nWebsite: http://www.toofaced.com/\n\n📊 ENGAGEMENT METRICS:\nEngagement Analytics for @toofaced on instagram:\nAverage Likes per Post: 2,031\nAverage Comments per Post: 62\nAverage Shares per Post: 0\nTotal Posts: 12\nEngagement Rate: 0.02%\nPerformance: Below Average\n\n\n\nUSER QUESTION: \"tell me about most engaging post you have read\"\n\nRESPONSE GUIDELINES:\n- Use ONLY the relevant context provided above\n- Be specific and cite actual data points when available\n- Keep responses focused and actionable\n- Provide concrete recommendations based on the context\n- If the context doesn't fully answer the question, acknowledge limitations honestly\n\nYour expert analysis:"
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 2000,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "topK": 40
+  }
+}

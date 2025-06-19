@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Based on the data provided, the most engaging post is: \"Meet our Ribbon Wrapped Lash Mascara, the ultimate solution for achieving extreme length and dramatic separation! The Lash Extension™ Brush is designed to reach every lash type, giving you volume and curl that lasts This unique tubing formula wraps your lashes for up to 24 hours of flawless wear—no smudging, clumping, or flaking Be the first to shop on toofaced.com tomorrow! #toofaced #tfcrueltyfree\".\n\nThis post received 8,188 likes and 126 comments, resulting in a total engagement of 8,314.\n\nFrom this, we can learn that posts highlighting new mascara products and emphasizing benefits like \"extreme length and dramatic separation,\" \"volume and curl that lasts,\" and \"24 hours of flawless wear\" resonate strongly with the @toofaced audience. The inclusion of specific features like the \"Lash Extension™ Brush\" and the promise of no \"smudging, clumping, or flaking\" likely contributed to the high engagement. The call to action to \"Be the first to shop on toofaced.com tomorrow!\" also likely drove engagement.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.09484127589634486
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 851,
+    "candidatesTokenCount": 245,
+    "totalTokenCount": 1096,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 851
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 245
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "iU5UaNW-I9aP1PIP6b2fqAs"
+}

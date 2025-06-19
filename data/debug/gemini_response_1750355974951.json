@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "\nBased on the provided data for @toofaced, the most engaging recent post is: \"Meet our Ribbon Wrapped Lash Mascara, the ultimate solution for achieving extreme length and dramatic separation! The Lash Extension™ Brush is designed to reach every lash type, giving you volume and curl that lasts This unique tubing formula wraps your lashes for up to 24 hours of flawless wear—no smudging, clumping, or flaking Be the first to shop on toofaced.com tomorrow! #toofaced #tfcrueltyfree\". This post received 8,188 likes and 126 comments, for a total engagement of 8,314.\n\nOther recent posts include:\n\n*   \"Kissing Jelly just found it's perfect match! Our NEW Kissing Juicy Tint delivers the perfect pop of color, and our Kissing Jelly takes shine to the next level. Together? Total lip goals Shop the collection now on toofaced.com or tap to shop! \" which received 1,410 likes and 28 comments, totaling 1,438 in engagement.\n*   \"Not my house, but I know where the new Ribbon Wrapped Lash Mascara lives and pays rent @sephora #toofaced #tfcrueltyfree\" which received 1,563 likes and 16 comments, totaling 1,579 in engagement.\n*   \"Get ready to unwrap the secret to your best lashes yet! Our NEW Ribbon Wrapped Lash Extreme Tubing Mascara is almost here!! This mascara delivers extreme length and separation for up to 24 hours for all lash types! No smudging, clumping, or flaking—just stunning lashes that last! Be the first to shop our new mascara when it drops tomorrow!\" which received 4,824 likes and 163 comments, totaling 4,987 in engagement.\n\nThe average likes per post is 2,031 and the average comments per post is 62. The engagement rate is 0.02%, which is considered below average.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.02424511811280414
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 786,
+    "candidatesTokenCount": 437,
+    "totalTokenCount": 1223,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 786
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 437
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "BFBUaLGzCemnmecPybvP0AI"
+}

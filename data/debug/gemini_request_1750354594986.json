@@ -1,0 +1,18 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "You are a social media data analyst. You have been provided with SPECIFIC, REAL DATA about the instagram account @fentybeauty. This data includes actual post content, engagement metrics, and performance statistics.\n\nYOUR TASK: Answer the user's question using ONLY the provided data below. You MUST reference specific numbers, captions, and metrics from the data provided.\n\n===== REAL ACCOUNT DATA FOR @fentybeauty =====\nProfile Analysis Data for fentybeauty on instagram: Account Information: Profile: FENTY BEAUTY BY RIHANNA Username: @fentybeauty Platform: instagram Bio: Shop online & worldwide at Sephora, Ulta Beauty, Harvey Nichols, Selfridges, Boots & select Asia duty free shops Tag us #FENTYBEAUTY ️ #CrueltyFree Followers: 13,256,392 Following: 1,126 Posts: 11,673 Verified: Yes Business Account: Yes Category: None,Health/beauty Website: https://likeshop.me/fentybeauty Recent Posts and Engagement: Post 1: \"@lookfantastic, your one stop shop for complexion perfection & the prettiest pout From foundation to the glossiest glosses @fentybeauty & @fentyskin have you covered with the most iconic Fenty formulas \" Engagement: 7,896 likes, 39 comments, Total: 7,935 Post 2: \"POV: It's 2018 and @badgalriri just dropped THE glowy product of the summer \" Engagement: 7,160 likes, 81 comments, Total: 7,241 Post 3: \"How we’re showing up to the function: \" Engagement: 10,228 likes, 99 comments, Total: 10,327 Post 4: \"Sp'oil your lips like @badgalriri \" Engagement: 67,131 likes, 437 comments, Total: 67,568 Most Engaging Post: \"Sp'oil your lips like @badgalriri \" Performance: 67,131 likes, 437 comments Total Engagement: 67,568 Analysis based on 8 relevant data points from the fentybeauty account.\n===== END OF REAL DATA =====\n\nUser Question: \"give me the most engaging post with caption, likes and comments\"\n\nINSTRUCTIONS:\n1. You MUST use the specific post data provided above\n2. You MUST quote actual captions from the \"Recent Posts and Engagement\" section\n3. You MUST include the exact engagement numbers (likes, comments, totals)\n4. You MUST reference the \"Most Engaging Post\" data if it exists\n5. DO NOT claim you lack data - all necessary data is provided above\n6. Answer based EXCLUSIVELY on the provided account data\n\nProvide a detailed response that directly uses the post content and engagement metrics shown above."
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 2000,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "topK": 40
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "username": "toofaced",
+  "platform": "instagram",
+  "timestamp": "2025-06-19T08:24:27.644Z",
+  "notification": {
+    "type": "message",
+    "instagram_user_id": "17841471786269325",
+    "sender_id": "679240224685804",
+    "message_id": "aWdfZAG1faXRlbToxOklHTWVzc2FnZAUlEOjE3ODQxNDcxNzg2MjY5MzI1OjM0MDI4MjM2Njg0MTcxMDMwMTI0NDI3NjAxODc5ODc2NjU1OTM1MzozMjI4NzczMTg0ODk5MTkyNjc3ODA5MDU3ODM3MTQxMTk2OAZDZD",
+    "text": "Tell me about your company",
+    "timestamp": 1750321464080,
+    "received_at": "2025-06-19T08:24:24.080Z",
+    "status": "pending",
+    "platform": "instagram"
+  },
+  "reply": "Hey there! 💕 We're Too Faced Cosmetics, a makeup brand that believes in serious glam with a playful heart. We're all about creating innovative, cruelty-free products that empower you to express yourself and feel confident. Think high-performance formulas with a touch of fun and a whole lotta pink! 🐶 We've always been cruelty-free, and we always will be!",
+  "mode": "instant",
+  "usedFallback": false,
+  "hasProfileData": true,
+  "hasConversationHistory": false
+}

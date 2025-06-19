@@ -903,54 +903,58 @@ const MainDashboard: React.FC = () => {
         </div>
 
         {activeTab === 'overview' && (
-          <>
-            <div className="instant-post-section">
-              <button 
-                className="instant-post-button"
-                onClick={openInstantPostModal}
-                title="Create a post for your platforms"
-              >
-                <div className="instant-post-icon">
-                  <svg viewBox="0 0 24 24">
-                    <path d="M3,20V4A1,1 0 0,1 4,3H20A1,1 0 0,1 21,4V20A1,1 0 0,1 20,21H4A1,1 0 0,1 3,20M5,19H19V5H5V19M7.5,17L9.5,14L11.5,16.5L14.5,12.5L18.5,17H7.5Z" />
-                  </svg>
-                </div>
-                <div className="instant-post-text">
-                  <h3>Instant Post</h3>
-                  <p>Create one post for all your connected platforms</p>
-                </div>
-                {connectedPlatforms.length > 0 && (
-                  <div className="connected-platforms-count">
-                    <span>{connectedPlatforms.length} connected</span>
-                  </div>
-                )}
-              </button>
-            </div>
-
-            {/* AI Autonomous Account Manager Preview Section */}
-            <div className="ai-manager-preview-section">
-              <div className="ai-manager-preview">
-                <div className="ai-manager-content">
-                  <div className="ai-manager-icon">
+          <div className="dashboard-content-grid">
+            {/* Action Buttons Section - Premium Layout */}
+            <div className="action-buttons-section">
+              <div className="instant-post-section">
+                <button 
+                  className="instant-post-button"
+                  onClick={openInstantPostModal}
+                  title="Create a post for your platforms"
+                >
+                  <div className="instant-post-icon">
                     <svg viewBox="0 0 24 24">
-                      <path d="M12,2A2,2 0 0,1 14,4C14,4.74 13.6,5.39 13,5.73V7H14A7,7 0 0,1 21,14H22A1,1 0 0,1 23,15V18A1,1 0 0,1 22,19H21V20A2,2 0 0,1 19,22H5A2,2 0 0,1 3,20V19H2A1,1 0 0,1 1,18V15A1,1 0 0,1 2,14H3A7,7 0 0,1 10,7H11V5.73C10.4,5.39 10,4.74 10,4A2,2 0 0,1 12,2M7.5,13A2.5,2.5 0 0,0 5,15.5A2.5,2.5 0 0,0 7.5,18A2.5,2.5 0 0,0 10,15.5A2.5,2.5 0 0,0 7.5,13M16.5,13A2.5,2.5 0 0,0 14,15.5A2.5,2.5 0 0,0 16.5,18A2.5,2.5 0 0,0 19,15.5A2.5,2.5 0 0,0 16.5,13Z" />
+                      <path d="M3,20V4A1,1 0 0,1 4,3H20A1,1 0 0,1 21,4V20A1,1 0 0,1 20,21H4A1,1 0 0,1 3,20M5,19H19V5H5V19M7.5,17L9.5,14L11.5,16.5L14.5,12.5L18.5,17H7.5Z" />
                     </svg>
                   </div>
-                  <div className="ai-manager-text">
-                    <h3>AI Autonomous Account Manager</h3>
-                    <p>Delegate campaigns, real-time tasks, or engagement workflows to your AI Manager—seamlessly autonomous.</p>
+                  <div className="instant-post-text">
+                    <h3>Instant Post</h3>
+                    <p>Create one post for all your connected platforms</p>
                   </div>
-                </div>
-                <button 
-                  className={`wishlist-button ${isWishlistAdded ? 'added' : ''}`}
-                  onClick={handleWishlistClick}
-                  disabled={isWishlistAdded}
-                >
-                  {isWishlistAdded ? '✓ Added to Wishlist' : '+ Add to Wishlist'}
+                  {connectedPlatforms.length > 0 && (
+                    <div className="connected-platforms-count">
+                      <span>{connectedPlatforms.length} connected</span>
+                    </div>
+                  )}
                 </button>
+              </div>
+
+              {/* AI Autonomous Account Manager Preview Section */}
+              <div className="ai-manager-preview-section">
+                <div className="ai-manager-preview">
+                  <div className="ai-manager-content">
+                    <div className="ai-manager-icon">
+                      <svg viewBox="0 0 24 24">
+                        <path d="M12,2A2,2 0 0,1 14,4C14,4.74 13.6,5.39 13,5.73V7H14A7,7 0 0,1 21,14H22A1,1 0 0,1 23,15V18A1,1 0 0,1 22,19H21V20A2,2 0 0,1 19,22H5A2,2 0 0,1 3,20V19H2A1,1 0 0,1 1,18V15A1,1 0 0,1 2,14H3A7,7 0 0,1 10,7H11V5.73C10.4,5.39 10,4.74 10,4A2,2 0 0,1 12,2M7.5,13A2.5,2.5 0 0,0 5,15.5A2.5,2.5 0 0,0 7.5,18A2.5,2.5 0 0,0 10,15.5A2.5,2.5 0 0,0 7.5,13M16.5,13A2.5,2.5 0 0,0 14,15.5A2.5,2.5 0 0,0 16.5,18A2.5,2.5 0 0,0 19,15.5A2.5,2.5 0 0,0 16.5,13Z" />
+                      </svg>
+                    </div>
+                    <div className="ai-manager-text">
+                      <h3>AI Autonomous Account Manager</h3>
+                      <p>Delegate campaigns, real-time tasks, or engagement workflows to your AI Manager—seamlessly autonomous.</p>
+                    </div>
+                  </div>
+                  <button 
+                    className={`wishlist-button ${isWishlistAdded ? 'added' : ''}`}
+                    onClick={handleWishlistClick}
+                    disabled={isWishlistAdded}
+                  >
+                    {isWishlistAdded ? '✓ Added to Wishlist' : '+ Add to Wishlist'}
+                  </button>
+                </div>
               </div>
             </div>
             
+            {/* Platform Cards Grid - Perfect Square Layout */}
             <div className="platforms-container">
               {sortedPlatforms.map(platform => (
                 <div 
@@ -961,7 +965,7 @@ const MainDashboard: React.FC = () => {
                     className="clickable-area"
                     onClick={() => platform.claimed ? navigateToPlatform(platform) : navigateToSetup(platform.id)}
                   >
-                    <div className="platform-icon reduced">
+                    <div className="platform-icon">
                       <img 
                         src={platform.icon} 
                         alt={`${platform.name} icon`}
@@ -980,7 +984,7 @@ const MainDashboard: React.FC = () => {
                   </div>
                   
                   <div className="platform-info">
-                    <div className="status-indicators aligned">
+                    <div className="status-indicators">
                       <div 
                         className={`status-indicator ${platform.claimed ? 'claimed' : 'unclaimed'}`}
                       >
@@ -1013,22 +1017,22 @@ const MainDashboard: React.FC = () => {
                 </div>
               ))}
             </div>
-            
-            {/* Platform-specific post components */}
-            {showInstagramScheduler && instagramUserId && (
-              <PostScheduler 
-                userId={instagramUserId}
-                onClose={() => setShowInstagramScheduler(false)}
-              />
-            )}
-            
-            {showTwitterComposer && twitterUserId && (
-              <TwitterCompose 
-                userId={twitterUserId}
-                onClose={() => setShowTwitterComposer(false)}
-              />
-            )}
-          </>
+          </div>
+        )}
+        
+        {/* Platform-specific post components */}
+        {showInstagramScheduler && instagramUserId && (
+          <PostScheduler 
+            userId={instagramUserId}
+            onClose={() => setShowInstagramScheduler(false)}
+          />
+        )}
+        
+        {showTwitterComposer && twitterUserId && (
+          <TwitterCompose 
+            userId={twitterUserId}
+            onClose={() => setShowTwitterComposer(false)}
+          />
         )}
         
         {activeTab === 'usage' && (

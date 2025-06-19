@@ -15,18 +15,24 @@
   transition: all 0.3s ease;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  box-sizing: border-box;
 }
 
 .social-icons {
   display: flex;
-  gap: 20px;
+  gap: 15px;
   height: 70px;
+  max-height: 70px;
   align-items: center;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .social-icon {
-  width: 40px;
-  height: 40px;
+  width: 60px;
+  height: 60px;
   color: rgba(255, 255, 255, 0.7);
   transition: all 0.2s ease;
   cursor: pointer;
@@ -34,8 +40,10 @@
   align-items: center;
   justify-content: center;
   position: relative;
-  border-radius: 8px;
+  border-radius: 10px;
   background: transparent;
+  box-sizing: border-box;
+  margin: 5px 0;
 }
 
 .social-icon:hover {
@@ -50,17 +58,17 @@
 .social-icon.active::after {
   content: '';
   position: absolute;
-  bottom: -15px;
+  bottom: -5px;
   left: 50%;
   transform: translateX(-50%);
-  width: 20px;
+  width: 30px;
   height: 2px;
   background-color: #fff;
 }
 
 .social-icon svg {
-  width: 20px;
-  height: 20px;
+  width: 36px;
+  height: 36px;
   fill: currentColor;
 }
 
@@ -160,37 +168,62 @@
   gap: clamp(15px, 3vw, 20px);
 }
 
-/* Home button on platform pages */
-.home-button {
+/* Dashboard button on platform pages */
+.dashboard-button {
+  color: #e0e0ff;
+  text-decoration: none;
+  font-size: clamp(0.9rem, 2.2vw, 1.1rem);
+  font-weight: 700;
+  padding: clamp(10px, 2.5vw, 12px) clamp(16px, 4vw, 20px);
+  border-radius: clamp(8px, 2vw, 10px);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
   display: flex;
   align-items: center;
-  gap: clamp(6px, 1.5vw, 8px);
-  color: #00ffcc;
-  transition: all 0.2s ease;
-  cursor: pointer;
-  padding: clamp(6px, 1.5vw, 8px) clamp(10px, 2.5vw, 12px);
-  background: rgba(0, 255, 204, 0.1);
-  border-radius: clamp(16px, 4vw, 20px);
-  border: 1px solid rgba(0, 255, 204, 0.3);
-  font-size: clamp(0.75rem, 1.8vw, 0.85rem);
-  font-weight: 600;
+  gap: 8px;
 }
 
-.home-button:hover {
-  background: rgba(0, 255, 204, 0.2);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 255, 204, 0.3);
+.dashboard-button:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
 }
 
-.home-button svg {
-  width: clamp(14px, 3vw, 16px);
-  height: clamp(14px, 3vw, 16px);
+.dashboard-button::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.5);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateX(-50%);
+  opacity: 0;
+  border-radius: 1px;
+}
+
+.dashboard-button:hover::after {
+  width: 30%;
+  opacity: 1;
+}
+
+.dashboard-button svg {
+  width: 18px;
+  height: 18px;
   fill: currentColor;
 }
 
-.home-button span {
-  font-size: clamp(0.75rem, 1.8vw, 0.85rem);
-  font-weight: 600;
+.dashboard-button span {
+  font-size: inherit;
+  font-weight: inherit;
 }
 
 /* Dashboard icon styles - deprecated, replaced by home-button */
@@ -248,18 +281,19 @@
   }
   
   .social-icons {
-    gap: 15px;
+    gap: 12px;
     height: 60px;
+    max-height: 60px;
   }
   
   .social-icon {
-    width: 35px;
-    height: 35px;
+    width: 60px;
+    height: 60px;
   }
   
   .social-icon svg {
-    width: 18px;
-    height: 18px;
+    width: 30px;
+    height: 30px;
   }
   
   .logo-image {
@@ -279,28 +313,25 @@
     font-size: clamp(1rem, 2.5vw, 1.1rem);
   }
   
-  .home-button {
-    padding: clamp(5px, 1.2vw, 6px) clamp(8px, 2vw, 10px);
-  }
-  
-  .home-button span {
-    font-size: clamp(0.65rem, 1.6vw, 0.75rem);
+  .dashboard-button {
+    padding: clamp(8px, 2vw, 10px) clamp(12px, 3vw, 16px);
+    font-size: clamp(0.85rem, 2vw, 0.95rem);
   }
 }
 
 @media (max-width: 480px) {
   .social-icons {
-    gap: 10px;
+    gap: 8px;
   }
   
   .social-icon {
-    width: 32px;
-    height: 32px;
+    width: 50px;
+    height: 50px;
   }
   
   .social-icon svg {
-    width: 16px;
-    height: 16px;
+    width: 26px;
+    height: 26px;
   }
   
   .logo-image {
@@ -316,26 +347,23 @@
     font-size: clamp(0.7rem, 1.6vw, 0.8rem);
   }
   
-  .home-button {
-    padding: clamp(4px, 1vw, 5px) clamp(6px, 1.5vw, 8px);
+  .dashboard-button {
+    padding: clamp(6px, 1.5vw, 8px) clamp(10px, 2.5vw, 12px);
+    font-size: clamp(0.75rem, 1.8vw, 0.85rem);
     gap: clamp(4px, 1vw, 6px);
   }
   
-  .home-button svg {
-    width: clamp(12px, 2.5vw, 14px);
-    height: clamp(12px, 2.5vw, 14px);
-  }
-  
-  .home-button span {
-    font-size: clamp(0.6rem, 1.4vw, 0.7rem);
+  .dashboard-button svg {
+    width: clamp(14px, 2.5vw, 16px);
+    height: clamp(14px, 2.5vw, 16px);
   }
 }
 
 /* Ultra-small screens */
 @media (max-width: 360px) {
   .social-icon {
-    width: clamp(30px, 6vw, 38px);
-    height: clamp(30px, 6vw, 38px);
+    width: clamp(40px, 8vw, 50px);
+    height: clamp(40px, 8vw, 50px);
   }
   
   .logo-image {

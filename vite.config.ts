@@ -46,6 +46,12 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      // Direct post-generator endpoint (also needs to go to RAG server)
+      '/api/post-generator': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false,
+      },
       '/api/rag/health': {
         target: 'http://localhost:3001',
         changeOrigin: true,

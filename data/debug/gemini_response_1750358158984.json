@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Okay, here's an Instagram post draft based on the provided Too Faced data, focusing on replicating the success of the \"Ribbon Wrapped Lash Extreme Tubing Mascara\" post, which had the highest engagement:\n\n**Caption:**\n\nGet ready for lashes that WOW! ✨ Our NEW Ribbon Wrapped Lash Extreme Tubing Mascara is HERE! 🎀 This game-changing formula delivers extreme length & separation that lasts up to 24 hours. Say goodbye to smudging, clumping, and flaking – hello to stunning, all-day lashes! 😍\n\nPerfect for ALL lash types, this mascara will be your new go-to for a flawless, wide-eyed look. Ready to unwrap your best lashes yet?\n\nShop now on toofaced.com or tap the link in bio! #toofaced #tfcrueltyfree\n\n**Hashtags:**\n\n#toofaced #mascara #newmakeup #lashes #lashgoals #crueltyfreebeauty #makeup #beauty #makeuplover #tfcrueltyfree\n\n**Call to Action:**\n\nShop now on toofaced.com or tap the link in bio! Let us know what you think in the comments below! 👇\n\n**Visual Description for Image:**\n\nThe image showcases the new Ribbon Wrapped Lash Extreme Tubing Mascara in a visually appealing and enticing way. The background is a soft, diffused pink, creating a feminine and playful mood. In the foreground, the mascara tube is prominently displayed, its sleek, black packaging accented with a delicate, shimmering pink ribbon detail wrapped around the center. The product is positioned slightly off-center, drawing the eye towards the wand, which is partially extended to reveal its unique bristle design.\n\nAround the mascara tube, several long, dramatic eyelashes are artfully arranged, showcasing the potential results of using the product. These lashes are dark, defined, and separated, demonstrating the mascara's lengthening and volumizing capabilities. The lighting is soft and diffused, highlighting the glossy finish of the mascara and the delicate details of the ribbon.\n\nThe overall composition is clean and modern, with a focus on showcasing the product's key features and benefits. The color palette is primarily pink and black, creating a visually striking contrast that is both feminine and sophisticated. The image evokes a sense of luxury and glamour, inviting viewers to experience the transformative power of the Ribbon Wrapped Lash Extreme Tubing Mascara. The image should be high-resolution and professionally lit to convey the quality and effectiveness of the product.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.22506823292766434
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 950,
+    "candidatesTokenCount": 502,
+    "totalTokenCount": 1452,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 950
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 502
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "i1hUaO3hCNm7nvgPwanEyQg"
+}

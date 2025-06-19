@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "The most engaging post is: \"Get ready to unwrap the secret to your best lashes yet! Our NEW Ribbon Wrapped Lash Extreme Tubing Mascara is almost here!! This mascara delivers extreme length and separation for up to 24 hours for all lash types! No smudging, clumping, or flaking—just stunning lashes that last! Be the first to shop our new mascara when it drops tomorrow!\"\n\nThis post received 4,824 likes and 163 comments, for a total engagement of 4,987.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.021607871604176748
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 847,
+    "candidatesTokenCount": 113,
+    "totalTokenCount": 960,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 847
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 113
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "LVRUaI-fFMf3ld8Pqd7q0Ao"
+}

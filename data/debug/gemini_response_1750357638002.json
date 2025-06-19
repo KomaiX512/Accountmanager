@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption: ✨Glow up your feed with our best-selling Better Than Sex Mascara!💖 This iconic formula delivers dramatic volume and intense length for lashes that are truly unforgettable. Ready to unleash your inner bombshell? 😉\n\nHashtags: #BetterThanSexMascara #TooFaced #LashGoals #MakeupObsessed #BeautyMustHave #GlamMakeup #MascaraMagic #MakeupLover #BeautyCommunity #IconicMakeup\n\nCall to Action: Tap the link in bio to shop now and experience the magic! ✨\n\nVisual Description for Image: A close-up, highly detailed shot of a woman's eye and lashes, showcasing the dramatic effect of the Better Than Sex Mascara. The woman has fair skin with a subtle, dewy glow. Her eye is a captivating shade of blue, framed by perfectly sculpted eyebrows. The focus is intensely on her lashes, which are thick, voluminous, and jet black, demonstrating the mascara's lengthening and thickening capabilities. The background is a soft, blurred gradient of pink and gold, creating a luxurious and feminine feel. The lighting is soft and diffused, highlighting the texture and definition of the lashes without harsh shadows. The mascara wand is subtly visible in the lower corner, partially obscured by the lashes, hinting at the product's application. The overall mood is glamorous, confident, and alluring, with a touch of playful femininity. The image should be high-resolution and visually striking, capturing the essence of the Too Faced brand. The style should be modern and clean, with a focus on showcasing the product's effectiveness.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.35968833633616
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 275,
+    "candidatesTokenCount": 316,
+    "totalTokenCount": 591,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 275
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 316
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "glZUaJOJHsnY1PIPhKXiuQ0"
+}

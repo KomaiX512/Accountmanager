@@ -65,7 +65,7 @@ start_service() {
 start_service "RAG Server" "node rag-server.js" 3001 "rag-server-unified.log"
 start_service "Main Server" "cd server && node server.js" 3000 "main-server-unified.log"
 start_service "Image Server" "node server.js" 3002 "server-unified.log"
-start_service "Frontend" "npm run dev" 5173 "frontend-unified.log"
+start_service "Frontend" "npm run frontend" 5173 "frontend-unified.log"
 
 echo ""
 echo "✅ All services started successfully!"

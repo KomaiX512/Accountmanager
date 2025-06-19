@@ -140,26 +140,82 @@ export const fetchImageFromR2 = async (
   platform: string = 'instagram'
 ): Promise<Blob | null> => {
   try {
-    // Use direct R2 endpoint (proven to work)
-    const directImageUrl = `http://localhost:3000/api/r2-image/${username}/${imageKey}?platform=${platform}`;
-    console.log(`[ScheduleHelper] Fetching image from R2: ${directImageUrl}`);
+    console.log(`[ScheduleHelper] 📤 Fetching image: ${imageKey} for platform: ${platform}`);
     
-    const response = await fetch(directImageUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch image: ${response.status}`);
+    // Try multiple endpoints with fallbacks (same approach as PostCooked.tsx)
+    const endpoints = [
+      // Primary: Direct R2 endpoint with cache busting
+      `http://localhost:3000/api/r2-image/${username}/${imageKey}?platform=${platform}&t=${Date.now()}`,
+      // Fallback 1: Fix-image endpoint
+      `http://localhost:3000/fix-image/${username}/${imageKey}?platform=${platform}`,
+      // Fallback 2: Direct R2 without cache busting
+      `http://localhost:3000/api/r2-image/${username}/${imageKey}?platform=${platform}`
+    ];
+    
+    let lastError: Error | null = null;
+    
+    for (let i = 0; i < endpoints.length; i++) {
+      const endpoint = endpoints[i];
+      console.log(`[ScheduleHelper] 🎯 Trying endpoint ${i + 1}/${endpoints.length}: ${endpoint}`);
+      
+      try {
+        const response = await fetch(endpoint, {
+          method: 'GET',
+          headers: {
+            'Accept': 'image/*,*/*',
+            'Cache-Control': 'no-cache'
+          }
+        });
+        
+        console.log(`[ScheduleHelper] 📊 Response ${i + 1}: Status ${response.status}, Content-Type: ${response.headers.get('content-type')}`);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        // Check content type
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.startsWith('image/') && !contentType.includes('octet-stream')) {
+          // If we get HTML or text, log it for debugging but try next endpoint
+          if (contentType.includes('text/html')) {
+            const htmlContent = await response.text();
+            console.warn(`[ScheduleHelper] ⚠️ Endpoint ${i + 1} returned HTML (probably error page): ${htmlContent.substring(0, 200)}...`);
+            throw new Error(`Invalid content type: ${contentType} (HTML error page)`);
+          }
+          throw new Error(`Invalid content type: ${contentType}. Expected image data.`);
+        }
+        
+        const imageBlob = await response.blob();
+        
+        // Validate image blob
+        if (!imageBlob || imageBlob.size === 0) {
+          throw new Error('Empty image blob received');
+        }
+        
+        if (imageBlob.size < 100) {
+          throw new Error(`Image too small: ${imageBlob.size} bytes (likely corrupted)`);
+        }
+        
+        // Validate image type
+        if (!['image/jpeg', 'image/png', 'image/webp', 'application/octet-stream'].includes(imageBlob.type)) {
+          console.warn(`[ScheduleHelper] ⚠️ Unusual blob type: ${imageBlob.type}, but proceeding`);
+        }
+        
+        console.log(`[ScheduleHelper] ✅ Image fetched successfully from endpoint ${i + 1}: ${imageBlob.size} bytes, type: ${imageBlob.type}`);
+        return imageBlob;
+        
+      } catch (endpointError: any) {
+        console.warn(`[ScheduleHelper] ⚠️ Endpoint ${i + 1} failed: ${endpointError.message}`);
+        lastError = endpointError;
+        continue;
+      }
     }
     
-    const imageBlob = await response.blob();
-    console.log(`[ScheduleHelper] Image fetched successfully (${imageBlob.size} bytes, type: ${imageBlob.type})`);
+    // All endpoints failed
+    throw new Error(`All ${endpoints.length} endpoints failed. Last error: ${lastError?.message || 'Unknown error'}`);
     
-    // Validate image type
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(imageBlob.type)) {
-      throw new Error(`Invalid image type: ${imageBlob.type}`);
-    }
-    
-    return imageBlob;
-  } catch (error) {
-    console.error(`[ScheduleHelper] Failed to fetch image ${imageKey}:`, error);
+  } catch (error: any) {
+    console.error(`[ScheduleHelper] ❌ Failed to fetch image ${imageKey}:`, error.message);
     return null;
   }
 };

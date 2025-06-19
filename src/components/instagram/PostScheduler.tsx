@@ -98,7 +98,7 @@ const PostScheduler: React.FC<PostSchedulerProps> = ({ userId, onClose, platform
         return;
       }
       
-      // Use smart reusable schedule helper
+      // Use smart reusable schedule helper with enhanced error handling
       const result = await schedulePost({
         platform,
         userId: userIdToUse,

@@ -133,20 +133,105 @@ function getAdminS3Client() {
   return client;
 }
 
-// Enterprise-grade S3 client with perfect AWS SDK v2 compatibility
+// Add v2-style helper methods to native S3Client prototype so that
+// getAdminS3Client()\.getObject / putObject etc. work even though we are
+// using the AWS SDK v3 underneath.  This keeps call-sites unchanged.
+if (!S3Client.prototype.getObject) {
+  const streamToBuffer = async (stream) =>
+    new Promise((resolve, reject) => {
+      const chunks = [];
+      stream.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+      stream.on('error', reject);
+      stream.on('end', () => resolve(Buffer.concat(chunks)));
+    });
+
+  S3Client.prototype.getObject = function (params) {
+    return {
+      promise: async () => {
+        try {
+          const response = await this.send(new GetObjectCommand(params));
+          let bodyBuffer;
+          if (typeof response.Body === 'string' || response.Body instanceof Uint8Array) {
+            bodyBuffer = Buffer.from(response.Body);
+          } else if (response.Body && typeof response.Body.transformToString === 'function') {
+            const str = await response.Body.transformToString('utf-8');
+            bodyBuffer = Buffer.from(str);
+          } else if (response.Body) {
+            bodyBuffer = await streamToBuffer(response.Body);
+          } else {
+            bodyBuffer = Buffer.alloc(0);
+          }
+          return { ...response, Body: bodyBuffer };
+        } catch (err) {
+          // Normalise AWS SDK v3 error object to look like v2 (code property)
+          if (err && err.Code && !err.code) err.code = err.Code;
+          throw err;
+        }
+      },
+    };
+  };
+
+  S3Client.prototype.putObject = function (params) {
+    return {
+      promise: async () => this.send(new PutObjectCommand(params)),
+    };
+  };
+
+  const listObjectsImpl = function (params) {
+    return {
+      promise: async () => this.send(new ListObjectsV2Command(params)),
+    };
+  };
+  S3Client.prototype.listObjectsV2 = listObjectsImpl;
+  S3Client.prototype.listObjects = listObjectsImpl;
+
+  S3Client.prototype.deleteObject = function (params) {
+    return {
+      promise: async () => this.send(new DeleteObjectCommand(params)),
+    };
+  };
+}
+
+// Update the existing pool-aware s3Client wrapper so that Body is returned as
+// a Buffer (not a stream) for full backwards compatibility with JSON.parse etc.
+// ... existing code ...
 const s3Client = {
   getObject(params) {
     return {
       promise: async () => {
-        const command = new GetObjectCommand(params);
-        const response = await getS3Client().send(command);
-        return {
-          Body: response.Body,
-          ContentType: response.ContentType,
-          LastModified: response.LastModified,
-          ContentLength: response.ContentLength
-        };
-      }
+        try {
+          const command = new GetObjectCommand(params);
+          const response = await getS3Client().send(command);
+          // Ensure Body is a Buffer (v2 behaviour) regardless of what the SDK v3 returns
+          let bodyBuffer;
+          if (typeof response.Body === 'string' || response.Body instanceof Uint8Array) {
+            bodyBuffer = Buffer.from(response.Body);
+          } else if (response.Body && typeof response.Body.transformToString === 'function') {
+            const str = await response.Body.transformToString('utf-8');
+            bodyBuffer = Buffer.from(str);
+          } else if (response.Body) {
+            const streamToBuffer = async (stream) =>
+              new Promise((resolve, reject) => {
+                const chunks = [];
+                stream.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+                stream.on('error', reject);
+                stream.on('end', () => resolve(Buffer.concat(chunks)));
+              });
+            bodyBuffer = await streamToBuffer(response.Body);
+          } else {
+            bodyBuffer = Buffer.alloc(0);
+          }
+          return {
+            Body: bodyBuffer,
+            ContentType: response.ContentType,
+            LastModified: response.LastModified,
+            ContentLength: response.ContentLength,
+          };
+        } catch (err) {
+          if (err && err.Code && !err.code) err.code = err.Code;
+          throw err;
+        }
+      },
     };
   },
   putObject(params) {

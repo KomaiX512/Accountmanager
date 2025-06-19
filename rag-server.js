@@ -2302,11 +2302,33 @@ Your metrics indicate a well-established ${platformName} presence with good grow
   }
 });
 
-// Create the post generation prompt
-function createPostGenerationPrompt(profileData, rulesData, query, platform = 'instagram') {
+// 🚀 ENHANCED Post Generation Prompt with ChromaDB semantic search
+async function createEnhancedPostGenerationPrompt(profileData, rulesData, query, platform = 'instagram', username = 'user') {
   const platformName = platform === 'twitter' ? 'X (Twitter)' : 
                       platform === 'facebook' ? 'Facebook' : 
                       'Instagram';
+  
+  console.log(`[RAG-Server] 🚀 Creating ENHANCED POST GENERATION prompt with ChromaDB semantic search for ${platform}/${username}`);
+  
+  // 🔥 STEP 1: Get semantically relevant context using ChromaDB
+  let enhancedContext = '';
+  try {
+    if (chromaDBInitialized) {
+      console.log(`[RAG-Server] 🔍 Performing semantic search for post generation: "${query}"`);
+      enhancedContext = await chromaDBService.createEnhancedContext(query, username, platform);
+      
+      if (enhancedContext) {
+        console.log(`[RAG-Server] ✅ Retrieved ${enhancedContext.length} characters of semantically relevant context for post creation`);
+      } else {
+        console.log(`[RAG-Server] ⚠️ No semantic context found for post generation, using traditional approach`);
+      }
+    } else {
+      console.log(`[RAG-Server] ⚠️ ChromaDB not initialized, using traditional post generation approach`);
+    }
+  } catch (error) {
+    console.error(`[RAG-Server] Error in semantic search for post generation:`, error);
+    enhancedContext = null;
+  }
   
   const characterLimit = platform === 'twitter' ? 280 : 
                         platform === 'instagram' ? 2200 : 
@@ -2320,6 +2342,47 @@ function createPostGenerationPrompt(profileData, rulesData, query, platform = 'i
                          platform === 'instagram' ? 'Make it visually appealing and Instagram-friendly' :
                          'Make it suitable for Facebook\'s diverse audience';
 
+  // 🔥 STEP 2: If we have enhanced context, use it; otherwise fallback to traditional approach
+  if (enhancedContext) {
+    console.log(`[RAG-Server] 🎯 Using ENHANCED semantic context for superior post generation quality`);
+    
+    // 🛡️ Apply content sanitization to prevent Gemini filtering
+    console.log(`[RAG-Server] 🛡️ Applying AGGRESSIVE content sanitization for post generation context...`);
+    const sanitizedContext = sanitizeContextForGemini(enhancedContext, username);
+    console.log(`[RAG-Server] 🛡️ Post generation context sanitized: ${sanitizedContext.length} chars (was ${enhancedContext.length})`);
+    
+    // Create enhanced prompt that uses real data from ChromaDB
+    return `You are a professional ${platformName} content creator for @${username}. You have been provided with SPECIFIC, REAL DATA about this account including actual post content, engagement metrics, and performance statistics.
+
+YOUR TASK: Create a high-quality ${platformName} post about "${query}" using ONLY the provided real data below.
+
+===== REAL ACCOUNT DATA FOR @${username} =====
+${sanitizedContext}
+===== END OF REAL DATA =====
+
+INSTRUCTIONS:
+1. You MUST base the post content on the actual data provided above
+2. Reference successful post patterns from the "Recent Posts and Engagement" section
+3. Use hashtags that have performed well based on the data
+4. Match the tone and style shown in the actual post content
+5. Create content that aligns with proven engagement patterns
+6. DO NOT use generic templates - use insights from the real data
+
+CREATE A ${platformName} POST WITH:
+
+Caption: [Write an engaging ${platformName} caption under ${characterLimit} characters that matches the style and themes from the real data above. ${contentGuidance}]
+
+Hashtags: [List ${hashtagGuidance} based on successful hashtags from the data above]
+
+Call to Action: [Create a call-to-action that matches engagement patterns from the real data]
+
+Visual Description for Image: [Write a detailed description for an image that aligns with the visual style and themes shown in the successful posts from the data above. Minimum 100 words with specific details about composition, colors, mood, and style that matches proven performance patterns.]
+
+Base everything on the real account data provided above.`;
+  }
+  
+  // 🔄 FALLBACK: Traditional approach when ChromaDB is not available
+  console.log(`[RAG-Server] 📋 Using traditional post generation approach as fallback`);
   return `
 # POST GENERATION MODE
 You are a ${platformName} content creator assistant.
@@ -2366,21 +2429,33 @@ app.post('/api/post-generator', async (req, res) => {
                            platform === 'instagram' ? '5-10 hashtags' :
                            '3-5 hashtags (Facebook best practice)';
     
-    // Create a customized prompt for the post generator
-    const prompt = `You are a professional social media marketing expert for the brand "${username}" on ${platformName}. 
-Your task is to create a high-quality, engaging ${platformName} post about: "${query}"
+    // 🚀 Get profile and rules data for enhanced RAG
+    let profileData = {};
+    let rulesData = {};
+    let usingFallbackProfile = false;
+    
+    try {
+      profileData = await getProfileData(username, platform);
+    } catch (profileError) {
+      console.log(`[RAG-Server] No profile data found for ${platform}/${username}, using fallback profile`);
+      usingFallbackProfile = true;
+      profileData = {
+        username: username,
+        platform: platform,
+        display_name: username,
+        bio: `${platform.charAt(0).toUpperCase() + platform.slice(1)} content creator`,
+      };
+    }
+    
+    try {
+      rulesData = await getRulesData(username, platform);
+    } catch (rulesError) {
+      console.log(`[RAG-Server] No rules data found for ${platform}/${username}, using empty rules`);
+      rulesData = {};
+    }
 
-IMPORTANT: DO NOT include any introductory text like "Here's a caption" or "I've created" or "Here's a post" or similar meta-commentary.
-
-Structure your response EXACTLY as follows (with NO other text):
-
-Caption: [Write a catchy, engaging ${platformName} caption that is 2-4 sentences long and under ${characterLimit} characters. Include relevant emojis. Make sure it's informal, conversational, and aligned with ${platformName} best practices.]
-
-Hashtags: [List ${hashtagGuidance} for discoverability on ${platformName}]
-
-Call to Action: [Add a brief call-to-action encouraging followers to take a specific action suitable for ${platformName}]
-
-Visual Description for Image: [Write a detailed, vivid description for the image that should accompany this post. Be extremely specific about what should be in the image, including colors, layout, mood, lighting, and key elements. This will be used to generate an AI image, so include details about composition, style, and visual elements suitable for ${platformName}. Minimum 100 words.]`;
+    // 🚀 Create ENHANCED post generation prompt with ChromaDB semantic search
+    const prompt = await createEnhancedPostGenerationPrompt(profileData, rulesData, query, platform, username);
 
     try {
       // Get response from AI model
@@ -3044,8 +3119,31 @@ async function saveConversationTurn(username, platform, userMessage, assistantRe
   }
 }
 
-// Create the advanced RAG-based instruction prompt for instant AI replies
-function createAIReplyPrompt(profileData, rulesData, notification, platform = 'instagram', usingFallbackProfile = false) {
+// 🚀 ENHANCED AI Reply Prompt with ChromaDB semantic search
+async function createEnhancedAIReplyPrompt(profileData, rulesData, notification, platform = 'instagram', usingFallbackProfile = false, username = 'user') {
+  console.log(`[RAG-Server] 🚀 Creating ENHANCED AI REPLY prompt with ChromaDB semantic search for ${platform}/${username}`);
+  
+  // 🔥 STEP 1: Get semantically relevant context using ChromaDB for better replies
+  let enhancedContext = '';
+  try {
+    if (chromaDBInitialized) {
+      // Use the notification text as query for semantic search
+      const searchQuery = notification.text || notification.content || 'user message';
+      console.log(`[RAG-Server] 🔍 Performing semantic search for AI reply: "${searchQuery}"`);
+      enhancedContext = await chromaDBService.createEnhancedContext(searchQuery, username, platform);
+      
+      if (enhancedContext) {
+        console.log(`[RAG-Server] ✅ Retrieved ${enhancedContext.length} characters of semantically relevant context for AI reply`);
+      } else {
+        console.log(`[RAG-Server] ⚠️ No semantic context found for AI reply, using traditional approach`);
+      }
+    } else {
+      console.log(`[RAG-Server] ⚠️ ChromaDB not initialized, using traditional AI reply approach`);
+    }
+  } catch (error) {
+    console.error(`[RAG-Server] Error in semantic search for AI reply:`, error);
+    enhancedContext = null;
+  }
   const isMessage = notification.type === 'message';
   const platformName = platform === 'twitter' ? 'X (Twitter)' : 
                       platform === 'facebook' ? 'Facebook' : 
@@ -3167,6 +3265,44 @@ ${intelligentPersonality.includes('personality') ? intelligentPersonality : `Bas
   const roleDescription = shouldActAsAccountHolder ? 
     `You ARE ${accountName}, responding as yourself` : 
     `You are the professional account manager for ${accountName}`;
+
+  // 🔥 STEP 2: If we have enhanced context, use it for more authentic replies
+  if (enhancedContext) {
+    console.log(`[RAG-Server] 🎯 Using ENHANCED semantic context for superior AI reply quality`);
+    
+    // 🛡️ Apply content sanitization to prevent Gemini filtering
+    console.log(`[RAG-Server] 🛡️ Applying AGGRESSIVE content sanitization for AI reply context...`);
+    const sanitizedContext = sanitizeContextForGemini(enhancedContext, username);
+    console.log(`[RAG-Server] 🛡️ AI reply context sanitized: ${sanitizedContext.length} chars (was ${enhancedContext.length})`);
+    
+    // Create enhanced prompt that uses real data from ChromaDB
+    return `You are ${accountName} (@${username}) on ${platformName}. You have been provided with SPECIFIC, REAL DATA about your account including actual post content, engagement metrics, and audience interactions.
+
+===== YOUR REAL ACCOUNT DATA =====
+${sanitizedContext}
+===== END OF REAL DATA =====
+
+COMMUNICATION STYLE: ${communicationStyle}
+BRAND VOICE: ${brandVoice}
+ROLE: ${roleDescription}
+
+A user just messaged you: "${notification.text}"
+
+INSTRUCTIONS:
+1. You MUST respond as ${accountName} using insights from the real data above
+2. Reference YOUR actual content themes and engagement patterns when relevant  
+3. Use the tone and style shown in your actual posts from the data
+4. Be completely authentic based on the real account personality above
+5. Keep under ${characterLimit} characters
+6. NEVER indicate this is AI-generated - respond as the real account owner
+7. Use casual, natural language that matches your proven communication style
+8. If asked about your content, reference specific themes from the real data
+
+Your natural, authentic response as ${accountName} based on the real data:`;
+  }
+
+  // 🔄 FALLBACK: Traditional approach when no enhanced context
+  console.log(`[RAG-Server] 📋 Using traditional AI reply approach as fallback`);
 
   // Create sophisticated prompt that uses real data when available
   if (hasRealProfileData) {
@@ -3451,8 +3587,8 @@ app.post('/api/instant-reply', async (req, res) => {
       }
     }
 
-    // Create advanced AI reply prompt with full context
-    const aiReplyPrompt = createAIReplyPrompt(profileData, rulesData, notification, platform, usingFallbackProfile);
+            // Create advanced AI reply prompt with full context
+        const aiReplyPrompt = await createEnhancedAIReplyPrompt(profileData, rulesData, notification, platform, usingFallbackProfile, username);
     
     // For instant replies, use minimal conversation context to avoid repetitive responses
     const messages = [];
@@ -3624,7 +3760,7 @@ app.post('/api/auto-reply-all', async (req, res) => {
         console.log(`[RAG-Server] Auto-replying to notification ${i + 1}/${notifications.length}: ${notificationId}`);
         
         // Generate AI reply
-        const aiReplyPrompt = createAIReplyPrompt(profileData, rulesData, notification, platform);
+        const aiReplyPrompt = await createEnhancedAIReplyPrompt(profileData, rulesData, notification, platform, false, username);
         
         // Load conversation history for this specific user
         let conversationHistory = [];
@@ -3880,12 +4016,12 @@ async function generateImageFromPrompt(imagePrompt, filename, username, platform
     // Step 4: Save the image to R2 storage
     const imageKey = `ready_post/${platform}/${username}/${filename}`;
     
-    await tasksS3.putObject({
+    await s3Operations.putObject(tasksS3, {
       Bucket: 'tasks',
       Key: imageKey,
       Body: imageBuffer,
       ContentType: imageUrl.includes('.webp') ? 'image/webp' : 'image/jpeg'
-    }).promise();
+    });
     
     console.log(`[${new Date().toISOString()}] [IMAGE-GEN] Successfully saved image to R2: ${imageKey}`);
     
@@ -3910,12 +4046,12 @@ async function generateImageFromPrompt(imagePrompt, filename, username, platform
       const placeholderBuffer = await createPlaceholderImage(username, platform);
       const imageKey = `ready_post/${platform}/${username}/${filename}`;
       
-      await tasksS3.putObject({
+      await s3Operations.putObject(tasksS3, {
         Bucket: 'tasks',
         Key: imageKey,
         Body: placeholderBuffer,
         ContentType: 'image/jpeg'
-      }).promise();
+      });
       
       // Also save locally
       const localImageDir = path.join(process.cwd(), 'ready_post', platform, username);

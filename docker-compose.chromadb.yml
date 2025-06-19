@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: accountmanager_chromadb
+    ports:
+      - "8000:8000"
+    environment:
+      - CHROMA_SERVER_HOST=0.0.0.0
+      - CHROMA_SERVER_HTTP_PORT=8000
+      - PERSIST_DIRECTORY=/chroma/chroma
+      - CHROMA_SERVER_CORS_ALLOW_ORIGINS=["*"]
+    volumes:
+      - chromadb_data:/chroma/chroma
+    restart: unless-stopped
+    networks:
+      - accountmanager_network
+
+volumes:
+  chromadb_data:
+    driver: local
+
+networks:
+  accountmanager_network:
+    driver: bridge 

@@ -12,7 +12,11 @@ import {
   FiUsers,
   FiChevronLeft,
   FiChevronRight,
-  FiStar
+  FiStar,
+  FiDatabase,
+  FiCpu,
+  FiLayers,
+  FiCheckCircle
 } from 'react-icons/fi';
 import { useAuth } from '../../context/AuthContext';
 import './ProcessingLoadingState.css';
@@ -21,6 +25,8 @@ interface ProcessingStage {
   id: number;
   name: string;
   description: string;
+  status: string;
+  icon: React.ReactNode;
   percentage: number;
 }
 
@@ -35,50 +41,62 @@ interface ProcessingLoadingStateProps {
   platform: 'instagram' | 'twitter' | 'facebook';
   username: string;
   onComplete: () => void;
+  countdownMinutes?: number; // Make countdown configurable
 }
-
-const TOTAL_DURATION = 600; // 10 minutes in seconds
 
 const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   platform,
   username,
-  onComplete
+  onComplete,
+  countdownMinutes = 7 // Default to 7 minutes
 }) => {
   const { currentUser } = useAuth();
+  const TOTAL_DURATION = countdownMinutes * 60; // Convert minutes to seconds
   const [timeLeft, setTimeLeft] = useState(TOTAL_DURATION);
   const [currentStage, setCurrentStage] = useState(0);
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
 
+  // Reusable stage system - automatically splits time into 5 equal stages
   const processingStages: ProcessingStage[] = [
     {
       id: 1,
-      name: 'Queuing',
-      description: 'Preparing your account data for processing...',
+      name: 'Queue',
+      description: 'Initializing AI analysis pipeline',
+      status: 'Preparing secure data connection...',
+      icon: <FiLayers size={20} />,
       percentage: 20
     },
     {
       id: 2,
-      name: 'Data Extraction',
-      description: 'Extracting insights from your social media activity...',
+      name: 'Extract',
+      description: 'Collecting social media insights',
+      status: 'Analyzing engagement patterns...',
+      icon: <FiDatabase size={20} />,
       percentage: 40
     },
     {
       id: 3,
-      name: 'Analysis',
-      description: 'Analyzing patterns and generating strategies...',
+      name: 'Analyze',
+      description: 'Processing competitive intelligence',
+      status: 'Generating strategic insights...',
+      icon: <FiCpu size={20} />,
       percentage: 60
     },
     {
       id: 4,
-      name: 'Generation',
-      description: 'Creating personalized recommendations...',
+      name: 'Generate',
+      description: 'Creating personalized strategies',
+      status: 'Optimizing recommendations...',
+      icon: <FiZap size={20} />,
       percentage: 80
     },
     {
       id: 5,
-      name: 'Final Processing',
-      description: 'Preparing your dashboard...',
+      name: 'Deploy',
+      description: 'Finalizing dashboard setup',
+      status: 'Ready for launch...',
+      icon: <FiCheckCircle size={20} />,
       percentage: 100
     }
   ];
@@ -103,51 +121,53 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     }
   }, [currentUser?.uid, platform, onComplete]);
 
-  // Update current stage based on time progress
+  // Update current stage based on time progress - reusable for any countdown duration
   useEffect(() => {
     const progress = ((TOTAL_DURATION - timeLeft) / TOTAL_DURATION) * 100;
-    const newStage = processingStages.findIndex(stage => progress <= stage.percentage);
-    if (newStage !== -1 && newStage !== currentStage) {
-      setCurrentStage(newStage);
+    const newStageIndex = processingStages.findIndex(stage => progress < stage.percentage);
+    const stageIndex = newStageIndex === -1 ? processingStages.length - 1 : Math.max(0, newStageIndex - 1);
+    
+    if (stageIndex !== currentStage) {
+      setCurrentStage(stageIndex);
     }
-  }, [timeLeft, currentStage]);
+  }, [timeLeft, currentStage, TOTAL_DURATION]);
 
   const proTips: ProTip[] = [
     {
       id: 'goal-button',
-      title: 'Goal Button Power',
-      description: 'The Goal button creates AI-powered organic campaigns that automatically optimize your content strategy based on your competitors and audience engagement patterns.',
-      icon: <FiTarget size={24} />
+      title: 'AI-Powered Goal Campaigns',
+      description: 'Create autonomous campaigns that adapt to market trends and competitor movements in real-time.',
+      icon: <FiTarget size={20} />
     },
     {
       id: 'auto-schedule',
-      title: 'Smart Auto-Scheduling',
-      description: 'Our AI analyzes your audience activity patterns and competitor posting times to schedule your content when engagement rates are highest for maximum reach.',
-      icon: <FiClock size={24} />
+      title: 'Intelligent Scheduling',
+      description: 'Our neural networks predict optimal posting times based on 50M+ data points.',
+      icon: <FiClock size={20} />
     },
     {
       id: 'auto-reply',
-      title: 'Intelligent Auto-Replies',
-      description: 'AI monitors your comments and DMs, providing contextual responses that match your brand voice while maintaining authentic engagement with your audience.',
-      icon: <FiMessageCircle size={24} />
+      title: 'Contextual Auto-Replies',
+      description: 'GPT-powered responses that maintain your brand voice across all interactions.',
+      icon: <FiMessageCircle size={20} />
     },
     {
       id: 'content-creation',
-      title: 'AI Content Generation',
-      description: 'Advanced models analyze trending topics, your posting style, and competitor strategies to create engaging posts that resonate with your target audience.',
-      icon: <FiZap size={24} />
+      title: 'Dynamic Content Generation',
+      description: 'AI creates viral-ready content based on trending topics and competitor analysis.',
+      icon: <FiZap size={20} />
     },
     {
       id: 'profit-analysis',
-      title: 'Profit Analytics',
-      description: 'Real-time ROI tracking analyzes engagement rates, follower growth, and conversion metrics to optimize your social media investment and maximize returns.',
-      icon: <FiBarChart size={24} />
+      title: 'Revenue Intelligence',
+      description: 'Track ROI with precision analytics that connect social metrics to business outcomes.',
+      icon: <FiBarChart size={20} />
     },
     {
       id: 'organic-campaigns',
-      title: 'Organic Campaign Automation',
-      description: 'Goal-driven campaigns automatically adjust content themes, posting frequency, and engagement strategies to achieve your specific business objectives organically.',
-      icon: <FiTrendingUp size={24} />
+      title: 'Organic Growth Engine',
+      description: 'Automated campaigns that scale organically without compromising authenticity.',
+      icon: <FiTrendingUp size={20} />
     }
   ];
 
@@ -166,7 +186,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     if (isAutoPlaying && timeLeft > 0) {
       const interval = setInterval(() => {
         setCurrentTipIndex((prev) => (prev + 1) % proTips.length);
-      }, 15000); // Change tip every 15 seconds
+      }, 8000); // Change tip every 8 seconds for better pacing
       return () => clearInterval(interval);
     }
   }, [isAutoPlaying, timeLeft, proTips.length]);
@@ -184,199 +204,172 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   const handleTipNavigation = (index: number) => {
     setCurrentTipIndex(index);
     setIsAutoPlaying(false);
-    // Resume auto-play after 30 seconds of manual navigation
-    setTimeout(() => setIsAutoPlaying(true), 30000);
+    setTimeout(() => setIsAutoPlaying(true), 15000);
   };
 
   const nextTip = () => {
     setCurrentTipIndex((prev) => (prev + 1) % proTips.length);
     setIsAutoPlaying(false);
-    setTimeout(() => setIsAutoPlaying(true), 30000);
+    setTimeout(() => setIsAutoPlaying(true), 15000);
   };
 
   const prevTip = () => {
     setCurrentTipIndex((prev) => (prev - 1 + proTips.length) % proTips.length);
     setIsAutoPlaying(false);
-    setTimeout(() => setIsAutoPlaying(true), 30000);
+    setTimeout(() => setIsAutoPlaying(true), 15000);
   };
 
-  const platformColors = {
-    instagram: '#E4405F',
-    twitter: '#1DA1F2',
-    facebook: '#1877F2'
+  const platformConfig = {
+    instagram: { color: '#E4405F', name: 'Instagram', icon: <FiCamera size={24} /> },
+    twitter: { color: '#1DA1F2', name: 'Twitter', icon: <FiTwitter size={24} /> },
+    facebook: { color: '#1877F2', name: 'Facebook', icon: <FiUsers size={24} /> }
   };
 
-  const platformName = {
-    instagram: 'Instagram',
-    twitter: 'Twitter',
-    facebook: 'Facebook'
-  };
-
-  const getPlatformIcon = () => {
-    switch (platform) {
-      case 'instagram':
-        return <FiCamera size={32} />;
-      case 'twitter':
-        return <FiTwitter size={32} />;
-      case 'facebook':
-        return <FiUsers size={32} />;
-      default:
-        return <FiCamera size={32} />;
-    }
-  };
+  const config = platformConfig[platform];
 
   return (
-    <motion.div
-      className="processing-loading-container"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      <div className="processing-content">
-        {/* Header Section */}
+    <div className="processing-container">
+      <div className="processing-backdrop" />
+      
+      <motion.div
+        className="processing-content"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+      >
+        {/* Header */}
         <motion.div
           className="processing-header"
-          initial={{ y: -20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.2 }}
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.6 }}
         >
-          <div className="platform-icon" style={{ color: platformColors[platform] }}>
-            {getPlatformIcon()}
+          <div className="platform-badge" style={{ backgroundColor: `${config.color}15` }}>
+            <div className="platform-icon" style={{ color: config.color }}>
+              {config.icon}
+            </div>
+            <span className="platform-name">{config.name}</span>
           </div>
-          <h1 className="processing-title">
-            Analyzing Your {platformName[platform]} Account
+          
+          <h1 className="main-title">
+            AI Analysis in Progress
           </h1>
-          <p className="processing-subtitle">
-            Our AI is processing <strong>@{username}</strong> and your competitors to create your personalized strategy
+          
+          <p className="subtitle">
+            Processing <span className="username">@{username}</span> and competitive landscape
           </p>
         </motion.div>
 
-        {/* Processing Stages */}
+        {/* Progress Section */}
         <motion.div
-          className="processing-stages"
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.4 }}
+          className="progress-section"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.4, duration: 0.6 }}
         >
-          <div className="stages-progress">
-            <div 
-              className="progress-bar"
-              style={{ 
-                width: `${calculateProgress()}%`,
-                backgroundColor: platformColors[platform]
-              }}
+          {/* Stage Indicators */}
+          <div className="stage-indicators">
+            {processingStages.map((stage, index) => (
+              <motion.div
+                key={stage.id}
+                className={`stage-indicator ${index <= currentStage ? 'active' : ''} ${index === currentStage ? 'current' : ''}`}
+                initial={{ opacity: 0, scale: 0 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.6 + index * 0.1 }}
+              >
+                <div className="stage-icon">{stage.icon}</div>
+                <span className="stage-name">{stage.name}</span>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Progress Bar */}
+          <div className="progress-track">
+            <motion.div
+              className="progress-fill"
+              style={{ backgroundColor: config.color }}
+              initial={{ width: 0 }}
+              animate={{ width: `${calculateProgress()}%` }}
+              transition={{ duration: 0.8, ease: "easeInOut" }}
             />
-            <div className="stage-markers">
-              {processingStages.map((stage, index) => (
-                <div
-                  key={stage.id}
-                  className={`stage-marker ${index <= currentStage ? 'active' : ''}`}
-                  style={{
-                    left: `${stage.percentage}%`,
-                    backgroundColor: index <= currentStage ? platformColors[platform] : 'rgba(255, 255, 255, 0.3)'
-                  }}
-                >
-                  <span className="stage-label">{stage.name}</span>
-                </div>
-              ))}
-            </div>
           </div>
-          <div className="current-stage-info">
-            <h3>{processingStages[currentStage].name}</h3>
-            <p>{processingStages[currentStage].description}</p>
-            <div className="time-remaining">
-              <FiClock size={16} />
-              <span>{formatTime(timeLeft)} remaining</span>
-            </div>
-          </div>
+
+          {/* Current Stage Info */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentStage}
+              className="current-stage"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.4 }}
+            >
+              <div className="stage-header">
+                <div className="stage-pulse" style={{ backgroundColor: config.color }} />
+                <h3>{processingStages[currentStage].description}</h3>
+              </div>
+              <p className="stage-status">{processingStages[currentStage].status}</p>
+              <div className="time-display">
+                <FiClock size={14} />
+                <span>{formatTime(timeLeft)}</span>
+              </div>
+            </motion.div>
+          </AnimatePresence>
         </motion.div>
 
-        {/* Pro Tips Carousel */}
+        {/* Pro Tips */}
         <motion.div
-          className="protips-section"
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.6 }}
+          className="tips-section"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8, duration: 0.6 }}
         >
-          <h2 className="protips-title"><FiStar size={20} /> Pro Tips</h2>
-          <p className="protips-subtitle">Learn how to maximize your AI-powered social media management</p>
+          <div className="tips-header">
+            <FiStar size={16} />
+            <span>Pro Insights</span>
+          </div>
 
-          <div className="protips-carousel">
+          <div className="tips-carousel">
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentTipIndex}
-                className="protip-card"
-                initial={{ x: 50, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                exit={{ x: -50, opacity: 0 }}
+                className="tip-card"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.5 }}
               >
-                <div className="protip-icon">{proTips[currentTipIndex].icon}</div>
-                <h3 className="protip-title">{proTips[currentTipIndex].title}</h3>
-                <p className="protip-description">{proTips[currentTipIndex].description}</p>
+                <div className="tip-icon">{proTips[currentTipIndex].icon}</div>
+                <div className="tip-content">
+                  <h4>{proTips[currentTipIndex].title}</h4>
+                  <p>{proTips[currentTipIndex].description}</p>
+                </div>
               </motion.div>
             </AnimatePresence>
 
-            {/* Navigation Controls */}
-            <div className="protips-controls">
-              <button
-                className="protip-nav-btn prev"
-                onClick={prevTip}
-                disabled={timeLeft === 0}
-              >
-                <FiChevronLeft size={20} />
+            <div className="tips-controls">
+              <button onClick={prevTip} className="tip-nav">
+                <FiChevronLeft size={16} />
               </button>
               
-              <div className="protips-indicators">
+              <div className="tip-dots">
                 {proTips.map((_, index) => (
                   <button
                     key={index}
-                    className={`protip-indicator ${index === currentTipIndex ? 'active' : ''}`}
+                    className={`tip-dot ${index === currentTipIndex ? 'active' : ''}`}
                     onClick={() => handleTipNavigation(index)}
-                    style={{ 
-                      backgroundColor: index === currentTipIndex ? platformColors[platform] : 'rgba(255, 255, 255, 0.3)' 
-                    }}
                   />
                 ))}
               </div>
-
-              <button
-                className="protip-nav-btn next"
-                onClick={nextTip}
-                disabled={timeLeft === 0}
-              >
-                <FiChevronRight size={20} />
+              
+              <button onClick={nextTip} className="tip-nav">
+                <FiChevronRight size={16} />
               </button>
             </div>
           </div>
         </motion.div>
-
-        {/* Processing Animation - Updated */}
-        <motion.div
-          className="processing-animation"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.8 }}
-        >
-          <div className="processing-pulse">
-            <motion.div
-              className="pulse-ring"
-              animate={{
-                scale: [1, 1.2, 1],
-                opacity: [0.5, 0.8, 0.5]
-              }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-                ease: "easeInOut"
-              }}
-              style={{ borderColor: platformColors[platform] }}
-            />
-          </div>
-        </motion.div>
-      </div>
-    </motion.div>
+      </motion.div>
+    </div>
   );
 };
 

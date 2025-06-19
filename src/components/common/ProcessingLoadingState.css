@@ -1,364 +1,490 @@
-.processing-loading-container {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-  position: relative;
+/* ====================================
+   BILLION DOLLAR PROCESSING STATE
+   Genius minimalist design
+   ==================================== */
+
+.processing-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #0a0a0a;
   overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
 }
 
-.processing-loading-container::before {
-  content: '';
+.processing-backdrop {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
   background: 
-    radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.05) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.05) 0%, transparent 50%);
-  pointer-events: none;
+    radial-gradient(ellipse at 50% 20%, rgba(120, 119, 198, 0.04) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 80%, rgba(255, 119, 198, 0.03) 0%, transparent 60%),
+    linear-gradient(180deg, #0a0a0a 0%, #111111 100%);
 }
 
 .processing-content {
-  max-width: 900px;
-  width: 100%;
-  text-align: center;
   position: relative;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 4rem 2rem;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   z-index: 1;
-  padding: 2rem;
-  background: rgba(255, 255, 255, 0.02);
-  backdrop-filter: blur(10px);
-  border-radius: 24px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-/* Header Section */
+/* ====================================
+   HEADER SECTION
+   ==================================== */
+
 .processing-header {
+  text-align: center;
   margin-bottom: 4rem;
 }
 
-.platform-icon {
-  font-size: 3rem;
-  margin-bottom: 1.5rem;
-  display: inline-block;
-  padding: 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 50%;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+.platform-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(20px);
+  margin-bottom: 2rem;
+  transition: all 0.3s ease;
 }
 
-.processing-title {
-  font-size: 2.5rem;
-  font-weight: 700;
+.platform-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.platform-name {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.main-title {
+  font-size: clamp(2.5rem, 5vw, 3.5rem);
+  font-weight: 600;
+  line-height: 1.1;
   color: #ffffff;
   margin-bottom: 1rem;
-  background: linear-gradient(135deg, #ffffff 0%, #e0e0ff 100%);
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #ffffff 0%, rgba(255, 255, 255, 0.8) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
-.processing-subtitle {
-  font-size: 1.2rem;
-  color: #a0a0cc;
-  line-height: 1.6;
-  max-width: 600px;
-  margin: 0 auto;
+.subtitle {
+  font-size: 1.125rem;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.5;
+  font-weight: 400;
 }
 
-/* Processing Stages */
-.processing-stages {
+.username {
+  color: #ffffff;
+  font-weight: 500;
+}
+
+/* ====================================
+   PROGRESS SECTION
+   ==================================== */
+
+.progress-section {
   margin-bottom: 4rem;
+}
+
+.stage-indicators {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 3rem;
   padding: 0 1rem;
 }
 
-.stages-progress {
+.stage-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
   position: relative;
-  height: 8px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-  margin-bottom: 3rem;
-  overflow: visible;
+  opacity: 0.4;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.progress-bar {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
-  border-radius: 4px;
-  transition: width 0.5s ease-in-out;
-}
-
-.stage-markers {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  height: 0;
-}
-
-.stage-marker {
-  position: absolute;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  transition: all 0.3s ease-in-out;
-  cursor: pointer;
-}
-
-.stage-marker::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 2px solid currentColor;
-  opacity: 0;
-  transition: all 0.3s ease-in-out;
-}
-
-.stage-marker.active::before {
-  opacity: 0.3;
-  animation: pulse 2s infinite;
-}
-
-.stage-label {
-  position: absolute;
-  top: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  font-size: 0.85rem;
-  color: #a0a0cc;
-  opacity: 0.7;
-  transition: all 0.3s ease-in-out;
-}
-
-.stage-marker:hover .stage-label,
-.stage-marker.active .stage-label {
-  color: #ffffff;
+.stage-indicator.active {
   opacity: 1;
 }
 
-.current-stage-info {
-  text-align: center;
-  padding: 2rem;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 16px;
-  margin-top: 2rem;
+.stage-indicator.current {
+  opacity: 1;
 }
 
-.current-stage-info h3 {
-  font-size: 1.5rem;
-  color: #ffffff;
-  margin-bottom: 0.5rem;
+.stage-indicator.current .stage-icon {
+  animation: pulse-glow 2s ease-in-out infinite;
 }
 
-.current-stage-info p {
-  color: #a0a0cc;
-  margin-bottom: 1rem;
-}
-
-.time-remaining {
+.stage-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(10px);
+  color: rgba(255, 255, 255, 0.7);
+  transition: all 0.4s ease;
+}
+
+.stage-indicator.active .stage-icon {
+  border-color: rgba(255, 255, 255, 0.2);
   color: #ffffff;
-  font-size: 0.9rem;
-  opacity: 0.8;
+  background: rgba(255, 255, 255, 0.05);
 }
 
-/* Processing Animation */
-.processing-animation {
-  margin-top: 2rem;
+.stage-name {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: color 0.3s ease;
 }
 
-.processing-pulse {
+.stage-indicator.active .stage-name {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.progress-track {
+  height: 2px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 1px;
+  margin-bottom: 3rem;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 1px;
   position: relative;
-  width: 60px;
-  height: 60px;
-  margin: 0 auto;
+  overflow: hidden;
 }
 
-.pulse-ring {
+.progress-fill::after {
+  content: '';
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  border: 2px solid;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: shimmer 2s infinite;
+}
+
+.current-stage {
+  text-align: center;
+  padding: 2rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 1rem;
+  backdrop-filter: blur(20px);
+}
+
+.stage-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.stage-pulse {
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
+  animation: pulse-dot 1.5s ease-in-out infinite;
 }
 
-/* Pro Tips Section - Updated */
-.protips-section {
-  margin-top: 4rem;
-  padding-top: 3rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.protips-title {
-  font-size: 1.8rem;
+.current-stage h3 {
+  font-size: 1.25rem;
   font-weight: 600;
   color: #ffffff;
-  margin-bottom: 0.5rem;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.stage-status {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 1.5rem;
+  line-height: 1.4;
+}
+
+.time-display {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.8);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ====================================
+   TIPS SECTION
+   ==================================== */
+
+.tips-section {
+  margin-top: auto;
+}
+
+.tips-header {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-}
-
-.protips-subtitle {
-  font-size: 1rem;
-  color: #a0a0cc;
   margin-bottom: 2rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-.protip-card {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 20px;
-  padding: 2.5rem 2rem;
-  margin-bottom: 2rem;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+.tips-carousel {
+  max-width: 600px;
+  margin: 0 auto;
 }
 
-.protip-icon {
-  font-size: 2.5rem;
+.tip-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 1rem;
+  backdrop-filter: blur(20px);
   margin-bottom: 1.5rem;
-  color: #ffffff;
-  opacity: 0.9;
 }
 
-.protip-title {
-  font-size: 1.3rem;
+.tip-icon {
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.tip-content h4 {
+  font-size: 1rem;
   font-weight: 600;
   color: #ffffff;
-  margin-bottom: 1rem;
+  margin: 0 0 0.5rem 0;
+  letter-spacing: -0.01em;
 }
 
-.protip-description {
-  font-size: 1rem;
-  color: #a0a0cc;
-  line-height: 1.6;
+.tip-content p {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.5;
   margin: 0;
 }
 
-/* Navigation Controls */
-.protips-controls {
+.tips-controls {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 1rem;
-  margin-top: 1.5rem;
 }
 
-.protip-nav-btn {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #ffffff;
-  width: 40px;
-  height: 40px;
+.tip-nav {
+  width: 2.5rem;
+  height: 2.5rem;
   border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+  color: rgba(255, 255, 255, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.3s ease;
-  font-size: 1.2rem;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
 }
 
-.protip-nav-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
-  transform: scale(1.1);
+.tip-nav:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.8);
+  transform: scale(1.05);
 }
 
-.protip-nav-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.tip-dots {
+  display: flex;
+  gap: 0.5rem;
 }
 
-/* Animations */
-@keyframes pulse {
-  0% {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 0.3;
+.tip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tip-dot.active {
+  background: rgba(255, 255, 255, 0.6);
+  transform: scale(1.2);
+}
+
+.tip-dot:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* ====================================
+   ANIMATIONS
+   ==================================== */
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.1);
   }
   50% {
-    transform: translate(-50%, -50%) scale(1.5);
-    opacity: 0.1;
+    box-shadow: 0 0 0 8px rgba(255, 255, 255, 0);
+  }
+}
+
+@keyframes pulse-dot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.8);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
   }
   100% {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 0.3;
+    transform: translateX(100%);
   }
 }
 
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
-}
+/* ====================================
+   RESPONSIVE DESIGN
+   ==================================== */
 
-/* Responsive Design */
 @media (max-width: 768px) {
   .processing-content {
-    padding: 1.5rem;
+    padding: 2rem 1rem;
   }
 
-  .processing-title {
-    font-size: 2rem;
-  }
-
-  .processing-stages {
+  .stage-indicators {
     padding: 0;
+    gap: 0.5rem;
   }
 
-  .stage-label {
-    font-size: 0.75rem;
+  .stage-icon {
+    width: 2.5rem;
+    height: 2.5rem;
   }
 
-  .current-stage-info {
+  .stage-name {
+    font-size: 0.65rem;
+  }
+
+  .current-stage {
     padding: 1.5rem;
   }
 
-  .protip-card {
-    padding: 2rem 1.5rem;
+  .tip-card {
+    padding: 1.25rem;
+    gap: 0.75rem;
+  }
+
+  .tip-icon {
+    width: 2rem;
+    height: 2rem;
   }
 }
 
 @media (max-width: 480px) {
   .processing-content {
-    padding: 1rem;
+    padding: 1.5rem 1rem;
   }
 
-  .processing-title {
-    font-size: 1.8rem;
+  .platform-badge {
+    padding: 0.5rem 1rem;
+    gap: 0.5rem;
   }
 
-  .stage-label {
+  .stage-indicators {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem 0.5rem;
+  }
+
+  .stage-name {
     display: none;
   }
 
-  .current-stage-info h3 {
-    font-size: 1.3rem;
+  .tip-card {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 1rem;
   }
+}
 
-  .protip-card {
-    padding: 1.5rem 1rem;
+/* ====================================
+   ACCESSIBILITY & PERFORMANCE
+   ==================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .processing-container {
+    background: #000000;
+  }
+  
+  .stage-indicator.active .stage-icon,
+  .tip-card,
+  .current-stage {
+    border-color: rgba(255, 255, 255, 0.3);
   }
 } 

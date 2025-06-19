@@ -1,0 +1,38 @@
+{
+  "watch": [
+    "server.js",
+    "rag-server.js",
+    "chromadb-service.js"
+  ],
+  "ignore": [
+    "node_modules/",
+    "*.log",
+    "*.pid",
+    "image_cache/",
+    "public/",
+    "logs/",
+    "test-results/",
+    "test-output/",
+    "ready_post/",
+    "data/",
+    ".git/",
+    "*.md",
+    "vite.config.ts",
+    "package.json",
+    "package-lock.json",
+    "yarn.lock"
+  ],
+  "ext": "js,json",
+  "delay": 2000,
+  "verbose": true,
+  "restartable": "rs",
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "signal": "SIGUSR2",
+  "events": {
+    "restart": "echo '🔄 Server restarted due to file changes'",
+    "crash": "echo '💥 Server crashed. Waiting for changes...'",
+    "exit": "echo '👋 Server exited'"
+  }
+} 

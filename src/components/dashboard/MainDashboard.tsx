@@ -65,8 +65,7 @@ const MainDashboard: React.FC = () => {
   const [showInstagramScheduler, setShowInstagramScheduler] = useState<boolean>(false);
   const [showTwitterComposer, setShowTwitterComposer] = useState<boolean>(false);
   
-  // AI Autonomous Account Manager wishlist state
-  const [isWishlistAdded, setIsWishlistAdded] = useState<boolean>(false);
+
   
   // Platform time tracking state
   const [platformTimeData, setPlatformTimeData] = useState<Record<string, number>>({
@@ -99,14 +98,7 @@ const MainDashboard: React.FC = () => {
     scheduleDate: null
   });
 
-  // Load wishlist state from localStorage
-  useEffect(() => {
-    if (currentUser?.uid) {
-      const wishlistKey = `ai_manager_wishlist_${currentUser.uid}`;
-      const saved = localStorage.getItem(wishlistKey);
-      setIsWishlistAdded(saved === 'true');
-    }
-  }, [currentUser?.uid]);
+
 
   // ✅ PLATFORM STATUS SYNC FIX: Improved platform access tracking
   const getPlatformAccessStatus = useCallback((platformId: string): boolean => {
@@ -816,53 +808,7 @@ const MainDashboard: React.FC = () => {
     }
   };
 
-  // Handle AI Manager wishlist action
-  const handleWishlistClick = () => {
-    if (isWishlistAdded || !currentUser?.uid) return;
-    
-    const wishlistKey = `ai_manager_wishlist_${currentUser.uid}`;
-    localStorage.setItem(wishlistKey, 'true');
-    setIsWishlistAdded(true);
-    
-    // Show confirmation with fade out
-    const confirmation = document.createElement('div');
-    confirmation.textContent = 'Added to wishlist. Thank you!';
-    confirmation.style.cssText = `
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(0, 255, 204, 0.9);
-      color: #1a1a3a;
-      padding: 12px 24px;
-      border-radius: 8px;
-      font-weight: 600;
-      z-index: 10000;
-      animation: fadeInOut 3s forwards;
-    `;
-    
-    // Add CSS animation
-    if (!document.getElementById('wishlist-styles')) {
-      const style = document.createElement('style');
-      style.id = 'wishlist-styles';
-      style.textContent = `
-        @keyframes fadeInOut {
-          0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
-          20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-          80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-          100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
-        }
-      `;
-      document.head.appendChild(style);
-    }
-    
-    document.body.appendChild(confirmation);
-    setTimeout(() => {
-      if (document.body.contains(confirmation)) {
-        document.body.removeChild(confirmation);
-      }
-    }, 3000);
-  };
+
 
   // Calculate total API calls for the usage section
   const getTotalApiCalls = () => {
@@ -902,58 +848,32 @@ const MainDashboard: React.FC = () => {
           </div>
         </div>
 
-        {activeTab === 'overview' && (
+                {activeTab === 'overview' && (
           <div className="dashboard-content-grid">
             {/* Action Buttons Section - Premium Layout */}
-            <div className="action-buttons-section">
-              <div className="instant-post-section">
-                <button 
-                  className="instant-post-button"
-                  onClick={openInstantPostModal}
-                  title="Create a post for your platforms"
-                >
-                  <div className="instant-post-icon">
-                    <svg viewBox="0 0 24 24">
-                      <path d="M3,20V4A1,1 0 0,1 4,3H20A1,1 0 0,1 21,4V20A1,1 0 0,1 20,21H4A1,1 0 0,1 3,20M5,19H19V5H5V19M7.5,17L9.5,14L11.5,16.5L14.5,12.5L18.5,17H7.5Z" />
-                    </svg>
-                  </div>
-                  <div className="instant-post-text">
-                    <h3>Instant Post</h3>
-                    <p>Create one post for all your connected platforms</p>
-                  </div>
-                  {connectedPlatforms.length > 0 && (
-                    <div className="connected-platforms-count">
-                      <span>{connectedPlatforms.length} connected</span>
-                    </div>
-                  )}
-                </button>
-              </div>
-
-              {/* AI Autonomous Account Manager Preview Section */}
-              <div className="ai-manager-preview-section">
-                <div className="ai-manager-preview">
-                  <div className="ai-manager-content">
-                    <div className="ai-manager-icon">
-                      <svg viewBox="0 0 24 24">
-                        <path d="M12,2A2,2 0 0,1 14,4C14,4.74 13.6,5.39 13,5.73V7H14A7,7 0 0,1 21,14H22A1,1 0 0,1 23,15V18A1,1 0 0,1 22,19H21V20A2,2 0 0,1 19,22H5A2,2 0 0,1 3,20V19H2A1,1 0 0,1 1,18V15A1,1 0 0,1 2,14H3A7,7 0 0,1 10,7H11V5.73C10.4,5.39 10,4.74 10,4A2,2 0 0,1 12,2M7.5,13A2.5,2.5 0 0,0 5,15.5A2.5,2.5 0 0,0 7.5,18A2.5,2.5 0 0,0 10,15.5A2.5,2.5 0 0,0 7.5,13M16.5,13A2.5,2.5 0 0,0 14,15.5A2.5,2.5 0 0,0 16.5,18A2.5,2.5 0 0,0 19,15.5A2.5,2.5 0 0,0 16.5,13Z" />
-                      </svg>
-                    </div>
-                    <div className="ai-manager-text">
-                      <h3>AI Autonomous Account Manager</h3>
-                      <p>Delegate campaigns, real-time tasks, or engagement workflows to your AI Manager—seamlessly autonomous.</p>
-                    </div>
-                  </div>
-                  <button 
-                    className={`wishlist-button ${isWishlistAdded ? 'added' : ''}`}
-                    onClick={handleWishlistClick}
-                    disabled={isWishlistAdded}
-                  >
-                    {isWishlistAdded ? '✓ Added to Wishlist' : '+ Add to Wishlist'}
-                  </button>
+            <div className="instant-post-section">
+              <button 
+                className="instant-post-button"
+                onClick={openInstantPostModal}
+                title="Create a post for your platforms"
+              >
+                <div className="instant-post-icon">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M3,20V4A1,1 0 0,1 4,3H20A1,1 0 0,1 21,4V20A1,1 0 0,1 20,21H4A1,1 0 0,1 3,20M5,19H19V5H5V19M7.5,17L9.5,14L11.5,16.5L14.5,12.5L18.5,17H7.5Z" />
+                  </svg>
                 </div>
-              </div>
+                <div className="instant-post-text">
+                  <h3>Instant Post</h3>
+                  <p>Create one post for all your connected platforms</p>
+                </div>
+                {connectedPlatforms.length > 0 && (
+                  <div className="connected-platforms-count">
+                    <span>{connectedPlatforms.length} connected</span>
+                  </div>
+                )}
+              </button>
             </div>
-            
+              
             {/* Platform Cards Grid - Perfect Square Layout */}
             <div className="platforms-container">
               {sortedPlatforms.map(platform => (
@@ -1019,20 +939,20 @@ const MainDashboard: React.FC = () => {
             </div>
           </div>
         )}
-        
-        {/* Platform-specific post components */}
-        {showInstagramScheduler && instagramUserId && (
-          <PostScheduler 
-            userId={instagramUserId}
-            onClose={() => setShowInstagramScheduler(false)}
-          />
-        )}
-        
-        {showTwitterComposer && twitterUserId && (
-          <TwitterCompose 
-            userId={twitterUserId}
-            onClose={() => setShowTwitterComposer(false)}
-          />
+            
+            {/* Platform-specific post components */}
+            {showInstagramScheduler && instagramUserId && (
+              <PostScheduler 
+                userId={instagramUserId}
+                onClose={() => setShowInstagramScheduler(false)}
+              />
+            )}
+            
+            {showTwitterComposer && twitterUserId && (
+              <TwitterCompose 
+                userId={twitterUserId}
+                onClose={() => setShowTwitterComposer(false)}
+              />
         )}
         
         {activeTab === 'usage' && (

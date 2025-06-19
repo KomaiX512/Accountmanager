@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "\n\n**Areas for Improvement:**\n\n*   **Inconsistent Engagement:** Engagement varies significantly across posts. The \"Ribbon Wrapped Lash Extreme Tubing Mascara\" post had significantly higher engagement than other posts.\n*   **Limited User-Generated Content:** There's little evidence of user-generated content or customer testimonials being featured.\n*   **Lack of Interactive Content:** There's limited use of interactive features like polls, quizzes, or Q&A sessions to engage the audience.\n\n**Recommendations:**\n\n*   **Analyze High-Performing Content:** Identify the factors that contributed to the success of the \"Ribbon Wrapped Lash Extreme Tubing Mascara\" post (e.g., product type, messaging, visuals) and replicate those elements in future posts.\n*   **Encourage User-Generated Content:** Run contests or campaigns to encourage customers to share their experiences with your products.\n*   **Increase Interactivity:** Use Instagram's interactive features to engage the audience and gather feedback.\n*   **Optimize Posting Schedule:** Analyze your Instagram analytics to determine the best times to post for maximum engagement.\n*   **Refine Product Messaging:** Tailor your product messaging to resonate with your target audience and highlight the unique benefits of your products.\n*   **Diversify Content Formats:** Experiment with different content formats (e.g., Reels, Stories, IGTV) to keep your audience engaged.\n*   **Track and Measure Results:** Continuously monitor your Instagram analytics to track your progress and make data-driven decisions.\n*   **Collaborate with Influencers:** Partner with relevant influencers to reach a wider audience and promote your products.\n*   **Run Targeted Ads:** Use Instagram's advertising platform to target specific demographics and interests.\n*   **Offer Exclusive Deals and Promotions:** Incentivize your followers to purchase your products by offering exclusive deals and promotions.\n\nBy implementing these recommendations, you can improve your Instagram engagement, increase brand awareness, and drive sales.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.25370094299316404
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 850,
+    "candidatesTokenCount": 400,
+    "totalTokenCount": 1250,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 850
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 400
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "h1FUaNjeK8bd1PIPvoyZ4Qo"
+}

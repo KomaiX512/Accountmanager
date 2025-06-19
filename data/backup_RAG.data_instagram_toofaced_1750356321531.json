@@ -1,0 +1,19 @@
+{
+  "username": "toofaced",
+  "platform": "instagram",
+  "timestamp": "2025-06-19T18:05:21.531Z",
+  "query": "tell me about my most engaging post in whole data you read and its metrices",
+  "response": " **Product Bundles:** You offer product bundles and sets (e.g., \"Better Together\" sets) to encourage multiple purchases. **Limited-Edition Products:** You release limited-edition products and collections (e.g., holiday collections) to create a sense of urgency and exclusivity. **Product Education:** You provide product education and information on ingredients, benefits, and usage (e.g., \"Hangover Skincare Routine\").\n",
+  "previousMessages": [
+    {
+      "role": "user",
+      "content": "hey do you know about my product"
+    },
+    {
+      "role": "assistant",
+      "content": "Okay, I've analyzed the Too Faced Cosmetics Instagram profile. Here's what I know about your products: **New Product Launches:** You heavily promote new product launches (e.g., Ribbon Wrapped Lash Mascara, Kissing Juicy Tint) with dedicated posts and videos. **Product Demos:** You create Too Faced Academy content and partner with makeup artists (e.g., Chinchilla, Elyse Reneau) to demonstrate product application and techniques."
+    }
+  ],
+  "usedFallback": false,
+  "quotaExhausted": false
+}

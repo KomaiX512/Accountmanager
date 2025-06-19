@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Here's an engagement summary for @toofaced based on the provided data:\n\nPost 1, with the caption \"Not my house, but I know where the new Ribbon Wrapped Lash Mascara lives and pays rent @sephora #toofaced #tfcrueltyfree\", received 1,563 likes and 16 comments, totaling 1,579 in engagement.\n\nPost 2, captioned \"Something fabulous is about to unravel soon! Wrapped until March 21st 🤫 #toofaced #tfcrueltyfree\", garnered 3,265 likes and 210 comments, resulting in a total engagement of 3,475.\n\nPost 3, which reads \"Meet our Ribbon Wrapped Lash Mascara, the ultimate solution for achieving extreme length and dramatic separation! The Lash Extension™ Brush is designed to reach every lash type, giving you volume and curl that lasts This unique tubing formula wraps your lashes for up to 24 hours of flawless wear—no smudging, clumping, or flaking Be the first to shop on toofaced.com tomorrow! #toofaced #tfcrueltyfree\", was the most engaging post with 8,188 likes and 126 comments, for a total engagement of 8,314.\n\nPost 4, with the caption \"Head of Global Makeup @elysereneau explains why Foreplay is the most slept-on @toofaced product. Listen to our full episode with Elyse wherever you get your podcasts and watch on YouTube!\", received 1,179 likes and 57 comments, totaling 1,236 in engagement.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.03790374744929011
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 664,
+    "candidatesTokenCount": 349,
+    "totalTokenCount": 1013,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 664
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 349
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "xUpUaIilF8nY1PIPhKXiuQ0"
+}

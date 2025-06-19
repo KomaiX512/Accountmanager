@@ -1,0 +1,66 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "You are a social media data analyst. You have been provided with SPECIFIC, REAL DATA about the instagram account @toofaced. This data includes actual post content, engagement metrics, and performance statistics.\n\nYOUR TASK: Answer the user's question using ONLY the provided data below. You MUST reference specific numbers, captions, and metrics from the data provided.\n\n===== REAL ACCOUNT DATA FOR @toofaced =====\nProfile Analysis Data for toofaced on instagram: Account Information: Profile: Too Faced Cosmetics Username: @toofaced Platform: instagram Bio: We're a serious makeup brand that knows how to have fun Too Faced is a cruelty-free brand, always has been, always will be. Followers: 12,502,261 Following: 2,278 Posts: 12,303 Verified: Yes Business Account: Yes Category: Personal Goods & General Merchandise Stores Website: http://www.toofaced.com/ Profile Description: Bio Analysis for @toofaced on instagram: Description: We're a serious makeup brand that knows how to have fun Too Faced is a cruelty-free brand, always has been, always will be. Themes: Beauty & Cosmetics, Business & Entrepreneurship Personality: Engaging Keywords: serious, makeup, brand, knows, faced, cruelty, free, always Recent Posts and Engagement: Post 1: \"Get ready to unwrap the secret to your best lashes yet! Our NEW Ribbon Wrapped Lash Extreme Tubing Mascara is almost here!! This mascara delivers extreme length and separation for up to 24 hours for all lash types! No smudging, clumping, or flaking—just stunning lashes that last! Be the first to shop our new mascara when it drops tomorrow!\" Engagement: 4,824 likes, 163 comments, Total: 4,987 Post 2: \"Meet our Ribbon Wrapped Lash Mascara, the ultimate solution for achieving extreme length and dramatic separation! The Lash Extension™ Brush is designed to reach every lash type, giving you volume and curl that lasts This unique tubing formula wraps your lashes for up to 24 hours of flawless wear—no smudging, clumping, or flaking Be the first to shop on toofaced.com tomorrow! #toofaced #tfcrueltyfree\" Engagement: 8,188 likes, 126 comments, Total: 8,314 Post 3: \"250 of our listeners got the chance to test Pillow Balm, @toofaced’s juicy, decadent balm you’ll want to wear to bed. Learn why the Glams fell in love in the full ep (& join our slack channel at the link in bio for future testing opps)! \" Engagement: 442 likes, 45 comments, Total: 487 Post 4: \"We can't get enough of this duo! Our NEW Kissing Juicy Tint gives you glossy, buildable color and hydration, while Kissing Jelly turns up the shine. Juicy, smooth, and totally irresistible Available now on toofaced.com and IG Shops! \" Engagement: 812 likes, 12 comments, Total: 824 Most Engaging Post: \"Meet our Ribbon Wrapped Lash Mascara, the ultimate solution for achieving extreme length and dramatic separation! The Lash Extension™ Brush is designed to reach every lash type, giving you volume and curl that lasts This unique tubing formula wraps your lashes for up to 24 hours of flawless wear—no smudging, clumping, or flaking Be the first to shop on toofaced.com tomorrow! #toofaced #tfcrueltyfree\" Performance: 8,188 likes, 126 comments Total Engagement: 8,314 Analysis based on 8 relevant data points from the toofaced account.\n===== END OF REAL DATA =====\n\nUser Question: \"give me detailed analytics on my best performing content\"\n\nINSTRUCTIONS:\n1. You MUST use the specific post data provided above\n2. You MUST quote actual captions from the \"Recent Posts and Engagement\" section\n3. You MUST include the exact engagement numbers (likes, comments, totals)\n4. You MUST reference the \"Most Engaging Post\" data if it exists\n5. DO NOT claim you lack data - all necessary data is provided above\n6. Answer based EXCLUSIVELY on the provided account data\n\nProvide a detailed response that directly uses the post content and engagement metrics shown above."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "tell me about my most engaging post"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Based on the data provided, your most engaging post is about the \"Meet our Ribbon Wrapped Lash Mascara, the ultimate solution for achieving extreme length and dramatic separation\" with 8,188 likes and 126 comments for a total engagement of 8,314."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "what about the engagement metrics"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "The post about Ribbon Wrapped Lash Mascara performs exceptionally well with beauty content featuring mascara products and makeup tutorials. It received 8,188 likes and 126 comments."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "tell me more details about the post"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "The post caption highlights the benefits of the Ribbon Wrapped Lash Mascara, such as \"extreme length and dramatic separation\" and a \"Lash Extension™ Brush\" designed to reach every lash type."
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 2000,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "topK": 40
+  }
+}

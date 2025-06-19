@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Based on the data provided, your most engaging post is about the \"Ribbon Wrapped Lash Mascara\". The caption reads: \"Meet our Ribbon Wrapped Lash Mascara, the ultimate solution for achieving extreme length and dramatic separation! The Lash Extension™ Brush is designed to reach every lash type, giving you volume and curl that lasts This unique tubing formula wraps your lashes for up to 24 hours of flawless wear—no smudging, clumping, or flaking Be the first to shop on toofaced.com tomorrow! #toofaced #tfcrueltyfree\".\n\nThis post received 8,188 likes and 126 comments, resulting in a total engagement of 8,314.\n\nYou can learn that product-focused posts, specifically about new mascara launches, tend to perform well with your audience. Highlighting key features like \"extreme length and dramatic separation,\" the \"Lash Extension™ Brush,\" and the \"24 hours of flawless wear\" seems to resonate with your followers. The inclusion of hashtags like \"#toofaced\" and \"#tfcrueltyfree\" also likely contributed to its success.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.10490408358366593
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 851,
+    "candidatesTokenCount": 230,
+    "totalTokenCount": 1081,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 851
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 230
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "SExUaMz3HcW8x_AP-P7HCQ"
+}

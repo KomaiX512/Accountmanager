@@ -1,0 +1,18 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Instagram account analysis:\n\nAccount metrics:\n- Followers: 12,502,261\n- Posts: 12,303\n- Platform: Instagram\n\nQuestion: tell me about most engagaing post you have read\n\nProvide analysis using the metrics above."
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 2000,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "topK": 40
+  }
+}

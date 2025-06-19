@@ -104,6 +104,13 @@ export default defineConfig({
         secure: false,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
+      // Post-now endpoint (port 3000) - critical for PostNow functionality
+      '/api/post-instagram-now': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
       // Account info endpoints (port 3000)
       '/api/save-account-info': {
         target: 'http://localhost:3000',

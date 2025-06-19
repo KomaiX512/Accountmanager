@@ -19,8 +19,8 @@ if (!existsSync(logsDir)) {
 const servers = [
   {
     name: 'Main Server',
-    command: os.platform() === 'win32' ? 'npm.cmd' : 'npm',
-    args: ['run', 'dev'],
+    command: 'node',
+    args: ['server/server.js'],
     defaultPort: 3000,
     logFile: join(logsDir, 'main-server.log')
   },
@@ -37,6 +37,13 @@ const servers = [
     args: ['server.js'],
     defaultPort: 3002,
     logFile: join(logsDir, 'image-server.log')
+  },
+  {
+    name: 'Frontend',
+    command: os.platform() === 'win32' ? 'npm.cmd' : 'npm',
+    args: ['run', 'frontend'],
+    defaultPort: 5173,
+    logFile: join(logsDir, 'frontend.log')
   }
 ];
 

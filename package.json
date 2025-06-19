@@ -30,7 +30,9 @@
     "stop-all": "chmod +x ./stop-servers.sh && ./stop-servers.sh",
     "stop-all:win": "stop-servers.bat",
     "rag:dev": "nodemon rag-server.js",
-    "cleanup-ports": "lsof -ti:3001,3002,5173 | xargs kill -9 || true"
+    "cleanup-ports": "lsof -ti:3001,3002,5173 | xargs kill -9 || true",
+    "frontend": "vite --host --port 5173",
+    "dev:frontend": "vite --host --port 5173"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.832.0",

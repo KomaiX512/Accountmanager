@@ -20,11 +20,7 @@
 
 .social-icons {
   display: flex;
-<<<<<<< HEAD
   gap: 15px;
-=======
-  gap: clamp(12px, 2.5vw, 16px);
->>>>>>> cb090812e7bfa62134ee07efa6036eb299824c10
   height: 70px;
   max-height: 70px;
   align-items: center;
@@ -35,13 +31,8 @@
 }
 
 .social-icon {
-<<<<<<< HEAD
   width: 60px;
   height: 60px;
-=======
-  width: clamp(18px, 4vw, 20px);
-  height: clamp(18px, 4vw, 20px);
->>>>>>> cb090812e7bfa62134ee07efa6036eb299824c10
   color: rgba(255, 255, 255, 0.7);
   transition: all 0.2s ease;
   cursor: pointer;
@@ -49,17 +40,10 @@
   align-items: center;
   justify-content: center;
   position: relative;
-<<<<<<< HEAD
   border-radius: 10px;
   background: transparent;
   box-sizing: border-box;
   margin: 5px 0;
-=======
-  border-radius: clamp(6px, 1.5vw, 8px);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
->>>>>>> cb090812e7bfa62134ee07efa6036eb299824c10
 }
 
 .social-icon:hover {
@@ -78,30 +62,18 @@
 .social-icon.active::after {
   content: '';
   position: absolute;
-<<<<<<< HEAD
   bottom: -5px;
   left: 50%;
   transform: translateX(-50%);
   width: 30px;
-=======
-  bottom: -1px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 30%;
->>>>>>> cb090812e7bfa62134ee07efa6036eb299824c10
   height: 2px;
   background-color: rgba(255, 255, 255, 0.5);
   border-radius: 1px;
 }
 
 .social-icon svg {
-<<<<<<< HEAD
   width: 36px;
   height: 36px;
-=======
-  width: clamp(18px, 3vw, 20px);
-  height: clamp(18px, 3vw, 20px);
->>>>>>> cb090812e7bfa62134ee07efa6036eb299824c10
   fill: currentColor;
 }
 
@@ -219,11 +191,7 @@
   cursor: pointer;
   display: flex;
   align-items: center;
-<<<<<<< HEAD
   gap: 8px;
-=======
-  gap: clamp(6px, 1.5vw, 8px);
->>>>>>> cb090812e7bfa62134ee07efa6036eb299824c10
 }
 
 .dashboard-button:hover {
@@ -253,24 +221,14 @@
 }
 
 .dashboard-button svg {
-<<<<<<< HEAD
   width: 18px;
   height: 18px;
-=======
-  width: clamp(14px, 3vw, 16px);
-  height: clamp(14px, 3vw, 16px);
->>>>>>> cb090812e7bfa62134ee07efa6036eb299824c10
   fill: currentColor;
 }
 
 .dashboard-button span {
-<<<<<<< HEAD
   font-size: inherit;
   font-weight: inherit;
-=======
-  font-size: clamp(0.9rem, 2.2vw, 1.1rem);
-  font-weight: 700;
->>>>>>> cb090812e7bfa62134ee07efa6036eb299824c10
 }
 
 /* Dashboard icon styles - deprecated, replaced by home-button */
@@ -328,33 +286,19 @@
   }
   
   .social-icons {
-<<<<<<< HEAD
     gap: 12px;
-=======
-    gap: clamp(10px, 2vw, 12px);
->>>>>>> cb090812e7bfa62134ee07efa6036eb299824c10
     height: 60px;
     max-height: 60px;
   }
   
   .social-icon {
-<<<<<<< HEAD
-    width: 60px;
-    height: 60px;
+    width: 50px;
+    height: 50px;
   }
   
   .social-icon svg {
-    width: 30px;
-    height: 30px;
-=======
-    width: clamp(26px, 4.5vw, 30px);
-    height: clamp(26px, 4.5vw, 30px);
-  }
-  
-  .social-icon svg {
-    width: clamp(16px, 3vw, 18px);
-    height: clamp(16px, 3vw, 18px);
->>>>>>> cb090812e7bfa62134ee07efa6036eb299824c10
+    width: 28px;
+    height: 28px;
   }
   
   .logo-image {
@@ -376,45 +320,23 @@
   
   .dashboard-button {
     padding: clamp(8px, 2vw, 10px) clamp(12px, 3vw, 16px);
-<<<<<<< HEAD
     font-size: clamp(0.85rem, 2vw, 0.95rem);
-=======
-    font-size: clamp(0.8rem, 2vw, 0.9rem);
-  }
-  
-  .dashboard-button span {
-    font-size: clamp(0.8rem, 2vw, 0.9rem);
->>>>>>> cb090812e7bfa62134ee07efa6036eb299824c10
   }
 }
 
 @media (max-width: 480px) {
   .social-icons {
-<<<<<<< HEAD
     gap: 8px;
   }
   
   .social-icon {
-    width: 50px;
-    height: 50px;
+    width: 45px;
+    height: 45px;
   }
   
   .social-icon svg {
-    width: 26px;
-    height: 26px;
-=======
-    gap: clamp(8px, 1.5vw, 10px);
-  }
-  
-  .social-icon {
-    width: clamp(24px, 4vw, 28px);
-    height: clamp(24px, 4vw, 28px);
-  }
-  
-  .social-icon svg {
-    width: clamp(14px, 2.5vw, 16px);
-    height: clamp(14px, 2.5vw, 16px);
->>>>>>> cb090812e7bfa62134ee07efa6036eb299824c10
+    width: 24px;
+    height: 24px;
   }
   
   .logo-image {
@@ -432,44 +354,26 @@
   
   .dashboard-button {
     padding: clamp(6px, 1.5vw, 8px) clamp(10px, 2.5vw, 12px);
-<<<<<<< HEAD
     font-size: clamp(0.75rem, 1.8vw, 0.85rem);
-=======
->>>>>>> cb090812e7bfa62134ee07efa6036eb299824c10
     gap: clamp(4px, 1vw, 6px);
-    font-size: clamp(0.7rem, 1.8vw, 0.8rem);
   }
   
   .dashboard-button svg {
-<<<<<<< HEAD
     width: clamp(14px, 2.5vw, 16px);
     height: clamp(14px, 2.5vw, 16px);
-=======
-    width: clamp(12px, 2.5vw, 14px);
-    height: clamp(12px, 2.5vw, 14px);
-  }
-  
-  .dashboard-button span {
-    font-size: clamp(0.7rem, 1.8vw, 0.8rem);
->>>>>>> cb090812e7bfa62134ee07efa6036eb299824c10
   }
 }
 
 /* Ultra-small screens */
 @media (max-width: 360px) {
   .social-icon {
-<<<<<<< HEAD
-    width: clamp(40px, 8vw, 50px);
-    height: clamp(40px, 8vw, 50px);
-=======
-    width: clamp(22px, 3.5vw, 26px);
-    height: clamp(22px, 3.5vw, 26px);
+    width: clamp(40px, 8vw, 45px);
+    height: clamp(40px, 8vw, 45px);
   }
   
   .social-icon svg {
-    width: clamp(12px, 2vw, 14px);
-    height: clamp(12px, 2vw, 14px);
->>>>>>> cb090812e7bfa62134ee07efa6036eb299824c10
+    width: clamp(20px, 4vw, 22px);
+    height: clamp(20px, 4vw, 22px);
   }
   
   .logo-image {

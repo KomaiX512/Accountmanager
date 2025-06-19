@@ -26,6 +26,11 @@ if is_port_in_use 3002; then
   kill $(lsof -t -i:3002) 2>/dev/null || true
 fi
 
+if is_port_in_use 5173; then
+  echo "Stopping front-end on port 5173..."
+  kill $(lsof -t -i:5173) 2>/dev/null || true
+fi
+
 # Wait a moment for processes to terminate
 sleep 2
 
@@ -34,26 +39,32 @@ if command -v gnome-terminal &>/dev/null; then
   echo "Starting servers in separate terminals..."
   
   # Start the main server (port 3000)
-  gnome-terminal --tab --title="Main Server" -- bash -c "cd \"$PROJECT_DIR\" && echo 'Starting main server on port 3000...' && npm run dev; bash"
+  gnome-terminal --tab --title="Main Server" -- bash -c "cd \"$PROJECT_DIR\" && echo 'Starting main server on port 3000...' && node server/server.js; bash"
   
   # Start the RAG server (port 3001)
   gnome-terminal --tab --title="RAG Server" -- bash -c "cd \"$PROJECT_DIR\" && echo 'Starting RAG server on port 3001...' && node rag-server.js; bash"
   
   # Start the image server (port 3002)
   gnome-terminal --tab --title="Image Server" -- bash -c "cd \"$PROJECT_DIR\" && echo 'Starting image server on port 3002...' && node server.js; bash"
+  
+  # Start the front-end dev server (port 5173)
+  gnome-terminal --tab --title="Frontend" -- bash -c "cd \"$PROJECT_DIR\" && echo 'Starting Vite dev server on port 5173...' && npm run frontend; bash"
 
 # Check if xterm is available as fallback
 elif command -v xterm &>/dev/null; then
   echo "Starting servers in separate terminals using xterm..."
   
   # Start the main server (port 3000)
-  xterm -T "Main Server" -e "cd \"$PROJECT_DIR\" && echo 'Starting main server on port 3000...' && npm run dev; bash" &
+  xterm -T "Main Server" -e "cd \"$PROJECT_DIR\" && echo 'Starting main server on port 3000...' && node server/server.js; bash" &
   
   # Start the RAG server (port 3001)
   xterm -T "RAG Server" -e "cd \"$PROJECT_DIR\" && echo 'Starting RAG server on port 3001...' && node rag-server.js; bash" &
   
   # Start the image server (port 3002)
   xterm -T "Image Server" -e "cd \"$PROJECT_DIR\" && echo 'Starting image server on port 3002...' && node server.js; bash" &
+  
+  # Start the front-end dev server (port 5173)
+  xterm -T "Frontend" -e "cd \"$PROJECT_DIR\" && echo 'Starting Vite dev server on port 5173...' && npm run frontend; bash" &
 
 # Use screen as final fallback
 else
@@ -69,13 +80,16 @@ else
   screen -wipe &>/dev/null
   
   # Start the main server
-  screen -dmS main_server bash -c "cd \"$PROJECT_DIR\" && echo 'Starting main server on port 3000...' && npm run dev; bash"
+  screen -dmS main_server bash -c "cd \"$PROJECT_DIR\" && echo 'Starting main server on port 3000...' && node server/server.js; bash"
   
   # Start the RAG server
   screen -dmS rag_server bash -c "cd \"$PROJECT_DIR\" && echo 'Starting RAG server on port 3001...' && node rag-server.js; bash"
   
   # Start the image server
   screen -dmS image_server bash -c "cd \"$PROJECT_DIR\" && echo 'Starting image server on port 3002...' && node server.js; bash"
+  
+  # Start the front-end dev server
+  screen -dmS frontend bash -c "cd \"$PROJECT_DIR\" && echo 'Starting Vite dev server on port 5173...' && npm run frontend; bash"
   
   echo "All servers started in screen sessions."
   echo "Use 'screen -r main_server', 'screen -r rag_server', or 'screen -r image_server' to view each server."
@@ -102,6 +116,12 @@ if is_port_in_use 3002; then
   echo "✅ Image server running on port 3002"
 else
   echo "❌ Image server not running on port 3002"
+fi
+
+if is_port_in_use 5173; then
+  echo "✅ Front-end running on port 5173"
+else
+  echo "❌ Front-end not running on port 5173"
 fi
 
 echo -e "\nAll servers should now be running."

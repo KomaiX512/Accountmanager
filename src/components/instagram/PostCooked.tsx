@@ -982,20 +982,17 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             formData.append('scheduleDate', scheduleTime.toISOString());
             formData.append('platform', 'facebook');
 
-            // Enhanced image handling for Facebook
+            // Enhanced image handling for Facebook using new robust method
             if (post.data.image_url) {
               try {
                 setAutoScheduleProgress(`📷 Fetching image for Facebook post ${postNumber}...`);
-                const imageUrl = getReliableImageUrl(post, true); // Force fresh URL
-                const proxyUrl = `${API_BASE_URL}/api/proxy-image?url=${encodeURIComponent(imageUrl)}`;
+                const imageBlob = await fetchImageBlob(post, 'facebookAutoSchedule');
                 
-                const imgRes = await fetch(proxyUrl);
-                if (imgRes.ok) {
-                  const imageBlob = await imgRes.blob();
-                  if (imageBlob.size > 0) {
-                    formData.append('image', imageBlob, `facebook_post_${postNumber}.jpg`);
-                    console.log(`[AutoSchedule] 📷 Image added to Facebook post ${postNumber} (${imageBlob.size} bytes)`);
-                  }
+                if (imageBlob && imageBlob.size > 0) {
+                  formData.append('image', imageBlob, `facebook_post_${postNumber}.jpg`);
+                  console.log(`[AutoSchedule] 📷 Image added to Facebook post ${postNumber} (${imageBlob.size} bytes)`);
+                } else {
+                  console.warn(`[AutoSchedule] ⚠️ Facebook post ${postNumber}: Image fetch failed, posting text-only`);
                 }
               } catch (imgErr) {
                 console.warn(`[AutoSchedule] ⚠️ Facebook post ${postNumber}: Image fetch failed, posting text-only`);
@@ -1021,84 +1018,16 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             // ============= INSTAGRAM SCHEDULING (NATIVE SCHEDULER) =============
             console.log(`[AutoSchedule] 📸 Instagram post ${postNumber}: Processing...`);
             
-            // Enhanced image key extraction
-            let imageKey = '';
+            // Enhanced image fetching using the new robust method
+            setAutoScheduleProgress(`📷 Fetching image for Instagram post ${postNumber}...`);
+            const imageBlob = await fetchImageBlob(post, 'autoSchedule');
             
-            // Method 1: From post key (most reliable)
-            if (post.key && post.key.match(/ready_post_\d+\.json$/)) {
-              const postIdMatch = post.key.match(/ready_post_(\d+)\.json$/);
-              if (postIdMatch) {
-                imageKey = `image_${postIdMatch[1]}.jpg`;
-                console.log(`[AutoSchedule] 🔑 Extracted imageKey from post key: ${imageKey}`);
-              }
-            }
-            
-            // Method 2: From image URL (fallback)
-            if (!imageKey && post.data.image_url) {
-              const urlMatch = post.data.image_url.match(/(image_\d+\.jpg)/);
-              if (urlMatch) {
-                imageKey = urlMatch[1];
-                console.log(`[AutoSchedule] 🔑 Extracted imageKey from URL: ${imageKey}`);
-              }
-            }
-            
-            if (!imageKey) {
-              console.error(`[AutoSchedule] ❌ Could not determine imageKey for post ${postNumber}`);
+            if (!imageBlob) {
+              console.error(`[AutoSchedule] ❌ Image fetch failed for post ${postNumber}`);
               failureCount++;
-              setToastMessage(`❌ Post ${postNumber}: Could not determine image`);
+              setToastMessage(`❌ Post ${postNumber}: Image fetch failed`);
               continue;
             }
-
-            // Enhanced image fetching with multiple fallback methods
-            let imageBlob: Blob | null = null;
-            
-            try {
-              setAutoScheduleProgress(`📷 Fetching image for Instagram post ${postNumber}...`);
-              
-              // Try direct R2 image first (most reliable)
-              const directImageUrl = `${API_BASE_URL}/api/r2-image/${username}/${imageKey}?platform=instagram&t=${Date.now()}`;
-              console.log(`[AutoSchedule] 🎯 Trying direct R2 URL: ${directImageUrl}`);
-              
-              let imgRes = await fetch(directImageUrl);
-              
-              if (!imgRes.ok) {
-                console.warn(`[AutoSchedule] ⚠️ Direct R2 failed, trying signed URL...`);
-                
-                // Fallback to signed URL
-                const signedUrlRes = await fetch(`${API_BASE_URL}/api/signed-image-url/${username}/${imageKey}?platform=instagram`);
-                const signedUrlData = await signedUrlRes.json();
-                
-                if (!signedUrlData.url) {
-                  throw new Error('No signed URL returned');
-                }
-                
-                const proxyUrl = `${API_BASE_URL}/api/proxy-image?url=${encodeURIComponent(signedUrlData.url)}`;
-                                 imgRes = await fetch(proxyUrl);
-              }
-              
-              if (!imgRes.ok) {
-                throw new Error(`Image fetch failed: HTTP ${imgRes.status}`);
-              }
-              
-              imageBlob = await imgRes.blob();
-              
-              // Validate image blob
-              if (!imageBlob || imageBlob.size === 0) {
-                throw new Error('Empty image blob received');
-              }
-              
-              if (!['image/jpeg', 'image/png'].includes(imageBlob.type)) {
-                throw new Error(`Invalid image type: ${imageBlob.type}`);
-              }
-              
-              console.log(`[AutoSchedule] ✅ Image fetched for post ${postNumber}: ${imageBlob.size} bytes, type: ${imageBlob.type}`);
-              
-                         } catch (imgError: any) {
-               console.error(`[AutoSchedule] ❌ Image fetch failed for post ${postNumber}:`, imgError);
-               failureCount++;
-               setToastMessage(`❌ Post ${postNumber}: Image fetch failed - ${imgError?.message || 'Unknown error'}`);
-               continue;
-             }
 
             // Enhanced caption handling
             let caption = post.data.post?.caption || '';
@@ -1253,115 +1182,328 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   };
 
   const handleConfirmPostNow = async () => {
-    if (!selectedPostForPosting || !userId) return;
+    if (!selectedPostForPosting || !userId) {
+      console.error('[PostNow] Missing required data:', { selectedPostForPosting: !!selectedPostForPosting, userId });
+      setToastMessage('Missing post or user information.');
+      setIsPosting(false);
+      setShowPostNowModal(false);
+      return;
+    }
     
     setIsPosting(true);
+    console.log(`[PostNow] 🚀 Starting PostNow process for user ${userId}`);
     
     try {
       const post = selectedPostForPosting;
       const caption = post.data.post?.caption || '';
       
-      // Get image blob with fresh signed URL and robust error handling
-      let imageBlob: Blob | null = null;
-      if (post.data.image_url) {
-        try {
-          // Use direct R2 endpoint instead of signed URLs for reliability
-          let imageUrl = post.data.image_url;
-          
-          if (imageUrl.includes('X-Amz-Signature') && imageUrl.includes('r2.cloudflarestorage.com')) {
-            // This is a signed R2 URL, convert to direct R2 endpoint
-            const pathMatch = imageUrl.match(/ready_post\/instagram\/([^\/]+)\/([^?]+)/);
-            if (pathMatch) {
-              const [, username, imageKey] = pathMatch;
-              imageUrl = `${API_BASE_URL}/api/r2-image/${username}/${imageKey}?platform=instagram`;
-              console.log(`[PostNow] Using direct R2 endpoint for ${imageKey}`);
-            }
-          }
-          
-          const proxyUrl = `${API_BASE_URL}/api/proxy-image?url=${encodeURIComponent(imageUrl)}`;
-          const imgRes = await fetch(proxyUrl);
-          
-          // Check if response is actually an image
-          const contentType = imgRes.headers.get('content-type') || '';
-          if (!contentType.startsWith('image/')) {
-            throw new Error(`Invalid content type: ${contentType}`);
-          }
-          
-          if (!imgRes.ok) {
-            throw new Error(`Failed to fetch image: ${imgRes.status} ${imgRes.statusText}`);
-          }
-          
-          imageBlob = await imgRes.blob();
-          console.log(`[PostNow] Successfully fetched image blob: ${imageBlob.size} bytes, type: ${imageBlob.type}`);
-        } catch (imgError: any) {
-          console.error(`[PostNow] Error fetching image:`, imgError);
-          setToastMessage(`Failed to fetch image: ${imgError.message}`);
-          setIsPosting(false);
-          setShowPostNowModal(false);
-          setSelectedPostForPosting(null);
-          return;
-        }
+      // ✅ PRE-VALIDATION: Check all requirements before starting
+      console.log(`[PostNow] 🔍 Validating post requirements...`);
+      
+      // Validate platform connection
+      if (!isConnected) {
+        throw new Error('Instagram account not connected. Please connect your Instagram account first.');
       }
+      
+      // Validate post data
+      if (!post.key) {
+        throw new Error('Post key is missing. Cannot identify post.');
+      }
+      
+      // Validate caption length for Instagram
+      if (caption.length > 2200) {
+        throw new Error('Caption too long. Instagram captions must be under 2200 characters.');
+      }
+      
+      console.log(`[PostNow] ✅ Pre-validation passed. Post key: ${post.key}, Caption length: ${caption.length}`);
+      
+      // Enhanced image fetching using the new robust method
+      console.log(`[PostNow] 📷 Fetching image for posting...`);
+      const imageBlob = await fetchImageBlob(post, 'postNow');
       
       if (!imageBlob) {
-        setToastMessage('No image found for this post.');
-        setIsPosting(false);
-        return;
+        throw new Error('Failed to fetch image for posting. Please try again or contact support.');
       }
       
+      // Additional image validation
+      if (imageBlob.size < 1000) {
+        throw new Error(`Image too small (${imageBlob.size} bytes). Please use a larger image.`);
+      }
+      
+      if (imageBlob.size > 8 * 1024 * 1024) {
+        throw new Error(`Image too large (${Math.round(imageBlob.size / 1024 / 1024)}MB). Please use an image under 8MB.`);
+      }
+      
+      console.log(`[PostNow] ✅ Image validated: ${imageBlob.size} bytes, type: ${imageBlob.type}`);
+      
+      // Prepare form data
       const formData = new FormData();
       formData.append('image', imageBlob, 'post_image.jpg');
       formData.append('caption', caption);
+      formData.append('platform', platform);
+      formData.append('postKey', post.key);
       
-      console.log(`[PostNow] Posting to Instagram for user ${userId}`);
+      console.log(`[PostNow] 📤 Submitting to Instagram API for user ${userId}...`);
+      console.log(`[PostNow] 📝 Caption preview: "${caption.substring(0, 100)}${caption.length > 100 ? '...' : ''}"`);
       
-      const response = await fetch(`${API_BASE_URL}/post-instagram-now/${userId}`, {
+      // Make the API call with enhanced error handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
+      const response = await fetch(`${API_BASE_URL}/api/post-instagram-now/${userId}`, {
         method: 'POST',
         body: formData,
+        signal: controller.signal,
+        headers: {
+          // Don't set Content-Type header, let browser set it for FormData
+        }
       });
       
+      clearTimeout(timeoutId);
+      
+      console.log(`[PostNow] 📊 Instagram API Response: Status ${response.status}`);
+      
+      // Enhanced response handling
+      let responseData: any = {};
+      let responseText = '';
+      
+      try {
+        responseText = await response.text();
+        console.log(`[PostNow] 📋 Raw response: ${responseText.substring(0, 500)}${responseText.length > 500 ? '...' : ''}`);
+        
+        if (responseText.trim()) {
+          responseData = JSON.parse(responseText);
+        }
+      } catch (parseError) {
+        console.warn(`[PostNow] ⚠️ Could not parse response as JSON: ${parseError}`);
+        responseData = { rawResponse: responseText };
+      }
+      
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('[PostNow] Failed to post:', errorData);
-        setToastMessage(`Failed to post: ${errorData.error || 'Unknown error'}`);
-      } else {
-        const resultData = await response.json();
-        console.log('[PostNow] Posted successfully:', resultData);
+        // Enhanced error handling with detailed diagnosis
+        let errorMessage = 'Unknown error occurred';
         
-        // ✅ REAL USAGE TRACKING: Track actual post publication
-        const trackingSuccess = await trackRealPostCreation(platform, {
-          scheduled: false,
-          immediate: true,
-          type: 'instant_post_now'
-        });
-        
-        if (!trackingSuccess) {
-          console.warn(`[PostCooked] 🚫 Post publication blocked for ${platform} - limit reached`);
-          setToastMessage('Post limit reached - upgrade to continue');
-          return;
+        if (response.status === 400) {
+          errorMessage = responseData.error || responseData.message || 'Bad request - check your post content and try again';
+        } else if (response.status === 401) {
+          errorMessage = 'Instagram authentication failed. Please reconnect your Instagram account.';
+        } else if (response.status === 403) {
+          errorMessage = 'Instagram API access denied. Your account may need verification.';
+        } else if (response.status === 429) {
+          errorMessage = 'Instagram rate limit exceeded. Please wait a few minutes and try again.';
+        } else if (response.status >= 500) {
+          errorMessage = 'Instagram server error. Please try again in a few minutes.';
+        } else {
+          errorMessage = responseData.error || responseData.message || `HTTP ${response.status}: ${response.statusText}`;
         }
         
-        console.log(`[PostCooked] ✅ Instant post tracked: ${platform} post published`);
-        setToastMessage('🎉 Posted to Instagram successfully! Usage tracked.');
+        console.error(`[PostNow] ❌ Instagram API Error (${response.status}):`, {
+          status: response.status,
+          statusText: response.statusText,
+          responseData,
+          responseText: responseText.substring(0, 1000)
+        });
         
-        // Update post status to posted (visual feedback)
-        setLocalPosts(prev => 
-          prev.map(p => 
-            p.key === selectedPostForPosting.key 
-              ? { ...p, data: { ...p.data, status: 'posted' } }
-              : p
-          )
-        );
+        throw new Error(errorMessage);
       }
+      
+      // Success handling
+      console.log(`[PostNow] ✅ Instagram posting successful:`, responseData);
+      
+      // ✅ REAL USAGE TRACKING: Track actual post publication
+      console.log(`[PostNow] 📊 Tracking usage...`);
+      const trackingSuccess = await trackRealPostCreation(platform, {
+        scheduled: false,
+        immediate: true,
+        type: 'instant_post_now'
+      });
+      
+      if (!trackingSuccess) {
+        console.warn(`[PostCooked] 🚫 Post publication blocked for ${platform} - limit reached`);
+        setToastMessage('⚠️ Post was successful but usage limit reached. Upgrade to continue posting.');
+        return;
+      }
+      
+      console.log(`[PostCooked] ✅ Usage tracking successful: ${platform} post tracked`);
+      
+      // Update UI to reflect successful post
+      setLocalPosts(prev => 
+        prev.map(p => 
+          p.key === selectedPostForPosting.key 
+            ? { ...p, data: { ...p.data, status: 'posted' } }
+            : p
+        )
+      );
+      
+      // Success message with post details
+      const postId = responseData.id || responseData.post_id || 'unknown';
+      setToastMessage(`🎉 Posted to Instagram successfully! Post ID: ${postId}`);
+      
     } catch (error: any) {
-      console.error('[PostNow] Error posting:', error);
-      setToastMessage(`Error posting: ${error.message}`);
+      // Comprehensive error logging and user feedback
+      console.error(`[PostNow] 💥 PostNow failed:`, {
+        error: error.message,
+        stack: error.stack,
+        userId,
+        postKey: selectedPostForPosting?.key,
+        platform
+      });
+      
+      // User-friendly error messages
+      let userMessage = error.message;
+      
+      if (error.name === 'AbortError') {
+        userMessage = 'Request timed out. Please check your internet connection and try again.';
+      } else if (error.message.includes('fetch')) {
+        userMessage = 'Network error. Please check your internet connection and try again.';
+      } else if (error.message.includes('Failed to fetch image')) {
+        userMessage = 'Could not load image. Please refresh the page and try again.';
+      }
+      
+      setToastMessage(`❌ PostNow failed: ${userMessage}`);
+      
     } finally {
       setIsPosting(false);
       setShowPostNowModal(false);
       setSelectedPostForPosting(null);
+      console.log(`[PostNow] 🏁 PostNow process completed`);
     }
   };
+
+  // Enhanced image key extraction with better fallbacks and validation
+  const extractImageKey = useCallback((post: any): string | null => {
+    try {
+      // Method 1: Extract from post key (most reliable)
+      if (post.key && post.key.match(/ready_post_\d+\.json$/)) {
+        const postIdMatch = post.key.match(/ready_post_(\d+)\.json$/);
+        if (postIdMatch) {
+          const imageKey = `image_${postIdMatch[1]}.jpg`;
+          console.log(`[PostCooked] 🔑 Extracted imageKey from post key: ${imageKey}`);
+          return imageKey;
+        }
+      }
+      
+      // Method 2: Extract from existing image URLs
+      const imageUrl = post.data.image_url || post.data.r2_image_url || '';
+      if (imageUrl) {
+        // Handle both direct R2 URLs and our proxy URLs
+        const urlPatterns = [
+          /(image_\d+\.jpg)/,           // Direct filename match
+          /\/([^\/]+\.jpg)$/,           // Last segment ending in .jpg
+          /image_(\d+)/                 // Image ID pattern
+        ];
+        
+        for (const pattern of urlPatterns) {
+          const match = imageUrl.match(pattern);
+          if (match) {
+            let imageKey = match[1];
+            // If we only got the ID, format it properly
+            if (pattern.source.includes('image_(\\d+)') && !imageKey.includes('.jpg')) {
+              imageKey = `image_${imageKey}.jpg`;
+            }
+            console.log(`[PostCooked] 🔑 Extracted imageKey from URL: ${imageKey}`);
+            return imageKey;
+          }
+        }
+      }
+      
+      console.warn(`[PostCooked] ⚠️ Could not extract imageKey for post ${post.key}`);
+      return null;
+    } catch (error) {
+      console.error(`[PostCooked] ❌ Error extracting imageKey:`, error);
+      return null;
+    }
+  }, []);
+
+  // Enhanced image fetching with comprehensive error handling and fallbacks
+  const fetchImageBlob = useCallback(async (post: any, purpose: string = 'general'): Promise<Blob | null> => {
+    try {
+      const imageKey = extractImageKey(post);
+      if (!imageKey) {
+        throw new Error('Could not determine image key for post');
+      }
+      
+      console.log(`[PostCooked] 📤 Fetching image for ${purpose}: ${imageKey}`);
+      
+      // Try multiple endpoints with fallbacks
+      const endpoints = [
+        // Primary: Direct R2 endpoint with cache busting
+        `${API_BASE_URL}/api/r2-image/${username}/${imageKey}?platform=${platform}&t=${Date.now()}&purpose=${purpose}`,
+        // Fallback 1: Fix-image endpoint
+        `${API_BASE_URL}/fix-image/${username}/${imageKey}?platform=${platform}`,
+        // Fallback 2: Direct R2 without cache busting
+        `${API_BASE_URL}/api/r2-image/${username}/${imageKey}?platform=${platform}`
+      ];
+      
+      let lastError: Error | null = null;
+      
+      for (let i = 0; i < endpoints.length; i++) {
+        const endpoint = endpoints[i];
+        console.log(`[PostCooked] 🎯 Trying endpoint ${i + 1}/${endpoints.length}: ${endpoint}`);
+        
+        try {
+                     const response = await fetch(endpoint, {
+             method: 'GET',
+             headers: {
+               'Accept': 'image/*,*/*',
+               'Cache-Control': purpose === 'postNow' ? 'no-cache' : 'default'
+             }
+           });
+          
+          console.log(`[PostCooked] 📊 Response ${i + 1}: Status ${response.status}, Content-Type: ${response.headers.get('content-type')}`);
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          
+          // Check content type
+          const contentType = response.headers.get('content-type') || '';
+          if (!contentType.startsWith('image/') && !contentType.includes('octet-stream')) {
+            // If we get HTML or text, log it for debugging but try next endpoint
+            if (contentType.includes('text/html')) {
+              const htmlContent = await response.text();
+              console.warn(`[PostCooked] ⚠️ Endpoint ${i + 1} returned HTML (probably error page): ${htmlContent.substring(0, 200)}...`);
+              throw new Error(`Invalid content type: ${contentType} (HTML error page)`);
+            }
+            throw new Error(`Invalid content type: ${contentType}. Expected image data.`);
+          }
+          
+          const imageBlob = await response.blob();
+          
+          // Validate image blob
+          if (!imageBlob || imageBlob.size === 0) {
+            throw new Error('Empty image blob received');
+          }
+          
+          if (imageBlob.size < 100) {
+            throw new Error(`Image too small: ${imageBlob.size} bytes (likely corrupted)`);
+          }
+          
+          // Check blob type
+          if (!['image/jpeg', 'image/png', 'image/webp', 'application/octet-stream'].includes(imageBlob.type)) {
+            console.warn(`[PostCooked] ⚠️ Unusual blob type: ${imageBlob.type}, but proceeding`);
+          }
+          
+          console.log(`[PostCooked] ✅ Image fetched successfully from endpoint ${i + 1}: ${imageBlob.size} bytes, type: ${imageBlob.type}`);
+          return imageBlob;
+          
+        } catch (endpointError: any) {
+          console.warn(`[PostCooked] ⚠️ Endpoint ${i + 1} failed: ${endpointError.message}`);
+          lastError = endpointError;
+          
+          // Don't wait between endpoint attempts
+          continue;
+        }
+      }
+      
+      // All endpoints failed
+      throw new Error(`All ${endpoints.length} endpoints failed. Last error: ${lastError?.message || 'Unknown error'}`);
+      
+    } catch (error: any) {
+      console.error(`[PostCooked] ❌ Image fetch failed for ${purpose}:`, error.message);
+      return null;
+    }
+  }, [username, platform, extractImageKey]);
 
   if (!username) {
     return (

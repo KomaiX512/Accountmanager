@@ -1,0 +1,18 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "You are an expert Instagram account analyst providing precise, data-driven insights.\n\nENHANCED CONTEXT FOR @fentybeauty ON INSTAGRAM:\n\n📈 ENGAGEMENT ANALYTICS:\nEngagement Analytics for @fentybeauty on instagram:\nAverage Likes per Post: 16,240\nAverage Comments per Post: 1,133\nAverage Shares per Post: 0\nTotal Posts: 12\nEngagement Rate: 0.13%\nPerformance: Below Average\n\n🎯 CONTEXT RELEVANCE:\n- Found 8 relevant documents\n- Average relevance score: 0.61\n- Document types: engagement\n\n\n\nUSER QUESTION: \"Tell me about the uniqueness of this account\"\n\nRESPONSE GUIDELINES:\n- Use ONLY the relevant context provided above\n- Be specific and cite actual data points when available\n- Keep responses focused and actionable\n- Provide concrete recommendations based on the context\n- If the context doesn't fully answer the question, acknowledge limitations honestly\n\nYour expert analysis:"
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 2000,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "topK": 40
+  }
+}

@@ -1,4 +1,4 @@
-/* Lightweight CSS Neural Network Fallback */
+/* Lightweight CSS Neural Network Fallback - Optimized for performance */
 .css-neural-network {
   position: absolute;
   top: 0;
@@ -7,9 +7,11 @@
   height: 100%;
   overflow: hidden;
   z-index: 1;
+  will-change: auto; /* Let browser optimize */
+  contain: layout style paint; /* Performance containment */
 }
 
-/* Animated background gradient */
+/* Animated background gradient - Performance optimized */
 .css-neural-background {
   position: absolute;
   top: 0;
@@ -17,10 +19,10 @@
   width: 100%;
   height: 100%;
   background: 
-    radial-gradient(circle at 20% 20%, rgba(0, 255, 204, 0.1) 0%, transparent 50%),
-    radial-gradient(circle at 80% 80%, rgba(0, 123, 255, 0.1) 0%, transparent 50%),
-    radial-gradient(circle at 40% 60%, rgba(106, 90, 205, 0.05) 0%, transparent 50%);
-  animation: backgroundPulse 8s ease-in-out infinite;
+    radial-gradient(circle at 20% 20%, rgba(0, 255, 204, 0.05) 0%, transparent 50%), /* Reduced opacity for performance */
+    radial-gradient(circle at 80% 80%, rgba(0, 123, 255, 0.05) 0%, transparent 50%);
+  animation: backgroundPulse 12s ease-in-out infinite; /* Slower animation for performance */
+  will-change: opacity; /* Only animate opacity for GPU optimization */
 }
 
 @keyframes backgroundPulse {
@@ -43,22 +45,21 @@
   height: 100%;
 }
 
-/* Individual neural nodes */
+/* Individual neural nodes - Performance optimized */
 .css-neural-node {
   position: absolute;
-  width: 8px;
-  height: 8px;
-  background: radial-gradient(circle, #00ffcc 0%, rgba(0, 255, 204, 0.2) 70%, transparent 100%);
+  width: 6px; /* Smaller for better performance */
+  height: 6px;
+  background: radial-gradient(circle, #00ffcc 0%, rgba(0, 255, 204, 0.15) 70%, transparent 100%); /* Reduced opacity */
   border-radius: 50%;
   left: var(--x);
   top: var(--y);
   transform-origin: center;
   animation: 
-    nodeFloat 4s ease-in-out infinite var(--delay),
-    nodePulse 2s ease-in-out infinite var(--delay);
-  box-shadow: 
-    0 0 10px rgba(0, 255, 204, 0.5),
-    0 0 20px rgba(0, 255, 204, 0.2);
+    nodeFloat 6s ease-in-out infinite var(--delay), /* Slower animations */
+    nodePulse 4s ease-in-out infinite var(--delay);
+  box-shadow: 0 0 8px rgba(0, 255, 204, 0.3); /* Simplified shadow for performance */
+  will-change: transform, opacity; /* Optimize for these properties */
 }
 
 @keyframes nodeFloat {

@@ -1,0 +1,18 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "You are a professional Instagram growth strategist and social media analyst with extensive experience helping brands optimize their digital presence. You have access to comprehensive profile data and advanced analytics.\n\n📊 COMPREHENSIVE DATA ANALYSIS FOR @fentybeauty:\n📊 STRATEGIC INTELLIGENCE REPORT FOR @fentybeauty ON INSTAGRAM:\n\n🎭 BRAND DNA & PERSONALITY MATRIX:\nBio Analysis for @fentybeauty on instagram:\nDescription: Shop online & worldwide at Sephora, Ulta Beauty, Harvey Nichols, Selfridges, Boots & select Asia duty free shops\n🖤 Tag us #FENTYBEAUTY\n♾️ #CrueltyFree\nThemes: Beauty & Cosmetics\nPersonality: Engaging\nKeywords: shop, online, worldwide, sephora, ulta, beauty, harvey, nichols, selfridges, boots\n\n🎯 BRAND INSIGHTS: The bio analysis reveals key brand values and messaging strategies that drive audience connection and engagement.\n\n📋 ANALYSIS SUMMARY:\n🎯 Data Confidence: 28% (High Quality)\n📊 Analysis Depth: 8 data points across 1 strategic categories\n🚀 Strategic Focus: bio = Comprehensive Brand Analysis\n💡 Recommendation Level: Professional insights ready for strategic implementation\n\n\n\nSTRATEGIC QUESTION: \"Tell me about my account, what do you know about me?\"\n\n🎯 YOUR EXPERTISE AS A SOCIAL MEDIA STRATEGIST:\n- Provide detailed insights based on the comprehensive data above\n- Use specific metrics and data points to support your analysis\n- Be confident and authoritative in your recommendations\n- Focus on actionable strategies for growth and engagement optimization\n- Identify competitive advantages and monetization opportunities\n- Present findings as data-driven strategic intelligence\n- Offer concrete next steps and implementation strategies\n\nDeliver your professional analysis based on this comprehensive data:"
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 2000,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "topK": 40
+  }
+}

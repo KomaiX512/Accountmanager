@@ -5,9 +5,10 @@ import './NeuralNetworkCSS.css';
 interface NeuralNetworkProps {
   mouseX: number;
   mouseY: number;
+  forceCSS?: boolean; // Force CSS fallback for performance
 }
 
-const NeuralNetwork: React.FC<NeuralNetworkProps> = ({ mouseX, mouseY }) => {
+const NeuralNetwork: React.FC<NeuralNetworkProps> = ({ mouseX, mouseY, forceCSS = false }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -16,8 +17,8 @@ const NeuralNetwork: React.FC<NeuralNetworkProps> = ({ mouseX, mouseY }) => {
   const connectionsRef = useRef<THREE.Line[]>([]);
   const particlesRef = useRef<THREE.Points | null>(null);
   const [isVisible, setIsVisible] = useState(true);
-  const [performanceMode, setPerformanceMode] = useState<'high' | 'medium' | 'low' | 'css'>('medium');
-  const [useCSSFallback, setUseCSSFallback] = useState(false);
+  const [performanceMode, setPerformanceMode] = useState<'high' | 'medium' | 'low' | 'css'>(forceCSS ? 'css' : 'medium');
+  const [useCSSFallback, setUseCSSFallback] = useState(forceCSS);
   
   // Performance monitoring
   const frameCountRef = useRef(0);
@@ -27,8 +28,13 @@ const NeuralNetwork: React.FC<NeuralNetworkProps> = ({ mouseX, mouseY }) => {
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // Check device capabilities for auto-fallback
+    // Check device capabilities for auto-fallback (skip if forceCSS is true)
     const checkDeviceCapabilities = () => {
+      if (forceCSS) {
+        setUseCSSFallback(true);
+        return;
+      }
+      
       const canvas = document.createElement('canvas');
       const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
       
@@ -37,12 +43,16 @@ const NeuralNetwork: React.FC<NeuralNetworkProps> = ({ mouseX, mouseY }) => {
         return;
       }
       
-      // Check for low-end devices
+      // Check for low-end devices - more aggressive for auth page performance
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       const isLowMemory = navigator.hardwareConcurrency && navigator.hardwareConcurrency < 4;
       
-      if (isMobile || isLowMemory) {
-        setPerformanceMode('low');
+      // Force CSS fallback on auth page for better performance
+      if (isMobile || isLowMemory || forceCSS) {
+        setUseCSSFallback(true);
+        setPerformanceMode('css');
+      } else {
+        setPerformanceMode('low'); // Start with low performance mode
       }
     };
 

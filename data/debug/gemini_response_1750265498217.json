@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Based on the provided engagement analytics for @fentybeauty, the account's uniqueness isn't immediately apparent from the data alone. We see an average of 16,240 likes and 1,133 comments per post. However, the engagement rate of 0.13% is below average, suggesting that while the account may have a large following, the audience isn't actively engaging with the content.\n\nTo determine the account's uniqueness, we'd need more context beyond engagement metrics. For example, analyzing the content themes, visual style, brand voice, and audience demographics would be crucial. Without this information, it's difficult to pinpoint what makes @fentybeauty unique.\n\n**Recommendations:**\n\n*   **Content Analysis:** Analyze the types of posts that receive the highest engagement (likes and comments) to identify successful content formats and themes.\n*   **Audience Analysis:** Understand the demographics and interests of @fentybeauty's followers to tailor content that resonates with them.\n*   **Competitor Benchmarking:** Compare @fentybeauty's content and engagement with similar beauty brands to identify areas for improvement and differentiation.\n\n**Limitations:**\n\nThe current analysis is limited by the lack of information on content themes, audience demographics, and competitor data. A more comprehensive analysis would be needed to fully understand the uniqueness of @fentybeauty's Instagram account.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.22269281301531413
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 207,
+    "candidatesTokenCount": 289,
+    "totalTokenCount": 496,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 207
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 289
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "l-5SaNPqG_6ShMIPm7P8iAY"
+}

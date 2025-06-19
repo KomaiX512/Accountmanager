@@ -603,22 +603,77 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
 app.get('/proxy-image', async (req, res) => {
   let { url } = req.query;
   if (!url) return res.status(400).send('Image URL is required');
+  
+  const MAX_RETRIES = 3;
+  const RETRY_DELAYS = [1000, 2000, 4000]; // Exponential backoff: 1s, 2s, 4s
+  const TIMEOUT = 10000; // 10 seconds
+  
   try {
     if (Array.isArray(url)) url = url[0];
     const decodedUrl = decodeURIComponent(url);
 
-    // Fetch the image directly (no puppeteer)
-    const response = await axios.get(decodedUrl, { responseType: 'arraybuffer' });
-    const contentType = response.headers['content-type'];
-    if (!contentType.startsWith('image/')) {
-      console.error(`[proxy-image] URL did not return an image:`, decodedUrl, 'Content-Type:', contentType);
-      return res.status(400).send('URL did not return an image');
+    let lastError = null;
+    
+    // Retry loop with exponential backoff
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        console.log(`[proxy-image] Attempt ${attempt + 1}/${MAX_RETRIES + 1} for: ${decodedUrl}`);
+        
+        // Fetch with timeout and proper headers
+        const response = await axios.get(decodedUrl, { 
+          responseType: 'arraybuffer',
+          timeout: TIMEOUT,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'image/*,*/*;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          },
+          // Important: Handle errors properly
+          validateStatus: (status) => status >= 200 && status < 400
+        });
+        
+        const contentType = response.headers['content-type'];
+        if (!contentType || !contentType.startsWith('image/')) {
+          console.error(`[proxy-image] URL did not return an image:`, decodedUrl, 'Content-Type:', contentType);
+          return res.status(400).send('URL did not return an image');
+        }
+        
+        // Success! Set headers and send image
+        res.set('Content-Type', contentType);
+        res.set('Access-Control-Allow-Origin', '*');
+        res.set('Cache-Control', 'public, max-age=3600');
+        res.set('X-Proxy-Attempts', attempt + 1);
+        res.send(response.data);
+        
+        console.log(`[proxy-image] SUCCESS on attempt ${attempt + 1} for: ${decodedUrl}`);
+        return; // Exit successfully
+        
+      } catch (error) {
+        lastError = error;
+        console.warn(`[proxy-image] Attempt ${attempt + 1} failed:`, error?.response?.status || error?.message);
+        
+        // Don't retry on 4xx errors (client errors)
+        if (error?.response?.status >= 400 && error?.response?.status < 500) {
+          console.log(`[proxy-image] Client error (${error.response.status}), not retrying`);
+          break;
+        }
+        
+        // If this isn't the last attempt, wait before retry
+        if (attempt < MAX_RETRIES) {
+          console.log(`[proxy-image] Waiting ${RETRY_DELAYS[attempt]}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAYS[attempt]));
+        }
+      }
     }
-    res.set('Content-Type', contentType);
-    res.set('Access-Control-Allow-Origin', '*');
-    res.send(response.data);
+    
+    // All retries failed
+    console.error(`[proxy-image] All ${MAX_RETRIES + 1} attempts failed for:`, url, lastError?.response?.status, lastError?.message);
+    res.status(500).send('Failed to fetch image after retries');
+    
   } catch (error) {
-    console.error(`[proxy-image] Failed to proxy image:`, url, error?.response?.status, error?.message);
+    console.error(`[proxy-image] Unexpected error:`, url, error?.message);
     res.status(500).send('Failed to fetch image');
   }
 });
@@ -5104,6 +5159,10 @@ app.get('/api/system/cache-stats', (req, res) => {
 app.get('/events/:username', (req, res) => {
   const { username } = req.params;
   const { since } = req.query;
+  
+  // Normalize username according to platform rules (e.g., lowercase for Instagram)
+  const normalizedUsername = PlatformSchemaManager.getPlatformConfig('instagram').normalizeUsername(username);
+  
   let sinceTimestamp = 0;
   
   // Parse reconnection timestamp if provided
@@ -5118,7 +5177,7 @@ app.get('/events/:username', (req, res) => {
     }
   }
   
-  console.log(`[${new Date().toISOString()}] Handling SSE request for /events/${username} (reconnect since: ${sinceTimestamp || 'new connection'})`);
+  console.log(`[${new Date().toISOString()}] Handling SSE request for /events/${normalizedUsername} (reconnect since: ${sinceTimestamp || 'new connection'})`);
 
   // Set headers for SSE
   res.setHeader('Content-Type', 'text/event-stream');
@@ -5136,7 +5195,7 @@ app.get('/events/:username', (req, res) => {
   // Send initial connection confirmation
   const initialEvent = {
     type: 'connection',
-    message: `Connected to events for ${username}`,
+    message: `Connected to events for ${normalizedUsername}`,
     timestamp: Date.now(),
     connectionId
   };
@@ -5144,15 +5203,15 @@ app.get('/events/:username', (req, res) => {
   res.write(`data: ${JSON.stringify(initialEvent)}\n\n`);
   
   // Register this client
-  if (!sseClients.has(username)) {
-    sseClients.set(username, []);
+  if (!sseClients.has(normalizedUsername)) {
+    sseClients.set(normalizedUsername, []);
   }
   
-  const clients = sseClients.get(username);
+  const clients = sseClients.get(normalizedUsername);
   clients.push(res);
   activeConnections.set(res, Date.now());
   
-  console.log(`[${new Date().toISOString()}] SSE client connected for ${username}. Total clients: ${clients.length}`);
+  console.log(`[${new Date().toISOString()}] SSE client connected for ${normalizedUsername}. Total clients: ${clients.length}`);
 
   // If reconnecting, check for missed events
   if (sinceTimestamp > 0) {
@@ -5186,7 +5245,7 @@ app.get('/events/:username', (req, res) => {
                 const data = await s3Client.send(getCommand);
                 const json = await data.Body.transformToString();
                 const token = JSON.parse(json);
-                if (token.username === username) {
+                if (token.username === normalizedUsername) {
                   userId = token.instagram_user_id;
                   break;
                 }
@@ -5194,12 +5253,12 @@ app.get('/events/:username', (req, res) => {
             }
           }
         } catch (err) {
-          console.error(`[${new Date().toISOString()}] Error finding user ID for username ${username}:`, err.message);
+          console.error(`[${new Date().toISOString()}] Error finding user ID for username ${normalizedUsername}:`, err.message);
         }
         
         // Check for missed events in InstagramEvents
         const checkPaths = [];
-        if (username) checkPaths.push(`InstagramEvents/${username}/`);
+        if (normalizedUsername) checkPaths.push(`InstagramEvents/${normalizedUsername}/`);
         if (userId) checkPaths.push(`InstagramEvents/${userId}/`);
         
         const missedEvents = [];
@@ -5252,7 +5311,7 @@ app.get('/events/:username', (req, res) => {
         
         // Send missed events to the client
         if (missedEvents.length > 0) {
-          console.log(`[${new Date().toISOString()}] Sending ${missedEvents.length} missed events to SSE client for ${username}`);
+          console.log(`[${new Date().toISOString()}] Sending ${missedEvents.length} missed events to SSE client for ${normalizedUsername}`);
           
           // First send a batch summary
           res.write(`data: ${JSON.stringify({
@@ -5292,7 +5351,7 @@ app.get('/events/:username', (req, res) => {
             connectionId
           })}\n\n`);
         } else {
-          console.log(`[${new Date().toISOString()}] No missed events found for ${username} since ${new Date(sinceTimestamp).toISOString()}`);
+          console.log(`[${new Date().toISOString()}] No missed events found for ${normalizedUsername} since ${new Date(sinceTimestamp).toISOString()}`);
           res.write(`data: ${JSON.stringify({
             type: 'missed_events_summary',
             count: 0,
@@ -5308,14 +5367,14 @@ app.get('/events/:username', (req, res) => {
   
   // Setup connection close handler
   req.on('close', () => {
-    const updatedClients = sseClients.get(username)?.filter(client => client !== res) || [];
-    sseClients.set(username, updatedClients);
+    const updatedClients = sseClients.get(normalizedUsername)?.filter(client => client !== res) || [];
+    sseClients.set(normalizedUsername, updatedClients);
     activeConnections.delete(res);
     
-    console.log(`[${new Date().toISOString()}] SSE client disconnected for ${username}. Remaining clients: ${updatedClients.length}`);
+    console.log(`[${new Date().toISOString()}] SSE client disconnected for ${normalizedUsername}. Remaining clients: ${updatedClients.length}`);
     if (updatedClients.length === 0) {
-      console.log(`[${new Date().toISOString()}] No more clients for ${username}, cleaning up`);
-      sseClients.delete(username);
+      console.log(`[${new Date().toISOString()}] No more clients for ${normalizedUsername}, cleaning up`);
+      sseClients.delete(normalizedUsername);
     }
   });
 });
@@ -6185,8 +6244,11 @@ class PlatformSchemaManager {
       throw new Error(`Unsupported platform: ${platform}. Must be 'instagram', 'twitter', or 'facebook'`);
     }
     
-    // Build base path
-    let path = `${module}/${normalizedPlatform}/${username}`;
+    // Normalize username according to platform rules (e.g., lowercase for Instagram)
+    const normalizedUsername = PlatformSchemaManager.getPlatformConfig(normalizedPlatform).normalizeUsername(username);
+    
+    // Build base path with normalized username
+    let path = `${module}/${normalizedPlatform}/${normalizedUsername}`;
     
     // Add additional component if provided
     if (additional) {
@@ -9160,24 +9222,64 @@ app.get('/api/proxy-image', async (req, res) => {
     return res.status(400).json({ error: 'URL parameter is required' });
   }
 
-  try {
-    console.log(`[Proxy] Proxying image from: ${url}`);
-    const imageResponse = await axios.get(url, {
-      responseType: 'arraybuffer',
-      timeout: 10000
-    });
-    
-    // Set appropriate content type and other headers
-    const contentType = imageResponse.headers['content-type'] || 'image/jpeg';
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
-    
-    // Send the image data
-    res.send(Buffer.from(imageResponse.data));
-  } catch (error) {
-    console.error(`[Proxy] Failed to proxy image: ${error.message}`);
-    res.status(500).json({ error: 'Failed to proxy image' });
+  const MAX_RETRIES = 3;
+  const RETRY_DELAYS = [1000, 2000, 4000]; // Exponential backoff: 1s, 2s, 4s
+  const TIMEOUT = 10000; // 10 seconds
+  
+  let lastError = null;
+  
+  // Retry loop with exponential backoff
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(`[Proxy] Attempt ${attempt + 1}/${MAX_RETRIES + 1} for: ${url}`);
+      
+      const imageResponse = await axios.get(url, {
+        responseType: 'arraybuffer',
+        timeout: TIMEOUT,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'image/*,*/*;q=0.9',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        },
+        validateStatus: (status) => status >= 200 && status < 400
+      });
+      
+      // Success! Set headers and send image
+      const contentType = imageResponse.headers['content-type'] || 'image/jpeg';
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('X-Proxy-Attempts', attempt + 1);
+      
+      // Send the image data
+      res.send(Buffer.from(imageResponse.data));
+      
+      console.log(`[Proxy] SUCCESS on attempt ${attempt + 1} for: ${url}`);
+      return; // Exit successfully
+      
+    } catch (error) {
+      lastError = error;
+      console.warn(`[Proxy] Attempt ${attempt + 1} failed:`, error?.response?.status || error?.message);
+      
+      // Don't retry on 4xx errors (client errors)
+      if (error?.response?.status >= 400 && error?.response?.status < 500) {
+        console.log(`[Proxy] Client error (${error.response.status}), not retrying`);
+        break;
+      }
+      
+      // If this isn't the last attempt, wait before retry
+      if (attempt < MAX_RETRIES) {
+        console.log(`[Proxy] Waiting ${RETRY_DELAYS[attempt]}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAYS[attempt]));
+      }
+    }
   }
+  
+  // All retries failed
+  console.error(`[Proxy] All ${MAX_RETRIES + 1} attempts failed for: ${url}`, lastError?.message);
+  res.status(500).json({ error: 'Failed to proxy image after retries' });
 });
 
 // Add OPTIONS handler for proxy-image endpoint
@@ -9191,51 +9293,80 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
   const { username, imageKey } = req.params;
   const platform = req.query.platform || 'instagram';
   
-  try {
-    // Construct the R2 key path
-    const r2Key = `ready_post/${platform}/${username}/${imageKey}`;
-    
-    console.log(`[R2-IMAGE] Fetching image: ${r2Key}`);
-    
-    // Get the object from R2
-    const getCommand = new GetObjectCommand({
-      Bucket: 'tasks',
-      Key: r2Key,
-    });
-    
-    const response = await s3Client.send(getCommand);
-    
-    if (!response.Body) {
-      return res.status(404).json({ error: 'Image not found' });
+  const MAX_RETRIES = 3;
+  const RETRY_DELAYS = [500, 1000, 2000]; // Faster retries for R2: 0.5s, 1s, 2s
+  const r2Key = `ready_post/${platform}/${username}/${imageKey}`;
+  
+  let lastError = null;
+  
+  // Retry loop with exponential backoff for R2 fetching
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(`[R2-IMAGE] Attempt ${attempt + 1}/${MAX_RETRIES + 1} for: ${r2Key}`);
+      
+      // Get the object from R2 with timeout
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: r2Key,
+      });
+      
+      const response = await s3Client.send(getCommand);
+      
+      if (!response.Body) {
+        console.log(`[R2-IMAGE] No body in response for: ${r2Key}`);
+        return res.status(404).json({ error: 'Image not found' });
+      }
+      
+      // Convert stream to buffer
+      const imageBuffer = await streamToBuffer(response.Body);
+      
+      if (!imageBuffer || imageBuffer.length === 0) {
+        console.log(`[R2-IMAGE] Empty buffer for: ${r2Key}`);
+        return res.status(404).json({ error: 'Empty image data' });
+      }
+      
+      // Success! Set appropriate headers for JPG images
+      res.setHeader('Content-Type', response.ContentType || 'image/jpeg');
+      res.setHeader('Content-Length', imageBuffer.length);
+      res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+      res.setHeader('ETag', response.ETag || `"${imageKey}-${Date.now()}"`);
+      res.setHeader('Last-Modified', response.LastModified?.toUTCString() || new Date().toUTCString());
+      res.setHeader('X-R2-Attempts', attempt + 1); // Debug header
+      
+      // Enable CORS for cross-origin requests
+      setCorsHeaders(res);
+      
+      // Send the image buffer directly
+      res.send(imageBuffer);
+      
+      console.log(`[R2-IMAGE] SUCCESS on attempt ${attempt + 1}: ${r2Key} (${imageBuffer.length} bytes)`);
+      return; // Exit successfully
+      
+    } catch (error) {
+      lastError = error;
+      console.warn(`[R2-IMAGE] Attempt ${attempt + 1} failed for ${r2Key}:`, error?.name || error?.message);
+      
+      // Don't retry on 404/NoSuchKey errors
+      if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+        console.log(`[R2-IMAGE] Image not found: ${r2Key}, not retrying`);
+        return res.status(404).json({ error: 'Image not found in R2 storage' });
+      }
+      
+      // If this isn't the last attempt, wait before retry
+      if (attempt < MAX_RETRIES) {
+        console.log(`[R2-IMAGE] Waiting ${RETRY_DELAYS[attempt]}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAYS[attempt]));
+      }
     }
-    
-    // Convert stream to buffer
-    const imageBuffer = await streamToBuffer(response.Body);
-    
-    // Set appropriate headers for JPG images
-    res.setHeader('Content-Type', response.ContentType || 'image/jpeg');
-    res.setHeader('Content-Length', imageBuffer.length);
-    res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
-    res.setHeader('ETag', response.ETag || `"${imageKey}-${Date.now()}"`);
-    res.setHeader('Last-Modified', response.LastModified?.toUTCString() || new Date().toUTCString());
-    
-    // Enable CORS for cross-origin requests
-    setCorsHeaders(res);
-    
-    // Send the image buffer directly
-    res.send(imageBuffer);
-    
-    console.log(`[R2-IMAGE] Successfully served: ${r2Key} (${imageBuffer.length} bytes)`);
-    
-  } catch (error) {
-    console.error(`[R2-IMAGE] Error serving image ${username}/${imageKey}:`, error);
-    
-    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
-      return res.status(404).json({ error: 'Image not found in R2 storage' });
-    }
-    
-    res.status(500).json({ error: 'Failed to retrieve image from R2 storage' });
   }
+  
+  // All retries failed
+  console.error(`[R2-IMAGE] All ${MAX_RETRIES + 1} attempts failed for: ${r2Key}`, lastError?.message);
+  res.status(500).json({ 
+    error: 'Failed to retrieve image from R2 storage after retries',
+    attempts: MAX_RETRIES + 1,
+    lastError: lastError?.message 
+  });
 });
 
 // Enhanced signed URL generator with R2 optimization

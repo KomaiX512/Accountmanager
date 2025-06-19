@@ -58,9 +58,9 @@ export default defineConfig({
         secure: false,
         rewrite: (path) => path.replace('/api/rag', ''),
       },
-      // Image endpoints (port 3002) - MUST come before general /api rule
+      // Image endpoints (port 3000) - MUST come before general /api rule  
       '/api/r2-image': {
-        target: 'http://localhost:3002',
+        target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
       },
@@ -162,13 +162,23 @@ export default defineConfig({
         secure: false,
       },
       // Direct pass-through endpoints
+      '/retrieve-strategies': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/retrieve-engagement-strategies': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+      },
       '/retrieve': {
-        target: 'http://localhost:3002',
+        target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
       },
       '/posts': {
-        target: 'http://localhost:3002',
+        target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
       },
@@ -183,7 +193,7 @@ export default defineConfig({
         secure: false,
       },
       '/ai-replies': {
-        target: 'http://localhost:3002',
+        target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
       },

@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Based on the provided data for @indushospital, here's a breakdown of the posts and their engagement:\n\nYou've posted about topics such as vaccinations and diabetes.\n\n*   **Post 1:** The post with the caption \"Top Reasons to Protect Children through Vaccination...\" received 8 likes and 0 comments, for a total engagement of 8.\n\n*   **Post 2:** The post with the caption \"Diabetes is a long-term (chronic) disease in which the body cannot regulate the amount of glucose (sugar) in the blood...\" received 11 likes and 0 comments, for a total engagement of 11.\n\n*   **Post 3:** The post with the caption \"Diabetes is a long-term (chronic) disease in which the body cannot regulate the amount of glucose (sugar) in the blood...\" received 22 likes and 1 comment, for a total engagement of 23.\n\nThe **Most Engaging Post** is: \"Diabetes is a long-term (chronic) disease in which the body cannot regulate the amount of glucose (sugar) in the blood...\". This post received 22 likes and 1 comment, resulting in a total engagement of 23.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.06960514292997473
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 747,
+    "candidatesTokenCount": 255,
+    "totalTokenCount": 1002,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 747
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 255
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "bWFUaMTEGumnmecPybvP0AI"
+}

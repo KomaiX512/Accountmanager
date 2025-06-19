@@ -1,0 +1,18 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "You are a social media data analyst. You have been provided with SPECIFIC, REAL DATA about the instagram account @indushospital. This data includes actual post content, engagement metrics, and performance statistics.\n\nYOUR TASK: Answer the user's question using ONLY the provided data below. You MUST reference specific numbers, captions, and metrics from the data provided.\n\n===== REAL ACCOUNT DATA FOR @indushospital =====\nProfile Analysis Data for indushospital on instagram: Account Information: Profile: indus jaipur hospital Username: @indushospital Platform: instagram Bio: Followers: 68 Following: 22 Posts: 4 Verified: No Business Account: Yes Category: None,Hospital Website: http://www.indusjh.com/ Recent Posts and Engagement: Post 1: \"Top Reasons to Protect Children through Vaccination • Parents want to do everything possible to make sure their children are healthy and protected from preventable diseases. Vaccination is the best way to do that. • Vaccination protects children from serious illness and complications of vaccine-preventable diseases which can include amputation of an arm or leg, paralysis of limbs, hearing loss, convulsions, brain damage, and death.\" Engagement: 8 likes, 0 comments, Total: 8 Post 2: \"Diabetes is a long-term (chronic) disease in which the body cannot regulate the amount of glucose (sugar) in the blood. Diabetes is a complicated disease. If you have diabetes ,or know anyone who has it, you may have questions about the disease. There are many popular myths about diabetes and its management. Here are some facts you should know about diabetes.\" Engagement: 11 likes, 0 comments, Total: 11 Post 3: \"Diabetes is a long-term (chronic) disease in which the body cannot regulate the amount of glucose (sugar) in the blood. Diabetes is a complicated disease. If you have diabetes ,or know anyone who has it, you may have questions about the disease. There are many popular myths about diabetes and its management. Here are some facts you should know about diabetes.\" Engagement: 22 likes, 1 comments, Total: 23 Most Engaging Post: \"Diabetes is a long-term (chronic) disease in which the body cannot regulate the amount of glucose (sugar) in the blood. Diabetes is a complicated disease. If you have diabetes ,or know anyone who has it, you may have questions about the disease. There are many popular myths about diabetes and its management. Here are some facts you should know about diabetes.\" Performance: 22 likes, 1 comments Total Engagement: 23 Engagement Metrics: Engagement Analytics for @indushospital on instagram: Average Likes per Post: 13 Average Comments per Post: 0 Average Shares per Post: 0 Total Posts: 4 Engagement Rate: 18.75% Performance: Excellent Analysis based on 5 relevant data points from the indushospital account.\n===== END OF REAL DATA =====\n\nUser Question: \"how much have post I've and more liked post I've done until now?\"\n\nINSTRUCTIONS:\n1. You MUST use the specific post data provided above\n2. You MUST quote actual captions from the \"Recent Posts and Engagement\" section\n3. You MUST include the exact engagement numbers (likes, comments, totals)\n4. You MUST reference the \"Most Engaging Post\" data if it exists\n5. DO NOT claim you lack data - all necessary data is provided above\n6. Answer based EXCLUSIVELY on the provided account data\n\nProvide a detailed response that directly uses the post content and engagement metrics shown above."
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 2000,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "topK": 40
+  }
+}

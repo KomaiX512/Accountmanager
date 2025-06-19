@@ -3,6 +3,7 @@ import '../instagram/Dashboard.css'; // Reuse the same styles
 import Cs_Analysis from '../instagram/Cs_Analysis';
 import OurStrategies from '../instagram/OurStrategies';
 import PostCooked from '../instagram/PostCooked';
+import { getApiUrl } from '../../config/api';
 import InstagramConnect from '../instagram/InstagramConnect';
 import TwitterConnect from '../twitter/TwitterConnect';
 import FacebookConnect from '../facebook/FacebookConnect';
@@ -1144,7 +1145,7 @@ Image Description: ${response.post.image_prompt}
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        axios.get(`http://localhost:3000/${accountType === 'branding' ? 'retrieve-strategies' : 'retrieve-engagement-strategies'}/${accountHolder}${platformParam}`).catch(err => {
+        axios.get(getApiUrl(`/${accountType === 'branding' ? 'retrieve-strategies' : 'retrieve-engagement-strategies'}/${accountHolder}${platformParam}`)).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
@@ -1155,7 +1156,7 @@ Image Description: ${response.post.image_prompt}
         // Always fetch competitor data for both account types
         Promise.all(
           competitors.map(comp =>
-            axios.get(`http://localhost:3000/retrieve/${accountHolder}/${comp}${platformParam}`).catch(err => {
+            axios.get(getApiUrl(`/retrieve/${accountHolder}/${comp}${platformParam}`)).catch(err => {
               if (err.response?.status === 404) {
                 console.warn(`No ${platform} competitor data found for ${comp}`);
                 return { data: [] };

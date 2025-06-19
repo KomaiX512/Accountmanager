@@ -3,6 +3,7 @@ import './Dashboard.css';
 import Cs_Analysis from './Cs_Analysis';
 import OurStrategies from './OurStrategies';
 import PostCooked from './PostCooked';
+import { getApiUrl } from '../../config/api';
 import InstagramConnect from './InstagramConnect';
 import DmsComments from './Dms_Comments';
 import PostScheduler from './PostScheduler';
@@ -1179,7 +1180,7 @@ Image Description: ${response.post.image_prompt}
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        axios.get(`http://localhost:3000/${accountType === 'branding' ? 'retrieve-strategies' : 'retrieve-engagement-strategies'}/${accountHolder}${forceRefresh ? '?forceRefresh=true' : ''}`).catch(err => {
+        axios.get(getApiUrl(`/${accountType === 'branding' ? 'retrieve-strategies' : 'retrieve-engagement-strategies'}/${accountHolder}${forceRefresh ? '?forceRefresh=true' : ''}`)).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
@@ -1190,7 +1191,7 @@ Image Description: ${response.post.image_prompt}
         // Always fetch competitor data for both account types
         Promise.all(
           competitors.map(comp =>
-            axios.get(`http://localhost:3000/retrieve/${accountHolder}/${comp}${forceRefresh ? '?forceRefresh=true' : ''}`).catch(err => {
+            axios.get(getApiUrl(`/retrieve/${accountHolder}/${comp}${forceRefresh ? '?forceRefresh=true' : ''}`)).catch(err => {
               if (err.response?.status === 404) {
                 console.warn(`No competitor data found for ${comp}`);
                 return { data: [] };
@@ -1292,7 +1293,7 @@ Image Description: ${response.post.image_prompt}
         if (prefix.startsWith(`competitor_analysis/${accountHolder}/`)) {
           Promise.all(
             competitors.map(comp =>
-              axios.get(`http://localhost:3000/retrieve/${accountHolder}/${comp}`).catch(err => {
+              axios.get(getApiUrl(`/retrieve/${accountHolder}/${comp}`)).catch(err => {
                 if (err.response?.status === 404) return { data: [] };
                 throw err;
               })

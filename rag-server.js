@@ -2368,42 +2368,50 @@ INSTRUCTIONS:
 5. Create content that aligns with proven engagement patterns
 6. DO NOT use generic templates - use insights from the real data
 
-CREATE A ${platformName} POST WITH:
+RESPOND WITH EXACTLY THIS FORMAT (no additional text):
 
-Caption: [Write an engaging ${platformName} caption under ${characterLimit} characters that matches the style and themes from the real data above. ${contentGuidance}]
+Caption:
+[Write an engaging ${platformName} caption under ${characterLimit} characters that matches the style and themes from the real data above. ${contentGuidance}]
 
-Hashtags: [List ${hashtagGuidance} based on successful hashtags from the data above]
+Hashtags:
+[List ${hashtagGuidance} based on successful hashtags from the data above]
 
-Call to Action: [Create a call-to-action that matches engagement patterns from the real data]
+Call to Action:
+[Create a call-to-action that matches engagement patterns from the real data]
 
-Visual Description for Image: [Write a detailed description for an image that aligns with the visual style and themes shown in the successful posts from the data above. Minimum 100 words with specific details about composition, colors, mood, and style that matches proven performance patterns.]
+Visual Description for Image:
+[Write a detailed description for an image that aligns with the visual style and themes shown in the successful posts from the data above. Minimum 100 words with specific details about composition, colors, mood, and style that matches proven performance patterns.]
 
-Base everything on the real account data provided above.`;
+IMPORTANT: Use EXACTLY the section headers shown above. Base everything on the real account data provided above.`;
   }
   
   // 🔄 FALLBACK: Traditional approach when ChromaDB is not available
   console.log(`[RAG-Server] 📋 Using traditional post generation approach as fallback`);
-  return `
-# POST GENERATION MODE
-You are a ${platformName} content creator assistant.
+  return `You are a ${platformName} content creator assistant.
 
-## USER PROFILE DATA
+USER PROFILE DATA:
 ${JSON.stringify(profileData, null, 2)}
 
-## ACCOUNT RULES
+ACCOUNT RULES:
 ${JSON.stringify(rulesData, null, 2)}
 
-## POST REQUEST
-${query}
+POST REQUEST: ${query}
 
-Please create a ${platformName} post content that aligns with the user's profile and follows their account rules.
-The response should include:
-1. A caption that is engaging, relevant, and under ${characterLimit} characters (${contentGuidance})
-2. Appropriate hashtags (${hashtagGuidance})
-3. A brief description of what image or video should accompany this post for ${platformName}
+RESPOND WITH EXACTLY THIS FORMAT (no additional text):
 
-Follow ${platformName}-specific best practices and tone.
-`;
+Caption:
+[Write an engaging ${platformName} caption under ${characterLimit} characters that aligns with the user's profile and follows their account rules. ${contentGuidance}]
+
+Hashtags:
+[List ${hashtagGuidance} that are relevant to the content and brand]
+
+Call to Action:
+[Create an engaging call-to-action that encourages interaction]
+
+Visual Description for Image:
+[Write a detailed description for an image that would accompany this ${platformName} post. Include composition, colors, mood, and style details.]
+
+IMPORTANT: Use EXACTLY the section headers shown above.`;
 }
 
 // API endpoint for post generator (updated with full image generation functionality)
@@ -2477,13 +2485,17 @@ app.post('/api/post-generator', async (req, res) => {
                               platform === 'facebook' ? 'Facebook' : 
                               'Instagram';
           
-          response = `Caption: ${fallbackContent.split('\n')[0]} 🚀
+          response = `Caption:
+${fallbackContent.split('\n')[0]} 🚀
 
-Hashtags: #${platform} #SocialMedia #Marketing #Strategy #Growth
+Hashtags:
+#${platform} #SocialMedia #Marketing #Strategy #Growth
 
-Call to Action: What's your biggest ${platformName} challenge? Share in the comments!
+Call to Action:
+What's your biggest ${platformName} challenge? Share in the comments!
 
-Visual Description for Image: Create a modern, professional ${platformName} strategy infographic with a clean blue and white color scheme. Include icons representing social media growth, engagement metrics, and success indicators. The image should have a bright, optimistic feel with arrows pointing upward to suggest growth and improvement. Add subtle ${platformName} branding elements and make it visually appealing for social media sharing.`;
+Visual Description for Image:
+Create a modern, professional ${platformName} strategy infographic with a clean blue and white color scheme. Include icons representing social media growth, engagement metrics, and success indicators. The image should have a bright, optimistic feel with arrows pointing upward to suggest growth and improvement. Add subtle ${platformName} branding elements and make it visually appealing for social media sharing.`;
           
           usedFallback = true;
         } else {
@@ -2494,20 +2506,206 @@ Visual Description for Image: Create a modern, professional ${platformName} stra
       // Clean and process the response to extract structured content
       console.log(`[${new Date().toISOString()}] [RAG SERVER] Raw response:`, response.substring(0, 200) + '...');
       
-      // Extract the sections using regex
-      const captionMatch = response.match(/Caption:(.*?)(?=Hashtags:|$)/s);
-      const hashtagsMatch = response.match(/Hashtags:(.*?)(?=Call to Action:|$)/s);
-      const ctaMatch = response.match(/Call to Action:(.*?)(?=Visual Description for Image:|$)/s);
-      const visualMatch = response.match(/Visual Description for Image:(.*?)(?=$)/s);
-      
-      // Format the sections into a structured response
-      const caption = captionMatch ? captionMatch[1].trim() : '';
+      // 🔥 ENHANCED PARSING LOGIC: Handle multiple response formats robustly
+      let caption = '';
       let hashtags = [];
-      if (hashtagsMatch && hashtagsMatch[1]) {
-        hashtags = hashtagsMatch[1].match(/#[\w\d]+/g) || [];
+      let callToAction = '';
+      let imagePrompt = '';
+      
+      // First, clean up the response by removing unnecessary formatting
+      let cleanResponse = response
+        .replace(/\*\*/g, '') // Remove ** markers
+        .replace(/^\s*Caption:\s*/gmi, 'CAPTION_START:')
+        .replace(/^\s*Hashtags?:\s*/gmi, 'HASHTAGS_START:')
+        .replace(/^\s*Call\s*to\s*Action:\s*/gmi, 'CTA_START:')
+        .replace(/^\s*Visual\s*Description\s*for\s*Image:\s*/gmi, 'IMAGE_START:')
+        .trim();
+      
+      console.log(`[${new Date().toISOString()}] [RAG SERVER] Cleaned response:`, cleanResponse.substring(0, 300) + '...');
+      
+      // Method 1: Try structured parsing with our cleaned markers
+      const captionMatch = cleanResponse.match(/CAPTION_START:(.*?)(?=HASHTAGS_START:|CTA_START:|IMAGE_START:|$)/s);
+      const hashtagsMatch = cleanResponse.match(/HASHTAGS_START:(.*?)(?=CTA_START:|IMAGE_START:|$)/s);
+      const ctaMatch = cleanResponse.match(/CTA_START:(.*?)(?=IMAGE_START:|$)/s);
+      const visualMatch = cleanResponse.match(/IMAGE_START:(.*?)$/s);
+      
+      if (captionMatch) {
+        caption = captionMatch[1].trim();
+        console.log(`[RAG SERVER] ✅ Parsed caption via structured method`);
       }
-      const callToAction = ctaMatch ? ctaMatch[1].trim() : '';
-      const imagePrompt = visualMatch ? visualMatch[1].trim() : '';
+      
+      if (hashtagsMatch) {
+        const hashtagText = hashtagsMatch[1].trim();
+        // Extract hashtags from the text
+        hashtags = hashtagText.match(/#[\w\d]+/g) || [];
+        console.log(`[RAG SERVER] ✅ Parsed ${hashtags.length} hashtags via structured method`);
+      }
+      
+      if (ctaMatch) {
+        callToAction = ctaMatch[1].trim();
+        console.log(`[RAG SERVER] ✅ Parsed call to action via structured method`);
+      }
+      
+      if (visualMatch) {
+        imagePrompt = visualMatch[1].trim();
+        console.log(`[RAG SERVER] ✅ Parsed image prompt via structured method`);
+      }
+      
+      // Method 2: Fallback parsing for unstructured responses
+      if (!caption || !hashtags.length || !callToAction) {
+        console.log(`[RAG SERVER] 🔄 Attempting fallback parsing for unstructured response...`);
+        
+        // Split the response into lines and analyze
+        const lines = response.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+        
+        let currentSection = 'caption';
+        let tempCaption = [];
+        let tempHashtags = [];
+        let tempCTA = [];
+        let tempImage = [];
+        
+        for (const line of lines) {
+          // Skip markdown formatting and section headers
+          if (line.startsWith('**') || line === 'Caption:' || line === 'Hashtags:' || line === 'Call to Action:' || line === 'Visual Description for Image:') {
+            continue;
+          }
+          
+          // Detect section changes
+          if (line.toLowerCase().includes('hashtag') && line.includes('#')) {
+            currentSection = 'hashtags';
+          } else if (line.toLowerCase().includes('call to action') || line.toLowerCase().includes('shop now') || line.toLowerCase().includes('tap the link')) {
+            currentSection = 'cta';
+          } else if (line.toLowerCase().includes('image') && line.toLowerCase().includes('description')) {
+            currentSection = 'image';
+          }
+          
+          // Assign content based on current section
+          switch (currentSection) {
+            case 'caption':
+              if (!line.includes('#') && !line.toLowerCase().includes('shop now') && !line.toLowerCase().includes('tap the link')) {
+                tempCaption.push(line);
+              }
+              break;
+            case 'hashtags':
+              // Extract hashtags from this line
+              const lineHashtags = line.match(/#[\w\d]+/g) || [];
+              tempHashtags.push(...lineHashtags);
+              break;
+            case 'cta':
+              tempCTA.push(line);
+              break;
+            case 'image':
+              tempImage.push(line);
+              break;
+          }
+        }
+        
+        // Use fallback results if structured parsing failed
+        if (!caption && tempCaption.length > 0) {
+          caption = tempCaption.join(' ').trim();
+          console.log(`[RAG SERVER] 🔄 Used fallback caption parsing`);
+        }
+        
+        if (hashtags.length === 0 && tempHashtags.length > 0) {
+          hashtags = [...new Set(tempHashtags)]; // Remove duplicates
+          console.log(`[RAG SERVER] 🔄 Used fallback hashtag parsing: ${hashtags.length} hashtags`);
+        }
+        
+        if (!callToAction && tempCTA.length > 0) {
+          callToAction = tempCTA.join(' ').trim();
+          console.log(`[RAG SERVER] 🔄 Used fallback CTA parsing`);
+        }
+        
+        if (!imagePrompt && tempImage.length > 0) {
+          imagePrompt = tempImage.join(' ').trim();
+          console.log(`[RAG SERVER] 🔄 Used fallback image prompt parsing`);
+        }
+      }
+      
+      // Method 3: Smart content analysis for mixed content
+      if (!caption || (!hashtags.length && !callToAction)) {
+        console.log(`[RAG SERVER] 🧠 Attempting smart content analysis...`);
+        
+        // Find all hashtags in the entire response
+        const allHashtags = response.match(/#[\w\d]+/g) || [];
+        
+        // Remove hashtags from response to get clean text
+        let textWithoutHashtags = response.replace(/#[\w\d]+/g, '').trim();
+        
+        // Find call to action phrases
+        const ctaPatterns = [
+          /shop now[^.!?]*[.!?]/gi,
+          /tap the link[^.!?]*[.!?]/gi,
+          /comment below[^.!?]*[.!?]/gi,
+          /tell us[^.!?]*[.!?]/gi,
+          /tag [^.!?]*[.!?]/gi,
+          /visit [^.!?]*[.!?]/gi,
+          /check out[^.!?]*[.!?]/gi
+        ];
+        
+        let extractedCTA = '';
+        for (const pattern of ctaPatterns) {
+          const matches = textWithoutHashtags.match(pattern);
+          if (matches) {
+            extractedCTA = matches[0].trim();
+            textWithoutHashtags = textWithoutHashtags.replace(pattern, '').trim();
+            break;
+          }
+        }
+        
+        // Clean up the remaining text for caption
+        let cleanCaption = textWithoutHashtags
+          .replace(/Caption:\s*/gi, '')
+          .replace(/Hashtags?:\s*/gi, '')
+          .replace(/Call to Action:\s*/gi, '')
+          .replace(/Visual Description for Image:\s*/gi, '')
+          .replace(/\*\*/g, '')
+          .trim();
+        
+        // Use smart analysis results if previous methods failed
+        if (!caption && cleanCaption) {
+          caption = cleanCaption;
+          console.log(`[RAG SERVER] 🧠 Used smart caption analysis`);
+        }
+        
+        if (hashtags.length === 0 && allHashtags.length > 0) {
+          hashtags = [...new Set(allHashtags)];
+          console.log(`[RAG SERVER] 🧠 Used smart hashtag analysis: ${hashtags.length} hashtags`);
+        }
+        
+        if (!callToAction && extractedCTA) {
+          callToAction = extractedCTA;
+          console.log(`[RAG SERVER] 🧠 Used smart CTA analysis`);
+        }
+      }
+      
+      // Final cleanup and validation
+      caption = caption.replace(/^undefined$/i, '').trim();
+      callToAction = callToAction.replace(/^undefined$/i, '').trim();
+      hashtags = hashtags.filter(tag => tag !== 'undefined' && tag.length > 1);
+      
+      // Ensure we have minimum viable content
+      if (!caption) {
+        caption = `Check out this amazing content! ✨`;
+      }
+      
+      if (hashtags.length === 0) {
+        hashtags = [`#${platform}`, '#content', '#social'];
+      }
+      
+      if (!callToAction) {
+        callToAction = `Let us know what you think in the comments! 💬`;
+      }
+      
+      if (!imagePrompt) {
+        imagePrompt = `A modern, engaging social media image that represents the brand perfectly with clean aesthetics and vibrant colors.`;
+      }
+      
+      console.log(`[RAG SERVER] 🎯 FINAL PARSED CONTENT:`);
+      console.log(`  Caption: "${caption.substring(0, 100)}..."`);
+      console.log(`  Hashtags: ${hashtags.length} tags - ${hashtags.slice(0, 3).join(', ')}`);
+      console.log(`  CTA: "${callToAction.substring(0, 50)}..."`);
+      console.log(`  Image: "${imagePrompt.substring(0, 50)}..."`);
       
       // Create the structured response
       const structuredResponse = {

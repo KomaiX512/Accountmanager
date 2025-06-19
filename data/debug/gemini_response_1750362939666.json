@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Okay, here's an Instagram post draft based on the provided data for @indushospital:\n\n**Caption:**\n\nDo you have questions about diabetes? 🤔 It's a complicated disease, and there are many myths surrounding it. We're here to help you separate fact from fiction!\n\nDiabetes is a long-term (chronic) disease where the body struggles to regulate blood sugar. Understanding the facts is the first step in managing it effectively. Stay tuned for more posts breaking down diabetes and its management.\n\n#DiabetesAwareness #DiabetesManagement #IndusHospital #HealthFacts #ChronicDisease #JaipurHospital #Healthcare #HealthEducation #MythBusters #Diabetes\n\n**Call to Action:**\n\nDo you know someone with diabetes? Share this post to help spread accurate information! Let us know in the comments if you have any specific questions about diabetes you'd like us to address in future posts! 👇\n\n**Visual Description for Image:**\n\nThe image is a brightly lit, close-up shot of a doctor in a white coat, smiling warmly at the camera. The doctor is holding a digital tablet displaying a simplified diagram of the human body with highlighted areas representing organs affected by diabetes. The background is softly blurred, showing a modern hospital environment with clean lines and muted pastel colors. The overall mood is reassuring and informative. The lighting is soft and diffused, creating a sense of trust and competence. The doctor's expression is friendly and approachable, aiming to convey a message of hope and proactive healthcare. The composition is balanced, with the doctor's face slightly off-center to draw the viewer's eye to the tablet. The color palette is dominated by whites, blues, and greens, creating a calming and professional atmosphere. The image aims to visually represent Indus Hospital's commitment to providing clear, accessible information about diabetes management.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.27291029451999205
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 849,
+    "candidatesTokenCount": 373,
+    "totalTokenCount": 1222,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 849
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 373
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "OGtUaP64Msbd1PIPvoyZ4Qo"
+}

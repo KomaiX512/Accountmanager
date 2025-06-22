@@ -1465,6 +1465,33 @@ Image Description: ${response.post.image_prompt}
   const handleCampaignStopped = () => {
     setShowCampaignButton(false);
     setIsCampaignModalOpen(false);
+    
+    // Refresh campaign status data after stopping
+    console.log(`[Dashboard] Refreshing campaign status after stop`);
+    checkCampaignStatus();
+  };
+
+  // Function to check campaign status from the server
+  const checkCampaignStatus = async () => {
+    try {
+      console.log(`[Dashboard] Checking campaign status for ${accountHolder}`);
+      // Add bypass_cache=true to ensure we get fresh data from the server
+      const response = await axios.get(`http://localhost:3000/campaign-status/${accountHolder}?platform=instagram&bypass_cache=true`);
+      const statusData = response.data;
+      
+      console.log(`[Dashboard] Campaign status response:`, statusData);
+      
+      // Update UI based on campaign status
+      if (statusData.hasActiveCampaign && statusData.platform === 'instagram') {
+        setShowCampaignButton(true);
+      } else {
+        setShowCampaignButton(false);
+      }
+    } catch (err) {
+      console.error(`[Dashboard] Error checking campaign status:`, err);
+      // If there's an error checking status, assume no active campaign
+      setShowCampaignButton(false);
+    }
   };
 
   // Handle custom event for opening campaign modal
@@ -1479,7 +1506,9 @@ Image Description: ${response.post.image_prompt}
 
     const handleCampaignStoppedEvent = (event: any) => {
       const { username, platform } = event.detail;
-      if (username === accountHolder && platform === 'instagram') {
+      console.log(`[Dashboard] Campaign stopped event received: username=${username}, platform=${platform}, accountHolder=${accountHolder}`);
+      if (username === accountHolder && platform.toLowerCase() === 'instagram') {
+        console.log(`[Dashboard] Campaign stopped event matched: Updating UI state`);
         setShowCampaignButton(false);
         setIsCampaignModalOpen(false);
       }
@@ -1605,6 +1634,13 @@ Image Description: ${response.post.image_prompt}
       setIsChatModalOpen(true);
     }
   };
+
+  // Check campaign status when component mounts or accountHolder changes
+  useEffect(() => {
+    if (accountHolder) {
+      checkCampaignStatus();
+    }
+  }, [accountHolder]);
 
   if (!accountHolder) {
     return null;

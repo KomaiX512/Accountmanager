@@ -5,17 +5,20 @@ import { motion } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext'; // Fixed import path
 import ProcessingLoadingState from '../common/ProcessingLoadingState';
+import { useProcessing } from '../../context/ProcessingContext';
 
 interface IG_EntryUsernamesProps {
   onSubmitSuccess: (username: string, competitors: string[], accountType: 'branding' | 'non-branding') => void;
   redirectIfCompleted?: boolean; // Flag to indicate if we should redirect if user already entered username
   markPlatformAccessed?: (platformId: string) => void; // Function to mark platform as accessed/claimed
+  onComplete: () => void;
 }
 
 const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({ 
   onSubmitSuccess, 
   redirectIfCompleted = true,
-  markPlatformAccessed
+  markPlatformAccessed,
+  onComplete
 }) => {
   const [username, setUsername] = useState<string>('');
   const [accountType, setAccountType] = useState<'branding' | 'non-branding'>('branding');
@@ -36,6 +39,7 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
   
   const navigate = useNavigate();
   const { currentUser } = useAuth(); // Get the current user from auth context
+  const { processingState, startProcessing } = useProcessing();
 
   const apiUrl = '/api/save-account-info';
 const statusApiUrl = '/api/user-instagram-status';
@@ -94,30 +98,11 @@ const usernameCheckUrl = '/api/check-username-availability';
 
   // Check for existing processing state on mount
   useEffect(() => {
-    const checkProcessingState = () => {
-      if (!currentUser?.uid) return;
-      
-      const processingKey = `instagram_processing_${currentUser.uid}`;
-      const processingData = localStorage.getItem(processingKey);
-      
-      if (processingData) {
-        const { startTime, duration } = JSON.parse(processingData);
-        const elapsed = Date.now() - startTime;
-        
-        if (elapsed < duration) {
-          // Processing is still active
+    if (processingState.isProcessing && processingState.platform === 'instagram') {
           setIsProcessing(true);
           setIsInitializing(false);
-          return;
-        } else {
-          // Processing has expired, clean up
-          localStorage.removeItem(processingKey);
-        }
-      }
-    };
-
-    checkProcessingState();
-  }, [currentUser?.uid]);
+    }
+  }, [processingState]);
 
   // Debounced username validation
   const checkUsernameAvailability = useCallback(
@@ -348,6 +333,12 @@ const usernameCheckUrl = '/api/check-username-availability';
     }
   };
 
+  const handleStartProcessing = (username: string) => {
+    startProcessing('instagram', username, 15); // 15 minutes duration
+    setIsProcessing(true);
+    setIsInitializing(false);
+  };
+
   if (isInitializing) {
     return (
       <div className="dashboard-container">
@@ -361,9 +352,7 @@ const usernameCheckUrl = '/api/check-username-availability';
   if (isProcessing) {
     return (
       <ProcessingLoadingState
-        platform="instagram"
-        username={username}
-        onComplete={handleProcessingComplete}
+        onComplete={onComplete}
       />
     );
   }

@@ -7581,40 +7581,22 @@ async function executeScheduledPost(scheduleData) {
       ContentType: 'application/json',
     }));
     
-    // Get the image from R2
-    const imageResponse = await s3Client.send(new GetObjectCommand({
-      Bucket: 'tasks',
-      Key: scheduleData.imageKey
-    }));
-    
-    const imageBuffer = await streamToBuffer(imageResponse.Body);
-    
     // Get Instagram token data - now handles both user ID and graph ID automatically
     const tokenData = await getTokenData(scheduleData.userId);
-    
     const { access_token, instagram_graph_id } = tokenData;
     
-    // Use the same successful posting logic as real-time posting
-    const tempDir = path.join(process.cwd(), 'server', 'temp-images');
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
-    }
+    // Generate a signed URL for the image in R2 that will be valid for 15 minutes
+    const signedUrlCommand = new GetObjectCommand({
+      Bucket: 'tasks',
+      Key: scheduleData.imageKey
+    });
     
-    const imageFilename = `${Date.now()}-${scheduleData.id}.${scheduleData.imageFormat}`;
-    const imagePath = path.join(tempDir, imageFilename);
+    const signedUrl = await getSignedUrl(s3Client, signedUrlCommand, { expiresIn: 900 }); // 15 minutes
+    console.log(`[${new Date().toISOString()}] Generated signed URL for scheduled post image: ${signedUrl}`);
     
-    // Write image to local temp file
-    fs.writeFileSync(imagePath, imageBuffer);
-    
-    // Construct public URL for Instagram access (same as real-time posting)
-    const baseUrl = process.env.PUBLIC_URL || 'https://cc48-121-52-146-243.ngrok-free.app';
-    const publicImageUrl = `${baseUrl}/temp-images/${imageFilename}`;
-    
-    console.log(`[${new Date().toISOString()}] Executing scheduled post via: ${publicImageUrl}`);
-    
-    // Upload image and create media object using Instagram API
+    // Upload image and create media object using Instagram API with signed URL
     const mediaResponse = await axios.post(`https://graph.instagram.com/v22.0/${instagram_graph_id}/media`, {
-      image_url: publicImageUrl,
+      image_url: signedUrl,
       caption: scheduleData.caption,
       access_token: access_token
     }, {
@@ -7673,14 +7655,6 @@ async function executeScheduledPost(scheduleData) {
       Body: JSON.stringify(postData, null, 2),
       ContentType: 'application/json',
     }));
-
-    // Clean up temporary image
-    try {
-      fs.unlinkSync(imagePath);
-      console.log(`[${new Date().toISOString()}] Scheduled post temporary image cleaned up: ${imageFilename}`);
-    } catch (cleanupError) {
-      console.warn(`[${new Date().toISOString()}] Failed to cleanup scheduled post image: ${cleanupError.message}`);
-    }
 
     console.log(`[${new Date().toISOString()}] Scheduled post executed successfully: ${scheduleData.id} -> ${postId}`);
 
@@ -8776,7 +8750,24 @@ app.get(['/campaign-status/:username', '/api/campaign-status/:username'], async 
       });
     }
     
-    console.log(`[${new Date().toISOString()}] Checking campaign status for ${username} on ${platform}`);
+    // Check if we should bypass cache
+    const bypassCache = req.query.bypass_cache === 'true' || req.query.refresh === 'true';
+    
+    console.log(`[${new Date().toISOString()}] Checking campaign status for ${username} on ${platform} (bypass_cache: ${bypassCache})`);
+
+    // Use cache key for campaign status
+    const cacheKey = `campaign-status:${platform}:${username}`;
+    
+    // Check cache first if not bypassing and if memoryCache is available
+    try {
+      if (!bypassCache && typeof memoryCache !== 'undefined' && memoryCache.has(cacheKey)) {
+        const cachedStatus = memoryCache.get(cacheKey);
+        console.log(`[${new Date().toISOString()}] Returning cached campaign status for ${username} on ${platform}: ${JSON.stringify(cachedStatus)}`);
+        return res.json(cachedStatus);
+      }
+    } catch (cacheError) {
+      console.log(`[${new Date().toISOString()}] Cache read skipped: ${cacheError.message}`);
+    }
 
     // Check for existing goal files
     const goalPrefix = `tasks/goal/${platform}/${username}`;
@@ -8788,29 +8779,44 @@ app.get(['/campaign-status/:username', '/api/campaign-status/:username'], async 
     const goalData = await s3Client.send(listGoalsCommand);
     const hasActiveGoal = goalData.Contents && goalData.Contents.length > 0;
 
+    let responseData;
     if (hasActiveGoal) {
       console.log(`[${new Date().toISOString()}] Active campaign found for ${username} on ${platform}`);
-      return res.json({ 
+      responseData = { 
         hasActiveCampaign: true,
         platform: platform,
         username: username,
-        goalFiles: goalData.Contents?.length || 0
-      });
+        goalFiles: goalData.Contents?.length || 0,
+        checkedAt: new Date().toISOString()
+      };
+    } else {
+      console.log(`[${new Date().toISOString()}] No active campaign found for ${username} on ${platform}`);
+      responseData = { 
+        hasActiveCampaign: false,
+        platform: platform,
+        username: username,
+        checkedAt: new Date().toISOString()
+      };
     }
-
-    console.log(`[${new Date().toISOString()}] No active campaign found for ${username} on ${platform}`);
-    res.json({ 
-      hasActiveCampaign: false,
-      platform: platform,
-      username: username
-    });
+    
+    // Cache the result for 30 seconds if memoryCache is available
+    try {
+      if (typeof memoryCache !== 'undefined') {
+        memoryCache.set(cacheKey, responseData, 30);
+      }
+    } catch (cacheError) {
+      console.log(`[${new Date().toISOString()}] Cache write skipped: ${cacheError.message}`);
+    }
+    
+    res.json(responseData);
 
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Campaign status check error:`, error);
     res.status(500).json({ 
       error: 'Failed to check campaign status', 
       details: error.message,
-      hasActiveCampaign: false
+      hasActiveCampaign: false,
+      checkedAt: new Date().toISOString()
     });
   }
 });
@@ -8887,7 +8893,50 @@ app.delete(['/stop-campaign/:username', '/api/stop-campaign/:username'], async (
       }
     }
 
+    // Verify campaign is truly stopped by checking campaign status
+    const goalPrefix = `tasks/goal/${platform}/${username}`;
+    const verifyCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: `${goalPrefix}/`
+    });
+    
+    const verifyData = await s3Client.send(verifyCommand);
+    const stillHasGoalFiles = verifyData.Contents && verifyData.Contents.length > 0;
+    
+    if (stillHasGoalFiles) {
+      console.error(`[${new Date().toISOString()}] Warning: Campaign files still exist after deletion attempt for ${username} on ${platform}`);
+      // Try one more time to delete any remaining files
+      for (const object of verifyData.Contents) {
+        if (object.Key) {
+          try {
+            const deleteCommand = new DeleteObjectCommand({
+              Bucket: 'tasks',
+              Key: object.Key
+            });
+            await s3Client.send(deleteCommand);
+            deletedFiles.push(object.Key);
+            console.log(`[${new Date().toISOString()}] Retry deleted: ${object.Key}`);
+          } catch (retryError) {
+            console.error(`[${new Date().toISOString()}] Error in retry deletion of ${object.Key}:`, retryError);
+          }
+        }
+      }
+    }
+
     console.log(`[${new Date().toISOString()}] Campaign deletion completed for ${username} on ${platform}. Deleted ${deletedFiles.length} files, ${deletionErrors.length} errors.`);
+
+    // Clear any cached status data - skip cache operations if memoryCache is not defined
+    try {
+      if (typeof memoryCache !== 'undefined') {
+        const cacheKey = `campaign-status:${platform}:${username}`;
+        if (memoryCache.has(cacheKey)) {
+          console.log(`[${new Date().toISOString()}] Clearing cached campaign status for ${username} on ${platform}`);
+          memoryCache.del(cacheKey);
+        }
+      }
+    } catch (cacheError) {
+      console.log(`[${new Date().toISOString()}] Cache operation skipped: ${cacheError.message}`);
+    }
 
     res.json({
       success: true,
@@ -8896,7 +8945,8 @@ app.delete(['/stop-campaign/:username', '/api/stop-campaign/:username'], async (
       deletedCount: deletedFiles.length,
       errors: deletionErrors,
       platform: platform,
-      username: username
+      username: username,
+      hasActiveCampaign: false
     });
 
   } catch (error) {

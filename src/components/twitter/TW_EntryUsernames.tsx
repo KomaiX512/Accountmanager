@@ -5,17 +5,20 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import ProcessingLoadingState from '../common/ProcessingLoadingState';
+import { useProcessing } from '../../context/ProcessingContext';
 
 interface TW_EntryUsernamesProps {
   onSubmitSuccess: (username: string, competitors: string[], accountType: 'branding' | 'non-branding') => void;
   redirectIfCompleted?: boolean;
   markPlatformAccessed?: (platformId: string) => void; // Function to mark platform as accessed/claimed
+  onComplete?: () => void;
 }
 
 const TW_EntryUsernames: React.FC<TW_EntryUsernamesProps> = ({ 
   onSubmitSuccess, 
   redirectIfCompleted = true,
-  markPlatformAccessed 
+  markPlatformAccessed,
+  onComplete
 }) => {
   const [username, setUsername] = useState<string>('');
   const [accountType, setAccountType] = useState<'branding' | 'non-branding' | ''>('branding');
@@ -36,6 +39,7 @@ const TW_EntryUsernames: React.FC<TW_EntryUsernamesProps> = ({
   
   const navigate = useNavigate();
   const { currentUser } = useAuth();
+  const { startProcessing, processingState } = useProcessing();
 
   // Twitter-specific endpoints
   const apiUrl = '/api/save-account-info';
@@ -47,30 +51,11 @@ const usernameCheckUrl = '/api/check-username-availability';
 
   // Check for existing processing state on mount
   useEffect(() => {
-    const checkProcessingState = () => {
-      if (!currentUser?.uid) return;
-      
-      const processingKey = `twitter_processing_${currentUser.uid}`;
-      const processingData = localStorage.getItem(processingKey);
-      
-      if (processingData) {
-        const { startTime, duration } = JSON.parse(processingData);
-        const elapsed = Date.now() - startTime;
-        
-        if (elapsed < duration) {
-          // Processing is still active
-          setIsProcessing(true);
-          setIsInitializing(false);
-          return;
-        } else {
-          // Processing has expired, clean up
-          localStorage.removeItem(processingKey);
-        }
-      }
-    };
-
-    checkProcessingState();
-  }, [currentUser?.uid]);
+    if (processingState.isProcessing && processingState.platform === 'twitter') {
+      setIsProcessing(true);
+      setIsInitializing(false);
+    }
+  }, [processingState]);
 
   // Check if user has already entered Twitter username
   useEffect(() => {
@@ -259,36 +244,16 @@ const usernameCheckUrl = '/api/check-username-availability';
     setTimeout(() => setMessage(''), 5000);
   };
 
+  const handleStartProcessing = (username: string) => {
+    startProcessing('twitter', username, 15); // 15 minutes duration
+    setIsProcessing(true);
+    setIsInitializing(false);
+  };
+
   const handleProcessingComplete = () => {
-    // Clear processing state from localStorage
-    if (currentUser?.uid) {
-      localStorage.removeItem(`twitter_processing_${currentUser.uid}`);
-    }
-    
-    const finalCompetitors = competitors.filter(comp => comp.trim() !== '');
-    
-    if (markPlatformAccessed) {
-      markPlatformAccessed('twitter');
-    }
-    
-    if (accountType === 'branding') {
-      navigate('/twitter-dashboard', { 
-        state: { 
-          accountHolder: username, 
-          competitors: finalCompetitors,
-          accountType: 'branding',
-          platform: 'twitter'
-        } 
-      });
-    } else {
-      navigate('/twitter-non-branding-dashboard', { 
-        state: { 
-          accountHolder: username,
-          competitors: finalCompetitors,
-          accountType: 'non-branding',
-          platform: 'twitter'
-        } 
-      });
+    setIsProcessing(false);
+    if (onComplete) {
+      onComplete();
     }
   };
 
@@ -371,8 +336,6 @@ const usernameCheckUrl = '/api/check-username-availability';
   if (isProcessing) {
     return (
       <ProcessingLoadingState
-        platform="twitter"
-        username={username}
         onComplete={handleProcessingComplete}
       />
     );

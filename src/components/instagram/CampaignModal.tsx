@@ -39,7 +39,6 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
   const [engagement, setEngagement] = useState<EngagementMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showStopConfirmation, setShowStopConfirmation] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
 
   useEffect(() => {
@@ -103,7 +102,8 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
   };
 
   const handleStopCampaign = () => {
-    setShowStopConfirmation(true);
+    // Remove confirmation and directly stop the campaign
+    handleConfirmStop();
   };
 
   const handleConfirmStop = async () => {
@@ -111,36 +111,54 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
     setError(null);
 
     try {
+      console.log(`[CampaignModal] Attempting to stop campaign for ${username} on ${platform.toLowerCase()}`);
       const response = await axios.delete(`http://localhost:3000/stop-campaign/${username}?platform=${platform.toLowerCase()}`);
       
       if (response.data.success) {
-        console.log('Campaign stopped successfully:', response.data);
+        console.log('[CampaignModal] Campaign stopped successfully:', response.data);
         
-        // Close the modal and notify parent component
-        onClose();
+        // Dispatch event to notify dashboard components first
+        window.dispatchEvent(new CustomEvent('campaignStopped', { 
+          detail: { username, platform: platform.toLowerCase() } 
+        }));
+        console.log(`[CampaignModal] Dispatched campaignStopped event for ${username} on ${platform.toLowerCase()}`);
         
-        if (onCampaignStopped) {
-          onCampaignStopped();
-        }
-        
+        // Wait a moment before closing to ensure event is processed
+        setTimeout(() => {
+          // Close the modal and notify parent component
+          if (onCampaignStopped) {
+            onCampaignStopped();
+          }
+          onClose();
+        }, 1000); // Wait 1 second before closing
+      } else {
+        console.error('[CampaignModal] Failed to stop campaign:', response.data);
+        setError('Failed to stop campaign. Please try again.');
+      }
+    } catch (err: any) {
+      console.error('[CampaignModal] Error stopping campaign:', err);
+      setError(err.response?.data?.error || 'Failed to stop campaign. Please try again.');
+      
+      // Even if there's an error, still close the modal and notify components
+      // This helps prevent UI getting stuck if backend has issues but campaign was actually stopped
+      setTimeout(() => {
         // Dispatch event to notify dashboard components
         window.dispatchEvent(new CustomEvent('campaignStopped', { 
           detail: { username, platform: platform.toLowerCase() } 
         }));
-      } else {
-        setError('Failed to stop campaign. Please try again.');
-      }
-    } catch (err: any) {
-      console.error('Error stopping campaign:', err);
-      setError(err.response?.data?.error || 'Failed to stop campaign. Please try again.');
+        console.log(`[CampaignModal] Dispatched campaignStopped event after error for ${username} on ${platform.toLowerCase()}`);
+        
+        // Wait a moment before closing to ensure event is processed
+        setTimeout(() => {
+          if (onCampaignStopped) {
+            onCampaignStopped();
+          }
+          onClose();
+        }, 1000);
+      }, 2000); // Give user 2 seconds to see the error message
     } finally {
       setIsStopping(false);
-      setShowStopConfirmation(false);
     }
-  };
-
-  const handleCancelStop = () => {
-    setShowStopConfirmation(false);
   };
 
   // Helper function to get the best available summary and post count
@@ -379,57 +397,6 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
           </div>
         </div>
       </motion.div>
-
-      {/* Stop Campaign Confirmation Modal */}
-      {showStopConfirmation && (
-        <motion.div
-          className="popup-overlay"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          style={{ zIndex: 3000 }}
-        >
-          <motion.div
-            className="popup-content"
-            initial={{ scale: 0.8, y: 50 }}
-            animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0.8, y: 50 }}
-            transition={{ duration: 0.3, ease: 'easeOut' }}
-            onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: 400, width: '100%' }}
-          >
-            <div style={{ padding: '24px', textAlign: 'center' }}>
-              <h3 style={{ color: '#ff4444', marginBottom: '16px' }}>Stop Campaign</h3>
-              <p style={{ color: '#e0e0ff', marginBottom: '24px', lineHeight: '1.5' }}>
-                Are you sure you want to stop the campaign? This will delete all campaign files and cannot be undone.
-              </p>
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-                <button
-                  onClick={handleCancelStop}
-                  className="insta-btn disconnect"
-                  disabled={isStopping}
-                  style={{ padding: '10px 20px' }}
-                >
-                  No, Keep Campaign
-                </button>
-                <button
-                  onClick={handleConfirmStop}
-                  className="insta-btn connect"
-                  disabled={isStopping}
-                  style={{
-                    padding: '10px 20px',
-                    background: 'linear-gradient(90deg, #ff4444, #cc3333)',
-                    borderColor: '#ff4444'
-                  }}
-                >
-                  {isStopping ? 'Stopping...' : 'Yes, Stop Campaign'}
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
     </motion.div>
   );
 };

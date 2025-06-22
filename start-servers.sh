@@ -1,13 +1,52 @@
 #!/bin/bash
 
+set -e
+
 # Colors for prettier output
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
+RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-echo "Starting Instagram Account Manager Servers..."
-echo "Press Ctrl+C to stop all servers"
+# Store PIDs in a file for cleanup
+PID_FILE=".server_pids"
+touch $PID_FILE
+
+# Cleanup function
+cleanup() {
+    echo -e "\n${RED}Shutting down all servers...${NC}"
+    if [ -f "$PID_FILE" ]; then
+        while read -r pid; do
+            if ps -p $pid > /dev/null; then
+                echo "Killing process $pid"
+                kill -15 $pid 2>/dev/null || kill -9 $pid 2>/dev3
+            fi
+        done < "$PID_FILE"
+        rm "$PID_FILE"
+    fi
+    
+    # Additional cleanup for any remaining processes
+    pkill -f 'node.*server.js' || true
+    exit 0
+}
+
+# Set up trap for cleanup
+trap cleanup SIGINT SIGTERM
+
+echo -e "${GREEN}Starting Instagram Account Manager Servers...${NC}"
+echo -e "${GREEN}Press Ctrl+C to stop all servers${NC}"
+
+# Ports to check
+PORTS=(3000 3001 3002)
+
+# Check if ports are free
+for port in "${PORTS[@]}"; do
+  if lsof -i ":$port" >/dev/null 2>&1; then
+    echo -e "${RED}Error: Port $port is already in use. Please free it first.${NC}"
+    exit 1
+  fi
+done
 
 # Check if the data directory exists, create if not
 if [ ! -d "./data" ]; then
@@ -15,31 +54,21 @@ if [ ! -d "./data" ]; then
   mkdir -p ./data/conversations
 fi
 
-# Start the RAG server first
-echo "Starting RAG server on port 3001..."
+# Start servers in the background and save their PIDs
 node rag-server.js &
 RAG_PID=$!
-
-# Small delay to let RAG server initialize
+echo $RAG_PID >> $PID_FILE
 sleep 2
-
-# Start the proxy server second
-echo "Starting proxy server on port 3002..."
-echo "This server handles: "
-echo "  • Discussions API (/rag-discussion/:username)"
-echo "  • Post Generation API with images (/rag-post/:username)"
-echo "  • Conversations API (/rag-conversations/:username)"
 
 node server.js &
 PROXY_PID=$!
-
-# Small delay to let proxy server initialize
+echo $PROXY_PID >> $PID_FILE
 sleep 2
 
-# Start the main server last
-echo "Starting main server on port 3000..."
 cd server && node server.js &
 MAIN_PID=$!
+echo $MAIN_PID >> $PID_FILE
+cd ..
 
 # Check if all servers are running
 sleep 5
@@ -76,5 +105,5 @@ echo "   - Generated posts will appear in the PostCooked module"
 echo ""
 echo "All servers are now running. Press Ctrl+C to stop all servers."
 
-# Wait for user to press Ctrl+C
+# Wait for all background processes
 wait 

@@ -43,11 +43,59 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
     checkCampaignStatus();
   }, [username, platform]);
 
+  // Force refresh campaign status when modal is opened
+  useEffect(() => {
+    // This will ensure fresh data every time the modal is shown
+    console.log(`[GoalModal] Modal opened - forcing campaign status refresh for ${username} on ${platform}`);
+    checkCampaignStatus();
+    
+    // Set up an interval to periodically check campaign status while modal is open
+    const intervalId = setInterval(() => {
+      console.log(`[GoalModal] Periodic campaign status check for ${username} on ${platform}`);
+      checkCampaignStatus();
+    }, 3000); // Check every 3 seconds while modal is open
+    
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, []); // Empty dependency array means this runs once when component mounts
+
+  // Listen for campaign stopped events
+  useEffect(() => {
+    const handleCampaignStoppedEvent = (event: any) => {
+      const { username: stoppedUsername, platform: stoppedPlatform } = event.detail;
+      console.log(`[GoalModal] Campaign stopped event received: ${stoppedUsername}/${stoppedPlatform.toLowerCase()} vs current ${username}/${platform.toLowerCase()}`);
+      
+      if (stoppedUsername === username && stoppedPlatform.toLowerCase() === platform.toLowerCase()) {
+        console.log(`[GoalModal] Campaign stopped event matched: Updating UI state`);
+        setCampaignStatus({
+          hasActiveCampaign: false,
+          platform: platform.toLowerCase(),
+          username,
+          goalFiles: 0
+        });
+        setShowCampaignButton(false);
+        
+        // Force a refresh from the server to ensure we have the latest status
+        setTimeout(() => {
+          checkCampaignStatus();
+        }, 500);
+      }
+    };
+
+    window.addEventListener('campaignStopped', handleCampaignStoppedEvent);
+    
+    return () => {
+      window.removeEventListener('campaignStopped', handleCampaignStoppedEvent);
+    };
+  }, [username, platform]);
+
   const checkCampaignStatus = async () => {
     setIsCheckingStatus(true);
     try {
       console.log(`[GoalModal] Checking campaign status for ${username} on ${platform}`);
-      const response = await axios.get(`http://localhost:3000/campaign-status/${username}?platform=${platform.toLowerCase()}`);
+      // Add bypass_cache=true to ensure we get fresh data from the server
+      const response = await axios.get(`http://localhost:3000/campaign-status/${username}?platform=${platform.toLowerCase()}&bypass_cache=true`);
       const statusData = response.data;
       
       console.log(`[GoalModal] Backend response:`, statusData);
@@ -61,14 +109,22 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
       };
       
       console.log(`[GoalModal] Platform-specific status:`, platformSpecificStatus);
+      console.log(`[GoalModal] Has active campaign: ${platformSpecificStatus.hasActiveCampaign}`);
       
+      // Update UI state based on campaign status
       setCampaignStatus(platformSpecificStatus);
+      setShowCampaignButton(platformSpecificStatus.hasActiveCampaign);
       
+      // Clear any cached form data if campaign is active
       if (platformSpecificStatus.hasActiveCampaign) {
+        console.log(`[GoalModal] Active campaign detected - showing campaign button`);
         setShowCampaignButton(true);
+      } else {
+        console.log(`[GoalModal] No active campaign detected - hiding campaign button`);
+        setShowCampaignButton(false);
       }
     } catch (err: any) {
-      console.error(`Error checking campaign status for ${platform}:`, err);
+      console.error(`[GoalModal] Error checking campaign status for ${platform}:`, err);
       // If there's an error checking status, assume no active campaign for this platform
       setCampaignStatus({ 
         hasActiveCampaign: false, 
@@ -76,6 +132,7 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
         username,
         goalFiles: 0 
       });
+      setShowCampaignButton(false);
     } finally {
       setIsCheckingStatus(false);
     }

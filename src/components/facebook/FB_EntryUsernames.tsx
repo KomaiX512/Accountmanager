@@ -5,17 +5,20 @@ import { motion } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import ProcessingLoadingState from '../common/ProcessingLoadingState';
+import { useProcessing } from '../../context/ProcessingContext';
 
 interface FB_EntryUsernamesProps {
   onSubmitSuccess: (username: string, competitors: string[], accountType: 'branding' | 'non-branding') => void;
   redirectIfCompleted?: boolean;
   markPlatformAccessed?: (platformId: string) => void;
+  onComplete?: () => void;
 }
 
 const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({ 
   onSubmitSuccess, 
   redirectIfCompleted = true,
-  markPlatformAccessed
+  markPlatformAccessed,
+  onComplete
 }) => {
   const [username, setUsername] = useState<string>('');
   const [accountType, setAccountType] = useState<'branding' | 'non-branding'>('branding');
@@ -35,6 +38,7 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
   
   const navigate = useNavigate();
   const { currentUser } = useAuth();
+  const { startProcessing, processingState } = useProcessing();
 
   const apiUrl = '/api/save-account-info';
 const statusApiUrl = '/api/user-facebook-status';
@@ -45,30 +49,11 @@ const usernameCheckUrl = '/api/check-username-availability';
 
   // Check for existing processing state on mount
   useEffect(() => {
-    const checkProcessingState = () => {
-      if (!currentUser?.uid) return;
-      
-      const processingKey = `facebook_processing_${currentUser.uid}`;
-      const processingData = localStorage.getItem(processingKey);
-      
-      if (processingData) {
-        const { startTime, duration } = JSON.parse(processingData);
-        const elapsed = Date.now() - startTime;
-        
-        if (elapsed < duration) {
-          // Processing is still active
-          setIsProcessing(true);
-          setIsInitializing(false);
-          return;
-        } else {
-          // Processing has expired, clean up
-          localStorage.removeItem(processingKey);
-        }
-      }
-    };
-
-    checkProcessingState();
-  }, [currentUser?.uid]);
+    if (processingState.isProcessing && processingState.platform === 'facebook') {
+      setIsProcessing(true);
+      setIsInitializing(false);
+    }
+  }, [processingState]);
 
   useEffect(() => {
     const checkUserStatus = async () => {
@@ -267,36 +252,16 @@ const usernameCheckUrl = '/api/check-username-availability';
     setTimeout(() => setMessage(''), 5000);
   };
 
+  const handleStartProcessing = (username: string) => {
+    startProcessing('facebook', username, 15); // 15 minutes duration
+    setIsProcessing(true);
+    setIsInitializing(false);
+  };
+
   const handleProcessingComplete = () => {
-    // Clear processing state from localStorage
-    if (currentUser?.uid) {
-      localStorage.removeItem(`facebook_processing_${currentUser.uid}`);
-    }
-    
-    const finalCompetitors = competitors.filter(comp => comp.trim() !== '');
-    
-    if (markPlatformAccessed) {
-      markPlatformAccessed('facebook');
-    }
-    
-    if (accountType === 'branding') {
-      navigate('/facebook-dashboard', { 
-        state: { 
-          accountHolder: username, 
-          competitors: finalCompetitors,
-          accountType: 'branding',
-          platform: 'facebook'
-        } 
-      });
-    } else {
-      navigate('/facebook-non-branding-dashboard', { 
-        state: { 
-          accountHolder: username,
-          competitors: finalCompetitors,
-          accountType: 'non-branding',
-          platform: 'facebook'
-        } 
-      });
+    setIsProcessing(false);
+    if (onComplete) {
+      onComplete();
     }
   };
 
@@ -343,18 +308,8 @@ const usernameCheckUrl = '/api/check-username-availability';
         
         showMessage('Submission successful', 'success');
         
-        // Save processing state to localStorage with timestamp
-        const processingData = {
-          startTime: Date.now(),
-          duration: 900000, // 15 minutes in milliseconds
-          username: username.trim(),
-          platform: 'facebook'
-        };
-        localStorage.setItem(`facebook_processing_${currentUser.uid}`, JSON.stringify(processingData));
-        
         // Start the processing phase
-        setIsLoading(false);
-        setIsProcessing(true);
+        handleStartProcessing(username);
       }
     } catch (error: any) {
       console.error('Error submitting Facebook data:', error);
@@ -384,8 +339,6 @@ const usernameCheckUrl = '/api/check-username-availability';
   if (isProcessing) {
     return (
       <ProcessingLoadingState
-        platform="facebook"
-        username={username}
         onComplete={handleProcessingComplete}
       />
     );

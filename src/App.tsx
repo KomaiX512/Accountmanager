@@ -27,23 +27,27 @@ import ChatModal from './components/instagram/ChatModal';
 import type { ChatMessage as ChatModalMessage } from './components/instagram/ChatModal';
 import QuotaStatusToast from './components/common/QuotaStatusToast';
 import AdminPanel from './components/admin/AdminPanel';
+import { ProcessingProvider } from './context/ProcessingContext';
+import Processing from './pages/Processing';
 
 
 // Main App component with AuthProvider
 const App: React.FC = () => {
   return (
     <AuthProvider>
-      <UsageProvider>
-        <UpgradePopupProvider>
-      <InstagramProvider>
-        <TwitterProvider>
-          <FacebookProvider>
-            <AppContent />
-          </FacebookProvider>
-        </TwitterProvider>
-      </InstagramProvider>
-        </UpgradePopupProvider>
-      </UsageProvider>
+      <ProcessingProvider>
+        <UsageProvider>
+          <UpgradePopupProvider>
+            <InstagramProvider>
+              <TwitterProvider>
+                <FacebookProvider>
+                  <AppContent />
+                </FacebookProvider>
+              </TwitterProvider>
+            </InstagramProvider>
+          </UpgradePopupProvider>
+        </UsageProvider>
+      </ProcessingProvider>
     </AuthProvider>
   );
 };
@@ -405,6 +409,14 @@ const AppContent: React.FC = () => {
             <Route
               path="/home"
               element={<Homepage />}
+            />
+            <Route
+              path="/processing"
+              element={
+                <PrivateRoute>
+                  <Processing />
+                </PrivateRoute>
+              }
             />
             <Route
               path="/privacy"

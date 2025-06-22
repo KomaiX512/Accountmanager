@@ -18,6 +18,12 @@ import useFeatureTracking from '../../hooks/useFeatureTracking';
 import { useUsage } from '../../context/UsageContext';
 import GlobalUpgradeHandler from '../common/GlobalUpgradeHandler';
 
+interface PlatformLoadingState {
+  startTime: number;
+  endTime: number;
+  isComplete: boolean;
+}
+
 interface PlatformData {
   id: string;
   name: string;
@@ -37,6 +43,7 @@ interface PlatformData {
   characterLimit?: number;
   supportsImages?: boolean;
   supportsVideo?: boolean;
+  loadingState?: PlatformLoadingState;
 }
 
 // Content data structure for instant posts
@@ -98,7 +105,69 @@ const MainDashboard: React.FC = () => {
     scheduleDate: null
   });
 
+  // Add new state for tracking loading states
+  const [platformLoadingStates, setPlatformLoadingStates] = useState<Record<string, PlatformLoadingState>>(() => {
+    const saved = localStorage.getItem('platformLoadingStates');
+    return saved ? JSON.parse(saved) : {};
+  });
 
+  // Save loading states to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('platformLoadingStates', JSON.stringify(platformLoadingStates));
+  }, [platformLoadingStates]);
+
+  // -------- Bullet-proof timer check using shared countdown key --------
+  const getProcessingCountdownKey = (platformId: string) => `${platformId}_processing_countdown`;
+
+  const getProcessingRemainingMs = (platformId: string): number => {
+    const raw = localStorage.getItem(getProcessingCountdownKey(platformId));
+    if (!raw) return 0;
+    const endTime = parseInt(raw, 10);
+    if (Number.isNaN(endTime)) return 0;
+    return Math.max(0, endTime - Date.now());
+  };
+
+  const isPlatformLoading = (platformId: string): boolean => {
+    const remaining = getProcessingRemainingMs(platformId);
+    if (remaining > 0) return true;
+
+    // fallback to in-memory state
+    const loadingState = platformLoadingStates[platformId];
+    if (!loadingState) return false;
+    return !loadingState.isComplete && Date.now() < loadingState.endTime;
+  };
+
+  // Function to start platform loading state
+  const startPlatformLoading = (platformId: string, durationMinutes: number = 15) => {
+    const now = Date.now();
+    const newLoadingState: PlatformLoadingState = {
+      startTime: now,
+      endTime: now + (durationMinutes * 60 * 1000),
+      isComplete: false
+    };
+    
+    setPlatformLoadingStates(prev => ({
+      ...prev,
+      [platformId]: newLoadingState
+    }));
+
+    // Persist countdown so all tabs/routes share it
+    const endTime = newLoadingState.endTime;
+    localStorage.setItem(getProcessingCountdownKey(platformId), endTime.toString());
+    // minimal info for ProcessingLoadingState UI
+    localStorage.setItem(`${platformId}_processing_info`, JSON.stringify({ platform: platformId, username: currentUser?.displayName || '', startTime: now, endTime }));
+  };
+
+  // Function to complete platform loading
+  const completePlatformLoading = (platformId: string) => {
+    setPlatformLoadingStates(prev => ({
+      ...prev,
+      [platformId]: {
+        ...prev[platformId],
+        isComplete: true
+      }
+    }));
+  };
 
   // ✅ PLATFORM STATUS SYNC FIX: Improved platform access tracking
   const getPlatformAccessStatus = useCallback((platformId: string): boolean => {
@@ -535,24 +604,36 @@ const MainDashboard: React.FC = () => {
   };
 
   const navigateToPlatform = (platform: PlatformData) => {
-    // Navigate to setup pages exactly like top bar navigation
-    // This ensures the username from the entry card is used consistently
-    switch(platform.id) {
-      case 'instagram':
-        navigate('/instagram');
-        break;
-      case 'twitter':
-        navigate('/twitter');
-        break;
-      case 'facebook':
-        navigate('/facebook');
-        break;
-      case 'linkedin':
-        navigate('/linkedin');
-        break;
-      default:
-        navigate(platform.route);
+    const remainingMs = getProcessingRemainingMs(platform.id);
+    
+    // If platform is in loading state and time isn't complete
+    if (remainingMs > 0) {
+      const remainingTime = Math.ceil(remainingMs / 1000 / 60);
+      navigate(`/processing/${platform.id}`, {
+        state: {
+          platform: platform.id,
+          username: currentUser?.displayName || '',
+          remainingMinutes: remainingTime
+        }
+      });
+      return;
     }
+    
+    // If this is first access, start loading state
+    if (!isPlatformLoading(platform.id) && platform.claimed && !platform.connected) {
+      startPlatformLoading(platform.id);
+      navigate(`/processing/${platform.id}`, {
+        state: {
+          platform: platform.id,
+          username: currentUser?.displayName || '',
+          remainingMinutes: 15
+        }
+      });
+      return;
+    }
+    
+    // Normal navigation if loading is complete or not required
+    navigate(`/${platform.route}`);
   };
 
   // Add a function to navigate to the entry setup
@@ -574,6 +655,20 @@ const MainDashboard: React.FC = () => {
   };
 
   const handleConnectionButtonClick = (platform: PlatformData) => {
+    // Always respect processing timer guard first
+    if (isPlatformLoading(platform.id)) {
+      const remainingMs = getProcessingRemainingMs(platform.id);
+      const remainingMinutes = Math.ceil(remainingMs / 1000 / 60);
+      navigate(`/processing/${platform.id}`, {
+        state: {
+          platform: platform.id,
+          username: currentUser?.displayName || '',
+          remainingMinutes
+        }
+      });
+      return;
+    }
+
     if (!platform.connected) {
       // Navigate to platform dashboard, not connection page
       if (platform.id === 'instagram') {

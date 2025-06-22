@@ -336,6 +336,8 @@ const usernameCheckUrl = '/api/check-username-availability';
   if (isProcessing) {
     return (
       <ProcessingLoadingState
+        platform="twitter"
+        username={username}
         onComplete={handleProcessingComplete}
       />
     );

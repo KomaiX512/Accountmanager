@@ -29,6 +29,7 @@ import QuotaStatusToast from './components/common/QuotaStatusToast';
 import AdminPanel from './components/admin/AdminPanel';
 import { ProcessingProvider } from './context/ProcessingContext';
 import Processing from './pages/Processing';
+import GlobalProcessingGuard from './components/guards/GlobalProcessingGuard';
 
 
 // Main App component with AuthProvider
@@ -400,152 +401,161 @@ const AppContent: React.FC = () => {
       <div className="main-content">
         {!shouldHideLeftBar && <LeftBar accountHolder={accountHolder} userId={userId} platform={currentPlatform} onOpenChat={handleOpenChatFromMessages} />}
         <div className={`content-area ${shouldHideLeftBar ? 'full-width' : ''}`}>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route
-              path="/"
-              element={<Homepage />}
-            />
-            <Route
-              path="/home"
-              element={<Homepage />}
-            />
-            <Route
-              path="/processing"
-              element={
-                <PrivateRoute>
-                  <Processing />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/privacy"
-              element={<PrivacyPolicy />}
-            />
-            <Route
-              path="/account"
-              element={
-                <PrivateRoute>
-                  <MainDashboard />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/instagram"
-              element={
-                <PrivateRoute>
-                  <Instagram />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/twitter"
-              element={
-                <PrivateRoute>
-                  <Twitter />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/facebook"
-              element={
-                <PrivateRoute>
-                  <Facebook />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/dashboard"
-              element={
-                <PrivateRoute>
-                  <Dashboard 
-                    accountHolder={accountHolder} 
-                    competitors={competitors} 
-                    accountType={accountType || 'branding'}
-                    onOpenChat={handleOpenChatFromMessages}
-                  />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/non-branding-dashboard"
-              element={
-                <PrivateRoute>
-                  <Dashboard 
-                    accountHolder={accountHolder} 
-                    competitors={competitors} 
-                    accountType="non-branding"
-                    onOpenChat={handleOpenChatFromMessages}
-                  />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/twitter-dashboard"
-              element={
-                <PrivateRoute>
-                  <PlatformDashboard 
-                    accountHolder={accountHolder} 
-                    competitors={competitors} 
-                    accountType={accountType || 'branding'}
-                    platform="twitter"
-                    onOpenChat={handleOpenChatFromMessages}
-                  />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/twitter-non-branding-dashboard"
-              element={
-                <PrivateRoute>
-                  <PlatformDashboard 
-                    accountHolder={accountHolder} 
-                    competitors={competitors} 
-                    accountType="non-branding"
-                    platform="twitter"
-                    onOpenChat={handleOpenChatFromMessages}
-                  />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/facebook-dashboard"
-              element={
-                <PrivateRoute>
-                  <PlatformDashboard 
-                    accountHolder={accountHolder} 
-                    competitors={competitors} 
-                    accountType={accountType || 'branding'}
-                    platform="facebook"
-                    onOpenChat={handleOpenChatFromMessages}
-                  />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/facebook-non-branding-dashboard"
-              element={
-                <PrivateRoute>
-                  <PlatformDashboard 
-                    accountHolder={accountHolder} 
-                    competitors={competitors} 
-                    accountType="non-branding"
-                    platform="facebook"
-                    onOpenChat={handleOpenChatFromMessages}
-                  />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/pricing"
-              element={
-                <PrivateRoute>
-                  <PricingPage />
-                </PrivateRoute>
-              }
-            />
-
-          </Routes>
+          <GlobalProcessingGuard>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route
+                path="/"
+                element={<Homepage />}
+              />
+              <Route
+                path="/home"
+                element={<Homepage />}
+              />
+              <Route
+                path="/processing"
+                element={
+                  <PrivateRoute>
+                    <Processing />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/processing/:platform"
+                element={
+                  <PrivateRoute>
+                    <Processing />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/privacy"
+                element={<PrivacyPolicy />}
+              />
+              <Route
+                path="/account"
+                element={
+                  <PrivateRoute>
+                    <MainDashboard />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/instagram"
+                element={
+                  <PrivateRoute>
+                    <Instagram />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/twitter"
+                element={
+                  <PrivateRoute>
+                    <Twitter />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/facebook"
+                element={
+                  <PrivateRoute>
+                    <Facebook />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/dashboard"
+                element={
+                  <PrivateRoute>
+                    <Dashboard 
+                      accountHolder={accountHolder} 
+                      competitors={competitors} 
+                      accountType={accountType || 'branding'}
+                      onOpenChat={handleOpenChatFromMessages}
+                    />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/non-branding-dashboard"
+                element={
+                  <PrivateRoute>
+                    <Dashboard 
+                      accountHolder={accountHolder} 
+                      competitors={competitors} 
+                      accountType="non-branding"
+                      onOpenChat={handleOpenChatFromMessages}
+                    />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/twitter-dashboard"
+                element={
+                  <PrivateRoute>
+                    <PlatformDashboard 
+                      accountHolder={accountHolder} 
+                      competitors={competitors} 
+                      accountType={accountType || 'branding'}
+                      platform="twitter"
+                      onOpenChat={handleOpenChatFromMessages}
+                    />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/twitter-non-branding-dashboard"
+                element={
+                  <PrivateRoute>
+                    <PlatformDashboard 
+                      accountHolder={accountHolder} 
+                      competitors={competitors} 
+                      accountType="non-branding"
+                      platform="twitter"
+                      onOpenChat={handleOpenChatFromMessages}
+                    />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/facebook-dashboard"
+                element={
+                  <PrivateRoute>
+                    <PlatformDashboard 
+                      accountHolder={accountHolder} 
+                      competitors={competitors} 
+                      accountType={accountType || 'branding'}
+                      platform="facebook"
+                      onOpenChat={handleOpenChatFromMessages}
+                    />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/facebook-non-branding-dashboard"
+                element={
+                  <PrivateRoute>
+                    <PlatformDashboard 
+                      accountHolder={accountHolder} 
+                      competitors={competitors} 
+                      accountType="non-branding"
+                      platform="facebook"
+                      onOpenChat={handleOpenChatFromMessages}
+                    />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/pricing"
+                element={
+                  <PrivateRoute>
+                    <PricingPage />
+                  </PrivateRoute>
+                }
+              />
+            </Routes>
+          </GlobalProcessingGuard>
         </div>
       </div>
               {chatModalData.isOpen && (

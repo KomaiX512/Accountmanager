@@ -37,6 +37,8 @@ import { GiSpy } from 'react-icons/gi';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
 import useUpgradeHandler from '../../hooks/useUpgradeHandler';
 import AccessControlPopup from '../common/AccessControlPopup';
+import { useNavigate } from 'react-router-dom';
+import useProcessingGuard from '../../hooks/useProcessingGuard';
 
 // Define RagService compatible ChatMessage
 interface RagChatMessage {
@@ -59,6 +61,99 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   platform,
   onOpenChat
 }) => {
+  const guard = useProcessingGuard(platform, accountHolder);
+
+  if (guard.active) {
+    // React Router will have already redirected inside the hook, but return null to avoid rendering.
+    return null;
+  }
+
+  const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
+  const loadingCheckRef = useRef(false);
+
+  // Check loading state on mount and after refreshes
+  useEffect(() => {
+    const checkLoadingState = () => {
+      if (loadingCheckRef.current) return;
+      loadingCheckRef.current = true;
+
+      try {
+        const savedCountdown = localStorage.getItem(`${platform}_processing_countdown`);
+        const processingInfo = localStorage.getItem(`${platform}_processing_info`);
+        
+        if (savedCountdown && processingInfo) {
+          const info = JSON.parse(processingInfo);
+          const endTime = parseInt(savedCountdown);
+          const now = Date.now();
+          
+          // Verify this loading state belongs to the current platform and is still active
+          if (info.platform === platform && now < endTime) {
+            const remainingMinutes = Math.ceil((endTime - now) / 1000 / 60);
+            navigate(`/processing/${platform}`, {
+              state: {
+                platform,
+                username: info.username || accountHolder,
+                remainingMinutes
+              },
+              replace: true
+            });
+            return;
+          }
+        }
+        
+        // If we reach here, either no loading state or it's expired/invalid
+        localStorage.removeItem(`${platform}_processing_countdown`);
+        localStorage.removeItem(`${platform}_processing_info`);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error checking loading state:', error);
+        setIsLoading(false);
+      }
+    };
+
+    // Check loading state immediately
+    checkLoadingState();
+
+    // Also check when window regains focus
+    const handleFocus = () => {
+      loadingCheckRef.current = false; // Reset the ref on focus
+      checkLoadingState();
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [platform, accountHolder, navigate]);
+
+  // Show loading indicator while checking state
+  if (isLoading) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        backgroundColor: '#f5f5f5'
+      }}>
+        <div style={{
+          textAlign: 'center',
+          color: '#666'
+        }}>
+          <div style={{
+            border: '4px solid #f3f3f3',
+            borderTop: '4px solid #00ffcc',
+            borderRadius: '50%',
+            width: '40px',
+            height: '40px',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 20px'
+          }} />
+          <div>Loading dashboard...</div>
+        </div>
+      </div>
+    );
+  }
+
   // Platform-specific context hooks
   const { userId: igUserId, isConnected: isInstagramConnected, connectInstagram } = useInstagram();
   const { userId: twitterId, isConnected: isTwitterConnected, connectTwitter } = useTwitter();

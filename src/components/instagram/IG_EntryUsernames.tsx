@@ -352,7 +352,9 @@ const usernameCheckUrl = '/api/check-username-availability';
   if (isProcessing) {
     return (
       <ProcessingLoadingState
-        onComplete={onComplete}
+        platform="instagram"
+        username={username}
+        onComplete={handleProcessingComplete}
       />
     );
   }

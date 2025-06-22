@@ -1,157 +1,516 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
+import { 
+  FiTarget,
+  FiClock,
+  FiMessageCircle,
   FiZap,
+  FiBarChart,
+  FiTrendingUp,
+  FiCamera,
+  FiTwitter,
+  FiUsers,
+  FiChevronLeft,
+  FiChevronRight,
+  FiStar,
   FiDatabase,
   FiCpu,
   FiLayers,
-  FiCheckCircle,
-  FiInstagram,
-  FiTwitter,
-  FiFacebook,
+  FiCheckCircle
 } from 'react-icons/fi';
-import { useProcessing } from '../../context/ProcessingContext';
+import { useAuth } from '../../context/AuthContext';
 import './ProcessingLoadingState.css';
+import { useNavigate } from 'react-router-dom';
+import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaInstagram, FaTwitter, FaFacebook } from 'react-icons/fa';
+import { MdAnalytics } from 'react-icons/md';
+import { BsLightningChargeFill } from 'react-icons/bs';
 
 interface ProcessingStage {
+  id: number;
   name: string;
+  description: string;
+  status: string;
+  icon: React.ReactNode;
+  percentage: number;
+}
+
+interface ProTip {
+  id: string;
+  title: string;
+  description: string;
   icon: React.ReactNode;
 }
 
-const STAGES: ProcessingStage[] = [
-  { name: 'Connecting to API...', icon: <FiLayers size={22} /> },
-  { name: 'Extracting public data...', icon: <FiDatabase size={22} /> },
-  { name: 'Analyzing with AI...', icon: <FiCpu size={22} /> },
-  { name: 'Generating insights...', icon: <FiZap size={22} /> },
-  { name: 'Finalizing dashboard...', icon: <FiCheckCircle size={22} /> },
-];
-
-const PLATFORM_CONFIG = {
-  instagram: {
-    color: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)',
-    icon: <FiInstagram size={36} />,
-    name: 'Instagram'
-  },
-  twitter: {
-    color: 'linear-gradient(45deg, #1DA1F2, #1A91DA)',
-    icon: <FiTwitter size={36} />,
-    name: 'X (Twitter)'
-  },
-  facebook: {
-    color: 'linear-gradient(45deg, #1877F2, #166FE5)',
-    icon: <FiFacebook size={36} />,
-    name: 'Facebook'
-  },
+// Define platform configuration type
+type PlatformConfigType = {
+  name: string;
+  primaryColor: string;
+  secondaryColor: string;
+  icon: React.ReactNode;
 };
 
-const ProcessingLoadingState: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
-  const { processingState } = useProcessing();
-  const { platform, username, startTime, duration } = processingState;
+// Define platform configurations
+const PLATFORM_CONFIGS: Record<string, PlatformConfigType> = {
+  instagram: {
+    name: 'Instagram',
+    primaryColor: '#e4405f',
+    secondaryColor: '#00ffcc',
+    icon: <FaInstagram />
+  },
+  twitter: {
+    name: 'X (Twitter)',
+    primaryColor: '#000000',
+    secondaryColor: '#ffffff',
+    icon: <FaTwitter />
+  },
+  facebook: {
+    name: 'Facebook',
+    primaryColor: '#1877f2',
+    secondaryColor: '#42a5f5',
+    icon: <FaFacebook />
+  }
+};
 
-  const [timeLeft, setTimeLeft] = useState(0);
-  const [currentStageIndex, setCurrentStageIndex] = useState(0);
+// Default platform config for fallback
+const DEFAULT_PLATFORM_CONFIG: PlatformConfigType = {
+  name: 'Platform',
+  primaryColor: '#666666',
+  secondaryColor: '#cccccc',
+  icon: <BsLightningChargeFill />
+};
+
+interface ProcessingLoadingStateProps {
+  platform: 'instagram' | 'twitter' | 'facebook';
+  username: string;
+  onComplete?: () => void;
+  countdownMinutes?: number;
+  remainingMinutes?: number;
+}
+
+const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
+  platform,
+  username,
+  onComplete,
+  countdownMinutes = 15,
+  remainingMinutes
+}) => {
+  const { currentUser } = useAuth();
+  const navigate = useNavigate();
+  
+  // Get platform configuration with fallback
+  const platformConfig = PLATFORM_CONFIGS[platform] || DEFAULT_PLATFORM_CONFIG;
+
+  // Initialize countdown from localStorage or props
+  const [countdown, setCountdown] = useState(() => {
+    try {
+      const savedCountdown = localStorage.getItem(`${platform}_processing_countdown`);
+      if (savedCountdown) {
+        const endTime = parseInt(savedCountdown);
+        const now = Date.now();
+        const remaining = Math.max(0, endTime - now);
+        return Math.ceil(remaining / 1000);
+      }
+    } catch (error) {
+      console.error('Error reading countdown from localStorage:', error);
+    }
+    return (remainingMinutes || countdownMinutes) * 60;
+  });
+
+  // Save end time to localStorage when component mounts
+  useEffect(() => {
+    try {
+      const endTime = Date.now() + (countdown * 1000);
+      localStorage.setItem(`${platform}_processing_countdown`, endTime.toString());
+      
+      // Also store the platform and username for verification
+      localStorage.setItem(`${platform}_processing_info`, JSON.stringify({
+        platform,
+        username,
+        startTime: Date.now(),
+        endTime
+      }));
+      
+      return () => {
+        if (countdown <= 0) {
+          localStorage.removeItem(`${platform}_processing_countdown`);
+          localStorage.removeItem(`${platform}_processing_info`);
+        }
+      };
+    } catch (error) {
+      console.error('Error saving to localStorage:', error);
+    }
+  }, []);
 
   useEffect(() => {
-    if (startTime && duration) {
-      const elapsedMs = Date.now() - startTime;
-      const remainingMs = Math.max(0, duration - elapsedMs);
-      setTimeLeft(Math.ceil(remainingMs / 1000));
-    }
-  }, [startTime, duration]);
+    const timer = setInterval(() => {
+      setCountdown(prev => {
+        const newCount = prev - 1;
+        if (newCount <= 0) {
+          clearInterval(timer);
+          try {
+            localStorage.removeItem(`${platform}_processing_countdown`);
+            localStorage.removeItem(`${platform}_processing_info`);
+          } catch (error) {
+            console.error('Error clearing localStorage:', error);
+          }
+          if (onComplete) onComplete();
+          return 0;
+        }
+        return newCount;
+      });
+    }, 1000);
 
+    return () => clearInterval(timer);
+  }, [onComplete, platform]);
+
+  // Prevent navigation away during processing
   useEffect(() => {
-    if (timeLeft <= 0) {
-      if (typeof onComplete === 'function') onComplete();
-      return;
-    }
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (countdown > 0) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
 
-    const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-    return () => clearTimeout(timer);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [countdown]);
+
+  // Handle direct navigation attempts
+  useEffect(() => {
+    const handleNavigation = () => {
+      if (countdown > 0) {
+        navigate(`/processing/${platform}`, { 
+          state: { 
+            platform, 
+            username,
+            remainingMinutes: Math.ceil(countdown / 60) 
+          },
+          replace: true
+        });
+      }
+    };
+
+    window.addEventListener('popstate', handleNavigation);
+    return () => window.removeEventListener('popstate', handleNavigation);
+  }, [countdown, navigate, platform, username]);
+
+  const TOTAL_DURATION = countdownMinutes * 60; // Convert minutes to seconds
+  const [timeLeft, setTimeLeft] = useState(TOTAL_DURATION);
+  const [currentStage, setCurrentStage] = useState(0);
+  const [currentTipIndex, setCurrentTipIndex] = useState(0);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+
+  // Reusable stage system - automatically splits time into 5 equal stages
+  const processingStages: ProcessingStage[] = [
+    {
+      id: 1,
+      name: 'Queue',
+      description: 'Initializing AI analysis pipeline',
+      status: 'Preparing secure data connection...',
+      icon: <FiLayers size={20} />,
+      percentage: 20
+    },
+    {
+      id: 2,
+      name: 'Extract',
+      description: 'Collecting social media insights',
+      status: 'Analyzing engagement patterns...',
+      icon: <FiDatabase size={20} />,
+      percentage: 40
+    },
+    {
+      id: 3,
+      name: 'Analyze',
+      description: 'Processing competitive intelligence',
+      status: 'Generating strategic insights...',
+      icon: <FiCpu size={20} />,
+      percentage: 60
+    },
+    {
+      id: 4,
+      name: 'Generate',
+      description: 'Creating personalized strategies',
+      status: 'Optimizing recommendations...',
+      icon: <FiZap size={20} />,
+      percentage: 80
+    },
+    {
+      id: 5,
+      name: 'Deploy',
+      description: 'Finalizing dashboard setup',
+      status: 'Ready for launch...',
+      icon: <FiCheckCircle size={20} />,
+      percentage: 100
+    }
+  ];
+
+  // Initialize countdown based on localStorage data
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+    
+    const processingKey = `${platform}_processing_${currentUser.uid}`;
+    const processingData = localStorage.getItem(processingKey);
+    
+    if (processingData) {
+      const { startTime, duration } = JSON.parse(processingData);
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(0, Math.ceil((duration - elapsed) / 1000));
+      
+      if (remaining > 0) {
+        setTimeLeft(remaining);
+      } else {
+        if (onComplete) onComplete();
+      }
+    }
+  }, [currentUser?.uid, platform, onComplete]);
+
+  // Update current stage based on time progress - reusable for any countdown duration
+  useEffect(() => {
+    const progress = ((TOTAL_DURATION - timeLeft) / TOTAL_DURATION) * 100;
+    const newStageIndex = processingStages.findIndex(stage => progress < stage.percentage);
+    const stageIndex = newStageIndex === -1 ? processingStages.length - 1 : Math.max(0, newStageIndex - 1);
+    
+    if (stageIndex !== currentStage) {
+      setCurrentStage(stageIndex);
+    }
+  }, [timeLeft, currentStage, TOTAL_DURATION]);
+
+  const proTips: ProTip[] = [
+    {
+      id: 'goal-button',
+      title: 'AI-Powered Goal Campaigns',
+      description: 'Create autonomous campaigns that adapt to market trends and competitor movements in real-time.',
+      icon: <FiTarget size={20} />
+    },
+    {
+      id: 'auto-schedule',
+      title: 'Intelligent Scheduling',
+      description: 'Our neural networks predict optimal posting times based on 50M+ data points.',
+      icon: <FiClock size={20} />
+    },
+    {
+      id: 'auto-reply',
+      title: 'Contextual Auto-Replies',
+      description: 'GPT-powered responses that maintain your brand voice across all interactions.',
+      icon: <FiMessageCircle size={20} />
+    },
+    {
+      id: 'content-creation',
+      title: 'Dynamic Content Generation',
+      description: 'AI creates viral-ready content based on trending topics and competitor analysis.',
+      icon: <FiZap size={20} />
+    },
+    {
+      id: 'profit-analysis',
+      title: 'Revenue Intelligence',
+      description: 'Track ROI with precision analytics that connect social metrics to business outcomes.',
+      icon: <FiBarChart size={20} />
+    },
+    {
+      id: 'organic-campaigns',
+      title: 'Organic Growth Engine',
+      description: 'Automated campaigns that scale organically without compromising authenticity.',
+      icon: <FiTrendingUp size={20} />
+    }
+  ];
+
+  // Countdown timer effect
+  useEffect(() => {
+    if (timeLeft > 0) {
+      const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
+      return () => clearTimeout(timer);
+    } else {
+      if (onComplete) onComplete();
+    }
   }, [timeLeft, onComplete]);
 
-  const progress = useMemo(() => {
-    if (!duration) return 0;
-    const elapsedSeconds = (duration / 1000) - timeLeft;
-    return Math.min(100, (elapsedSeconds / (duration / 1000)) * 100);
-  }, [duration, timeLeft]);
-
+  // Auto-advance tips effect
   useEffect(() => {
-    const stagePercentage = 100 / STAGES.length;
-    const newStageIndex = Math.min(
-      Math.floor(progress / stagePercentage),
-      STAGES.length - 1
-    );
-    setCurrentStageIndex(newStageIndex);
-  }, [progress]);
-  
-  if (!platform || !username) return null;
-
-  const config = PLATFORM_CONFIG[platform];
+    if (isAutoPlaying && timeLeft > 0) {
+      const interval = setInterval(() => {
+        setCurrentTipIndex((prev) => (prev + 1) % proTips.length);
+      }, 8000); // Change tip every 8 seconds for better pacing
+      return () => clearInterval(interval);
+    }
+  }, [isAutoPlaying, timeLeft, proTips.length]);
 
   const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  const calculateProgress = () => {
+    return ((TOTAL_DURATION - timeLeft) / TOTAL_DURATION) * 100;
+  };
+
+  const handleTipNavigation = (index: number) => {
+    setCurrentTipIndex(index);
+    setIsAutoPlaying(false);
+    setTimeout(() => setIsAutoPlaying(true), 15000);
+  };
+
+  const nextTip = () => {
+    setCurrentTipIndex((prev) => (prev + 1) % proTips.length);
+    setIsAutoPlaying(false);
+    setTimeout(() => setIsAutoPlaying(true), 15000);
+  };
+
+  const prevTip = () => {
+    setCurrentTipIndex((prev) => (prev - 1 + proTips.length) % proTips.length);
+    setIsAutoPlaying(false);
+    setTimeout(() => setIsAutoPlaying(true), 15000);
   };
 
   return (
     <div className="processing-container">
+      <div className="processing-backdrop" />
+      
       <motion.div
-        className="processing-card"
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.7, ease: [0.2, 0.8, 0.2, 1] }}
+        className="processing-content"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
       >
-        <div className="processing-header">
-          <motion.div
-            className="platform-icon"
-            style={{ background: config.color }}
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.2, type: 'spring', stiffness: 200, damping: 15 }}
+        {/* Header */}
+        <motion.div
+          className="processing-header"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.6 }}
+        >
+          <div 
+            className="platform-badge" 
+            style={{ 
+              backgroundColor: platformConfig.primaryColor,
+              color: platformConfig.secondaryColor 
+            }}
           >
-            {config.icon}
-          </motion.div>
-          <h2>AI Analysis in Progress</h2>
-          <p>
-            Crunching data for <span className="username-highlight">@{username}</span> on {config.name}
+            <span className="platform-icon">
+              {platformConfig.icon}
+            </span>
+            <span className="platform-name">{platformConfig.name}</span>
+          </div>
+          
+          <h1 className="main-title">
+            Setting Up Your {platformConfig.name} Dashboard
+          </h1>
+          
+          <p className="subtitle">
+            Please wait while we prepare everything for
           </p>
-        </div>
+          <p className="username">{username}</p>
+        </motion.div>
 
-        <div className="progress-bar-container">
-          <motion.div
-            className="progress-bar-fill"
-            style={{ background: config.color }}
-            initial={{ width: 0 }}
-            animate={{ width: `${progress}%` }}
-            transition={{ duration: 1, ease: 'easeInOut' }}
-          />
-        </div>
-        
-        <div className="status-container">
+        {/* Progress Section */}
+        <motion.div
+          className="progress-section"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.4, duration: 0.6 }}
+        >
+          {/* Stage Indicators */}
+          <div className="stage-indicators">
+            {processingStages.map((stage, index) => (
+              <motion.div
+                key={stage.id}
+                className={`stage-indicator ${index <= currentStage ? 'active' : ''} ${index === currentStage ? 'current' : ''}`}
+                initial={{ opacity: 0, scale: 0 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.6 + index * 0.1 }}
+              >
+                <div className="stage-icon">{stage.icon}</div>
+                <span className="stage-name">{stage.name}</span>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Progress Bar */}
+          <div className="progress-track">
+            <motion.div
+              className="progress-fill"
+              style={{ backgroundColor: platformConfig.primaryColor }}
+              initial={{ width: 0 }}
+              animate={{ width: `${calculateProgress()}%` }}
+              transition={{ duration: 0.8, ease: "easeInOut" }}
+            />
+          </div>
+
+          {/* Current Stage Info */}
           <AnimatePresence mode="wait">
             <motion.div
-              key={currentStageIndex}
-              className="status-stage"
-              initial={{ opacity: 0, y: 15 }}
+              key={currentStage}
+              className="current-stage"
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.4, ease: 'easeInOut' }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.4 }}
             >
-              {STAGES[currentStageIndex].icon}
-              <span>{STAGES[currentStageIndex].name}</span>
+              <div className="stage-header">
+                <div className="stage-pulse" style={{ backgroundColor: platformConfig.primaryColor }} />
+                <h3>{processingStages[currentStage].description}</h3>
+              </div>
+              <p className="stage-status">{processingStages[currentStage].status}</p>
+              <div className="time-display">
+                <FiClock size={14} />
+                <span>{formatTime(timeLeft)}</span>
+              </div>
             </motion.div>
           </AnimatePresence>
-        </div>
+        </motion.div>
 
-        <div className="timer">
-          <span>Time Remaining:</span>
-          <strong>{formatTime(timeLeft)}</strong>
-        </div>
+        {/* Pro Tips */}
+        <motion.div
+          className="tips-section"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8, duration: 0.6 }}
+        >
+          <div className="tips-header">
+            <FiStar size={16} />
+            <span>Pro Insights</span>
+          </div>
 
-        <div className="footer-note">
-          Please keep this window open. You will be redirected automatically.
-        </div>
+          <div className="tips-carousel">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentTipIndex}
+                className="tip-card"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.5 }}
+              >
+                <div className="tip-icon">{proTips[currentTipIndex].icon}</div>
+                <div className="tip-content">
+                  <h4>{proTips[currentTipIndex].title}</h4>
+                  <p>{proTips[currentTipIndex].description}</p>
+                </div>
+              </motion.div>
+            </AnimatePresence>
+
+            <div className="tips-controls">
+              <button onClick={prevTip} className="tip-nav">
+                <FiChevronLeft size={16} />
+              </button>
+              
+              <div className="tip-dots">
+                {proTips.map((_, index) => (
+                  <button
+                    key={index}
+                    className={`tip-dot ${index === currentTipIndex ? 'active' : ''}`}
+                    onClick={() => handleTipNavigation(index)}
+                  />
+                ))}
+              </div>
+              
+              <button onClick={nextTip} className="tip-nav">
+                <FiChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        </motion.div>
       </motion.div>
     </div>
   );

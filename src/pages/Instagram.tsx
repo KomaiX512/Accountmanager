@@ -104,6 +104,7 @@ const Instagram: React.FC = () => {
           key="entry"
           onSubmitSuccess={handleSubmitSuccess}
           redirectIfCompleted={false}
+          onComplete={() => {}}
         />
       </AnimatePresence>
     </div>

@@ -339,6 +339,8 @@ const usernameCheckUrl = '/api/check-username-availability';
   if (isProcessing) {
     return (
       <ProcessingLoadingState
+        platform="facebook"
+        username={username}
         onComplete={handleProcessingComplete}
       />
     );

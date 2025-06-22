@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Based on the provided data for @fentybeauty, your most popular post is:\n\n\"Born to dew your body right ️‍\"\n\nThis post has 29,447 likes and 141 comments, for a total engagement of 29,588. This is also confirmed by the \"Most Engaging Post\" data, which identifies the same post and engagement numbers.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.12754693088761296
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 476,
+    "candidatesTokenCount": 83,
+    "totalTokenCount": 559,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 476
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 83
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "EKxWaJO7EZXX1PIPsqOKqAs"
+}

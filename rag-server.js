@@ -1092,37 +1092,34 @@ async function createEnhancedRagPrompt(profileData, rulesData, query, platform =
     console.log(`[RAG-Server] 🎯 Using ENHANCED semantic context for superior response quality`);
     
     // 🛡️ Apply content sanitization to prevent Gemini filtering
-    console.log(`[RAG-Server] 🛡️ Applying AGGRESSIVE content sanitization for enhanced context...`);
+    console.log(`[RAG-Server] 🛡️ Applying content sanitization for enhanced context...`);
     const sanitizedContext = sanitizeContextForGemini(enhancedContext, username);
     console.log(`[RAG-Server] 🛡️ Context sanitized: ${sanitizedContext.length} chars (was ${enhancedContext.length})`);
     
-    // Create explicit, directive enhanced prompt that forces data usage
-    const enhancedPrompt = `You are a social media data analyst. You have been provided with SPECIFIC, REAL DATA about the ${platform} account @${username}. This data includes actual post content, engagement metrics, and performance statistics.
+    // Create intelligent, conversational prompt for social media expertise
+    const enhancedPrompt = `You're a seasoned social media strategist with years of experience managing successful ${platformName} accounts. You're analyzing the account @${username} and have access to comprehensive performance data.
 
-YOUR TASK: Answer the user's question using ONLY the provided data below. You MUST reference specific numbers, captions, and metrics from the data provided.
-
-===== REAL ACCOUNT DATA FOR @${username} =====
+===== ACCOUNT DATA FOR @${username} =====
 ${sanitizedContext}
-===== END OF REAL DATA =====
+===== END OF ACCOUNT DATA =====
 
-User Question: "${query}"
+Question: "${query}"
 
-INSTRUCTIONS:
-1. You MUST use the specific post data provided above
-2. You MUST quote actual captions from the "Recent Posts and Engagement" section
-3. You MUST include the exact engagement numbers (likes, comments, totals)
-4. You MUST reference the "Most Engaging Post" data if it exists
-5. DO NOT claim you lack data - all necessary data is provided above
-6. Answer based EXCLUSIVELY on the provided account data
+Instructions:
+• Analyze the actual data above to answer the specific question
+• Be conversational, insightful, and specific to this account
+• Reference real numbers, captions, and performance patterns from the data
+• Provide actionable recommendations based on what's actually working
+• Think like a consultant who's deeply familiar with this account's performance
 
-Provide a detailed response that directly uses the post content and engagement metrics shown above.`;
+Respond as a knowledgeable social media expert discussing this specific account.`;
 
     return enhancedPrompt;
   }
   
   // 🔄 FALLBACK: Traditional RAG approach for when ChromaDB is not available
   console.log(`[RAG-Server] 📋 Using traditional RAG approach as fallback`);
-  return createTraditionalRagPrompt(profileData, rulesData, query, platform, usingFallbackProfile, username);
+  return createNaturalRagPrompt(profileData, rulesData, query, platform, usingFallbackProfile, username);
 }
 
 // 🛡️ Comprehensive content sanitization to prevent Gemini filtering
@@ -1257,8 +1254,8 @@ function sanitizeAssistantResponseForContext(text) {
   return sanitized;
 }
 
-// Original RAG prompt function (renamed for clarity)
-function createTraditionalRagPrompt(profileData, rulesData, query, platform = 'instagram', usingFallbackProfile = false, username = 'user') {
+// Natural RAG prompt function that creates conversational, intelligent responses
+function createNaturalRagPrompt(profileData, rulesData, query, platform = 'instagram', usingFallbackProfile = false, username = 'user') {
   const platformName = platform === 'twitter' ? 'X (Twitter)' : 
                       platform === 'facebook' ? 'Facebook' : 
                       'Instagram';
@@ -1562,32 +1559,36 @@ This shows strong e-commerce/business integration.`;
 
   console.log(`[RAG-Server] Real RAG query: "${safeQuery}"`);
 
-  // Build ultra-safe RAG prompt that avoids all content filtering triggers
-  let ultraSafePrompt = `Business account analysis for ${platformName} platform.
+  // Build comprehensive account data context for natural AI conversation
+  const accountContext = buildAccountDataContext(profileData, query, platform, username);
+  
+  // Create natural, conversational prompt for social media management
+  const naturalPrompt = `You are an expert social media strategist and account manager with deep knowledge of ${platformName}. You have access to comprehensive data about the ${platformName} account @${username}, including posts, engagement metrics, audience insights, and performance analytics.
 
-ACCOUNT METRICS:
-${accountMetrics}
+Your role is to be a knowledgeable, conversational social media expert who can answer ANY question about social media strategy, content performance, audience engagement, growth tactics, marketing insights, or account optimization.
 
-BUSINESS QUESTION: "${safeQuery}"
+===== ACCOUNT DATA FOR @${username} =====
+${accountContext}
+===== END OF ACCOUNT DATA =====
 
-Please provide a professional business analysis using the account metrics shown above. Focus on numerical data and growth recommendations.`;
+User Question: "${query}"
 
-  // Only add the safest possible engagement data
-  if (profileData && !usingFallbackProfile) {
-    const followerCount = profileData?.followersCount || profileData?.[0]?.followersCount;
-    const postCount = profileData?.postsCount || profileData?.[0]?.postsCount;
-    
-    if (followerCount && postCount) {
-      ultraSafePrompt += `\n\nACCOUNT DATA:
-- Total followers: ${followerCount.toLocaleString()}
-- Total posts: ${postCount.toLocaleString()}
-- Platform: ${platformName}`;
-    }
-  }
+INSTRUCTIONS FOR NATURAL RESPONSE:
+• Be conversational and knowledgeable like a real social media manager
+• Answer the specific question asked - don't provide templated responses
+• Use the actual account data to support your insights and recommendations
+• Provide actionable, specific advice based on the real performance metrics
+• If asked about specific posts, reference actual captions and engagement numbers
+• For strategy questions, analyze actual content themes and performance patterns
+• For growth questions, base recommendations on actual follower/engagement data
+• For content ideas, analyze what's actually working for this specific account
+• For advertising questions, use the actual hashtags and content themes from the data
+• Always be helpful, insightful, and specific to this account's actual performance
+• Answer naturally as if you're a social media expert consultant
 
-  ultraSafePrompt += `\n\nProvide specific business insights using the metrics above.`;
+Respond naturally and conversationally based on the specific account data provided above.`;
 
-  return ultraSafePrompt;
+  return naturalPrompt;
 }
 
 // Helper function to extract content themes from bio
@@ -1677,8 +1678,8 @@ function analyzePostThemes(postTexts) {
   return themes.size > 0 ? Array.from(themes) : ['General Content'];
 }
 
-// Enhanced RAG Response Generator - Bulletproof solution for content filtering
-function generateIntelligentRAGResponse(profileData, query, platform = 'instagram', username = 'user') {
+// Natural RAG Response Context Builder - Creates comprehensive data context for AI model
+function buildAccountDataContext(profileData, query, platform = 'instagram', username = 'user') {
   const platformName = platform === 'twitter' ? 'X (Twitter)' : 
                       platform === 'facebook' ? 'Facebook' : 
                       'Instagram';
@@ -1713,356 +1714,127 @@ function generateIntelligentRAGResponse(profileData, query, platform = 'instagra
     }
   }
   
-  // Format numbers
+  // Format numbers for display
   const formatNumber = (num) => {
     if (typeof num === 'number') return num.toLocaleString();
     if (typeof num === 'string' && !isNaN(num)) return parseInt(num).toLocaleString();
     return num;
   };
   
-  followerCount = formatNumber(followerCount);
-  postCount = formatNumber(postCount);
-  followingCount = formatNumber(followingCount);
+  const formattedFollowerCount = formatNumber(followerCount);
+  const formattedPostCount = formatNumber(postCount);
+  const formattedFollowingCount = formatNumber(followingCount);
   
-  // Analyze posts for engagement patterns
-  let totalLikes = 0;
-  let totalComments = 0;
-  let totalEngagement = 0;
-  let mostEngagedPost = null;
-  let maxEngagement = 0;
+  // Analyze posts for comprehensive insights
+  let postAnalysis = '';
+  let engagementInsights = '';
+  let contentThemes = [];
   
   if (posts && posts.length > 0) {
-    posts.forEach(post => {
+    // Calculate engagement metrics
+    let totalLikes = 0;
+    let totalComments = 0;
+    let mostEngagedPost = null;
+    let maxEngagement = 0;
+    let postDetails = [];
+    
+    posts.forEach((post, index) => {
       const likes = post.likesCount || post.likes || 0;
       const comments = post.commentsCount || post.comments || 0;
       const engagement = likes + comments;
       
       totalLikes += likes;
       totalComments += comments;
-      totalEngagement += engagement;
       
       if (engagement > maxEngagement) {
         maxEngagement = engagement;
         mostEngagedPost = post;
       }
+      
+      // Build detailed post data for analysis
+      postDetails.push({
+        index: index + 1,
+        caption: (post.caption || '').substring(0, 200),
+        likes: formatNumber(likes),
+        comments: formatNumber(comments),
+        engagement: formatNumber(engagement),
+        hashtags: post.hashtags ? post.hashtags.slice(0, 5) : [],
+        mentions: post.mentions ? post.mentions.slice(0, 3) : [],
+        timestamp: post.timestamp || 'Recent'
+      });
     });
-  }
-  
-  const avgEngagement = posts.length > 0 ? Math.round(totalEngagement / posts.length) : 0;
-  const avgLikes = posts.length > 0 ? Math.round(totalLikes / posts.length) : 0;
-  
-  // Generate intelligent response based on query type
-  const queryLower = query.toLowerCase();
-  
-  if (queryLower.includes('follower') && queryLower.includes('count')) {
-    return generateFollowerCountResponse(username, followerCount, postCount, followingCount, platformName, isVerified, isBusinessAccount);
-  }
-  
-  if (queryLower.includes('post') && (queryLower.includes('number') || queryLower.includes('count') || queryLower.includes('how many'))) {
-    return generatePostCountResponse(username, postCount, followerCount, platformName, posts.length);
-  }
-  
-  if (queryLower.includes('engagement') || queryLower.includes('metric')) {
-    return generateEngagementResponse(username, followerCount, postCount, avgEngagement, avgLikes, posts.length, platformName);
-  }
-  
-  if (queryLower.includes('popular') || queryLower.includes('liked') || queryLower.includes('engaging')) {
-    return generatePopularPostResponse(username, mostEngagedPost, maxEngagement, avgEngagement, posts.length, platformName);
-  }
-  
-  if (queryLower.includes('theme') || queryLower.includes('content') || queryLower.includes('topic')) {
-    return generateContentThemeResponse(username, posts, bio, platformName);
-  }
-  
-  // Default comprehensive response
-  return generateComprehensiveResponse(username, followerCount, postCount, followingCount, avgEngagement, posts.length, platformName, isVerified, isBusinessAccount);
-}
-
-function generateFollowerCountResponse(username, followerCount, postCount, followingCount, platformName, isVerified, isBusinessAccount) {
-  const verifiedBadge = isVerified ? ' ✓' : '';
-  const accountType = isBusinessAccount ? 'Business Account' : 'Personal Account';
-  
-  return `## ${platformName} Account Analysis: @${username}${verifiedBadge}
-
-### 📊 **Follower Metrics**
-Your ${platformName} account has **${followerCount} followers**, which represents a substantial audience base.
-
-### 📈 **Account Overview**
-- **Followers:** ${followerCount}
-- **Following:** ${followingCount}
-- **Total Posts:** ${postCount}
-- **Account Type:** ${accountType}
-
-### 💡 **Analysis & Insights**
-With ${followerCount} followers across ${postCount} posts, your account demonstrates strong audience engagement potential. This follower base provides excellent reach for content distribution and brand messaging.
-
-### 🎯 **Strategic Recommendations**
-1. **Audience Leverage:** Your ${followerCount} followers represent significant marketing potential
-2. **Content Optimization:** With ${postCount} posts, focus on high-performing content types
-3. **Engagement Growth:** Maintain consistent posting to grow beyond ${followerCount} followers
-4. **Platform Strategy:** Optimize for ${platformName}'s algorithm with your current audience size
-
-Your follower count of **${followerCount}** positions you well for continued growth and engagement on ${platformName}.`;
-}
-
-function generatePostCountResponse(username, postCount, followerCount, platformName, recentPostsAnalyzed) {
-  const postsPerFollower = followerCount !== 'N/A' && postCount !== 'N/A' ? 
-    Math.round(parseInt(followerCount.replace(/,/g, '')) / parseInt(postCount.replace(/,/g, ''))) : 'N/A';
-  
-  return `## ${platformName} Content Analysis: @${username}
-
-### 📝 **Post Volume Metrics**
-You have published **${postCount} posts** on your ${platformName} account.
-
-### 📊 **Content Statistics**
-- **Total Posts:** ${postCount}
-- **Followers:** ${followerCount}
-- **Followers per Post:** ${postsPerFollower !== 'N/A' ? postsPerFollower.toLocaleString() : 'N/A'}
-- **Recent Posts Analyzed:** ${recentPostsAnalyzed}
-
-### 📈 **Content Performance Insights**
-With ${postCount} posts reaching ${followerCount} followers, your content strategy shows:
-
-**Volume Analysis:**
-- **High Activity:** ${postCount} posts demonstrates consistent content creation
-- **Audience Reach:** Each post potentially reaches ${followerCount} followers
-- **Engagement Potential:** Strong foundation for audience interaction
-
-### 🎯 **Content Strategy Recommendations**
-1. **Consistency:** Your ${postCount} posts show commitment to regular content creation
-2. **Quality Focus:** Analyze top-performing posts from your ${postCount} total posts
-3. **Audience Growth:** Leverage your ${postCount} posts to attract new followers
-4. **Content Optimization:** Review engagement patterns across your ${postCount} posts
-
-### 📋 **Most Engaging Content**
-Based on your recent posts, focus on content types that generate the highest engagement to maximize the impact of your ${postCount} posts portfolio.
-
-Your **${postCount} posts** represent substantial content investment with significant audience reach potential.`;
-}
-
-function generateEngagementResponse(username, followerCount, postCount, avgEngagement, avgLikes, postsAnalyzed, platformName) {
-  const engagementRate = followerCount !== 'N/A' && avgEngagement > 0 ? 
-    ((avgEngagement / parseInt(followerCount.replace(/,/g, ''))) * 100).toFixed(2) : 'N/A';
-  
-  return `## ${platformName} Engagement Analytics: @${username}
-
-### 📊 **Engagement Metrics Overview**
-Based on analysis of your ${platformName} account performance:
-
-### 🔢 **Key Performance Indicators**
-- **Account Followers:** ${followerCount}
-- **Total Posts:** ${postCount}
-- **Posts Analyzed:** ${postsAnalyzed}
-- **Average Engagement:** ${avgEngagement.toLocaleString()} interactions per post
-- **Average Likes:** ${avgLikes.toLocaleString()} per post
-- **Engagement Rate:** ${engagementRate}%
-
-### 📈 **Performance Analysis**
-**Engagement Strength:**
-Your content generates an average of **${avgEngagement.toLocaleString()} interactions** per post, which includes likes, comments, and other engagement metrics.
-
-**Audience Response:**
-- **Likes per Post:** ${avgLikes.toLocaleString()} average
-- **Follower Base:** ${followerCount} potential viewers
-- **Content Reach:** Strong engagement across ${postsAnalyzed} recent posts
-
-### 💡 **Engagement Insights**
-1. **Performance Level:** ${avgEngagement.toLocaleString()} average engagement shows active audience
-2. **Growth Potential:** With ${followerCount} followers, engagement can scale significantly
-3. **Content Impact:** Your posts consistently generate ${avgLikes.toLocaleString()} likes on average
-
-### 🎯 **Optimization Strategies**
-1. **Engagement Growth:** Target increasing beyond ${avgEngagement.toLocaleString()} interactions per post
-2. **Audience Activation:** Leverage ${followerCount} followers for higher engagement rates
-3. **Content Performance:** Build on posts exceeding ${avgLikes.toLocaleString()} likes
-4. **Platform Optimization:** Use ${platformName} features to boost engagement
-
-Your engagement metrics show **${avgEngagement.toLocaleString()} average interactions** with strong growth potential across your ${followerCount} follower base.`;
-}
-
-function generatePopularPostResponse(username, mostEngagedPost, maxEngagement, avgEngagement, postsAnalyzed, platformName) {
-  if (!mostEngagedPost || maxEngagement === 0) {
-    return `## ${platformName} Popular Content Analysis: @${username}
-
-### 🔍 **Post Performance Overview**
-Based on analysis of ${postsAnalyzed} recent posts from your ${platformName} account:
-
-### 📊 **Engagement Patterns**
-- **Posts Analyzed:** ${postsAnalyzed}
-- **Average Engagement:** ${avgEngagement.toLocaleString()} interactions per post
-- **Performance Range:** Varied engagement across content types
-
-### 💡 **Content Insights**
-Your posts show consistent engagement patterns with opportunities for optimization. To identify your most popular content:
-
-1. **Review High-Performing Posts:** Look for content exceeding ${avgEngagement.toLocaleString()} interactions
-2. **Analyze Content Types:** Identify formats that generate above-average engagement
-3. **Timing Analysis:** Consider when your most engaging posts were published
-4. **Audience Response:** Monitor which topics resonate most with your audience
-
-### 🎯 **Recommendations**
-1. **Performance Tracking:** Monitor posts that exceed ${avgEngagement.toLocaleString()} average engagement
-2. **Content Replication:** Create more content similar to your top performers
-3. **Engagement Optimization:** Focus on formats that drive higher interaction rates
-4. **Audience Insights:** Use ${platformName} analytics to identify peak engagement times
-
-Continue analyzing your post performance to identify and replicate your most successful content strategies.`;
-  }
-  
-  const likes = mostEngagedPost.likesCount || mostEngagedPost.likes || 0;
-  const comments = mostEngagedPost.commentsCount || mostEngagedPost.comments || 0;
-  const caption = mostEngagedPost.caption || mostEngagedPost.text || 'Content not available';
-  const shortCaption = caption.length > 100 ? caption.substring(0, 100) + '...' : caption;
-  
-  return `## ${platformName} Top Performing Content: @${username}
-
-### 🏆 **Most Engaging Post Analysis**
-Your highest-performing post generated **${maxEngagement.toLocaleString()} total interactions**.
-
-### 📊 **Top Post Metrics**
-- **Total Engagement:** ${maxEngagement.toLocaleString()} interactions
-- **Likes:** ${likes.toLocaleString()}
-- **Comments:** ${comments.toLocaleString()}
-- **Performance vs Average:** ${Math.round((maxEngagement / avgEngagement) * 100)}% above average
-
-### 📝 **Content Preview**
-"${shortCaption}"
-
-### 📈 **Performance Analysis**
-**Engagement Breakdown:**
-- **Likes:** ${likes.toLocaleString()} (${Math.round((likes/maxEngagement)*100)}% of total engagement)
-- **Comments:** ${comments.toLocaleString()} (${Math.round((comments/maxEngagement)*100)}% of total engagement)
-- **Interaction Rate:** Significantly outperformed ${avgEngagement.toLocaleString()} average
-
-### 💡 **Success Factors**
-This post's exceptional performance (${maxEngagement.toLocaleString()} interactions) suggests:
-1. **Content Resonance:** Strong audience connection with this topic/format
-2. **Timing Optimization:** Posted at optimal engagement window
-3. **Visual Appeal:** Compelling imagery or video content
-4. **Caption Strategy:** Effective messaging that drove interaction
-
-### 🎯 **Replication Strategy**
-1. **Content Analysis:** Study elements that made this post generate ${maxEngagement.toLocaleString()} interactions
-2. **Format Replication:** Create similar content types that achieved ${likes.toLocaleString()} likes
-3. **Engagement Tactics:** Apply successful strategies to reach ${maxEngagement.toLocaleString()} interaction levels
-4. **Performance Monitoring:** Track if new posts can exceed ${maxEngagement.toLocaleString()} engagement
-
-Your most popular post achieved **${maxEngagement.toLocaleString()} total interactions**, setting a benchmark for future content performance.`;
-}
-
-function generateContentThemeResponse(username, posts, bio, platformName) {
-  const themes = [];
-  
-  if (posts && posts.length > 0) {
-    const allText = posts.map(p => (p.caption || p.text || '')).join(' ').toLowerCase();
     
-    // Analyze themes from content
-    if (allText.includes('beauty') || allText.includes('makeup') || allText.includes('cosmetics')) themes.push('Beauty & Cosmetics');
-    if (allText.includes('fashion') || allText.includes('style')) themes.push('Fashion & Style');
-    if (allText.includes('new') || allText.includes('launch') || allText.includes('collection')) themes.push('Product Launches');
-    if (allText.includes('collaboration') || allText.includes('collab') || allText.includes('partnership')) themes.push('Brand Collaborations');
-    if (allText.includes('event') || allText.includes('show') || allText.includes('campaign')) themes.push('Events & Campaigns');
-    if (allText.includes('tutorial') || allText.includes('how to') || allText.includes('tips')) themes.push('Educational Content');
-    if (allText.includes('behind') || allText.includes('backstage') || allText.includes('process')) themes.push('Behind The Scenes');
+    const avgEngagement = Math.round((totalLikes + totalComments) / posts.length);
+    const avgLikes = Math.round(totalLikes / posts.length);
+    
+    // Build engagement insights
+    engagementInsights = `
+ENGAGEMENT ANALYTICS:
+- Total posts analyzed: ${posts.length}
+- Average engagement per post: ${formatNumber(avgEngagement)}
+- Average likes per post: ${formatNumber(avgLikes)}
+- Most engaging post: ${formatNumber(maxEngagement)} total engagement
+- Engagement rate: ${followerCount !== 'N/A' ? ((avgEngagement / parseInt(followerCount.toString().replace(/,/g, ''))) * 100).toFixed(2) + '%' : 'N/A'}`;
+
+    // Build detailed post analysis
+    if (mostEngagedPost) {
+      const topPostCaption = (mostEngagedPost.caption || '').substring(0, 150);
+      postAnalysis += `
+MOST ENGAGING POST:
+Caption: "${topPostCaption}${mostEngagedPost.caption && mostEngagedPost.caption.length > 150 ? '...' : ''}"
+Engagement: ${formatNumber(maxEngagement)} total (${formatNumber(mostEngagedPost.likesCount || 0)} likes, ${formatNumber(mostEngagedPost.commentsCount || 0)} comments)`;
+    }
+    
+    // Add recent posts breakdown for the top 5 posts
+    postAnalysis += `\n\nRECENT POSTS BREAKDOWN:`;
+    postDetails.slice(0, 5).forEach(post => {
+      postAnalysis += `\nPost ${post.index}: ${post.engagement} engagement (${post.likes} likes, ${post.comments} comments)`;
+      if (post.caption) {
+        postAnalysis += `\n  Caption: "${post.caption}${post.caption.length > 200 ? '...' : ''}"`;
+      }
+      if (post.hashtags.length > 0) {
+        postAnalysis += `\n  Hashtags: ${post.hashtags.join(', ')}`;
+      }
+    });
+    
+    // Analyze content themes
+    const allCaptions = posts.map(p => p.caption || '').join(' ').toLowerCase();
+    if (allCaptions.includes('beauty') || allCaptions.includes('makeup')) contentThemes.push('Beauty & Cosmetics');
+    if (allCaptions.includes('fashion') || allCaptions.includes('style')) contentThemes.push('Fashion & Style');
+    if (allCaptions.includes('new') || allCaptions.includes('launch')) contentThemes.push('Product Launches');
+    if (allCaptions.includes('collaboration') || allCaptions.includes('collab')) contentThemes.push('Brand Collaborations');
+    if (allCaptions.includes('tutorial') || allCaptions.includes('how to')) contentThemes.push('Educational Content');
+    if (allCaptions.includes('behind') || allCaptions.includes('backstage')) contentThemes.push('Behind The Scenes');
   }
   
-  if (themes.length === 0) {
-    themes.push('Lifestyle Content', 'Brand Marketing', 'Community Engagement');
-  }
-  
-  return `## ${platformName} Content Strategy Analysis: @${username}
+  // Build comprehensive account context
+  const accountContext = `
+ACCOUNT OVERVIEW FOR @${username}:
+Platform: ${platformName}
+Account Type: ${isBusinessAccount ? 'Business Account' : 'Personal Account'}${isVerified ? ' (Verified ✓)' : ''}
+Followers: ${formattedFollowerCount}
+Following: ${formattedFollowingCount}
+Total Posts: ${formattedPostCount}
+Bio: ${bio || 'No bio available'}
 
-### 🎨 **Content Theme Overview**
-Analysis of your ${platformName} content reveals distinct thematic patterns:
+${engagementInsights}
 
-### 📋 **Primary Content Themes**
-${themes.map((theme, index) => `${index + 1}. **${theme}**`).join('\n')}
+${postAnalysis}
 
-### 📊 **Content Analysis**
-- **Posts Analyzed:** ${posts.length}
-- **Theme Diversity:** ${themes.length} distinct content categories
-- **Content Strategy:** Multi-faceted approach across ${themes.length} themes
+CONTENT THEMES: ${contentThemes.length > 0 ? contentThemes.join(', ') : 'General content'}
 
-### 🔍 **Thematic Breakdown**
-${themes.map(theme => `**${theme}:**\n- Consistent presence across your content portfolio\n- Strong audience engagement potential\n- Aligns with ${platformName} best practices`).join('\n\n')}
+This is comprehensive real data about the ${platformName} account @${username} that can be used to answer any social media management questions.`;
 
-### 💡 **Content Strategy Insights**
-Your content demonstrates strategic diversity across **${themes.length} main themes**:
-
-1. **Thematic Consistency:** Clear focus areas that define your brand
-2. **Audience Targeting:** Content themes that resonate with your followers
-3. **Platform Optimization:** Themes well-suited for ${platformName} engagement
-4. **Brand Positioning:** Strategic content mix that builds authority
-
-### 🎯 **Content Development Recommendations**
-1. **Theme Expansion:** Develop deeper content within your ${themes.length} core themes
-2. **Cross-Theme Content:** Create posts that combine multiple themes for broader appeal
-3. **Seasonal Adaptation:** Adapt your ${themes.length} themes for trending topics
-4. **Performance Tracking:** Monitor which themes generate highest engagement
-
-### 📈 **Strategic Focus Areas**
-Based on your content analysis, prioritize:
-- **${themes[0]}**: Primary theme with strong audience connection
-- **${themes[1] || 'Content Innovation'}**: Secondary focus for growth
-- **${themes[2] || 'Community Building'}**: Engagement-driving content
-
-Your content strategy spans **${themes.length} distinct themes**, providing a solid foundation for continued ${platformName} growth and audience engagement.`;
+  return accountContext;
 }
 
-function generateComprehensiveResponse(username, followerCount, postCount, followingCount, avgEngagement, postsAnalyzed, platformName, isVerified, isBusinessAccount) {
-  const verifiedBadge = isVerified ? ' ✓' : '';
-  const accountType = isBusinessAccount ? 'Business Account' : 'Personal Account';
-  
-  return `## Comprehensive ${platformName} Account Analysis: @${username}${verifiedBadge}
+// Hardcoded response functions removed - now using natural AI responses
 
-### 📊 **Account Overview**
-Complete performance analysis of your ${platformName} presence:
+// More hardcoded template functions removed - using natural AI responses instead
 
-### 🔢 **Core Metrics**
-- **Followers:** ${followerCount}
-- **Following:** ${followingCount}
-- **Total Posts:** ${postCount}
-- **Account Type:** ${accountType}
-- **Average Engagement:** ${avgEngagement.toLocaleString()} interactions per post
+// All hardcoded template functions replaced with natural AI approach
 
-### 📈 **Performance Indicators**
-**Audience Metrics:**
-- **Reach Potential:** ${followerCount} followers provide substantial audience base
-- **Content Volume:** ${postCount} posts demonstrate consistent activity
-- **Engagement Level:** ${avgEngagement.toLocaleString()} average interactions show active community
-
-**Account Strength:**
-- **Follower Base:** Strong ${followerCount} audience for content distribution
-- **Content Portfolio:** Extensive ${postCount} posts library
-- **Platform Presence:** Well-established ${platformName} account
-
-### 💡 **Strategic Analysis**
-Your ${platformName} account shows strong fundamentals:
-
-1. **Audience Scale:** ${followerCount} followers provide significant reach potential
-2. **Content Consistency:** ${postCount} posts indicate regular publishing schedule
-3. **Engagement Health:** ${avgEngagement.toLocaleString()} average interactions per post
-4. **Growth Foundation:** Solid metrics for continued expansion
-
-### 🎯 **Growth Opportunities**
-1. **Audience Expansion:** Leverage ${followerCount} followers to attract new audiences
-2. **Content Optimization:** Analyze top performers from ${postCount} posts
-3. **Engagement Increase:** Target exceeding ${avgEngagement.toLocaleString()} interactions per post
-4. **Platform Features:** Utilize ${platformName} tools for enhanced visibility
-
-### 📋 **Action Plan**
-**Immediate Focus:**
-- Maintain consistency across your ${postCount} posts portfolio
-- Engage actively with your ${followerCount} follower community
-- Monitor performance to exceed ${avgEngagement.toLocaleString()} average engagement
-
-**Long-term Strategy:**
-- Scale beyond current ${followerCount} follower count
-- Optimize content strategy based on ${postCount} posts performance data
-- Build on ${avgEngagement.toLocaleString()} engagement foundation
-
-Your ${platformName} account demonstrates strong performance with **${followerCount} followers**, **${postCount} posts**, and **${avgEngagement.toLocaleString()} average engagement** - excellent foundation for continued growth.`;
-}
+// ALL hardcoded template functions completely removed - now using natural AI responses
 
 // API endpoint for discussion mode
 app.post('/api/discussion', async (req, res) => {
@@ -2241,10 +2013,30 @@ Your metrics indicate a well-established ${platformName} presence with good grow
             }
           } catch (thirdError) {
             console.log(`[RAG-Server] All AI strategies failed for ${platform}/${username}: ${thirdError.message}`);
-            console.log(`[RAG-Server] 🧠 Using Intelligent RAG Response Generator for ${platform}/${username}`);
-            response = generateIntelligentRAGResponse(profileData, query, platform, username);
-            console.log(`[RAG-Server] ✅ Generated intelligent response using real data for ${platform}/${username}`);
-            usedFallback = false; // This is not a fallback, it's intelligent data processing
+            console.log(`[RAG-Server] 🧠 Using Natural Account Data Context for ${platform}/${username}`);
+            
+            // Build comprehensive account context for natural response
+            const accountContext = buildAccountDataContext(profileData, query, platform, username);
+            
+            // Create a simple natural prompt without complex AI instructions
+            const simpleNaturalPrompt = `I'm a social media expert. Here's the account data:
+
+${accountContext}
+
+Question: ${query}
+
+Answer naturally based on the data above.`;
+
+            try {
+              response = await callGeminiAPI(simpleNaturalPrompt, []);
+              console.log(`[RAG-Server] ✅ Generated natural response using account data for ${platform}/${username}`);
+              usedFallback = false; // This is not a fallback, it's natural data processing
+            } catch (finalError) {
+              console.log(`[RAG-Server] Final natural approach failed: ${finalError.message}`);
+              // Ultimate fallback with minimal data
+              response = `Based on the available account data for @${username}, I can provide insights about social media strategy and performance. Please ask specific questions about engagement, content strategy, or growth tactics.`;
+              usedFallback = true;
+            }
           }
       }
     }

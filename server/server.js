@@ -793,7 +793,7 @@ app.post('/save-account-info', async (req, res) => {
   }
 });
 
-app.post('/scrape', async (req, res) => {
+app.post(['/scrape', '/api/scrape'], async (req, res) => {
   try {
     const { parent, children } = req.body;
 
@@ -859,7 +859,7 @@ app.post('/scrape', async (req, res) => {
   }
 });
 
-app.get('/retrieve/:accountHolder/:competitor', async (req, res) => {
+app.get(['/retrieve/:accountHolder/:competitor', '/api/retrieve/:accountHolder/:competitor'], async (req, res) => {
   try {
     const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
     const { competitor } = req.params;
@@ -878,7 +878,7 @@ app.get('/retrieve/:accountHolder/:competitor', async (req, res) => {
   }
 });
 
-app.get('/retrieve-multiple/:accountHolder', async (req, res) => {
+app.get(['/retrieve-multiple/:accountHolder', '/api/retrieve-multiple/:accountHolder'], async (req, res) => {
   try {
     const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
     const competitorsParam = req.query.competitors;
@@ -911,7 +911,7 @@ app.get('/retrieve-multiple/:accountHolder', async (req, res) => {
   }
 });
 
-app.get('/retrieve-strategies/:accountHolder', async (req, res) => {
+app.get(['/retrieve-strategies/:accountHolder', '/api/retrieve-strategies/:accountHolder'], async (req, res) => {
   try {
     const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
     const forceRefresh = req.query.forceRefresh === 'true';
@@ -937,7 +937,7 @@ app.get('/retrieve-strategies/:accountHolder', async (req, res) => {
   }
 });
 
-app.get('/retrieve-engagement-strategies/:accountHolder', async (req, res) => {
+app.get(['/retrieve-engagement-strategies/:accountHolder', '/api/retrieve-engagement-strategies/:accountHolder'], async (req, res) => {
   try {
     const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
     const forceRefresh = req.query.forceRefresh === 'true';
@@ -963,7 +963,7 @@ app.get('/retrieve-engagement-strategies/:accountHolder', async (req, res) => {
   }
 });
 
-app.get('/news-for-you/:accountHolder', async (req, res) => {
+app.get(['/news-for-you/:accountHolder', '/api/news-for-you/:accountHolder'], async (req, res) => {
   try {
     const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
     const forceRefresh = req.query.forceRefresh === 'true';
@@ -989,7 +989,7 @@ app.get('/news-for-you/:accountHolder', async (req, res) => {
   }
 });
 
-app.post('/save-query/:accountHolder', async (req, res) => {
+app.post(['/save-query/:accountHolder', '/api/save-query/:accountHolder'], async (req, res) => {
   // Set CORS headers explicitly for this endpoint
   setCorsHeaders(res, req.headers.origin || '*');
   
@@ -998,7 +998,7 @@ app.post('/save-query/:accountHolder', async (req, res) => {
   res.json({ success: true, message: 'AI instant reply system is enabled, no persistence needed' });
 });
 
-app.get('/rules/:username', async (req, res) => {
+app.get(['/rules/:username', '/api/rules/:username'], async (req, res) => {
   const { username } = req.params;
   const platform = req.query.platform || 'instagram'; // Default to Instagram
 
@@ -1042,7 +1042,7 @@ app.get('/rules/:username', async (req, res) => {
   }
 });
 
-app.post('/rules/:username', async (req, res) => {
+app.post(['/rules/:username', '/api/rules/:username'], async (req, res) => {
   const { username } = req.params;
   const { rules } = req.body;
   const platform = req.query.platform || 'instagram'; // Default to Instagram
@@ -1082,7 +1082,7 @@ app.post('/rules/:username', async (req, res) => {
   }
 });
 
-app.get('/responses/:username', async (req, res) => {
+app.get(['/responses/:username', '/api/responses/:username'], async (req, res) => {
   try {
     const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
     const forceRefresh = req.query.forceRefresh === 'true';
@@ -1098,7 +1098,7 @@ app.get('/responses/:username', async (req, res) => {
   }
 });
 
-app.post('/responses/:username/:responseId', async (req, res) => {
+app.post(['/responses/:username/:responseId', '/api/responses/:username/:responseId'], async (req, res) => {
   try {
     const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
     const { responseId } = req.params;
@@ -1143,7 +1143,7 @@ app.post('/responses/:username/:responseId', async (req, res) => {
   }
 });
 
-app.get('/retrieve-account-info/:username', async (req, res) => {
+app.get(['/retrieve-account-info/:username', '/api/retrieve-account-info/:username'], async (req, res) => {
   try {
     const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
     
@@ -1243,7 +1243,7 @@ app.get('/retrieve-account-info/:username', async (req, res) => {
   }
 });
 
-app.get('/posts/:username', async (req, res) => {
+app.get(['/posts/:username', '/api/posts/:username'], async (req, res) => {
   try {
     const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
     const forceRefresh = req.query.forceRefresh === 'true';
@@ -1386,7 +1386,7 @@ app.get('/posts/:username', async (req, res) => {
   }
 });
 
-app.post('/feedback/:username', async (req, res) => {
+app.post(['/feedback/:username', '/api/feedback/:username'], async (req, res) => {
   const { username } = req.params;
   const { responseKey, feedback, type } = req.body;
   const platform = req.query.platform || 'instagram'; // Default to Instagram
@@ -1454,7 +1454,7 @@ async function streamToBuffer(stream) {
 // Instagram App Credentials
 const APP_ID = '576296982152813';
 const APP_SECRET = 'd48ddc9eaf0e5c4969d4ddc4e293178c';
-const REDIRECT_URI = 'https://cc48-121-52-146-243.ngrok-free.app/instagram/callback';
+const REDIRECT_URI = 'https://366c-121-52-146-243.ngrok-free.app/instagram/callback';
 const VERIFY_TOKEN = 'myInstagramWebhook2025';
 
 // Facebook App Credentials  
@@ -1463,7 +1463,7 @@ const FB_APP_SECRET = 'cdd153955e347e194390333e48cb0480'; // Your actual App Sec
 const FB_REDIRECT_URI = 'https://cc48-121-52-146-243.ngrok-free.app/facebook/callback';
 const FB_VERIFY_TOKEN = 'myFacebookWebhook2025';
 
-app.get('/instagram/callback', async (req, res) => {
+app.get(['/instagram/callback', '/api/instagram/callback'], async (req, res) => {
   const code = req.query.code;
 
   if (!code) {
@@ -1576,7 +1576,7 @@ app.get('/instagram/callback', async (req, res) => {
 });
 
 // Facebook OAuth callback endpoint
-app.get('/facebook/callback', async (req, res) => {
+app.get(['/facebook/callback', '/api/facebook/callback'], async (req, res) => {
   const code = req.query.code;
   const state = req.query.state;
 
@@ -1758,7 +1758,7 @@ app.get('/facebook/callback', async (req, res) => {
 
 
 // Webhook Verification
-app.get('/webhook/instagram', (req, res) => {
+app.get(['/webhook/instagram', '/api/webhook/instagram'], (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
@@ -1773,7 +1773,7 @@ app.get('/webhook/instagram', (req, res) => {
 });
 
 // Webhook Receiver - Enhanced with real-time event propagation
-app.post('/webhook/instagram', async (req, res) => {
+app.post(['/webhook/instagram', '/api/webhook/instagram'], async (req, res) => {
   const body = req.body;
 
   if (body.object !== 'instagram') {
@@ -1957,7 +1957,7 @@ app.post('/webhook/instagram', async (req, res) => {
 // ============= FACEBOOK WEBHOOK ENDPOINTS =============
 
 // Facebook Webhook Verification
-app.get('/webhook/facebook', (req, res) => {
+app.get(['/webhook/facebook', '/api/webhook/facebook'], (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
@@ -1972,7 +1972,7 @@ app.get('/webhook/facebook', (req, res) => {
 });
 
 // Facebook Webhook Receiver
-app.post('/webhook/facebook', async (req, res) => {
+app.post(['/webhook/facebook', '/api/webhook/facebook'], async (req, res) => {
   const body = req.body;
 
   if (body.object !== 'page') {
@@ -2167,7 +2167,7 @@ async function getTokenData(userIdOrGraphId) {
 }
 
 // Send DM Reply
-app.post('/send-dm-reply/:userId', async (req, res) => {
+app.post(['/send-dm-reply/:userId', '/api/send-dm-reply/:userId'], async (req, res) => {
   // Set CORS headers explicitly for this endpoint
   setCorsHeaders(res, req.headers.origin || '*');
   
@@ -2477,7 +2477,7 @@ app.post('/send-dm-reply/:userId', async (req, res) => {
 });
 
 // Send Comment Reply
-app.post('/send-comment-reply/:userId', async (req, res) => {
+app.post(['/send-comment-reply/:userId', '/api/send-comment-reply/:userId'], async (req, res) => {
   // Set CORS headers explicitly for this endpoint
   setCorsHeaders(res, req.headers.origin || '*');
   
@@ -2720,7 +2720,7 @@ app.post('/send-comment-reply/:userId', async (req, res) => {
 });
 
 // Ignore Notification
-app.post('/ignore-notification/:userId', async (req, res) => {
+app.post(['/ignore-notification/:userId', '/api/ignore-notification/:userId'], async (req, res) => {
   const { userId } = req.params;
   const { message_id, comment_id, platform = 'instagram' } = req.body;
 
@@ -2834,7 +2834,7 @@ app.post('/ignore-notification/:userId', async (req, res) => {
 });
 
 // List Stored Events
-app.get('/events-list/:userId', async (req, res) => {
+app.get(['/events-list/:userId', '/api/events-list/:userId'], async (req, res) => {
   const { userId } = req.params;
   const platform = req.query.platform || 'instagram';
   const forceRefresh = req.query.forceRefresh === 'true';
@@ -3609,7 +3609,7 @@ app.get('/instagram-token-check/:graphId', async (req, res) => {
 });
 
 // Real-time Instagram posting endpoint
-app.post('/post-instagram-now/:userId', upload.single('image'), async (req, res) => {
+app.post(['/api/post-instagram-now/:userId', '/post-instagram-now/:userId'], upload.single('image'), async (req, res) => {
   setCorsHeaders(res);
   
   const { userId } = req.params;
@@ -3739,26 +3739,24 @@ app.post('/post-instagram-now/:userId', upload.single('image'), async (req, res)
     
     console.log(`[${new Date().toISOString()}] Uploading ${mimeType} image to Instagram (${imageBuffer.length} bytes)...`);
     
-    // Save image temporarily to local file system and serve via express
-    
-    // Create temp directory if it doesn't exist
-    const tempDir = path.join(process.cwd(), 'server', 'temp-images');
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
-    }
-    
-    const imageFilename = `${Date.now()}-${Math.random().toString(36).substring(7)}.${actualFormat}`;
-    const imagePath = path.join(tempDir, imageFilename);
-    
-    // Write image to local temp file
-    fs.writeFileSync(imagePath, imageBuffer);
-    
-    // Construct public URL for the locally served image (production-ready with ngrok)
-    const baseUrl = process.env.PUBLIC_URL || 'https://cc48-121-52-146-243.ngrok-free.app';
-    const publicImageUrl = `${baseUrl}/temp-images/${imageFilename}`;
-    
-    console.log(`[${new Date().toISOString()}] Image saved locally for Instagram access: ${publicImageUrl}`);
-    
+    // === New implementation: store image in R2 and use a short-lived signed URL ===
+    const r2Key = `temp_instagram_uploads/${userId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${actualFormat}`;
+    await s3Client.send(new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: r2Key,
+      Body: imageBuffer,
+      ContentType: mimeType,
+      ACL: 'public-read'
+    }));
+
+    // Generate a 15-minute signed URL for the image
+    const publicImageUrl = await getSignedUrl(
+      s3Client,
+      new GetObjectCommand({ Bucket: 'tasks', Key: r2Key }),
+      { expiresIn: 900 }
+    );
+    console.log(`[${new Date().toISOString()}] Image uploaded to R2 for Instagram access: ${publicImageUrl}`);
+
     // Upload image and create media object using public URL
     const mediaResponse = await axios.post(`https://graph.instagram.com/v22.0/${instagram_graph_id}/media`, {
       image_url: publicImageUrl,
@@ -3811,14 +3809,6 @@ app.post('/post-instagram-now/:userId', upload.single('image'), async (req, res)
 
     console.log(`[${new Date().toISOString()}] Instagram post record stored at ${postKey}`);
 
-    // Clean up temporary image from local storage
-    try {
-      fs.unlinkSync(imagePath);
-      console.log(`[${new Date().toISOString()}] Temporary image cleaned up: ${imageFilename}`);
-    } catch (cleanupError) {
-      console.warn(`[${new Date().toISOString()}] Failed to cleanup temporary image: ${cleanupError.message}`);
-    }
-
     res.json({ 
       success: true, 
       message: 'Instagram post published successfully!',
@@ -3849,7 +3839,7 @@ app.post('/post-instagram-now/:userId', upload.single('image'), async (req, res)
 // ============= INSTAGRAM SCHEDULING ENDPOINT =============
 
 // Schedule Instagram post endpoint - matches our successful real-time implementation
-app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
+app.post(['/api/schedule-post/:userId', '/schedule-post/:userId'], upload.single('image'), async (req, res) => {
   setCorsHeaders(res);
   
   const { userId } = req.params;
@@ -3941,6 +3931,11 @@ app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
 
     // Generate unique keys for storage
     const scheduleId = `schedule_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    const finalFormat = actualFormat === 'jpeg' ? 'jpg' : actualFormat;
+    if (finalFormat !== actualFormat) {
+      console.log(`[${new Date().toISOString()}] Renaming scheduled image extension to .${finalFormat}`);
+      actualFormat = finalFormat;
+    }
     const imageKey = `scheduled_posts/${platform}/${userId}/${scheduleId}.${actualFormat}`;
     const scheduleKey = `scheduled_posts/${platform}/${userId}/${scheduleId}.json`;
 
@@ -3995,7 +3990,7 @@ app.post('/schedule-post/:userId', upload.single('image'), async (req, res) => {
 // ============= FACEBOOK CONNECTION ENDPOINTS =============
 
 // Facebook connection endpoints
-app.get('/facebook-connection/:userId', async (req, res) => {
+app.get(['/facebook-connection/:userId', '/api/facebook-connection/:userId'], async (req, res) => {
   setCorsHeaders(res);
   
   const { userId } = req.params;
@@ -4029,7 +4024,7 @@ app.get('/facebook-connection/:userId', async (req, res) => {
   }
 });
 
-app.post('/facebook-connection/:userId', async (req, res) => {
+app.post(['/facebook-connection/:userId', '/api/facebook-connection/:userId'], async (req, res) => {
   setCorsHeaders(res);
   
   const { userId } = req.params;
@@ -4065,7 +4060,7 @@ app.post('/facebook-connection/:userId', async (req, res) => {
   }
 });
 
-app.delete('/facebook-connection/:userId', async (req, res) => {
+app.delete(['/facebook-connection/:userId', '/api/facebook-connection/:userId'], async (req, res) => {
   setCorsHeaders(res);
   
   const { userId } = req.params;
@@ -4100,7 +4095,7 @@ app.delete('/facebook-connection/:userId', async (req, res) => {
 });
 
 // Facebook user status endpoints
-app.get('/user-facebook-status/:userId', async (req, res) => {
+app.get(['/user-facebook-status/:userId', '/api/user-facebook-status/:userId'], async (req, res) => {
   setCorsHeaders(res);
   
   const { userId } = req.params;
@@ -4134,7 +4129,7 @@ app.get('/user-facebook-status/:userId', async (req, res) => {
   }
 });
 
-app.post('/user-facebook-status/:userId', async (req, res) => {
+app.post(['/user-facebook-status/:userId', '/api/user-facebook-status/:userId'], async (req, res) => {
   setCorsHeaders(res);
   
   const { userId } = req.params;
@@ -4169,17 +4164,17 @@ app.post('/user-facebook-status/:userId', async (req, res) => {
 });
 
 // Add OPTIONS handlers for Facebook endpoints
-app.options('/facebook-connection/:userId', (req, res) => {
+app.options(['/facebook-connection/:userId', '/api/facebook-connection/:userId'], (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });
 
-app.options('/user-facebook-status/:userId', (req, res) => {
+app.options(['/user-facebook-status/:userId', '/api/user-facebook-status/:userId'], (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });
 
-app.post('/instagram-connection/:userId', async (req, res) => {
+app.post(['/instagram-connection/:userId', '/api/instagram-connection/:userId'], async (req, res) => {
   setCorsHeaders(res);
   
   const { userId } = req.params;
@@ -4217,7 +4212,7 @@ app.post('/instagram-connection/:userId', async (req, res) => {
 // =================== FACEBOOK CONNECTION ENDPOINTS ===================
 
 // This endpoint retrieves the user's Facebook connection
-app.get('/facebook-connection/:userId', async (req, res) => {
+app.get(['/facebook-connection/:userId', '/api/facebook-connection/:userId'], async (req, res) => {
   setCorsHeaders(res);
   
   const { userId } = req.params;
@@ -4252,7 +4247,7 @@ app.get('/facebook-connection/:userId', async (req, res) => {
 });
 
 // This endpoint stores the user's Facebook connection
-app.post('/facebook-connection/:userId', async (req, res) => {
+app.post(['/facebook-connection/:userId', '/api/facebook-connection/:userId'], async (req, res) => {
   setCorsHeaders(res);
   
   const { userId } = req.params;
@@ -4287,7 +4282,7 @@ app.post('/facebook-connection/:userId', async (req, res) => {
 });
 
 // This endpoint deletes the user's Facebook connection
-app.delete('/facebook-connection/:userId', async (req, res) => {
+app.delete(['/facebook-connection/:userId', '/api/facebook-connection/:userId'], async (req, res) => {
   setCorsHeaders(res);
   
   const { userId } = req.params;
@@ -4324,7 +4319,7 @@ app.delete('/facebook-connection/:userId', async (req, res) => {
 });
 
 // Add OPTIONS handlers for Facebook connection endpoints
-app.options('/facebook-connection/:userId', (req, res) => {
+app.options(['/facebook-connection/:userId', '/api/facebook-connection/:userId'], (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });
@@ -4334,7 +4329,7 @@ app.options('/facebook-connection/:userId', (req, res) => {
 // DUPLICATE ENDPOINT REMOVED - Using the comprehensive one above with WebP auto-conversion and better error handling
 
 // Get scheduled posts for a user
-app.get('/scheduled-posts/:userId', async (req, res) => {
+app.get(['/scheduled-posts/:userId', '/api/scheduled-posts/:userId'], async (req, res) => {
   setCorsHeaders(res);
   
   const { userId } = req.params;
@@ -4385,7 +4380,7 @@ app.get('/scheduled-posts/:userId', async (req, res) => {
 // ============= INSIGHTS ENDPOINTS =============
 
 // Unified insights endpoint for all platforms
-app.get('/insights/:userId', async (req, res) => {
+app.get(['/insights/:userId', '/api/insights/:userId'], async (req, res) => {
   setCorsHeaders(res);
   
   const { userId } = req.params;
@@ -4626,7 +4621,7 @@ async function fetchInstagramInsights(graphId, accessToken) {
   };
 }
 
-app.get('/check-username-availability/:username', async (req, res) => {
+app.get(['/check-username-availability/:username', '/api/check-username-availability/:username'], async (req, res) => {
   try {
     const { username } = req.params;
     const platform = req.query.platform || 'instagram'; // Default to Instagram
@@ -4961,7 +4956,7 @@ function scheduleConnectionHealthCheck() {
 scheduleConnectionHealthCheck();
 
 // Enhance event streaming with reconnection support and event persistence for missed updates
-app.get('/events-missed/:username', async (req, res) => {
+app.get(['/events-missed/:username', '/api/events-missed/:username'], async (req, res) => {
   const { username } = req.params;
   const { since } = req.query;
   let sinceTimestamp = 0;
@@ -5089,7 +5084,7 @@ app.get('/events-missed/:username', async (req, res) => {
 });
 
 // Add endpoint for getting cache stats
-app.get('/api/system/cache-stats', (req, res) => {
+app.get(['/api/system/cache-stats', '/system/cache-stats'], (req, res) => {
   setCorsHeaders(res);
   
   const now = Date.now();
@@ -5156,7 +5151,7 @@ app.get('/api/system/cache-stats', (req, res) => {
 });
 
 // Handle disconnections/reconnections more gracefully
-app.get('/events/:username', (req, res) => {
+app.get(['/events/:username', '/api/events/:username'], (req, res) => {
   const { username } = req.params;
   const { since } = req.query;
   
@@ -5379,7 +5374,7 @@ app.get('/events/:username', (req, res) => {
   });
 });
 
-app.post('/update-post-status/:username', async (req, res) => {
+app.post(['/update-post-status/:username', '/api/update-post-status/:username'], async (req, res) => {
   const { username } = req.params;
   const { postKey, status } = req.body; // postKey should be the full R2 key, e.g., ready_post/user/ready_post_123.json
 
@@ -5453,13 +5448,13 @@ app.post('/update-post-status/:username', async (req, res) => {
 });
 
 // Add OPTIONS handler for the new endpoint
-app.options('/update-post-status/:username', (req, res) => {
+app.options(['/update-post-status/:username', '/api/update-post-status/:username'], (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });
 
 // RAG server proxy endpoint for instant AI replies to DMs/comments
-app.post('/rag-instant-reply/:username', async (req, res, next) => {
+app.post(['/rag-instant-reply/:username', '/api/rag-instant-reply/:username'], async (req, res, next) => {
   // Set CORS headers for this specific endpoint
   setCorsHeaders(res, req.headers.origin || '*');
   
@@ -5726,7 +5721,7 @@ app.post('/rag-instant-reply/:username', async (req, res, next) => {
 });
 
 // RAG proxy - Instant Reply
-app.post('/rag-instant-reply/:username', async (req, res) => {
+app.post(['/rag-instant-reply/:username', '/api/rag-instant-reply/:username'], async (req, res) => {
   const { username } = req.params;
   const notification = req.body;
   
@@ -5851,7 +5846,7 @@ app.post('/rag-instant-reply/:username', async (req, res) => {
 });
 
 // Mark notification as handled (for AI replies)
-app.post('/mark-notification-handled/:userId', async (req, res) => {
+app.post(['/mark-notification-handled/:userId', '/api/mark-notification-handled/:userId'], async (req, res) => {
   // Set CORS headers
   setCorsHeaders(res, req.headers.origin || '*');
   
@@ -5948,7 +5943,7 @@ app.post('/mark-notification-handled/:userId', async (req, res) => {
 // ======================== TWITTER STATUS ENDPOINTS ========================
 
 // This endpoint checks if a user has entered their Twitter username
-app.get('/user-twitter-status/:userId', async (req, res) => {
+app.get(['/user-twitter-status/:userId', '/api/user-twitter-status/:userId'], async (req, res) => {
   // Set CORS headers
   setCorsHeaders(res);
   
@@ -5984,7 +5979,7 @@ app.get('/user-twitter-status/:userId', async (req, res) => {
 });
 
 // This endpoint updates the user's Twitter username entry state
-app.post('/user-twitter-status/:userId', async (req, res) => {
+app.post(['/user-twitter-status/:userId', '/api/user-twitter-status/:userId'], async (req, res) => {
   // Set CORS headers
   setCorsHeaders(res);
   
@@ -6022,14 +6017,14 @@ app.post('/user-twitter-status/:userId', async (req, res) => {
 });
 
 // Add OPTIONS handlers for Twitter status endpoints
-app.options('/user-twitter-status/:userId', (req, res) => {
+app.options(['/user-twitter-status/:userId', '/api/user-twitter-status/:userId'], (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });
 
 // ===============================================================
 
-app.get('/check-username-availability/:username', async (req, res) => {
+app.get(['/check-username-availability/:username', '/api/check-username-availability/:username'], async (req, res) => {
   try {
     const { username } = req.params;
     const platform = req.query.platform || 'instagram'; // Default to Instagram
@@ -6081,7 +6076,7 @@ app.get('/check-username-availability/:username', async (req, res) => {
 });
 
 // Twitter connection endpoints
-app.post('/twitter-connection/:userId', async (req, res) => {
+app.post(['/twitter-connection/:userId', '/api/twitter-connection/:userId'], async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
   
   const { userId } = req.params;
@@ -6117,7 +6112,7 @@ app.post('/twitter-connection/:userId', async (req, res) => {
   }
 });
 
-app.get('/twitter-connection/:userId', async (req, res) => {
+app.get(['/twitter-connection/:userId', '/api/twitter-connection/:userId'], async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
   
   const { userId } = req.params;
@@ -6144,7 +6139,7 @@ app.get('/twitter-connection/:userId', async (req, res) => {
   }
 });
 
-app.delete('/twitter-connection/:userId', async (req, res) => {
+app.delete(['/twitter-connection/:userId', '/api/twitter-connection/:userId'], async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
   
   const { userId } = req.params;
@@ -6339,7 +6334,7 @@ function generateCodeChallenge(codeVerifier) {
 const pkceStore = new Map();
 
 // Twitter OAuth 2.0 - Step 1: Generate authorization URL
-app.get('/twitter/auth', async (req, res) => {
+app.get(['/twitter/auth', '/api/twitter/auth'], async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
   
   const { userId } = req.query; // Firebase user ID
@@ -6407,7 +6402,7 @@ app.get('/twitter/auth', async (req, res) => {
 });
 
 // Twitter OAuth 2.0 - Step 2: Handle callback and exchange code for access token
-app.get('/twitter/callback', async (req, res) => {
+app.get(['/twitter/callback', '/api/twitter/callback'], async (req, res) => {
   const { code, state } = req.query;
   
   if (!code || !state) {
@@ -6552,7 +6547,7 @@ app.get('/twitter/callback', async (req, res) => {
 });
 
 // Post tweet endpoint - immediate posting with OAuth 2.0
-app.post('/post-tweet/:userId', async (req, res) => {
+app.post(['/post-tweet/:userId', '/api/post-tweet/:userId'], async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
   
   const { userId } = req.params;
@@ -6705,7 +6700,7 @@ app.post('/post-tweet/:userId', async (req, res) => {
 });
 
 // Schedule tweet endpoint - for future posting
-app.post('/schedule-tweet/:userId', async (req, res) => {
+app.post(['/schedule-tweet/:userId', '/api/schedule-tweet/:userId'], async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
   
   const { userId } = req.params;
@@ -6783,7 +6778,7 @@ app.post('/schedule-tweet/:userId', async (req, res) => {
 });
 
 // Schedule tweet endpoint - for future posting with OAuth 2.0
-app.post('/schedule-tweet/:userId', async (req, res) => {
+app.post(['/schedule-tweet/:userId', '/api/schedule-tweet/:userId'], async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
   
   const { userId } = req.params;
@@ -6849,7 +6844,7 @@ app.post('/schedule-tweet/:userId', async (req, res) => {
 });
 
 // Schedule tweet with image endpoint - for future posting with OAuth 2.0 and image
-app.post('/schedule-tweet-with-image/:userId', upload.single('image'), async (req, res) => {
+app.post(['/schedule-tweet-with-image/:userId', '/api/schedule-tweet-with-image/:userId'], upload.single('image'), async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
   
   const { userId } = req.params;
@@ -6944,7 +6939,7 @@ app.post('/schedule-tweet-with-image/:userId', upload.single('image'), async (re
 });
 
 // Get scheduled tweets for a user
-app.get('/scheduled-tweets/:userId', async (req, res) => {
+app.get(['/scheduled-tweets/:userId', '/api/scheduled-tweets/:userId'], async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
   
   const { userId } = req.params;
@@ -6996,7 +6991,7 @@ app.get('/scheduled-tweets/:userId', async (req, res) => {
 });
 
 // Delete scheduled tweet
-app.delete('/scheduled-tweet/:userId/:scheduleId', async (req, res) => {
+app.delete(['/scheduled-tweet/:userId/:scheduleId', '/api/scheduled-tweet/:userId/:scheduleId'], async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
   
   const { userId, scheduleId } = req.params;
@@ -8005,7 +8000,7 @@ app.get('/debug/instagram-tokens', async (req, res) => {
 });
 
 // Debug endpoint to list connected Twitter users
-app.get('/debug/twitter-users', async (req, res) => {
+app.get(['/debug/twitter-users', '/api/debug/twitter-users'], async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
   
   try {
@@ -8058,7 +8053,7 @@ app.get('/debug/twitter-users', async (req, res) => {
 });
 
 // Post tweet with image endpoint - immediate posting with OAuth 2.0 and chunked media upload
-app.post('/post-tweet-with-image/:userId', upload.single('image'), async (req, res) => {
+app.post(['/post-tweet-with-image/:userId', '/api/post-tweet-with-image/:userId'], upload.single('image'), async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
   
   const { userId } = req.params;
@@ -8342,7 +8337,7 @@ app.post('/post-tweet-with-image/:userId', upload.single('image'), async (req, r
 // ============= GOAL MANAGEMENT ENDPOINTS =============
 
 // Save goal endpoint - Schema: tasks/goal/<platform>/<username>/goal_*.json
-app.post('/save-goal/:username', async (req, res) => {
+app.post(['/save-goal/:username', '/api/save-goal/:username'], async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
   
   try {
@@ -8441,13 +8436,13 @@ app.post('/save-goal/:username', async (req, res) => {
 });
 
 // OPTIONS handler for save-goal
-app.options('/save-goal/:username', (req, res) => {
+app.options(['/save-goal/:username', '/api/save-goal/:username'], (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });
 
 // Goal summary retrieval endpoint - Schema: tasks/goal_summary/<platform>/<username>/summary_*.json
-app.get('/goal-summary/:username', async (req, res) => {
+app.get(['/goal-summary/:username', '/api/goal-summary/:username'], async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
   
   try {
@@ -8531,13 +8526,13 @@ app.get('/goal-summary/:username', async (req, res) => {
 });
 
 // OPTIONS handler for goal-summary
-app.options('/goal-summary/:username', (req, res) => {
+app.options(['/goal-summary/:username', '/api/goal-summary/:username'], (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });
 
 // Campaign ready posts count endpoint - Schema: tasks/ready_post/<platform>/<username>/campaign_ready_post_*.json
-app.get('/campaign-posts-count/:username', async (req, res) => {
+app.get(['/campaign-posts-count/:username', '/api/campaign-posts-count/:username'], async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
   
   try {
@@ -8602,13 +8597,13 @@ app.get('/campaign-posts-count/:username', async (req, res) => {
 });
 
 // OPTIONS handler for campaign-posts-count
-app.options('/campaign-posts-count/:username', (req, res) => {
+app.options(['/campaign-posts-count/:username', '/api/campaign-posts-count/:username'], (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });
 
 // Engagement metrics endpoint (placeholder for platform-specific engagement)
-app.get('/engagement-metrics/:username', async (req, res) => {
+app.get(['/engagement-metrics/:username', '/api/engagement-metrics/:username'], async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
   
   try {
@@ -8657,13 +8652,13 @@ app.get('/engagement-metrics/:username', async (req, res) => {
 });
 
 // OPTIONS handler for engagement-metrics
-app.options('/engagement-metrics/:username', (req, res) => {
+app.options(['/engagement-metrics/:username', '/api/engagement-metrics/:username'], (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });
 
 // Generated content summary endpoint - Schema: tasks/generated_content/<platform>/<username>/posts.json
-app.get('/generated-content-summary/:username', async (req, res) => {
+app.get(['/generated-content-summary/:username', '/api/generated-content-summary/:username'], async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
   
   try {
@@ -8761,13 +8756,13 @@ app.get('/generated-content-summary/:username', async (req, res) => {
 });
 
 // OPTIONS handler for generated-content-summary
-app.options('/generated-content-summary/:username', (req, res) => {
+app.options(['/generated-content-summary/:username', '/api/generated-content-summary/:username'], (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });
 
 // Campaign status check endpoint - Check if user has an active campaign
-app.get('/campaign-status/:username', async (req, res) => {
+app.get(['/campaign-status/:username', '/api/campaign-status/:username'], async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
   
   try {
@@ -8821,13 +8816,13 @@ app.get('/campaign-status/:username', async (req, res) => {
 });
 
 // OPTIONS handler for campaign-status
-app.options('/campaign-status/:username', (req, res) => {
+app.options(['/campaign-status/:username', '/api/campaign-status/:username'], (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });
 
 // Stop campaign endpoint - Delete all campaign-related files
-app.delete('/stop-campaign/:username', async (req, res) => {
+app.delete(['/stop-campaign/:username', '/api/stop-campaign/:username'], async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
   
   try {
@@ -8915,13 +8910,13 @@ app.delete('/stop-campaign/:username', async (req, res) => {
 });
 
 // OPTIONS handler for stop-campaign
-app.options('/stop-campaign/:username', (req, res) => {
+app.options(['/stop-campaign/:username', '/api/stop-campaign/:username'], (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });
 
 // Get timeline from generated content endpoint
-app.get('/generated-content-timeline/:username', async (req, res) => {
+app.get(['/generated-content-timeline/:username', '/api/generated-content-timeline/:username'], async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
   
   try {
@@ -8993,7 +8988,7 @@ app.get('/generated-content-timeline/:username', async (req, res) => {
 });
 
 // OPTIONS handler for generated-content-timeline
-app.options('/generated-content-timeline/:username', (req, res) => {
+app.options(['/generated-content-timeline/:username', '/api/generated-content-timeline/:username'], (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });
@@ -9001,7 +8996,7 @@ app.options('/generated-content-timeline/:username', (req, res) => {
 // ============= END GOAL MANAGEMENT ENDPOINTS =============
 
 // Profit Analysis endpoint - Schema: tasks/prophet_analysis/<platform>/<username>/analysis_*.json
-app.get('/profit-analysis/:username', async (req, res) => {
+app.get(['/profit-analysis/:username', '/api/profit-analysis/:username'], async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
   
   try {
@@ -9089,7 +9084,7 @@ app.get('/profit-analysis/:username', async (req, res) => {
 // ... existing code ...
 
 // Generate a fresh signed URL for a ready_post image
-app.get('/api/signed-image-url/:username/:imageKey', async (req, res) => {
+app.get(['/api/signed-image-url/:username/:imageKey', '/signed-image-url/:username/:imageKey'], async (req, res) => {
   const { username, imageKey } = req.params;
   try {
     const key = `ready_post/${username}/${imageKey}`;
@@ -9106,7 +9101,7 @@ app.get('/api/signed-image-url/:username/:imageKey', async (req, res) => {
 });
 
 // Add OPTIONS handler for signed-image-url endpoint
-app.options('/api/signed-image-url/:username/:imageKey', (req, res) => {
+app.options(['/api/signed-image-url/:username/:imageKey', '/signed-image-url/:username/:imageKey'], (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });
@@ -9114,7 +9109,7 @@ app.options('/api/signed-image-url/:username/:imageKey', (req, res) => {
 // ... existing code ...
 
 // Add the API endpoint for update-post-status
-app.post('/api/update-post-status/:username', async (req, res) => {
+app.post(['/api/update-post-status/:username', '/update-post-status/:username'], async (req, res) => {
   const { username } = req.params;
   const { postKey, status, like, dislike, userComment } = req.body;
 
@@ -9210,13 +9205,13 @@ app.post('/api/update-post-status/:username', async (req, res) => {
 });
 
 // Add OPTIONS handler for the new API endpoint
-app.options('/api/update-post-status/:username', (req, res) => {
+app.options(['/api/update-post-status/:username', '/update-post-status/:username'], (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });
 
 // Proxy image requests to avoid CORS issues
-app.get('/api/proxy-image', async (req, res) => {
+app.get(['/api/proxy-image', '/proxy-image'], async (req, res) => {
   const { url } = req.query;
   if (!url) {
     return res.status(400).json({ error: 'URL parameter is required' });
@@ -9283,13 +9278,13 @@ app.get('/api/proxy-image', async (req, res) => {
 });
 
 // Add OPTIONS handler for proxy-image endpoint
-app.options('/api/proxy-image', (req, res) => {
+app.options(['/api/proxy-image', '/proxy-image'], (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });
 
 // Robust R2 Image Renderer - handles JPG images seamlessly from Cloudflare R2
-app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
+app.get(['/api/r2-image/:username/:imageKey', '/r2-image/:username/:imageKey'], async (req, res) => {
   const { username, imageKey } = req.params;
   const platform = req.query.platform || 'instagram';
   
@@ -9370,7 +9365,7 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
 });
 
 // Enhanced signed URL generator with R2 optimization
-app.get('/api/signed-image-url/:username/:imageKey', async (req, res) => {
+app.get(['/api/signed-image-url/:username/:imageKey', '/signed-image-url/:username/:imageKey'], async (req, res) => {
   const { username, imageKey } = req.params;
   const platform = req.query.platform || 'instagram';
   
@@ -9417,13 +9412,13 @@ app.get('/api/signed-image-url/:username/:imageKey', async (req, res) => {
 });
 
 // OPTIONS handler for R2 image endpoint
-app.options('/api/r2-image/:username/:imageKey', (req, res) => {
+app.options(['/api/r2-image/:username/:imageKey', '/r2-image/:username/:imageKey'], (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });
 
 // HEAD handler for R2 image endpoint (for testing accessibility)
-app.head('/api/r2-image/:username/:imageKey', async (req, res) => {
+app.head(['/api/r2-image/:username/:imageKey', '/r2-image/:username/:imageKey'], async (req, res) => {
   const { username, imageKey } = req.params;
   const platform = req.query.platform || 'instagram';
   
@@ -9460,7 +9455,7 @@ app.head('/api/r2-image/:username/:imageKey', async (req, res) => {
 });
 
 // Save edited post from Canvas Editor
-app.post('/api/save-edited-post/:username', upload.single('image'), async (req, res) => {
+app.post(['/api/save-edited-post/:username', '/save-edited-post/:username'], upload.single('image'), async (req, res) => {
   const { username } = req.params;
   const { postKey, caption, platform } = req.body;
   const imageFile = req.file;
@@ -9569,7 +9564,7 @@ app.post('/api/save-edited-post/:username', upload.single('image'), async (req, 
 });
 
 // OPTIONS handler for save-edited-post endpoint
-app.options('/api/save-edited-post/:username', (req, res) => {
+app.options(['/api/save-edited-post/:username', '/save-edited-post/:username'], (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });
@@ -9577,7 +9572,7 @@ app.options('/api/save-edited-post/:username', (req, res) => {
 // =================== FACEBOOK STATUS ENDPOINTS ===================
 
 // This endpoint checks if a user has entered their Facebook username
-app.get('/user-facebook-status/:userId', async (req, res) => {
+app.get(['/user-facebook-status/:userId', '/api/user-facebook-status/:userId'], async (req, res) => {
   // Set CORS headers
   setCorsHeaders(res);
   
@@ -9613,7 +9608,7 @@ app.get('/user-facebook-status/:userId', async (req, res) => {
 });
 
 // This endpoint updates the user's Facebook username entry state
-app.post('/user-facebook-status/:userId', async (req, res) => {
+app.post(['/user-facebook-status/:userId', '/api/user-facebook-status/:userId'], async (req, res) => {
   // Set CORS headers
   setCorsHeaders(res);
   
@@ -9651,7 +9646,7 @@ app.post('/user-facebook-status/:userId', async (req, res) => {
 });
 
 // Add OPTIONS handlers for Facebook status endpoints
-app.options('/user-facebook-status/:userId', (req, res) => {
+app.options(['/user-facebook-status/:userId', '/api/user-facebook-status/:userId'], (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });
@@ -9696,7 +9691,7 @@ function generateVerificationCode() {
 }
 
 // Send verification email endpoint
-app.post('/api/send-verification-email', async (req, res) => {
+app.post(['/api/send-verification-email', '/send-verification-email'], async (req, res) => {
   setCorsHeaders(res);
   
   try {
@@ -9786,7 +9781,7 @@ app.post('/api/send-verification-email', async (req, res) => {
 });
 
 // Verify email code endpoint
-app.post('/api/verify-email-code', async (req, res) => {
+app.post(['/api/verify-email-code', '/verify-email-code'], async (req, res) => {
   setCorsHeaders(res);
   
   try {
@@ -9832,7 +9827,7 @@ app.post('/api/verify-email-code', async (req, res) => {
 });
 
 // Resend verification code endpoint
-app.post('/api/resend-verification-code', async (req, res) => {
+app.post(['/api/resend-verification-code', '/resend-verification-code'], async (req, res) => {
   setCorsHeaders(res);
   
   try {
@@ -9908,17 +9903,17 @@ app.post('/api/resend-verification-code', async (req, res) => {
 });
 
 // OPTIONS handlers for email verification endpoints
-app.options('/api/send-verification-email', (req, res) => {
+app.options(['/api/send-verification-email', '/send-verification-email'], (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });
 
-app.options('/api/verify-email-code', (req, res) => {
+app.options(['/api/verify-email-code', '/verify-email-code'], (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });
 
-app.options('/api/resend-verification-code', (req, res) => {
+app.options(['/api/resend-verification-code', '/resend-verification-code'], (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
 });

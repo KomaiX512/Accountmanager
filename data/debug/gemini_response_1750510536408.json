@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Based on the provided data for @fentybeauty, recent posts show varying levels of engagement. For example, the post with the caption \"How we’re showing up to the function:\" received 6,720 likes and 60 comments, totaling 6,780 in engagement. Another post, \"Body shinin' bright, I know that's right ️‍,\" garnered 6,236 likes and 56 comments, totaling 6,292. A more successful post, \"Born to dew your body right ️‍,\" achieved 29,447 likes and 141 comments, for a total of 29,588. The post \"Fresh off the Fenty Beauty vine \" received 10,025 likes and 85 comments, totaling 10,110.\n\nThe most engaging post in the provided data is \"Sp'oil your lips like @badgalriri,\" which significantly outperformed the others with 67,131 likes and 437 comments, resulting in a total engagement of 67,568.\n\nWithout comparative data from competitors in the beauty space, it's impossible to definitively say how @fentybeauty's engagement compares. However, the provided data shows a range of engagement levels across different posts, with the post featuring @badgalriri demonstrating a significantly higher level of audience interaction.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.12472108499893289
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 452,
+    "candidatesTokenCount": 302,
+    "totalTokenCount": 754,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 452
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 302
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "xqtWaMOSG9mYhMIP46GkkAk"
+}

@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Hey there! ✨ FENTY BEAUTY is all about creating makeup that feels good and looks even better on *everyone*. We're cruelty-free and available worldwide at Sephora, Ulta, Harvey Nichols, and more! Think bomb products for all skin tones. We love showing off how our community uses our products, like those killer lip combos we posted recently that everyone loved! 😉 #FENTYBEAUTY\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.19981089933418933
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 560,
+    "candidatesTokenCount": 81,
+    "totalTokenCount": 641,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 560
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 81
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "ssdWaKfvFbjL1PIP24ez0Aw"
+}

@@ -86,7 +86,7 @@ const Homepage: React.FC = () => {
                     className="glassy-button btn-primary large"
                     onClick={() => window.location.href = '/account'}
                   >
-                    Feel the Future
+                    Get your AI SMM Agent
                   </button>
                 </motion.div>
               </div>

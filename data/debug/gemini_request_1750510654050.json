@@ -1,0 +1,18 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Instagram account analysis:\n\nAccount metrics:\n- Followers: 13,256,392\n- Posts: 11,673\n- Platform: Instagram\n\nQuestion: What keywords should I use for that campaign?\n\nProvide analysis using the metrics above."
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 2000,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "topK": 40
+  }
+}

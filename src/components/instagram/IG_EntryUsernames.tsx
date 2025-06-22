@@ -328,7 +328,7 @@ const usernameCheckUrl = '/api/check-username-availability';
         // Save processing state to localStorage with timestamp
         const processingData = {
           startTime: Date.now(),
-          duration: 60000, // 60 seconds in milliseconds
+          duration: 900000, // 15 minutes in milliseconds
           username: username.trim(),
           platform: 'instagram'
         };

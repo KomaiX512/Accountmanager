@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption:\nPouting perfection unlocked! 💋 We're obsessed with all the lipstick combos you're creating! Huge shoutout to @sajjad for their amazing contribution to our iconic formulas. What's YOUR go-to Fenty Beauty lip look? Tell us below! 👇\n\nHashtags:\n#FENTYBEAUTY #CrueltyFree #Lipstick #FentyGlow #Makeup #Beauty #Pout #Iconic #Combos #FentySkin\n\nCall to Action:\nComment your favorite Fenty Beauty lipstick shade!\n\nVisual Description for Image:\nA close-up shot showcasing a variety of Fenty Beauty lipsticks in different shades and textures. The composition is artfully arranged, with the lipsticks slightly overlapping to create depth and visual interest. The color palette is vibrant and diverse, ranging from classic reds and nudes to bold pinks and purples. The lighting is soft and diffused, highlighting the smooth textures and rich pigments of the lipsticks. In the background, there's a subtle blurred effect, drawing focus to the foreground. The overall mood is playful, luxurious, and confident, reflecting the brand's identity. The image is styled to evoke a sense of creativity and self-expression, encouraging viewers to experiment with different lip looks. The image is clean, modern, and visually appealing, designed to capture attention and inspire engagement.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.2624020473562556
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 724,
+    "candidatesTokenCount": 278,
+    "totalTokenCount": 1002,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 724
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 278
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "GMdWaPeCGNmYhMIP46GkkAk"
+}

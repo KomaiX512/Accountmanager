@@ -45,6 +45,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { BsLightbulb } from 'react-icons/bs';
 import { FaBell } from 'react-icons/fa';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
+import { getApiUrl } from '../../config/api';
 // Missing modules - comment out until they're available
 // import EditCaption from '../common/EditCaption';
 // import { ScheduleItem } from '../../types/schedule';
@@ -74,7 +75,7 @@ interface ImageErrorState {
 }
 
 // Base URL for all API requests (using relative URLs with Vite proxy)
-const API_BASE_URL = '';
+const API_BASE_URL = ''; // Deprecated: prefer getApiUrl for new API calls
 
 // Debug flag - set to true to enable verbose logging
 const DEBUG_LOGGING = false;
@@ -685,7 +686,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
 
     try {
       console.log(`[Schedule] Updating post status to scheduled for ${selectedPostKey}`);
-      const statusUpdateResponse = await fetch(`${API_BASE_URL}/api/update-post-status/${username}`, {
+      const updateStatusUrl = getApiUrl('/api/update-post-status', `/${username}`);
+      const statusUpdateResponse = await fetch(updateStatusUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -999,7 +1001,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
               }
             }
 
-            const resp = await fetch(`${API_BASE_URL}/schedule-post/${userId}`, {
+            const resp = await fetch(`${API_BASE_URL}/api/schedule-post/${userId}`, {
               method: 'POST',
               body: formData,
             });
@@ -1047,7 +1049,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
 
             console.log(`[AutoSchedule] 📤 Submitting Instagram post ${postNumber} to NATIVE scheduler...`);
             
-            const resp = await fetch(`${API_BASE_URL}/schedule-post/${userId}`, {
+            const resp = await fetch(`${API_BASE_URL}/api/schedule-post/${userId}`, {
               method: 'POST',
               body: formData,
             });
@@ -1250,7 +1252,9 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
       
-      const response = await fetch(`${API_BASE_URL}/api/post-instagram-now/${userId}`, {
+      const postNowUrl = getApiUrl('/api/post-instagram-now', `/${userId}`);
+      
+      const response = await fetch(postNowUrl, {
         method: 'POST',
         body: formData,
         signal: controller.signal,

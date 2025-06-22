@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Based on the provided data, the @fentybeauty Instagram account showcases a variety of content, from product announcements to showcasing looks.\n\nOne unique aspect is the use of playful and engaging captions. For example, \"Sorry, we can't come to the phone right now... we're swatching the NEW shades of Trace'd Out Pencil Lip Liner ​\" is a creative way to announce a new product. This post received 5,834 likes and 51 comments, totaling 5,885 in engagement.\n\nAnother example is the caption \"How we’re showing up to the function: \" which received 6,720 likes and 60 comments, totaling 6,780 in engagement.\n\nThe post \"Fresh off the Fenty Beauty vine \" garnered 10,025 likes and 85 comments, totaling 10,110 in engagement.\n\nThe \"Most Engaging Post\" is \"Born to dew your body right ️‍\", with a significant 29,447 likes and 141 comments, resulting in a total engagement of 29,588. This suggests that content focusing on body products or a specific aesthetic resonates strongly with the audience.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.16643311427189753
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 462,
+    "candidatesTokenCount": 260,
+    "totalTokenCount": 722,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 462
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 260
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "oatWaJe2FuKJ_NUPqtic2Qw"
+}

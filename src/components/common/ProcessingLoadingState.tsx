@@ -48,7 +48,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   platform,
   username,
   onComplete,
-  countdownMinutes = 7 // Default to 7 minutes
+  countdownMinutes = 15 // Default to 15 minutes
 }) => {
   const { currentUser } = useAuth();
   const TOTAL_DURATION = countdownMinutes * 60; // Convert minutes to seconds

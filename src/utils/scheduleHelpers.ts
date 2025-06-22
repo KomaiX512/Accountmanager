@@ -1,3 +1,5 @@
+import { getApiUrl, API_CONFIG } from '../config/api';
+
 export interface ScheduleOptions {
   platform: 'instagram' | 'twitter' | 'facebook';
   userId: string;
@@ -41,6 +43,12 @@ export const schedulePost = async (options: ScheduleOptions): Promise<ScheduleRe
   try {
     const formData = new FormData();
     
+    // Helper to resolve endpoint URLs consistently (handles optional BASE_URL)
+    const resolveEndpoint = (endpointKey: keyof typeof API_CONFIG.ENDPOINTS, extra = ''): string => {
+      const endpoint = API_CONFIG.ENDPOINTS[endpointKey] as string;
+      return getApiUrl(endpoint, extra);
+    };
+    
     // Platform-specific handling
     if (platform === 'twitter') {
       // Twitter text validation
@@ -59,7 +67,7 @@ export const schedulePost = async (options: ScheduleOptions): Promise<ScheduleRe
         formData.append('text', caption.trim());
         formData.append('scheduled_time', scheduleTime.toISOString());
         
-        const response = await fetch(`/api/schedule-tweet-with-image/${userId}`, {
+        const response = await fetch(resolveEndpoint('SCHEDULE_TWEET_WITH_IMAGE', `/${userId}`), {
           method: 'POST',
           body: formData,
         });
@@ -77,7 +85,7 @@ export const schedulePost = async (options: ScheduleOptions): Promise<ScheduleRe
         };
       } else {
         // Twitter text-only
-        const response = await fetch(`/api/schedule-tweet/${userId}`, {
+        const response = await fetch(resolveEndpoint('SCHEDULE_TWEET', `/${userId}`), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -107,7 +115,7 @@ export const schedulePost = async (options: ScheduleOptions): Promise<ScheduleRe
         formData.append('image', imageBlob, filename);
       }
       
-      const response = await fetch(`/api/schedule-post/${userId}`, {
+      const response = await fetch(resolveEndpoint('SCHEDULE_POST', `/${userId}`), {
         method: 'POST',
         body: formData,
       });
@@ -145,11 +153,11 @@ export const fetchImageFromR2 = async (
     // Try multiple endpoints with fallbacks (same approach as PostCooked.tsx)
     const endpoints = [
       // Primary: Direct R2 endpoint with cache busting
-      `http://localhost:3000/api/r2-image/${username}/${imageKey}?platform=${platform}&t=${Date.now()}`,
+      `/api/r2-image/${username}/${imageKey}?platform=${platform}&t=${Date.now()}`,
       // Fallback 1: Fix-image endpoint
-      `http://localhost:3000/fix-image/${username}/${imageKey}?platform=${platform}`,
+      `/fix-image/${username}/${imageKey}?platform=${platform}`,
       // Fallback 2: Direct R2 without cache busting
-      `http://localhost:3000/api/r2-image/${username}/${imageKey}?platform=${platform}`
+      `/api/r2-image/${username}/${imageKey}?platform=${platform}`
     ];
     
     let lastError: Error | null = null;

@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Based on the recent posts from @fentybeauty, recurring themes include summer beauty, highlighting Rihanna's involvement, and promoting specific products.\n\nPost 1, with the caption \"Fenty summer mood board: 🪭🥥\" received 6,301 likes and 37 comments, totaling 6,338 in engagement. This indicates a focus on a summer aesthetic.\n\nPost 2, \"POV: It's 2018 and @badgalriri just dropped THE glowy product of the summer \" garnered 7,160 likes and 81 comments, totaling 7,241 in engagement. This post directly references Rihanna and a specific product launch, while also playing on nostalgia.\n\nPost 3, \"How we’re showing up to the function: \" received 6,720 likes and 60 comments, totaling 6,780 in engagement. This post implies a focus on beauty looks for social events.\n\nThe most engaging post, \"Sp'oil your lips like @badgalriri \" received 67,131 likes and 437 comments, totaling 67,568 in engagement. This post again highlights Rihanna and promotes a specific product for lips.\n\nIn summary, the messaging revolves around summer beauty, leveraging Rihanna's image and influence, and promoting specific Fenty Beauty products.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.1931848010501346
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 666,
+    "candidatesTokenCount": 296,
+    "totalTokenCount": 962,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 666
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 296
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "1KtWaJClFbjL1PIP24ez0Aw"
+}

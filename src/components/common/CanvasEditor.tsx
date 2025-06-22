@@ -1153,7 +1153,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
       formData.append('platform', detectedPlatform);
       
       // Send to server to update the post
-      const response = await fetch(`http://localhost:3000/api/save-edited-post/${username}`, {
+      const response = await fetch(`/api/save-edited-post/${username}`, {
         method: 'POST',
         body: formData,
       });

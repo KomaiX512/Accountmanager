@@ -127,7 +127,16 @@ export default defineConfig({
         target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/api/, ''),
+        // Preserve /api prefix so backend route '/api/post-instagram-now' matches
+        // No rewrite here
+      },
+      // Schedule-post endpoint (port 3000) - critical for scheduling functionality
+      '/api/schedule-post': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+        // Preserve /api prefix so backend route '/api/schedule-post' matches
+        // No rewrite here
       },
       // Account info endpoints (port 3000)
       '/api/save-account-info': {

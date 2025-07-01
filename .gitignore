@@ -22,3 +22,40 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Build artifacts and large files
+production-build/
+*.zip
+*.tar.gz
+*.tar
+*.gz
+
+# SSH keys and sensitive files
+*.pem
+*.key
+id_rsa
+id_rsa.pub
+namecheap_cpanel_*
+
+# Temporary files
+temp-images/
+image_cache/
+*.pid
+.server_pids
+.monitor.pid
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.development
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini

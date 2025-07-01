@@ -49,72 +49,41 @@ const usernameCheckUrl = '/api/check-username-availability';
   // Twitter username validation regex (alphanumeric and underscores only)
   const twitterUsernameRegex = /^[a-zA-Z0-9_]+$/;
 
+  // Initialize component
+  useEffect(() => {
+    // Only check for active processing state, not completed state
+    // The dashboards will handle redirecting completed users
+    setIsInitializing(false);
+  }, []);
+
   // Check for existing processing state on mount
   useEffect(() => {
     if (processingState.isProcessing && processingState.platform === 'twitter') {
       setIsProcessing(true);
       setIsInitializing(false);
-    }
-  }, [processingState]);
-
-  // Check if user has already entered Twitter username
-  useEffect(() => {
-    // Only check status if we're allowed to redirect on completion
-    // This prevents double-checking when parent component (Twitter.tsx) is already handling it
-    if (!redirectIfCompleted) {
-      setIsInitializing(false);
-      return;
-    }
-
-    const checkUserStatus = async () => {
-      if (!currentUser || !currentUser.uid) {
-        console.error('No authenticated user found');
-        setIsInitializing(false);
-        return;
-      }
       
-      try {
-        const response = await axios.get(`${statusApiUrl}/${currentUser.uid}`);
-        
-        if (response.data.hasEnteredTwitterUsername && redirectIfCompleted) {
-          // User has already entered username, redirect to dashboard
-          const savedUsername = response.data.twitter_username;
-          const savedCompetitors = response.data.competitors || [];
-          const savedAccountType = response.data.accountType || 'branding';
-          
-          onSubmitSuccess(savedUsername, savedCompetitors, savedAccountType as 'branding' | 'non-branding');
-          
-          if (savedAccountType === 'branding') {
-            navigate('/twitter-dashboard', { 
-              state: { 
-                accountHolder: savedUsername, 
-                competitors: savedCompetitors,
-                accountType: 'branding',
-                platform: 'twitter'
-              } 
-            });
+      // Restore username from processing state or localStorage
+      if (processingState.username) {
+        setUsername(processingState.username);
           } else {
-            navigate('/twitter-non-branding-dashboard', { 
-              state: { 
-                accountHolder: savedUsername,
-                accountType: 'non-branding',
-                platform: 'twitter'
-              } 
-            });
+        // Fallback to localStorage
+      try {
+          const processingInfo = localStorage.getItem('twitter_processing_info');
+          if (processingInfo) {
+            const info = JSON.parse(processingInfo);
+            if (info.username) {
+              setUsername(info.username);
+            }
           }
-        } else {
+        } catch (error) {
+          console.error('Error reading username from localStorage:', error);
+              } 
+      }
+          } else {
+      // No active processing, show the form
           setIsInitializing(false);
         }
-      } catch (error) {
-        console.error('Error checking user Twitter status:', error);
-        setIsInitializing(false);
-        // Don't retry on error to prevent infinite loop
-      }
-    };
-    
-    // Only run once on mount when conditions are met
-    checkUserStatus();
-  }, [currentUser?.uid, redirectIfCompleted]); // Removed navigate and onSubmitSuccess to prevent excessive re-runs
+  }, [processingState]);
 
   // Debounced username validation
   const checkUsernameAvailability = useCallback(
@@ -244,14 +213,19 @@ const usernameCheckUrl = '/api/check-username-availability';
     setTimeout(() => setMessage(''), 5000);
   };
 
-  const handleStartProcessing = (username: string) => {
-    startProcessing('twitter', username, 15); // 15 minutes duration
-    setIsProcessing(true);
-    setIsInitializing(false);
-  };
-
   const handleProcessingComplete = () => {
+    // Reset local processing state
     setIsProcessing(false);
+    
+    // Mark platform as accessed after processing is complete
+    if (markPlatformAccessed) {
+      markPlatformAccessed('twitter');
+    } else if (currentUser?.uid) {
+      // Fallback: set localStorage flag directly
+      localStorage.setItem(`twitter_accessed_${currentUser.uid}`, 'true');
+    }
+    
+    // Call the onComplete callback
     if (onComplete) {
       onComplete();
     }
@@ -298,20 +272,16 @@ const usernameCheckUrl = '/api/check-username-availability';
           competitors: competitors.map(comp => comp.trim())
         });
         
+        // Save to localStorage immediately for future use
+        localStorage.setItem(`twitter_accessed_${currentUser.uid}`, 'true');
+        localStorage.setItem(`twitter_username_${currentUser.uid}`, username.trim());
+        localStorage.setItem(`twitter_account_type_${currentUser.uid}`, accountType);
+        localStorage.setItem(`twitter_competitors_${currentUser.uid}`, JSON.stringify(competitors.map(comp => comp.trim())));
+        
         showMessage('Submission successful', 'success');
         
-        // Save processing state to localStorage with timestamp
-        const processingData = {
-          startTime: Date.now(),
-          duration: 900000, // 15 minutes in milliseconds
-          username: username.trim(),
-          platform: 'twitter'
-        };
-        localStorage.setItem(`twitter_processing_${currentUser.uid}`, JSON.stringify(processingData));
-        
-        // Start the processing phase
-        setIsLoading(false);
-        setIsProcessing(true);
+        // Start the processing phase using unified ProcessingContext
+        startProcessing('twitter', username.trim(), 15); // 15 minutes duration
       }
     } catch (error: any) {
       console.error('Error submitting data:', error);

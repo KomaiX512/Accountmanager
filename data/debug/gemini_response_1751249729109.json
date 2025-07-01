@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Hey there! 👋 FENTY BEAUTY is all about creating makeup for everyone! We've got a huge range of products, from complexion must-haves like our foundations and concealers (with tons of shades!) to vibrant lipsticks (like 'Hot Cherry' 😉 - Riri's fave!). We also drop limited edition collections, so keep an eye out! You can find us online and worldwide at Sephora, Ulta, Harvey Nichols, Selfridges, Boots & select Asia duty free shops! #FENTYBEAUTY 💖\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.19755359899217836
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 590,
+    "candidatesTokenCount": 107,
+    "totalTokenCount": 697,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 590
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 107
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "P_NhaLnAMsXmld8PjonACA"
+}

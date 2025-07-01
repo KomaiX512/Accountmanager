@@ -67,8 +67,26 @@ export const FacebookProvider: React.FC<FacebookProviderProps> = ({ children }) 
   // Check if user has accessed Facebook dashboard
   useEffect(() => {
     if (currentUser?.uid) {
-      const hasUserAccessed = localStorage.getItem(`facebook_accessed_${currentUser.uid}`) === 'true';
-      setHasAccessed(hasUserAccessed);
+      // Check backend API status for platform access
+      const checkFacebookStatus = async () => {
+        try {
+          const response = await fetch(`/api/user-facebook-status/${currentUser.uid}`);
+          const data = await response.json();
+          const hasUserAccessed = data.hasEnteredFacebookUsername || localStorage.getItem(`facebook_accessed_${currentUser.uid}`) === 'true';
+          setHasAccessed(hasUserAccessed);
+          
+          if (hasUserAccessed) {
+            localStorage.setItem(`facebook_accessed_${currentUser.uid}`, 'true');
+          }
+        } catch (error) {
+          console.error(`[${new Date().toISOString()}] Error checking Facebook status:`, error);
+          // Fallback to localStorage
+          const hasUserAccessed = localStorage.getItem(`facebook_accessed_${currentUser.uid}`) === 'true';
+          setHasAccessed(hasUserAccessed);
+        }
+      };
+      
+      checkFacebookStatus();
     } else {
       setHasAccessed(false);
     }

@@ -1,0 +1,34 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "You're a seasoned social media strategist with years of experience managing successful Instagram accounts. You're analyzing the account @toofaced and have access to comprehensive performance data.\n\n===== ACCOUNT DATA FOR @toofaced =====\nProfile Analysis Data for toofaced on instagram: Recent Posts and Engagement: Post 1: \"LAST CHANCE TO WIN $10,000!! Our Wrapped Masterpiece™ Art Competition ends FRIDAY!! We're celebrating the launch of our mascara product and we want YOU to submit your original artwork that embodies the true spirit of a Wrapped Masterpiece™! This can be a painting, a sketch, digital art, even a sculpture - totally up to you! We can’t wait to see what you create!\" Engagement: 764 likes, 29 comments, Total: 793 Post 2: \"Get ready to unwrap the secret to your best lashes yet! Our NEW Ribbon Wrapped Lash Extreme Tubing Mascara is almost here!! This mascara delivers extreme length and separation for up to 24 hours for all lash types! No smudging, clumping, or flaking—just stunning lashes that last! Be the first to shop our new mascara when it drops tomorrow!\" Engagement: 6,192 likes, 178 comments, Total: 6,370 Post 3: \"High-performing beauty product with strong engagement.com tomorrow! #toofaced #tfcrueltyfree\" Engagement: 9,417 likes, 134 comments, Total: 9,551 Post 4: \"your perfect everyday lip is here! Our NEW Kissing Juicy Tints are here and they’re giving sheer, shiny color with a kiss of hydration! Grab your favorite shade (or one of each, no judgment ) Available now in-store & online at @sephora #toofaced #tfcrueltyfree\" Engagement: 1,584 likes, 18 comments, Total: 1,602 Most Engaging Post: \"High-performing beauty product with strong engagement.com tomorrow! #toofaced #tfcrueltyfree\" Performance: 9,417 likes, 134 comments Total Engagement: 9,551 Analysis based on 8 relevant data points from the toofaced account.\n===== END OF ACCOUNT DATA =====\n\nQuestion: \"tell my most m=popular post and its reason so I learn from it and any engagaing unique about posting so i continue grow like a king\"\n\nInstructions:\n• Analyze the actual data above to answer the specific question\n• Be conversational, insightful, and specific to this account\n• Reference real numbers, captions, and performance patterns from the data\n• Provide actionable recommendations based on what's actually working\n• Think like a consultant who's deeply familiar with this account's performance\n\nRespond as a knowledgeable social media expert discussing this specific account."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "tell me about if I've to run the ad campaign about lips stick  then what should be my Meta detailed audience targetting that boost me "
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Previous response about Instagram strategy and product information. [content summary]"
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 2000,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "topK": 40
+  }
+}

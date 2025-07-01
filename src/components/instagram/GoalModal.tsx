@@ -43,22 +43,11 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
     checkCampaignStatus();
   }, [username, platform]);
 
-  // Force refresh campaign status when modal is opened
+  // Refresh campaign status once when the modal mounts
   useEffect(() => {
-    // This will ensure fresh data every time the modal is shown
-    console.log(`[GoalModal] Modal opened - forcing campaign status refresh for ${username} on ${platform}`);
+    console.log(`[GoalModal] Modal opened - refreshing campaign status for ${username} on ${platform}`);
     checkCampaignStatus();
-    
-    // Set up an interval to periodically check campaign status while modal is open
-    const intervalId = setInterval(() => {
-      console.log(`[GoalModal] Periodic campaign status check for ${username} on ${platform}`);
-      checkCampaignStatus();
-    }, 3000); // Check every 3 seconds while modal is open
-    
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, []); // Empty dependency array means this runs once when component mounts
+  }, []);
 
   // Listen for campaign stopped events
   useEffect(() => {

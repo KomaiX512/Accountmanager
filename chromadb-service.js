@@ -50,25 +50,68 @@ class ChromaDBService {
 
   async initialize() {
     try {
-      this.client = new ChromaClient({
-        path: 'http://localhost:8000' // Default ChromaDB server
-      });
-      
-      console.log('[ChromaDB] Attempting to connect to ChromaDB server...');
-      
-      // Test connection using version call instead of heartbeat for newer ChromaDB versions
-      try {
-        const version = await this.client.version();
-        console.log(`[ChromaDB] Connected to ChromaDB version: ${version}`);
-      } catch (versionError) {
-        // Fallback to heartbeat for older versions
-        await this.client.heartbeat();
-        console.log('[ChromaDB] Connected using heartbeat (older API)');
+      // Determine ChromaDB endpoint (allows overriding the default when port 8000 is busy)
+      const chromaPath =
+        // Highest-priority: explicit full URL
+        process.env.CHROMADB_URL ||
+        // Host + Port combination
+        (process.env.CHROMA_DB_HOST && process.env.CHROMA_DB_PORT
+          ? `http://${process.env.CHROMA_DB_HOST}:${process.env.CHROMA_DB_PORT}`
+          : null) ||
+        // Only custom port (assume localhost)
+        (process.env.CHROMA_DB_PORT || process.env.CHROMA_DB_PORT_HOST
+          ? `http://localhost:${process.env.CHROMA_DB_PORT || process.env.CHROMA_DB_PORT_HOST}`
+          : null) ||
+        // Fallback to default
+        'http://localhost:8000';
+
+      const candidatePaths = [];
+      // 1) Provided path
+      if (chromaPath) candidatePaths.push(chromaPath);
+
+      // 2) If only port given, scan common alternatives up to 8010
+      const defaultHost = 'http://localhost';
+      for (let p = 8000; p <= 8010; p++) {
+        const alt = `${defaultHost}:${p}`;
+        if (!candidatePaths.includes(alt)) candidatePaths.push(alt);
       }
-      
+
+      // Helper to test a given path
+      const testPath = async (pathToTest) => {
+        try {
+          const testClient = new ChromaClient({ path: pathToTest });
+          // Prefer version call but fallback to heartbeat
+          try {
+            await testClient.version();
+          } catch (_) {
+            await testClient.heartbeat();
+          }
+          // If succeeded, set as active client
+          this.client = testClient;
+          console.log(`[ChromaDB] Connected to ChromaDB at ${pathToTest}`);
+          return true;
+        } catch (err) {
+          return false;
+        }
+      };
+
+      let connected = false;
+      for (const pathToTry of candidatePaths) {
+        console.log(`[ChromaDB] Attempting to connect at ${pathToTry} ...`);
+        // eslint-disable-next-line no-await-in-loop
+        if (await testPath(pathToTry)) {
+          connected = true;
+          break;
+        }
+      }
+
+      if (!connected) {
+        throw new Error('All connection attempts failed');
+      }
+
       this.isInitialized = true;
       console.log('[ChromaDB] Successfully connected to ChromaDB server');
-      
+
       return true;
     } catch (error) {
       console.warn('[ChromaDB] ChromaDB server not available, using in-memory fallback:', error.message);
@@ -479,17 +522,28 @@ Performance: ${this.categorizePerformance(engagement.engagementRate)}`;
 
       const collectionName = `${platform}_profiles`;
       
-      // Get or create collection
+      // Get or create collection with better error handling
       let collection;
       try {
+        // First try to get existing collection
         collection = await this.client.getCollection({
           name: collectionName
         });
+        console.log(`[ChromaDB] Using existing collection: ${collectionName}`);
       } catch (error) {
-        collection = await this.client.createCollection({
-          name: collectionName,
-          metadata: { platform, created: new Date().toISOString() }
-        });
+        // Collection doesn't exist, create it
+        console.log(`[ChromaDB] Creating new collection: ${collectionName}`);
+        try {
+          collection = await this.client.createCollection({
+            name: collectionName,
+            metadata: { platform, created: new Date().toISOString() }
+          });
+          console.log(`[ChromaDB] Successfully created collection: ${collectionName}`);
+        } catch (createError) {
+          console.error(`[ChromaDB] Failed to create collection ${collectionName}:`, createError.message);
+          console.log(`[ChromaDB] Using fallback storage for ${platform}/${username}`);
+          return this.storeFallbackData(username, platform, profileData);
+        }
       }
 
       // Process the profile data
@@ -541,29 +595,50 @@ Performance: ${this.categorizePerformance(engagement.engagementRate)}`;
         return cleaned;
       });
 
-      // Delete existing data for this user if any
+      // Check existing data count before adding
       try {
-        await collection.delete({
-          where: { username: username }
-        });
-      } catch (error) {
-        // Collection might be empty, continue
+        const existingCount = await collection.count();
+        console.log(`[ChromaDB] Collection ${collectionName} currently has ${existingCount} documents`);
+      } catch (countError) {
+        console.log(`[ChromaDB] Could not get existing count: ${countError.message}`);
       }
 
-      // Add new documents with validated data
+      // Upsert data instead of delete + add (this prevents data loss)
+      try {
+        await collection.upsert({
+          ids: validIds,
+          embeddings: embeddings,
+          documents: documents,
+          metadatas: cleanMetadatas
+        });
+        console.log(`[ChromaDB] Successfully upserted ${documents.length} documents for ${platform}/${username}`);
+      } catch (upsertError) {
+        console.error(`[ChromaDB] Upsert failed, trying add: ${upsertError.message}`);
+        // Fallback to add if upsert fails
       await collection.add({
         ids: validIds,
         embeddings: embeddings,
         documents: documents,
         metadatas: cleanMetadatas
       });
+        console.log(`[ChromaDB] Successfully added ${documents.length} documents for ${platform}/${username}`);
+      }
 
-      console.log(`[ChromaDB] Successfully stored ${documents.length} documents for ${platform}/${username}`);
+      // Verify the data was stored
+      try {
+        const finalCount = await collection.count();
+        console.log(`[ChromaDB] Collection ${collectionName} now has ${finalCount} documents`);
+      } catch (countError) {
+        console.log(`[ChromaDB] Could not verify final count: ${countError.message}`);
+      }
+
       return true;
 
     } catch (error) {
       console.error(`[ChromaDB] Error storing profile data for ${platform}/${username}:`, error);
-      return false;
+      // Fallback to local storage
+      console.log(`[ChromaDB] Falling back to local storage for ${platform}/${username}`);
+      return this.storeFallbackData(username, platform, profileData);
     }
   }
 
@@ -601,17 +676,47 @@ Performance: ${this.categorizePerformance(engagement.engagementRate)}`;
   async semanticSearch(query, username, platform, limit = 5) {
     try {
       if (!this.isInitialized) {
-        return this.fallbackSearch(query, username, platform, limit);
+        console.log(`[ChromaDB] ChromaDB not initialized, forcing initialization for ${platform}/${username}`);
+        // Try to initialize ChromaDB
+        const initialized = await this.initialize();
+        if (!initialized) {
+          console.error(`[ChromaDB] Failed to initialize ChromaDB for ${platform}/${username}`);
+          throw new Error('ChromaDB initialization failed');
+        }
       }
 
       const collectionName = `${platform}_profiles`;
       
       let collection;
       try {
+        // First try to get existing collection
         collection = await this.client.getCollection({ name: collectionName });
+        console.log(`[ChromaDB] Found existing collection: ${collectionName}`);
       } catch (error) {
-        console.log(`[ChromaDB] Collection ${collectionName} not found`);
-        return [];
+        // Collection doesn't exist, try to create it
+        console.log(`[ChromaDB] Collection ${collectionName} not found, attempting to create...`);
+        try {
+          collection = await this.client.createCollection({
+            name: collectionName,
+            metadata: { platform, created: new Date().toISOString() }
+          });
+          console.log(`[ChromaDB] Successfully created collection: ${collectionName}`);
+        } catch (createError) {
+          console.error(`[ChromaDB] Failed to create collection ${collectionName}:`, createError.message);
+          throw new Error(`ChromaDB collection creation failed: ${createError.message}`);
+        }
+      }
+
+      // Check if collection has any data
+      try {
+        const count = await collection.count();
+        if (count === 0) {
+          console.log(`[ChromaDB] Collection ${collectionName} is empty, but continuing with search`);
+        }
+        console.log(`[ChromaDB] Collection ${collectionName} has ${count} documents`);
+      } catch (countError) {
+        console.error(`[ChromaDB] Error checking collection count:`, countError.message);
+        // Continue anyway, don't fallback
       }
 
       // Generate query embedding
@@ -629,108 +734,27 @@ Performance: ${this.categorizePerformance(engagement.engagementRate)}`;
       const formattedResults = [];
       if (results.documents && results.documents[0]) {
         for (let i = 0; i < results.documents[0].length; i++) {
+          const document = results.documents[0][i];
+          const metadata = results.metadatas && results.metadatas[0] ? results.metadatas[0][i] : {};
+          const distance = results.distances && results.distances[0] ? results.distances[0][i] : 0;
+          
           formattedResults.push({
-            content: results.documents[0][i],
-            metadata: results.metadatas[0][i],
-            similarity: 1 - results.distances[0][i], // Convert distance to similarity
-            relevance: this.calculateRelevance(query, results.documents[0][i], results.metadatas[0][i])
+            content: document,
+            metadata: metadata,
+            distance: distance,
+            relevance: 1 - distance // Convert distance to relevance score
           });
         }
       }
-
-      // Sort by relevance score
-      formattedResults.sort((a, b) => b.relevance - a.relevance);
 
       console.log(`[ChromaDB] Found ${formattedResults.length} relevant documents for query: "${query}"`);
       return formattedResults;
 
     } catch (error) {
-      console.error(`[ChromaDB] Error in semantic search:`, error);
-      return this.fallbackSearch(query, username, platform, limit);
+      console.error(`[ChromaDB] Error in semantic search for ${platform}/${username}:`, error);
+      // Don't fallback, throw error to force ChromaDB usage
+      throw new Error(`ChromaDB search failed: ${error.message}`);
     }
-  }
-
-  // Fallback search when ChromaDB is not available
-  fallbackSearch(query, username, platform, limit = 5) {
-    try {
-      const fallbackPath = path.join(process.cwd(), 'data', 'vector_fallback', `${platform}_${username}.json`);
-      
-      if (!fs.existsSync(fallbackPath)) {
-        console.log(`[ChromaDB] No fallback data found for ${platform}/${username}`);
-        return [];
-      }
-
-      const data = JSON.parse(fs.readFileSync(fallbackPath, 'utf8'));
-      const queryLower = query.toLowerCase();
-      
-      // Simple text-based matching for fallback
-      const results = [];
-      for (let i = 0; i < data.documents.length; i++) {
-        const document = data.documents[i];
-        const metadata = data.metadatas[i];
-        
-        const relevance = this.calculateTextRelevance(queryLower, document.toLowerCase());
-        if (relevance > 0.1) { // Minimum relevance threshold
-          results.push({
-            content: document,
-            metadata: metadata,
-            similarity: relevance,
-            relevance: relevance
-          });
-        }
-      }
-
-      results.sort((a, b) => b.relevance - a.relevance);
-      return results.slice(0, limit);
-
-    } catch (error) {
-      console.error(`[ChromaDB] Error in fallback search:`, error);
-      return [];
-    }
-  }
-
-  // Calculate relevance score for ranking
-  calculateRelevance(query, document, metadata) {
-    let score = 0;
-    const queryLower = query.toLowerCase();
-    const docLower = document.toLowerCase();
-
-    // Exact keyword matches
-    const queryWords = queryLower.split(/\s+/);
-    const docWords = docLower.split(/\s+/);
-    
-    for (const word of queryWords) {
-      if (docWords.includes(word)) {
-        score += 0.3;
-      }
-    }
-
-    // Metadata relevance
-    if (metadata.type === 'profile' && queryLower.includes('profile')) score += 0.2;
-    if (metadata.type === 'post' && queryLower.includes('post')) score += 0.2;
-    if (metadata.type === 'engagement' && queryLower.includes('engagement')) score += 0.2;
-    if (metadata.type === 'bio' && queryLower.includes('bio')) score += 0.2;
-
-    // Engagement-based scoring
-    if (metadata.totalEngagement > 1000) score += 0.1;
-    if (metadata.verified) score += 0.05;
-    if (metadata.businessAccount) score += 0.05;
-
-    return Math.min(score, 1.0); // Cap at 1.0
-  }
-
-  calculateTextRelevance(query, document) {
-    const queryWords = query.split(/\s+/);
-    const docWords = document.split(/\s+/);
-    
-    let matches = 0;
-    for (const word of queryWords) {
-      if (docWords.some(docWord => docWord.includes(word) || word.includes(docWord))) {
-        matches++;
-      }
-    }
-    
-    return matches / queryWords.length;
   }
 
   // Create enhanced context for RAG
@@ -738,12 +762,13 @@ Performance: ${this.categorizePerformance(engagement.engagementRate)}`;
     try {
       console.log(`[ChromaDB] Creating enhanced context for: "${query}"`);
       
-      // Get relevant documents through semantic search
+      // Always use ChromaDB semantic search - no fallback
       const relevantDocs = await this.semanticSearch(query, username, platform, 8);
       
       if (relevantDocs.length === 0) {
-        console.log(`[ChromaDB] No relevant documents found for ${platform}/${username}`);
-        return null;
+        console.log(`[ChromaDB] No relevant documents found for ${platform}/${username}, but continuing with empty context`);
+        // Return minimal context instead of null to prevent fallback
+        return `Profile Analysis Data for ${username} on ${platform}:\n\nNo specific data found for this query, but account exists.\n`;
       }
 
       // Group documents by type for better organization
@@ -850,11 +875,13 @@ Performance: ${this.categorizePerformance(engagement.engagementRate)}`;
       context += `Analysis based on ${relevantDocs.length} relevant data points from the ${username} account.\n`;
 
       console.log(`[ChromaDB] Enhanced context created with ${relevantDocs.length} relevant documents`);
+      console.log(`[ChromaDB] Final context length: ${context.length} characters`);
       return context;
 
     } catch (error) {
-      console.error(`[ChromaDB] Error creating enhanced context:`, error);
-      return null;
+      console.error(`[ChromaDB] Error creating enhanced context for ${platform}/${username}:`, error);
+      // Don't return null, return minimal context to prevent fallback
+      return `Profile Analysis Data for ${username} on ${platform}:\n\nError retrieving data, but account exists.\n`;
     }
   }
 
@@ -929,4 +956,4 @@ Performance: ${this.categorizePerformance(engagement.engagementRate)}`;
 
 // Export singleton instance
 const chromaDBService = new ChromaDBService();
-export default chromaDBService; 
+export default chromaDBService;

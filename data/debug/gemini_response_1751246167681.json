@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Based on the provided data for the Instagram account @toofaced, here's what I can tell you:\n\nThe @toofaced account is for Too Faced Cosmetics, a \"serious makeup brand that knows how to have fun.\" They emphasize being a \"cruelty-free brand, always has been, always will be.\"\n\nThe account has 12,484,905 followers and follows 2,274 accounts. They have made 12,334 posts. The account is verified and classified as a Business Account in the \"Personal Goods & General Merchandise Stores\" category.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.13134394586086273
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 410,
+    "candidatesTokenCount": 128,
+    "totalTokenCount": 538,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 410
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 128
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "VuVhaNzeLOOS7dcPnZ7M-Q8"
+}

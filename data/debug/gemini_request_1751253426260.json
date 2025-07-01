@@ -1,0 +1,18 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "You are a professional X (Twitter) content creator for @sama. You have been provided with SPECIFIC, REAL DATA about this account including actual post content, engagement metrics, and performance statistics.\n\nYOUR TASK: Create a high-quality X (Twitter) post about \"create one post for me high engagaing\" using ONLY the provided real data below.\n\n===== REAL ACCOUNT DATA FOR @sama =====\nProfile Analysis Data for sama on twitter: Recent Posts and Engagement: Post 1: \"i love the openai team so much\" Post 2: \"chatgpt plus is free for college students in the US and canada through may!\" Post 3: \"I think US college education is nearer to collapsing than it appears.\" Post 4: \"very glad President Trump is safe!\" Analysis based on 8 relevant data points from the sama account.\n===== END OF REAL DATA =====\n\nINSTRUCTIONS:\n1. You MUST base the post content on the actual data provided above\n2. Reference successful post patterns from the \"Recent Posts and Engagement\" section\n3. Use hashtags that have performed well based on the data\n4. Match the tone and style shown in the actual post content\n5. Create content that aligns with proven engagement patterns\n6. DO NOT use generic templates - use insights from the real data\n\nRESPOND WITH EXACTLY THIS FORMAT (no additional text):\n\nCaption:\n[Write an engaging X (Twitter) caption under 280 characters that matches the style and themes from the real data above. Keep it concise and engaging for Twitter's fast-paced environment]\n\nHashtags:\n[List 1-3 hashtags (Twitter best practice) based on successful hashtags from the data above]\n\nCall to Action:\n[Create a call-to-action that matches engagement patterns from the real data]\n\nVisual Description for Image:\n[Write a detailed description for an image that aligns with the visual style and themes shown in the successful posts from the data above. Minimum 100 words with specific details about composition, colors, mood, and style that matches proven performance patterns.]\n\nIMPORTANT: Use EXACTLY the section headers shown above. Base everything on the real account data provided above."
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 2000,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "topK": 40
+  }
+}

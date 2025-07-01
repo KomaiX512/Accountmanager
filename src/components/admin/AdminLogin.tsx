@@ -88,28 +88,21 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onAdminAccess }) => {
       return;
     }
 
-    const isValidAdmin = UserService.authenticateAdmin(credentials.username, credentials.password);
-    
-    if (isValidAdmin) {
-      try {
-        await UserService.upgradeToAdmin(currentUser.uid);
+    try {
+      const result = await UserService.authenticateAdmin(credentials.username, credentials.password);
+      if (result.success && result.adminToken) {
+        await UserService.upgradeToAdmin(currentUser.uid, result.adminToken);
         setIsAdminMode(true);
         setShowAdminLogin(false);
         onAdminAccess?.(true);
-        
-        // Clear credentials
         setCredentials({ username: '', password: '' });
-        
-        // Navigate to admin dashboard
         navigate('/admin');
-        
-        // Show success message
         alert('✅ Admin access granted! You now have unlimited access to all features.');
-      } catch (error) {
-        setError('Failed to upgrade to admin');
+      } else {
+        setError(result.message || 'Invalid credentials');
       }
-    } else {
-      setError('Invalid credentials');
+    } catch (error) {
+      setError('Failed to upgrade to admin');
     }
   };
 

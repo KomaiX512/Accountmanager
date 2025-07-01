@@ -69,11 +69,22 @@ export const InstagramProvider: React.FC<InstagramProviderProps> = ({ children }
       const connected = isInstagramConnected(currentUser.uid);
       setIsConnected(connected);
 
-      // In a real app, we would fetch this from the user's profile or preferences
-      // For now, we'll use localStorage to simulate the accessed stateclear
-      
-      const hasUserAccessed = localStorage.getItem(`instagram_accessed_${currentUser.uid}`) === 'true';
-      setHasAccessed(hasUserAccessed);
+      // Check backend API status for platform access
+      try {
+        const response = await fetch(`/api/user-instagram-status/${currentUser.uid}`);
+        const data = await response.json();
+        const hasUserAccessed = data.hasEnteredInstagramUsername || localStorage.getItem(`instagram_accessed_${currentUser.uid}`) === 'true';
+        setHasAccessed(hasUserAccessed);
+        
+        if (hasUserAccessed) {
+          localStorage.setItem(`instagram_accessed_${currentUser.uid}`, 'true');
+        }
+      } catch (error) {
+        console.error(`[${new Date().toISOString()}] Error checking Instagram status:`, error);
+        // Fallback to localStorage
+        const hasUserAccessed = localStorage.getItem(`instagram_accessed_${currentUser.uid}`) === 'true';
+        setHasAccessed(hasUserAccessed);
+      }
 
       if (connected) {
         const connectionData = getInstagramConnection(currentUser.uid);

@@ -18,7 +18,7 @@ import OAuth from 'oauth-1.0a';
 import FormData from 'form-data';
 import nodemailer from 'nodemailer';
 const app = express();
-const port = 3000;
+const port = process.env.MAIN_SERVER_PORT || 3000;
 
 // Serve temporary images for Instagram access
 app.use('/temp-images', express.static(path.join(process.cwd(), 'server', 'temp-images')));
@@ -267,11 +267,11 @@ function scheduleCacheCleanup() {
 scheduleCacheCleanup();
 
 const s3Client = new S3Client({
-  endpoint: 'https://b21d96e73b908d7d7b822d41516ccc64.r2.cloudflarestorage.com',
+  endpoint: 'https://570f213f1410829ee9a733a77a5f40e3.r2.cloudflarestorage.com',
   region: 'auto',
   credentials: {
-    accessKeyId: '986718fe67d6790c7fe4eeb78943adba',
-    secretAccessKey: '08fb3b012163cce35bee80b54d83e3a6924f2679f466790a9c7fdd9456bc44fe',
+    accessKeyId: '18f60c98e08f1a24040de7cb7aab646c',
+    secretAccessKey: '0a8c50865ecab3c410baec4d751f35493fd981f4851203fe205fe0f86063a5f6',
   },
   maxAttempt: 3,
   httpOptions: {
@@ -1098,6 +1098,426 @@ app.get(['/responses/:username', '/api/responses/:username'], async (req, res) =
   }
 });
 
+app.get('/profile-info/:username', async (req, res) => {
+  const { username } = req.params;
+  const forceRefresh = req.query.forceRefresh === 'true';
+  const platform = req.query.platform || 'instagram'; // Default to Instagram
+  
+  // Try multiple possible key formats for ProfileInfo
+  const possibleKeys = [
+    `ProfileInfo/${platform}/${username}/profileinfo.json`,
+    `ProfileInfo/${platform}/${username}.json`,
+    `ProfileInfo/${username}/profileinfo.json`,
+    `ProfileInfo/${username}.json`
+  ];
+
+  console.log(`[${new Date().toISOString()}] Attempting to fetch ${platform} profile info for ${username}`);
+
+  for (const key of possibleKeys) {
+    try {
+      console.log(`[${new Date().toISOString()}] Trying key: ${key}`);
+      
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: key,
+      });
+      const response = await s3Client.send(getCommand);
+      const body = await streamToString(response.Body);
+
+      if (!body || body.trim() === '') {
+        console.warn(`Empty file detected at ${key}`);
+        continue;
+      }
+
+      const data = JSON.parse(body);
+      console.log(`[${new Date().toISOString()}] Successfully fetched ${platform} profile info for ${username} from ${key}`);
+      return res.json(data);
+    } catch (error) {
+      if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+        console.log(`Key not found: ${key}`);
+        continue;
+      }
+      console.error(`Error fetching profile info from ${key}:`, error.message);
+      continue;
+    }
+  }
+
+  console.log(`Profile info not found for ${username} on ${platform} (tried ${possibleKeys.length} locations)`);
+  return res.status(404).json({ error: 'Profile info not found' });
+});
+
+app.post('/save-account-info', async (req, res) => {
+  try {
+    const { username, accountType, postingStyle, competitors, platform } = req.body;
+    const platformParam = req.query.platform || platform || 'instagram';
+
+    if (!username || !accountType || !postingStyle) {
+      return res.status(400).json({ error: 'Username, account type, and posting style are required' });
+    }
+
+    // Use centralized platform management for normalization
+    const platformConfig = PlatformSchemaManager.getPlatformConfig(platformParam);
+    const normalizedUsername = platformConfig.normalizeUsername(username);
+
+    // Create platform-specific key using centralized schema manager
+    const key = PlatformSchemaManager.buildPath('AccountInfo', platformParam, normalizedUsername, 'info.json');
+
+    let isUsernameAlreadyInUse = false;
+    
+    try {
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: key,
+      });
+      await s3Client.send(getCommand);
+      isUsernameAlreadyInUse = true;
+      console.warn(`Warning: ${platformParam} username '${normalizedUsername}' is already in use by another account, but allowing save operation`);
+    } catch (error) {
+      if (error.name !== 'NoSuchKey' && error.$metadata?.httpStatusCode !== 404) {
+        throw error;
+      }
+      // Username is not in use, which is the normal case
+    }
+
+    const payload = {
+      username: normalizedUsername,
+      accountType,
+      postingStyle,
+      platform: platformParam,
+      ...(competitors && { competitors: competitors.map(c => platformConfig.normalizeUsername(c)) }),
+      timestamp: new Date().toISOString(),
+    };
+
+    console.log(`Saving ${platformParam} account info to: ${key}`);
+    const putCommand = new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: key,
+      Body: JSON.stringify(payload, null, 2),
+      ContentType: 'application/json',
+    });
+    await s3Client.send(putCommand);
+
+    // Clear cache using centralized schema
+    const cacheKey = PlatformSchemaManager.buildPath('AccountInfo', platformParam, normalizedUsername);
+    cache.delete(cacheKey);
+
+    res.json({ 
+      success: true, 
+      message: `${platformParam} account info saved successfully`,
+      isUsernameAlreadyInUse,
+      platform: platformParam
+    });
+  } catch (error) {
+    console.error('Save account info error:', error);
+    handleErrorResponse(res, error);
+  }
+});
+
+app.post(['/scrape', '/api/scrape'], async (req, res) => {
+  try {
+    const { parent, children } = req.body;
+
+    if (!parent?.username || !Array.isArray(children)) {
+      return res.status(400).json({
+        error: 'Invalid request structure',
+        details: 'Request must contain parent.username and children array',
+      });
+    }
+
+    const newUsername = parent.username.trim();
+    console.log('Processing hierarchical data for:', {
+      parent: newUsername,
+      children: children.map(c => c.username),
+    });
+
+    if (currentUsername !== newUsername) {
+      console.log(`Username changed from ${currentUsername || 'none'} to ${newUsername}, resetting caches...`);
+      currentUsername = newUsername;
+
+      MODULE_PREFIXES.forEach((prefixTemplate) => {
+        // Clear cache for both Instagram and Twitter platforms
+        for (const platform of ['instagram', 'twitter']) {
+          const prefix = `${prefixTemplate}/${platform}/${currentUsername}`;
+          console.log(`Clearing cache for ${prefix}`);
+          cache.delete(prefix);
+        }
+      });
+
+      const clients = sseClients.get(currentUsername) || [];
+      for (const client of clients) {
+        client.write(`data: ${JSON.stringify({ type: 'usernameChanged', username: currentUsername })}\n\n`);
+      }
+    }
+
+    const timestamp = new Date().toISOString();
+    const hierarchicalEntry = {
+      username: newUsername,
+      timestamp,
+      status: 'pending',
+      children: children.map(child => ({
+        username: child.username.trim(),
+        timestamp,
+        status: 'pending',
+      })),
+    };
+
+    let existingData = await getExistingData();
+    existingData.push(hierarchicalEntry);
+    await saveToR2(existingData);
+
+    cache.delete('Usernames');
+
+    res.json({
+      success: true,
+      message: 'Data stored in hierarchical format',
+      parent: hierarchicalEntry.username,
+      childrenCount: hierarchicalEntry.children.length,
+    });
+  } catch (error) {
+    console.error('Scrape endpoint error:', error);
+    handleErrorResponse(res, error);
+  }
+});
+
+app.get(['/retrieve/:accountHolder/:competitor', '/api/retrieve/:accountHolder/:competitor'], async (req, res) => {
+  try {
+    const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
+    const { competitor } = req.params;
+    const forceRefresh = req.query.forceRefresh === 'true';
+
+    // Use centralized schema management for competitor analysis
+    const data = await fetchDataForModule(username, `competitor_analysis/{username}/${competitor}`, forceRefresh, platform);
+    console.log(`Returning ${platform} data for ${username}/${competitor}`);
+    res.json(data);
+  } catch (error) {
+    console.error(`Retrieve ${req.query.platform || 'instagram'} endpoint error:`, error);
+    res.status(500).json({ 
+      error: `Error retrieving ${req.query.platform || 'instagram'} data`, 
+      details: error.message 
+    });
+  }
+});
+
+app.get(['/retrieve-multiple/:accountHolder', '/api/retrieve-multiple/:accountHolder'], async (req, res) => {
+  try {
+    const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
+    const competitorsParam = req.query.competitors;
+    const forceRefresh = req.query.forceRefresh === 'true';
+
+    if (!competitorsParam || typeof competitorsParam !== 'string') {
+      return res.status(400).json({ error: 'Competitors query parameter is required and must be a string' });
+    }
+
+    const competitors = competitorsParam.split(',').map(c => c.trim()).filter(c => c.length > 0);
+
+    const results = await Promise.all(
+      competitors.map(async (competitor) => {
+        try {
+          const data = await fetchDataForModule(username, `competitor_analysis/{username}/${competitor}`, forceRefresh, platform);
+          return { competitor, data };
+        } catch (error) {
+          console.error(`Error fetching ${platform} data for ${username}/${competitor}:`, error);
+          return { competitor, data: [], error: error.message };
+        }
+      })
+    );
+    res.json(results);
+  } catch (error) {
+    console.error(`Retrieve multiple ${req.query.platform || 'instagram'} endpoint error:`, error);
+    res.status(500).json({ 
+      error: `Error retrieving ${req.query.platform || 'instagram'} data for multiple competitors`, 
+      details: error.message 
+    });
+  }
+});
+
+app.get(['/retrieve-strategies/:accountHolder', '/api/retrieve-strategies/:accountHolder'], async (req, res) => {
+  try {
+    const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
+    const forceRefresh = req.query.forceRefresh === 'true';
+
+    const data = await fetchDataForModule(username, 'recommendations/{username}', forceRefresh, platform);
+    if (data.length === 0) {
+      res.status(404).json({ error: `No ${platform} recommendation files found` });
+    } else {
+      res.json(data);
+    }
+  } catch (error) {
+    console.error(`Retrieve ${req.query.platform || 'instagram'} strategies endpoint error:`, error);
+    
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+      const platformName = (req.query.platform || 'instagram').charAt(0).toUpperCase() + (req.query.platform || 'instagram').slice(1);
+      res.status(404).json({ error: `${platformName} data not ready yet` });
+    } else {
+      res.status(500).json({ 
+        error: `Error retrieving ${req.query.platform || 'instagram'} data`, 
+        details: error.message 
+      });
+    }
+  }
+});
+
+app.get(['/retrieve-engagement-strategies/:accountHolder', '/api/retrieve-engagement-strategies/:accountHolder'], async (req, res) => {
+  try {
+    const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
+    const forceRefresh = req.query.forceRefresh === 'true';
+
+    const data = await fetchDataForModule(username, 'engagement_strategies/{username}', forceRefresh, platform);
+    if (data.length === 0) {
+      res.status(404).json({ error: `No ${platform} engagement strategy files found` });
+    } else {
+      res.json(data);
+    }
+  } catch (error) {
+    console.error(`Retrieve ${req.query.platform || 'instagram'} engagement strategies endpoint error:`, error);
+    
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+      const platformName = (req.query.platform || 'instagram').charAt(0).toUpperCase() + (req.query.platform || 'instagram').slice(1);
+      res.status(404).json({ error: `${platformName} data not ready yet` });
+    } else {
+      res.status(500).json({ 
+        error: `Error retrieving ${req.query.platform || 'instagram'} data`, 
+        details: error.message 
+      });
+    }
+  }
+});
+
+app.get(['/news-for-you/:accountHolder', '/api/news-for-you/:accountHolder'], async (req, res) => {
+  try {
+    const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
+    const forceRefresh = req.query.forceRefresh === 'true';
+
+    const data = await fetchDataForModule(username, 'NewForYou/{username}', forceRefresh, platform);
+    if (data.length === 0) {
+      res.status(404).json({ error: `No ${platform} news files found` });
+    } else {
+      res.json(data);
+    }
+  } catch (error) {
+    console.error(`Retrieve ${req.query.platform || 'instagram'} news endpoint error:`, error);
+    
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+      const platformName = (req.query.platform || 'instagram').charAt(0).toUpperCase() + (req.query.platform || 'instagram').slice(1);
+      res.status(404).json({ error: `${platformName} data not ready yet` });
+    } else {
+      res.status(500).json({ 
+        error: `Error retrieving ${req.query.platform || 'instagram'} data`, 
+        details: error.message 
+      });
+    }
+  }
+});
+
+app.post(['/save-query/:accountHolder', '/api/save-query/:accountHolder'], async (req, res) => {
+  // Set CORS headers explicitly for this endpoint
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  // Simply respond with success without storing in R2 bucket
+  // The instant AI reply system makes this R2 storage unnecessary
+  res.json({ success: true, message: 'AI instant reply system is enabled, no persistence needed' });
+});
+
+app.get(['/rules/:username', '/api/rules/:username'], async (req, res) => {
+  const { username } = req.params;
+  const platform = req.query.platform || 'instagram'; // Default to Instagram
+
+  // Create platform-specific key using new schema: rules/<platform>/<username>/rules.json
+  const key = `rules/${platform}/${username}/rules.json`;
+  const prefix = `rules/${platform}/${username}/`;
+
+  try {
+    let data;
+    if (cache.has(prefix)) {
+      console.log(`Cache hit for rules: ${prefix}`);
+      const cachedData = cache.get(prefix);
+      data = cachedData.find(item => item.key === key)?.data;
+    }
+
+    if (!data) {
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: key,
+      });
+      const response = await s3Client.send(getCommand);
+      const body = await streamToString(response.Body);
+
+      if (!body || body.trim() === '') {
+        throw new Error(`Empty file detected at ${key}`);
+      }
+
+      data = JSON.parse(body);
+      cache.set(prefix, [{ key, data }]);
+      cacheTimestamps.set(prefix, Date.now());
+    }
+
+    res.json(data);
+  } catch (error) {
+    console.error(`Error fetching rules for ${key}:`, error);
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+      res.status(404).json({ error: 'Rules not found' });
+    } else {
+      res.status(500).json({ error: 'Error retrieving rules', details: error.message });
+    }
+  }
+});
+
+app.post(['/rules/:username', '/api/rules/:username'], async (req, res) => {
+  const { username } = req.params;
+  const { rules } = req.body;
+  const platform = req.query.platform || 'instagram'; // Default to Instagram
+
+  // Create platform-specific key using new schema: rules/<platform>/<username>/rules.json
+  const key = `rules/${platform}/${username}/rules.json`;
+  const prefix = `rules/${platform}/${username}/`;
+
+  if (!rules || typeof rules !== 'string') {
+    return res.status(400).json({ error: 'Rules must be a non-empty string' });
+  }
+
+  try {
+    const rulesData = {
+      rules: rules.trim(),
+      timestamp: new Date().toISOString(),
+    };
+    const putCommand = new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: key,
+      Body: JSON.stringify(rulesData, null, 2),
+      ContentType: 'application/json',
+    });
+    await s3Client.send(putCommand);
+
+    cache.delete(prefix);
+
+    const clients = sseClients.get(username) || [];
+    for (const client of clients) {
+      client.write(`data: ${JSON.stringify({ type: 'update', prefix })}\n\n`);
+    }
+
+    res.json({ success: true, message: 'Rules saved successfully' });
+  } catch (error) {
+    console.error(`Save rules error for ${key}:`, error);
+    res.status(500).json({ error: 'Error saving rules', details: error.message });
+  }
+});
+
+app.get(['/responses/:username', '/api/responses/:username'], async (req, res) => {
+  try {
+    const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
+    const forceRefresh = req.query.forceRefresh === 'true';
+
+    const data = await fetchDataForModule(username, 'queries/{username}', forceRefresh, platform);
+    res.json(data);
+  } catch (error) {
+    console.error(`Retrieve ${req.query.platform || 'instagram'} responses error:`, error);
+    res.status(500).json({ 
+      error: `Error retrieving ${req.query.platform || 'instagram'} responses`, 
+      details: error.message 
+    });
+  }
+});
+
 app.post(['/responses/:username/:responseId', '/api/responses/:username/:responseId'], async (req, res) => {
   try {
     const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
@@ -1319,8 +1739,7 @@ app.get(['/posts/:username', '/api/posts/:username'], async (req, res) => {
           }
           
           // Check if this post should be skipped based on status
-          // Only skip if status is explicitly set to 'processed' or 'rejected'
-          if (postData.status === 'processed' || postData.status === 'rejected') {
+          if (['processed', 'rejected', 'scheduled', 'posted', 'published'].includes(postData.status)) {
             console.log(`[${new Date().toISOString()}] Skipping ${platform} post ${file.Key} with status: ${postData.status}`);
             return null;
           }
@@ -1454,13 +1873,13 @@ async function streamToBuffer(stream) {
 // Instagram App Credentials
 const APP_ID = '576296982152813';
 const APP_SECRET = 'd48ddc9eaf0e5c4969d4ddc4e293178c';
-const REDIRECT_URI = 'https://366c-121-52-146-243.ngrok-free.app/instagram/callback';
+const REDIRECT_URI = 'https://1d68-121-52-146-243.ngrok-free.app/instagram/callback';
 const VERIFY_TOKEN = 'myInstagramWebhook2025';
 
 // Facebook App Credentials  
 const FB_APP_ID = '581584257679639'; // Your ACTUAL Facebook App ID (NOT Configuration ID)
 const FB_APP_SECRET = 'cdd153955e347e194390333e48cb0480'; // Your actual App Secret
-const FB_REDIRECT_URI = 'https://cc48-121-52-146-243.ngrok-free.app/facebook/callback';
+const FB_REDIRECT_URI = 'https://1d68-121-52-146-243.ngrok-free.app/facebook/callback';
 const FB_VERIFY_TOKEN = 'myFacebookWebhook2025';
 
 app.get(['/instagram/callback', '/api/instagram/callback'], async (req, res) => {
@@ -1577,6 +1996,18 @@ app.get(['/instagram/callback', '/api/instagram/callback'], async (req, res) => 
 
 // Facebook OAuth callback endpoint
 app.get(['/facebook/callback', '/api/facebook/callback'], async (req, res) => {
+  // Check if this is a webhook verification request
+  const hubMode = req.query['hub.mode'];
+  const hubToken = req.query['hub.verify_token'];
+  const hubChallenge = req.query['hub.challenge'];
+  
+  if (hubMode === 'subscribe' && hubToken === FB_VERIFY_TOKEN) {
+    // This is a webhook verification request
+    console.log(`[${new Date().toISOString()}] WEBHOOK_VERIFIED for Facebook via callback endpoint`);
+    return res.status(200).send(hubChallenge);
+  }
+  
+  // This is an OAuth callback request
   const code = req.query.code;
   const state = req.query.state;
 
@@ -2724,6 +3155,13 @@ app.post(['/ignore-notification/:userId', '/api/ignore-notification/:userId'], a
   const { userId } = req.params;
   const { message_id, comment_id, platform = 'instagram' } = req.body;
 
+  console.log(`[${new Date().toISOString()}] [IGNORE] Ignore request received:`, {
+    userId,
+    message_id,
+    comment_id,
+    platform
+  });
+
   if (!message_id && !comment_id) {
     console.log(`[${new Date().toISOString()}] Missing message_id or comment_id for ignore action`);
     return res.status(400).json({ error: 'Missing message_id or comment_id' });
@@ -2771,6 +3209,8 @@ app.post(['/ignore-notification/:userId', '/api/ignore-notification/:userId'], a
     const fileKey = message_id 
       ? `${eventPrefix}/${userId}/${message_id}.json`
       : `${eventPrefix}/${userId}/comment_${comment_id}.json`;
+
+    console.log(`[${new Date().toISOString()}] [IGNORE] Will store ignored status at: ${fileKey}`);
 
     let updatedItem;
     try {
@@ -2820,11 +3260,67 @@ app.post(['/ignore-notification/:userId', '/api/ignore-notification/:userId'], a
       
     } catch (error) {
       if (error.name === 'NoSuchKey') {
-        console.log(`[${new Date().toISOString()}] ${platform} notification file not found at ${fileKey}, proceeding`);
+        console.log(`[${new Date().toISOString()}] ${platform} notification file not found at ${fileKey}, creating new ignored status file`);
+        
+        // Create a new ignored status file since the original doesn't exist
+        const ignoredNotificationData = {
+          message_id: message_id,
+          comment_id: comment_id,
+          status: 'ignored',
+          platform: platform,
+          user_id: userId,
+          ignored_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        
+        await s3Client.send(new PutObjectCommand({
+          Bucket: 'tasks',
+          Key: fileKey,
+          Body: JSON.stringify(ignoredNotificationData, null, 2),
+          ContentType: 'application/json',
+        }));
+        
+        console.log(`[${new Date().toISOString()}] Created new ignored status file at ${fileKey}`);
+        updatedItem = ignoredNotificationData;
+        
+        // Comprehensive cache invalidation for ignore functionality
+        cache.delete(`${eventPrefix}/${userId}`);
+        cache.delete(`events-list/${userId}`);
+        cache.delete(`events-list/${userId}?platform=${platform}`);
+        if (username) {
+          cache.delete(`${eventPrefix}/${username}`);
+          cache.delete(`events-list/${username}`);
+        }
+        
+        // Clear data module caches to force refresh
+        const dataModuleCacheKey = `data_${username || userId}_events_${platform}`;
+        cache.delete(dataModuleCacheKey);
+        
+        // Broadcast status update
+        const statusUpdate = {
+          type: message_id ? 'message_status' : 'comment_status',
+          [message_id ? 'message_id' : 'comment_id']: message_id || comment_id,
+          status: 'ignored',
+          updated_at: ignoredNotificationData.updated_at,
+          timestamp: Date.now(),
+          platform: platform
+        };
+        
+        broadcastUpdate(userId, { event: 'status_update', data: statusUpdate });
+        if (username) broadcastUpdate(username, { event: 'status_update', data: statusUpdate });
+        
       } else {
         throw error;
       }
     }
+
+    console.log(`[${new Date().toISOString()}] [IGNORE] Successfully ignored ${platform} notification:`, {
+      userId,
+      message_id,
+      comment_id,
+      fileKey,
+      updated: !!updatedItem
+    });
 
     res.json({ success: true, updated: !!updatedItem });
   } catch (error) {
@@ -2869,6 +3365,11 @@ app.get(['/events-list/:userId', '/api/events-list/:userId'], async (req, res) =
 
 // Helper function to filter out handled/replied/ignored notifications
 async function filterHandledNotifications(notifications, userId, platform) {
+  console.log(`[${new Date().toISOString()}] [FILTER] Starting filter for ${platform} notifications:`, {
+    userId,
+    totalNotifications: notifications?.length || 0
+  });
+
   if (!notifications || notifications.length === 0) {
     return notifications;
   }
@@ -2893,6 +3394,8 @@ async function filterHandledNotifications(notifications, userId, platform) {
         ? `${eventPrefix}/${userId}/${notification.message_id}.json`
         : `${eventPrefix}/${userId}/comment_${notification.comment_id}.json`;
 
+      console.log(`[${new Date().toISOString()}] [FILTER] Checking status for ${platform} notification ${notificationId} at: ${fileKey}`);
+
       const getCommand = new GetObjectCommand({
         Bucket: 'tasks',
         Key: fileKey,
@@ -2901,9 +3404,11 @@ async function filterHandledNotifications(notifications, userId, platform) {
       const data = await s3Client.send(getCommand);
       const storedNotification = JSON.parse(await data.Body.transformToString());
 
+      console.log(`[${new Date().toISOString()}] [FILTER] Found stored status for ${notificationId}:`, storedNotification.status);
+
       // PERMANENTLY FILTER OUT: Skip notifications that are already handled, replied, ignored, or ai_handled
       if (storedNotification.status && 
-          ['replied', 'ignored', 'ai_handled', 'handled', 'sent'].includes(storedNotification.status)) {
+          ['replied', 'ignored', 'ai_handled', 'handled', 'sent', 'scheduled', 'posted', 'published'].includes(storedNotification.status)) {
         console.log(`[${new Date().toISOString()}] Filtering out ${platform} notification ${notificationId} with status: ${storedNotification.status}`);
         continue; // Skip this notification completely
       }
@@ -2917,6 +3422,7 @@ async function filterHandledNotifications(notifications, userId, platform) {
     } catch (error) {
       if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
         // No stored status, include as pending
+        console.log(`[${new Date().toISOString()}] [FILTER] No stored status found for ${notificationId}, including as pending`);
         filteredNotifications.push(notification);
       } else {
         // Log error but include notification to avoid data loss
@@ -3093,13 +3599,23 @@ async function sendTwitterMentionReply(userId, commentId, text) {
 
 // Facebook notification helper functions
 async function fetchFacebookNotifications(userId) {
+  console.log(`[${new Date().toISOString()}] [FACEBOOK] Fetching notifications for userId: ${userId}`);
+  
   try {
     // Get Facebook access token
     const tokenData = await getFacebookTokenData(userId);
     if (!tokenData) {
       // No token found, return empty array (reduced logging)
+      console.log(`[${new Date().toISOString()}] [FACEBOOK] No token data found for userId: ${userId}`);
       return [];
     }
+
+    console.log(`[${new Date().toISOString()}] [FACEBOOK] Token data found:`, {
+      userId,
+      page_id: tokenData.page_id,
+      user_id: tokenData.user_id,
+      hasAccessToken: !!tokenData.access_token
+    });
 
     const notifications = [];
     
@@ -3111,8 +3627,21 @@ async function fetchFacebookNotifications(userId) {
     const comments = await fetchFacebookComments(userId);
     notifications.push(...comments);
     
+    console.log(`[${new Date().toISOString()}] [FACEBOOK] Raw notifications before filtering:`, {
+      userId,
+      dmsCount: dms.length,
+      commentsCount: comments.length,
+      totalCount: notifications.length
+    });
+    
     // Filter out handled/replied/ignored notifications
     const filteredNotifications = await filterHandledNotifications(notifications, userId, 'facebook');
+    
+    console.log(`[${new Date().toISOString()}] [FACEBOOK] Final filtered notifications:`, {
+      userId,
+      beforeFilter: notifications.length,
+      afterFilter: filteredNotifications.length
+    });
     
     return filteredNotifications.sort((a, b) => b.timestamp - a.timestamp);
   } catch (error) {
@@ -3437,7 +3966,7 @@ app.options('/user-instagram-status/:userId', (req, res) => {
 });
 
 // This endpoint checks if a user has entered their Instagram username
-app.get('/user-instagram-status/:userId', async (req, res) => {
+app.get(['/user-instagram-status/:userId', '/api/user-instagram-status/:userId'], async (req, res) => {
   // Set CORS headers
   setCorsHeaders(res);
   
@@ -3473,7 +4002,7 @@ app.get('/user-instagram-status/:userId', async (req, res) => {
 });
 
 // This endpoint updates the user's Instagram username entry state
-app.post('/user-instagram-status/:userId', async (req, res) => {
+app.post(['/user-instagram-status/:userId', '/api/user-instagram-status/:userId'], async (req, res) => {
   // Set CORS headers
   setCorsHeaders(res);
   
@@ -3509,7 +4038,7 @@ app.post('/user-instagram-status/:userId', async (req, res) => {
 });
 
 // Instagram connection endpoints (GET endpoint was missing)
-app.get('/instagram-connection/:userId', async (req, res) => {
+app.get(['/instagram-connection/:userId', '/api/instagram-connection/:userId'], async (req, res) => {
   setCorsHeaders(res);
   
   const { userId } = req.params;
@@ -3543,7 +4072,7 @@ app.get('/instagram-connection/:userId', async (req, res) => {
   }
 });
 
-app.post('/instagram-connection/:userId', async (req, res) => {
+app.post(['/instagram-connection/:userId', '/api/instagram-connection/:userId'], async (req, res) => {
   setCorsHeaders(res);
   
   const { userId } = req.params;
@@ -4748,7 +5277,7 @@ async function warmupCacheForActiveUsers() {
                 }
                 
                 // Check if this post should be skipped based on status
-                if (postData.status === 'processed' || postData.status === 'rejected') {
+                if (['processed', 'rejected', 'scheduled', 'posted', 'published'].includes(postData.status)) {
                   console.log(`[${new Date().toISOString()}] Skipping ${platform} post ${file.Key} with status: ${postData.status}`);
                   return null;
                 }
@@ -5384,7 +5913,7 @@ app.post(['/update-post-status/:username', '/api/update-post-status/:username'],
   }
 
   // Validate allowed statuses (optional but recommended)
-  const allowedStatuses = ['ready', 'rejected', 'scheduled', 'published', 'failed'];
+  const allowedStatuses = ['ready', 'rejected', 'scheduled', 'posted', 'published', 'failed'];
   if (!allowedStatuses.includes(status)) {
     console.log(`[${new Date().toISOString()}] Invalid status provided: ${status}`);
     return res.status(400).json({ error: `Invalid status. Allowed statuses: ${allowedStatuses.join(', ')}` });
@@ -6314,7 +6843,7 @@ class PlatformSchemaManager {
 // Twitter OAuth 2.0 credentials
 const TWITTER_CLIENT_ID = 'cVNYR3UxVm5jQ3d5UWw0UHFqUTI6MTpjaQ';
 const TWITTER_CLIENT_SECRET = 'Wr8Kewh92NVB-035hAvpQeQ1Azc7chre3PUTgDoEltjO57mxzO';
-const TWITTER_REDIRECT_URI = 'https://cc48-121-52-146-243.ngrok-free.app/twitter/callback';
+const TWITTER_REDIRECT_URI = 'https://1d68-121-52-146-243.ngrok-free.app/twitter/callback';
 
 // Debug logging for OAuth 2.0
 console.log(`[${new Date().toISOString()}] Twitter OAuth 2.0 Configuration:`);
@@ -7221,12 +7750,11 @@ function startFacebookScheduler() {
 
 // Twitter scheduler worker - checks for due tweets every minute
 function startTwitterScheduler() {
-  console.log(`[${new Date().toISOString()}] Starting Twitter OAuth 2.0 scheduler...`);
+  console.log(`[${new Date().toISOString()}] [SCHEDULER] Starting Twitter OAuth 2.0 scheduler...`);
   
   setInterval(async () => {
     try {
-      console.log(`[${new Date().toISOString()}] Checking for due tweets...`);
-      
+      console.log(`[${new Date().toISOString()}] [SCHEDULER] Running Twitter scheduler interval...`);
       // Get all scheduled tweets
       const listCommand = new ListObjectsV2Command({
         Bucket: 'tasks',
@@ -7251,7 +7779,7 @@ function startTwitterScheduler() {
           
           // Check if tweet is due (within 1 minute tolerance)
           if (scheduledTime <= now && scheduledTweet.status === 'scheduled') {
-            console.log(`[${new Date().toISOString()}] Processing due tweet: ${scheduledTweet.schedule_id}`);
+            console.log(`[${new Date().toISOString()}] [SCHEDULER] Processing due tweet: ${scheduledTweet.schedule_id}`);
             
             try {
               // Get user's Twitter tokens
@@ -7265,7 +7793,7 @@ function startTwitterScheduler() {
               
               // Check if token is expired and needs refresh
               if (tokenData.expires_at && new Date() > new Date(tokenData.expires_at)) {
-                console.log(`[${new Date().toISOString()}] Scheduled tweet: Access token expired, attempting to refresh...`);
+                console.log(`[${new Date().toISOString()}] [SCHEDULER] Scheduled tweet: Access token expired, attempting to refresh...`);
                 
                 if (tokenData.refresh_token) {
                   try {
@@ -7302,9 +7830,9 @@ function startTwitterScheduler() {
                       ContentType: 'application/json'
                     }));
                     
-                    console.log(`[${new Date().toISOString()}] Scheduled tweet: Access token refreshed successfully`);
+                    console.log(`[${new Date().toISOString()}] [SCHEDULER] Scheduled tweet: Access token refreshed successfully`);
                   } catch (refreshError) {
-                    console.error(`[${new Date().toISOString()}] Scheduled tweet: Token refresh failed:`, refreshError.response?.data || refreshError.message);
+                    console.error(`[${new Date().toISOString()}] [SCHEDULER] Scheduled tweet: Token refresh failed:`, refreshError.response?.data || refreshError.message);
                     throw new Error('Token refresh failed');
                   }
                 } else {
@@ -7317,7 +7845,7 @@ function startTwitterScheduler() {
               
               // Check if this is a tweet with image
               if (scheduledTweet.type === 'with_image' && scheduledTweet.image_key) {
-                console.log(`[${new Date().toISOString()}] Scheduled tweet has image, uploading media first...`);
+                console.log(`[${new Date().toISOString()}] [SCHEDULER] Scheduled tweet has image, uploading media first...`);
                 
                 try {
                   // Get the image from R2
@@ -7329,7 +7857,7 @@ function startTwitterScheduler() {
                   const imageBuffer = await streamToBuffer(imageResponse.Body);
                   
                   // Upload media using X API v1.1 media upload (required for chunked uploads)
-                  console.log(`[${new Date().toISOString()}] Starting chunked media upload...`);
+                  console.log(`[${new Date().toISOString()}] [SCHEDULER] Starting chunked media upload...`);
                   
                   const totalBytes = imageBuffer.length;
                   const mediaType = 'image/jpeg';
@@ -7349,7 +7877,7 @@ function startTwitterScheduler() {
                   });
                   
                   const mediaId = initResponse.data.media_id_string;
-                  console.log(`[${new Date().toISOString()}] Media upload initialized: ${mediaId}`);
+                  console.log(`[${new Date().toISOString()}] [SCHEDULER] Media upload initialized: ${mediaId}`);
                   
                   // Step 2: APPEND - Upload media chunks
                   const chunkSize = 1024 * 1024; // 1MB chunks
@@ -7374,7 +7902,7 @@ function startTwitterScheduler() {
                       }
                     });
                     
-                    console.log(`[${new Date().toISOString()}] Uploaded chunk ${segmentIndex + 1}`);
+                    console.log(`[${new Date().toISOString()}] [SCHEDULER] Uploaded chunk ${segmentIndex + 1}`);
                     segmentIndex++;
                   }
                   
@@ -7390,11 +7918,11 @@ function startTwitterScheduler() {
                     }
                   });
                   
-                  console.log(`[${new Date().toISOString()}] Media upload finalized: ${mediaId}`);
+                  console.log(`[${new Date().toISOString()}] [SCHEDULER] Media upload finalized: ${mediaId}`);
                   
                   // Step 4: STATUS - Check processing status if needed
                   if (finalizeResponse.data.processing_info) {
-                    console.log(`[${new Date().toISOString()}] Media processing required, checking status...`);
+                    console.log(`[${new Date().toISOString()}] [SCHEDULER] Media processing required, checking status...`);
                     
                     let processingComplete = false;
                     let attempts = 0;
@@ -7410,7 +7938,7 @@ function startTwitterScheduler() {
                       });
                       
                       const processingInfo = statusResponse.data.processing_info;
-                      console.log(`[${new Date().toISOString()}] Media processing status: ${processingInfo.state}`);
+                      console.log(`[${new Date().toISOString()}] [SCHEDULER] Media processing status: ${processingInfo.state}`);
                       
                       if (processingInfo.state === 'succeeded') {
                         processingComplete = true;
@@ -7426,13 +7954,13 @@ function startTwitterScheduler() {
                     }
                   }
                   
-                  console.log(`[${new Date().toISOString()}] Scheduled tweet: Media uploaded successfully: ${mediaId}`);
+                  console.log(`[${new Date().toISOString()}] [SCHEDULER] Scheduled tweet: Media uploaded successfully: ${mediaId}`);
                   
                   // Add media to tweet data
                   tweetData.media = { media_ids: [mediaId] };
                   
                 } catch (mediaError) {
-                  console.error(`[${new Date().toISOString()}] Error uploading media for scheduled tweet:`, mediaError.response?.data || mediaError.message);
+                  console.error(`[${new Date().toISOString()}] [SCHEDULER] Error uploading media for scheduled tweet:`, mediaError.response?.data || mediaError.message);
                   throw new Error('Failed to upload media');
                 }
               }
@@ -7446,7 +7974,7 @@ function startTwitterScheduler() {
               
               const tweetId = response.data.data.id;
               
-              console.log(`[${new Date().toISOString()}] Scheduled tweet posted: ${tweetId}`);
+              console.log(`[${new Date().toISOString()}] [SCHEDULER] Scheduled tweet posted: ${tweetId}`);
               
               // Update status to posted
               scheduledTweet.status = 'posted';
@@ -7480,7 +8008,7 @@ function startTwitterScheduler() {
               }));
               
             } catch (postError) {
-              console.error(`[${new Date().toISOString()}] Error posting scheduled tweet ${scheduledTweet.schedule_id}:`, postError.response?.data || postError.message);
+              console.error(`[${new Date().toISOString()}] [SCHEDULER] Error posting scheduled tweet ${scheduledTweet.schedule_id}:`, postError.response?.data || postError.message);
               
               // Update status to failed
               scheduledTweet.status = 'failed';
@@ -7496,11 +8024,11 @@ function startTwitterScheduler() {
             }
           }
         } catch (error) {
-          console.error(`[${new Date().toISOString()}] Error processing scheduled tweet file ${file.Key}:`, error);
+          console.error(`[${new Date().toISOString()}] [SCHEDULER] Error processing scheduled tweet file ${file.Key}:`, error);
         }
       }
     } catch (error) {
-      console.error(`[${new Date().toISOString()}] Error in Twitter scheduler:`, error);
+      console.error(`[${new Date().toISOString()}] [SCHEDULER] Error in Twitter scheduler:`, error);
     }
   }, 60000); // Check every minute
 }
@@ -7509,19 +8037,21 @@ function startTwitterScheduler() {
 
 // Instagram scheduler worker - checks for due Instagram posts every minute  
 function startInstagramScheduler() {
-  console.log(`[${new Date().toISOString()}] Starting Instagram post scheduler...`);
+  console.log(`[${new Date().toISOString()}] [SCHEDULER] Starting Instagram post scheduler...`);
   
   setInterval(async () => {
     try {
+      console.log(`[${new Date().toISOString()}] [SCHEDULER] Running Instagram scheduler interval...`);
       await processScheduledInstagramPosts();
     } catch (error) {
-      console.error(`[${new Date().toISOString()}] Instagram scheduler error:`, error);
+      console.error(`[${new Date().toISOString()}] [SCHEDULER] Instagram scheduler error:`, error);
     }
   }, 60000); // Check every minute
 }
 
 async function processScheduledInstagramPosts() {
   try {
+    console.log(`[${new Date().toISOString()}] [SCHEDULER] processScheduledInstagramPosts started.`);
     // List all scheduled posts
     const listCommand = new ListObjectsV2Command({
       Bucket: 'tasks',
@@ -7547,25 +8077,33 @@ async function processScheduledInstagramPosts() {
           const scheduleDataStr = await streamToString(scheduleResponse.Body);
           const scheduleData = JSON.parse(scheduleDataStr);
           
+          // Log every scheduled post found
+          console.log(`[${new Date().toISOString()}] [SCHEDULER] Found scheduled post: id=${scheduleData.id}, user=${scheduleData.userId}, status=${scheduleData.status}, scheduleDate=${scheduleData.scheduleDate}`);
+          
           // Check if it's time to post
           const scheduleTime = new Date(scheduleData.scheduleDate);
           
           if (scheduleData.status === 'scheduled' && scheduleTime <= now) {
-            console.log(`[${new Date().toISOString()}] Processing scheduled post: ${scheduleData.id}`);
+            console.log(`[${new Date().toISOString()}] [SCHEDULER] Processing due post: id=${scheduleData.id}, user=${scheduleData.userId}, scheduleDate=${scheduleData.scheduleDate}`);
             await executeScheduledPost(scheduleData);
+          } else {
+            console.log(`[${new Date().toISOString()}] [SCHEDULER] Skipping post: id=${scheduleData.id}, status=${scheduleData.status}, scheduleDate=${scheduleData.scheduleDate}`);
           }
           
         } catch (itemError) {
-          console.error(`[${new Date().toISOString()}] Error processing scheduled item ${object.Key}:`, itemError.message);
+          console.error(`[${new Date().toISOString()}] [SCHEDULER] Error processing scheduled item ${object.Key}:`, itemError.message);
         }
       }
+    } else {
+      console.log(`[${new Date().toISOString()}] [SCHEDULER] No scheduled posts found.`);
     }
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error in processScheduledInstagramPosts:`, error.message);
+    console.error(`[${new Date().toISOString()}] [SCHEDULER] Error in processScheduledInstagramPosts:`, error.message);
   }
 }
 
 async function executeScheduledPost(scheduleData) {
+  console.log(`[${new Date().toISOString()}] [SCHEDULER] Executing scheduled post: id=${scheduleData.id}, user=${scheduleData.userId}`);
   try {
     // Update status to processing
     scheduleData.status = 'processing';
@@ -7580,10 +8118,12 @@ async function executeScheduledPost(scheduleData) {
       Body: JSON.stringify(scheduleData, null, 2),
       ContentType: 'application/json',
     }));
+    console.log(`[${new Date().toISOString()}] [SCHEDULER] Updated status to processing for post: id=${scheduleData.id}`);
     
     // Get Instagram token data - now handles both user ID and graph ID automatically
     const tokenData = await getTokenData(scheduleData.userId);
     const { access_token, instagram_graph_id } = tokenData;
+    console.log(`[${new Date().toISOString()}] [SCHEDULER] Got Instagram token for user: ${scheduleData.userId}`);
     
     // Generate a signed URL for the image in R2 that will be valid for 15 minutes
     const signedUrlCommand = new GetObjectCommand({
@@ -7592,7 +8132,7 @@ async function executeScheduledPost(scheduleData) {
     });
     
     const signedUrl = await getSignedUrl(s3Client, signedUrlCommand, { expiresIn: 900 }); // 15 minutes
-    console.log(`[${new Date().toISOString()}] Generated signed URL for scheduled post image: ${signedUrl}`);
+    console.log(`[${new Date().toISOString()}] [SCHEDULER] Generated signed URL for scheduled post image: ${signedUrl}`);
     
     // Upload image and create media object using Instagram API with signed URL
     const mediaResponse = await axios.post(`https://graph.instagram.com/v22.0/${instagram_graph_id}/media`, {
@@ -7606,7 +8146,7 @@ async function executeScheduledPost(scheduleData) {
     });
 
     const mediaId = mediaResponse.data.id;
-    console.log(`[${new Date().toISOString()}] Instagram media created for scheduled post: ${mediaId}`);
+    console.log(`[${new Date().toISOString()}] [SCHEDULER] Instagram media created for scheduled post: ${mediaId}`);
 
     // Publish the media
     const publishResponse = await axios.post(`https://graph.instagram.com/v22.0/${instagram_graph_id}/media_publish`, {
@@ -7619,7 +8159,7 @@ async function executeScheduledPost(scheduleData) {
     });
 
     const postId = publishResponse.data.id;
-    console.log(`[${new Date().toISOString()}] Scheduled Instagram post published successfully: ${postId}`);
+    console.log(`[${new Date().toISOString()}] [SCHEDULER] Scheduled Instagram post published successfully: ${postId}`);
 
     // Update schedule status to completed
     scheduleData.status = 'completed';
@@ -7656,18 +8196,35 @@ async function executeScheduledPost(scheduleData) {
       ContentType: 'application/json',
     }));
 
-    console.log(`[${new Date().toISOString()}] Scheduled post executed successfully: ${scheduleData.id} -> ${postId}`);
+    console.log(`[${new Date().toISOString()}] [SCHEDULER] Marked post as completed: id=${scheduleData.id}`);
+    console.log(`[${new Date().toISOString()}] [SCHEDULER] Scheduled post executed successfully: ${scheduleData.id} -> ${postId}`);
 
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error executing scheduled post ${scheduleData.id}:`, error.message);
+    console.error(`[${new Date().toISOString()}] [SCHEDULER] Error executing scheduled post ${scheduleData.id}:`, error);
+    console.error(`[${new Date().toISOString()}] [SCHEDULER] Error details for ${scheduleData.id}:`, {
+      message: error.message,
+      stack: error.stack,
+      response: error.response?.data,
+      status: error.response?.status,
+      userId: scheduleData.userId,
+      scheduleDate: scheduleData.scheduleDate,
+      attempts: scheduleData.attempts
+    });
     
     // Update status to failed if max attempts reached
     if (scheduleData.attempts >= 3) {
       scheduleData.status = 'failed';
       scheduleData.failedAt = new Date().toISOString();
-      scheduleData.error = error.message;
+      scheduleData.error = error.message || String(error);
+      scheduleData.errorDetails = {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      };
+      console.error(`[${new Date().toISOString()}] [SCHEDULER] Marked post as failed after 3 attempts: id=${scheduleData.id}`);
     } else {
       scheduleData.status = 'scheduled'; // Retry later
+      console.warn(`[${new Date().toISOString()}] [SCHEDULER] Will retry post: id=${scheduleData.id}, attempt=${scheduleData.attempts}`);
     }
     
     const scheduleKey = `scheduled_posts/${scheduleData.platform}/${scheduleData.userId}/${scheduleData.id}.json`;
@@ -7880,6 +8437,207 @@ app.post('/sync-facebook-tokens/:userId', async (req, res) => {
   } catch (error) {
     console.error(`Error syncing Facebook tokens for ${userId}:`, error);
     res.status(500).json({ error: 'Failed to sync Facebook tokens' });
+  }
+});
+
+// ============= SCHEDULER HEALTH ENDPOINTS =============
+
+// Comprehensive scheduler health endpoint for Instagram
+app.get(['/api/scheduler-health/instagram', '/scheduler-health/instagram'], async (req, res) => {
+  setCorsHeaders(res);
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [HEALTH] Checking Instagram scheduler health...`);
+    
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: 'scheduled_posts/instagram/',
+      MaxKeys: 1000
+    });
+    
+    const response = await s3Client.send(listCommand);
+    const now = new Date();
+    const posts = {
+      scheduled: [],
+      processing: [],
+      completed: [],
+      failed: [],
+      overdue: []
+    };
+    
+    if (response.Contents) {
+      for (const object of response.Contents) {
+        if (!object.Key?.endsWith('.json')) continue;
+        
+        try {
+          const getCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: object.Key
+          });
+          
+          const scheduleResponse = await s3Client.send(getCommand);
+          const scheduleDataStr = await streamToString(scheduleResponse.Body);
+          const scheduleData = JSON.parse(scheduleDataStr);
+          
+          const scheduleTime = new Date(scheduleData.scheduleDate);
+          const isOverdue = scheduleTime <= now && scheduleData.status === 'scheduled';
+          
+          const postInfo = {
+            id: scheduleData.id,
+            userId: scheduleData.userId,
+            status: scheduleData.status,
+            scheduleDate: scheduleData.scheduleDate,
+            attempts: scheduleData.attempts || 0,
+            error: scheduleData.error,
+            lastAttempt: scheduleData.lastAttempt,
+            completedAt: scheduleData.completedAt,
+            failedAt: scheduleData.failedAt,
+            isOverdue
+          };
+          
+          if (isOverdue) {
+            posts.overdue.push(postInfo);
+          } else {
+            posts[scheduleData.status].push(postInfo);
+          }
+          
+        } catch (error) {
+          console.error(`[${new Date().toISOString()}] [HEALTH] Error reading scheduled post ${object.Key}:`, error);
+        }
+      }
+    }
+    
+    const summary = {
+      total: posts.scheduled.length + posts.processing.length + posts.completed.length + posts.failed.length + posts.overdue.length,
+      scheduled: posts.scheduled.length,
+      processing: posts.processing.length,
+      completed: posts.completed.length,
+      failed: posts.failed.length,
+      overdue: posts.overdue.length,
+      posts
+    };
+    
+    console.log(`[${new Date().toISOString()}] [HEALTH] Instagram scheduler health:`, summary);
+    res.json(summary);
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [HEALTH] Error checking scheduler health:`, error);
+    res.status(500).json({ 
+      error: 'Failed to check scheduler health',
+      details: error.message 
+    });
+  }
+});
+
+// Manual retry endpoint for failed posts
+app.post(['/api/scheduler-retry/:postId', '/scheduler-retry/:postId'], async (req, res) => {
+  setCorsHeaders(res);
+  
+  const { postId } = req.params;
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [RETRY] Manual retry requested for post: ${postId}`);
+    
+    // Find the failed post
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: 'scheduled_posts/instagram/',
+      MaxKeys: 1000
+    });
+    
+    const response = await s3Client.send(listCommand);
+    let foundPost = null;
+    let postKey = null;
+    
+    if (response.Contents) {
+      for (const object of response.Contents) {
+        if (!object.Key?.endsWith('.json')) continue;
+        
+        try {
+          const getCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: object.Key
+          });
+          
+          const scheduleResponse = await s3Client.send(getCommand);
+          const scheduleDataStr = await streamToString(scheduleResponse.Body);
+          const scheduleData = JSON.parse(scheduleDataStr);
+          
+          if (scheduleData.id === postId) {
+            foundPost = scheduleData;
+            postKey = object.Key;
+            break;
+          }
+          
+        } catch (error) {
+          console.error(`[${new Date().toISOString()}] [RETRY] Error reading scheduled post ${object.Key}:`, error);
+        }
+      }
+    }
+    
+    if (!foundPost) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+    
+    if (foundPost.status !== 'failed') {
+      return res.status(400).json({ error: 'Post is not in failed status' });
+    }
+    
+    // Reset the post for retry
+    foundPost.status = 'scheduled';
+    foundPost.attempts = 0;
+    foundPost.error = null;
+    foundPost.failedAt = null;
+    foundPost.lastAttempt = null;
+    
+    // Save the reset post
+    await s3Client.send(new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: postKey,
+      Body: JSON.stringify(foundPost, null, 2),
+      ContentType: 'application/json',
+    }));
+    
+    console.log(`[${new Date().toISOString()}] [RETRY] Successfully reset post for retry: ${postId}`);
+    
+    res.json({ 
+      success: true, 
+      message: 'Post reset for retry',
+      postId,
+      nextScheduleTime: foundPost.scheduleDate
+    });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [RETRY] Error retrying post ${postId}:`, error);
+    res.status(500).json({ 
+      error: 'Failed to retry post',
+      details: error.message 
+    });
+  }
+});
+
+// Force process overdue posts endpoint
+app.post(['/api/scheduler-process-overdue', '/scheduler-process-overdue'], async (req, res) => {
+  setCorsHeaders(res);
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [FORCE] Force processing overdue posts requested`);
+    
+    // Call the scheduler function directly
+    await processScheduledInstagramPosts();
+    
+    res.json({ 
+      success: true, 
+      message: 'Overdue posts processed',
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [FORCE] Error processing overdue posts:`, error);
+    res.status(500).json({ 
+      error: 'Failed to process overdue posts',
+      details: error.message 
+    });
   }
 });
 
@@ -8310,7 +9068,7 @@ app.post(['/post-tweet-with-image/:userId', '/api/post-tweet-with-image/:userId'
 
 // ============= GOAL MANAGEMENT ENDPOINTS =============
 
-// Save goal endpoint - Schema: tasks/goal/<platform>/<username>/goal_*.json
+// Save goal endpoint - Schema: goal/<platform>/<username>/goal_*.json
 app.post(['/save-goal/:username', '/api/save-goal/:username'], async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
   
@@ -8342,7 +9100,7 @@ app.post(['/save-goal/:username', '/api/save-goal/:username'], async (req, res) 
 
     // Check for existing active campaign
     console.log(`[${new Date().toISOString()}] Checking for existing campaign before creating new goal for ${username} on ${platform}`);
-    const goalPrefix = `tasks/goal/${platform}/${username}`;
+    const goalPrefix = `goal/${platform}/${username}`;
     const listExistingCommand = new ListObjectsV2Command({
       Bucket: 'tasks',
       Prefix: `${goalPrefix}/`
@@ -8363,7 +9121,7 @@ app.post(['/save-goal/:username', '/api/save-goal/:username'], async (req, res) 
     const goalId = `goal_${timestamp}`;
     
     // Build goal path
-    const goalPath = `tasks/goal/${platform}/${username}/${goalId}.json`;
+    const goalPath = `goal/${platform}/${username}/${goalId}.json`;
 
     // Create goal data structure
     const goalData = {
@@ -8415,7 +9173,7 @@ app.options(['/save-goal/:username', '/api/save-goal/:username'], (req, res) => 
   res.status(204).send();
 });
 
-// Goal summary retrieval endpoint - Schema: tasks/goal_summary/<platform>/<username>/summary_*.json
+// Goal summary retrieval endpoint - Schema: goal_summary/<platform>/<username>/summary_*.json
 app.get(['/goal-summary/:username', '/api/goal-summary/:username'], async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
   
@@ -8431,7 +9189,7 @@ app.get(['/goal-summary/:username', '/api/goal-summary/:username'], async (req, 
     }
     
     // Build summary prefix
-    const summaryPrefix = `tasks/goal_summary/${platform}/${username}`;
+    const summaryPrefix = `goal_summary/${platform}/${username}`;
 
     console.log(`[${new Date().toISOString()}] Retrieving goal summary from: ${summaryPrefix}/`);
 
@@ -8770,7 +9528,7 @@ app.get(['/campaign-status/:username', '/api/campaign-status/:username'], async 
     }
 
     // Check for existing goal files
-    const goalPrefix = `tasks/goal/${platform}/${username}`;
+    const goalPrefix = `goal/${platform}/${username}`;
     const listGoalsCommand = new ListObjectsV2Command({
       Bucket: 'tasks',
       Prefix: `${goalPrefix}/`
@@ -8849,9 +9607,9 @@ app.delete(['/stop-campaign/:username', '/api/stop-campaign/:username'], async (
 
     // Define file prefixes to delete
     const prefixesToDelete = [
-      `tasks/goal/${platform}/${username}`,
-      `tasks/goal_summary/${platform}/${username}`,
-      `tasks/ready_post/${platform}/${username}`
+      `goal/${platform}/${username}`,
+      `goal_summary/${platform}/${username}`,
+      `ready_post/${platform}/${username}`
     ];
 
     // Delete files from each prefix
@@ -8894,7 +9652,7 @@ app.delete(['/stop-campaign/:username', '/api/stop-campaign/:username'], async (
     }
 
     // Verify campaign is truly stopped by checking campaign status
-    const goalPrefix = `tasks/goal/${platform}/${username}`;
+    const goalPrefix = `goal/${platform}/${username}`;
     const verifyCommand = new ListObjectsV2Command({
       Bucket: 'tasks',
       Prefix: `${goalPrefix}/`
@@ -9168,7 +9926,7 @@ app.post(['/api/update-post-status/:username', '/update-post-status/:username'],
   }
 
   // Validate status if provided
-  const allowedStatuses = ['pending', 'scheduled', 'posted', 'rejected', 'failed'];
+  const allowedStatuses = ['pending', 'scheduled', 'posted', 'rejected', 'failed', 'published'];
   if (status && !allowedStatuses.includes(status)) {
     return res.status(400).json({ error: `Invalid status. Allowed statuses: ${allowedStatuses.join(', ')}` });
   }

@@ -127,7 +127,9 @@ const PostScheduler: React.FC<PostSchedulerProps> = ({ userId, onClose, platform
   return (
     <div className="post-scheduler-modal">
       <div className="post-scheduler-content">
-        <h2 className="post-scheduler-title">Schedule Instagram Post</h2>
+        <h2 className="post-scheduler-title">
+          {`Schedule ${(platform || 'Instagram').charAt(0).toUpperCase() + (platform || 'Instagram').slice(1)} Post`}
+        </h2>
         {!userIdToUse ? (
           <div className="instagram-not-connected">
             <p>Connect your Instagram account to schedule posts.</p>

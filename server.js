@@ -11,7 +11,7 @@ import jpeg from 'jpeg-js';
 import multer from 'multer';
 
 const app = express();
-const port = process.env.PORT || 3002;
+const port = process.env.PROXY_SERVER_PORT || 3002;
 
 console.log('Setting up server with proxy endpoints...');
 
@@ -96,11 +96,11 @@ const checkPortInUse = (port) => {
 
 // Configure AWS SDK v3 (Enterprise-grade with connection pooling)
 const S3_CONFIG = {
-  endpoint: 'https://b21d96e73b908d7d7b822d41516ccc64.r2.cloudflarestorage.com',
+  endpoint: 'https://570f213f1410829ee9a733a77a5f40e3.r2.cloudflarestorage.com',
   region: 'auto',
   credentials: {
-    accessKeyId: '986718fe67d6790c7fe4eeb78943adba',
-    secretAccessKey: '08fb3b012163cce35bee80b54d83e3a6924f2679f466790a9c7fdd9456bc44fe',
+    accessKeyId: '18f60c98e08f1a24040de7cb7aab646c',
+    secretAccessKey: '0a8c50865ecab3c410baec4d751f35493fd981f4851203fe205fe0f86063a5f6',
   },
   maxAttempts: 5,
   requestHandler: {
@@ -2715,6 +2715,72 @@ app.post('/api/user-instagram-status/:userId', async (req, res) => {
   } catch (error) {
     console.error(`Error updating user Instagram status for ${userId}:`, error);
     res.status(500).json({ error: 'Failed to update user Instagram status' });
+  }
+});
+
+// User Facebook status endpoints
+app.get('/api/user-facebook-status/:userId', async (req, res) => {
+  const { userId } = req.params;
+  
+  try {
+    const key = `UserFacebookStatus/${userId}/status.json`;
+    
+    try {
+      const result = await s3Client.getObject({
+        Bucket: 'tasks',
+        Key: key,
+      }).promise();
+      
+      const body = result.Body.toString();
+      
+      if (!body || body.trim() === '') {
+        return res.json({ hasEnteredFacebookUsername: false });
+      }
+      
+      const userData = JSON.parse(body);
+      return res.json(userData);
+    } catch (error) {
+      if (error.code === 'NoSuchKey' || error.statusCode === 404) {
+        return res.json({ hasEnteredFacebookUsername: false });
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error(`Error retrieving user Facebook status for ${userId}:`, error);
+    res.status(500).json({ error: 'Failed to retrieve user Facebook status' });
+  }
+});
+
+app.post('/api/user-facebook-status/:userId', async (req, res) => {
+  const { userId } = req.params;
+  const { facebook_username, accountType, competitors } = req.body;
+  
+  if (!facebook_username || !facebook_username.trim()) {
+    return res.status(400).json({ error: 'Facebook username is required' });
+  }
+  
+  try {
+    const key = `UserFacebookStatus/${userId}/status.json`;
+    const userData = {
+      uid: userId,
+      hasEnteredFacebookUsername: true,
+      facebook_username: facebook_username.trim(),
+      accountType: accountType || 'branding',
+      competitors: competitors || [],
+      lastUpdated: new Date().toISOString()
+    };
+    
+    await s3Client.putObject({
+      Bucket: 'tasks',
+      Key: key,
+      Body: JSON.stringify(userData, null, 2),
+      ContentType: 'application/json',
+    }).promise();
+    
+    res.json({ success: true, message: 'User Facebook status updated successfully' });
+  } catch (error) {
+    console.error(`Error updating user Facebook status for ${userId}:`, error);
+    res.status(500).json({ error: 'Failed to update user Facebook status' });
   }
 });
 

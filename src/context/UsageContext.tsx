@@ -167,10 +167,10 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
         };
       case 'freemium':
         return {
-          posts: 5,
-          discussions: 10,
-          aiReplies: 5,
-          campaigns: 1
+          posts: 20,
+          discussions: 50,
+          aiReplies: 50,
+          campaigns: 3
         };
       default: // free
         return {

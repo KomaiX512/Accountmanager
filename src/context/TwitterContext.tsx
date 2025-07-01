@@ -72,8 +72,26 @@ export const TwitterProvider: React.FC<TwitterProviderProps> = ({ children }) =>
   // Check if user has accessed Twitter dashboard
   useEffect(() => {
     if (currentUser?.uid) {
-      const hasUserAccessed = localStorage.getItem(`twitter_accessed_${currentUser.uid}`) === 'true';
-      setHasAccessed(hasUserAccessed);
+      // Check backend API status for platform access
+      const checkTwitterStatus = async () => {
+        try {
+          const response = await fetch(`/api/user-twitter-status/${currentUser.uid}`);
+          const data = await response.json();
+          const hasUserAccessed = data.hasEnteredTwitterUsername || localStorage.getItem(`twitter_accessed_${currentUser.uid}`) === 'true';
+          setHasAccessed(hasUserAccessed);
+          
+          if (hasUserAccessed) {
+            localStorage.setItem(`twitter_accessed_${currentUser.uid}`, 'true');
+          }
+        } catch (error) {
+          console.error(`[${new Date().toISOString()}] Error checking Twitter status:`, error);
+          // Fallback to localStorage
+          const hasUserAccessed = localStorage.getItem(`twitter_accessed_${currentUser.uid}`) === 'true';
+          setHasAccessed(hasUserAccessed);
+        }
+      };
+      
+      checkTwitterStatus();
     } else {
       setHasAccessed(false);
     }

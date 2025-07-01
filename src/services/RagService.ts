@@ -262,6 +262,8 @@ class RagService {
   ): Promise<{ 
     response: string; 
     usedFallback?: boolean; 
+    usingFallbackProfile?: boolean;
+    enhancedContext?: boolean;
     quotaInfo?: { 
       exhausted: boolean; 
       resetTime?: string; 
@@ -276,20 +278,32 @@ class RagService {
       cacheKey,
       async () => {
         try {
-          if (this.VERBOSE_LOGGING) {
-            console.log(`[RagService] Sending discussion query for ${platform}/${username}: "${query}"`);
-          }
+          console.log(`[RagService] 🔍 STARTING discussion query for ${platform}/${username}`);
+          console.log(`[RagService] 📝 Query: "${query}"`);
+          console.log(`[RagService] 📊 Previous messages count: ${previousMessages.length}`);
+          console.log(`[RagService] 🎯 Target RAG servers:`, this.RAG_SERVER_URLS);
           
           // Add platform context to request for better session management
-          return await this.tryServerUrls(`/api/discussion`, (url) => 
-            axios.post(url, {
-              username,
-              query,
-              previousMessages,
-              platform,
-              sessionId: `${platform}_${username}_${Date.now()}`, // Unique session per platform
-              timestamp: new Date().toISOString()
-            }, {
+          const requestPayload = {
+            username,
+            query,
+            previousMessages,
+            platform,
+            sessionId: `${platform}_${username}_${Date.now()}`, // Unique session per platform
+            timestamp: new Date().toISOString()
+          };
+          
+          console.log(`[RagService] 📦 Request payload:`, {
+            username: requestPayload.username,
+            platform: requestPayload.platform,
+            queryLength: requestPayload.query.length,
+            previousMessagesCount: requestPayload.previousMessages.length,
+            sessionId: requestPayload.sessionId
+          });
+          
+          const response = await this.tryServerUrls(`/api/discussion`, (url) => {
+            console.log(`[RagService] 🌐 Attempting request to: ${url}/api/discussion`);
+            return axios.post(url, requestPayload, {
               timeout: 120000, // 2 minute timeout to handle request queuing
               withCredentials: false, // Disable sending cookies
               headers: {
@@ -297,30 +311,93 @@ class RagService {
                 'X-Platform': platform,
                 'X-Username': username
               }
-            }), this.RAG_SERVER_URLS
-          ).then(response => {
-            if (this.VERBOSE_LOGGING) {
-              console.log(`[RagService] Received response for ${platform}/${username}`);
-            }
-            
-            // Process markdown formatting in the response
-            if (response.data && response.data.response) {
-              response.data.response = this.processMarkdownFormatting(response.data.response);
-            }
-            
-            return response.data;
+            });
+          }, this.RAG_SERVER_URLS);
+          
+          console.log(`[RagService] ✅ RAW response received for ${platform}/${username}`);
+          console.log(`[RagService] 🔍 Response status:`, response.status);
+          console.log(`[RagService] 🔍 Response headers:`, response.headers);
+          console.log(`[RagService] 📝 Response data structure:`, {
+            hasResponse: !!response.data?.response,
+            responseLength: response.data?.response?.length || 0,
+            usedFallback: response.data?.usedFallback,
+            usingFallbackProfile: response.data?.usingFallbackProfile,
+            hasQuotaInfo: !!response.data?.quotaInfo,
+            dataKeys: Object.keys(response.data || {})
           });
           
+          // Log the first 200 characters of the actual response
+          if (response.data?.response) {
+            console.log(`[RagService] 📄 Response preview:`, response.data.response.substring(0, 200) + '...');
+          }
+          
+          // Validate response structure
+          if (!response.data || !response.data.response) {
+            console.error(`[RagService] ❌ INVALID response structure for ${platform}/${username}:`, response.data);
+            throw new Error('Invalid response structure from RAG server');
+          }
+          
+          // Check if response is empty or too short (indicating content filtering)
+          if (response.data.response.trim().length < 10) {
+            console.warn(`[RagService] ⚠️ Response too short (${response.data.response.length} chars) - likely content filtered for ${platform}/${username}`);
+            throw new Error('CONTENT_FILTERED: Response too short');
+          }
+          
+          // Check if response contains enhanced context indicators
+          const enhancedContext = this.detectEnhancedContext(response.data.response);
+          console.log(`[RagService] 🧠 Enhanced context detected: ${enhancedContext} for ${platform}/${username}`);
+          
+          // Log specific context indicators
+          if (enhancedContext) {
+            console.log(`[RagService] 🎯 ENHANCED CONTEXT FOUND - ChromaDB is working!`);
+          } else {
+            console.log(`[RagService] ⚠️ NO enhanced context detected - possible ChromaDB issue`);
+          }
+          
+          // Process markdown formatting in the response
+          if (response.data.response) {
+            response.data.response = this.processMarkdownFormatting(response.data.response);
+            console.log(`[RagService] ✨ Processed markdown formatting for ${platform}/${username}`);
+          }
+          
+          // Return enhanced response structure
+          const finalResponse = {
+            response: response.data.response,
+            usedFallback: response.data.usedFallback || false,
+            usingFallbackProfile: response.data.usingFallbackProfile || false,
+            enhancedContext: enhancedContext,
+            quotaInfo: response.data.quotaInfo || null
+          };
+          
+          console.log(`[RagService] 🎉 FINAL response for ${platform}/${username}:`, {
+            responseLength: finalResponse.response.length,
+            usedFallback: finalResponse.usedFallback,
+            usingFallbackProfile: finalResponse.usingFallbackProfile,
+            enhancedContext: finalResponse.enhancedContext,
+            hasQuotaInfo: !!finalResponse.quotaInfo
+          });
+          
+          return finalResponse;
+          
         } catch (error: any) {
-          console.error('[RagService] Discussion query error:', error.response?.data || error.message);
+          console.error(`[RagService] ❌ CRITICAL ERROR in discussion query for ${platform}/${username}:`, {
+            errorMessage: error.message,
+            errorCode: error.code,
+            responseStatus: error.response?.status,
+            responseData: error.response?.data,
+            stack: error.stack?.split('\n').slice(0, 3)
+          });
           
           // Enhanced error handling for content filtering
-          if (error.response?.data?.error?.includes('content filtering') || 
+          if (error.message?.includes('CONTENT_FILTERED') || 
+              error.response?.data?.error?.includes('content filtering') || 
               error.response?.data?.error?.includes('Empty response')) {
-            console.log(`[RagService] Content filtering detected, using safe fallback for ${platform}`);
+            console.log(`[RagService] 🛡️ Content filtering detected, using safe fallback for ${platform}/${username}`);
             return {
-              response: `I'm here to help with your ${platform === 'facebook' ? 'Facebook' : platform === 'twitter' ? 'X (Twitter)' : 'Instagram'} strategy! I'm currently optimizing my responses. Could you try asking about specific topics like content planning, engagement strategies, or growth techniques?`,
+              response: `I'm here to help with your ${platform === 'facebook' ? 'Facebook' : platform === 'twitter' ? 'X (Twitter)' : 'Instagram'} strategy! I'm currently optimizing my responses to provide better insights. Could you try asking about specific topics like content planning, engagement strategies, or growth techniques?`,
               usedFallback: true,
+              usingFallbackProfile: true,
+              enhancedContext: false,
               quotaInfo: {
                 exhausted: false,
                 message: "Optimizing responses for better assistance"
@@ -331,10 +408,12 @@ class RagService {
           // Handle array access errors specifically
           if (error.response?.data?.error?.includes('Cannot read properties of undefined') ||
               error.response?.data?.error?.includes('reading \'0\'')) {
-            console.log(`[RagService] Array access error detected, using fallback for ${platform}`);
+            console.log(`[RagService] 🔧 Array access error detected, using fallback for ${platform}/${username}`);
             return {
               response: `I'm temporarily optimizing my system for better ${platform === 'facebook' ? 'Facebook' : platform === 'twitter' ? 'X (Twitter)' : 'Instagram'} insights. Please try your query again in a moment, or ask about specific topics like content strategy, audience engagement, or growth planning.`,
               usedFallback: true,
+              usingFallbackProfile: true,
+              enhancedContext: false,
               quotaInfo: {
                 exhausted: false,
                 message: "System optimization in progress - please retry"
@@ -344,10 +423,12 @@ class RagService {
           
           // Handle rate limiting with auto-queue
           if (error.response?.data?.error?.includes('RATE_LIMITED_AUTO_QUEUE')) {
-            console.log(`[RagService] Request auto-queued due to rate limiting for ${platform}`);
+            console.log(`[RagService] ⏳ Request auto-queued due to rate limiting for ${platform}/${username}`);
             return {
               response: `Your request is being processed! Due to high demand, it's been automatically queued. Please wait a moment for your ${platform === 'facebook' ? 'Facebook' : platform === 'twitter' ? 'X (Twitter)' : 'Instagram'} insights.`,
               usedFallback: true,
+              usingFallbackProfile: true,
+              enhancedContext: false,
               quotaInfo: {
                 exhausted: false,
                 message: "Request queued - processing shortly"
@@ -355,11 +436,61 @@ class RagService {
             };
           }
           
-          throw new Error(error.response?.data?.error || 'Failed to process discussion query');
+          // Generic fallback for other errors
+          console.log(`[RagService] 🔄 Using generic fallback for ${platform}/${username} due to: ${error.message}`);
+          return {
+            response: `I'm experiencing some technical difficulties with my enhanced analysis system. Let me help you with general ${platform === 'facebook' ? 'Facebook' : platform === 'twitter' ? 'X (Twitter)' : 'Instagram'} strategy advice. What specific aspect would you like to discuss?`,
+            usedFallback: true,
+            usingFallbackProfile: true,
+            enhancedContext: false,
+            quotaInfo: {
+              exhausted: false,
+              message: "Technical optimization in progress"
+            }
+          };
         }
       },
       false // Don't cache discussion responses as they're context-sensitive
     );
+  }
+  
+  /**
+   * Detects if the response contains enhanced context from ChromaDB
+   */
+  private static detectEnhancedContext(response: string): boolean {
+    if (!response || response.length < 50) return false;
+    
+    // Look for indicators of enhanced context
+    const enhancedIndicators = [
+      'based on your profile data',
+      'according to your posts',
+      'from your content analysis',
+      'based on your engagement',
+      'from your account insights',
+      'based on your posting patterns',
+      'from your audience data',
+      'based on your content themes',
+      'from your performance metrics',
+      'based on your social media strategy',
+      'from your account analytics',
+      'based on your content performance',
+      'from your engagement metrics',
+      'based on your audience insights',
+      'from your posting history'
+    ];
+    
+    const lowerResponse = response.toLowerCase();
+    const hasEnhancedIndicators = enhancedIndicators.some(indicator => 
+      lowerResponse.includes(indicator.toLowerCase())
+    );
+    
+    // Also check for specific data references
+    const hasDataReferences = /\d+ (followers|posts|engagement|likes|comments|shares)/i.test(response);
+    
+    // Check for platform-specific insights
+    const hasPlatformInsights = /(instagram|twitter|facebook|social media) (strategy|insights|analysis|performance)/i.test(response);
+    
+    return hasEnhancedIndicators || hasDataReferences || hasPlatformInsights;
   }
   
   /**

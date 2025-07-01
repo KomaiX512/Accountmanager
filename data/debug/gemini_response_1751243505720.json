@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "\n\nBased on the data provided, I am unable to determine your most engaging post. The provided data includes the following information about the @elonmusk Twitter account:\n\n*   **Profile:** Elon Musk\n*   **Username:** @elonmusk\n*   **Followers:** 220,243,049\n*   **Following:** 1,140\n*   **Posts:** 79,481\n\nThe data also states \"Analysis based on 1 relevant data points from the elonmusk account.\" However, the actual post content, engagement metrics (likes, comments, etc.), and \"Most Engaging Post\" data are not included in the provided information. Without this information, I cannot identify which post had the highest engagement.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.16970787519290123
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 332,
+    "candidatesTokenCount": 162,
+    "totalTokenCount": 494,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 332
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 162
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "8NphaK3gGeOXmecPnNjlSA"
+}

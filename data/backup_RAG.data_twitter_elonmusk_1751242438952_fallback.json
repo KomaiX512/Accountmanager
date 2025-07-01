@@ -1,0 +1,19 @@
+{
+  "username": "elonmusk",
+  "platform": "twitter",
+  "timestamp": "2025-06-30T00:13:58.952Z",
+  "query": "tell me about my post history, and my most engaging post",
+  "response": "X (Twitter) content that gets engagement:\n\n• Quick tips and insights\n• Industry observations\n• Controversial but thoughtful takes\n• Thread tutorials\n• Live-tweeting events\n• Polls and questions\n• Memes and humor (when appropriate)\n• News commentary and analysis\n\nI'll help craft specific tweets when I'm fully operational again!",
+  "previousMessages": [
+    {
+      "role": "user",
+      "content": "Generate twitter post: create post for me about neuralink"
+    },
+    {
+      "role": "assistant",
+      "content": "\nCaption: undefined\n\nHashtags: undefined\n\nCall to Action: undefined\n\nImage Description: undefined\n          "
+    }
+  ],
+  "usedFallback": true,
+  "quotaExhausted": false
+}

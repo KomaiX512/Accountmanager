@@ -1,0 +1,18 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "You are a professional Instagram content creator for @hudabeauty. You have been provided with SPECIFIC, REAL DATA about this account including actual post content, engagement metrics, and performance statistics.\n\nYOUR TASK: Create a high-quality Instagram post about \"create a post to give a religious touch to my cosmetic products for selling in the middle east\" using ONLY the provided real data below.\n\n===== REAL ACCOUNT DATA FOR @hudabeauty =====\nProfile Analysis Data for hudabeauty on instagram: Recent Posts and Engagement: Post 1: \"i promise we’re listening…we just got to make sure our lips look & stay hydrated 🤭\" Engagement: 8,056 likes, 184 comments, Total: 8,240 Post 2: \"Did you guess right? These beautiful lips belong to the stunning @uchjn, one of our beautiful models flaunting our new Lip Stains + FAUX FILLER Jelly Oils. No Photoshop, no filter \" Engagement: 28,369 likes, 728 comments, Total: 29,097 Post 3: \"The new love , THE LIP CONTOUR STAIN + JELLY OIL \" Engagement: 157,528 likes, 1,357 comments, Total: 158,885 Post 4: \"To celebrate the launch of our NEW Lip Contour Stain + FAUX FILLER Jelly Oils today... I’m dropping my signature lip combo: 🧸Soft Nude + 🤎 Rich Brown + Jelly Oil in Juicy Peach.\" Engagement: 9,140 likes, 450 comments, Total: 9,590 Most Engaging Post: \"The new love , THE LIP CONTOUR STAIN + JELLY OIL \" Performance: 157,528 likes, 1,357 comments Total Engagement: 158,885 Analysis based on 8 relevant data points from the hudabeauty account.\n===== END OF REAL DATA =====\n\nINSTRUCTIONS:\n1. You MUST base the post content on the actual data provided above\n2. Reference successful post patterns from the \"Recent Posts and Engagement\" section\n3. Use hashtags that have performed well based on the data\n4. Match the tone and style shown in the actual post content\n5. Create content that aligns with proven engagement patterns\n6. DO NOT use generic templates - use insights from the real data\n\nRESPOND WITH EXACTLY THIS FORMAT (no additional text):\n\nCaption:\n[Write an engaging Instagram caption under 2200 characters that matches the style and themes from the real data above. Make it visually appealing and Instagram-friendly]\n\nHashtags:\n[List 5-10 hashtags based on successful hashtags from the data above]\n\nCall to Action:\n[Create a call-to-action that matches engagement patterns from the real data]\n\nVisual Description for Image:\n[Write a detailed description for an image that aligns with the visual style and themes shown in the successful posts from the data above. Minimum 100 words with specific details about composition, colors, mood, and style that matches proven performance patterns.]\n\nIMPORTANT: Use EXACTLY the section headers shown above. Base everything on the real account data provided above."
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 2000,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "topK": 40
+  }
+}

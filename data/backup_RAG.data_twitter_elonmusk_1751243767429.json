@@ -1,0 +1,10 @@
+{
+  "username": "elonmusk",
+  "platform": "twitter",
+  "timestamp": "2025-06-30T00:36:07.429Z",
+  "query": "tell me my most engaging post",
+  "response": "Based on the data provided, I am unable to determine your most engaging post. The provided data only includes general profile information for @elonmusk, such as follower count (220,243,049), number of posts (79,481), and that the account is verified. There is no specific post content or engagement metrics (likes, comments, etc.) included in the provided data.\n",
+  "previousMessages": [],
+  "usedFallback": false,
+  "quotaExhausted": false
+}

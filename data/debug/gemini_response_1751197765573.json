@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Okay, let's dive into what's working for @elonmusk on X and figure out the most engaging content themes to focus on.\n\nBased on the data we have, the primary content theme is \"General content\". To give you more specific advice, I'd need to analyze the actual posts, engagement metrics (likes, retweets, replies, impressions), and audience insights.\n\nHowever, since the data is limited, I can provide some general guidance based on common observations of high-performing accounts, especially those of prominent figures:\n\n*   **Authenticity and Personality:** People connect with authenticity. Sharing personal thoughts, behind-the-scenes glimpses, and even occasional humor can boost engagement.\n*   **Controversy (Use with Caution):** While controversial topics can generate a lot of buzz, they can also be divisive. If you choose to go this route, be prepared for both positive and negative reactions.\n*   **Responding to Trends:** Jumping on relevant trends and adding your unique perspective can increase visibility.\n*   **Visual Content:** Including images and videos can significantly boost engagement.\n\nTo give you truly tailored advice, I'd need access to the actual posts and their performance data. With that, I could identify specific topics, formats, and posting styles that resonate most with @elonmusk's audience.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.285898751586023
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 384,
+    "candidatesTokenCount": 274,
+    "totalTokenCount": 658,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 384
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 274
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "QyhhaO_xGK3qld8PtbK3-A8"
+}

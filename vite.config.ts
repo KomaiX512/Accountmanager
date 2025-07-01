@@ -14,6 +14,31 @@ export default defineConfig({
   server: {
     port: 5173,
     host: '0.0.0.0', // Allow external connections
+    // Optimize file watching to prevent EMFILE errors
+    watch: {
+      usePolling: false,
+      interval: 1000,
+      // Exclude unnecessary directories from watching
+      ignored: [
+        '**/node_modules/**',
+        '**/dist/**',
+        '**/.git/**',
+        '**/logs/**',
+        '**/temp-images/**',
+        '**/image_cache/**',
+        '**/local_storage/**',
+        '**/test-output/**',
+        '**/test_data/**',
+        '**/*.log',
+        '**/*.pid',
+        '**/chroma.log',
+        '**/server.log',
+        '**/frontend.log',
+        '**/backend.log',
+        '**/rag-server.log',
+        '**/main-server.log'
+      ]
+    },
     proxy: {
       // RAG server endpoints (port 3001) - MUST come before general /api rule
       '/api/rag/post-generator': {
@@ -64,63 +89,76 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
-      // User endpoints (port 3002) - keep /api prefix
+      // User endpoints (port 3000) - Main server contains user management
       '/api/user': {
-        target: 'http://localhost:3002',
+        target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
       },
       '/api/access-check': {
-        target: 'http://localhost:3002',
+        target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
       },
       '/api/usage': {
-        target: 'http://localhost:3002',
+        target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
+        // Preserve /api prefix so backend route '/api/user/:userId/usage' matches
+        // No rewrite here
       },
       '/api/rag-instant-reply': {
-        target: 'http://localhost:3002',
+        target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
       },
-      // Connection status endpoints (port 3000) - consolidated and de-duplicated
+      '/rag-instant-reply': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+      },
+      // Connection status endpoints (port 3000) - Main server contains these endpoints
       '/api/user-instagram-status': {
         target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/api/, ''),
-      },
-      '/api/user-twitter-status': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path.replace(/^\/api/, ''),
+        // Preserve /api prefix so backend route '/api/user-instagram-status/:userId' matches
+        // No rewrite here
       },
       '/api/user-facebook-status': {
         target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/api/, ''),
+        // Preserve /api prefix so backend route '/api/user-facebook-status/:userId' matches
+        // No rewrite here
+      },
+      '/api/user-twitter-status': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+        // Preserve /api prefix so backend route '/api/user-twitter-status/:userId' matches
+        // No rewrite here
       },
       '/api/instagram-connection': {
         target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/api/, ''),
+        // Preserve /api prefix so backend route '/api/instagram-connection/:userId' matches
+        // No rewrite here
       },
       '/api/twitter-connection': {
         target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/api/, ''),
+        // Preserve /api prefix so backend route '/api/twitter-connection/:userId' matches
+        // No rewrite here
       },
       '/api/facebook-connection': {
         target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/api/, ''),
+        // Preserve /api prefix so backend route '/api/facebook-connection/:userId' matches
+        // No rewrite here
       },
       // Post-now endpoint (port 3000) - critical for PostNow functionality
       '/api/post-instagram-now': {
@@ -226,4 +264,54 @@ export default defineConfig({
       '.ngrok.io'
     ]
   },
+  // Optimize build and development performance
+  optimizeDeps: {
+    include: ['react', 'react-dom']
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Core React libraries
+          'react-vendor': ['react', 'react-dom'],
+          
+          // UI libraries
+          'mui-vendor': ['@mui/material', '@mui/icons-material', '@mui/x-date-pickers'],
+          
+          // Utility libraries
+          'utility-vendor': ['axios', 'date-fns', 'framer-motion'],
+          
+          // Chart and visualization
+          'chart-vendor': ['chart.js', 'react-chartjs-2'],
+          
+          // Image and canvas libraries
+          'canvas-vendor': ['konva', 'react-konva'],
+          
+          // Form and date libraries
+          'form-vendor': ['react-hook-form', 'react-datepicker'],
+          
+          // Icon libraries
+          'icon-vendor': ['react-icons'],
+          
+          // Three.js
+          'three-vendor': ['three']
+        }
+      }
+    },
+    // Increase chunk size warning limit to 1MB
+    chunkSizeWarningLimit: 1000,
+    // Optimize for production
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true
+      }
+    },
+    // Enable source maps for debugging if needed
+    sourcemap: false
+  },
+  // Reduce file system operations
+  clearScreen: false,
+  logLevel: 'warn'
 });

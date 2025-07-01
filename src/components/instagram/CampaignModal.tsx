@@ -43,9 +43,22 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
 
   useEffect(() => {
     fetchCampaignData();
-  }, [username, platform]);
+    
+    // Set up periodic refresh only if modal is open and not stopping
+    const intervalId = setInterval(() => {
+      if (!isStopping) {
+        fetchCampaignData();
+      }
+    }, 15000); // Check every 15 seconds
+    
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [username, platform, isStopping]);
 
   const fetchCampaignData = async () => {
+    if (isStopping) return; // Don't fetch if we're in the process of stopping
+    
     setLoading(true);
     setError(null);
 

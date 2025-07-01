@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption:\nOkay, I need a break from thinking. Someone create next post for me! What should I tweet about? 🤔\n\nHashtags:\n#OpenAI #AI\n\nCall to Action:\nReply with your best tweet idea!\n\nVisual Description for Image:\nThe image is a close-up, slightly blurred photograph of a person's face, specifically focusing on their eyes and forehead. The person appears to be in deep thought or contemplation, with a furrowed brow and a slightly concerned expression. The lighting is soft and diffused, creating a sense of intimacy and vulnerability. The color palette is muted, with predominantly neutral tones and subtle hints of blue and gray, contributing to a calm and introspective mood. The background is out of focus, drawing the viewer's attention to the person's face and their internal state. The overall style is reminiscent of a candid portrait, capturing a moment of genuine emotion and reflection. The image should evoke a sense of empathy and curiosity, prompting viewers to wonder what the person is thinking about and to engage with the tweet's question. The image should be high resolution and slightly grainy to give it a realistic feel.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.32868841629994067
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 473,
+    "candidatesTokenCount": 237,
+    "totalTokenCount": 710,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 473
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 237
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "OgNiaImzBO6knvgPyJun4Q8"
+}

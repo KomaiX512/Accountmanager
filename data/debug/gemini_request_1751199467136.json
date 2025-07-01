@@ -1,0 +1,50 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "You're a seasoned social media strategist with years of experience managing successful X (Twitter) accounts. You're analyzing the account @elonmusk and have access to comprehensive performance data.\n\n===== ACCOUNT DATA FOR @elonmusk =====\nProfile Analysis Data for elonmusk on twitter: Account Information: Profile: Elon Musk Username: @elonmusk Platform: twitter Bio: Followers: 220,243,049 Following: 1,140 Posts: 79,481 Verified: Yes Business Account: No Category: Personal Website: None Analysis based on 1 relevant data points from the elonmusk account.\n===== END OF ACCOUNT DATA =====\n\nQuestion: \"tell me about my most engaging posts themes, so I continue post so to grow faste\"\n\nInstructions:\n• Analyze the actual data above to answer the specific question\n• Be conversational, insightful, and specific to this account\n• Reference real numbers, captions, and performance patterns from the data\n• Provide actionable recommendations based on what's actually working\n• Think like a consultant who's deeply familiar with this account's performance\n\nRespond as a knowledgeable social media expert discussing this specific account."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "tell me about my most engaging posts themes, so I continue post so to grow faster"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Previous response about Instagram strategy and product information. [content summary]"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "tell me about my most engaging posts themes, so I continue post so to grow faster"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "Previous response about Instagram strategy and product information. [content summary]"
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 2000,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "topK": 40
+  }
+}

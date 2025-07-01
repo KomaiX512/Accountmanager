@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Caption:\nEmbrace the beauty within, a reflection of your inner light ✨ Our NEW Lip Contour Stain + FAUX FILLER Jelly Oils are crafted to enhance your natural radiance, with shades inspired by the rich hues of our heritage. May your beauty shine, inside and out. Discover your perfect shade and let your lips speak volumes. No Photoshop, no filter, just pure, radiant beauty.\n\nHashtags:\n#LipContourStain #FauxFiller #JellyOil #HudaBeauty #LipLove #Beauty #Makeup #MiddleEastBeauty #RadiantLips #InnerBeauty\n\nCall to Action:\nFind your perfect shade and share your radiant look with us! Tag us in your photos using #HudaBeautyLips for a chance to be featured!\n\nVisual Description for Image:\nThe image showcases a close-up of a model with beautifully enhanced lips using the new Huda Beauty Lip Contour Stain and Faux Filler Jelly Oil. The model, with warm, medium skin tone, is wearing a soft nude lip contour paired with a glossy, peach-toned jelly oil, creating a plump and hydrated effect. The background is a soft, diffused beige, creating a warm and inviting atmosphere. The lighting is soft and diffused, highlighting the natural texture and radiance of the lips. The focus is sharp on the lips, with a slight blur in the background to draw attention to the product. The overall mood is elegant, sophisticated, and radiant, emphasizing natural beauty and confidence. The image is free of filters and Photoshop, showcasing the true color and texture of the products. The model's expression is serene and confident, reflecting the empowering nature of the brand. The composition is balanced and aesthetically pleasing, with the lips centered in the frame. The color palette is warm and inviting, with shades of nude, brown, and peach dominating the scene. The image aims to convey a sense of natural beauty and effortless glamour, aligning with the brand's commitment to inclusivity and authenticity.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.2905636511478327
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 685,
+    "candidatesTokenCount": 394,
+    "totalTokenCount": 1079,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 685
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 394
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "0r1ZaNz5PNfpx_AP0szZ0AE"
+}

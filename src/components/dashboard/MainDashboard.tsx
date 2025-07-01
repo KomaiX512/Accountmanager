@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { safeNavigate } from '../../utils/navigationGuard';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import './MainDashboard.css';
@@ -17,6 +18,7 @@ import { schedulePost } from '../../utils/scheduleHelpers';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
 import { useUsage } from '../../context/UsageContext';
 import GlobalUpgradeHandler from '../common/GlobalUpgradeHandler';
+import { useProcessing } from '../../context/ProcessingContext';
 
 interface PlatformLoadingState {
   startTime: number;
@@ -55,6 +57,7 @@ interface PostContent {
 }
 
 const MainDashboard: React.FC = () => {
+  const { processingState } = useProcessing();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'overview' | 'usage'>('overview');
   const { isConnected: isInstagramConnected, userId: instagramUserId, hasAccessed: hasAccessedInstagram = false } = useInstagram();
@@ -111,15 +114,29 @@ const MainDashboard: React.FC = () => {
     return saved ? JSON.parse(saved) : {};
   });
 
+  // Track completed platforms to never show loading again
+  const [completedPlatforms, setCompletedPlatforms] = useState<Set<string>>(() => {
+    const saved = localStorage.getItem('completedPlatforms');
+    return new Set(saved ? JSON.parse(saved) : []);
+  });
+
   // Save loading states to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem('platformLoadingStates', JSON.stringify(platformLoadingStates));
   }, [platformLoadingStates]);
 
+  // Save completed platforms to localStorage
+  useEffect(() => {
+    localStorage.setItem('completedPlatforms', JSON.stringify(Array.from(completedPlatforms)));
+  }, [completedPlatforms]);
+
   // -------- Bullet-proof timer check using shared countdown key --------
   const getProcessingCountdownKey = (platformId: string) => `${platformId}_processing_countdown`;
 
   const getProcessingRemainingMs = (platformId: string): number => {
+    // Never show timer for completed platforms
+    if (completedPlatforms.has(platformId)) return 0;
+
     const raw = localStorage.getItem(getProcessingCountdownKey(platformId));
     if (!raw) return 0;
     const endTime = parseInt(raw, 10);
@@ -128,6 +145,9 @@ const MainDashboard: React.FC = () => {
   };
 
   const isPlatformLoading = (platformId: string): boolean => {
+    // Never show loading for completed platforms
+    if (completedPlatforms.has(platformId)) return false;
+
     const remaining = getProcessingRemainingMs(platformId);
     if (remaining > 0) return true;
 
@@ -139,6 +159,9 @@ const MainDashboard: React.FC = () => {
 
   // Function to start platform loading state
   const startPlatformLoading = (platformId: string, durationMinutes: number = 15) => {
+    // Don't start loading for completed platforms
+    if (completedPlatforms.has(platformId)) return;
+
     const now = Date.now();
     const newLoadingState: PlatformLoadingState = {
       startTime: now,
@@ -160,6 +183,10 @@ const MainDashboard: React.FC = () => {
 
   // Function to complete platform loading
   const completePlatformLoading = (platformId: string) => {
+    // Mark platform as completed
+    setCompletedPlatforms(prev => new Set([...prev, platformId]));
+
+    // Clean up all loading state data
     setPlatformLoadingStates(prev => ({
       ...prev,
       [platformId]: {
@@ -167,21 +194,27 @@ const MainDashboard: React.FC = () => {
         isComplete: true
       }
     }));
+
+    // Clean up localStorage
+    localStorage.removeItem(getProcessingCountdownKey(platformId));
+    localStorage.removeItem(`${platformId}_processing_info`);
   };
 
   // ✅ PLATFORM STATUS SYNC FIX: Improved platform access tracking
   const getPlatformAccessStatus = useCallback((platformId: string): boolean => {
     if (!currentUser?.uid) return false;
     
-    // Check localStorage for platform access
+    // Check localStorage for platform access (fallback)
     const accessedFromStorage = localStorage.getItem(`${platformId}_accessed_${currentUser.uid}`) === 'true';
     
-    // Check context status for platforms that have it
+    // Check context status for platforms that have it (fallback)
     let accessedFromContext = false;
     if (platformId === 'instagram') accessedFromContext = hasAccessedInstagram;
     if (platformId === 'twitter') accessedFromContext = hasAccessedTwitter;
     if (platformId === 'facebook') accessedFromContext = hasAccessedFacebook;
     
+    // If either localStorage or context shows accessed, return true
+    // This ensures that once a user has submitted the entry form, they won't see it again
     return accessedFromStorage || accessedFromContext;
   }, [currentUser?.uid, hasAccessedInstagram, hasAccessedTwitter, hasAccessedFacebook]);
 
@@ -411,7 +444,7 @@ const MainDashboard: React.FC = () => {
           cooked_posts: 0
         }
       },
-      route: '/dashboard',
+      route: 'instagram', // Entry form route
       characterLimit: 2200,
       supportsImages: true,
       supportsVideo: true
@@ -431,7 +464,7 @@ const MainDashboard: React.FC = () => {
           cooked_posts: 0
         }
       },
-      route: '/twitter-dashboard',
+      route: 'twitter-dashboard', // Fixed: removed leading slash
       characterLimit: 280,
       supportsImages: true,
       supportsVideo: true
@@ -451,7 +484,7 @@ const MainDashboard: React.FC = () => {
           cooked_posts: 0
         }
       },
-      route: '/facebook-dashboard',
+      route: 'facebook-dashboard', // Fixed: removed leading slash
       characterLimit: 63206,
       supportsImages: true,
       supportsVideo: true
@@ -471,7 +504,7 @@ const MainDashboard: React.FC = () => {
           cooked_posts: 0
         }
       },
-      route: '/linkedin-dashboard',
+      route: 'linkedin-dashboard', // Fixed: removed leading slash
       characterLimit: 3000,
       supportsImages: true,
       supportsVideo: true
@@ -502,6 +535,20 @@ const MainDashboard: React.FC = () => {
       })
     );
   }, [getPlatformAccessStatus, getPlatformConnectionStatus]);
+
+  // ✅ AUTO-COMPLETE CLAIMED PLATFORMS: Mark claimed platforms as completed to prevent timer
+  useEffect(() => {
+    platforms.forEach(platform => {
+      // Only mark as completed if platform is claimed AND has no active timer
+      if (platform.claimed && !completedPlatforms.has(platform.id)) {
+        const remainingMs = getProcessingRemainingMs(platform.id);
+        if (remainingMs === 0) {
+          console.log(`[MainDashboard] ✅ Auto-marking claimed platform ${platform.id} as completed (no active timer)`);
+          completePlatformLoading(platform.id);
+        }
+      }
+    });
+  }, [platforms, completedPlatforms]);
 
   // ✅ NOTIFICATION COUNT UPDATE: Separate effect for notification updates
   useEffect(() => {
@@ -609,31 +656,52 @@ const MainDashboard: React.FC = () => {
     // If platform is in loading state and time isn't complete
     if (remainingMs > 0) {
       const remainingTime = Math.ceil(remainingMs / 1000 / 60);
-      navigate(`/processing/${platform.id}`, {
+      safeNavigate(navigate, `/processing/${platform.id}`, {
         state: {
           platform: platform.id,
           username: currentUser?.displayName || '',
           remainingMinutes: remainingTime
         }
-      });
+      }, 7);
       return;
     }
     
-    // If this is first access, start loading state
-    if (!isPlatformLoading(platform.id) && platform.claimed && !platform.connected) {
+    // If platform is claimed but not connected and has no active timer, navigate normally
+    if (platform.claimed && !platform.connected && remainingMs === 0) {
+      // Navigate to the appropriate dashboard
+      if (platform.id === 'instagram') {
+        safeNavigate(navigate, '/dashboard', {}, 6); // Instagram dashboard
+      } else {
+        safeNavigate(navigate, `/${platform.route}`, {}, 6);
+      }
+      return;
+    }
+    
+    // If this is first access and not claimed, start loading state
+    if (!isPlatformLoading(platform.id) && !platform.claimed) {
       startPlatformLoading(platform.id);
-      navigate(`/processing/${platform.id}`, {
+      safeNavigate(navigate, `/processing/${platform.id}`, {
         state: {
           platform: platform.id,
           username: currentUser?.displayName || '',
           remainingMinutes: 15
         }
-      });
+      }, 7);
       return;
     }
     
     // Normal navigation if loading is complete or not required
-    navigate(`/${platform.route}`);
+    // Handle Instagram routing specifically
+    if (platform.id === 'instagram') {
+      if (platform.claimed) {
+        safeNavigate(navigate, '/dashboard', {}, 6); // Instagram dashboard
+      } else {
+        safeNavigate(navigate, '/instagram', {}, 6); // Instagram entry form
+      }
+    } else {
+      // All other platforms: add leading slash to route
+      safeNavigate(navigate, `/${platform.route}`, {}, 6);
+    }
   };
 
   // Add a function to navigate to the entry setup
@@ -644,13 +712,29 @@ const MainDashboard: React.FC = () => {
     }
 
     if (platformId === 'instagram') {
-      navigate('/instagram');
+      safeNavigate(navigate, '/instagram', { 
+        state: { 
+          platformId: 'instagram'
+        } 
+      }, 6);
     } else if (platformId === 'twitter') {
-      navigate('/twitter');
+      safeNavigate(navigate, '/twitter', { 
+        state: { 
+          platformId: 'twitter'
+        } 
+      }, 6);
     } else if (platformId === 'facebook') {
-      navigate('/facebook');
+      safeNavigate(navigate, '/facebook', { 
+        state: { 
+          platformId: 'facebook'
+        } 
+      }, 6);
     } else if (platformId === 'linkedin') {
-      navigate('/linkedin');
+      safeNavigate(navigate, '/linkedin', { 
+        state: { 
+          platformId: 'linkedin'
+        } 
+      }, 6);
     }
   };
 
@@ -659,26 +743,23 @@ const MainDashboard: React.FC = () => {
     if (isPlatformLoading(platform.id)) {
       const remainingMs = getProcessingRemainingMs(platform.id);
       const remainingMinutes = Math.ceil(remainingMs / 1000 / 60);
-      navigate(`/processing/${platform.id}`, {
+      safeNavigate(navigate, `/processing/${platform.id}`, {
         state: {
           platform: platform.id,
           username: currentUser?.displayName || '',
           remainingMinutes
         }
-      });
+      }, 7);
       return;
     }
 
     if (!platform.connected) {
-      // Navigate to platform dashboard, not connection page
+      // Navigate to platform dashboard using the platform's route
       if (platform.id === 'instagram') {
-        navigate('/dashboard');
-      } else if (platform.id === 'twitter') {
-        navigate('/twitter-dashboard');
-      } else if (platform.id === 'facebook') {
-        navigate('/facebook-dashboard');
-      } else if (platform.id === 'linkedin') {
-        navigate('/linkedin-dashboard');
+        safeNavigate(navigate, '/dashboard', {}, 6);
+      } else {
+        // Use the platform's route for consistent navigation
+        safeNavigate(navigate, `/${platform.route}`, {}, 6);
       }
     }
   };
@@ -910,6 +991,12 @@ const MainDashboard: React.FC = () => {
     const limits = getUserLimits();
     return usage.posts + usage.aiReplies + usage.discussions;
   };
+
+  useEffect(() => {
+    if (processingState.isProcessing && processingState.platform === 'instagram') {
+      navigate('/processing/instagram', { replace: true });
+    }
+  }, [processingState, navigate]);
 
   return (
     <div className="dashboard-page">

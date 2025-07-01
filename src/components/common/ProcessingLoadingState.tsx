@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FiTarget,
@@ -16,14 +16,19 @@ import {
   FiDatabase,
   FiCpu,
   FiLayers,
-  FiCheckCircle
+  FiCheckCircle,
+  FiPlay,
+  FiPause,
+  FiRotateCcw
 } from 'react-icons/fi';
 import { useAuth } from '../../context/AuthContext';
 import './ProcessingLoadingState.css';
 import { useNavigate } from 'react-router-dom';
+import { safeNavigate } from '../../utils/navigationGuard';
 import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaInstagram, FaTwitter, FaFacebook } from 'react-icons/fa';
 import { MdAnalytics } from 'react-icons/md';
 import { BsLightningChargeFill } from 'react-icons/bs';
+import { useProcessing } from '../../context/ProcessingContext';
 
 interface ProcessingStage {
   id: number;
@@ -89,18 +94,33 @@ interface ProcessingLoadingStateProps {
 
 const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   platform,
-  username,
+  username: propUsername,
   onComplete,
   countdownMinutes = 15,
   remainingMinutes
 }) => {
-  const { currentUser } = useAuth();
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
+  const { completeProcessing } = useProcessing();
   
   // Get platform configuration with fallback
   const platformConfig = PLATFORM_CONFIGS[platform] || DEFAULT_PLATFORM_CONFIG;
 
-  // Initialize countdown from localStorage or props
+  // Get username from props or localStorage
+  const username = propUsername || (() => {
+    try {
+      const processingInfo = localStorage.getItem(`${platform}_processing_info`);
+      if (processingInfo) {
+        const info = JSON.parse(processingInfo);
+        return info.username || 'User';
+      }
+    } catch (error) {
+      console.error('Error reading username from localStorage:', error);
+    }
+    return 'User';
+  })();
+
+  // Single countdown state - initialize from localStorage or props
   const [countdown, setCountdown] = useState(() => {
     try {
       const savedCountdown = localStorage.getItem(`${platform}_processing_countdown`);
@@ -116,52 +136,68 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     return (remainingMinutes || countdownMinutes) * 60;
   });
 
-  // Save end time to localStorage when component mounts
+  // Set localStorage only if it doesn't already exist (prevents restart on refresh)
   useEffect(() => {
     try {
-      const endTime = Date.now() + (countdown * 1000);
-      localStorage.setItem(`${platform}_processing_countdown`, endTime.toString());
-      
-      // Also store the platform and username for verification
-      localStorage.setItem(`${platform}_processing_info`, JSON.stringify({
-        platform,
-        username,
-        startTime: Date.now(),
-        endTime
-      }));
-      
-      return () => {
-        if (countdown <= 0) {
-          localStorage.removeItem(`${platform}_processing_countdown`);
-          localStorage.removeItem(`${platform}_processing_info`);
-        }
-      };
+      const existingCountdown = localStorage.getItem(`${platform}_processing_countdown`);
+      if (!existingCountdown) {
+        const endTime = Date.now() + (countdown * 1000);
+        localStorage.setItem(`${platform}_processing_countdown`, endTime.toString());
+        
+        // Store processing info for verification
+        localStorage.setItem(`${platform}_processing_info`, JSON.stringify({
+          platform,
+          username,
+          startTime: Date.now(),
+          endTime,
+          totalDuration: countdown
+        }));
+      }
     } catch (error) {
       console.error('Error saving to localStorage:', error);
     }
-  }, []);
+  }, [platform, username, countdown]);
 
+  // Single timer effect
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCountdown(prev => {
-        const newCount = prev - 1;
-        if (newCount <= 0) {
-          clearInterval(timer);
-          try {
-            localStorage.removeItem(`${platform}_processing_countdown`);
-            localStorage.removeItem(`${platform}_processing_info`);
-          } catch (error) {
-            console.error('Error clearing localStorage:', error);
-          }
-          if (onComplete) onComplete();
-          return 0;
+    if (countdown <= 0) {
+      // Clean up localStorage when countdown reaches 0
+      try {
+        localStorage.removeItem(`${platform}_processing_countdown`);
+        localStorage.removeItem(`${platform}_processing_info`);
+        
+        // Mark platform as completed
+        const completedPlatforms = localStorage.getItem('completedPlatforms');
+        const completed = completedPlatforms ? JSON.parse(completedPlatforms) : [];
+        if (!completed.includes(platform)) {
+          completed.push(platform);
+          localStorage.setItem('completedPlatforms', JSON.stringify(completed));
         }
-        return newCount;
-      });
+      } catch (error) {
+        console.error('Error clearing localStorage:', error);
+      }
+      
+      // Call ProcessingContext completeProcessing
+      completeProcessing();
+      
+      if (onComplete) onComplete();
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setCountdown(prev => Math.max(0, prev - 1));
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [onComplete, platform]);
+  }, [countdown, onComplete, platform, completeProcessing]);
+
+  // Handle completion on mount if countdown is already 0
+  useEffect(() => {
+    if (countdown <= 0 && onComplete) {
+      completeProcessing();
+      onComplete();
+    }
+  }, [countdown, onComplete, completeProcessing]);
 
   // Prevent navigation away during processing
   useEffect(() => {
@@ -180,14 +216,14 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   useEffect(() => {
     const handleNavigation = () => {
       if (countdown > 0) {
-        navigate(`/processing/${platform}`, { 
+        safeNavigate(navigate, `/processing/${platform}`, { 
           state: { 
             platform, 
             username,
             remainingMinutes: Math.ceil(countdown / 60) 
           },
           replace: true
-        });
+        }, 8);
       }
     };
 
@@ -195,8 +231,20 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     return () => window.removeEventListener('popstate', handleNavigation);
   }, [countdown, navigate, platform, username]);
 
-  const TOTAL_DURATION = countdownMinutes * 60; // Convert minutes to seconds
-  const [timeLeft, setTimeLeft] = useState(TOTAL_DURATION);
+  // Calculate total duration from localStorage or props
+  const totalDuration = (() => {
+    try {
+      const processingInfo = localStorage.getItem(`${platform}_processing_info`);
+      if (processingInfo) {
+        const { totalDuration: savedDuration } = JSON.parse(processingInfo);
+        return savedDuration || (countdownMinutes * 60);
+      }
+    } catch (error) {
+      console.error('Error reading total duration from localStorage:', error);
+    }
+    return countdownMinutes * 60;
+  })();
+
   const [currentStage, setCurrentStage] = useState(0);
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
@@ -245,36 +293,16 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     }
   ];
 
-  // Initialize countdown based on localStorage data
+  // Update current stage based on time progress
   useEffect(() => {
-    if (!currentUser?.uid) return;
-    
-    const processingKey = `${platform}_processing_${currentUser.uid}`;
-    const processingData = localStorage.getItem(processingKey);
-    
-    if (processingData) {
-      const { startTime, duration } = JSON.parse(processingData);
-      const elapsed = Date.now() - startTime;
-      const remaining = Math.max(0, Math.ceil((duration - elapsed) / 1000));
-      
-      if (remaining > 0) {
-        setTimeLeft(remaining);
-      } else {
-        if (onComplete) onComplete();
-      }
-    }
-  }, [currentUser?.uid, platform, onComplete]);
-
-  // Update current stage based on time progress - reusable for any countdown duration
-  useEffect(() => {
-    const progress = ((TOTAL_DURATION - timeLeft) / TOTAL_DURATION) * 100;
+    const progress = ((totalDuration - countdown) / totalDuration) * 100;
     const newStageIndex = processingStages.findIndex(stage => progress < stage.percentage);
     const stageIndex = newStageIndex === -1 ? processingStages.length - 1 : Math.max(0, newStageIndex - 1);
     
     if (stageIndex !== currentStage) {
       setCurrentStage(stageIndex);
     }
-  }, [timeLeft, currentStage, TOTAL_DURATION]);
+  }, [countdown, currentStage, totalDuration, processingStages]);
 
   const proTips: ProTip[] = [
     {
@@ -315,25 +343,15 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     }
   ];
 
-  // Countdown timer effect
-  useEffect(() => {
-    if (timeLeft > 0) {
-      const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-      return () => clearTimeout(timer);
-    } else {
-      if (onComplete) onComplete();
-    }
-  }, [timeLeft, onComplete]);
-
   // Auto-advance tips effect
   useEffect(() => {
-    if (isAutoPlaying && timeLeft > 0) {
+    if (isAutoPlaying && countdown > 0) {
       const interval = setInterval(() => {
         setCurrentTipIndex((prev) => (prev + 1) % proTips.length);
       }, 8000); // Change tip every 8 seconds for better pacing
       return () => clearInterval(interval);
     }
-  }, [isAutoPlaying, timeLeft, proTips.length]);
+  }, [isAutoPlaying, countdown, proTips.length]);
 
   const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -342,7 +360,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   };
 
   const calculateProgress = () => {
-    return ((TOTAL_DURATION - timeLeft) / TOTAL_DURATION) * 100;
+    return ((totalDuration - countdown) / totalDuration) * 100;
   };
 
   const handleTipNavigation = (index: number) => {
@@ -454,7 +472,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
               <p className="stage-status">{processingStages[currentStage].status}</p>
               <div className="time-display">
                 <FiClock size={14} />
-                <span>{formatTime(timeLeft)}</span>
+                <span>{formatTime(countdown)}</span>
               </div>
             </motion.div>
           </AnimatePresence>

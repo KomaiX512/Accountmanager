@@ -39,6 +39,7 @@ import useUpgradeHandler from '../../hooks/useUpgradeHandler';
 import AccessControlPopup from '../common/AccessControlPopup';
 import { useNavigate } from 'react-router-dom';
 import useProcessingGuard from '../../hooks/useProcessingGuard';
+import { useProcessing } from '../../context/ProcessingContext';
 
 // Define RagService compatible ChatMessage
 interface RagChatMessage {
@@ -61,146 +62,27 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   platform,
   onOpenChat
 }) => {
+  // ALL HOOKS MUST BE CALLED FIRST - Rules of Hooks
   const guard = useProcessingGuard(platform, accountHolder);
+  const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
+  const loadingCheckRef = useRef(false);
+  const { processingState } = useProcessing();
 
   if (guard.active) {
     // React Router will have already redirected inside the hook, but return null to avoid rendering.
     return null;
   }
 
-  const [isLoading, setIsLoading] = useState(true);
-  const navigate = useNavigate();
-  const loadingCheckRef = useRef(false);
-
-  // Check loading state on mount and after refreshes
-  useEffect(() => {
-    const checkLoadingState = () => {
-      if (loadingCheckRef.current) return;
-      loadingCheckRef.current = true;
-
-      try {
-        const savedCountdown = localStorage.getItem(`${platform}_processing_countdown`);
-        const processingInfo = localStorage.getItem(`${platform}_processing_info`);
-        
-        if (savedCountdown && processingInfo) {
-          const info = JSON.parse(processingInfo);
-          const endTime = parseInt(savedCountdown);
-          const now = Date.now();
-          
-          // Verify this loading state belongs to the current platform and is still active
-          if (info.platform === platform && now < endTime) {
-            const remainingMinutes = Math.ceil((endTime - now) / 1000 / 60);
-            navigate(`/processing/${platform}`, {
-              state: {
-                platform,
-                username: info.username || accountHolder,
-                remainingMinutes
-              },
-              replace: true
-            });
-            return;
-          }
-        }
-        
-        // If we reach here, either no loading state or it's expired/invalid
-        localStorage.removeItem(`${platform}_processing_countdown`);
-        localStorage.removeItem(`${platform}_processing_info`);
-        setIsLoading(false);
-      } catch (error) {
-        console.error('Error checking loading state:', error);
-        setIsLoading(false);
-      }
-    };
-
-    // Check loading state immediately
-    checkLoadingState();
-
-    // Also check when window regains focus
-    const handleFocus = () => {
-      loadingCheckRef.current = false; // Reset the ref on focus
-      checkLoadingState();
-    };
-    
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, [platform, accountHolder, navigate]);
-
-  // Show loading indicator while checking state
-  if (isLoading) {
-    return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh',
-        backgroundColor: '#f5f5f5'
-      }}>
-        <div style={{
-          textAlign: 'center',
-          color: '#666'
-        }}>
-          <div style={{
-            border: '4px solid #f3f3f3',
-            borderTop: '4px solid #00ffcc',
-            borderRadius: '50%',
-            width: '40px',
-            height: '40px',
-            animation: 'spin 1s linear infinite',
-            margin: '0 auto 20px'
-          }} />
-          <div>Loading dashboard...</div>
-        </div>
-      </div>
-    );
-  }
-
-  // Platform-specific context hooks
+  // ALL CONTEXT HOOKS MUST BE CALLED FIRST - Rules of Hooks
+  const { currentUser } = useAuth();
   const { userId: igUserId, isConnected: isInstagramConnected, connectInstagram } = useInstagram();
   const { userId: twitterId, isConnected: isTwitterConnected, connectTwitter } = useTwitter();
   const { userId: facebookId, isConnected: isFacebookConnected, connectFacebook } = useFacebook();
-  
-  // Determine current platform connection info
-  const userId = platform === 'twitter' ? twitterId : 
-               platform === 'facebook' ? facebookId : // Use Facebook context userId
-               igUserId;
-  const isConnected = platform === 'twitter' ? isTwitterConnected : 
-                     platform === 'facebook' ? isFacebookConnected : // Use Facebook context connection status
-                     isInstagramConnected;
-  
-  // Platform configuration
-  const config = {
-    instagram: {
-      name: 'Instagram',
-      primaryColor: '#e4405f',
-      secondaryColor: '#00ffcc',
-      baseUrl: 'https://instagram.com/',
-      supportsNotifications: true,
-      supportsScheduling: true,
-      supportsInsights: true
-    },
-    twitter: {
-      name: 'X (Twitter)',
-      primaryColor: '#000000',
-      secondaryColor: '#ffffff',
-      baseUrl: 'https://twitter.com/',
-      supportsNotifications: true, // Enable Twitter notifications
-      supportsScheduling: false, // Not implemented yet for Twitter
-      supportsInsights: true // Enable Twitter insights
-    },
-    facebook: {
-      name: 'Facebook',
-      primaryColor: '#1877f2',
-      secondaryColor: '#42a5f5',
-      baseUrl: 'https://facebook.com/',
-      supportsNotifications: true, // Enable notifications for Facebook
-      supportsScheduling: true, // Enable scheduling for Facebook
-      supportsInsights: true // Enable insights for Facebook
-    }
-  }[platform];
+  const { trackRealDiscussion, trackRealAIReply, trackRealPostCreation, canUseFeature } = useFeatureTracking();
+  const { showUpgradePopup, blockedFeature, handleFeatureAttempt, closeUpgradePopup, currentUsage } = useUpgradeHandler();
 
-  // Platform-specific query parameter
-  const platformParam = `?platform=${platform}`;
-
+  // ALL STATE HOOKS
   const [query, setQuery] = useState('');
   const [toast, setToast] = useState<string | null>(null);
   const [responses, setResponses] = useState<{ key: string; data: any }[]>([]);
@@ -209,7 +91,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const [competitorData, setCompetitorData] = useState<{ key: string; data: any }[]>([]);
   const [news, setNews] = useState<{ key: string; data: any }[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
-
   const [profileInfo, setProfileInfo] = useState<any | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -222,10 +103,46 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const [linkedAccounts, setLinkedAccounts] = useState<any[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [aiProcessingNotifications, setAiProcessingNotifications] = useState<Record<string, boolean>>({});
-  
-  // Content viewed tracking - track what has been seen vs unseen with localStorage persistence
+  const [showInitialText, setShowInitialText] = useState(true);
+  const [showBio, setShowBio] = useState(false);
+  const [typedBio, setTypedBio] = useState('');
+  const [bioAnimationComplete, setBioAnimationComplete] = useState(false);
+  const [isSchedulerOpen, setIsSchedulerOpen] = useState(false);
+  const [isInsightsOpen, setIsInsightsOpen] = useState(false);
+  const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
+  const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
+  const [showCampaignButton, setShowCampaignButton] = useState(false);
+  const [replySentTracker, setReplySentTracker] = useState<{
+    text: string;
+    timestamp: number;
+    type: 'dm' | 'comment';
+    id: string;
+  }[]>([]);
+  const [aiRepliesRefreshKey, setAiRepliesRefreshKey] = useState(0);
+  const [processingNotifications, setProcessingNotifications] = useState<Record<string, boolean>>({});
+  const [isAutoReplying, setIsAutoReplying] = useState(false);
+  const [isTwitterSchedulerOpen, setIsTwitterSchedulerOpen] = useState(false);
+  const [isTwitterInsightsOpen, setIsTwitterInsightsOpen] = useState(false);
+  const [isTwitterComposeOpen, setIsTwitterComposeOpen] = useState(false);
+  const [isFacebookSchedulerOpen, setIsFacebookSchedulerOpen] = useState(false);
+  const [isFacebookInsightsOpen, setIsFacebookInsightsOpen] = useState(false);
+  const [isFacebookComposeOpen, setIsFacebookComposeOpen] = useState(false);
+
+  // ALL REF HOOKS
+  const firstLoadRef = useRef(true);
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const reconnectAttempts = useRef(0);
+  const lastProfilePicRenderTimeRef = useRef<number>(0);
+  const imageRetryAttemptsRef = useRef(0);
+
+  // CONSTANTS
+  const maxReconnectAttempts = 5;
+  const baseReconnectDelay = 5000;
+  const maxImageRetryAttempts = 3;
+
+  // Helper function to get viewed storage key
   const getViewedStorageKey = (section: string) => `viewed_${section}_${platform}_${accountHolder}`;
-  
+
   // Initialize viewed sets from localStorage
   const [viewedStrategies, setViewedStrategies] = useState<Set<string>>(() => {
     const stored = localStorage.getItem(getViewedStorageKey('strategies'));
@@ -242,42 +159,202 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     return stored ? new Set(JSON.parse(stored)) : new Set();
   });
 
-  // Bio animation states
-  const [showInitialText, setShowInitialText] = useState(true);
-  const [showBio, setShowBio] = useState(false);
-  const [typedBio, setTypedBio] = useState('');
-  const [bioAnimationComplete, setBioAnimationComplete] = useState(false);
-  const { currentUser } = useAuth();
-  const firstLoadRef = useRef(true);
-  const [isSchedulerOpen, setIsSchedulerOpen] = useState(false);
-  const [isInsightsOpen, setIsInsightsOpen] = useState(false);
-  const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
-  const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
-  const [showCampaignButton, setShowCampaignButton] = useState(false);
-  const [replySentTracker, setReplySentTracker] = useState<{
-    text: string;
-    timestamp: number;
-    type: 'dm' | 'comment';
-    id: string;
-  }[]>([]);
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const reconnectAttempts = useRef(0);
-  const maxReconnectAttempts = 5;
-  const baseReconnectDelay = 5000;
-  const lastProfilePicRenderTimeRef = useRef<number>(0);
-  const imageRetryAttemptsRef = useRef(0);
-  const maxImageRetryAttempts = 3;
-  const [aiRepliesRefreshKey, setAiRepliesRefreshKey] = useState(0);
-  const [processingNotifications, setProcessingNotifications] = useState<Record<string, boolean>>({});
-  const [isAutoReplying, setIsAutoReplying] = useState(false);
-  const [isTwitterSchedulerOpen, setIsTwitterSchedulerOpen] = useState(false);
-  const [isTwitterInsightsOpen, setIsTwitterInsightsOpen] = useState(false);
-  const [isTwitterComposeOpen, setIsTwitterComposeOpen] = useState(false);
-  const [isFacebookSchedulerOpen, setIsFacebookSchedulerOpen] = useState(false);
-  const [isFacebookInsightsOpen, setIsFacebookInsightsOpen] = useState(false);
-  const [isFacebookComposeOpen, setIsFacebookComposeOpen] = useState(false);
-  const { trackRealDiscussion, trackRealAIReply, trackRealPostCreation, canUseFeature } = useFeatureTracking();
-  const { showUpgradePopup, blockedFeature, handleFeatureAttempt, closeUpgradePopup, currentUsage } = useUpgradeHandler();
+  // ALL useEffect HOOKS MUST BE CALLED FIRST - Rules of Hooks
+  useEffect(() => {
+    if (isLoading) {
+      const checkLoadingState = () => {
+        if (platform === 'instagram' && igUserId) {
+          setIsLoading(false);
+        } else if (platform === 'twitter' && twitterId) {
+          setIsLoading(false);
+        } else if (platform === 'facebook' && facebookId) {
+          setIsLoading(false);
+        } else if (loadingCheckRef.current) {
+          // If we've already checked and still loading, stop checking
+          setIsLoading(false);
+        } else {
+          loadingCheckRef.current = true;
+          setTimeout(checkLoadingState, 1000);
+        }
+      };
+      checkLoadingState();
+    }
+  }, [isLoading, platform, igUserId, twitterId, facebookId]);
+
+  useEffect(() => {
+    const handleFocus = () => {
+      if (document.visibilityState === 'visible') {
+        // Refresh data when user returns to the tab
+        if (accountHolder) {
+          refreshAllData();
+          fetchProfileInfo();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleFocus);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleFocus);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [accountHolder]);
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    if (accountHolder) {
+      refreshAllData();
+      fetchProfileInfo();
+    }
+  }, [accountHolder, competitors, platform]);
+
+  // Load previous conversations when the component mounts
+  useEffect(() => {
+    if (accountHolder) {
+      RagService.loadConversations(accountHolder, platform)
+        .then(messages => {
+          const safeMessages = messages.map(msg => ({
+            role: msg.role === 'user' ? 'user' as const : 'assistant' as const,
+            content: msg.content
+          }));
+          setChatMessages(safeMessages);
+        })
+        .catch(err => console.error('Failed to load conversations:', err));
+    }
+  }, [accountHolder, platform]);
+
+  // Initialize notifications and SSE for the current platform
+  useEffect(() => {
+    const currentUserId = platform === 'twitter' ? twitterId : igUserId;
+    if (currentUserId) {
+      fetchNotifications();
+      setupSSE(currentUserId);
+
+      // Fallback polling every 5 minutes
+      const interval = setInterval(() => {
+        fetchNotifications();
+      }, 300000);
+
+      return () => {
+        clearInterval(interval);
+        if (eventSourceRef.current) {
+          eventSourceRef.current.close();
+          eventSourceRef.current = null;
+        }
+      };
+    }
+  }, [platform === 'twitter' ? twitterId : igUserId, platform]);
+
+  // Clean old entries from reply tracker
+  useEffect(() => {
+    const cleanInterval = setInterval(() => {
+      const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+      setReplySentTracker(prev => prev.filter(reply => reply.timestamp > tenMinutesAgo));
+    }, 60000);
+    
+    return () => clearInterval(cleanInterval);
+  }, []);
+
+  // Handle custom event for opening campaign modal
+  useEffect(() => {
+    const handleOpenCampaignEvent = (event: any) => {
+      const { username, platform } = event.detail;
+      if (username === accountHolder && platform === 'Twitter') {
+        setShowCampaignButton(true);
+        setIsCampaignModalOpen(true);
+      }
+    };
+
+    const handleCampaignStoppedEvent = (event: any) => {
+      const { username, platform } = event.detail;
+      if (username === accountHolder && platform === 'twitter') {
+        setShowCampaignButton(false);
+        setIsCampaignModalOpen(false);
+      }
+    };
+
+    window.addEventListener('openCampaignModal', handleOpenCampaignEvent);
+    window.addEventListener('campaignStopped', handleCampaignStoppedEvent);
+    
+    return () => {
+      window.removeEventListener('openCampaignModal', handleOpenCampaignEvent);
+      window.removeEventListener('campaignStopped', handleCampaignStoppedEvent);
+    };
+  }, [accountHolder]);
+
+  // Bio typing animation effect
+  useEffect(() => {
+    if (!profileInfo?.biography || !profileInfo.biography.trim()) {
+      return;
+    }
+
+    // Start the initial animation sequence
+    const timer1 = setTimeout(() => {
+      // Fade out initial text after 5 seconds
+      setShowInitialText(false);
+      
+      // Start showing bio with typing effect after fade out completes
+      setTimeout(() => {
+        setShowBio(true);
+        
+        // Start typing animation
+        const bio = profileInfo.biography!; // Non-null assertion since we already checked
+        let currentIndex = 0;
+        
+        const typeNextChar = () => {
+          if (currentIndex < bio.length) {
+            setTypedBio(bio.substring(0, currentIndex + 1));
+            currentIndex++;
+            
+            // Fast typing speed - 50ms per character
+            setTimeout(typeNextChar, 50);
+          } else {
+            setBioAnimationComplete(true);
+          }
+        };
+        
+        typeNextChar();
+      }, 500); // Wait for fade out to complete
+    }, 5000); // Initial 5 second delay
+
+    return () => clearTimeout(timer1);
+  }, [profileInfo?.biography]);
+
+  // Reset animation states when profile info changes
+  useEffect(() => {
+    if (profileInfo?.biography && profileInfo.biography.trim()) {
+      setShowInitialText(true);
+      setShowBio(false);
+      setTypedBio('');
+      setBioAnimationComplete(false);
+    }
+  }, [profileInfo]);
+
+  // [ADDED] ensure campaign button persists across refreshes by checking backend on mount
+  useEffect(() => {
+    if (!accountHolder) return;
+
+    const checkCampaignStatus = async () => {
+      try {
+        const response = await axios.get(`http://localhost:3000/campaign-status/${accountHolder}?platform=${platform.toLowerCase()}&bypass_cache=true`);
+        const status = response.data;
+        if (status?.hasActiveCampaign) {
+          setShowCampaignButton(true);
+        }
+      } catch (err) {
+        console.error(`[PlatformDashboard] Error checking campaign status:`, err);
+      }
+    };
+
+    checkCampaignStatus();
+  }, [accountHolder, platform]);
 
   // Helper function to get unseen count for each section
   const getUnseenStrategiesCount = () => {
@@ -296,19 +373,19 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const markStrategiesAsViewed = () => {
     const newViewedStrategies = new Set(strategies.map(s => s.key));
     setViewedStrategies(newViewedStrategies);
-    localStorage.setItem(getViewedStorageKey('strategies'), JSON.stringify(Array.from(newViewedStrategies)));
+    localStorage.setItem(`viewed_strategies_${platform}_${accountHolder}`, JSON.stringify(Array.from(newViewedStrategies)));
   };
 
   const markCompetitorDataAsViewed = () => {
     const newViewedCompetitorData = new Set(competitorData.map(c => c.key));
     setViewedCompetitorData(newViewedCompetitorData);
-    localStorage.setItem(getViewedStorageKey('competitor'), JSON.stringify(Array.from(newViewedCompetitorData)));
+    localStorage.setItem(`viewed_competitor_data_${platform}_${accountHolder}`, JSON.stringify(Array.from(newViewedCompetitorData)));
   };
 
   const markPostsAsViewed = () => {
     const newViewedPosts = new Set(posts.map(p => p.key));
     setViewedPosts(newViewedPosts);
-    localStorage.setItem(getViewedStorageKey('posts'), JSON.stringify(Array.from(newViewedPosts)));
+    localStorage.setItem(`viewed_posts_${platform}_${accountHolder}`, JSON.stringify(Array.from(newViewedPosts)));
   };
 
   // Auto-mark strategies as viewed when they're accessed/opened (via intersection observer)
@@ -386,25 +463,165 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
 
   // Update viewed sets when new data arrives
   useEffect(() => {
-    const currentViewed = localStorage.getItem(getViewedStorageKey('strategies'));
+    const currentViewed = localStorage.getItem(`viewed_strategies_${platform}_${accountHolder}`);
     if (currentViewed) {
       setViewedStrategies(new Set(JSON.parse(currentViewed)));
     }
   }, [strategies]);
 
   useEffect(() => {
-    const currentViewed = localStorage.getItem(getViewedStorageKey('competitor'));
+    const currentViewed = localStorage.getItem(`viewed_competitor_data_${platform}_${accountHolder}`);
     if (currentViewed) {
       setViewedCompetitorData(new Set(JSON.parse(currentViewed)));
     }
   }, [competitorData]);
 
   useEffect(() => {
-    const currentViewed = localStorage.getItem(getViewedStorageKey('posts'));
+    const currentViewed = localStorage.getItem(`viewed_posts_${platform}_${accountHolder}`);
     if (currentViewed) {
       setViewedPosts(new Set(JSON.parse(currentViewed)));
     }
   }, [posts]);
+
+  // Check loading state on mount and after refreshes
+  useEffect(() => {
+    const checkLoadingState = () => {
+      if (loadingCheckRef.current) return;
+      loadingCheckRef.current = true;
+
+      try {
+        // Check if platform is marked as completed
+        const completedPlatforms = localStorage.getItem('completedPlatforms');
+        if (completedPlatforms) {
+          const completed = JSON.parse(completedPlatforms);
+          if (completed.includes(platform)) {
+            setIsLoading(false);
+            return;
+          }
+        }
+
+        const savedCountdown = localStorage.getItem(`${platform}_processing_countdown`);
+        const processingInfo = localStorage.getItem(`${platform}_processing_info`);
+        
+        if (savedCountdown && processingInfo) {
+          const info = JSON.parse(processingInfo);
+          const endTime = parseInt(savedCountdown);
+          const now = Date.now();
+          
+          // Verify this loading state belongs to the current platform and is still active
+          if (info.platform === platform && now < endTime) {
+            const remainingMinutes = Math.ceil((endTime - now) / 1000 / 60);
+            navigate(`/processing/${platform}`, {
+              state: {
+                platform,
+                username: info.username || accountHolder,
+                remainingMinutes
+              },
+              replace: true
+            });
+            return;
+          }
+        }
+        
+        // If we reach here, either no loading state or it's expired/invalid
+        localStorage.removeItem(`${platform}_processing_countdown`);
+        localStorage.removeItem(`${platform}_processing_info`);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error checking loading state:', error);
+        setIsLoading(false);
+      }
+    };
+
+    // Check loading state immediately
+    checkLoadingState();
+
+    // Also check when window regains focus
+    const handleFocus = () => {
+      loadingCheckRef.current = false; // Reset the ref on focus
+      checkLoadingState();
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [platform, accountHolder, navigate]);
+
+  useEffect(() => {
+    if (processingState.isProcessing && processingState.platform === platform) {
+      navigate(`/processing/${platform}`, { replace: true });
+    }
+  }, [processingState, navigate, platform]);
+
+  // Show loading indicator while checking state
+  if (isLoading) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        backgroundColor: '#f5f5f5'
+      }}>
+        <div style={{
+          textAlign: 'center',
+          color: '#666'
+        }}>
+          <div style={{
+            border: '4px solid #f3f3f3',
+            borderTop: '4px solid #00ffcc',
+            borderRadius: '50%',
+            width: '40px',
+            height: '40px',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 20px'
+          }} />
+          <div>Loading dashboard...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Determine current platform connection info
+  const userId = platform === 'twitter' ? twitterId : 
+               platform === 'facebook' ? facebookId : // Use Facebook context userId
+               igUserId;
+  const isConnected = platform === 'twitter' ? isTwitterConnected : 
+                     platform === 'facebook' ? isFacebookConnected : // Use Facebook context connection status
+                     isInstagramConnected;
+  
+  // Platform configuration
+  const config = {
+    instagram: {
+      name: 'Instagram',
+      primaryColor: '#e4405f',
+      secondaryColor: '#00ffcc',
+      baseUrl: 'https://instagram.com/',
+      supportsNotifications: true,
+      supportsScheduling: true,
+      supportsInsights: true
+    },
+    twitter: {
+      name: 'X (Twitter)',
+      primaryColor: '#000000',
+      secondaryColor: '#ffffff',
+      baseUrl: 'https://twitter.com/',
+      supportsNotifications: true, // Enable Twitter notifications
+      supportsScheduling: false, // Not implemented yet for Twitter
+      supportsInsights: true // Enable Twitter insights
+    },
+    facebook: {
+      name: 'Facebook',
+      primaryColor: '#1877f2',
+      secondaryColor: '#42a5f5',
+      baseUrl: 'https://facebook.com/',
+      supportsNotifications: true, // Enable notifications for Facebook
+      supportsScheduling: true, // Enable scheduling for Facebook
+      supportsInsights: true // Enable insights for Facebook
+    }
+  }[platform];
+
+  // Platform-specific query parameter
+  const platformParam = `?platform=${platform}`;
 
   const handleOpenChatFromMessages = (messageContent: string) => {
     console.log(`[PlatformDashboard] Opening chat for ${platform} with message: "${messageContent}"`);
@@ -1076,6 +1293,10 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const handleSendQuery = async () => {
     if (!query.trim()) return;
     
+    console.log(`[PlatformDashboard] 🚀 Starting ${chatMode} query for ${accountHolder} on ${platform}`);
+    console.log(`[PlatformDashboard] 📝 Query: "${query}"`);
+    console.log(`[PlatformDashboard] 📊 Previous messages: ${chatMessages.length}`);
+    
     setIsProcessing(true);
     
     try {
@@ -1089,8 +1310,23 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           return;
         }
         
-        console.log(`Sending ${platform} discussion query to RAG for ${accountHolder}: ${query}`);
+        console.log(`[PlatformDashboard] 🔍 Sending ${platform} discussion query to RAG for ${accountHolder}: "${query}"`);
         const response = await RagService.sendDiscussionQuery(accountHolder, query, chatMessages, platform);
+        
+        console.log(`[PlatformDashboard] ✅ Received discussion response for ${accountHolder} on ${platform}`);
+        console.log(`[PlatformDashboard] 📝 Response details:`, {
+          responseLength: response.response?.length || 0,
+          usedFallback: response.usedFallback,
+          usingFallbackProfile: response.usingFallbackProfile,
+          enhancedContext: response.enhancedContext,
+          hasQuotaInfo: !!response.quotaInfo
+        });
+        
+        // Validate response
+        if (!response.response || response.response.trim().length === 0) {
+          console.error(`[PlatformDashboard] ❌ Empty response received for ${accountHolder} on ${platform}`);
+          throw new Error('Empty response from RAG service');
+        }
         
         const userMessage: RagChatMessage = {
           role: 'user',
@@ -1107,6 +1343,8 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           assistantMessage as ChatModalMessage
         ];
         
+        console.log(`[PlatformDashboard] 💬 Updated conversation with ${updatedMessages.length} messages for ${accountHolder}`);
+        
         // ✅ REAL USAGE TRACKING: Track actual discussion usage
         const trackingSuccess = await trackRealDiscussion(platform, {
           messageCount: updatedMessages.length,
@@ -1121,10 +1359,20 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         setChatMessages(updatedMessages);
         console.log(`[PlatformDashboard] ✅ Discussion tracked: ${platform} chat engagement`);
         
+        // Log response quality indicators
+        if (response.enhancedContext) {
+          console.log(`[PlatformDashboard] 🧠 Enhanced ChromaDB context detected for ${accountHolder} on ${platform}`);
+        } else if (response.usedFallback) {
+          console.log(`[PlatformDashboard] ⚠️ Using fallback response for ${accountHolder} on ${platform}`);
+        } else {
+          console.log(`[PlatformDashboard] ✅ Standard response processed for ${accountHolder} on ${platform}`);
+        }
+        
         try {
           await RagService.saveConversation(accountHolder, [...chatMessages, userMessage, assistantMessage], platform);
+          console.log(`[PlatformDashboard] 💾 Conversation saved for ${accountHolder} on ${platform}`);
         } catch (saveErr) {
-          console.warn('Failed to save conversation, but continuing:', saveErr);
+          console.warn(`[PlatformDashboard] ⚠️ Failed to save conversation for ${accountHolder}:`, saveErr);
         }
         
         setResult(response.response);
@@ -1142,6 +1390,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
             addedAt: new Date().toISOString()
           }));
           setLinkedAccounts(prev => [...prev, ...newLinkedAccounts]);
+          console.log(`[PlatformDashboard] 🔗 Found ${matches.length} linked accounts in response for ${accountHolder}`);
         }
         
       } else if (chatMode === 'post') {
@@ -1154,8 +1403,15 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           return;
         }
         
-        console.log(`Generating ${platform} post for ${accountHolder}: ${query}`);
+        console.log(`[PlatformDashboard] 🎨 Generating ${platform} post for ${accountHolder}: "${query}"`);
         const response = await RagService.sendPostQuery(accountHolder, query, platform);
+        
+        console.log(`[PlatformDashboard] ✅ Received post generation response for ${accountHolder} on ${platform}`);
+        console.log(`[PlatformDashboard] 📝 Post generation details:`, {
+          success: response.success,
+          hasPost: !!response.post,
+          error: response.error
+        });
         
         if (response.success && response.post) {
           const postContent = `
@@ -1169,6 +1425,7 @@ Image Description: ${response.post.image_prompt}
           `;
           
           setResult(postContent);
+          console.log(`[PlatformDashboard] ✨ Post content generated for ${accountHolder} on ${platform}`);
           
           const userMessage: RagChatMessage = {
             role: 'user',
@@ -1209,25 +1466,27 @@ Image Description: ${response.post.image_prompt}
             }
           });
           window.dispatchEvent(newPostEvent);
-          console.log(`[PlatformDashboard] NEW POST: Triggered PostCooked refresh event for ${platform}`);
+          console.log(`[PlatformDashboard] 🔄 NEW POST: Triggered PostCooked refresh event for ${platform}`);
           
           // DON'T OPEN POPUP FOR POST MODE: Just show success message via toast
           setToast('Post generated successfully! Check the Cooked Posts section.');
           
         } else {
+          console.error(`[PlatformDashboard] ❌ Post generation failed for ${accountHolder} on ${platform}:`, response.error);
           setToast('Failed to generate post. Please try again.');
         }
       }
     } catch (error: any) {
-      console.error(`Error processing ${chatMode} query:`, error);
+      console.error(`[PlatformDashboard] ❌ Error processing ${chatMode} query for ${accountHolder} on ${platform}:`, error);
       setToast(error.message || `Failed to process ${chatMode} query`);
     } finally {
       setIsProcessing(false);
       setQuery('');
+      console.log(`[PlatformDashboard] ✅ Completed ${chatMode} query processing for ${accountHolder} on ${platform}`);
     }
   };
 
-  const refreshAllData = async () => {
+  async function refreshAllData() {
     if (!accountHolder) {
       return;
     }
@@ -1279,7 +1538,7 @@ Image Description: ${response.post.image_prompt}
     }
   };
 
-  const fetchProfileInfo = async () => {
+  async function fetchProfileInfo() {
     if (!accountHolder) return;
     setProfileLoading(true);
     setProfileError(null);
@@ -1299,142 +1558,6 @@ Image Description: ${response.post.image_prompt}
       setProfileLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
-
-  useEffect(() => {
-    if (accountHolder) {
-      refreshAllData();
-      fetchProfileInfo();
-    }
-  }, [accountHolder, competitors, platform]);
-
-  // Load previous conversations when the component mounts
-  useEffect(() => {
-    if (accountHolder) {
-      RagService.loadConversations(accountHolder, platform)
-        .then(messages => {
-          const safeMessages = messages.map(msg => ({
-            role: msg.role === 'user' ? 'user' as const : 'assistant' as const,
-            content: msg.content
-          }));
-          setChatMessages(safeMessages);
-        })
-        .catch(err => console.error('Failed to load conversations:', err));
-    }
-  }, [accountHolder, platform]);
-
-  // Initialize notifications and SSE for the current platform
-  useEffect(() => {
-    const currentUserId = platform === 'twitter' ? twitterId : igUserId;
-    if (currentUserId) {
-      fetchNotifications();
-      setupSSE(currentUserId);
-
-      // Fallback polling every 5 minutes
-      const interval = setInterval(() => {
-        fetchNotifications();
-      }, 300000);
-
-      return () => {
-        clearInterval(interval);
-        if (eventSourceRef.current) {
-          eventSourceRef.current.close();
-          eventSourceRef.current = null;
-        }
-      };
-    }
-  }, [platform === 'twitter' ? twitterId : igUserId, platform]);
-
-  // Clean old entries from reply tracker
-  useEffect(() => {
-    const cleanInterval = setInterval(() => {
-      const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
-      setReplySentTracker(prev => prev.filter(reply => reply.timestamp > tenMinutesAgo));
-    }, 60000);
-    
-    return () => clearInterval(cleanInterval);
-  }, []);
-
-  // Handle custom event for opening campaign modal
-  useEffect(() => {
-    const handleOpenCampaignEvent = (event: any) => {
-      const { username, platform } = event.detail;
-      if (username === accountHolder && platform === 'Twitter') {
-        setShowCampaignButton(true);
-        setIsCampaignModalOpen(true);
-      }
-    };
-
-    const handleCampaignStoppedEvent = (event: any) => {
-      const { username, platform } = event.detail;
-      if (username === accountHolder && platform === 'twitter') {
-        setShowCampaignButton(false);
-        setIsCampaignModalOpen(false);
-      }
-    };
-
-    window.addEventListener('openCampaignModal', handleOpenCampaignEvent);
-    window.addEventListener('campaignStopped', handleCampaignStoppedEvent);
-    
-    return () => {
-      window.removeEventListener('openCampaignModal', handleOpenCampaignEvent);
-      window.removeEventListener('campaignStopped', handleCampaignStoppedEvent);
-    };
-  }, [accountHolder]);
-
-  // Bio typing animation effect
-  useEffect(() => {
-    if (!profileInfo?.biography || !profileInfo.biography.trim()) {
-      return;
-    }
-
-    // Start the initial animation sequence
-    const timer1 = setTimeout(() => {
-      // Fade out initial text after 5 seconds
-      setShowInitialText(false);
-      
-      // Start showing bio with typing effect after fade out completes
-      setTimeout(() => {
-        setShowBio(true);
-        
-        // Start typing animation
-        const bio = profileInfo.biography!; // Non-null assertion since we already checked
-        let currentIndex = 0;
-        
-        const typeNextChar = () => {
-          if (currentIndex < bio.length) {
-            setTypedBio(bio.substring(0, currentIndex + 1));
-            currentIndex++;
-            
-            // Fast typing speed - 50ms per character
-            setTimeout(typeNextChar, 50);
-          } else {
-            setBioAnimationComplete(true);
-          }
-        };
-        
-        typeNextChar();
-      }, 500); // Wait for fade out to complete
-    }, 5000); // Initial 5 second delay
-
-    return () => clearTimeout(timer1);
-  }, [profileInfo?.biography]);
-
-  // Reset animation states when profile info changes
-  useEffect(() => {
-    if (profileInfo?.biography && profileInfo.biography.trim()) {
-      setShowInitialText(true);
-      setShowBio(false);
-      setTypedBio('');
-      setBioAnimationComplete(false);
-    }
-  }, [profileInfo]);
 
   if (!accountHolder) {
     return null;

@@ -1,0 +1,18 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "You are a helpful social media assistant. Provide a brief, helpful response to:  \"tell me about my enagaging post \"\n\nInstructions:\n• Analyze the actual data above to answer the specific question\n• Be conversational, insightful, and specific to this account\n• Reference real numbers, captions, and performance patterns from the data\n• Provide actionable recommendations based on what's actually working\n• Think like a consultant who's deeply familiar with this account's performance\n\nRespond as a knowledgeable social media expert discussing this specific account."
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 2000,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "topK": 40
+  }
+}

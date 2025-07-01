@@ -47,13 +47,12 @@ const usernameCheckUrl = '/api/check-username-availability';
   // Facebook username validation (letters, numbers, periods only - no underscores for Facebook)
   const facebookUsernameRegex = /^[a-zA-Z0-9.]+$/;
 
-  // Check for existing processing state on mount
+  // Initialize component
   useEffect(() => {
-    if (processingState.isProcessing && processingState.platform === 'facebook') {
-      setIsProcessing(true);
+    // Only check for active processing state, not completed state
+    // The dashboards will handle redirecting completed users
       setIsInitializing(false);
-    }
-  }, [processingState]);
+  }, []);
 
   useEffect(() => {
     const checkUserStatus = async () => {
@@ -63,6 +62,42 @@ const usernameCheckUrl = '/api/check-username-availability';
         return;
       }
       
+      // First check localStorage as primary source of truth
+      const hasAccessed = localStorage.getItem(`facebook_accessed_${currentUser.uid}`) === 'true';
+      
+      if (hasAccessed && redirectIfCompleted) {
+        // User has already accessed, try to get saved data from localStorage or backend
+        const savedUsername = localStorage.getItem(`facebook_username_${currentUser.uid}`);
+        const savedAccountType = localStorage.getItem(`facebook_account_type_${currentUser.uid}`) as 'branding' | 'non-branding' || 'branding';
+        const savedCompetitors = JSON.parse(localStorage.getItem(`facebook_competitors_${currentUser.uid}`) || '[]');
+        
+        if (savedUsername) {
+          onSubmitSuccess(savedUsername, savedCompetitors, savedAccountType);
+          
+          if (savedAccountType === 'branding') {
+            navigate('/facebook-dashboard', { 
+              state: { 
+                accountHolder: savedUsername, 
+                competitors: savedCompetitors,
+                accountType: 'branding',
+                platform: 'facebook'
+              } 
+            });
+          } else {
+            navigate('/facebook-non-branding-dashboard', { 
+              state: { 
+                accountHolder: savedUsername,
+                competitors: savedCompetitors,
+                accountType: 'non-branding',
+                platform: 'facebook'
+              } 
+            });
+          }
+          return;
+        }
+      }
+      
+      // If not in localStorage, try backend API as fallback
       try {
         const response = await axios.get(`${statusApiUrl}/${currentUser.uid}`);
         
@@ -70,6 +105,12 @@ const usernameCheckUrl = '/api/check-username-availability';
           const savedUsername = response.data.facebook_username;
           const savedCompetitors = response.data.competitors || [];
           const savedAccountType = response.data.accountType || 'branding';
+          
+          // Save to localStorage for future use
+          localStorage.setItem(`facebook_accessed_${currentUser.uid}`, 'true');
+          localStorage.setItem(`facebook_username_${currentUser.uid}`, savedUsername);
+          localStorage.setItem(`facebook_account_type_${currentUser.uid}`, savedAccountType);
+          localStorage.setItem(`facebook_competitors_${currentUser.uid}`, JSON.stringify(savedCompetitors));
           
           onSubmitSuccess(savedUsername, savedCompetitors, savedAccountType as 'branding' | 'non-branding');
           
@@ -97,6 +138,7 @@ const usernameCheckUrl = '/api/check-username-availability';
         }
       } catch (error) {
         console.error('Error checking user Facebook status:', error);
+        // If backend fails, just show the form
         setIsInitializing(false);
       }
     };
@@ -252,14 +294,19 @@ const usernameCheckUrl = '/api/check-username-availability';
     setTimeout(() => setMessage(''), 5000);
   };
 
-  const handleStartProcessing = (username: string) => {
-    startProcessing('facebook', username, 15); // 15 minutes duration
-    setIsProcessing(true);
-    setIsInitializing(false);
-  };
-
   const handleProcessingComplete = () => {
+    // Reset local processing state
     setIsProcessing(false);
+    
+    // Mark platform as accessed after processing is complete
+    if (markPlatformAccessed) {
+      markPlatformAccessed('facebook');
+    } else if (currentUser?.uid) {
+      // Fallback: set localStorage flag directly
+      localStorage.setItem(`facebook_accessed_${currentUser.uid}`, 'true');
+    }
+    
+    // Call the onComplete callback
     if (onComplete) {
       onComplete();
     }
@@ -306,10 +353,16 @@ const usernameCheckUrl = '/api/check-username-availability';
           competitors: competitors.map(comp => comp.trim())
         });
         
+        // Save to localStorage immediately for future use
+        localStorage.setItem(`facebook_accessed_${currentUser.uid}`, 'true');
+        localStorage.setItem(`facebook_username_${currentUser.uid}`, username.trim());
+        localStorage.setItem(`facebook_account_type_${currentUser.uid}`, accountType);
+        localStorage.setItem(`facebook_competitors_${currentUser.uid}`, JSON.stringify(competitors.map(comp => comp.trim())));
+        
         showMessage('Submission successful', 'success');
         
-        // Start the processing phase
-        handleStartProcessing(username);
+        // Start the processing phase using unified ProcessingContext
+        startProcessing('facebook', username.trim(), 25); // 25 minutes duration
       }
     } catch (error: any) {
       console.error('Error submitting Facebook data:', error);
@@ -319,6 +372,35 @@ const usernameCheckUrl = '/api/check-username-availability';
       setIsLoading(false);
     }
   };
+
+  // Check for existing processing state on mount
+  useEffect(() => {
+    if (processingState.isProcessing && processingState.platform === 'facebook') {
+      setIsProcessing(true);
+      setIsInitializing(false);
+      
+      // Restore username from processing state or localStorage
+      if (processingState.username) {
+        setUsername(processingState.username);
+      } else {
+        // Fallback to localStorage
+        try {
+          const processingInfo = localStorage.getItem('facebook_processing_info');
+          if (processingInfo) {
+            const info = JSON.parse(processingInfo);
+            if (info.username) {
+              setUsername(info.username);
+            }
+          }
+        } catch (error) {
+          console.error('Error reading username from localStorage:', error);
+        }
+      }
+    } else {
+      // No active processing, show the form
+      setIsInitializing(false);
+    }
+  }, [processingState]);
 
   if (isInitializing) {
     return (

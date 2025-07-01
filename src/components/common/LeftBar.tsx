@@ -10,7 +10,7 @@ interface LeftBarProps {
   accountHolder: string;
   userId?: string;
   platform?: 'instagram' | 'twitter' | 'facebook';
-  onOpenChat?: (messageContent: string) => void;
+  onOpenChat?: (messageContent: string, platform?: string) => void;
 }
 
 const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'instagram', onOpenChat }) => {
@@ -30,6 +30,7 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
   }, [navigate]);
 
   const menuItems = [
+    { icon: 'chat', label: 'AI Chat', action: () => setShowMessagesPopup(true) },
     { icon: 'content', label: 'Content Hub', action: () => setShowCanvasEditor(true) },
     { icon: 'profile', label: 'Profile', action: () => setShowProfilePopup(true) }
   ];
@@ -57,6 +58,11 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
             }}
             onClick={item.action}
           >
+            {item.icon === 'chat' && (
+              <svg className="icon" viewBox="0 0 24 24">
+                <path d="M21,15A2,2 0 0,1 19,17H7L4,20V5A2,2 0 0,1 6,3H19A2,2 0 0,1 21,5V15Z" />
+              </svg>
+            )}
             {item.icon === 'content' && (
               <svg className="icon" viewBox="0 0 24 24">
                 <path d="M19,3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M19,19H5V5H19V19Z M17,17H7V15H17V17Z M17,13H7V11H17V13Z M17,9H7V7H17V9Z" />
@@ -68,9 +74,23 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
               </svg>
             )}
             <span>{item.label}</span>
+            {item.icon === 'chat' && hasNewMessages && (
+              <div className="notification-dot"></div>
+            )}
           </motion.button>
         ))}
       </div>
+      
+      {showMessagesPopup && (
+        <MessagesPopup
+          username={accountHolder}
+          onClose={() => setShowMessagesPopup(false)}
+          setHasNewMessages={setHasNewMessages}
+          onOpenChat={onOpenChat}
+          platform={platform}
+        />
+      )}
+      
       {showProfilePopup && (
         <ProfilePopup 
           username={accountHolder} 
@@ -78,6 +98,7 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
           platform={platform}
         />
       )}
+      
       {showCanvasEditor && (
         <CanvasEditor 
           username={accountHolder} 

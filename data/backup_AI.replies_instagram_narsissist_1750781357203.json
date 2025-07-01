@@ -1,0 +1,21 @@
+{
+  "username": "narsissist",
+  "platform": "instagram",
+  "timestamp": "2025-06-24T16:09:17.203Z",
+  "notification": {
+    "type": "message",
+    "instagram_user_id": "17841471786269325",
+    "sender_id": "539180445642894",
+    "message_id": "aWdfZAG1faXRlbToxOklHTWVzc2FnZAUlEOjE3ODQxNDcxNzg2MjY5MzI1OjM0MDI4MjM2Njg0MTcxMDMwMTI0NDI3NjAxNzgyNzg1ODU2MDMyODozMjI5NjIxNTM0MjQ1NTg5NDE0ODEwNTU1OTg1NDgwOTA4OAZDZD",
+    "text": "Hey tell me about your products?",
+    "timestamp": 1750781351126,
+    "received_at": "2025-06-24T16:09:11.126Z",
+    "status": "pending",
+    "platform": "instagram"
+  },
+  "reply": "Hey there! 👋 We're NARS Cosmetics, founded by makeup artist François Nars back in '94. We're all about breaking the rules and empowering self-expression through makeup. Think bold colors, innovative textures, and products that let you create your own signature look. From our iconic Orgasm blush to our creamy Radiant Creamy Concealer, we've got everything you need to play, experiment, and unleash your inner artist! ✨💄",
+  "mode": "instant",
+  "usedFallback": false,
+  "hasProfileData": true,
+  "hasConversationHistory": false
+}

@@ -1,0 +1,21 @@
+{
+  "username": "fentybeauty",
+  "platform": "instagram",
+  "timestamp": "2025-06-30T02:15:29.109Z",
+  "notification": {
+    "type": "message",
+    "instagram_user_id": "17841471786269325",
+    "sender_id": "679240224685804",
+    "message_id": "aWdfZAG1faXRlbToxOklHTWVzc2FnZAUlEOjE3ODQxNDcxNzg2MjY5MzI1OjM0MDI4MjM2Njg0MTcxMDMwMTI0NDI3NjAxODc5ODc2NjU1OTM1MzozMjMwNDg1NTI2NDIyNjA3OTcxNzk1MjQ4ODE2ODQ4ODk2MAZDZD",
+    "text": "Hey tell me about your brands products and varieties?",
+    "timestamp": 1751249725315,
+    "received_at": "2025-06-30T02:15:25.315Z",
+    "status": "pending",
+    "platform": "instagram"
+  },
+  "reply": "Hey there! 👋 FENTY BEAUTY is all about creating makeup for everyone! We've got a huge range of products, from complexion must-haves like our foundations and concealers (with tons of shades!) to vibrant lipsticks (like 'Hot Cherry' 😉 - Riri's fave!). We also drop limited edition collections, so keep an eye out! You can find us online and worldwide at Sephora, Ulta, Harvey Nichols, Selfridges, Boots & select Asia duty free shops! #FENTYBEAUTY 💖",
+  "mode": "instant",
+  "usedFallback": false,
+  "hasProfileData": true,
+  "hasConversationHistory": false
+}

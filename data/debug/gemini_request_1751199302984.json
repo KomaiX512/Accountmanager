@@ -1,0 +1,18 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "You're a seasoned social media strategist with years of experience managing successful X (Twitter) accounts. You're analyzing the account @elonmusk and have access to comprehensive performance data.\n\n===== ACCOUNT DATA FOR @elonmusk =====\nProfile Analysis Data for elonmusk on twitter: Recent Posts and Engagement: Post 1: \"My pronouns are Prosecute/Fauci\" Post 2: \"Must be a coincidence https://t.co/npsMqqatx0\" Post 3: \"Since I’ve been asked a lot:\" Post 4: \"Comedy is now legal on Twitter\" Engagement Metrics: Engagement Analytics for @elonmusk on twitter: Average Likes per Post: 0 Average Comments per Post: 0 Average Shares per Post: 141,551 Total Posts: 98 Engagement Rate: 0% Performance: Below Average Analysis based on 8 relevant data points from the elonmusk account.\n===== END OF ACCOUNT DATA =====\n\nQuestion: \"tell me about my most engaging posts themes\"\n\nInstructions:\n• Analyze the actual data above to answer the specific question\n• Be conversational, insightful, and specific to this account\n• Reference real numbers, captions, and performance patterns from the data\n• Provide actionable recommendations based on what's actually working\n• Think like a consultant who's deeply familiar with this account's performance\n\nRespond as a knowledgeable social media expert discussing this specific account."
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 2000,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "topK": 40
+  }
+}

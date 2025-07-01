@@ -1,0 +1,41 @@
+{
+  "buildVersion": "1.0.0",
+  "buildDate": "2025-01-20",
+  "buildType": "production",
+  "optimizations": {
+    "manualChunks": true,
+    "terserMinification": true,
+    "consoleRemoval": true,
+    "debuggerRemoval": true,
+    "chunkSizeOptimized": true,
+    "sourceMapDisabled": true
+  },
+  "chunks": {
+    "react-vendor": "Core React libraries",
+    "mui-vendor": "Material-UI components",
+    "utility-vendor": "Axios, date-fns, framer-motion",
+    "chart-vendor": "Chart.js and React Chart.js",
+    "canvas-vendor": "Konva and React Konva",
+    "form-vendor": "React Hook Form and date picker",
+    "icon-vendor": "React Icons",
+    "three-vendor": "Three.js library",
+    "tui-image-editor": "Image editor component",
+    "index": "Main application bundle"
+  },
+  "deployment": {
+    "ready": true,
+    "distFolder": "./dist",
+    "staticFiles": [
+      "index.html",
+      "favicon.ico",
+      "sw.js",
+      "assets/"
+    ],
+    "warningsFixed": [
+      "Dynamic import optimization",
+      "Chunk size warnings addressed",
+      "TypeScript build errors resolved",
+      "Terser minification enabled"
+    ]
+  }
+} 

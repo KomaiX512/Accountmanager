@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "\n\nBased on the provided data, I can tell you about the Too Faced Instagram account, @toofaced.\n\nThe data includes the following information:\n\n*   **Account Information:**\n    *   Profile: Too Faced Cosmetics\n    *   Username: @toofaced\n    *   Platform: Instagram\n    *   Followers: 12,484,905\n    *   Following: 2,274\n    *   Posts: 12,334\n    *   Verified: Yes\n    *   Business Account: Yes\n    *   Category: Personal Goods & General Merchandise Stores\n\n*   **Bio Analysis:**\n    *   Description: \"We're a serious makeup brand that knows how to have fun Too Faced is a cruelty-free brand, always has been, always will be.\"\n    *   Themes: Beauty & Cosmetics, Business & Entrepreneurship\n    *   Personality: Engaging\n    *   Keywords: serious, makeup, brand, knows, faced, cruelty, free, always\n\nUnfortunately, the provided data **does not include information about specific posts or their engagement metrics** (likes, comments, etc.). Therefore, I cannot identify the most engaging post for @toofaced.\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.11860097687819908
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 438,
+    "candidatesTokenCount": 261,
+    "totalTokenCount": 699,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 438
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 261
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "Md9haM62E6GV7dcP9rfw2Qc"
+}

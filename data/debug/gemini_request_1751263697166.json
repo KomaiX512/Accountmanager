@@ -1,0 +1,18 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "You are a social media data analyst. You have been provided with SPECIFIC, REAL DATA about the facebook account @shakira. This data includes actual post content, engagement metrics, and performance statistics.\n\nYOUR TASK: Answer the user's question using ONLY the provided data below. You MUST reference specific numbers, captions, and metrics from the data provided.\n\n===== REAL ACCOUNT DATA FOR @shakira =====\nProfile Analysis Data for shakira on facebook: Recent Posts and Engagement: Post 1: \"Thank you to my audience for 30 sold-out shows! Happy 30th show! Amazing crowd tonight, screaming all the rock tunes. Rock on, Detroit!!! #LMYNLWorldTour #LMYNLWorldTourDetroit\" Post 2: \"Miami, these two nights have been a dream! Two packed stadium shows, 90,000 people singing in unison with me. Gracias, mi gente, por ayudarme a hacer historia. ¡Sin ustedes, nada de esto habría sido posible! ️ Gracias @alejandrosanz @bizarrap @manuelturizo y @ozuna! Los quiero #LMYNLWorldTourMiami\" Post 3: \"@rauwalejandro ! I can’t wait to be on stage with you and your “carita linda” performing this song at my second night in NY! See you in MetLife next Friday! 🤖 #LMYNLWorldTour\" Post 4: \"This song is feeling so anthemic, it’s becoming one of my fav moments.\" Engagement Metrics: Engagement Analytics for @shakira on facebook: Average Likes per Post: 0 Average Comments per Post: 0 Average Shares per Post: 0 Total Posts: 50 Engagement Rate: 0% Performance: Below Average Analysis based on 8 relevant data points from the shakira account.\n===== END OF REAL DATA =====\n\nUser Question: \"he tell me how much post you have and tell me most engaging posts theme to me from my posts histories\"\n\nINSTRUCTIONS:\n1. You MUST use the specific post data provided above\n2. You MUST quote actual captions from the \"Recent Posts and Engagement\" section\n3. You MUST include the exact engagement numbers (likes, comments, totals)\n4. You MUST reference the \"Most Engaging Post\" data if it exists\n5. DO NOT claim you lack data - all necessary data is provided above\n6. Answer based EXCLUSIVELY on the provided account data\n\nProvide a detailed response that directly uses the post content and engagement metrics shown above."
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 2000,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "topK": 40
+  }
+}

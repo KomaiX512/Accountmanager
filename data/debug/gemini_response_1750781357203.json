@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Hey there! 👋 We're NARS Cosmetics, founded by makeup artist François Nars back in '94. We're all about breaking the rules and empowering self-expression through makeup. Think bold colors, innovative textures, and products that let you create your own signature look. From our iconic Orgasm blush to our creamy Radiant Creamy Concealer, we've got everything you need to play, experiment, and unleash your inner artist! ✨💄\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.11148291445792989
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 359,
+    "candidatesTokenCount": 94,
+    "totalTokenCount": 453,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 359
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 94
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "rM1aaKeWAoHjx_APgdCCwAU"
+}

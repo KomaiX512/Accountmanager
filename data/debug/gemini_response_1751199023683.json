@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Okay, based on the limited information you've provided (no followers, no posts), I can't tell you anything specific about your most engaging post themes. **I have absolutely no data to analyze.**\n\nTo get the analysis you're looking for, you'll need to provide data about your X (Twitter) account. Specifically, I need:\n\n*   **Your past posts:** The content of your tweets is crucial.\n*   **Engagement metrics for each post:** This includes:\n    *   Likes\n    *   Retweets (Reposts)\n    *   Replies\n    *   Impressions (how many times the tweet was seen)\n    *   Link clicks (if applicable)\n    *   Profile visits (if applicable)\n\nOnce you provide that data, I can analyze it to identify:\n\n*   **Themes:** What topics resonate with your audience? Are they interested in specific news, opinions, humor, tutorials, etc.?\n*   **Formats:** Do your followers prefer text-based tweets, images, videos, polls, or threads?\n*   **Timing:** When are your followers most active and engaging with your content?\n*   **Tone:** What kind of voice and style do your followers respond to? (e.g., humorous, informative, serious, controversial)\n*   **Hashtags:** Which hashtags are associated with your most successful posts?\n\n**In the meantime, here are some general tips for growing your X (Twitter) account:**\n\n*   **Post consistently:** Regular posting keeps you visible.\n*   **Engage with others:** Reply to comments, retweet relevant content, and participate in conversations.\n*   **Use relevant hashtags:** Hashtags help people discover your content.\n*   **Post visually appealing content:** Images and videos tend to get more engagement than text-only tweets.\n*   **Experiment with different types of content:** Try different formats and topics to see what resonates with your audience.\n*   **Analyze your results:** Use X (Twitter) Analytics to track your performance and identify what's working.\n\n**In short, give me data, and I can give you analysis!**\n"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.2263975863986545
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 61,
+    "candidatesTokenCount": 450,
+    "totalTokenCount": 511,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 61
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 450
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "LC1haIX-NoOi7dcPoZvY0AQ"
+}

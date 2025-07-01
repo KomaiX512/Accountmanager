@@ -1,0 +1,18 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Instagram account analysis:\n\nAccount metrics:\n- Followers: 12,488,635\n- Posts: 12,324\n- Platform: Instagram\n\nQuestion: tell my most m=popular post and its reason so I learn from it and any engagaing unique about posting so i continue grow like a king\n\nProvide analysis using the metrics above."
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 2000,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "topK": 40
+  }
+}

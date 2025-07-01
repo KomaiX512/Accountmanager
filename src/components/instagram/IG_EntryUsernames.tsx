@@ -48,59 +48,39 @@ const usernameCheckUrl = '/api/check-username-availability';
   // Username validation regex (lowercase letters, numbers, underscores, periods only)
   const instagramUsernameRegex = /^[a-z0-9._]+$/;
 
-  // Check if user has already entered Instagram username
+  // Initialize component
   useEffect(() => {
-    const checkUserStatus = async () => {
-      if (!currentUser || !currentUser.uid) {
-        console.error('No authenticated user found');
+    // Only check for active processing state, not completed state
+    // The dashboards will handle redirecting completed users
         setIsInitializing(false);
-        return;
-      }
-      
-      try {
-        const response = await axios.get(`${statusApiUrl}/${currentUser.uid}`);
-        
-        if (response.data.hasEnteredInstagramUsername && redirectIfCompleted) {
-          // User has already entered username, redirect to dashboard
-          const savedUsername = response.data.instagram_username;
-          const savedCompetitors = response.data.competitors || [];
-          const savedAccountType = response.data.accountType || 'branding';
-          
-          onSubmitSuccess(savedUsername, savedCompetitors, savedAccountType as 'branding' | 'non-branding');
-          
-          if (savedAccountType === 'branding') {
-            navigate('/dashboard', { 
-              state: { 
-                accountHolder: savedUsername, 
-                competitors: savedCompetitors,
-                accountType: 'branding'
-              } 
-            });
-          } else {
-            navigate('/non-branding-dashboard', { 
-              state: { 
-                accountHolder: savedUsername,
-                accountType: 'non-branding' 
-              } 
-            });
-          }
-        } else {
-          setIsInitializing(false);
-        }
-      } catch (error) {
-        console.error('Error checking user Instagram status:', error);
-        setIsInitializing(false);
-      }
-    };
-    
-    checkUserStatus();
-  }, [currentUser, navigate, onSubmitSuccess, redirectIfCompleted]);
+  }, []);
 
   // Check for existing processing state on mount
   useEffect(() => {
     if (processingState.isProcessing && processingState.platform === 'instagram') {
           setIsProcessing(true);
           setIsInitializing(false);
+      
+      // Restore username from processing state or localStorage
+      if (processingState.username) {
+        setUsername(processingState.username);
+      } else {
+        // Fallback to localStorage
+        try {
+          const processingInfo = localStorage.getItem('instagram_processing_info');
+          if (processingInfo) {
+            const info = JSON.parse(processingInfo);
+            if (info.username) {
+              setUsername(info.username);
+            }
+          }
+        } catch (error) {
+          console.error('Error reading username from localStorage:', error);
+        }
+      }
+    } else {
+      // No active processing, show the form
+      setIsInitializing(false);
     }
   }, [processingState]);
 
@@ -235,35 +215,20 @@ const usernameCheckUrl = '/api/check-username-availability';
   };
 
   const handleProcessingComplete = () => {
-    // Clear processing state from localStorage
-    if (currentUser?.uid) {
-      localStorage.removeItem(`instagram_processing_${currentUser.uid}`);
-    }
+    // Reset local processing state
+    setIsProcessing(false);
     
-    const finalCompetitors = competitors.filter(comp => comp.trim() !== '');
-    
+    // Mark platform as accessed after processing is complete
     if (markPlatformAccessed) {
       markPlatformAccessed('instagram');
+    } else if (currentUser?.uid) {
+      // Fallback: set localStorage flag directly
+      localStorage.setItem(`instagram_accessed_${currentUser.uid}`, 'true');
     }
     
-    if (accountType === 'branding') {
-      navigate('/dashboard', { 
-        state: { 
-          accountHolder: username, 
-          competitors: finalCompetitors,
-          accountType: 'branding',
-          platform: 'instagram'
-        } 
-      });
-    } else {
-      navigate('/non-branding-dashboard', { 
-        state: { 
-          accountHolder: username,
-          competitors: finalCompetitors,
-          accountType: 'non-branding',
-          platform: 'instagram'
-        } 
-      });
+    // Call the onComplete callback
+    if (onComplete) {
+      onComplete();
     }
   };
 
@@ -308,20 +273,16 @@ const usernameCheckUrl = '/api/check-username-availability';
           competitors: competitors.map(comp => comp.trim()) // Always save competitors
         });
         
+        // Save to localStorage immediately for future use
+        localStorage.setItem(`instagram_accessed_${currentUser.uid}`, 'true');
+        localStorage.setItem(`instagram_username_${currentUser.uid}`, username.trim());
+        localStorage.setItem(`instagram_account_type_${currentUser.uid}`, accountType);
+        localStorage.setItem(`instagram_competitors_${currentUser.uid}`, JSON.stringify(competitors.map(comp => comp.trim())));
+        
         showMessage('Submission successful', 'success');
         
-        // Save processing state to localStorage with timestamp
-        const processingData = {
-          startTime: Date.now(),
-          duration: 900000, // 15 minutes in milliseconds
-          username: username.trim(),
-          platform: 'instagram'
-        };
-        localStorage.setItem(`instagram_processing_${currentUser.uid}`, JSON.stringify(processingData));
-        
-        // Start the processing phase
-        setIsLoading(false);
-        setIsProcessing(true);
+        // Start the processing phase using unified ProcessingContext
+        startProcessing('instagram', username.trim(), 15); // 15 minutes duration
       }
     } catch (error: any) {
       console.error('Error submitting data:', error);
@@ -331,12 +292,6 @@ const usernameCheckUrl = '/api/check-username-availability';
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleStartProcessing = (username: string) => {
-    startProcessing('instagram', username, 15); // 15 minutes duration
-    setIsProcessing(true);
-    setIsInitializing(false);
   };
 
   if (isInitializing) {

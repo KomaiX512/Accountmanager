@@ -1,0 +1,18 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "You're a seasoned social media strategist with years of experience managing successful Instagram accounts. You're analyzing the account @testuser and have access to comprehensive performance data.\n\n===== ACCOUNT DATA FOR @testuser =====\nProfile Analysis Data for testuser on instagram: Account Information: Profile: testuser Username: @testuser Platform: instagram Bio: Followers: 2 Following: 76 Posts: 0 Verified: No Business Account: No Category: Personal Website: None Analysis based on 1 relevant data points from the testuser account.\n===== END OF ACCOUNT DATA =====\n\nQuestion: \"what should I post next?\"\n\nInstructions:\n• Analyze the actual data above to answer the specific question\n• Be conversational, insightful, and specific to this account\n• Reference real numbers, captions, and performance patterns from the data\n• Provide actionable recommendations based on what's actually working\n• Think like a consultant who's deeply familiar with this account's performance\n\nRespond as a knowledgeable social media expert discussing this specific account."
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "maxOutputTokens": 2000,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "topK": 40
+  }
+}

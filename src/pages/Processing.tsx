@@ -1,11 +1,16 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import ProcessingLoadingState from '../components/common/ProcessingLoadingState';
+import { useProcessing } from '../context/ProcessingContext';
+import { useAuth } from '../context/AuthContext';
+import { safeNavigate, safeHistoryManipulation } from '../utils/navigationGuard';
 
 const Processing: React.FC = () => {
   const navigate = useNavigate();
   const { platform } = useParams<{ platform: string }>();
   const location = useLocation();
+  const { completeProcessing } = useProcessing();
+  const { currentUser } = useAuth();
   const [isValidating, setIsValidating] = useState(true);
   const [shouldRender, setShouldRender] = useState(false);
   const validationRef = useRef(false);
@@ -19,23 +24,65 @@ const Processing: React.FC = () => {
   } | null;
 
   const targetPlatform = platform || stateData?.platform || 'instagram';
-  const username = stateData?.username || 'User';
+  
+  // Get username from state or localStorage
+  const username = stateData?.username || (() => {
+    try {
+      const processingInfo = localStorage.getItem(`${targetPlatform}_processing_info`);
+      if (processingInfo) {
+        const info = JSON.parse(processingInfo);
+        return info.username || 'User';
+      }
+    } catch (error) {
+      console.error('Error reading username from localStorage:', error);
+    }
+    return 'User';
+  })();
+  
   const remainingMinutes = stateData?.remainingMinutes;
   const forcedRedirect = stateData?.forcedRedirect || false;
 
-  // BULLETPROOF timer validation
-  const validateTimer = (): { isValid: boolean; remainingMs: number } => {
+  // Validate timer and check if platform is completed
+  const validateTimer = () => {
     try {
-      const raw = localStorage.getItem(`${targetPlatform}_processing_countdown`);
-      if (!raw) return { isValid: false, remainingMs: 0 };
+      const savedCountdown = localStorage.getItem(`${targetPlatform}_processing_countdown`);
+      const processingInfo = localStorage.getItem(`${targetPlatform}_processing_info`);
       
-      const endTime = parseInt(raw, 10);
-      if (Number.isNaN(endTime)) return { isValid: false, remainingMs: 0 };
+      if (!savedCountdown || !processingInfo) {
+        // No active timer - check if platform is completed
+        const completedPlatforms = localStorage.getItem('completedPlatforms');
+        if (completedPlatforms) {
+          const completed = JSON.parse(completedPlatforms);
+          if (completed.includes(targetPlatform)) {
+            console.log(`🛡️ PROCESSING PAGE: Platform ${targetPlatform} already completed, redirecting to dashboard`);
+            return { isValid: false, reason: 'completed' };
+          }
+        }
+        return { isValid: false, reason: 'no_data' };
+      }
+
+      const info = JSON.parse(processingInfo);
+      const endTime = parseInt(savedCountdown);
+      const now = Date.now();
       
-      const remainingMs = Math.max(0, endTime - Date.now());
-      return { isValid: remainingMs > 0, remainingMs };
-    } catch {
-      return { isValid: false, remainingMs: 0 };
+      // Verify this loading state belongs to the current platform
+      if (info.platform !== targetPlatform) {
+        return { isValid: false, reason: 'platform_mismatch' };
+      }
+      
+      // Check if timer has expired
+      if (now >= endTime) {
+        return { isValid: false, reason: 'expired' };
+      }
+      
+      const remainingMs = endTime - now;
+      const remainingMinutes = Math.ceil(remainingMs / 1000 / 60);
+      
+      console.log(`🛡️ PROCESSING PAGE: Valid timer for ${targetPlatform} - ${remainingMinutes} minutes remaining`);
+      return { isValid: true, remainingMs, remainingMinutes };
+    } catch (error) {
+      console.error('Error validating timer:', error);
+      return { isValid: false, reason: 'error' };
     }
   };
 
@@ -59,21 +106,23 @@ const Processing: React.FC = () => {
         localStorage.removeItem(`${targetPlatform}_processing_countdown`);
         localStorage.removeItem(`${targetPlatform}_processing_info`);
         
+        // Reset global processing state & redirect to appropriate dashboard
+        completeProcessing();
         // Redirect to appropriate dashboard
         const dashboardPath = getDashboardPath(targetPlatform);
-        navigate(dashboardPath, { replace: true });
+        safeNavigate(navigate, dashboardPath, { replace: true }, 8);
         return;
       }
 
       // Valid timer found - allow processing page to render
-      console.log(`🛡️ PROCESSING PAGE: Valid timer for ${targetPlatform} - ${Math.ceil(timer.remainingMs / 1000 / 60)} minutes remaining`);
+      console.log(`🛡️ PROCESSING PAGE: Valid timer for ${targetPlatform} - ${timer.remainingMs ? Math.ceil(timer.remainingMs / 1000 / 60) : 'unknown'} minutes remaining`);
       setShouldRender(true);
       setIsValidating(false);
     };
 
     // Add slight delay to prevent flash
     setTimeout(validate, 100);
-  }, [targetPlatform, navigate]);
+  }, [targetPlatform, navigate, completeProcessing]);
 
   // Helper function to get dashboard path
   const getDashboardPath = (platform: string): string => {
@@ -100,14 +149,16 @@ const Processing: React.FC = () => {
         localStorage.removeItem(`${targetPlatform}_processing_countdown`);
         localStorage.removeItem(`${targetPlatform}_processing_info`);
         
-        // Redirect to dashboard
+        // Reset global processing state & redirect to appropriate dashboard
+        completeProcessing();
+        // Redirect to appropriate dashboard
         const dashboardPath = getDashboardPath(targetPlatform);
-        navigate(dashboardPath, { replace: true });
+        safeNavigate(navigate, dashboardPath, { replace: true }, 8);
       }
     }, 1000); // Check every second
 
     return () => clearInterval(interval);
-  }, [shouldRender, targetPlatform, navigate]);
+  }, [shouldRender, targetPlatform, navigate, completeProcessing]);
 
   // FORCED REDIRECT protection - prevent users from staying on processing if they shouldn't be
   useEffect(() => {
@@ -120,7 +171,7 @@ const Processing: React.FC = () => {
         if (!timer.isValid) {
           console.log(`🛡️ PROCESSING PAGE: Forced redirect validation failed for ${targetPlatform}`);
           const dashboardPath = getDashboardPath(targetPlatform);
-          navigate(dashboardPath, { replace: true });
+          safeNavigate(navigate, dashboardPath, { replace: true }, 8);
         }
       }
     };
@@ -138,13 +189,13 @@ const Processing: React.FC = () => {
       const timer = validateTimer();
       if (timer.isValid) {
         // Push state back to prevent navigation
-        window.history.pushState(null, '', window.location.href);
+        safeHistoryManipulation('pushState', null, '', window.location.href);
         console.log(`🛡️ PROCESSING PAGE: Blocked back navigation for ${targetPlatform}`);
       }
     };
 
     // Push initial state
-    window.history.pushState(null, '', window.location.href);
+    safeHistoryManipulation('pushState', null, '', window.location.href);
     window.addEventListener('popstate', handlePopState);
 
     return () => window.removeEventListener('popstate', handlePopState);
@@ -171,13 +222,23 @@ const Processing: React.FC = () => {
   const handleComplete = () => {
     console.log(`🛡️ PROCESSING PAGE: Timer completed for ${targetPlatform}`);
     
-    // Clean up storage
+    // Clean up storage & reset context
     localStorage.removeItem(`${targetPlatform}_processing_countdown`);
     localStorage.removeItem(`${targetPlatform}_processing_info`);
     
+    // Mark platform as completed
+    const completedPlatforms = localStorage.getItem('completedPlatforms');
+    const completed = completedPlatforms ? JSON.parse(completedPlatforms) : [];
+    if (!completed.includes(targetPlatform)) {
+      completed.push(targetPlatform);
+      localStorage.setItem('completedPlatforms', JSON.stringify(completed));
+    }
+    
+    completeProcessing();
+    
     // Navigate to appropriate dashboard
     const dashboardPath = getDashboardPath(targetPlatform);
-    navigate(dashboardPath, { replace: true });
+    safeNavigate(navigate, dashboardPath, { replace: true }, 8);
   };
 
   // Show loading while validating

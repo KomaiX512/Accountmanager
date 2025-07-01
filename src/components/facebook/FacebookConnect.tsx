@@ -114,7 +114,7 @@ const FacebookConnect: React.FC<FacebookConnectProps> = ({ onConnected, classNam
     
     // Facebook OAuth configuration
     const appId = '581584257679639';
-    const redirectUri = 'https://84e7-121-52-146-243.ngrok-free.app/facebook/callback';
+    const redirectUri = 'https://1d68-121-52-146-243.ngrok-free.app/facebook/callback';
     const scope = 'pages_messaging,pages_show_list,pages_manage_posts,pages_manage_metadata,pages_manage_engagement,pages_read_engagement,pages_read_user_content,instagram_manage_messages,instagram_content_publish,instagram_manage_comments,instagram_manage_insights';
     
     const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code&state=${currentUser.uid}`;

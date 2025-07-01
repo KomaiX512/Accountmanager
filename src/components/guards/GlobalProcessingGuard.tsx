@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { safeNavigate, safeHistoryManipulation } from '../../utils/navigationGuard';
 
 interface GlobalProcessingGuardProps {
   children: React.ReactNode;
@@ -40,20 +41,6 @@ const hasActiveTimer = (platform: string): { active: boolean; remainingMs: numbe
   }
 };
 
-// Check if ANY platform has active timer (global protection)
-const hasAnyActiveTimer = (): { platform: string | null; remainingMs: number } => {
-  const platforms = ['instagram', 'twitter', 'facebook', 'linkedin'];
-  
-  for (const platform of platforms) {
-    const timer = hasActiveTimer(platform);
-    if (timer.active) {
-      return { platform, remainingMs: timer.remainingMs };
-    }
-  }
-  
-  return { platform: null, remainingMs: 0 };
-};
-
 // Get username for platform
 const getPlatformUsername = (platform: string): string => {
   try {
@@ -86,7 +73,6 @@ const GlobalProcessingGuard: React.FC<GlobalProcessingGuardProps> = ({ children 
   const location = useLocation();
   const [isBlocked, setIsBlocked] = useState(false);
   const blockingRef = useRef(false);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const historyBlockRef = useRef<any>(null);
 
   // BULLETPROOF redirect function
@@ -101,8 +87,8 @@ const GlobalProcessingGuard: React.FC<GlobalProcessingGuardProps> = ({ children 
     
     setIsBlocked(true);
     
-    // Force immediate redirect with replace to prevent history manipulation
-    navigate(`/processing/${platform}`, {
+    // Use safe navigation to prevent rapid API calls
+    safeNavigate(navigate, `/processing/${platform}`, {
       state: {
         platform,
         username,
@@ -110,7 +96,7 @@ const GlobalProcessingGuard: React.FC<GlobalProcessingGuardProps> = ({ children 
         forcedRedirect: true
       },
       replace: true
-    });
+    }, 10); // High priority for security redirects
     
     // Reset blocking flag after redirect
     setTimeout(() => {
@@ -146,12 +132,6 @@ const GlobalProcessingGuard: React.FC<GlobalProcessingGuardProps> = ({ children 
     if (timer.active) {
       forceRedirectToProcessing(platform, timer.remainingMs);
       return;
-    }
-
-    // Also check if ANY other platform has active timer (cross-platform protection)
-    const globalTimer = hasAnyActiveTimer();
-    if (globalTimer.platform && globalTimer.platform !== platform) {
-      forceRedirectToProcessing(globalTimer.platform, globalTimer.remainingMs);
     }
 
   }, [location.pathname, navigate]);
@@ -202,11 +182,14 @@ const GlobalProcessingGuard: React.FC<GlobalProcessingGuardProps> = ({ children 
       
       if (!isProtectedRoute) return;
 
-      // Check all platforms for active timers
-      const globalTimer = hasAnyActiveTimer();
-      if (globalTimer.platform) {
-        console.log(`🚫 BULLETPROOF GUARD (focus): Tab focus protection triggered for ${globalTimer.platform}`);
-        forceRedirectToProcessing(globalTimer.platform, globalTimer.remainingMs);
+      // Check only the current platform for active timer
+      const platform = getPlatformFromRoute(currentPath);
+      if (platform) {
+        const timer = hasActiveTimer(platform);
+        if (timer.active) {
+          console.log(`🚫 BULLETPROOF GUARD (focus): Tab focus protection triggered for ${platform}`);
+          forceRedirectToProcessing(platform, timer.remainingMs);
+        }
       }
     };
 
@@ -232,11 +215,14 @@ const GlobalProcessingGuard: React.FC<GlobalProcessingGuardProps> = ({ children 
       
       if (!isProtectedRoute) return;
 
-      // Check all platforms for active timers
-      const globalTimer = hasAnyActiveTimer();
-      if (globalTimer.platform) {
-        console.log(`🚫 BULLETPROOF GUARD (visibility): Tab visibility protection triggered for ${globalTimer.platform}`);
-        forceRedirectToProcessing(globalTimer.platform, globalTimer.remainingMs);
+      // Check only the current platform for active timer
+      const platform = getPlatformFromRoute(currentPath);
+      if (platform) {
+        const timer = hasActiveTimer(platform);
+        if (timer.active) {
+          console.log(`🚫 BULLETPROOF GUARD (visibility): Tab visibility protection triggered for ${platform}`);
+          forceRedirectToProcessing(platform, timer.remainingMs);
+        }
       }
     };
 
@@ -256,71 +242,46 @@ const GlobalProcessingGuard: React.FC<GlobalProcessingGuardProps> = ({ children 
     
     if (!isProtectedRoute) return;
 
-    // Check if any timer is active
-    const globalTimer = hasAnyActiveTimer();
-    if (globalTimer.platform) {
-      // Block browser back/forward buttons
-      const blockHistory = () => {
-        window.history.pushState(null, '', window.location.href);
-      };
-      
-      // Push current state to prevent back navigation
-      window.history.pushState(null, '', window.location.href);
-      window.addEventListener('popstate', blockHistory);
-      
-      historyBlockRef.current = () => {
-        window.removeEventListener('popstate', blockHistory);
-      };
-      
-      return historyBlockRef.current;
+    // Check if current platform timer is active
+    const platform = getPlatformFromRoute(currentPath);
+    if (platform) {
+      const timer = hasActiveTimer(platform);
+      if (timer.active) {
+        // Block browser back/forward buttons
+        const blockHistory = () => {
+          safeHistoryManipulation('pushState', null, '', window.location.href);
+        };
+        
+        // Push current state to prevent back navigation
+        safeHistoryManipulation('pushState', null, '', window.location.href);
+        window.addEventListener('popstate', blockHistory);
+        
+        historyBlockRef.current = () => {
+          window.removeEventListener('popstate', blockHistory);
+        };
+        
+        return historyBlockRef.current;
+      }
     }
   }, [location.pathname]);
 
-  // LAYER 6: PERIODIC TIMER CHECK - Continuously validates timer state
-  useEffect(() => {
-    // Only run periodic checks on protected routes
-    const currentPath = location.pathname;
-    
-    // Skip if already on processing page
-    if (currentPath.startsWith('/processing/')) return;
-    
-    const isProtectedRoute = PROTECTED_ROUTES.some(route => {
-      const routePattern = route.replace('/', '');
-      return currentPath.includes(routePattern);
-    });
-    
-    if (!isProtectedRoute) return;
-
-    // Check every 2 seconds for timer changes
-    intervalRef.current = setInterval(() => {
-      const globalTimer = hasAnyActiveTimer();
-      if (globalTimer.platform) {
-        console.log(`🚫 BULLETPROOF GUARD (periodic): Continuous protection triggered for ${globalTimer.platform}`);
-        forceRedirectToProcessing(globalTimer.platform, globalTimer.remainingMs);
-      }
-    }, 2000);
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    };
-  }, [location.pathname, navigate]);
-
   // LAYER 7: BEFORE UNLOAD PROTECTION - Warns before leaving processing
   useEffect(() => {
-    const globalTimer = hasAnyActiveTimer();
+    const currentPath = location.pathname;
+    const platform = getPlatformFromRoute(currentPath);
     
-    if (globalTimer.platform) {
-      const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-        e.preventDefault();
-        e.returnValue = 'AI processing is still running. Are you sure you want to leave?';
-        return 'AI processing is still running. Are you sure you want to leave?';
-      };
+    if (platform) {
+      const timer = hasActiveTimer(platform);
+      if (timer.active) {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+          e.preventDefault();
+          e.returnValue = 'AI processing is still running. Are you sure you want to leave?';
+          return 'AI processing is still running. Are you sure you want to leave?';
+        };
 
-      window.addEventListener('beforeunload', handleBeforeUnload);
-      return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+      }
     }
   }, [location.pathname]);
 

@@ -3,14 +3,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import './ChatModal.css';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
 
-interface ChatMessage {
+export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
 }
 
-interface LinkedAccount {
+export interface LinkedAccount {
+  platform: string;
   username: string;
-  platform: 'twitter' | 'instagram';
+  url: string;
   addedAt: string;
 }
 
@@ -36,7 +37,6 @@ const ChatModal: React.FC<ChatModalProps> = ({
   platform = 'instagram'
 }) => {
   const [message, setMessage] = useState('');
-  const [showLinkedAccounts, setShowLinkedAccounts] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { trackRealDiscussion, canUseFeature } = useFeatureTracking();
@@ -53,7 +53,7 @@ const ChatModal: React.FC<ChatModalProps> = ({
     e.preventDefault();
     if (!message.trim() || isProcessing) return;
 
-    // ✅ PRE-ACTION CHECK: Verify discussion limits before proceeding
+    // Verify discussion limits before proceeding
     const discussionAccessCheck = canUseFeature('discussions');
     if (!discussionAccessCheck.allowed) {
       alert(discussionAccessCheck.reason || 'Discussions feature is not available');
@@ -63,28 +63,20 @@ const ChatModal: React.FC<ChatModalProps> = ({
     const messageToSend = message.trim();
     setMessage('');
 
-    console.log(`[ChatModal] 🚀 Sending discussion message for ${platform}: "${messageToSend.substring(0, 50)}..."`);
-
-    // ✅ REAL USAGE TRACKING: Track actual discussion engagement BEFORE sending
+    // Track actual discussion engagement
     try {
       const trackingSuccess = await trackRealDiscussion(platform, {
-        messageCount: messages.length + 1, // Include the new message
+        messageCount: messages.length + 1,
         type: 'chat'
       });
       
       if (!trackingSuccess) {
-        console.warn(`[ChatModal] 🚫 Discussion blocked for ${platform} - limit reached, showing upgrade popup`);
-        // Don't send the message if tracking failed due to limits
         return;
       }
-      
-      console.log(`[ChatModal] ✅ Discussion tracked: ${platform} chat message sent`);
     } catch (trackingError) {
-      console.error(`[ChatModal] ❌ Discussion tracking error:`, trackingError);
-      // Continue with message sending even if tracking fails due to technical error
+      console.error(`[ChatModal] Discussion tracking error:`, trackingError);
     }
 
-    // Send the message only if tracking was successful
     onSendMessage(messageToSend);
   };
 
@@ -95,8 +87,14 @@ const ChatModal: React.FC<ChatModalProps> = ({
     }
   };
 
-  const toggleLinkedAccounts = () => {
-    setShowLinkedAccounts(!showLinkedAccounts);
+  // Format message content for better display
+  const formatMessageContent = (content: string) => {
+    // Convert URLs to clickable links
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const formattedContent = content.replace(urlRegex, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+    
+    // Convert line breaks to proper HTML
+    return formattedContent.replace(/\n/g, '<br>');
   };
 
   if (!open) return null;
@@ -121,54 +119,16 @@ const ChatModal: React.FC<ChatModalProps> = ({
             <h3>AI Discussion with {username}</h3>
             <span className="platform-badge">{platform}</span>
           </div>
-          <div className="chat-header-actions">
-            {linkedAccounts.length > 0 && (
-              <button
-                className="linked-accounts-toggle"
-                onClick={toggleLinkedAccounts}
-                title={`${linkedAccounts.length} linked accounts`}
-              >
-                🔗 {linkedAccounts.length}
-              </button>
-            )}
-            <button className="chat-close-btn" onClick={onClose}>
-              ✕
-            </button>
-          </div>
+          <button className="chat-close-btn" onClick={onClose}>
+            ✕
+          </button>
         </div>
-
-        <AnimatePresence>
-          {showLinkedAccounts && (
-            <motion.div
-              className="linked-accounts-panel"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-            >
-              <h4>Linked Accounts Discovered</h4>
-              <div className="linked-accounts-list">
-                {linkedAccounts.map((account, index) => (
-                  <div key={index} className="linked-account-item">
-                    <span className="account-platform">{account.platform}</span>
-                    <span className="account-username">@{account.username}</span>
-                    <span className="account-added-at">
-                      {new Date(account.addedAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         <div className="chat-messages">
           {messages.length === 0 ? (
             <div className="welcome-message">
               <h4>Start a new AI discussion</h4>
               <p>Ask questions, get strategic insights, or discuss your {platform} growth!</p>
-              <div className="tracking-info">
-                💡 Each message counts towards your discussion limit - make them count!
-              </div>
             </div>
           ) : (
             messages.map((msg, index) => (
@@ -179,9 +139,10 @@ const ChatModal: React.FC<ChatModalProps> = ({
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
               >
-                <div className="message-content">
-                  {msg.content}
-                </div>
+                <div 
+                  className="message-content"
+                  dangerouslySetInnerHTML={{ __html: formatMessageContent(msg.content) }}
+                />
               </motion.div>
             ))
           )}
@@ -232,9 +193,6 @@ const ChatModal: React.FC<ChatModalProps> = ({
           </div>
           <div className="chat-input-footer">
             <small>Press Enter to send, Shift+Enter for new line</small>
-            <div className="real-time-tracking-indicator">
-              🔄 Discussion tracking: Active
-            </div>
           </div>
         </form>
       </motion.div>

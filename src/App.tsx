@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import './App.css';
+import { safeNavigate } from './utils/navigationGuard';
 import './styles/global-ui-refinements.css';
 import LeftBar from './components/common/LeftBar';
 import TopBar from './components/common/TopBar';
@@ -23,13 +24,14 @@ import { TwitterProvider } from './context/TwitterContext';
 import { FacebookProvider } from './context/FacebookContext';
 import axios from 'axios';
 import { syncInstagramConnection, isInstagramDisconnected } from './utils/instagramSessionManager';
-import ChatModal from './components/instagram/ChatModal';
-import type { ChatMessage as ChatModalMessage } from './components/instagram/ChatModal';
+import ChatModal from './components/common/ChatModal';
+import type { ChatMessage as ChatModalMessage } from './components/common/ChatModal';
 import QuotaStatusToast from './components/common/QuotaStatusToast';
 import AdminPanel from './components/admin/AdminPanel';
 import { ProcessingProvider } from './context/ProcessingContext';
 import Processing from './pages/Processing';
 import GlobalProcessingGuard from './components/guards/GlobalProcessingGuard';
+import RagService from './services/RagService';
 
 
 // Main App component with AuthProvider
@@ -95,86 +97,78 @@ const AppContent: React.FC = () => {
     // Use the platform passed from component, or fall back to current platform
     const targetPlatform = platform || (currentPlatform as 'instagram' | 'twitter' | 'facebook') || 'instagram';
     
-    console.log(`[App] Opening chat for ${targetPlatform}/${accountHolder}`);
-    console.log(`[App] Platform source: ${platform ? 'passed from component' : 'detected from URL'}`);
-    console.log(`[App] Current URL: ${location.pathname}`);
-    console.log(`[App] Message: "${messageContent}"`);
-    
     if (messageContent.trim() === '') {
+      
       // Start a new conversation - just load existing history without adding a new message
-      import('./services/RagService').then(({ default: RagService }) => {
-        RagService.loadConversations(accountHolder, targetPlatform)
-          .then((existingMessages: any[]) => {
-            // Convert RagService messages to ChatModalMessage format
-            const convertedMessages: ChatModalMessage[] = existingMessages.map(msg => ({
-              role: (msg.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
-              content: msg.content
-            }));
-            
-            setChatModalData({
-              isOpen: true,
-              messages: convertedMessages,
-              platform: targetPlatform as 'instagram' | 'twitter' | 'facebook',
-              quotaInfo: null,
-              usingFallbackProfile: false
-            });
-          })
-          .catch((err: any) => {
-            console.error('Error loading conversation history:', err);
-            // Start fresh conversation
-            setChatModalData({
-              isOpen: true,
-              messages: [],
-              platform: targetPlatform as 'instagram' | 'twitter' | 'facebook',
-              quotaInfo: null,
-              usingFallbackProfile: false
-            });
+      RagService.loadConversations(accountHolder, targetPlatform)
+        .then((existingMessages: any[]) => {
+          // Convert RagService messages to ChatModalMessage format
+          const convertedMessages: ChatModalMessage[] = existingMessages.map(msg => ({
+            role: (msg.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+            content: msg.content
+          }));
+          
+          setChatModalData({
+            isOpen: true,
+            messages: convertedMessages,
+            platform: targetPlatform as 'instagram' | 'twitter' | 'facebook',
+            quotaInfo: null,
+            usingFallbackProfile: false
           });
-      });
+        })
+        .catch((err: any) => {
+          console.error('Error loading conversation history:', err);
+          // Start fresh conversation
+          setChatModalData({
+            isOpen: true,
+            messages: [],
+            platform: targetPlatform as 'instagram' | 'twitter' | 'facebook',
+            quotaInfo: null,
+            usingFallbackProfile: false
+          });
+        });
     } else {
       // Opening from a specific AI insight - load conversation and add the insight
-      import('./services/RagService').then(({ default: RagService }) => {
-        RagService.loadConversations(accountHolder, targetPlatform)
-          .then((existingMessages: any[]) => {
-            // Convert RagService messages to ChatModalMessage format
-            const convertedMessages: ChatModalMessage[] = existingMessages.map(msg => ({
-              role: (msg.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
-              content: msg.content
-            }));
-            
-            const assistantMessage: ChatModalMessage = {
-              role: 'assistant',
-              content: messageContent
-            };
-            
-            // Append the new message to existing conversation
-            const allMessages = [...convertedMessages, assistantMessage];
-            
-            setChatModalData({
-              isOpen: true,
-              messages: allMessages,
-              platform: targetPlatform as 'instagram' | 'twitter' | 'facebook',
-              quotaInfo: null,
-              usingFallbackProfile: false
-            });
-          })
-          .catch((err: any) => {
-            console.error('Error loading conversation history:', err);
-            // Fallback to just the new message if loading fails
-            const assistantMessage: ChatModalMessage = {
-              role: 'assistant',
-              content: messageContent
-            };
-            
-            setChatModalData({
-              isOpen: true,
-              messages: [assistantMessage],
-              platform: targetPlatform as 'instagram' | 'twitter' | 'facebook',
-              quotaInfo: null,
-              usingFallbackProfile: false
-            });
+      RagService.loadConversations(accountHolder, targetPlatform)
+        .then((existingMessages: any[]) => {
+          // Convert RagService messages to ChatModalMessage format
+          const convertedMessages: ChatModalMessage[] = existingMessages.map(msg => ({
+            role: (msg.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+            content: msg.content
+          }));
+          
+          const assistantMessage: ChatModalMessage = {
+            role: 'assistant',
+            content: messageContent
+          };
+          
+          // Append the new message to existing conversation
+          const allMessages = [...convertedMessages, assistantMessage];
+          
+          setChatModalData({
+            isOpen: true,
+            messages: allMessages,
+            platform: targetPlatform as 'instagram' | 'twitter' | 'facebook',
+            quotaInfo: null,
+            usingFallbackProfile: false
           });
-      });
+        })
+        .catch((err: any) => {
+          console.error('Error loading conversation history:', err);
+          // Fallback to just the new message if loading fails
+          const assistantMessage: ChatModalMessage = {
+            role: 'assistant',
+            content: messageContent
+          };
+          
+          setChatModalData({
+            isOpen: true,
+            messages: [assistantMessage],
+            platform: targetPlatform as 'instagram' | 'twitter' | 'facebook',
+            quotaInfo: null,
+            usingFallbackProfile: false
+          });
+        });
     }
   };
 
@@ -366,7 +360,7 @@ const AppContent: React.FC = () => {
             });
             
             // Navigate to the correct dashboard with the saved data
-            navigate(location.pathname, {
+            safeNavigate(navigate, location.pathname, {
               state: {
                 accountHolder: savedUsername,
                 competitors: savedCompetitors,
@@ -374,14 +368,14 @@ const AppContent: React.FC = () => {
                 platform: isTwitterDashboard ? 'twitter' : isFacebookDashboard ? 'facebook' : 'instagram'
               },
               replace: true
-            });
+            }, 5); // Medium priority for user data loading
           } else {
             // User hasn't set up the platform yet, redirect to setup page
-            navigate(isTwitterDashboard ? '/twitter' : isFacebookDashboard ? '/facebook' : '/instagram');
+            safeNavigate(navigate, isTwitterDashboard ? '/twitter' : isFacebookDashboard ? '/facebook' : '/instagram', {}, 5);
           }
         } catch (error) {
           console.error('Error fetching user status:', error);
-          navigate(location.pathname.includes('twitter') ? '/twitter' : location.pathname.includes('facebook') ? '/facebook' : '/instagram');
+          safeNavigate(navigate, location.pathname.includes('twitter') ? '/twitter' : location.pathname.includes('facebook') ? '/facebook' : '/instagram', {}, 5);
         } finally {
           setIsLoadingUserData(false);
         }
@@ -576,53 +570,34 @@ const AppContent: React.FC = () => {
                 messages: [...prev.messages, userMessage],
                 isProcessing: true
               }));
-              
-              // Load RagService dynamically
-              import('./services/RagService').then(({ default: RagService }) => {
-                RagService.sendDiscussionQuery(accountHolder, message, chatModalData.messages, chatModalData.platform)
-                  .then((response: { 
-                    response: string; 
-                    usedFallback?: boolean; 
-                    usingFallbackProfile?: boolean;
-                    quotaInfo?: { 
-                      exhausted: boolean; 
-                      resetTime?: string; 
-                      message: string; 
-                    } 
-                  }) => {
-                    const assistantMessage: ChatModalMessage = { role: 'assistant', content: response.response };
-                    const updatedMessages = [
-                      ...chatModalData.messages,
-                      userMessage,
-                      assistantMessage
-                    ];
-                    
-                    setChatModalData(prev => ({
-                      ...prev,
-                      messages: updatedMessages,
-                      isProcessing: false,
-                      quotaInfo: response.quotaInfo || null,
-                      usingFallbackProfile: response.usingFallbackProfile || false
-                    }));
-                    
-                    // Save conversation with platform context
-                    RagService.saveConversation(accountHolder, updatedMessages, chatModalData.platform)
-                      .catch((err: any) => console.error('Error saving conversation:', err));
-                  })
-                  .catch((err: any) => {
-                    console.error('Error in discussion query:', err);
-                    setChatModalData(prev => ({
-                      ...prev,
-                      isProcessing: false
-                    }));
-                  });
-              }).catch((err: any) => {
-                console.error('Error loading RagService:', err);
-                setChatModalData(prev => ({
-                  ...prev,
-                  isProcessing: false
-                }));
-              });
+
+              // Send the message to RAG service
+              RagService.sendDiscussionQuery(accountHolder, message, chatModalData.messages as any[], chatModalData.platform)
+                .then(response => {
+                  const assistantMessage: ChatModalMessage = { 
+                    role: 'assistant', 
+                    content: response.response 
+                  };
+                  
+                  const updatedMessages = [...chatModalData.messages, userMessage, assistantMessage];
+                  
+                  setChatModalData(prev => ({
+                    ...prev,
+                    messages: updatedMessages,
+                    isProcessing: false
+                  }));
+
+                  // Save the conversation
+                  RagService.saveConversation(accountHolder, updatedMessages, chatModalData.platform)
+                    .catch(err => console.error('Error saving conversation:', err));
+                })
+                .catch(error => {
+                  console.error('Error with chat message:', error);
+                  setChatModalData(prev => ({
+                    ...prev,
+                    isProcessing: false
+                  }));
+                });
             }}
           />
         )}

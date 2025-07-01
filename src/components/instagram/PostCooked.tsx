@@ -658,10 +658,18 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     );
   };
 
+  const toLocalDateTimeString = (date: Date) => {
+    // Ensure we always get a string in the format YYYY-MM-DDTHH:mm for the browser's local time zone
+    const offsetMs = date.getTimezoneOffset() * 60000;
+    const localDate = new Date(date.getTime() - offsetMs);
+    return localDate.toISOString().slice(0, 16);
+  };
+
   const handleScheduleClick = (key: string) => {
     const now = new Date();
-    const defaultTime = new Date(now.getTime() + 60 * 1000); // 1 min in future
-    setScheduleDateTime(defaultTime.toISOString().slice(0, 16));
+    // Add 2 minutes so that, after seconds are stripped, we are guaranteed to be > 1-minute ahead
+    const defaultTime = new Date(now.getTime() + 2 * 60 * 1000);
+    setScheduleDateTime(toLocalDateTimeString(defaultTime));
     setSelectedPostKey(key);
     setShowScheduleModal(true);
   };
@@ -899,10 +907,16 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       const res = await fetch(`${API_BASE_URL}/api/time-delay/${username}`);
       if (!res.ok) throw new Error('Not found');
       const data = await res.json();
-      const delay = parseInt(data?.Posting_Delay_Intervals);
-      const finalDelay = isNaN(delay) ? 12 : delay;
-      console.log(`[AutoSchedule] Using time delay from endpoint: ${finalDelay} hours`);
-      return finalDelay;
+
+      // Ensure we fall back to a safe default if the value is missing, zero, or negative
+      let delay = parseInt(data?.Posting_Delay_Intervals);
+      if (isNaN(delay) || delay <= 0) {
+        console.warn(`[AutoSchedule] Invalid delay received ("${data?.Posting_Delay_Intervals}"), defaulting to 6 hours`);
+        delay = 6;
+      }
+
+      console.log(`[AutoSchedule] Using time delay from endpoint: ${delay} hours`);
+      return delay;
     } catch (err) {
       console.warn(`[AutoSchedule] Failed to fetch time delay from endpoint, using default 6 hours:`, err);
       return 6; // Changed default from 12 to 6 hours as specified in requirements
@@ -930,7 +944,13 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     try {
       // Enhanced time delay fetching with better error handling
       console.log(`[AutoSchedule] 🚀 Starting auto-schedule for ${localPosts.length} ${platform} posts`);
-      const delayHours = await fetchTimeDelay(intervalOverride);
+      let delayHours = await fetchTimeDelay(intervalOverride);
+      
+      // Final sanity-check: never allow zero or negative intervals
+      if (delayHours <= 0) {
+        console.warn(`[AutoSchedule] Resolved interval (${delayHours}) is invalid, forcing to 6 hours.`);
+        delayHours = 6;
+      }
       
       console.log(`[AutoSchedule] ⏰ Using interval: ${delayHours} hours`);
       setAutoScheduleProgress(`⏰ Scheduling ${localPosts.length} ${platform === 'twitter' ? 'tweets' : 'posts'} every ${delayHours} hours...`);
@@ -1825,7 +1845,11 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       >
-                        <path d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h1a4 4 0 0 0 0 8H2m16-8l-5 4m5-4l-5-4" />
+                        <circle cx="18" cy="5" r="3" />
+                        <circle cx="6" cy="12" r="3" />
+                        <circle cx="18" cy="19" r="3" />
+                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
                       </svg>
                     </motion.button>
                     <motion.button
@@ -1845,7 +1869,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       >
-                        <path d="M17 2v9h-3v6a3 3 0 0 1-3 3h-2l-3-3v-6h-3l8-8 6 6h-3z" />
+                        <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
                       </svg>
                     </motion.button>
                   </div>

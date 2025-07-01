@@ -367,6 +367,10 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
   const handleSendQuery = async () => {
     if (!accountHolder || !query.trim()) return;
     
+    console.log(`[Dashboard] 🚀 Starting ${chatMode} query for ${accountHolder} on Instagram`);
+    console.log(`[Dashboard] 📝 Query: "${query}"`);
+    console.log(`[Dashboard] 📊 Previous messages: ${chatMessages.length}`);
+    
     // Check feature access and show upgrade popup if blocked
     if (chatMode === 'discussion') {
       if (!handleFeatureAttempt('discussions')) {
@@ -396,8 +400,23 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
           return;
         }
         
-        console.log(`Sending discussion query to RAG for ${accountHolder}: ${query}`);
+        console.log(`[Dashboard] 🔍 Sending discussion query to RAG for ${accountHolder}: "${query}"`);
         const response = await RagService.sendDiscussionQuery(accountHolder, query, chatMessages, 'instagram');
+        
+        console.log(`[Dashboard] ✅ Received discussion response for ${accountHolder} on Instagram`);
+        console.log(`[Dashboard] 📝 Response details:`, {
+          responseLength: response.response?.length || 0,
+          usedFallback: response.usedFallback,
+          usingFallbackProfile: response.usingFallbackProfile,
+          enhancedContext: response.enhancedContext,
+          hasQuotaInfo: !!response.quotaInfo
+        });
+        
+        // Validate response
+        if (!response.response || response.response.trim().length === 0) {
+          console.error(`[Dashboard] ❌ Empty response received for ${accountHolder} on Instagram`);
+          throw new Error('Empty response from RAG service');
+        }
         
         // Add messages to history
         const userMessage: RagChatMessage = {
@@ -416,13 +435,25 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
           assistantMessage as ChatModalMessage
         ];
         
+        console.log(`[Dashboard] 💬 Updated conversation with ${updatedMessages.length} messages for ${accountHolder}`);
+        
         setChatMessages(updatedMessages);
+        
+        // Log response quality indicators
+        if (response.enhancedContext) {
+          console.log(`[Dashboard] 🧠 Enhanced ChromaDB context detected for ${accountHolder} on Instagram`);
+        } else if (response.usedFallback) {
+          console.log(`[Dashboard] ⚠️ Using fallback response for ${accountHolder} on Instagram`);
+        } else {
+          console.log(`[Dashboard] ✅ Standard response processed for ${accountHolder} on Instagram`);
+        }
         
         // Save to RAG server
         try {
           await RagService.saveConversation(accountHolder, [...chatMessages, userMessage, assistantMessage], 'instagram');
+          console.log(`[Dashboard] 💾 Conversation saved for ${accountHolder} on Instagram`);
         } catch (saveErr) {
-          console.warn('Failed to save conversation, but continuing:', saveErr);
+          console.warn(`[Dashboard] ⚠️ Failed to save conversation for ${accountHolder}:`, saveErr);
         }
         
         // Set the result
@@ -435,6 +466,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
               url,
               username: url.replace('https://instagram.com/', '')
             })));
+            console.log(`[Dashboard] 🔗 Found ${matches.length} linked accounts in response for ${accountHolder}`);
           }
         }
         
@@ -456,8 +488,15 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
           return;
         }
         
-        console.log(`Sending post generation query to RAG for ${accountHolder}: ${query}`);
+        console.log(`[Dashboard] 🎨 Sending post generation query to RAG for ${accountHolder}: "${query}"`);
         const response = await RagService.sendPostQuery(accountHolder, query, 'instagram');
+        
+        console.log(`[Dashboard] ✅ Received post generation response for ${accountHolder} on Instagram`);
+        console.log(`[Dashboard] 📝 Post generation details:`, {
+          success: response.success,
+          hasPost: !!response.post,
+          error: response.error
+        });
         
         if (response.success && response.post) {
           const postContent = `
@@ -471,6 +510,7 @@ Image Description: ${response.post.image_prompt}
           `;
           
           setResult(postContent);
+          console.log(`[Dashboard] ✨ Post content generated for ${accountHolder} on Instagram`);
           
           // Add to history
           const userMessage: RagChatMessage = {
@@ -500,19 +540,20 @@ Image Description: ${response.post.image_prompt}
             }
           });
           window.dispatchEvent(newPostEvent);
-          console.log('[Dashboard] NEW POST: Triggered PostCooked refresh event for Instagram');
+          console.log(`[Dashboard] 🔄 NEW POST: Triggered PostCooked refresh event for Instagram`);
           
           // DON'T OPEN POPUP FOR POST MODE: Just show success message via toast
           setToast('Post generated successfully! Check the Cooked Posts section.');
         } else {
           // Handle error from post generation
+          console.error(`[Dashboard] ❌ Post generation failed for ${accountHolder} on Instagram:`, response.error);
           setToast(response.error || 'Failed to generate post');
         }
       }
       
       setQuery('');
     } catch (error: unknown) {
-      console.error('Error with RAG query:', error);
+      console.error(`[Dashboard] ❌ Error processing ${chatMode} query for ${accountHolder} on Instagram:`, error);
       setToast('Failed to process your request.');
       
       // Type guard for AxiosError or any error with response property
@@ -530,6 +571,7 @@ Image Description: ${response.post.image_prompt}
       }
     } finally {
       setIsProcessing(false);
+      console.log(`[Dashboard] ✅ Completed ${chatMode} query processing for ${accountHolder} on Instagram`);
     }
   };
 

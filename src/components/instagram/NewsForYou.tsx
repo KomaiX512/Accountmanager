@@ -89,7 +89,13 @@ const NewsForYou: React.FC<NewsForYouProps> = ({ accountHolder, platform = 'inst
       } else {
         return (
           <p key={idx} className="news-detail">
-            <span className="detail-label">{formattedKey}:</span> {value ?? 'N/A'}
+            <span className="detail-label">{formattedKey}:</span>{' '}
+            {(() => {
+              if (value === null || value === undefined) return 'N/A';
+              if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : 'N/A';
+              if (typeof value === 'object') return Object.keys(value as object).length > 0 ? JSON.stringify(value, null, 2) : 'N/A';
+              return String(value);
+            })()}
           </p>
         );
       }

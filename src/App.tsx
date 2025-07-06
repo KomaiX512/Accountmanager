@@ -339,6 +339,11 @@ const AppContent: React.FC = () => {
           
           const response = await axios.get(endpoint);
           
+          // Defensive check for valid response data
+          if (!response.data || typeof response.data !== 'object') {
+            throw new Error('Invalid response data');
+          }
+          
           const hasEnteredUsername = isTwitterDashboard 
             ? response.data.hasEnteredTwitterUsername
             : isFacebookDashboard
@@ -351,7 +356,7 @@ const AppContent: React.FC = () => {
               : isFacebookDashboard
               ? response.data.facebook_username
               : response.data.instagram_username;
-            const savedCompetitors = response.data.competitors || [];
+            const savedCompetitors = Array.isArray(response.data.competitors) ? response.data.competitors : [];
             const savedAccountType = response.data.accountType || 'branding';
             
             console.log(`Retrieved saved ${isTwitterDashboard ? 'Twitter' : isFacebookDashboard ? 'Facebook' : 'Instagram'} data for ${currentUser.uid}:`, {

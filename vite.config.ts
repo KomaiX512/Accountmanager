@@ -249,6 +249,27 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      // Twitter OAuth endpoints (port 3000)
+      '/twitter/auth': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/twitter/callback': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api/twitter/auth': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api/twitter/callback': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+      },
     },
     hmr: {
       // Using the same port as the Vite server

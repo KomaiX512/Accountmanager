@@ -17,6 +17,164 @@ import schedule from 'node-schedule';
 import OAuth from 'oauth-1.0a';
 import FormData from 'form-data';
 import nodemailer from 'nodemailer';
+import jpeg from 'jpeg-js';
+
+// Function to convert WebP to JPEG for Instagram compatibility
+async function convertWebPToJPEG(webpBuffer) {
+  try {
+    // Validate that the buffer is actually a valid WebP file
+    if (!webpBuffer || webpBuffer.length < 12) {
+      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Buffer too small or empty, skipping conversion`);
+      return webpBuffer;
+    }
+    
+    const looksLikeRIFF = webpBuffer[0] === 0x52 && webpBuffer[1] === 0x49 &&
+                          webpBuffer[2] === 0x46 && webpBuffer[3] === 0x46;
+
+    // WEBP signature lives at offset 8 for RIFF containers
+    const isWebP = looksLikeRIFF && webpBuffer.length > 12 &&
+                   webpBuffer[8] === 0x57 && webpBuffer[9] === 0x45 &&
+                   webpBuffer[10] === 0x42 && webpBuffer[11] === 0x50;
+
+    // If the buffer isn't RIFF at all, it's certainly not WebP. Return as-is.
+    if (!looksLikeRIFF) {
+      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Buffer is not RIFF/WebP, returning original without conversion`);
+      return webpBuffer;
+    }
+
+    // If RIFF but not clearly WebP, we'll still attempt conversion – Sharp might decode partially corrupted data.
+    if (!isWebP && looksLikeRIFF) {
+      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] RIFF detected without WEBP signature, forcing conversion attempt`);
+    }
+    
+    console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Converting valid WebP to JPEG (${webpBuffer.length} bytes)`);
+    
+    // Try multiple conversion strategies
+    let jpegBuffer;
+    
+    // Strategy 1: Direct conversion
+    try {
+      jpegBuffer = await sharp(webpBuffer)
+        .jpeg({ quality: 90 })
+        .toBuffer();
+      
+      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Successfully converted WebP to JPEG (${webpBuffer.length} -> ${jpegBuffer.length} bytes)`);
+      return jpegBuffer;
+    } catch (error) {
+      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 1 failed: ${error.message}`);
+    }
+    
+    // Strategy 2: Try with different sharp options
+    try {
+      jpegBuffer = await sharp(webpBuffer, { failOnError: false })
+        .jpeg({ quality: 85, progressive: true })
+        .toBuffer();
+      
+      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 2 successful (${webpBuffer.length} -> ${jpegBuffer.length} bytes)`);
+      return jpegBuffer;
+    } catch (error) {
+      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 2 failed: ${error.message}`);
+    }
+    
+    // Strategy 3: Try to clean the buffer first
+    try {
+      // Remove potential corruption by creating a clean buffer
+      const cleanBuffer = Buffer.from(webpBuffer);
+      jpegBuffer = await sharp(cleanBuffer, { failOnError: false })
+        .jpeg({ quality: 80 })
+        .toBuffer();
+      
+      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 3 successful (${webpBuffer.length} -> ${jpegBuffer.length} bytes)`);
+      return jpegBuffer;
+    } catch (error) {
+      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 3 failed: ${error.message}`);
+    }
+    
+    // Strategy 4: Try to extract and convert as raw image data
+    try {
+      // Try to process as raw image data
+      jpegBuffer = await sharp(webpBuffer, { 
+        failOnError: false,
+        limitInputPixels: false 
+      })
+        .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 75 })
+        .toBuffer();
+      
+      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 4 successful (${webpBuffer.length} -> ${jpegBuffer.length} bytes)`);
+      return jpegBuffer;
+    } catch (error) {
+      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 4 failed: ${error.message}`);
+    }
+    
+    // If all strategies fail, check if the original buffer might actually be JPEG
+    if (webpBuffer.length >= 2 && webpBuffer[0] === 0xFF && webpBuffer[1] === 0xD8) {
+      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Buffer appears to be JPEG already, returning as-is`);
+      return webpBuffer;
+    }
+    
+    // Last resort: Generate placeholder
+    console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] All conversion strategies failed, generating placeholder`);
+    return generatePlaceholderImage('Image Conversion Failed');
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [IMAGE-CONVERT] Critical error in conversion:`, error.message);
+    
+    // Check if original buffer might be usable
+    if (webpBuffer && webpBuffer.length > 0) {
+      // If it looks like JPEG, return it
+      if (webpBuffer.length >= 2 && webpBuffer[0] === 0xFF && webpBuffer[1] === 0xD8) {
+        console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Returning original buffer as it appears to be JPEG`);
+        return webpBuffer;
+      }
+    }
+    
+    // Generate placeholder as ultimate fallback
+    return generatePlaceholderImage('Image Error');
+  }
+}
+
+// Function to generate a simple placeholder image when needed
+function generatePlaceholderImage(text = 'Image Not Available', width = 512, height = 512) {
+  try {
+    // Create a simple text-based placeholder image
+    const frameData = Buffer.alloc(width * height * 4);
+    
+    // Fill with a light background color
+    for (let i = 0; i < width * height; i++) {
+      // RGBA: Light blue background
+      frameData[i * 4] = 220;     // R
+      frameData[i * 4 + 1] = 230; // G
+      frameData[i * 4 + 2] = 240; // B
+      frameData[i * 4 + 3] = 255; // A
+    }
+    
+    // Create JPEG image
+    const rawImageData = {
+      data: frameData,
+      width,
+      height
+    };
+    
+    // Convert to JPEG
+    return jpeg.encode(rawImageData, 90).data;
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error generating placeholder image:`, error);
+    // Return a minimal 1x1 transparent pixel as ultimate fallback
+    return Buffer.from([
+      0xFF, 0xD8, // JPEG SOI marker
+      0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x01, 0x00, 0x48, 0x00, 0x48, 0x00, 0x00, // JFIF header
+      0xFF, 0xDB, 0x00, 0x43, 0x00, 0x08, 0x06, 0x06, 0x07, 0x06, 0x05, 0x08, 0x07, 0x07, 0x07, 0x09, 0x09, 0x08, 0x0A, 0x0C, 0x14, 0x0D, 0x0C, 0x0B, 0x0B, 0x0C, 0x19, 0x12, 0x13, 0x0F, 0x14, 0x1D, 0x1A, 0x1F, 0x1E, 0x1D, 0x1A, 0x1C, 0x1C, 0x20, 0x24, 0x2E, 0x27, 0x20, 0x22, 0x2C, 0x23, 0x1C, 0x1C, 0x28, 0x37, 0x29, 0x2C, 0x30, 0x31, 0x34, 0x34, 0x34, 0x1F, 0x27, 0x39, 0x3D, 0x38, 0x32, 0x3C, 0x2E, 0x33, 0x34, 0x32, // DQT marker
+      0xFF, 0xC0, 0x00, 0x11, 0x08, 0x00, 0x01, 0x00, 0x01, 0x03, 0x01, 0x22, 0x00, 0x02, 0x11, 0x01, 0x03, 0x11, 0x01, // SOF marker
+      0xFF, 0xC4, 0x00, 0x1F, 0x00, 0x00, 0x01, 0x05, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, // DHT marker
+      0xFF, 0xC4, 0x00, 0xB5, 0x10, 0x00, 0x02, 0x01, 0x03, 0x03, 0x02, 0x04, 0x03, 0x05, 0x05, 0x04, 0x04, 0x00, 0x00, 0x01, 0x7D, 0x01, 0x02, 0x03, 0x00, 0x04, 0x11, 0x05, 0x12, 0x21, 0x31, 0x41, 0x06, 0x13, 0x51, 0x61, 0x07, 0x22, 0x71, 0x14, 0x32, 0x81, 0x91, 0xA1, 0x08, 0x23, 0x42, 0xB1, 0xC1, 0x15, 0x52, 0xD1, 0xF0, 0x24, 0x33, 0x62, 0x72, 0x82, 0x09, 0x0A, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5A, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6A, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7A, 0x83, 0x84, 0x85, 0x86, 0x87, 0x88, 0x89, 0x8A, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0x9A, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7, 0xA8, 0xA9, 0xAA, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7, 0xB8, 0xB9, 0xBA, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, 0xC7, 0xC8, 0xC9, 0xCA, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7, 0xD8, 0xD9, 0xDA, 0xE1, 0xE2, 0xE3, 0xE4, 0xE5, 0xE6, 0xE7, 0xE8, 0xE9, 0xEA, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 0xF6, 0xF7, 0xF8, 0xF9, 0xFA, // DHT marker
+      0xFF, 0xDA, 0x00, 0x0C, 0x03, 0x01, 0x00, 0x02, 0x11, 0x03, 0x11, 0x00, 0x3F, 0x00, // SOS marker
+      0x01, 0x51, 0x00, // Image data
+      0xFF, 0xD9 // EOI marker
+    ]);
+  }
+}
+
 const app = express();
 const port = process.env.MAIN_SERVER_PORT || 3000;
 
@@ -339,6 +497,559 @@ app.use((req, res, next) => {
   next();
 });
 
+// ... existing code ...
+
+// Add this after the existing endpoints (around line 9600+)
+
+// ============================================================
+// USER MANAGEMENT & USAGE TRACKING ENDPOINTS
+// ============================================================
+
+// Get user data from admin R2 bucket
+app.get(['/api/user/:userId', '/user/:userId'], async (req, res) => {
+  const { userId } = req.params;
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [USER-API] Getting user data for ${userId}`);
+    
+    const params = {
+      Bucket: 'admin',
+      Key: `users/${userId}.json`
+    };
+    
+    const getCommand = new GetObjectCommand(params);
+    const data = await s3Client.send(getCommand);
+    const userData = JSON.parse(await streamToString(data.Body));
+    
+    console.log(`[${new Date().toISOString()}] [USER-API] Found user data for ${userId}`);
+    res.json(userData);
+    
+  } catch (error) {
+    if (error.code === 'NoSuchKey') {
+      console.log(`[${new Date().toISOString()}] [USER-API] User ${userId} not found, creating default`);
+      res.status(404).json({ error: 'User not found' });
+    } else {
+      console.error(`[${new Date().toISOString()}] [USER-API] Error getting user data:`, error);
+      res.status(500).json({ error: 'Failed to get user data' });
+    }
+  }
+});
+
+// Save user data to admin R2 bucket
+app.put(['/api/user/:userId', '/user/:userId'], async (req, res) => {
+  const { userId } = req.params;
+  const userData = req.body;
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [USER-API] Saving user data for ${userId}`);
+    
+    const params = {
+      Bucket: 'admin',
+      Key: `users/${userId}.json`,
+      Body: JSON.stringify(userData, null, 2),
+      ContentType: 'application/json'
+    };
+    
+    const putCommand = new PutObjectCommand(params);
+    await s3Client.send(putCommand);
+    
+    console.log(`[${new Date().toISOString()}] [USER-API] Saved user data for ${userId}`);
+    res.json({ success: true });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [USER-API] Error saving user data:`, error);
+    res.status(500).json({ error: 'Failed to save user data' });
+  }
+});
+
+// Get usage stats for current period (no period specified)
+app.get(['/api/user/:userId/usage', '/user/:userId/usage'], async (req, res) => {
+  const { userId } = req.params;
+  const currentPeriod = new Date().toISOString().substring(0, 7); // YYYY-MM
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [USER-API] Getting usage stats for ${userId}/${currentPeriod}`);
+    
+    // Try R2 first
+    try {
+      console.log(`[${new Date().toISOString()}] [R2-OPERATION] Attempting to get usage stats from R2`);
+      const params = {
+        Bucket: 'admin',
+        Key: `usage/${userId}/${currentPeriod}.json`
+      };
+      
+      const getCommand = new GetObjectCommand(params);
+      const data = await s3Client.send(getCommand);
+      const usageStats = JSON.parse(await streamToString(data.Body));
+      
+      console.log(`[${new Date().toISOString()}] [USER-API] Found usage stats from R2 for ${userId}/${currentPeriod}`);
+      res.json(usageStats);
+      return;
+    } catch (r2Error) {
+      console.log(`[${new Date().toISOString()}] [R2-OPERATION] Error performing R2 operation: ${r2Error.message}`);
+      
+      if (r2Error.code === 'NoSuchKey' || r2Error.message.includes('does not exist')) {
+        console.log(`[${new Date().toISOString()}] [USER-API] R2 failed for usage stats, trying fallbacks: ${r2Error.message}`);
+        
+        // Try local storage fallback
+        const localStorageDir = path.join(process.cwd(), 'local_storage', 'usage', userId);
+        const localStorageFile = path.join(localStorageDir, `${currentPeriod}.json`);
+        
+        if (fs.existsSync(localStorageFile)) {
+          try {
+            console.log(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Found usage in local storage: ${localStorageFile}`);
+            const localData = JSON.parse(fs.readFileSync(localStorageFile, 'utf8'));
+            res.json(localData);
+            return;
+          } catch (localError) {
+            console.error(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Error reading local usage stats:`, localError);
+          }
+        }
+        
+        // If both R2 and local storage fail, create default stats
+        console.log(`[${new Date().toISOString()}] [USER-API] Using default usage stats for ${userId}/${currentPeriod}`);
+        const defaultStats = {
+          userId,
+          period: currentPeriod,
+          postsUsed: 0,
+          discussionsUsed: 0,
+          aiRepliesUsed: 0,
+          campaignsUsed: 0,
+          lastUpdated: new Date().toISOString()
+        };
+        
+        // Save default stats to local storage
+        try {
+          if (!fs.existsSync(localStorageDir)) {
+            fs.mkdirSync(localStorageDir, { recursive: true });
+          }
+          fs.writeFileSync(localStorageFile, JSON.stringify(defaultStats, null, 2));
+          console.log(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Saved usage to local storage: ${localStorageFile}`);
+        } catch (saveError) {
+          console.error(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Error saving to local storage:`, saveError);
+        }
+        
+        console.log(`[${new Date().toISOString()}] [USER-API] Creating default usage stats for ${userId}/${currentPeriod}`);
+        res.json(defaultStats);
+        return;
+      } else {
+        // For other R2 errors, fall back to local storage if available
+        const localStorageDir = path.join(process.cwd(), 'local_storage', 'usage', userId);
+        const localStorageFile = path.join(localStorageDir, `${currentPeriod}.json`);
+        
+        if (fs.existsSync(localStorageFile)) {
+          try {
+            console.log(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Using local storage due to R2 error: ${localStorageFile}`);
+            const localData = JSON.parse(fs.readFileSync(localStorageFile, 'utf8'));
+            res.json(localData);
+            return;
+          } catch (localError) {
+            console.error(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Error reading local storage:`, localError);
+          }
+        }
+        
+        throw r2Error; // Re-throw if no local fallback available
+      }
+    }
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [USER-API] Error getting usage stats:`, error);
+    
+    // Ultimate fallback - return default stats
+    const defaultStats = {
+      userId,
+      period: currentPeriod,
+      postsUsed: 0,
+      discussionsUsed: 0,
+      aiRepliesUsed: 0,
+      campaignsUsed: 0,
+      lastUpdated: new Date().toISOString()
+    };
+    
+    res.json(defaultStats);
+  }
+});
+
+// Get usage stats for specific period
+app.get(['/api/user/:userId/usage/:period', '/user/:userId/usage/:period'], async (req, res) => {
+  const { userId, period } = req.params;
+  const currentPeriod = period || new Date().toISOString().substring(0, 7); // YYYY-MM
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [USER-API] Getting usage stats for ${userId}/${currentPeriod}`);
+    
+    const params = {
+      Bucket: 'admin',
+      Key: `usage/${userId}/${currentPeriod}.json`
+    };
+    
+    const getCommand = new GetObjectCommand(params);
+    const data = await s3Client.send(getCommand);
+    const usageStats = JSON.parse(await streamToString(data.Body));
+    
+    console.log(`[${new Date().toISOString()}] [USER-API] Found usage stats for ${userId}/${currentPeriod}`);
+    res.json(usageStats);
+    
+  } catch (error) {
+    if (error.code === 'NoSuchKey') {
+      // Create default usage stats
+      const defaultStats = {
+        userId,
+        period: currentPeriod,
+        postsUsed: 0,
+        discussionsUsed: 0,
+        aiRepliesUsed: 0,
+        campaignsUsed: 0,
+        lastUpdated: new Date().toISOString()
+      };
+      
+      console.log(`[${new Date().toISOString()}] [USER-API] Creating default usage stats for ${userId}/${currentPeriod}`);
+      res.json(defaultStats);
+    } else {
+      console.error(`[${new Date().toISOString()}] [USER-API] Error getting usage stats:`, error);
+      res.status(500).json({ error: 'Failed to get usage stats' });
+    }
+  }
+});
+
+// Update usage stats
+app.patch(['/api/user/:userId/usage', '/user/:userId/usage'], async (req, res) => {
+  const { userId } = req.params;
+  const statsUpdate = req.body;
+  const currentPeriod = new Date().toISOString().substring(0, 7);
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [USER-API] Updating usage stats for ${userId}/${currentPeriod}`);
+    
+    // Get current stats or create default
+    let currentStats;
+    try {
+      const params = {
+        Bucket: 'admin',
+        Key: `usage/${userId}/${currentPeriod}.json`
+      };
+      const getCommand = new GetObjectCommand(params);
+      const data = await s3Client.send(getCommand);
+      currentStats = JSON.parse(await streamToString(data.Body));
+    } catch (error) {
+      if (error.code === 'NoSuchKey') {
+        currentStats = {
+          userId,
+          period: currentPeriod,
+          postsUsed: 0,
+          discussionsUsed: 0,
+          aiRepliesUsed: 0,
+          campaignsUsed: 0,
+          lastUpdated: new Date().toISOString()
+        };
+      } else {
+        throw error;
+      }
+    }
+    
+    // Update stats
+    const updatedStats = {
+      ...currentStats,
+      ...statsUpdate,
+      lastUpdated: new Date().toISOString()
+    };
+    
+    // Save updated stats
+    const params = {
+      Bucket: 'admin',
+      Key: `usage/${userId}/${currentPeriod}.json`,
+      Body: JSON.stringify(updatedStats, null, 2),
+      ContentType: 'application/json'
+    };
+    
+    const putCommand = new PutObjectCommand(params);
+    await s3Client.send(putCommand);
+    
+    console.log(`[${new Date().toISOString()}] [USER-API] Updated usage stats for ${userId}/${currentPeriod}`);
+    res.json({ success: true });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [USER-API] Error updating usage stats:`, error);
+    res.status(500).json({ error: 'Failed to update usage stats' });
+  }
+});
+
+// Check access for a specific feature
+app.post(['/api/access-check/:userId', '/access-check/:userId'], async (req, res) => {
+  const { userId } = req.params;
+  const { feature } = req.body;
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [ACCESS-CHECK] Checking ${feature} access for ${userId}`);
+    
+    // Get user data and usage stats
+    const [userResponse, usageResponse] = await Promise.allSettled([
+      fetch(`http://localhost:3000/api/user/${userId}`),
+      fetch(`http://localhost:3000/api/user/${userId}/usage`)
+    ]);
+    
+    let userData = null;
+    let usageStats = null;
+    
+    if (userResponse.status === 'fulfilled' && userResponse.value.ok) {
+      userData = await userResponse.value.json();
+    }
+    
+    if (usageResponse.status === 'fulfilled' && usageResponse.value.ok) {
+      usageStats = await usageResponse.value.json();
+    }
+    
+    // If no user data, create default freemium user
+    if (!userData) {
+      userData = {
+        id: userId,
+        userType: 'freemium',
+        subscription: {
+          planId: 'basic',
+          status: 'trial',
+          startDate: new Date().toISOString(),
+          endDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+          limits: {
+            posts: 5,
+            discussions: 10,
+            aiReplies: 5,
+            goalModelDays: 2,
+            campaigns: 1,
+            autoSchedule: false,
+            autoReply: false
+          },
+          trialDaysRemaining: 3
+        },
+        trialEndsAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+        isTrialActive: true
+      };
+      
+      // Save the new user
+      await fetch(`http://localhost:3000/api/user/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData)
+      });
+    }
+    
+    // Default usage stats if not found
+    if (!usageStats) {
+      usageStats = {
+        userId,
+        period: new Date().toISOString().substring(0, 7),
+        postsUsed: 0,
+        discussionsUsed: 0,
+        aiRepliesUsed: 0,
+        campaignsUsed: 0,
+        lastUpdated: new Date().toISOString()
+      };
+    }
+    
+    // Admin users have unlimited access
+    if (userData.userType === 'admin') {
+      console.log(`[${new Date().toISOString()}] [ACCESS-CHECK] Admin user ${userId} has unlimited access`);
+      return res.json({ allowed: true });
+    }
+    
+    const subscription = userData.subscription;
+    if (!subscription) {
+      return res.json({ 
+        allowed: false, 
+        reason: 'No active subscription', 
+        upgradeRequired: true 
+      });
+    }
+    
+    // Check if trial is expired
+    if (subscription.status === 'trial' && userData.trialEndsAt) {
+      const trialEnd = new Date(userData.trialEndsAt);
+      if (new Date() > trialEnd) {
+        return res.json({ 
+          allowed: false, 
+          reason: 'Trial expired', 
+          upgradeRequired: true,
+          redirectToPricing: true 
+        });
+      }
+    }
+    
+    // Check subscription status
+    if (subscription.status === 'cancelled' || subscription.status === 'expired') {
+      return res.json({ 
+        allowed: false, 
+        reason: 'Subscription inactive', 
+        upgradeRequired: true,
+        redirectToPricing: true 
+      });
+    }
+    
+    const limits = subscription.limits;
+    
+    // Check feature-specific access
+    let accessResult = { allowed: true };
+    
+    switch (feature) {
+      case 'posts':
+        if (typeof limits.posts === 'number' && usageStats.postsUsed >= limits.posts) {
+          accessResult = { 
+            allowed: false, 
+            reason: `Post limit reached (${usageStats.postsUsed}/${limits.posts})`, 
+            limitReached: true,
+            upgradeRequired: true 
+          };
+        }
+        break;
+        
+      case 'discussions':
+        if (typeof limits.discussions === 'number' && usageStats.discussionsUsed >= limits.discussions) {
+          accessResult = { 
+            allowed: false, 
+            reason: `Discussion limit reached (${usageStats.discussionsUsed}/${limits.discussions})`, 
+            limitReached: true,
+            upgradeRequired: true 
+          };
+        }
+        break;
+        
+      case 'aiReplies':
+        if (limits.aiReplies !== 'unlimited' && usageStats.aiRepliesUsed >= limits.aiReplies) {
+          accessResult = { 
+            allowed: false, 
+            reason: `AI Reply limit reached (${usageStats.aiRepliesUsed}/${limits.aiReplies})`, 
+            limitReached: true,
+            upgradeRequired: true 
+          };
+        }
+        break;
+        
+      case 'campaigns':
+        if (typeof limits.campaigns === 'number' && usageStats.campaignsUsed >= limits.campaigns) {
+          accessResult = { 
+            allowed: false, 
+            reason: `Campaign limit reached (${usageStats.campaignsUsed}/${limits.campaigns})`, 
+            limitReached: true,
+            upgradeRequired: true 
+          };
+        }
+        break;
+        
+      case 'autoSchedule':
+        if (!limits.autoSchedule) {
+          accessResult = { 
+            allowed: false, 
+            reason: 'Auto Schedule not available in your plan', 
+            upgradeRequired: true 
+          };
+        }
+        break;
+        
+      case 'autoReply':
+        if (!limits.autoReply) {
+          accessResult = { 
+            allowed: false, 
+            reason: 'Auto Reply not available in your plan', 
+            upgradeRequired: true 
+          };
+        }
+        break;
+        
+      case 'goalModel':
+        if (userData.userType !== 'premium' && userData.userType !== 'admin') {
+          const goalModelDays = limits.goalModelDays;
+          if (typeof goalModelDays === 'number' && goalModelDays <= 0) {
+            accessResult = { 
+              allowed: false, 
+              reason: 'Goal Model is a Premium feature', 
+              upgradeRequired: true 
+            };
+          }
+        }
+        break;
+        
+      default:
+        accessResult = { allowed: false, reason: 'Unknown feature' };
+    }
+    
+    console.log(`[${new Date().toISOString()}] [ACCESS-CHECK] ${feature} access for ${userId}: ${accessResult.allowed ? 'ALLOWED' : 'DENIED'}`);
+    res.json(accessResult);
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [ACCESS-CHECK] Error checking access:`, error);
+    // Allow access if there's an error to prevent app breaking
+    res.json({ allowed: true });
+  }
+});
+
+// Increment usage counter
+app.post(['/api/usage/increment/:userId', '/usage/increment/:userId'], async (req, res) => {
+  const { userId } = req.params;
+  const { feature } = req.body;
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [USAGE-INCREMENT] Incrementing ${feature} usage for ${userId}`);
+    
+    // Get current usage stats
+    const response = await fetch(`http://localhost:3000/api/user/${userId}/usage`);
+    let usageStats;
+    
+    if (response.ok) {
+      usageStats = await response.json();
+    } else {
+      const currentPeriod = new Date().toISOString().substring(0, 7);
+      usageStats = {
+        userId,
+        period: currentPeriod,
+        postsUsed: 0,
+        discussionsUsed: 0,
+        aiRepliesUsed: 0,
+        campaignsUsed: 0,
+        lastUpdated: new Date().toISOString()
+      };
+    }
+    
+    // Increment the appropriate counter
+    const update = { lastUpdated: new Date().toISOString() };
+    
+    switch (feature) {
+      case 'posts':
+        update.postsUsed = usageStats.postsUsed + 1;
+        break;
+      case 'discussions':
+        update.discussionsUsed = usageStats.discussionsUsed + 1;
+        break;
+      case 'aiReplies':
+        update.aiRepliesUsed = usageStats.aiRepliesUsed + 1;
+        break;
+      case 'campaigns':
+        update.campaignsUsed = usageStats.campaignsUsed + 1;
+        break;
+      default:
+        console.warn(`[${new Date().toISOString()}] [USAGE-INCREMENT] Unknown feature: ${feature}`);
+        return res.json({ success: true, message: 'Unknown feature, no increment performed' });
+    }
+    
+    // Update usage stats
+    const updateResponse = await fetch(`http://localhost:3000/api/user/${userId}/usage`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(update)
+    });
+    
+    if (!updateResponse.ok) {
+      throw new Error('Failed to update usage stats');
+    }
+    
+    console.log(`[${new Date().toISOString()}] [USAGE-INCREMENT] Successfully incremented ${feature} usage for ${userId}`);
+    res.json({ success: true, newCount: usageStats[feature + 'Used'] + 1 });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [USAGE-INCREMENT] Error incrementing usage:`, error);
+    // Don't fail the request - usage tracking is not critical
+    res.json({ success: true, message: 'Usage tracking error, but operation continued' });
+  }
+});
+
+// ... existing code continues ...
+
 app.use((req, res, next) => {
   // Reduce repetitive request logging for better server performance
   const requestKey = `${req.method}_${req.url}`;
@@ -426,56 +1137,7 @@ app.post('/webhook/r2', async (req, res) => {
   }
 });
 
-// Enhanced SSE connection with improved reliability
-app.get('/events/:username', (req, res) => {
-  const { username } = req.params;
-
-  console.log(`[${new Date().toISOString()}] Handling SSE request for /events/${username}`);
-
-  // Set headers for SSE
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache, no-transform');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Expose-Headers', 'Content-Type');
-  res.flushHeaders();
-
-  // Send initial connection confirmation
-  const initialEvent = {
-    type: 'connection',
-    message: `Connected to events for ${username}`,
-    timestamp: Date.now(),
-    connectionId: randomUUID()
-  };
-  
-  res.write(`data: ${JSON.stringify(initialEvent)}\n\n`);
-  
-  // Register this client
-  if (!sseClients.has(username)) {
-    sseClients.set(username, []);
-  }
-  
-  const clients = sseClients.get(username);
-  clients.push(res);
-  activeConnections.set(res, Date.now());
-  
-  console.log(`[${new Date().toISOString()}] SSE client connected for ${username}. Total clients: ${clients.length}`);
-
-  // Setup connection close handler
-  req.on('close', () => {
-    const updatedClients = sseClients.get(username)?.filter(client => client !== res) || [];
-    sseClients.set(username, updatedClients);
-    activeConnections.delete(res);
-    
-    console.log(`[${new Date().toISOString()}] SSE client disconnected for ${username}. Remaining clients: ${updatedClients.length}`);
-    if (updatedClients.length === 0) {
-      console.log(`[${new Date().toISOString()}] No more clients for ${username}, cleaning up`);
-      sseClients.delete(username);
-    }
-  });
-});
+// REMOVED: Duplicate SSE endpoint - using the enhanced version below
 
 // Enhanced data fetching with centralized schema management
 async function fetchDataForModule(username, prefixTemplate, forceRefresh = false, platform = 'instagram') {
@@ -678,7 +1340,7 @@ app.get('/proxy-image', async (req, res) => {
   }
 });
 
-app.get('/profile-info/:username', async (req, res) => {
+app.get(['/profile-info/:username', '/api/profile-info/:username'], async (req, res) => {
   const { username } = req.params;
   const forceRefresh = req.query.forceRefresh === 'true';
   const platform = req.query.platform || 'instagram'; // Default to Instagram
@@ -726,427 +1388,7 @@ app.get('/profile-info/:username', async (req, res) => {
   return res.status(404).json({ error: 'Profile info not found' });
 });
 
-app.post('/save-account-info', async (req, res) => {
-  try {
-    const { username, accountType, postingStyle, competitors, platform } = req.body;
-    const platformParam = req.query.platform || platform || 'instagram';
-
-    if (!username || !accountType || !postingStyle) {
-      return res.status(400).json({ error: 'Username, account type, and posting style are required' });
-    }
-
-    // Use centralized platform management for normalization
-    const platformConfig = PlatformSchemaManager.getPlatformConfig(platformParam);
-    const normalizedUsername = platformConfig.normalizeUsername(username);
-
-    // Create platform-specific key using centralized schema manager
-    const key = PlatformSchemaManager.buildPath('AccountInfo', platformParam, normalizedUsername, 'info.json');
-
-    let isUsernameAlreadyInUse = false;
-    
-    try {
-      const getCommand = new GetObjectCommand({
-        Bucket: 'tasks',
-        Key: key,
-      });
-      await s3Client.send(getCommand);
-      isUsernameAlreadyInUse = true;
-      console.warn(`Warning: ${platformParam} username '${normalizedUsername}' is already in use by another account, but allowing save operation`);
-    } catch (error) {
-      if (error.name !== 'NoSuchKey' && error.$metadata?.httpStatusCode !== 404) {
-        throw error;
-      }
-      // Username is not in use, which is the normal case
-    }
-
-    const payload = {
-      username: normalizedUsername,
-      accountType,
-      postingStyle,
-      platform: platformParam,
-      ...(competitors && { competitors: competitors.map(c => platformConfig.normalizeUsername(c)) }),
-      timestamp: new Date().toISOString(),
-    };
-
-    console.log(`Saving ${platformParam} account info to: ${key}`);
-    const putCommand = new PutObjectCommand({
-      Bucket: 'tasks',
-      Key: key,
-      Body: JSON.stringify(payload, null, 2),
-      ContentType: 'application/json',
-    });
-    await s3Client.send(putCommand);
-
-    // Clear cache using centralized schema
-    const cacheKey = PlatformSchemaManager.buildPath('AccountInfo', platformParam, normalizedUsername);
-    cache.delete(cacheKey);
-
-    res.json({ 
-      success: true, 
-      message: `${platformParam} account info saved successfully`,
-      isUsernameAlreadyInUse,
-      platform: platformParam
-    });
-  } catch (error) {
-    console.error('Save account info error:', error);
-    handleErrorResponse(res, error);
-  }
-});
-
-app.post(['/scrape', '/api/scrape'], async (req, res) => {
-  try {
-    const { parent, children } = req.body;
-
-    if (!parent?.username || !Array.isArray(children)) {
-      return res.status(400).json({
-        error: 'Invalid request structure',
-        details: 'Request must contain parent.username and children array',
-      });
-    }
-
-    const newUsername = parent.username.trim();
-    console.log('Processing hierarchical data for:', {
-      parent: newUsername,
-      children: children.map(c => c.username),
-    });
-
-    if (currentUsername !== newUsername) {
-      console.log(`Username changed from ${currentUsername || 'none'} to ${newUsername}, resetting caches...`);
-      currentUsername = newUsername;
-
-      MODULE_PREFIXES.forEach((prefixTemplate) => {
-        // Clear cache for both Instagram and Twitter platforms
-        for (const platform of ['instagram', 'twitter']) {
-          const prefix = `${prefixTemplate}/${platform}/${currentUsername}`;
-          console.log(`Clearing cache for ${prefix}`);
-          cache.delete(prefix);
-        }
-      });
-
-      const clients = sseClients.get(currentUsername) || [];
-      for (const client of clients) {
-        client.write(`data: ${JSON.stringify({ type: 'usernameChanged', username: currentUsername })}\n\n`);
-      }
-    }
-
-    const timestamp = new Date().toISOString();
-    const hierarchicalEntry = {
-      username: newUsername,
-      timestamp,
-      status: 'pending',
-      children: children.map(child => ({
-        username: child.username.trim(),
-        timestamp,
-        status: 'pending',
-      })),
-    };
-
-    let existingData = await getExistingData();
-    existingData.push(hierarchicalEntry);
-    await saveToR2(existingData);
-
-    cache.delete('Usernames');
-
-    res.json({
-      success: true,
-      message: 'Data stored in hierarchical format',
-      parent: hierarchicalEntry.username,
-      childrenCount: hierarchicalEntry.children.length,
-    });
-  } catch (error) {
-    console.error('Scrape endpoint error:', error);
-    handleErrorResponse(res, error);
-  }
-});
-
-app.get(['/retrieve/:accountHolder/:competitor', '/api/retrieve/:accountHolder/:competitor'], async (req, res) => {
-  try {
-    const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
-    const { competitor } = req.params;
-    const forceRefresh = req.query.forceRefresh === 'true';
-
-    // Use centralized schema management for competitor analysis
-    const data = await fetchDataForModule(username, `competitor_analysis/{username}/${competitor}`, forceRefresh, platform);
-    console.log(`Returning ${platform} data for ${username}/${competitor}`);
-    res.json(data);
-  } catch (error) {
-    console.error(`Retrieve ${req.query.platform || 'instagram'} endpoint error:`, error);
-    res.status(500).json({ 
-      error: `Error retrieving ${req.query.platform || 'instagram'} data`, 
-      details: error.message 
-    });
-  }
-});
-
-app.get(['/retrieve-multiple/:accountHolder', '/api/retrieve-multiple/:accountHolder'], async (req, res) => {
-  try {
-    const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
-    const competitorsParam = req.query.competitors;
-    const forceRefresh = req.query.forceRefresh === 'true';
-
-    if (!competitorsParam || typeof competitorsParam !== 'string') {
-      return res.status(400).json({ error: 'Competitors query parameter is required and must be a string' });
-    }
-
-    const competitors = competitorsParam.split(',').map(c => c.trim()).filter(c => c.length > 0);
-
-    const results = await Promise.all(
-      competitors.map(async (competitor) => {
-        try {
-          const data = await fetchDataForModule(username, `competitor_analysis/{username}/${competitor}`, forceRefresh, platform);
-          return { competitor, data };
-        } catch (error) {
-          console.error(`Error fetching ${platform} data for ${username}/${competitor}:`, error);
-          return { competitor, data: [], error: error.message };
-        }
-      })
-    );
-    res.json(results);
-  } catch (error) {
-    console.error(`Retrieve multiple ${req.query.platform || 'instagram'} endpoint error:`, error);
-    res.status(500).json({ 
-      error: `Error retrieving ${req.query.platform || 'instagram'} data for multiple competitors`, 
-      details: error.message 
-    });
-  }
-});
-
-app.get(['/retrieve-strategies/:accountHolder', '/api/retrieve-strategies/:accountHolder'], async (req, res) => {
-  try {
-    const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
-    const forceRefresh = req.query.forceRefresh === 'true';
-
-    const data = await fetchDataForModule(username, 'recommendations/{username}', forceRefresh, platform);
-    if (data.length === 0) {
-      res.status(404).json({ error: `No ${platform} recommendation files found` });
-    } else {
-      res.json(data);
-    }
-  } catch (error) {
-    console.error(`Retrieve ${req.query.platform || 'instagram'} strategies endpoint error:`, error);
-    
-    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
-      const platformName = (req.query.platform || 'instagram').charAt(0).toUpperCase() + (req.query.platform || 'instagram').slice(1);
-      res.status(404).json({ error: `${platformName} data not ready yet` });
-    } else {
-      res.status(500).json({ 
-        error: `Error retrieving ${req.query.platform || 'instagram'} data`, 
-        details: error.message 
-      });
-    }
-  }
-});
-
-app.get(['/retrieve-engagement-strategies/:accountHolder', '/api/retrieve-engagement-strategies/:accountHolder'], async (req, res) => {
-  try {
-    const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
-    const forceRefresh = req.query.forceRefresh === 'true';
-
-    const data = await fetchDataForModule(username, 'engagement_strategies/{username}', forceRefresh, platform);
-    if (data.length === 0) {
-      res.status(404).json({ error: `No ${platform} engagement strategy files found` });
-    } else {
-      res.json(data);
-    }
-  } catch (error) {
-    console.error(`Retrieve ${req.query.platform || 'instagram'} engagement strategies endpoint error:`, error);
-    
-    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
-      const platformName = (req.query.platform || 'instagram').charAt(0).toUpperCase() + (req.query.platform || 'instagram').slice(1);
-      res.status(404).json({ error: `${platformName} data not ready yet` });
-    } else {
-      res.status(500).json({ 
-        error: `Error retrieving ${req.query.platform || 'instagram'} data`, 
-        details: error.message 
-      });
-    }
-  }
-});
-
-app.get(['/news-for-you/:accountHolder', '/api/news-for-you/:accountHolder'], async (req, res) => {
-  try {
-    const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
-    const forceRefresh = req.query.forceRefresh === 'true';
-
-    const data = await fetchDataForModule(username, 'NewForYou/{username}', forceRefresh, platform);
-    if (data.length === 0) {
-      res.status(404).json({ error: `No ${platform} news files found` });
-    } else {
-      res.json(data);
-    }
-  } catch (error) {
-    console.error(`Retrieve ${req.query.platform || 'instagram'} news endpoint error:`, error);
-    
-    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
-      const platformName = (req.query.platform || 'instagram').charAt(0).toUpperCase() + (req.query.platform || 'instagram').slice(1);
-      res.status(404).json({ error: `${platformName} data not ready yet` });
-    } else {
-      res.status(500).json({ 
-        error: `Error retrieving ${req.query.platform || 'instagram'} data`, 
-        details: error.message 
-      });
-    }
-  }
-});
-
-app.post(['/save-query/:accountHolder', '/api/save-query/:accountHolder'], async (req, res) => {
-  // Set CORS headers explicitly for this endpoint
-  setCorsHeaders(res, req.headers.origin || '*');
-  
-  // Simply respond with success without storing in R2 bucket
-  // The instant AI reply system makes this R2 storage unnecessary
-  res.json({ success: true, message: 'AI instant reply system is enabled, no persistence needed' });
-});
-
-app.get(['/rules/:username', '/api/rules/:username'], async (req, res) => {
-  const { username } = req.params;
-  const platform = req.query.platform || 'instagram'; // Default to Instagram
-
-  // Create platform-specific key using new schema: rules/<platform>/<username>/rules.json
-  const key = `rules/${platform}/${username}/rules.json`;
-  const prefix = `rules/${platform}/${username}/`;
-
-  try {
-    let data;
-    if (cache.has(prefix)) {
-      console.log(`Cache hit for rules: ${prefix}`);
-      const cachedData = cache.get(prefix);
-      data = cachedData.find(item => item.key === key)?.data;
-    }
-
-    if (!data) {
-      const getCommand = new GetObjectCommand({
-        Bucket: 'tasks',
-        Key: key,
-      });
-      const response = await s3Client.send(getCommand);
-      const body = await streamToString(response.Body);
-
-      if (!body || body.trim() === '') {
-        throw new Error(`Empty file detected at ${key}`);
-      }
-
-      data = JSON.parse(body);
-      cache.set(prefix, [{ key, data }]);
-      cacheTimestamps.set(prefix, Date.now());
-    }
-
-    res.json(data);
-  } catch (error) {
-    console.error(`Error fetching rules for ${key}:`, error);
-    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
-      res.status(404).json({ error: 'Rules not found' });
-    } else {
-      res.status(500).json({ error: 'Error retrieving rules', details: error.message });
-    }
-  }
-});
-
-app.post(['/rules/:username', '/api/rules/:username'], async (req, res) => {
-  const { username } = req.params;
-  const { rules } = req.body;
-  const platform = req.query.platform || 'instagram'; // Default to Instagram
-
-  // Create platform-specific key using new schema: rules/<platform>/<username>/rules.json
-  const key = `rules/${platform}/${username}/rules.json`;
-  const prefix = `rules/${platform}/${username}/`;
-
-  if (!rules || typeof rules !== 'string') {
-    return res.status(400).json({ error: 'Rules must be a non-empty string' });
-  }
-
-  try {
-    const rulesData = {
-      rules: rules.trim(),
-      timestamp: new Date().toISOString(),
-    };
-    const putCommand = new PutObjectCommand({
-      Bucket: 'tasks',
-      Key: key,
-      Body: JSON.stringify(rulesData, null, 2),
-      ContentType: 'application/json',
-    });
-    await s3Client.send(putCommand);
-
-    cache.delete(prefix);
-
-    const clients = sseClients.get(username) || [];
-    for (const client of clients) {
-      client.write(`data: ${JSON.stringify({ type: 'update', prefix })}\n\n`);
-    }
-
-    res.json({ success: true, message: 'Rules saved successfully' });
-  } catch (error) {
-    console.error(`Save rules error for ${key}:`, error);
-    res.status(500).json({ error: 'Error saving rules', details: error.message });
-  }
-});
-
-app.get(['/responses/:username', '/api/responses/:username'], async (req, res) => {
-  try {
-    const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
-    const forceRefresh = req.query.forceRefresh === 'true';
-
-    const data = await fetchDataForModule(username, 'queries/{username}', forceRefresh, platform);
-    res.json(data);
-  } catch (error) {
-    console.error(`Retrieve ${req.query.platform || 'instagram'} responses error:`, error);
-    res.status(500).json({ 
-      error: `Error retrieving ${req.query.platform || 'instagram'} responses`, 
-      details: error.message 
-    });
-  }
-});
-
-app.get('/profile-info/:username', async (req, res) => {
-  const { username } = req.params;
-  const forceRefresh = req.query.forceRefresh === 'true';
-  const platform = req.query.platform || 'instagram'; // Default to Instagram
-  
-  // Try multiple possible key formats for ProfileInfo
-  const possibleKeys = [
-    `ProfileInfo/${platform}/${username}/profileinfo.json`,
-    `ProfileInfo/${platform}/${username}.json`,
-    `ProfileInfo/${username}/profileinfo.json`,
-    `ProfileInfo/${username}.json`
-  ];
-
-  console.log(`[${new Date().toISOString()}] Attempting to fetch ${platform} profile info for ${username}`);
-
-  for (const key of possibleKeys) {
-    try {
-      console.log(`[${new Date().toISOString()}] Trying key: ${key}`);
-      
-      const getCommand = new GetObjectCommand({
-        Bucket: 'tasks',
-        Key: key,
-      });
-      const response = await s3Client.send(getCommand);
-      const body = await streamToString(response.Body);
-
-      if (!body || body.trim() === '') {
-        console.warn(`Empty file detected at ${key}`);
-        continue;
-      }
-
-      const data = JSON.parse(body);
-      console.log(`[${new Date().toISOString()}] Successfully fetched ${platform} profile info for ${username} from ${key}`);
-      return res.json(data);
-    } catch (error) {
-      if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
-        console.log(`Key not found: ${key}`);
-        continue;
-      }
-      console.error(`Error fetching profile info from ${key}:`, error.message);
-      continue;
-    }
-  }
-
-  console.log(`Profile info not found for ${username} on ${platform} (tried ${possibleKeys.length} locations)`);
-  return res.status(404).json({ error: 'Profile info not found' });
-});
-
-app.post('/save-account-info', async (req, res) => {
+app.post(['/save-account-info', '/api/save-account-info'], async (req, res) => {
   try {
     const { username, accountType, postingStyle, competitors, platform } = req.body;
     const platformParam = req.query.platform || platform || 'instagram';
@@ -1873,16 +2115,28 @@ async function streamToBuffer(stream) {
 // Instagram App Credentials
 const APP_ID = '576296982152813';
 const APP_SECRET = 'd48ddc9eaf0e5c4969d4ddc4e293178c';
-const REDIRECT_URI = 'https://1d68-121-52-146-243.ngrok-free.app/instagram/callback';
+const REDIRECT_URI = 'https://www.sentientm.com/instagram/callback';
 const VERIFY_TOKEN = 'myInstagramWebhook2025';
 
 // Facebook App Credentials  
 const FB_APP_ID = '581584257679639'; // Your ACTUAL Facebook App ID (NOT Configuration ID)
 const FB_APP_SECRET = 'cdd153955e347e194390333e48cb0480'; // Your actual App Secret
-const FB_REDIRECT_URI = 'https://1d68-121-52-146-243.ngrok-free.app/facebook/callback';
+const FB_REDIRECT_URI = 'https://www.sentientm.com/facebook/callback';
 const FB_VERIFY_TOKEN = 'myFacebookWebhook2025';
 
 app.get(['/instagram/callback', '/api/instagram/callback'], async (req, res) => {
+  // Check if this is a webhook verification request
+  const hubMode = req.query['hub.mode'];
+  const hubToken = req.query['hub.verify_token'];
+  const hubChallenge = req.query['hub.challenge'];
+  
+  if (hubMode === 'subscribe' && hubToken === VERIFY_TOKEN) {
+    // This is a webhook verification request
+    console.log(`[${new Date().toISOString()}] WEBHOOK_VERIFIED for Instagram via callback endpoint`);
+    return res.status(200).send(hubChallenge);
+  }
+  
+  // This is an OAuth callback request
   const code = req.query.code;
 
   if (!code) {
@@ -1993,6 +2247,272 @@ app.get(['/instagram/callback', '/api/instagram/callback'], async (req, res) => 
     res.status(500).send('Error connecting Instagram account');
   }
 });
+
+// Instagram Webhook POST Handler (for webhook events sent to callback URL)
+app.post(['/instagram/callback', '/api/instagram/callback'], async (req, res) => {
+  const body = req.body;
+
+  if (body.object !== 'instagram') {
+    console.log(`[${new Date().toISOString()}] Invalid payload received at callback, not Instagram object`);
+    return res.sendStatus(404);
+  }
+
+  console.log(`[${new Date().toISOString()}] WEBHOOK ➜ Instagram payload received at callback: ${JSON.stringify(body)}`);
+
+  try {
+    for (const entry of body.entry) {
+      const webhookGraphId = entry.id; // This is the Graph ID from the webhook
+      console.log(`[${new Date().toISOString()}] Processing entry for Webhook Graph ID: ${webhookGraphId}`);
+
+      // Find the user's actual token data based on webhook Graph ID
+      let matchedToken = null;
+      try {
+        const listCommand = new ListObjectsV2Command({
+          Bucket: 'tasks',
+          Prefix: `InstagramTokens/`,
+        });
+        const { Contents } = await s3Client.send(listCommand);
+        
+        if (Contents) {
+          console.log(`[${new Date().toISOString()}] Available tokens for webhook lookup:`);
+          for (const obj of Contents) {
+            if (obj.Key.endsWith('/token.json')) {
+              const getCommand = new GetObjectCommand({
+                Bucket: 'tasks',
+                Key: obj.Key,
+              });
+              const data = await s3Client.send(getCommand);
+              const json = await data.Body.transformToString();
+              const token = JSON.parse(json);
+              
+              console.log(`[${new Date().toISOString()}] Token: graph_id=${token.instagram_graph_id}, user_id=${token.instagram_user_id}, username=${token.username}`);
+              
+              // FIXED: Match webhook Graph ID to instagram_user_id instead of instagram_graph_id
+              // The webhook Graph ID often corresponds to the user_id, not the graph_id
+              if (token.instagram_user_id === webhookGraphId || token.instagram_graph_id === webhookGraphId) {
+                matchedToken = token;
+                console.log(`[${new Date().toISOString()}] Found matching token for webhook ID ${webhookGraphId}: username=${token.username}, userUserId=${token.instagram_user_id}`);
+                break;
+              }
+            }
+          }
+          
+          if (!matchedToken) {
+            console.log(`[${new Date().toISOString()}] No matching token found for webhook ID ${webhookGraphId}`);
+          }
+        }
+      } catch (err) {
+        console.error(`[${new Date().toISOString()}] Error finding token for webhook ID ${webhookGraphId}:`, err.message);
+      }
+
+      // Handle Direct Messages
+      if (Array.isArray(entry.messaging)) {
+        for (const msg of entry.messaging) {
+          if (!msg.message?.text || msg.message.is_echo) {
+            console.log(`[${new Date().toISOString()}] Skipping non-text or echo message: ${JSON.stringify(msg.message)}`);
+            continue;
+          }
+
+          const eventData = {
+            type: 'message',
+            instagram_user_id: matchedToken ? matchedToken.instagram_user_id : webhookGraphId,
+            sender_id: msg.sender.id,
+            message_id: msg.message.mid,
+            text: msg.message.text,
+            timestamp: msg.timestamp,
+            received_at: new Date().toISOString(),
+            username: matchedToken ? matchedToken.username : 'unknown',
+            status: 'pending'
+          };
+
+          // ALWAYS store with USER ID (not graph ID)
+          const storeUserId = matchedToken ? matchedToken.instagram_user_id : webhookGraphId;
+          if (!storeUserId) {
+            console.log(`[${new Date().toISOString()}] Skipping DM storage - no user ID found for webhook ID ${webhookGraphId}`);
+            continue;
+          }
+          
+          console.log(`[${new Date().toISOString()}] Storing DM event with USER ID: ${storeUserId}`);
+          
+          const userKey = `InstagramEvents/${storeUserId}/${eventData.message_id}.json`;
+          await s3Client.send(new PutObjectCommand({
+            Bucket: 'tasks',
+            Key: userKey,
+            Body: JSON.stringify(eventData, null, 2),
+            ContentType: 'application/json'
+          }));
+          
+          console.log(`[${new Date().toISOString()}] Stored DM at ${userKey}`);
+
+          // Broadcast update
+          broadcastUpdate(storeUserId, { 
+            event: 'message', 
+            data: eventData,
+            timestamp: Date.now() 
+          });
+          
+          // Clear cache
+          cache.delete(`InstagramEvents/${storeUserId}`);
+        }
+      }
+
+      // Handle Comments (similar fix)
+      if (Array.isArray(entry.changes)) {
+        for (const change of entry.changes) {
+          if (change.field !== 'comments' || !change.value?.text) {
+            console.log(`[${new Date().toISOString()}] Skipping non-comment change: ${JSON.stringify(change)}`);
+            continue;
+          }
+
+          const eventData = {
+            type: 'comment',
+            instagram_user_id: matchedToken ? matchedToken.instagram_user_id : webhookGraphId,
+            comment_id: change.value.id,
+            text: change.value.text,
+            post_id: change.value.media.id,
+            timestamp: change.value.timestamp || Date.now(),
+            received_at: new Date().toISOString(),
+            username: matchedToken ? matchedToken.username : 'unknown',
+            status: 'pending'
+          };
+
+          // ALWAYS store with USER ID (not graph ID)
+          const storeUserId = matchedToken ? matchedToken.instagram_user_id : webhookGraphId;
+          if (!storeUserId) {
+            console.log(`[${new Date().toISOString()}] Skipping comment storage - no user ID found for webhook ID ${webhookGraphId}`);
+            continue;
+          }
+          
+          console.log(`[${new Date().toISOString()}] Storing comment event with USER ID: ${storeUserId}`);
+          
+          const userKey = `InstagramEvents/${storeUserId}/comment_${eventData.comment_id}.json`;
+          await s3Client.send(new PutObjectCommand({
+            Bucket: 'tasks',
+            Key: userKey,
+            Body: JSON.stringify(eventData, null, 2),
+            ContentType: 'application/json'
+          }));
+          
+          console.log(`[${new Date().toISOString()}] Stored comment at ${userKey}`);
+
+          // Broadcast update
+          broadcastUpdate(storeUserId, { 
+            event: 'comment', 
+            data: eventData,
+            timestamp: Date.now() 
+          });
+          
+          // Clear cache
+          cache.delete(`InstagramEvents/${storeUserId}`);
+        }
+      }
+    }
+
+    res.sendStatus(200);
+  } catch (err) {
+    console.error(`[${new Date().toISOString()}] Error processing webhook at callback:`, err);
+    res.sendStatus(500);
+  }
+});
+
+// Simplified Instagram DM fetching - ALWAYS use USER ID
+async function fetchInstagramDMs(userId) {
+  try {
+    console.log(`[${new Date().toISOString()}] Fetching Instagram DMs for USER ID: ${userId}`);
+    
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: `InstagramEvents/${userId}/`, // ALWAYS use userId directly
+    });
+    
+    const { Contents } = await s3Client.send(listCommand);
+    const dms = [];
+    
+    if (Contents && Contents.length > 0) {
+      for (const obj of Contents) {
+        if (obj.Key.endsWith('.json') && !obj.Key.includes('reply_') && !obj.Key.includes('comment_')) {
+          try {
+            const getCommand = new GetObjectCommand({
+              Bucket: 'tasks',
+              Key: obj.Key,
+            });
+            const data = await s3Client.send(getCommand);
+            const eventData = JSON.parse(await data.Body.transformToString());
+            
+            if (eventData.type === 'message') {
+              dms.push({
+                id: eventData.message_id,
+                sender_id: eventData.sender_id,
+                text: eventData.text,
+                created_at: eventData.received_at,
+                sender_username: eventData.username || 'unknown',
+                status: eventData.status || 'pending'
+              });
+            }
+          } catch (error) {
+            console.error(`Error reading stored event ${obj.Key}:`, error);
+          }
+        }
+      }
+    }
+
+    console.log(`[${new Date().toISOString()}] Found ${dms.length} Instagram DMs for user ${userId}`);
+    return dms;
+  } catch (error) {
+    console.error('Error fetching Instagram DMs:', error);
+    return [];
+  }
+}
+
+// Simplified Instagram Comments fetching - ALWAYS use USER ID
+async function fetchInstagramComments(userId) {
+  try {
+    console.log(`[${new Date().toISOString()}] Fetching Instagram comments for USER ID: ${userId}`);
+    
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: `InstagramEvents/${userId}/`, // ALWAYS use userId directly
+    });
+    
+    const { Contents } = await s3Client.send(listCommand);
+    const comments = [];
+    
+    if (Contents && Contents.length > 0) {
+      for (const obj of Contents) {
+        if (obj.Key.endsWith('.json') && obj.Key.includes('comment_') && !obj.Key.includes('reply_')) {
+          try {
+            const getCommand = new GetObjectCommand({
+              Bucket: 'tasks',
+              Key: obj.Key,
+            });
+            const data = await s3Client.send(getCommand);
+            const eventData = JSON.parse(await data.Body.transformToString());
+            
+            if (eventData.type === 'comment') {
+              comments.push({
+                id: eventData.comment_id,
+                user_id: eventData.sender_id,
+                text: eventData.text,
+                created_at: eventData.received_at,
+                username: eventData.username || 'unknown',
+                media_id: eventData.post_id,
+                status: eventData.status || 'pending'
+              });
+            }
+          } catch (error) {
+            console.error(`Error reading stored comment event ${obj.Key}:`, error);
+          }
+        }
+      }
+    }
+
+    console.log(`[${new Date().toISOString()}] Found ${comments.length} Instagram comments for user ${userId}`);
+    return comments;
+  } catch (error) {
+    console.error('Error fetching Instagram comments:', error);
+    return [];
+  }
+}
 
 // Facebook OAuth callback endpoint
 app.get(['/facebook/callback', '/api/facebook/callback'], async (req, res) => {
@@ -2203,31 +2723,33 @@ app.get(['/webhook/instagram', '/api/webhook/instagram'], (req, res) => {
   }
 });
 
-// Webhook Receiver - Enhanced with real-time event propagation
-app.post(['/webhook/instagram', '/api/webhook/instagram'], async (req, res) => {
+// Fixed Instagram Webhook POST Handler
+app.post(['/instagram/callback', '/api/instagram/callback'], async (req, res) => {
   const body = req.body;
 
   if (body.object !== 'instagram') {
-    console.log(`[${new Date().toISOString()}] Invalid payload received, not Instagram object`);
+    console.log(`[${new Date().toISOString()}] Invalid payload received at callback, not Instagram object`);
     return res.sendStatus(404);
   }
 
-  console.log(`[${new Date().toISOString()}] WEBHOOK ➜ Instagram payload received: ${JSON.stringify(body)}`);
+  console.log(`[${new Date().toISOString()}] WEBHOOK ➜ Instagram payload received at callback: ${JSON.stringify(body)}`);
 
   try {
     for (const entry of body.entry) {
-      const igGraphId = entry.id;
-      console.log(`[${new Date().toISOString()}] Processing entry for IG Graph ID: ${igGraphId}`);
+      const webhookGraphId = entry.id; // This is the Graph ID from the webhook
+      console.log(`[${new Date().toISOString()}] Processing entry for Webhook Graph ID: ${webhookGraphId}`);
 
-      // Find username associated with this igGraphId for event broadcasting
-      let targetUsername = null;
+      // Find the user's actual token data based on webhook Graph ID
+      let matchedToken = null;
       try {
         const listCommand = new ListObjectsV2Command({
           Bucket: 'tasks',
           Prefix: `InstagramTokens/`,
         });
         const { Contents } = await s3Client.send(listCommand);
+        
         if (Contents) {
+          console.log(`[${new Date().toISOString()}] Available tokens for webhook lookup:`);
           for (const obj of Contents) {
             if (obj.Key.endsWith('/token.json')) {
               const getCommand = new GetObjectCommand({
@@ -2237,18 +2759,28 @@ app.post(['/webhook/instagram', '/api/webhook/instagram'], async (req, res) => {
               const data = await s3Client.send(getCommand);
               const json = await data.Body.transformToString();
               const token = JSON.parse(json);
-              if (token.instagram_graph_id === igGraphId && token.username) {
-                targetUsername = token.username;
+              
+              console.log(`[${new Date().toISOString()}] Token: graph_id=${token.instagram_graph_id}, user_id=${token.instagram_user_id}, username=${token.username}`);
+              
+              // FIXED: Match webhook Graph ID to instagram_user_id instead of instagram_graph_id
+              // The webhook Graph ID often corresponds to the user_id, not the graph_id
+              if (token.instagram_user_id === webhookGraphId || token.instagram_graph_id === webhookGraphId) {
+                matchedToken = token;
+                console.log(`[${new Date().toISOString()}] Found matching token for webhook ID ${webhookGraphId}: username=${token.username}, userUserId=${token.instagram_user_id}`);
                 break;
               }
             }
           }
+          
+          if (!matchedToken) {
+            console.log(`[${new Date().toISOString()}] No matching token found for webhook ID ${webhookGraphId}`);
+          }
         }
       } catch (err) {
-        console.error(`[${new Date().toISOString()}] Error finding username for graph ID ${igGraphId}:`, err.message);
+        console.error(`[${new Date().toISOString()}] Error finding token for webhook ID ${webhookGraphId}:`, err.message);
       }
 
-      // Handle Direct Messages with improved event broadcasting
+      // Handle Direct Messages
       if (Array.isArray(entry.messaging)) {
         for (const msg of entry.messaging) {
           if (!msg.message?.text || msg.message.is_echo) {
@@ -2258,50 +2790,48 @@ app.post(['/webhook/instagram', '/api/webhook/instagram'], async (req, res) => {
 
           const eventData = {
             type: 'message',
-            instagram_graph_id: igGraphId,
+            instagram_user_id: matchedToken ? matchedToken.instagram_user_id : webhookGraphId,
             sender_id: msg.sender.id,
             message_id: msg.message.mid,
             text: msg.message.text,
             timestamp: msg.timestamp,
             received_at: new Date().toISOString(),
-            username: targetUsername || 'unknown',
+            username: matchedToken ? matchedToken.username : 'unknown',
             status: 'pending'
           };
 
-          console.log(`[${new Date().toISOString()}] Storing DM event: ${eventData.message_id}, status: ${eventData.status}`);
-          const key = `InstagramEvents/${igGraphId}/${eventData.message_id}.json`;
+          // ALWAYS store with USER ID (not graph ID)
+          const storeUserId = matchedToken ? matchedToken.instagram_user_id : webhookGraphId;
+          if (!storeUserId) {
+            console.log(`[${new Date().toISOString()}] Skipping DM storage - no user ID found for webhook ID ${webhookGraphId}`);
+            continue;
+          }
+          
+          console.log(`[${new Date().toISOString()}] Storing DM event with USER ID: ${storeUserId}`);
+          
+          const userKey = `InstagramEvents/${storeUserId}/${eventData.message_id}.json`;
           await s3Client.send(new PutObjectCommand({
             Bucket: 'tasks',
-            Key: key,
+            Key: userKey,
             Body: JSON.stringify(eventData, null, 2),
             ContentType: 'application/json'
           }));
+          
+          console.log(`[${new Date().toISOString()}] Stored DM at ${userKey}`);
 
-          console.log(`[${new Date().toISOString()}] Stored DM in R2 at ${key}`);
-
-          // Broadcast update using enhanced system - by both graph ID and username
-          broadcastUpdate(igGraphId, { 
+          // Broadcast update
+          broadcastUpdate(storeUserId, { 
             event: 'message', 
             data: eventData,
             timestamp: Date.now() 
           });
           
-          // Also broadcast to username clients if available
-          if (targetUsername) {
-            broadcastUpdate(targetUsername, { 
-              event: 'message', 
-              data: eventData,
-              timestamp: Date.now() 
-            });
-          }
-          
-          // Clear any cache for this event type
-          cache.delete(`InstagramEvents/${igGraphId}`);
-          if (targetUsername) cache.delete(`InstagramEvents/${targetUsername}`);
+          // Clear cache
+          cache.delete(`InstagramEvents/${storeUserId}`);
         }
       }
 
-      // Handle Comments with improved event broadcasting
+      // Handle Comments (similar fix)
       if (Array.isArray(entry.changes)) {
         for (const change of entry.changes) {
           if (change.field !== 'comments' || !change.value?.text) {
@@ -2309,293 +2839,56 @@ app.post(['/webhook/instagram', '/api/webhook/instagram'], async (req, res) => {
             continue;
           }
 
-          let username = targetUsername || 'unknown';
-          let tokenData = null;
-          for (let attempt = 1; attempt <= 3; attempt++) {
-            try {
-              tokenData = await getTokenData(igGraphId);
-              const response = await axios.get(`https://graph.instagram.com/v22.0/${change.value.id}`, {
-                params: {
-                  fields: 'username',
-                  access_token: tokenData.access_token
-                }
-              });
-              username = response.data.username || targetUsername || 'unknown';
-              console.log(`[${new Date().toISOString()}] Fetched username for comment ${change.value.id}: ${username}`);
-              break;
-            } catch (error) {
-              console.error(`[${new Date().toISOString()}] Attempt ${attempt} - Error fetching username for comment ${change.value.id}:`, error.message);
-              if (attempt < 3) {
-                console.log(`[${new Date().toISOString()}] Retrying username fetch in 1s...`);
-                await new Promise(resolve => setTimeout(resolve, 1000));
-              }
-            }
-          }
-
           const eventData = {
             type: 'comment',
-            instagram_graph_id: igGraphId,
+            instagram_user_id: matchedToken ? matchedToken.instagram_user_id : webhookGraphId,
             comment_id: change.value.id,
             text: change.value.text,
             post_id: change.value.media.id,
             timestamp: change.value.timestamp || Date.now(),
             received_at: new Date().toISOString(),
-            username,
+            username: matchedToken ? matchedToken.username : 'unknown',
             status: 'pending'
           };
 
-          console.log(`[${new Date().toISOString()}] Storing comment event: ${eventData.comment_id}, status: ${eventData.status}`);
-          const key = `InstagramEvents/${igGraphId}/comment_${eventData.comment_id}.json`;
+          // ALWAYS store with USER ID (not graph ID)
+          const storeUserId = matchedToken ? matchedToken.instagram_user_id : webhookGraphId;
+          if (!storeUserId) {
+            console.log(`[${new Date().toISOString()}] Skipping comment storage - no user ID found for webhook ID ${webhookGraphId}`);
+            continue;
+          }
+          
+          console.log(`[${new Date().toISOString()}] Storing comment event with USER ID: ${storeUserId}`);
+          
+          const userKey = `InstagramEvents/${storeUserId}/comment_${eventData.comment_id}.json`;
           await s3Client.send(new PutObjectCommand({
             Bucket: 'tasks',
-            Key: key,
+            Key: userKey,
             Body: JSON.stringify(eventData, null, 2),
             ContentType: 'application/json'
           }));
+          
+          console.log(`[${new Date().toISOString()}] Stored comment at ${userKey}`);
 
-          console.log(`[${new Date().toISOString()}] Stored comment in R2 at ${key}`);
-
-          // Broadcast using enhanced system - by both graph ID and username
-          broadcastUpdate(igGraphId, { 
+          // Broadcast update
+          broadcastUpdate(storeUserId, { 
             event: 'comment', 
             data: eventData,
             timestamp: Date.now() 
           });
           
-          // Also broadcast to username clients if available
-          if (targetUsername) {
-            broadcastUpdate(targetUsername, { 
-              event: 'comment', 
-              data: eventData,
-              timestamp: Date.now() 
-            });
-          }
-          
-          // Clear any cache for this event type
-          cache.delete(`InstagramEvents/${igGraphId}`);
-          if (targetUsername) cache.delete(`InstagramEvents/${targetUsername}`);
+          // Clear cache
+          cache.delete(`InstagramEvents/${storeUserId}`);
         }
       }
     }
 
     res.sendStatus(200);
   } catch (err) {
-    console.error(`[${new Date().toISOString()}] Error processing webhook:`, err);
+    console.error(`[${new Date().toISOString()}] Error processing webhook at callback:`, err);
     res.sendStatus(500);
   }
 });
-
-// ============= FACEBOOK WEBHOOK ENDPOINTS =============
-
-// Facebook Webhook Verification
-app.get(['/webhook/facebook', '/api/webhook/facebook'], (req, res) => {
-  const mode = req.query['hub.mode'];
-  const token = req.query['hub.verify_token'];
-  const challenge = req.query['hub.challenge'];
-
-  if (mode === 'subscribe' && token === FB_VERIFY_TOKEN) {
-    console.log(`[${new Date().toISOString()}] WEBHOOK_VERIFIED for Facebook`);
-    res.status(200).send(challenge);
-  } else {
-    console.log(`[${new Date().toISOString()}] FACEBOOK_WEBHOOK_VERIFICATION_FAILED: Invalid token or mode`);
-    res.sendStatus(403);
-  }
-});
-
-// Facebook Webhook Receiver
-app.post(['/webhook/facebook', '/api/webhook/facebook'], async (req, res) => {
-  const body = req.body;
-
-  if (body.object !== 'page') {
-    console.log(`[${new Date().toISOString()}] Invalid Facebook payload received, not page object`);
-    return res.sendStatus(404);
-  }
-
-  console.log(`[${new Date().toISOString()}] WEBHOOK ➜ Facebook payload received: ${JSON.stringify(body)}`);
-
-  try {
-    for (const entry of body.entry) {
-      const pageId = entry.id;
-      console.log(`[${new Date().toISOString()}] Processing Facebook entry for Page ID: ${pageId}`);
-
-      // Find username associated with this pageId for event broadcasting
-      let targetUsername = null;
-      try {
-        const listCommand = new ListObjectsV2Command({
-          Bucket: 'tasks',
-          Prefix: `FacebookTokens/`,
-        });
-        const { Contents } = await s3Client.send(listCommand);
-        if (Contents) {
-          for (const obj of Contents) {
-            if (obj.Key.endsWith('/token.json')) {
-              const getCommand = new GetObjectCommand({
-                Bucket: 'tasks',
-                Key: obj.Key,
-              });
-              const data = await s3Client.send(getCommand);
-              const json = await data.Body.transformToString();
-              const token = JSON.parse(json);
-              if (token.page_id === pageId && token.username) {
-                targetUsername = token.username;
-                break;
-              }
-            }
-          }
-        }
-      } catch (err) {
-        console.error(`[${new Date().toISOString()}] Error finding username for Facebook page ID ${pageId}:`, err.message);
-      }
-
-      // Handle Facebook Messages
-      if (Array.isArray(entry.messaging)) {
-        for (const msg of entry.messaging) {
-          if (!msg.message?.text || msg.message.is_echo) {
-            console.log(`[${new Date().toISOString()}] Skipping non-text or echo Facebook message: ${JSON.stringify(msg.message)}`);
-            continue;
-          }
-
-          const eventData = {
-            type: 'message',
-            platform: 'facebook',
-            page_id: pageId,
-            sender_id: msg.sender.id,
-            message_id: msg.message.mid,
-            text: msg.message.text,
-            timestamp: msg.timestamp,
-            received_at: new Date().toISOString(),
-            username: targetUsername || 'unknown',
-            status: 'pending'
-          };
-
-          console.log(`[${new Date().toISOString()}] Storing Facebook DM event: ${eventData.message_id}, status: ${eventData.status}`);
-          const key = `FacebookEvents/${pageId}/${eventData.message_id}.json`;
-          await s3Client.send(new PutObjectCommand({
-            Bucket: 'tasks',
-            Key: key,
-            Body: JSON.stringify(eventData, null, 2),
-            ContentType: 'application/json'
-          }));
-
-          console.log(`[${new Date().toISOString()}] Stored Facebook DM in R2 at ${key}`);
-
-          // Broadcast update
-          broadcastUpdate(pageId, { 
-            event: 'facebook_message', 
-            data: eventData,
-            timestamp: Date.now() 
-          });
-          
-          if (targetUsername) {
-            broadcastUpdate(targetUsername, { 
-              event: 'facebook_message', 
-              data: eventData,
-              timestamp: Date.now() 
-            });
-          }
-          
-          // Clear cache
-          cache.delete(`FacebookEvents/${pageId}`);
-          if (targetUsername) cache.delete(`FacebookEvents/${targetUsername}`);
-        }
-      }
-
-      // Handle Facebook Comments
-      if (Array.isArray(entry.changes)) {
-        for (const change of entry.changes) {
-          if (change.field !== 'feed' || !change.value?.item || change.value.item !== 'comment') {
-            console.log(`[${new Date().toISOString()}] Skipping non-comment Facebook change: ${JSON.stringify(change)}`);
-            continue;
-          }
-
-          const eventData = {
-            type: 'comment',
-            platform: 'facebook',
-            page_id: pageId,
-            comment_id: change.value.comment_id,
-            text: change.value.message,
-            post_id: change.value.post_id,
-            timestamp: change.value.created_time || Date.now(),
-            received_at: new Date().toISOString(),
-            username: targetUsername || 'unknown',
-            status: 'pending'
-          };
-
-          console.log(`[${new Date().toISOString()}] Storing Facebook comment event: ${eventData.comment_id}, status: ${eventData.status}`);
-          const key = `FacebookEvents/${pageId}/comment_${eventData.comment_id}.json`;
-          await s3Client.send(new PutObjectCommand({
-            Bucket: 'tasks',
-            Key: key,
-            Body: JSON.stringify(eventData, null, 2),
-            ContentType: 'application/json'
-          }));
-
-          console.log(`[${new Date().toISOString()}] Stored Facebook comment in R2 at ${key}`);
-
-          // Broadcast update
-          broadcastUpdate(pageId, { 
-            event: 'facebook_comment', 
-            data: eventData,
-            timestamp: Date.now() 
-          });
-          
-          if (targetUsername) {
-            broadcastUpdate(targetUsername, { 
-              event: 'facebook_comment', 
-              data: eventData,
-              timestamp: Date.now() 
-            });
-          }
-          
-          // Clear cache
-          cache.delete(`FacebookEvents/${pageId}`);
-          if (targetUsername) cache.delete(`FacebookEvents/${targetUsername}`);
-        }
-      }
-    }
-
-    res.sendStatus(200);
-  } catch (err) {
-    console.error(`[${new Date().toISOString()}] Error processing Facebook webhook:`, err);
-    res.sendStatus(500);
-  }
-});
-
-// Helper function to get token data
-async function getTokenData(userIdOrGraphId) {
-  const listCommand = new ListObjectsV2Command({
-    Bucket: 'tasks',
-    Prefix: `InstagramTokens/`,
-  });
-  const { Contents } = await s3Client.send(listCommand);
-
-  let tokenData = null;
-  if (Contents) {
-    for (const key of Contents) {
-      if (key.Key.endsWith('/token.json')) {
-        const getCommand = new GetObjectCommand({
-          Bucket: 'tasks',
-          Key: key.Key,
-        });
-        const data = await s3Client.send(getCommand);
-        const json = await data.Body.transformToString();
-        const token = JSON.parse(json);
-        
-        // Search by BOTH instagram_graph_id AND instagram_user_id
-        if (token.instagram_graph_id === userIdOrGraphId || 
-            token.instagram_user_id === userIdOrGraphId) {
-          tokenData = token;
-          console.log(`[${new Date().toISOString()}] Found token for ${userIdOrGraphId}: graph_id=${token.instagram_graph_id}, user_id=${token.instagram_user_id}`);
-          break;
-        }
-      }
-    }
-  }
-  if (!tokenData) {
-    throw new Error(`No token found for user_id/graph_id ${userIdOrGraphId}`);
-  }
-  return tokenData;
-}
 
 // Send DM Reply
 app.post(['/send-dm-reply/:userId', '/api/send-dm-reply/:userId'], async (req, res) => {
@@ -3436,28 +3729,7 @@ async function filterHandledNotifications(notifications, userId, platform) {
   return filteredNotifications;
 }
 
-// Instagram notification helper functions
-async function fetchInstagramDMs(userId) {
-  try {
-    // TODO: Implement actual Instagram API calls
-    // For now, return empty array to prevent crashes (reduced logging)
-    return [];
-  } catch (error) {
-    console.error('Error fetching Instagram DMs:', error);
-    return [];
-  }
-}
 
-async function fetchInstagramComments(userId) {
-  try {
-    // TODO: Implement actual Instagram API calls
-    // For now, return empty array to prevent crashes (reduced logging)
-    return [];
-  } catch (error) {
-    console.error('Error fetching Instagram comments:', error);
-    return [];
-  }
-}
 
 async function fetchInstagramNotifications(userId) {
   try {
@@ -4208,6 +4480,11 @@ app.post(['/api/post-instagram-now/:userId', '/post-instagram-now/:userId'], upl
     let actualFormat = 'unknown';
     let mimeType = file.mimetype;
     
+    // Debug: Log the first few bytes to understand what we're dealing with
+    const firstBytes = imageBuffer.slice(0, 16);
+    console.log(`[${new Date().toISOString()}] [DEBUG] Image format detection - First 16 bytes:`, Array.from(firstBytes).map(b => b.toString(16).padStart(2, '0')).join(' '));
+    console.log(`[${new Date().toISOString()}] [DEBUG] Reported mimetype: ${file.mimetype}`);
+    
     if (imageBuffer.length >= 4) {
       // Check for JPEG signature (FF D8)
       if (imageBuffer[0] === 0xFF && imageBuffer[1] === 0xD8) {
@@ -4220,15 +4497,13 @@ app.post(['/api/post-instagram-now/:userId', '/post-instagram-now/:userId'], upl
         actualFormat = 'png';
         mimeType = 'image/png';
       }
-      // Check for WebP signature (RIFF + WEBP) and convert to JPEG
-      else if (imageBuffer.length >= 12 &&
-               imageBuffer.toString('ascii', 0, 4) === 'RIFF' &&
-               imageBuffer.toString('ascii', 8, 12) === 'WEBP') {
-        actualFormat = 'webp';
-        console.log(`[${new Date().toISOString()}] WebP image detected, converting to JPEG...`);
+      // Check for RIFF format (WebP or other RIFF formats) - Convert all to JPEG for Instagram compatibility
+      else if (imageBuffer.length >= 4 &&
+               imageBuffer.toString('ascii', 0, 4) === 'RIFF') {
+        console.log(`[${new Date().toISOString()}] RIFF format detected, converting to JPEG for Instagram compatibility...`);
         
         try {
-          // Convert WebP to JPEG using sharp
+          // Convert to JPEG using sharp (handles both valid and corrupted WebP)
           imageBuffer = await sharp(imageBuffer)
             .jpeg({ 
               quality: 85, // High quality JPEG
@@ -4240,13 +4515,20 @@ app.post(['/api/post-instagram-now/:userId', '/post-instagram-now/:userId'], upl
           actualFormat = 'jpeg';
           mimeType = 'image/jpeg';
           
-          console.log(`[${new Date().toISOString()}] WebP successfully converted to JPEG (${imageBuffer.length} bytes)`);
+          console.log(`[${new Date().toISOString()}] RIFF successfully converted to JPEG for Instagram posting (${imageBuffer.length} bytes)`);
         } catch (conversionError) {
-          console.error(`[${new Date().toISOString()}] WebP conversion failed:`, conversionError);
-          return res.status(400).json({ 
-            error: 'Failed to convert WebP image to JPEG format.',
-            details: 'There was an issue converting your WebP image. Please try with a JPEG or PNG image instead.'
-          });
+          console.error(`[${new Date().toISOString()}] RIFF to JPEG conversion failed:`, conversionError);
+          
+          // If conversion fails, try to create a placeholder image
+          try {
+            imageBuffer = await generatePlaceholderImage('Image conversion failed', 512, 512);
+            actualFormat = 'jpeg';
+            mimeType = 'image/jpeg';
+            console.log(`[${new Date().toISOString()}] Generated placeholder image for failed conversion`);
+          } catch (placeholderError) {
+            console.error(`[${new Date().toISOString()}] Failed to generate placeholder:`, placeholderError);
+            return res.status(500).json({ error: 'Image processing failed' });
+          }
         }
       }
     }
@@ -4269,7 +4551,9 @@ app.post(['/api/post-instagram-now/:userId', '/post-instagram-now/:userId'], upl
     console.log(`[${new Date().toISOString()}] Uploading ${mimeType} image to Instagram (${imageBuffer.length} bytes)...`);
     
     // === New implementation: store image in R2 and use a short-lived signed URL ===
-    const r2Key = `temp_instagram_uploads/${userId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${actualFormat}`;
+    // Ensure proper file extension for Instagram (jpeg -> jpg)
+    const fileExtension = actualFormat === 'jpeg' ? 'jpg' : actualFormat;
+    const r2Key = `temp_instagram_uploads/${userId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`;
     await s3Client.send(new PutObjectCommand({
       Bucket: 'tasks',
       Key: r2Key,
@@ -4414,12 +4698,12 @@ app.post(['/api/schedule-post/:userId', '/schedule-post/:userId'], upload.single
         actualFormat = 'png';
         mimeType = 'image/png';
       }
-      // Check for WebP signature (RIFF + WEBP) and convert to JPEG
+      // Check for WebP signature (RIFF + WEBP) - Strict validation
       else if (imageBuffer.length >= 12 &&
                imageBuffer.toString('ascii', 0, 4) === 'RIFF' &&
                imageBuffer.toString('ascii', 8, 12) === 'WEBP') {
         actualFormat = 'webp';
-        console.log(`[${new Date().toISOString()}] WebP image detected in scheduled post, converting to JPEG...`);
+        console.log(`[${new Date().toISOString()}] Valid WebP image detected in scheduled post, converting to JPEG...`);
         
         try {
           // Convert WebP to JPEG using sharp
@@ -4437,11 +4721,26 @@ app.post(['/api/schedule-post/:userId', '/schedule-post/:userId'], upload.single
           console.log(`[${new Date().toISOString()}] WebP successfully converted to JPEG for scheduled post (${imageBuffer.length} bytes)`);
         } catch (conversionError) {
           console.error(`[${new Date().toISOString()}] WebP conversion failed for scheduled post:`, conversionError);
-          return res.status(400).json({ 
-            error: 'Failed to convert WebP image to JPEG format.',
-            details: 'There was an issue converting your WebP image. Please try with a JPEG or PNG image instead.'
-          });
+          
+          // If it's a corrupt header error, treat as JPEG instead of failing
+          if (conversionError.message.includes('corrupt header') || conversionError.message.includes('unable to parse')) {
+            console.log(`[${new Date().toISOString()}] Corrupt WebP detected, treating as JPEG for scheduling`);
+            actualFormat = 'jpeg';
+            mimeType = 'image/jpeg';
+          } else {
+            return res.status(400).json({ 
+              error: 'Failed to convert WebP image to JPEG format.',
+              details: 'There was an issue converting your WebP image. Please try with a JPEG or PNG image instead.'
+            });
+          }
         }
+      }
+      // Handle RIFF format that's not WebP - treat as JPEG
+      else if (imageBuffer.length >= 4 &&
+               imageBuffer.toString('ascii', 0, 4) === 'RIFF') {
+        console.log(`[${new Date().toISOString()}] RIFF format detected but not WebP, treating as JPEG for scheduling`);
+        actualFormat = 'jpeg';
+        mimeType = 'image/jpeg';
       }
     }
     
@@ -6452,7 +6751,7 @@ app.post(['/mark-notification-handled/:userId', '/api/mark-notification-handled/
       return res.json({ success: true });
     } catch (error) {
       // If the notification doesn't exist, that's okay
-      if (error.code === 'NoSuchKey') {
+      if (error.name === 'NoSuchKey') {
         console.log(`[${new Date().toISOString()}] ${platform} notification ${notification_id} not found, skipping`);
         return res.json({ success: true, message: 'Notification not found, no action needed' });
       }
@@ -6843,7 +7142,7 @@ class PlatformSchemaManager {
 // Twitter OAuth 2.0 credentials
 const TWITTER_CLIENT_ID = 'cVNYR3UxVm5jQ3d5UWw0UHFqUTI6MTpjaQ';
 const TWITTER_CLIENT_SECRET = 'Wr8Kewh92NVB-035hAvpQeQ1Azc7chre3PUTgDoEltjO57mxzO';
-const TWITTER_REDIRECT_URI = 'https://1d68-121-52-146-243.ngrok-free.app/twitter/callback';
+const TWITTER_REDIRECT_URI = 'https://www.sentientm.com/twitter/callback';
 
 // Debug logging for OAuth 2.0
 console.log(`[${new Date().toISOString()}] Twitter OAuth 2.0 Configuration:`);
@@ -8784,6 +9083,94 @@ app.get(['/debug/twitter-users', '/api/debug/twitter-users'], async (req, res) =
   }
 });
 
+// Debug endpoint to inspect R2 bucket contents for campaign posts
+app.get(['/debug/campaign-posts/:username', '/api/debug/campaign-posts/:username'], async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  try {
+    const { username } = req.params;
+    const platform = (req.query.platform || 'instagram').toLowerCase();
+    
+    console.log(`[${new Date().toISOString()}] Debug: Inspecting campaign posts for ${username} on ${platform}`);
+    
+    // Build posts prefix
+    const postsPrefix = `ready_post/${platform}/${username}`;
+    
+    console.log(`[${new Date().toISOString()}] Debug: Checking prefix: ${postsPrefix}/`);
+    
+    // List all files in the directory
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: `${postsPrefix}/`
+    });
+    
+    const data = await s3Client.send(listCommand);
+    
+    if (!data.Contents || data.Contents.length === 0) {
+      console.log(`[${new Date().toISOString()}] Debug: No files found in ${postsPrefix}/`);
+      return res.json({
+        prefix: postsPrefix,
+        totalFiles: 0,
+        campaignFiles: [],
+        allFiles: [],
+        message: 'No files found in directory'
+      });
+    }
+    
+    console.log(`[${new Date().toISOString()}] Debug: Found ${data.Contents.length} total files`);
+    
+    // Separate campaign and non-campaign files
+    const allFiles = data.Contents.map(obj => ({
+      key: obj.Key,
+      size: obj.Size,
+      lastModified: obj.LastModified
+    }));
+    
+    const campaignFiles = allFiles.filter(file => 
+      file.key.includes('campaign_ready_post_')
+    );
+    
+    const nonCampaignFiles = allFiles.filter(file => 
+      !file.key.includes('campaign_ready_post_')
+    );
+    
+    console.log(`[${new Date().toISOString()}] Debug: Found ${campaignFiles.length} campaign files and ${nonCampaignFiles.length} non-campaign files`);
+    
+    // Extract campaign post numbers
+    const campaignPostNumbers = campaignFiles
+      .map(file => {
+        const match = file.key.match(/campaign_ready_post_(\d+)\.json$/);
+        return match ? parseInt(match[1]) : null;
+      })
+      .filter(num => num !== null)
+      .sort((a, b) => a - b);
+    
+    res.json({
+      prefix: postsPrefix,
+      totalFiles: allFiles.length,
+      campaignFiles: campaignFiles,
+      nonCampaignFiles: nonCampaignFiles,
+      campaignPostNumbers: campaignPostNumbers,
+      postCooked: campaignFiles.length,
+      highestId: campaignPostNumbers.length > 0 ? Math.max(...campaignPostNumbers) : 0,
+      message: `Found ${campaignFiles.length} campaign posts out of ${allFiles.length} total files`
+    });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Debug campaign posts error:`, error);
+    res.status(500).json({ 
+      error: 'Failed to inspect campaign posts', 
+      details: error.message 
+    });
+  }
+});
+
+// OPTIONS handler for debug campaign posts
+app.options(['/debug/campaign-posts/:username', '/api/debug/campaign-posts/:username'], (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+
 // Post tweet with image endpoint - immediate posting with OAuth 2.0 and chunked media upload
 app.post(['/post-tweet-with-image/:userId', '/api/post-tweet-with-image/:userId'], upload.single('image'), async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
@@ -9279,7 +9666,7 @@ app.get(['/campaign-posts-count/:username', '/api/campaign-posts-count/:username
     }
     
     // Build posts prefix
-    const postsPrefix = `tasks/ready_post/${platform}/${username}`;
+    const postsPrefix = `ready_post/${platform}/${username}`;
 
     console.log(`[${new Date().toISOString()}] Counting campaign posts from: ${postsPrefix}/`);
 
@@ -10108,18 +10495,18 @@ app.get(['/api/r2-image/:username/:imageKey', '/r2-image/:username/:imageKey'], 
       console.log(`[R2-IMAGE] Attempt ${attempt + 1}/${MAX_RETRIES + 1} for: ${r2Key}`);
       
       // Get the object from R2 with timeout
-      const getCommand = new GetObjectCommand({
-        Bucket: 'tasks',
-        Key: r2Key,
-      });
-      
-      const response = await s3Client.send(getCommand);
-      
-      if (!response.Body) {
+    const getCommand = new GetObjectCommand({
+      Bucket: 'tasks',
+      Key: r2Key,
+    });
+    
+    const response = await s3Client.send(getCommand);
+    
+    if (!response.Body) {
         console.log(`[R2-IMAGE] No body in response for: ${r2Key}`);
-        return res.status(404).json({ error: 'Image not found' });
-      }
-      
+      return res.status(404).json({ error: 'Image not found' });
+    }
+    
       // Convert stream to buffer
       const imageBuffer = await streamToBuffer(response.Body);
       
@@ -10129,7 +10516,7 @@ app.get(['/api/r2-image/:username/:imageKey', '/r2-image/:username/:imageKey'], 
       }
       
       // Success! Set appropriate headers for JPG images
-      res.setHeader('Content-Type', response.ContentType || 'image/jpeg');
+    res.setHeader('Content-Type', response.ContentType || 'image/jpeg');
       res.setHeader('Content-Length', imageBuffer.length);
       res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
       res.setHeader('ETag', response.ETag || `"${imageKey}-${Date.now()}"`);
@@ -10144,13 +10531,13 @@ app.get(['/api/r2-image/:username/:imageKey', '/r2-image/:username/:imageKey'], 
       
       console.log(`[R2-IMAGE] SUCCESS on attempt ${attempt + 1}: ${r2Key} (${imageBuffer.length} bytes)`);
       return; // Exit successfully
-      
-    } catch (error) {
+    
+  } catch (error) {
       lastError = error;
       console.warn(`[R2-IMAGE] Attempt ${attempt + 1} failed for ${r2Key}:`, error?.name || error?.message);
-      
+    
       // Don't retry on 404/NoSuchKey errors
-      if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
         console.log(`[R2-IMAGE] Image not found: ${r2Key}, not retrying`);
         return res.status(404).json({ error: 'Image not found in R2 storage' });
       }
@@ -10189,7 +10576,7 @@ app.get(['/api/signed-image-url/:username/:imageKey', '/signed-image-url/:userna
       await s3Client.send(headCommand);
     } catch (headError) {
       if (headError.name === 'NotFound' || headError.$metadata?.httpStatusCode === 404) {
-        return res.status(404).json({ error: 'Image not found' });
+      return res.status(404).json({ error: 'Image not found' });
       }
       throw headError;
     }
@@ -10223,6 +10610,49 @@ app.get(['/api/signed-image-url/:username/:imageKey', '/signed-image-url/:userna
 app.options(['/api/r2-image/:username/:imageKey', '/r2-image/:username/:imageKey'], (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
+});
+
+// NEW CLEAN R2 IMAGE ROUTE - BYPASSES CORRUPTION
+app.get(['/api/clean-image/:username/:imageKey', '/clean-image/:username/:imageKey'], async (req, res) => {
+  const { username, imageKey } = req.params;
+  const platform = req.query.platform || 'instagram';
+  const r2Key = `ready_post/${platform}/${username}/${imageKey}`;
+  
+  try {
+    console.log(`[CLEAN-IMAGE] Direct fetch: ${r2Key}`);
+    
+    // Direct fetch from R2 without any validation, caching, or processing
+    const getCommand = new GetObjectCommand({
+      Bucket: 'tasks',
+      Key: r2Key,
+    });
+    
+    const response = await s3Client.send(getCommand);
+    
+    if (!response.Body) {
+      return res.status(404).json({ error: 'Image not found' });
+    }
+    
+    // Set headers and pipe directly
+    res.setHeader('Content-Type', response.ContentType || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('X-Source', 'clean-direct');
+    
+    // Stream directly without any buffer conversion that could corrupt the data
+    response.Body.pipe(res);
+    
+    console.log(`[CLEAN-IMAGE] ✅ Streaming complete: ${r2Key}`);
+    
+  } catch (error) {
+    console.error(`[CLEAN-IMAGE] Error: ${r2Key}:`, error.message);
+    
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+      return res.status(404).json({ error: 'Image not found' });
+    }
+    
+    return res.status(500).json({ error: 'Failed to retrieve image' });
+  }
 });
 
 // HEAD handler for R2 image endpoint (for testing accessibility)
@@ -10261,6 +10691,127 @@ app.head(['/api/r2-image/:username/:imageKey', '/r2-image/:username/:imageKey'],
     }
   }
 });
+
+// Fix-Image endpoint for local file serving (matching main server behavior)
+app.get('/fix-image/:username/:filename', async (req, res) => {
+  const { username, filename } = req.params;
+  const platform = req.query.platform || 'instagram';
+  
+  try {
+    console.log(`[FIX-IMAGE-PROXY] Request for ${username}/${filename} (platform: ${platform})`);
+    
+    // Construct the local file path
+    const localPath = path.join(process.cwd(), 'ready_post', platform, username, filename);
+    
+    // Check if file exists
+    if (!fs.existsSync(localPath)) {
+      console.log(`[FIX-IMAGE-PROXY] File not found: ${localPath}`);
+      return res.status(404).json({ error: 'Image not found' });
+    }
+    
+    // Read the file as binary data
+    const imageData = fs.readFileSync(localPath);
+    
+    // Validate that we got a proper Buffer
+    if (!Buffer.isBuffer(imageData)) {
+      console.error(`[FIX-IMAGE-PROXY] Invalid file data type for ${localPath}`);
+      return res.status(500).json({ error: 'Invalid image data' });
+    }
+    
+    // Validate image data integrity
+    if (!validateImageBuffer(imageData)) {
+      console.error(`[FIX-IMAGE-PROXY] Invalid image format for ${localPath}`);
+      return res.status(500).json({ error: 'Invalid image format' });
+    }
+    
+    console.log(`[FIX-IMAGE-PROXY] Serving ${localPath} (${imageData.length} bytes)`);
+    console.log(`[FIX-IMAGE-PROXY] First 12 bytes:`, Array.from(imageData.slice(0, 12)).map(b => b.toString(16).padStart(2, '0')).join(' '));
+    
+    // Detect content type from image data
+    let contentType = 'image/jpeg'; // Default
+    if (imageData.length > 12) {
+      // Check for WebP signature (RIFF...WEBP)
+      if (imageData[0] === 0x52 && imageData[1] === 0x49 && imageData[2] === 0x46 && imageData[3] === 0x46) {
+        if (imageData.length > 12 && imageData[8] === 0x57 && imageData[9] === 0x45 && imageData[10] === 0x42 && imageData[11] === 0x50) {
+          contentType = 'image/webp';
+        }
+      }
+      // Check for JPEG signature (FF D8 FF)
+      else if (imageData[0] === 0xFF && imageData[1] === 0xD8 && imageData[2] === 0xFF) {
+        contentType = 'image/jpeg';
+      }
+      // Check for PNG signature (89 50 4E 47)
+      else if (imageData[0] === 0x89 && imageData[1] === 0x50 && imageData[2] === 0x4E && imageData[3] === 0x47) {
+        contentType = 'image/png';
+      }
+      // Check for GIF signature
+      else if (imageData[0] === 0x47 && imageData[1] === 0x49 && imageData[2] === 0x46) {
+        contentType = 'image/gif';
+      }
+      // Check for BMP signature
+      else if (imageData[0] === 0x42 && imageData[1] === 0x4D) {
+        contentType = 'image/bmp';
+      }
+    }
+    
+    // Set proper headers
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Length', imageData.length);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('X-Image-Source', 'local-file');
+    
+    // Enable CORS
+    setCorsHeaders(res);
+    
+    // Send the binary data directly
+    res.send(imageData);
+    
+    console.log(`[FIX-IMAGE-PROXY] ✅ Successfully served ${filename}`);
+    
+  } catch (error) {
+    console.error(`[FIX-IMAGE-PROXY] Error serving ${username}/${filename}:`, error);
+    res.status(500).json({ error: 'Failed to serve image' });
+  }
+});
+
+// Helper function to validate image buffer integrity (same as main server)
+function validateImageBuffer(buffer) {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 12) {
+    return false;
+  }
+  
+  // Check for valid image signatures
+  const firstBytes = buffer.slice(0, 12);
+  
+  // JPEG: FF D8 FF
+  if (firstBytes[0] === 0xFF && firstBytes[1] === 0xD8 && firstBytes[2] === 0xFF) {
+    return true;
+  }
+  
+  // PNG: 89 50 4E 47
+  if (firstBytes[0] === 0x89 && firstBytes[1] === 0x50 && firstBytes[2] === 0x4E && firstBytes[3] === 0x47) {
+    return true;
+  }
+  
+  // GIF: 47 49 46
+  if (firstBytes[0] === 0x47 && firstBytes[1] === 0x49 && firstBytes[2] === 0x46) {
+    return true;
+  }
+  
+  // WebP: RIFF...WEBP
+  if (firstBytes[0] === 0x52 && firstBytes[1] === 0x49 && firstBytes[2] === 0x46 && firstBytes[3] === 0x46) {
+    if (firstBytes.length > 12 && firstBytes[8] === 0x57 && firstBytes[9] === 0x45 && firstBytes[10] === 0x42 && firstBytes[11] === 0x50) {
+      return true;
+    }
+  }
+  
+  // BMP: 42 4D
+  if (firstBytes[0] === 0x42 && firstBytes[1] === 0x4D) {
+    return true;
+  }
+  
+  return false;
+}
 
 // Save edited post from Canvas Editor
 app.post(['/api/save-edited-post/:username', '/save-edited-post/:username'], upload.single('image'), async (req, res) => {
@@ -10737,6 +11288,62 @@ setInterval(() => {
 }, 10 * 60 * 1000);
 
 console.log(`[${new Date().toISOString()}] Email verification service initialized`);
+
+// ===============================================================
+
+// Initialize token index map
+const tokenIndex = new Map();
+
+async function buildTokenIndex() {
+  try {
+    console.log('Building token index...');
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: 'InstagramTokens/',
+    });
+    const { Contents } = await s3Client.send(listCommand);
+    
+    if (Contents) {
+      for (const obj of Contents) {
+        if (obj.Key.endsWith('/token.json')) {
+          try {
+            const getCommand = new GetObjectCommand({
+              Bucket: 'tasks',
+              Key: obj.Key,
+            });
+            const data = await s3Client.send(getCommand);
+            const token = JSON.parse(await data.Body.transformToString());
+            
+            // Extract app user ID from key path
+            const appUserId = obj.Key.split('/')[1];
+            
+            // Index by all possible identifiers
+            if (token.instagram_user_id) {
+              tokenIndex.set(token.instagram_user_id, appUserId);
+            }
+            if (token.instagram_graph_id) {
+              tokenIndex.set(token.instagram_graph_id, appUserId);
+            }
+            if (token.username) {
+              tokenIndex.set(token.username, appUserId);
+            }
+          } catch (err) {
+            console.error('Error indexing token:', err);
+          }
+        }
+      }
+    }
+    console.log(`Token index built with ${tokenIndex.size} entries`);
+  } catch (error) {
+    console.error('Error building token index:', error);
+  }
+}
+
+// Call this on server startup
+buildTokenIndex();
+
+// Periodically rebuild index (every 5 minutes)
+setInterval(buildTokenIndex, 300000);
 
 // ===============================================================
 

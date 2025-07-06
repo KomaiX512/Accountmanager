@@ -59,3 +59,88 @@ image_cache/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+# Debug and backup files
+data/debug/
+data/backup_*
+data/cache/
+data/chroma/
+data/conversations/
+data/vector_fallback/
+data/users/
+data/posts/
+data/ready_post/
+
+# Test files and images
+test_*.jpg
+test_*.png
+test_*.gif
+test-*.jpg
+test-*.png
+test-*.gif
+final-test.jpg
+test_image*.jpg
+test_output*.jpg
+test-new.jpg
+test-fresh.jpg
+test-final.jpg
+test-download.jpg
+test-local.jpg
+test-https.jpg
+test-restart.jpg
+test-fixed*.jpg
+
+# Temporary and cache files
+*.bak
+*.backup
+*.tmp
+*.temp
+cloudflared.deb
+~/
+
+# Local storage and usage data
+local_storage/
+
+# Nginx configs (keep only the main ones)
+nginx-*.conf
+ultimate-nginx-*.conf
+sentientm.nginx.conf
+VPS.conf
+
+# Scripts that are temporary
+*.sh
+!start-*.sh
+!stop-*.sh
+!install-*.sh
+!setup-*.sh
+apply-*.sh
+comprehensive-*.sh
+quick-*.sh
+test-*.sh
+system-status.sh
+final-test.sh
+
+# Reports and documentation that might be temporary
+*_REPORT.md
+*_SUMMARY.md
+*_SUCCESS_REPORT.md
+*_CONFIGURATION_SUMMARY.md
+FINAL_STATUS_REPORT.md
+NGINX_*.md
+
+# Migration and utility scripts
+migrate_*.js
+check_*.js
+cleanup-*.js
+debug-*.js
+handle-*.js
+server-*.js
+server.js.bak
+server-direct-fix.js
+server-monitor.js
+rag-server.js
+chromadb-service.js
+create-fallback.js
+
+# Ecosystem configs (keep only the main one)
+ecosystem.config.cjs

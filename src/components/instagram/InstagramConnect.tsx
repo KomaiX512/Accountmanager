@@ -98,7 +98,7 @@ const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected, classN
     }
     
     const appId = '576296982152813';
-    const redirectUri = 'https://1d68-121-52-146-243.ngrok-free.app/instagram/callback';
+    const redirectUri = 'https://4872-121-52-146-243.ngrok-free.app/instagram/callback';
     const scope = 'instagram_business_basic,instagram_business_manage_messages,instagram_business_content_publish';
     
     const authUrl = `https://api.instagram.com/oauth/authorize?app_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code`;

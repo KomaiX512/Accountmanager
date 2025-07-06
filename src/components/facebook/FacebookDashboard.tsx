@@ -87,7 +87,7 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ accountHolder, on
   useEffect(() => {
     if (!facebookPageId || !currentUser?.uid) return;
 
-    const eventSource = new EventSource(`http://localhost:3000/stream/${facebookPageId}`);
+    const eventSource = new EventSource(`/stream/${facebookPageId}`);
     eventSourceRef.current = eventSource;
 
     eventSource.onmessage = (event) => {
@@ -176,7 +176,7 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ accountHolder, on
     try {
       const endpoint = notification.type === 'message' ? 'send-dm-reply' : 'send-comment-reply';
       
-      await axios.post(`http://localhost:3000/${endpoint}/${facebookPageId}`, {
+      await axios.post(`/${endpoint}/${facebookPageId}`, {
         sender_id: notification.sender_id,
         text: replyText,
         message_id: notification.message_id,
@@ -209,7 +209,7 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ accountHolder, on
     if (!facebookPageId) return;
     
     try {
-      await axios.post(`http://localhost:3000/ignore-notification/${facebookPageId}`, {
+      await axios.post(`/ignore-notification/${facebookPageId}`, {
         message_id: notification.message_id,
         comment_id: notification.comment_id,
         platform: 'facebook'
@@ -294,7 +294,7 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ accountHolder, on
         
         // Mark notification as handled to prevent re-appearance
         try {
-          await axios.post(`http://localhost:3000/mark-notification-handled/${facebookPageId}`, {
+          await axios.post(`/mark-notification-handled/${facebookPageId}`, {
             notification_id: notifId,
             type: notification.type,
             handled_by: 'ai',
@@ -332,7 +332,7 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ accountHolder, on
     try {
       const endpoint = notification.type === 'message' ? 'send-dm-reply' : 'send-comment-reply';
       
-      const sendResponse = await fetch(`http://localhost:3000/${endpoint}/${facebookPageId}`, {
+      const sendResponse = await fetch(`/${endpoint}/${facebookPageId}`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -422,7 +422,7 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ accountHolder, on
           // Send the generated reply
           const endpoint = notification.type === 'message' ? 'send-dm-reply' : 'send-comment-reply';
           
-          await axios.post(`http://localhost:3000/${endpoint}/${facebookPageId}`, {
+          await axios.post(`/${endpoint}/${facebookPageId}`, {
             sender_id: notification.sender_id,
             text: response.data.reply,
             message_id: notification.message_id,

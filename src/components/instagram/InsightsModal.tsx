@@ -108,7 +108,7 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
 
       try {
         console.log(`[${new Date().toISOString()}] Fetching profit analysis for ${platform} user: ${accountUsername}`);
-        const response = await axios.get(`/profit-analysis/${accountUsername}?platform=${platform}`);
+        const response = await axios.get(`/api/profit-analysis/${accountUsername}?platform=${platform}`);
         setProfitAnalysis(response.data);
         console.log(`[${new Date().toISOString()}] Profit analysis fetched:`, response.data);
       } catch (err: any) {
@@ -210,6 +210,17 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
   };
 
   const renderEngagementAnalysis = (engagement: ProfitAnalysisData['primary_analysis']['engagement']) => {
+    if (!engagement || !engagement.content_type_analysis) {
+      return (
+        <div className="analysis-section">
+          <h3>📊 Content Performance Analysis</h3>
+          <div className="analysis-note">
+            <p>No engagement data available for this account.</p>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="analysis-section">
         <h3>📊 Content Performance Analysis</h3>
@@ -243,6 +254,17 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
   };
 
   const renderPostingTrends = (trends: ProfitAnalysisData['primary_analysis']['posting_trends']) => {
+    if (!trends || !trends.day_distribution || !trends.hour_distribution) {
+      return (
+        <div className="analysis-section">
+          <h3>📅 Posting Trends & Optimal Times</h3>
+          <div className="analysis-note">
+            <p>No posting trends data available for this account.</p>
+          </div>
+        </div>
+      );
+    }
+
     const sortedDays = Object.entries(trends.day_distribution).sort(([,a], [,b]) => b - a);
     const sortedHours = Object.entries(trends.hour_distribution).sort(([,a], [,b]) => b - a).slice(0, 5);
     
@@ -253,17 +275,17 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
         <div className="trends-grid">
           <div className="trend-card">
             <h4>⭐ Most Active Day</h4>
-            <p className="highlight-text">{trends.most_active_day}</p>
+            <p className="highlight-text">{trends.most_active_day || 'N/A'}</p>
           </div>
           
           <div className="trend-card">
             <h4>🕐 Best Posting Hour</h4>
-            <p className="highlight-text">{trends.hour_formatted}</p>
+            <p className="highlight-text">{trends.hour_formatted || 'N/A'}</p>
           </div>
           
           <div className="trend-card">
             <h4>📈 Daily Post Rate</h4>
-            <p className="highlight-text">{trends.posts_per_day.toFixed(1)} posts/day</p>
+            <p className="highlight-text">{trends.posts_per_day ? trends.posts_per_day.toFixed(1) : 'N/A'} posts/day</p>
           </div>
         </div>
 
@@ -305,7 +327,7 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
           </div>
         </div>
 
-        {Object.keys(trends.high_activity_months).length > 0 && (
+        {trends.high_activity_months && Object.keys(trends.high_activity_months).length > 0 && (
           <div className="activity-months">
             <h4>📆 High Activity Months</h4>
             <div className="months-list">
@@ -334,8 +356,8 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
       return (
         <div className="insights-error">
           {!accountUsername 
-            ? `Please set up your ${platform === 'instagram' ? 'Instagram' : platform === 'twitter' ? 'Twitter' : 'Facebook'} account to view profit analysis.`
-            : 'No profit analysis data available for this account.'
+            ? `Please set up your ${platform === 'instagram' ? 'Instagram' : platform === 'twitter' ? 'Twitter' : 'Facebook'} account to view prophet analysis.`
+            : 'No Prophet analysis data available for this account.'
           }
         </div>
       );
@@ -350,8 +372,17 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
           </p>
         </div>
         
-        {profitAnalysis.primary_analysis.engagement && renderEngagementAnalysis(profitAnalysis.primary_analysis.engagement)}
-        {profitAnalysis.primary_analysis.posting_trends && renderPostingTrends(profitAnalysis.primary_analysis.posting_trends)}
+        {profitAnalysis.primary_analysis?.engagement && renderEngagementAnalysis(profitAnalysis.primary_analysis.engagement)}
+        {profitAnalysis.primary_analysis?.posting_trends && renderPostingTrends(profitAnalysis.primary_analysis.posting_trends)}
+        
+        {(!profitAnalysis.primary_analysis?.engagement && !profitAnalysis.primary_analysis?.posting_trends) && (
+          <div className="analysis-section">
+            <h3>📊 Analysis Status</h3>
+            <div className="analysis-note">
+              <p>No analysis data available for this account. The analysis may still be processing or the account may not have sufficient data.</p>
+            </div>
+          </div>
+        )}
       </div>
     );
   };

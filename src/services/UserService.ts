@@ -2,7 +2,7 @@ import { User, UsageStats, AccessControlResult, PricingPlan } from '../types/use
 
 class UserService {
   private readonly API_BASE_URL = process.env.NODE_ENV === 'production' 
-    ? 'https://your-domain.com/api' 
+    ? 'https://sentientm.com/api' 
     : '/api';
 
   // Cache for user data to reduce API calls

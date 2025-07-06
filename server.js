@@ -9,6 +9,7 @@ import { pipeline } from 'stream';
 import path from 'path';
 import jpeg from 'jpeg-js';
 import multer from 'multer';
+import sharp from 'sharp';
 
 const app = express();
 const port = process.env.PROXY_SERVER_PORT || 3002;
@@ -153,9 +154,6 @@ if (!S3Client.prototype.getObject) {
           let bodyBuffer;
           if (typeof response.Body === 'string' || response.Body instanceof Uint8Array) {
             bodyBuffer = Buffer.from(response.Body);
-          } else if (response.Body && typeof response.Body.transformToString === 'function') {
-            const str = await response.Body.transformToString('utf-8');
-            bodyBuffer = Buffer.from(str);
           } else if (response.Body) {
             bodyBuffer = await streamToBuffer(response.Body);
           } else {
@@ -206,9 +204,6 @@ const s3Client = {
           let bodyBuffer;
           if (typeof response.Body === 'string' || response.Body instanceof Uint8Array) {
             bodyBuffer = Buffer.from(response.Body);
-          } else if (response.Body && typeof response.Body.transformToString === 'function') {
-            const str = await response.Body.transformToString('utf-8');
-            bodyBuffer = Buffer.from(str);
           } else if (response.Body) {
             const streamToBuffer = async (stream) =>
               new Promise((resolve, reject) => {
@@ -437,6 +432,122 @@ app.get('/fix-image-narsissist', (req, res) => {
   }
 });
 
+// Function to convert WebP to JPEG for Instagram compatibility
+async function convertWebPToJPEG(webpBuffer) {
+  try {
+    // Validate that the buffer is actually a valid WebP file
+    if (!webpBuffer || webpBuffer.length < 12) {
+      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Buffer too small or empty, skipping conversion`);
+      return webpBuffer;
+    }
+    
+    // Check for valid WebP signature (RIFF...WEBP)
+    const looksLikeRIFF = webpBuffer[0] === 0x52 && webpBuffer[1] === 0x49 && 
+                          webpBuffer[2] === 0x46 && webpBuffer[3] === 0x46;
+    
+    // WEBP signature lives at offset 8 for RIFF containers
+    const isWebP = looksLikeRIFF && webpBuffer.length > 12 &&
+                   webpBuffer[8] === 0x57 && webpBuffer[9] === 0x45 &&
+                   webpBuffer[10] === 0x42 && webpBuffer[11] === 0x50;
+    
+    // If this buffer is not RIFF at all, it is definitely not WebP – just return it untouched.
+    if (!looksLikeRIFF) {
+      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Buffer is not RIFF/WebP, returning original without conversion`);
+      return webpBuffer;
+    }
+    
+    // If RIFF but not clearly WebP we'll still attempt conversion – Sharp might still decode.
+    if (!isWebP && looksLikeRIFF) {
+      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] RIFF detected without WEBP signature, forcing conversion attempt`);
+    }
+    
+    console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Converting valid WebP to JPEG (${webpBuffer.length} bytes)`);
+    
+    // Try multiple conversion strategies
+    let jpegBuffer;
+    
+    // Strategy 1: Direct conversion
+    try {
+      jpegBuffer = await sharp(webpBuffer)
+        .jpeg({ quality: 90 })
+        .toBuffer();
+      
+      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Successfully converted WebP to JPEG (${webpBuffer.length} -> ${jpegBuffer.length} bytes)`);
+      return jpegBuffer;
+    } catch (error) {
+      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 1 failed: ${error.message}`);
+    }
+    
+    // Strategy 2: Try with different sharp options
+    try {
+      jpegBuffer = await sharp(webpBuffer, { failOnError: false })
+        .jpeg({ quality: 85, progressive: true })
+        .toBuffer();
+      
+      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 2 successful (${webpBuffer.length} -> ${jpegBuffer.length} bytes)`);
+      return jpegBuffer;
+    } catch (error) {
+      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 2 failed: ${error.message}`);
+    }
+    
+    // Strategy 3: Try to clean the buffer first
+    try {
+      // Remove potential corruption by creating a clean buffer
+      const cleanBuffer = Buffer.from(webpBuffer);
+      jpegBuffer = await sharp(cleanBuffer, { failOnError: false })
+        .jpeg({ quality: 80 })
+        .toBuffer();
+      
+      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 3 successful (${webpBuffer.length} -> ${jpegBuffer.length} bytes)`);
+      return jpegBuffer;
+    } catch (error) {
+      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 3 failed: ${error.message}`);
+    }
+    
+    // Strategy 4: Try to extract and convert as raw image data
+    try {
+      // Try to process as raw image data
+      jpegBuffer = await sharp(webpBuffer, { 
+        failOnError: false,
+        limitInputPixels: false 
+      })
+        .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 75 })
+        .toBuffer();
+      
+      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 4 successful (${webpBuffer.length} -> ${jpegBuffer.length} bytes)`);
+      return jpegBuffer;
+    } catch (error) {
+      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 4 failed: ${error.message}`);
+    }
+    
+    // If all strategies fail, check if the original buffer might actually be JPEG
+    if (webpBuffer.length >= 2 && webpBuffer[0] === 0xFF && webpBuffer[1] === 0xD8) {
+      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Buffer appears to be JPEG already, returning as-is`);
+      return webpBuffer;
+    }
+    
+    // Last resort: Generate placeholder
+    console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] All conversion strategies failed, generating placeholder`);
+    return generatePlaceholderImage('Image Conversion Failed');
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [IMAGE-CONVERT] Critical error in conversion:`, error.message);
+    
+    // Check if original buffer might be usable
+    if (webpBuffer && webpBuffer.length > 0) {
+      // If it looks like JPEG, return it
+      if (webpBuffer.length >= 2 && webpBuffer[0] === 0xFF && webpBuffer[1] === 0xD8) {
+        console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Returning original buffer as it appears to be JPEG`);
+        return webpBuffer;
+      }
+    }
+    
+    // Generate placeholder as ultimate fallback
+    return generatePlaceholderImage('Image Error');
+  }
+}
+
 // Function to generate a simple placeholder image when needed
 function generatePlaceholderImage(text = 'Image Not Available', width = 512, height = 512) {
   try {
@@ -486,7 +597,13 @@ async function fetchImageWithFallbacks(key, fallbackImagePath = null, username =
     const { data, timestamp } = imageCache.get(cacheKey);
     if (Date.now() - timestamp < IMAGE_CACHE_TTL) {
       console.log(`[${new Date().toISOString()}] [IMAGE] Using cached image for ${key}`);
-      return { data, source: 'memory-cache' };
+      // Validate that cached data is a proper Buffer
+      if (Buffer.isBuffer(data)) {
+        return { data, source: 'memory-cache' };
+      } else {
+        console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid cached data type for ${key}, removing from cache`);
+        imageCache.delete(cacheKey);
+      }
     }
     // Cache expired
     imageCache.delete(cacheKey);
@@ -502,30 +619,47 @@ async function fetchImageWithFallbacks(key, fallbackImagePath = null, username =
       console.log(`[${new Date().toISOString()}] [IMAGE] Using local cached image for ${key}`);
       const data = fs.readFileSync(localCacheFilePath);
       
-      // Refresh memory cache
-      imageCache.set(cacheKey, { 
-        data, 
-        timestamp: Date.now() 
-      });
-      
-      // Limit cache size
-      if (imageCache.size > IMAGE_CACHE_MAX_SIZE) {
-        const oldestKey = Array.from(imageCache.keys())[0];
-        imageCache.delete(oldestKey);
+      // Validate the cached file is a proper Buffer
+      if (!Buffer.isBuffer(data)) {
+        console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid cached file data type for ${key}, removing cache file`);
+        fs.unlinkSync(localCacheFilePath);
+      } else {
+        // Refresh memory cache with validated data
+        imageCache.set(cacheKey, { 
+          data, 
+          timestamp: Date.now() 
+        });
+        
+        // Limit cache size
+        if (imageCache.size > IMAGE_CACHE_MAX_SIZE) {
+          const oldestKey = Array.from(imageCache.keys())[0];
+          imageCache.delete(oldestKey);
+        }
+        
+        return { data, source: 'file-cache' };
       }
-      
-      return { data, source: 'file-cache' };
     }
     
-    // If not in cache, fetch from R2
+    // If not in cache, fetch from R2 using the proper s3Client wrapper
     console.log(`[${new Date().toISOString()}] [IMAGE] Fetching from R2: ${key}`);
     
-    // Use the S3 client pool for better resilience
-    const s3 = getS3Client();
-    const data = await s3.getObject({
+    // Use the s3Client wrapper (not getS3Client) for proper Buffer handling
+    const data = await s3Client.getObject({
       Bucket: 'tasks',
       Key: key
     }).promise();
+    
+    // Validate that we got a proper Buffer
+    if (!data || !data.Body || !Buffer.isBuffer(data.Body)) {
+      throw new Error(`Invalid response from S3: expected Buffer, got ${typeof data?.Body}`);
+    }
+    
+    // Validate image data integrity (check for valid image headers)
+    const isValidImage = validateImageBuffer(data.Body);
+    if (!isValidImage) {
+      console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid image data detected for ${key}, not caching`);
+      return { data: data.Body, source: 'r2-invalid' };
+    }
     
     // Save to local file cache
     fs.writeFileSync(localCacheFilePath, data.Body);
@@ -550,7 +684,13 @@ async function fetchImageWithFallbacks(key, fallbackImagePath = null, username =
     if (fallbackImagePath && fs.existsSync(fallbackImagePath)) {
       console.log(`[${new Date().toISOString()}] [IMAGE] Using fallback image: ${fallbackImagePath}`);
       const data = fs.readFileSync(fallbackImagePath);
-      return { data, source: 'fallback-file' };
+      
+      // Validate fallback image
+      if (Buffer.isBuffer(data) && validateImageBuffer(data)) {
+        return { data, source: 'fallback-file' };
+      } else {
+        console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid fallback image data: ${fallbackImagePath}`);
+      }
     }
     
     // If username and filename are provided, check for alternate image names
@@ -571,11 +711,16 @@ async function fetchImageWithFallbacks(key, fallbackImagePath = null, username =
           
           try {
             console.log(`[${new Date().toISOString()}] [IMAGE] Trying alternative key: ${altKey}`);
-            const s3 = getS3Client();
-            const data = await s3.getObject({
+            const data = await s3Client.getObject({
               Bucket: 'tasks',
               Key: altKey
             }).promise();
+            
+            // Validate alternative image data
+            if (!data || !data.Body || !Buffer.isBuffer(data.Body) || !validateImageBuffer(data.Body)) {
+              console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid alternative image data: ${altKey}`);
+              continue;
+            }
             
             // Cache the successful result
             const hashedAltKey = Buffer.from(altKey).toString('base64').replace(/[\/\+\=]/g, '_');
@@ -599,6 +744,45 @@ async function fetchImageWithFallbacks(key, fallbackImagePath = null, username =
     const placeholderImage = generatePlaceholderImage(placeholderText);
     return { data: placeholderImage, source: 'placeholder' };
   }
+}
+
+// Helper function to validate image buffer integrity
+function validateImageBuffer(buffer) {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 12) {
+    return false;
+  }
+  
+  // Check for valid image signatures
+  const firstBytes = buffer.slice(0, 12);
+  
+  // JPEG: FF D8 FF
+  if (firstBytes[0] === 0xFF && firstBytes[1] === 0xD8 && firstBytes[2] === 0xFF) {
+    return true;
+  }
+  
+  // PNG: 89 50 4E 47
+  if (firstBytes[0] === 0x89 && firstBytes[1] === 0x50 && firstBytes[2] === 0x4E && firstBytes[3] === 0x47) {
+    return true;
+  }
+  
+  // GIF: 47 49 46
+  if (firstBytes[0] === 0x47 && firstBytes[1] === 0x49 && firstBytes[2] === 0x46) {
+    return true;
+  }
+  
+  // WebP: RIFF...WEBP
+  if (firstBytes[0] === 0x52 && firstBytes[1] === 0x49 && firstBytes[2] === 0x46 && firstBytes[3] === 0x46) {
+    if (firstBytes.length > 12 && firstBytes[8] === 0x57 && firstBytes[9] === 0x45 && firstBytes[10] === 0x42 && firstBytes[11] === 0x50) {
+      return true;
+    }
+  }
+  
+  // BMP: 42 4D
+  if (firstBytes[0] === 0x42 && firstBytes[1] === 0x4D) {
+    return true;
+  }
+  
+  return false;
 }
 
 // Update the fix-image endpoint with our enhanced fetching and emergency recovery
@@ -697,10 +881,15 @@ app.get('/fix-image/:username/:filename', async (req, res) => {
       // Detect actual image format from the data
       let contentType = 'image/jpeg'; // Default
       if (data && data.length > 12) {
-        // Check for WebP signature (RIFF...WEBP)
-        if (data[0] === 0x52 && data[1] === 0x49 && data[2] === 0x46 && data[3] === 0x46 &&
-            data[8] === 0x57 && data[9] === 0x45 && data[10] === 0x42 && data[11] === 0x50) {
-          contentType = 'image/webp';
+        // Check for WebP signature (RIFF...WEBP) - Strict validation
+        if (data[0] === 0x52 && data[1] === 0x49 && data[2] === 0x46 && data[3] === 0x46) {
+          // Check for WEBP signature at offset 8
+          if (data.length > 12 && data[8] === 0x57 && data[9] === 0x45 && data[10] === 0x42 && data[11] === 0x50) {
+            contentType = 'image/webp';
+          } else {
+            // RIFF format but not WebP - treat as JPEG
+            contentType = 'image/jpeg';
+          }
         }
         // Check for JPEG signature (FF D8 FF)
         else if (data[0] === 0xFF && data[1] === 0xD8 && data[2] === 0xFF) {
@@ -710,19 +899,42 @@ app.get('/fix-image/:username/:filename', async (req, res) => {
         else if (data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4E && data[3] === 0x47) {
           contentType = 'image/png';
         }
+        // Check for GIF signature
+        else if (data[0] === 0x47 && data[1] === 0x49 && data[2] === 0x46) {
+          contentType = 'image/gif';
+        }
+        // Check for BMP signature
+        else if (data[0] === 0x42 && data[1] === 0x4D) {
+          contentType = 'image/bmp';
+        }
       }
       
-      res.setHeader('Content-Type', contentType);
+      // Convert WebP to JPEG for better compatibility
+      let finalData = data;
+      let finalContentType = contentType;
+      
+      if (contentType === 'image/webp') {
+        try {
+          console.log(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Converting WebP to JPEG for compatibility`);
+          finalData = await convertWebPToJPEG(data);
+          finalContentType = 'image/jpeg';
+          console.log(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] ✅ Successfully converted WebP to JPEG`);
+        } catch (conversionError) {
+          console.error(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] ⚠️ WebP to JPEG conversion failed: ${conversionError.message}. Sending original WebP.`);
+        }
+      }
+
+      res.setHeader('Content-Type', finalContentType);
       res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
       res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
       res.setHeader('X-Image-Source', source); // For debugging
       res.setHeader('X-Request-ID', requestId); // For tracing
-      res.setHeader('X-Image-Format', contentType.split('/')[1]); // For debugging
+      res.setHeader('X-Image-Format', finalContentType.split('/')[1]); // For debugging
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Access-Control-Expose-Headers', 'X-Image-Source, X-Request-ID, X-Image-Format');
       
       // Send the image
-      res.send(data);
+      res.send(finalData);
       
       // Log performance
       const duration = Date.now() - startTime;
@@ -791,10 +1003,15 @@ app.get('/r2-images/:username/:filename', async (req, res) => {
     // Detect actual image format from the data
     let contentType = 'image/jpeg'; // Default
     if (data && data.length > 12) {
-      // Check for WebP signature (RIFF...WEBP)
-      if (data[0] === 0x52 && data[1] === 0x49 && data[2] === 0x46 && data[3] === 0x46 &&
-          data[8] === 0x57 && data[9] === 0x45 && data[10] === 0x42 && data[11] === 0x50) {
-        contentType = 'image/webp';
+      // Check for WebP signature (RIFF...WEBP) - Strict validation
+      if (data[0] === 0x52 && data[1] === 0x49 && data[2] === 0x46 && data[3] === 0x46) {
+        // Check for WEBP signature at offset 8
+        if (data.length > 12 && data[8] === 0x57 && data[9] === 0x45 && data[10] === 0x42 && data[11] === 0x50) {
+          contentType = 'image/webp';
+        } else {
+          // RIFF format but not WebP - treat as JPEG
+          contentType = 'image/jpeg';
+        }
       }
       // Check for JPEG signature (FF D8 FF)
       else if (data[0] === 0xFF && data[1] === 0xD8 && data[2] === 0xFF) {
@@ -804,6 +1021,22 @@ app.get('/r2-images/:username/:filename', async (req, res) => {
       else if (data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4E && data[3] === 0x47) {
         contentType = 'image/png';
       }
+      // Check for GIF signature
+      else if (data[0] === 0x47 && data[1] === 0x49 && data[2] === 0x46) {
+        contentType = 'image/gif';
+      }
+      // Check for BMP signature
+      else if (data[0] === 0x42 && data[1] === 0x4D) {
+        contentType = 'image/bmp';
+      }
+    }
+    
+    let dataForResponse = data;
+    // Check if the image is WebP and convert it to JPEG
+    if (contentType === 'image/webp') {
+      console.log(`[${new Date().toISOString()}] [R2-IMAGES] Converting WebP to JPEG.`);
+      dataForResponse = await convertWebPToJPEG(data);
+      contentType = 'image/jpeg'; // Update content type after conversion
     }
     
     // Set appropriate headers
@@ -815,7 +1048,7 @@ app.get('/r2-images/:username/:filename', async (req, res) => {
     res.setHeader('Access-Control-Expose-Headers', 'X-Image-Source, X-Image-Format');
     
     // Send the image
-    res.send(data);
+    res.send(dataForResponse);
     
     // Log performance
     const duration = Date.now() - startTime;
@@ -1134,36 +1367,63 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
     if (data.length > 12) {
       // Comprehensive image format detection and validation
       const firstBytes = data.slice(0, 12);
+      console.log(`[${new Date().toISOString()}] [R2-IMAGE] DEBUG: First 12 bytes for ${imageKey}:`, Array.from(firstBytes).map(b => b.toString(16).padStart(2, '0')).join(' '));
       
-      // JPEG validation (FF D8 FF)
-      if (firstBytes[0] === 0xFF && firstBytes[1] === 0xD8 && firstBytes[2] === 0xFF) {
-        contentType = 'image/jpeg';
-        isValidImage = true;
-        
-        // Additional JPEG validation - check for valid marker
-        if (firstBytes[3] === 0xE0 || firstBytes[3] === 0xE1 || firstBytes[3] === 0xDB) {
-          console.log(`[${new Date().toISOString()}] [R2-IMAGE] Valid JPEG detected for ${imageKey}`);
-        }
-      }
+      // JPEG validation (FF D8)
+      if (firstBytes[0] === 0xFF && firstBytes[1] === 0xD8) {
+         contentType = 'image/jpeg';
+         isValidImage = true;
+         console.log(`[${new Date().toISOString()}] [R2-IMAGE] Valid JPEG detected for ${imageKey}`);
++        console.log(`[${new Date().toISOString()}] [R2-IMAGE] JPEG bytes confirmed: ${firstBytes[0].toString(16)} ${firstBytes[1].toString(16)} ${firstBytes[2].toString(16)} ${firstBytes[3].toString(16)}`);
+       }
       // PNG validation (89 50 4E 47)
       else if (firstBytes[0] === 0x89 && firstBytes[1] === 0x50 && firstBytes[2] === 0x4E && firstBytes[3] === 0x47) {
         contentType = 'image/png';
         isValidImage = true;
         console.log(`[${new Date().toISOString()}] [R2-IMAGE] Valid PNG detected for ${imageKey}`);
       }
-      // WebP validation (RIFF...WEBP)
-      else if (firstBytes[0] === 0x52 && firstBytes[1] === 0x49 && firstBytes[2] === 0x46 && firstBytes[3] === 0x46 &&
-               firstBytes[8] === 0x57 && firstBytes[9] === 0x45 && firstBytes[10] === 0x42 && firstBytes[11] === 0x50) {
-        contentType = 'image/webp';
+      // WebP validation (RIFF...WEBP) - More lenient validation for corrupted images
+      else if (firstBytes[0] === 0x52 && firstBytes[1] === 0x49 && firstBytes[2] === 0x46 && firstBytes[3] === 0x46) {
+        // Check for WEBP signature at offset 8 - be more lenient with corruption
+        if (data.length > 12 && firstBytes[8] === 0x57 && firstBytes[9] === 0x45 && firstBytes[10] === 0x42 && firstBytes[11] === 0x50) {
+          contentType = 'image/webp';
+          isValidImage = true;
+          console.log(`[${new Date().toISOString()}] [R2-IMAGE] Valid WebP detected for ${imageKey}`);
+        } else {
+          // RIFF format but WebP signature unclear - could be corrupted WebP, try to convert anyway
+          console.log(`[${new Date().toISOString()}] [R2-IMAGE] RIFF format detected but WebP signature unclear for ${imageKey}, attempting WebP conversion`);
+          contentType = 'image/webp'; // Treat as WebP and let conversion handle it
+          isValidImage = true;
+        }
+      }
+      // Additional validation for other image formats
+      else if (firstBytes[0] === 0x47 && firstBytes[1] === 0x49 && firstBytes[2] === 0x46) {
+        // GIF format
+        contentType = 'image/gif';
         isValidImage = true;
-        console.log(`[${new Date().toISOString()}] [R2-IMAGE] Valid WebP detected for ${imageKey}`);
+        console.log(`[${new Date().toISOString()}] [R2-IMAGE] Valid GIF detected for ${imageKey}`);
+      }
+      else if (firstBytes[0] === 0x42 && firstBytes[1] === 0x4D) {
+        // BMP format
+        contentType = 'image/bmp';
+        isValidImage = true;
+        console.log(`[${new Date().toISOString()}] [R2-IMAGE] Valid BMP detected for ${imageKey}`);
       }
     }
     
-    // CRITICAL: If image validation fails, don't serve potentially corrupted data
+    // CRITICAL: If image validation fails, try to serve anyway with basic validation
     if (!isValidImage) {
-      console.error(`[${new Date().toISOString()}] [R2-IMAGE] Invalid image format detected for ${imageKey}, first 12 bytes:`, Array.from(data.slice(0, 12)).map(b => b.toString(16).padStart(2, '0')).join(' '));
-      throw new Error('Invalid image format detected');
+      console.warn(`[${new Date().toISOString()}] [R2-IMAGE] Unknown image format for ${imageKey}, first 12 bytes:`, Array.from(data.slice(0, 12)).map(b => b.toString(16).padStart(2, '0')).join(' '));
+      
+      // More lenient validation - if it has some image-like characteristics, serve it
+      if (data.length > 100 && (data[0] === 0xFF || data[0] === 0x89 || data[0] === 0x52 || data[0] === 0x47 || data[0] === 0x42)) {
+        console.log(`[${new Date().toISOString()}] [R2-IMAGE] Accepting unknown format as valid image for ${imageKey}`);
+        isValidImage = true;
+        contentType = 'image/jpeg'; // Default to JPEG
+      } else {
+        console.error(`[${new Date().toISOString()}] [R2-IMAGE] Invalid image format detected for ${imageKey}, first 12 bytes:`, Array.from(data.slice(0, 12)).map(b => b.toString(16).padStart(2, '0')).join(' '));
+        throw new Error('Invalid image format detected');
+      }
     }
     
     // Minimum size check (prevent tiny corrupted files)
@@ -1203,12 +1463,44 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.setHeader('Access-Control-Expose-Headers', 'X-Image-Source, X-Image-Format, X-Image-Valid, X-Image-Size, X-Cache-Mode');
     
-    // Send the validated image buffer
-    res.send(data);
+    // Convert WebP to JPEG for better compatibility
+    let finalData = data;
+    let finalContentType = contentType;
     
-    console.log(`[${new Date().toISOString()}] [R2-IMAGE] ✅ Successfully served valid ${contentType.split('/')[1].toUpperCase()}: ${r2Key} (${data.length} bytes) from ${source}`);
+    if (contentType === 'image/webp') {
+      try {
+        console.log(`[${new Date().toISOString()}] [R2-IMAGE] Attempting WebP→JPEG conversion: ${imageKey}`);
+        const jpegBuffer = await sharp(data, { failOnError: false })
+          .jpeg({ quality: 90 })
+          .toBuffer();
+
+        // Basic sanity-check: must start with JPEG SOI marker and be larger than 1 KB
+        if (jpegBuffer && jpegBuffer.length > 1024 && jpegBuffer[0] === 0xFF && jpegBuffer[1] === 0xD8) {
+          finalData = jpegBuffer;
+          finalContentType = 'image/jpeg';
+          console.log(`[${new Date().toISOString()}] [R2-IMAGE] ✅ WebP→JPEG conversion succeeded for ${imageKey}`);
+        } else {
+          console.warn(`[${new Date().toISOString()}] [R2-IMAGE] WebP→JPEG conversion produced invalid result for ${imageKey}; serving original WebP`);
+        }
+      } catch (conversionError) {
+        console.warn(`[${new Date().toISOString()}] [R2-IMAGE] WebP→JPEG conversion error for ${imageKey}: ${conversionError.message}; serving original WebP`);
+      }
+    }
+    
+    // Update headers with final content type
+    res.setHeader('Content-Type', finalContentType);
+    res.setHeader('X-Image-Format', finalContentType.split('/')[1]);
+    res.setHeader('Content-Length', finalData.length);
+    
+    // Send the validated image buffer
+    res.send(finalData);
+    
+    console.log(`[${new Date().toISOString()}] [R2-IMAGE] ✅ About to complete successfully: ${r2Key} (${finalData.length} bytes) from ${source}, isValidImage: ${isValidImage}`);
+    
+    console.log(`[${new Date().toISOString()}] [R2-IMAGE] ✅ Successfully served valid ${finalContentType.split('/')[1].toUpperCase()}: ${r2Key} (${finalData.length} bytes) from ${source}`);
     
   } catch (error) {
+    console.error(`[${new Date().toISOString()}] [R2-IMAGE] ❌ Exception caught for ${username}/${imageKey}:`, error.message, error.stack);
     console.error(`[${new Date().toISOString()}] [R2-IMAGE] ❌ Error serving ${username}/${imageKey}:`, error.message);
     
     // Enhanced error response with debugging info
@@ -1261,9 +1553,38 @@ app.head('/api/r2-image/:username/:imageKey', async (req, res) => {
     const localFallbackPath = path.join(process.cwd(), 'ready_post', platform, username, imageKey);
     const { data, source } = await fetchImageWithFallbacks(r2Key, localFallbackPath, username, imageKey);
     
+    // Detect image format and handle WebP conversion
+    let contentType = 'image/jpeg';
+    let finalData = data;
+    
+    if (data && data.length > 12) {
+      // Check for WebP signature (RIFF...WEBP)
+      if (data[0] === 0x52 && data[1] === 0x49 && data[2] === 0x46 && data[3] === 0x46) {
+        if (data.length > 12 && data[8] === 0x57 && data[9] === 0x45 && data[10] === 0x42 && data[11] === 0x50) {
+          contentType = 'image/webp';
+          console.log(`[${new Date().toISOString()}] [R2-IMAGE-HEAD] RIFF format detected for ${imageKey}, treating as WebP`);
+        } else {
+          contentType = 'image/webp';
+          console.log(`[${new Date().toISOString()}] [R2-IMAGE-HEAD] RIFF format detected for ${imageKey}, treating as WebP`);
+        }
+      }
+    }
+    
+    // Convert WebP to JPEG for better compatibility
+    if (contentType === 'image/webp') {
+      try {
+        console.log(`[${new Date().toISOString()}] [R2-IMAGE-HEAD] Converting WebP to JPEG for compatibility: ${imageKey}`);
+        finalData = await convertWebPToJPEG(data);
+        contentType = 'image/jpeg';
+        console.log(`[${new Date().toISOString()}] [R2-IMAGE-HEAD] ✅ Successfully converted WebP to JPEG for ${imageKey}`);
+      } catch (conversionError) {
+        console.error(`[${new Date().toISOString()}] [R2-IMAGE-HEAD] ⚠️ WebP to JPEG conversion failed for ${imageKey}: ${conversionError.message}. Using original WebP.`);
+      }
+    }
+    
     // Set headers without body (HEAD request)
-    res.setHeader('Content-Type', 'image/jpeg');
-    res.setHeader('Content-Length', data.length);
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Length', finalData.length);
     
     // Check if this is a cache-busting request
     const isCacheBusting = req.query.cb || req.query.updated || req.query.v;
@@ -1416,9 +1737,10 @@ async function handlePostsEndpoint(req, res) {
         }
         
         if (imageKey) {
-          // Use relative URLs for port forwarding compatibility
-          imageUrl = `/fix-image/${username}/${imageKey}?platform=${platform}`;
-          r2ImageUrl = `/api/r2-image/${username}/${imageKey}?platform=${platform}`;
+          // Use absolute URLs for proper image loading
+          const baseUrl = req.get('host') ? `${req.protocol}://${req.get('host')}` : 'https://sentientm.com';
+          imageUrl = `${baseUrl}/fix-image/${username}/${imageKey}?platform=${platform}`;
+          r2ImageUrl = `${baseUrl}/api/r2-image/${username}/${imageKey}?platform=${platform}`;
         }
         
         // Extract and properly structure post data for frontend
@@ -1737,6 +2059,9 @@ app.get('/ai-replies/:username', async (req, res) => {
   const { username } = req.params;
   const platform = req.query.platform || 'instagram';
   
+  console.log(`[${new Date().toISOString()}] [AI-REPLIES-DEBUG] Route hit: ${req.method} ${req.url}`);
+  console.log(`[${new Date().toISOString()}] [AI-REPLIES-DEBUG] Username: ${username}, Platform: ${platform}`);
+  
   try {
     console.log(`[${new Date().toISOString()}] [AI-REPLIES] Fetching AI replies for ${platform}/${username}`);
     
@@ -1747,7 +2072,11 @@ app.get('/ai-replies/:username', async (req, res) => {
       MaxKeys: 50 // Limit to last 50 replies
     };
     
+    console.log(`[${new Date().toISOString()}] [AI-REPLIES-DEBUG] List params:`, listParams);
+    
     const data = await s3Client.listObjects(listParams).promise();
+    
+    console.log(`[${new Date().toISOString()}] [AI-REPLIES-DEBUG] S3 response:`, data);
     
     if (!data.Contents || data.Contents.length === 0) {
       console.log(`[${new Date().toISOString()}] [AI-REPLIES] No AI replies found for ${platform}/${username}`);
@@ -1785,10 +2114,12 @@ app.get('/ai-replies/:username', async (req, res) => {
     }
     
     console.log(`[${new Date().toISOString()}] [AI-REPLIES] Found ${replies.length} AI replies for ${platform}/${username}`);
+    console.log(`[${new Date().toISOString()}] [AI-REPLIES-DEBUG] Sending response:`, { replies });
     res.json({ replies });
     
   } catch (error) {
     console.error(`[${new Date().toISOString()}] [AI-REPLIES] Error fetching AI replies:`, error);
+    console.error(`[${new Date().toISOString()}] [AI-REPLIES-DEBUG] Full error:`, error);
     res.status(500).json({ 
       error: 'Failed to fetch AI replies',
       details: error.message 
@@ -2861,3 +3192,36 @@ const startServer = async () => {
 
 // Start the server with enterprise-grade reliability
 startServer();
+
+// Test endpoint to directly serve local image file
+app.get('/test-direct-image/:username/:filename', (req, res) => {
+  const { username, filename } = req.params;
+  const platform = req.query.platform || 'instagram';
+  
+  try {
+    const localPath = path.join(process.cwd(), 'ready_post', platform, username, filename);
+    
+    if (!fs.existsSync(localPath)) {
+      return res.status(404).send('File not found');
+    }
+    
+    console.log(`[TEST-DIRECT] Serving file: ${localPath}`);
+    
+    // Read file as binary and send directly
+    const imageData = fs.readFileSync(localPath);
+    
+    console.log(`[TEST-DIRECT] File size: ${imageData.length} bytes`);
+    console.log(`[TEST-DIRECT] First 12 bytes:`, Array.from(imageData.slice(0, 12)).map(b => b.toString(16).padStart(2, '0')).join(' '));
+    
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Content-Length', imageData.length);
+    res.setHeader('X-Test-Source', 'direct-local');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    
+    res.send(imageData);
+    
+  } catch (error) {
+    console.error(`[TEST-DIRECT] Error:`, error);
+    res.status(500).send('Error reading file');
+  }
+});

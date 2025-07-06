@@ -19,6 +19,7 @@ import useFeatureTracking from '../../hooks/useFeatureTracking';
 import { useUsage } from '../../context/UsageContext';
 import GlobalUpgradeHandler from '../common/GlobalUpgradeHandler';
 import { useProcessing } from '../../context/ProcessingContext';
+import { safeFilter, safeMap, safeLength } from '../../utils/safeArrayUtils';
 
 interface PlatformLoadingState {
   startTime: number;
@@ -320,7 +321,7 @@ const MainDashboard: React.FC = () => {
     const counts: Record<string, number> = {};
     
     // Get actually claimed platforms using improved function
-    const claimedPlatforms = platforms.filter(platform => getPlatformAccessStatus(platform));
+        const claimedPlatforms = safeFilter(platforms, (platform: PlatformData) => getPlatformAccessStatus(platform.id));
     
     if (claimedPlatforms.length === 0) {
       // No claimed platforms, set all counts to 0
@@ -366,11 +367,14 @@ const MainDashboard: React.FC = () => {
               const strategiesResponse = await fetch(`/api/retrieve-strategies/${platformUsername}?platform=${platform}`);
               if (strategiesResponse.ok) {
                 const strategies = await strategiesResponse.json();
-                // Count unseen strategies
-                const viewedKey = `viewed_strategies_${platform}_${platformUsername}`;
-                const viewedStrategies = JSON.parse(localStorage.getItem(viewedKey) || '[]');
-                const unseenStrategies = strategies.filter((s: any) => !viewedStrategies.includes(s.key));
-                totalCount += unseenStrategies.length;
+                // Defensive check: ensure strategies is an array before filtering
+                if (Array.isArray(strategies)) {
+                  // Count unseen strategies
+                  const viewedKey = `viewed_strategies_${platform}_${platformUsername}`;
+                  const viewedStrategies = JSON.parse(localStorage.getItem(viewedKey) || '[]');
+                  const unseenStrategies = safeFilter(strategies, (s: any) => !viewedStrategies.includes(s.key));
+                  totalCount += unseenStrategies.length;
+                }
               }
             } catch (err) {
               // Ignore strategy fetch errors - don't log to reduce console noise
@@ -381,11 +385,14 @@ const MainDashboard: React.FC = () => {
               const postsResponse = await fetch(`/api/posts/${platformUsername}?platform=${platform}`);
               if (postsResponse.ok) {
                 const posts = await postsResponse.json();
-                // Count unseen posts
-                const viewedKey = `viewed_posts_${platform}_${platformUsername}`;
-                const viewedPosts = JSON.parse(localStorage.getItem(viewedKey) || '[]');
-                const unseenPosts = posts.filter((p: any) => !viewedPosts.includes(p.key));
-                totalCount += unseenPosts.length;
+                // Defensive check: ensure posts is an array before filtering
+                if (Array.isArray(posts)) {
+                  // Count unseen posts
+                  const viewedKey = `viewed_posts_${platform}_${platformUsername}`;
+                  const viewedPosts = JSON.parse(localStorage.getItem(viewedKey) || '[]');
+                  const unseenPosts = safeFilter(posts, (p: any) => !viewedPosts.includes(p.key));
+                  totalCount += unseenPosts.length;
+                }
               }
             } catch (err) {
               // Ignore posts fetch errors - don't log to reduce console noise
@@ -402,11 +409,14 @@ const MainDashboard: React.FC = () => {
                   const competitorResponse = await fetch(`/api/retrieve-multiple/${platformUsername}?competitors=${competitors.join(',')}&platform=${platform}`);
                   if (competitorResponse.ok) {
                     const competitorData = await competitorResponse.json();
-                    // Count unseen competitor analysis
-                    const viewedKey = `viewed_competitor_${platform}_${platformUsername}`;
-                    const viewedCompetitor = JSON.parse(localStorage.getItem(viewedKey) || '[]');
-                    const unseenCompetitor = competitorData.filter((c: any) => !viewedCompetitor.includes(c.key || `${c.competitor}_${c.timestamp}`));
-                    totalCount += unseenCompetitor.length;
+                    // Defensive check: ensure competitorData is an array before filtering
+                    if (Array.isArray(competitorData)) {
+                      // Count unseen competitor analysis
+                      const viewedKey = `viewed_competitor_${platform}_${platformUsername}`;
+                      const viewedCompetitor = JSON.parse(localStorage.getItem(viewedKey) || '[]');
+                      const unseenCompetitor = safeFilter(competitorData, (c: any) => !viewedCompetitor.includes(c.key || `${c.competitor}_${c.timestamp}`));
+                      totalCount += unseenCompetitor.length;
+                    }
                   }
                 }
               }
@@ -512,7 +522,7 @@ const MainDashboard: React.FC = () => {
   ]);
 
   // Get only connected platforms
-  const connectedPlatforms = platforms.filter(p => p.connected);
+  const connectedPlatforms = safeFilter(platforms, (p: PlatformData) => p.connected);
 
   // ✅ UNIFIED PLATFORM STATUS UPDATE: Single effect that handles both claimed and connected status
   useEffect(() => {
@@ -787,7 +797,7 @@ const MainDashboard: React.FC = () => {
   const removeImage = (index: number) => {
     setPostContent(prev => ({
       ...prev,
-      images: prev.images.filter((_, i) => i !== index)
+              images: safeFilter(prev.images, (_, i) => i !== index)
     }));
   };
   
@@ -797,7 +807,7 @@ const MainDashboard: React.FC = () => {
       if (prev.platformIds.includes(platformId)) {
         return {
           ...prev,
-          platformIds: prev.platformIds.filter(id => id !== platformId)
+          platformIds: safeFilter(prev.platformIds, id => id !== platformId)
         };
       } else {
         return {
@@ -812,19 +822,20 @@ const MainDashboard: React.FC = () => {
   const getRemainingCharacters = () => {
     if (postContent.platformIds.length === 0) return null;
     
-    const selectedPlatforms = platforms.filter(p => postContent.platformIds.includes(p.id));
+    const selectedPlatforms = safeFilter(platforms, (p: PlatformData) => postContent.platformIds.includes(p.id));
     if (selectedPlatforms.length === 0) return null;
     
-    const minCharLimit = Math.min(...selectedPlatforms.map(p => p.characterLimit || Infinity));
+    const minCharLimit = Math.min(...safeMap(selectedPlatforms, (p: PlatformData) => p.characterLimit || Infinity));
     return minCharLimit === Infinity ? null : minCharLimit - postContent.text.length;
   };
   
   // Open the instant post modal without checking for connected platforms
   const openInstantPostModal = () => {
     // Pre-select connected platforms
-    const connectedPlatformIds = platforms
-      .filter(p => p.connected)
-      .map(p => p.id);
+    const connectedPlatformIds = safeMap(
+      safeFilter(platforms, (p: PlatformData) => p.connected),
+      (p: PlatformData) => p.id
+    );
     
     setPostContent({
       text: '',
@@ -845,7 +856,7 @@ const MainDashboard: React.FC = () => {
     }
     
     // Get selected platforms that are connected
-    const selectedPlatforms = platforms.filter(p => 
+    const selectedPlatforms = safeFilter(platforms, (p: PlatformData) => 
       postContent.platformIds.includes(p.id) && p.connected
     );
     
@@ -934,19 +945,19 @@ const MainDashboard: React.FC = () => {
     }
     
     // Show consolidated results
-    const successfulPosts = results.filter(r => r.success);
-    const failedPosts = results.filter(r => !r.success);
+    const successfulPosts = safeFilter(results, (r: {platform: string, success: boolean, message: string}) => r.success);
+    const failedPosts = safeFilter(results, (r: {platform: string, success: boolean, message: string}) => !r.success);
     
     let alertMessage = '';
     
     if (successfulPosts.length > 0) {
       const action = postContent.scheduleDate ? 'scheduled' : 'posted';
-      alertMessage += `✅ Successfully ${action} to: ${successfulPosts.map(r => r.platform).join(', ')}\n`;
+      alertMessage += `✅ Successfully ${action} to: ${safeMap(successfulPosts, (r: {platform: string, success: boolean, message: string}) => r.platform).join(', ')}\n`;
       alertMessage += `📊 Usage tracked for ${successfulPosts.length} platform(s)\n`;
     }
     
     if (failedPosts.length > 0) {
-      alertMessage += `❌ Failed to post to: ${failedPosts.map(r => `${r.platform} (${r.message})`).join(', ')}`;
+      alertMessage += `❌ Failed to post to: ${safeMap(failedPosts, (r: {platform: string, success: boolean, message: string}) => `${r.platform} (${r.message})`).join(', ')}`;
     }
     
     alert(alertMessage);
@@ -1155,7 +1166,7 @@ const MainDashboard: React.FC = () => {
                 </div>
                 <div className="stat-details">
                   <h4>Claimed Platforms</h4>
-                  <p className="stat-value">{platforms.filter(p => p.claimed).length}</p>
+                  <p className="stat-value">{safeLength(safeFilter(platforms, (p: PlatformData) => p.claimed))}</p>
                 </div>
               </div>
               
@@ -1167,7 +1178,7 @@ const MainDashboard: React.FC = () => {
                 </div>
                 <div className="stat-details">
                   <h4>Connected APIs</h4>
-                  <p className="stat-value">{platforms.filter(p => p.connected).length}</p>
+                  <p className="stat-value">{safeLength(safeFilter(platforms, (p: PlatformData) => p.connected))}</p>
                 </div>
               </div>
               
@@ -1246,15 +1257,15 @@ const MainDashboard: React.FC = () => {
               <h4>Select platforms to post to:</h4>
               
               {/* Connected Platforms */}
-              {platforms.filter(platform => platform.connected).length > 0 && (
+              {safeLength(safeFilter(platforms, (platform: PlatformData) => platform.connected)) > 0 && (
                 <div className="connected-platforms-section">
                   <div className="section-title">
                     <span className="status-indicator connected">✓ Connected Platforms</span>
                   </div>
                   <div className="platform-checkboxes">
-                    {platforms
-                      .filter(platform => platform.connected)
-                      .map(platform => (
+                    {safeMap(
+                      safeFilter(platforms, (platform: PlatformData) => platform.connected),
+                      (platform: PlatformData) => (
                         <div 
                           key={platform.id} 
                           className={`platform-checkbox ${postContent.platformIds.includes(platform.id) ? 'selected' : ''}`}
@@ -1290,15 +1301,15 @@ const MainDashboard: React.FC = () => {
               )}
               
               {/* Disconnected Platforms */}
-              {platforms.filter(platform => !platform.connected && platform.claimed).length > 0 && (
+              {safeLength(safeFilter(platforms, (platform: PlatformData) => !platform.connected && platform.claimed)) > 0 && (
                 <div className="disconnected-platforms-section">
                   <div className="section-title">
                     <span className="status-indicator disconnected">⚠ Not Connected (Connect to post)</span>
                   </div>
                   <div className="platform-checkboxes disabled">
-                    {platforms
-                      .filter(platform => !platform.connected && platform.claimed)
-                      .map(platform => (
+                    {safeMap(
+                      safeFilter(platforms, (platform: PlatformData) => !platform.connected && platform.claimed),
+                      (platform: PlatformData) => (
                         <div 
                           key={platform.id} 
                           className="platform-checkbox disabled"
@@ -1322,7 +1333,7 @@ const MainDashboard: React.FC = () => {
                 </div>
               )}
               
-              {platforms.filter(p => p.connected).length === 0 && (
+              {safeLength(safeFilter(platforms, (p: PlatformData) => p.connected)) === 0 && (
                 <div className="no-connected-platforms">
                   <p>No connected platforms. Please connect your accounts from the platform dashboards to start posting.</p>
                 </div>

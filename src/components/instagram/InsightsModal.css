@@ -118,6 +118,16 @@
     border-left: 4px solid #00ffcc;
   }
   
+  .analysis-note {
+    background: #2a2a2a;
+    padding: 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #aaa;
+    text-align: center;
+    border: 1px solid #444;
+  }
+  
   .insights-loading, .insights-error {
     text-align: center;
     padding: 40px 20px;

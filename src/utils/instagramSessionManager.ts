@@ -358,7 +358,7 @@ export const syncInstagramConnection = async (authUserId: string): Promise<void>
       // Verify that the backend also has token data for API calls
       if (backendConnection.instagram_graph_id) {
         try {
-          const tokenCheckResponse = await axios.get(`http://localhost:3000/instagram-token-check/${backendConnection.instagram_graph_id}`);
+          const tokenCheckResponse = await axios.get(`/instagram-token-check/${backendConnection.instagram_graph_id}`);
           if (tokenCheckResponse.status === 200) {
             console.log(`[${new Date().toISOString()}] Verified Instagram token exists for graph ID ${backendConnection.instagram_graph_id}`);
           }

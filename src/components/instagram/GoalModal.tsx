@@ -84,7 +84,7 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
     try {
       console.log(`[GoalModal] Checking campaign status for ${username} on ${platform}`);
       // Add bypass_cache=true to ensure we get fresh data from the server
-      const response = await axios.get(`http://localhost:3000/campaign-status/${username}?platform=${platform.toLowerCase()}&bypass_cache=true`);
+      const response = await axios.get(`/campaign-status/${username}?platform=${platform.toLowerCase()}&bypass_cache=true`);
       const statusData = response.data;
       
       console.log(`[GoalModal] Backend response:`, statusData);
@@ -158,7 +158,7 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
     setIsSubmitting(true);
     setError(null);
     try {
-      await axios.post(`http://localhost:3000/save-goal/${username}?platform=${platform.toLowerCase()}`, {
+      await axios.post(`/save-goal/${username}?platform=${platform.toLowerCase()}`, {
         persona: form.persona,
         timeline: Number(form.timeline),
         goal: form.goal,

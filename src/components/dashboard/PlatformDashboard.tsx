@@ -40,6 +40,7 @@ import AccessControlPopup from '../common/AccessControlPopup';
 import { useNavigate } from 'react-router-dom';
 import useProcessingGuard from '../../hooks/useProcessingGuard';
 import { useProcessing } from '../../context/ProcessingContext';
+import { safeFilter, safeMap, safeLength } from '../../utils/safeArrayUtils';
 
 // Define RagService compatible ChatMessage
 interface RagChatMessage {
@@ -256,7 +257,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   useEffect(() => {
     const cleanInterval = setInterval(() => {
       const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
-      setReplySentTracker(prev => prev.filter(reply => reply.timestamp > tenMinutesAgo));
+      setReplySentTracker(prev => safeFilter(prev, reply => reply.timestamp > tenMinutesAgo));
     }, 60000);
     
     return () => clearInterval(cleanInterval);
@@ -343,7 +344,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
 
     const checkCampaignStatus = async () => {
       try {
-        const response = await axios.get(`http://localhost:3000/campaign-status/${accountHolder}?platform=${platform.toLowerCase()}&bypass_cache=true`);
+        const response = await axios.get(`/campaign-status/${accountHolder}?platform=${platform.toLowerCase()}&bypass_cache=true`);
         const status = response.data;
         if (status?.hasActiveCampaign) {
           setShowCampaignButton(true);
@@ -358,32 +359,32 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
 
   // Helper function to get unseen count for each section
   const getUnseenStrategiesCount = () => {
-    return strategies.filter(strategy => !viewedStrategies.has(strategy.key)).length;
+    return safeLength(safeFilter(strategies, (strategy: { key: string }) => !viewedStrategies.has(strategy.key)));
   };
 
   const getUnseenCompetitorCount = () => {
-    return competitorData.filter(data => !viewedCompetitorData.has(data.key)).length;
+    return safeLength(safeFilter(competitorData, (data: { key: string }) => !viewedCompetitorData.has(data.key)));
   };
 
   const getUnseenPostsCount = () => {
-    return posts.filter(post => !viewedPosts.has(post.key)).length;
+    return safeLength(safeFilter(posts, (post: { key: string }) => !viewedPosts.has(post.key)));
   };
 
   // Function to mark content as viewed with localStorage persistence
   const markStrategiesAsViewed = () => {
-    const newViewedStrategies = new Set(strategies.map(s => s.key));
+    const newViewedStrategies = new Set(Array.isArray(strategies) ? strategies.map(s => s.key) : []);
     setViewedStrategies(newViewedStrategies);
     localStorage.setItem(`viewed_strategies_${platform}_${accountHolder}`, JSON.stringify(Array.from(newViewedStrategies)));
   };
 
   const markCompetitorDataAsViewed = () => {
-    const newViewedCompetitorData = new Set(competitorData.map(c => c.key));
+    const newViewedCompetitorData = new Set(Array.isArray(competitorData) ? competitorData.map(c => c.key) : []);
     setViewedCompetitorData(newViewedCompetitorData);
     localStorage.setItem(`viewed_competitor_data_${platform}_${accountHolder}`, JSON.stringify(Array.from(newViewedCompetitorData)));
   };
 
   const markPostsAsViewed = () => {
-    const newViewedPosts = new Set(posts.map(p => p.key));
+    const newViewedPosts = new Set(Array.isArray(posts) ? posts.map(p => p.key) : []);
     setViewedPosts(newViewedPosts);
     localStorage.setItem(`viewed_posts_${platform}_${accountHolder}`, JSON.stringify(Array.from(newViewedPosts)));
   };
@@ -677,7 +678,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
             id: notification.message_id || ''
           }
         ].slice(-20));
-        setNotifications(prev => prev.filter(n => n.message_id !== notification.message_id));
+        setNotifications(prev => safeFilter(prev, n => n.message_id !== notification.message_id));
         setToast(`${platform === 'twitter' ? 'Tweet' : platform === 'facebook' ? 'Facebook message' : 'DM'} reply sent!`);
       } else if (notification.type === 'comment' && notification.comment_id) {
         await axios.post(`/api/send-comment-reply/${currentUserId}`, {
@@ -694,7 +695,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
             id: notification.comment_id || ''
           }
         ].slice(-20));
-        setNotifications(prev => prev.filter(n => n.comment_id !== notification.comment_id));
+        setNotifications(prev => safeFilter(prev, n => n.comment_id !== notification.comment_id));
         setToast(`${platform === 'twitter' ? 'Reply' : platform === 'facebook' ? 'Facebook comment reply' : 'Comment reply'} sent!`);
       }
     } catch (error: any) {
@@ -717,12 +718,12 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     if (!currentUserId || (!notification.message_id && !notification.comment_id)) return;
     
     try {
-      await axios.post(`http://localhost:3000/ignore-notification/${currentUserId}`, {
+      await axios.post(`/ignore-notification/${currentUserId}`, {
         message_id: notification.message_id,
         comment_id: notification.comment_id,
         platform: platform
       });
-      setNotifications(prev => prev.filter(n =>
+      setNotifications(prev => safeFilter(prev, n =>
         !(
           (notification.message_id && n.message_id === notification.message_id) ||
           (notification.comment_id && n.comment_id === notification.comment_id)
@@ -807,7 +808,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         setToast(`AI reply generated for ${notification.username || 'user'}`);
         
         // Remove the original notification to prevent duplicates
-        setNotifications(prev => prev.filter(n => 
+        setNotifications(prev => safeFilter(prev, n => 
           !((n.message_id && n.message_id === notification.message_id) || 
             (n.comment_id && n.comment_id === notification.comment_id))
         ));
@@ -877,7 +878,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       if (sendResponse.ok) {
         console.log(`[${new Date().toISOString()}] Successfully sent ${platform} AI reply for ${notifId}`, responseData);
         
-        setNotifications(prev => prev.filter(n => 
+        setNotifications(prev => safeFilter(prev, n => 
           !((n.message_id && n.message_id === notification.message_id) || 
             (n.comment_id && n.comment_id === notification.comment_id))
         ));
@@ -907,7 +908,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           if (responseData.handled) {
             console.log(`[${new Date().toISOString()}] ${platform} message marked as handled but not sent: ${responseData.warning || 'unknown reason'}`);
             
-            setNotifications(prev => prev.filter(n => 
+            setNotifications(prev => safeFilter(prev, n => 
               !((n.message_id && n.message_id === notification.message_id) || 
                 (n.comment_id && n.comment_id === notification.comment_id))
             ));
@@ -967,12 +968,12 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     }
     
     try {
-      setNotifications(prev => prev.filter(n => 
+      setNotifications(prev => safeFilter(prev, n => 
         !((n.message_id && n.message_id === notification.message_id) || 
           (n.comment_id && n.comment_id === notification.comment_id))
       ));
       
-      const res = await fetch(`http://localhost:3000/ignore-ai-reply/${accountHolder}`, {
+      const res = await fetch(`/ignore-ai-reply/${accountHolder}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -1043,7 +1044,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           // Send the generated reply
           const endpoint = notification.type === 'message' ? 'send-dm-reply' : 'send-comment-reply';
           
-          await axios.post(`http://localhost:3000/${endpoint}/${currentUserId}`, {
+          await axios.post(`/${endpoint}/${currentUserId}`, {
             sender_id: notification.sender_id,
             text: response.data.reply,
             message_id: notification.message_id,
@@ -1052,7 +1053,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           });
 
           // Mark notification as handled permanently
-          await axios.post(`http://localhost:3000/mark-notification-handled/${currentUserId}`, {
+          await axios.post(`/mark-notification-handled/${currentUserId}`, {
             notification_id: notification.message_id || notification.comment_id,
             type: notification.type,
             handled_by: 'ai_auto_reply',
@@ -1195,7 +1196,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         
         if (prefix.startsWith(`queries/${platform}/${accountHolder}/`)) {
           axios.get(`/api/responses/${accountHolder}${platformParam}`).then(res => {
-            setResponses(res.data);
+            setResponses(Array.isArray(res.data) ? res.data : []);
             setToast(`New ${platform} response received!`);
           }).catch(err => {
             console.error(`Error fetching ${platform} responses:`, err);
@@ -1208,7 +1209,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
             : `/api/retrieve-engagement-strategies/${accountHolder}${platformParam}`;
           
           axios.get(endpoint).then(res => {
-            setStrategies(res.data);
+            setStrategies(Array.isArray(res.data) ? res.data : []);
             setToast(`New ${platform} strategies available!`);
           }).catch(err => {
             console.error(`Error fetching ${platform} strategies:`, err);
@@ -1217,7 +1218,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         
         if (prefix.startsWith(`ready_post/${platform}/${accountHolder}/`)) {
           axios.get(`/api/posts/${accountHolder}${platformParam}`).then(res => {
-            setPosts(res.data);
+            setPosts(Array.isArray(res.data) ? res.data : []);
             setToast(`New ${platform} post cooked!`);
           }).catch(err => {
             console.error(`Error fetching ${platform} posts:`, err);
@@ -1227,14 +1228,15 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         if (prefix.startsWith(`competitor_analysis/${platform}/${accountHolder}/`)) {
           Promise.all(
             competitors.map(comp =>
-              axios.get(`http://localhost:3000/retrieve/${accountHolder}/${comp}${platformParam}`).catch(err => {
+              axios.get(`/retrieve/${accountHolder}/${comp}${platformParam}`).catch(err => {
                 if (err.response?.status === 404) return { data: [] };
                 throw err;
               })
             )
           )
             .then(res => {
-              setCompetitorData(res.flatMap(r => r.data));
+              const flatData = res.flatMap(r => Array.isArray(r.data) ? r.data : []);
+              setCompetitorData(flatData);
               setToast(`New ${platform} competitor analysis available!`);
             })
             .catch(err => {
@@ -1262,7 +1264,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         
         if (!isRecentlySent) {
           setNotifications(prev => {
-            const updated = [data.data, ...prev.filter(n => 
+            const updated = [data.data, ...safeFilter(prev, (n: any) => 
               n.message_id !== data.data.message_id && 
               n.comment_id !== data.data.comment_id
             )];
@@ -1521,13 +1523,15 @@ Image Description: ${response.post.image_prompt}
         )
       ]);
 
-      setResponses(responsesData.data);
-      setStrategies(strategiesData.data);
-      setPosts(postsData.data);
+      // Defensive checks for array data before setting state
+      setResponses(Array.isArray(responsesData.data) ? responsesData.data : []);
+      setStrategies(Array.isArray(strategiesData.data) ? strategiesData.data : []);
+      setPosts(Array.isArray(postsData.data) ? postsData.data : []);
       
-      // Always set competitor data
+      // Always set competitor data with defensive check
       const competitorResponses = competitorData as any[];
-      setCompetitorData(competitorResponses.flatMap(res => res.data));
+      const flatData = competitorResponses.flatMap(res => Array.isArray(res.data) ? res.data : []);
+      setCompetitorData(flatData);
 
       if (firstLoadRef.current) {
         firstLoadRef.current = false;
@@ -1545,8 +1549,14 @@ Image Description: ${response.post.image_prompt}
     setImageError(false);
     try {
       const response = await axios.get(`/api/profile-info/${accountHolder}${platformParam ? `${platformParam}&forceRefresh=true` : '?forceRefresh=true'}`);
-      setProfileInfo(response.data);
-      console.log(`${config.name} Profile Info Fetched:`, response.data);
+      // Defensive check: ensure response data is a valid object
+      if (response.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
+        setProfileInfo(response.data);
+        console.log(`${config.name} Profile Info Fetched:`, response.data);
+      } else {
+        setProfileInfo(null);
+        setProfileError(`Invalid ${config.name} profile data received.`);
+      }
     } catch (err: any) {
       if (err.response?.status === 404) {
         setProfileInfo(null);

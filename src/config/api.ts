@@ -1,8 +1,10 @@
 // API Configuration for unified hosting
 export const API_CONFIG = {
-  // Use relative URLs when running through the reverse proxy
-  // This automatically uses the current domain (ngrok URL or localhost:8080)
-  BASE_URL: '',
+  // Use absolute URLs for production to ensure proper image loading
+  // This ensures images load correctly from any domain
+  BASE_URL: typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+    ? 'http://localhost:3000' 
+    : 'https://sentientm.com',
   
   // API endpoints
   ENDPOINTS: {
@@ -62,4 +64,6 @@ export const getApiUrl = (endpoint: string, params?: string): string => {
 };
 
 // Legacy support - for quick migration
-export const API_BASE_URL = API_CONFIG.BASE_URL; 
+export const API_BASE_URL = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+  ? 'http://localhost:3000' 
+  : 'https://sentientm.com'; 

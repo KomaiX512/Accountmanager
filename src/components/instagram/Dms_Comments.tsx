@@ -4,6 +4,7 @@ import { useInstagram } from '../../context/InstagramContext';
 import { useTwitter } from '../../context/TwitterContext';
 import { useFacebook } from '../../context/FacebookContext';
 import { Notification } from '../../types/notifications';
+import { safeFilter } from '../../utils/safeArrayUtils';
 
 interface DmsCommentsProps {
   notifications: Notification[];
@@ -97,7 +98,7 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
     if (!onAutoReplyAll || isAutoReplying) return;
     
     // Filter notifications that can be auto-replied (not already replied/ignored)
-    const pendingNotifications = notifications.filter(notif => 
+    const pendingNotifications = safeFilter(notifications, (notif: any) => 
       !notif.status || notif.status === 'pending'
     );
     
@@ -239,7 +240,7 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
             disabled={isAutoReplying || isLoading}
             className="auto-reply-all-btn"
           >
-            {isAutoReplying ? 'Auto-Replying...' : `Auto-Reply All (${notifications.filter(n => !n.status || n.status === 'pending').length})`}
+            {isAutoReplying ? 'Auto-Replying...' : `Auto-Reply All (${safeFilter(notifications, (n: any) => !n.status || n.status === 'pending').length})`}
           </button>
           <span className="auto-reply-info">
             AI will reply to all pending Comments and Dms based on rule set and according to yours personalization.

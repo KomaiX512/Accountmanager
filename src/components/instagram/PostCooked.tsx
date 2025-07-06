@@ -12,6 +12,7 @@ import { useTwitter } from '../../context/TwitterContext';
 import { useFacebook } from '../../context/FacebookContext';
 import { schedulePost, fetchImageFromR2, extractImageKey } from '../../utils/scheduleHelpers';
 import axios from 'axios';
+import { safeFilter } from '../../utils/safeArrayUtils';
 import {
   Avatar,
   Box,
@@ -175,7 +176,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
 
   // Helper function to get unseen count
   const getUnseenPostsCount = () => {
-    return localPosts.filter(post => !viewedPosts.has(post.key)).length;
+    return safeFilter(localPosts, (post: any) => !viewedPosts.has(post.key)).length;
   };
 
   // Function to mark posts as viewed
@@ -1540,7 +1541,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     );
   }
 
-  const filteredPosts = localPosts.filter(post => !rejectedPosts.includes(post.key));
+  const filteredPosts = safeFilter(localPosts, (post: any) => !rejectedPosts.includes(post.key));
 
   return (
     <ErrorBoundary>

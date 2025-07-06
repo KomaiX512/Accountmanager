@@ -24,6 +24,7 @@ import ChatModal from './ChatModal';
 import RagService from '../../services/RagService';
 import type { ChatMessage as ChatModalMessage } from './ChatModal';
 import type { Notification, ProfileInfo, LinkedAccount } from '../../types/notifications';
+import { safeFilter, safeMap, safeLength } from '../../utils/safeArrayUtils';
 // Import icons from react-icons
 import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaLock, FaBell } from 'react-icons/fa';
 import { MdAnalytics, MdOutlineSchedule, MdOutlineAutoGraph } from 'react-icons/md';
@@ -120,32 +121,32 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
 
   // Helper function to get unseen count for each section
   const getUnseenStrategiesCount = () => {
-    return strategies.filter(strategy => !viewedStrategies.has(strategy.key)).length;
+    return safeLength(safeFilter(strategies, (strategy: { key: string }) => !viewedStrategies.has(strategy.key)));
   };
 
   const getUnseenCompetitorCount = () => {
-    return competitorData.filter(data => !viewedCompetitorData.has(data.key)).length;
+    return safeLength(safeFilter(competitorData, (data: { key: string }) => !viewedCompetitorData.has(data.key)));
   };
 
   const getUnseenPostsCount = () => {
-    return posts.filter(post => !viewedPosts.has(post.key)).length;
+    return safeLength(safeFilter(posts, (post: { key: string }) => !viewedPosts.has(post.key)));
   };
 
   // Function to mark content as viewed with localStorage persistence
   const markStrategiesAsViewed = () => {
-    const newViewedStrategies = new Set(strategies.map(s => s.key));
+    const newViewedStrategies = new Set(Array.isArray(strategies) ? strategies.map(s => s.key) : []);
     setViewedStrategies(newViewedStrategies);
     localStorage.setItem(getViewedStorageKey('strategies'), JSON.stringify(Array.from(newViewedStrategies)));
   };
 
   const markCompetitorDataAsViewed = () => {
-    const newViewedCompetitorData = new Set(competitorData.map(c => c.key));
+    const newViewedCompetitorData = new Set(Array.isArray(competitorData) ? competitorData.map(c => c.key) : []);
     setViewedCompetitorData(newViewedCompetitorData);
     localStorage.setItem(getViewedStorageKey('competitor'), JSON.stringify(Array.from(newViewedCompetitorData)));
   };
 
   const markPostsAsViewed = () => {
-    const newViewedPosts = new Set(posts.map(p => p.key));
+    const newViewedPosts = new Set(Array.isArray(posts) ? posts.map(p => p.key) : []);
     setViewedPosts(newViewedPosts);
     localStorage.setItem(getViewedStorageKey('posts'), JSON.stringify(Array.from(newViewedPosts)));
   };
@@ -616,7 +617,7 @@ Image Description: ${response.post.image_prompt}
             id: notification.message_id || ''
           }
         ].slice(-20));
-        setNotifications(prev => prev.filter(n => n.message_id !== notification.message_id));
+        setNotifications(prev => safeFilter(prev, n => n.message_id !== notification.message_id));
         setToast('DM reply sent!');
       } else if (notification.type === 'comment' && notification.comment_id) {
         // ✅ REAL USAGE TRACKING: Check limits BEFORE sending comment reply
@@ -647,7 +648,7 @@ Image Description: ${response.post.image_prompt}
             id: notification.comment_id || ''
           }
         ].slice(-20));
-        setNotifications(prev => prev.filter(n => n.comment_id !== notification.comment_id));
+        setNotifications(prev => safeFilter(prev, n => n.comment_id !== notification.comment_id));
         setToast('Comment reply sent!');
       }
     } catch (error: any) {
@@ -665,11 +666,11 @@ Image Description: ${response.post.image_prompt}
   const handleIgnore = async (notification: Notification) => {
     if (!igBusinessId || (!notification.message_id && !notification.comment_id)) return;
     try {
-      await axios.post(`http://localhost:3000/ignore-notification/${igBusinessId}`, {
+      await axios.post(`/ignore-notification/${igBusinessId}`, {
         message_id: notification.message_id,
         comment_id: notification.comment_id,
       });
-      setNotifications(prev => prev.filter(n =>
+      setNotifications(prev => safeFilter(prev, n =>
         !(
           (notification.message_id && n.message_id === notification.message_id) ||
           (notification.comment_id && n.comment_id === notification.comment_id)
@@ -769,7 +770,7 @@ Image Description: ${response.post.image_prompt}
         try {
           console.log(`[${new Date().toISOString()}] Marking notification ${notifId} as handled permanently`);
           
-          await axios.post(`http://localhost:3000/mark-notification-handled/${userId}`, {
+          await axios.post(`/mark-notification-handled/${userId}`, {
             notification_id: notifId,
             type: notification.type,
             handled_by: 'ai'
@@ -784,7 +785,7 @@ Image Description: ${response.post.image_prompt}
           
           // QUICK FIX 1: Immediately remove the original notification from the list
           // to prevent duplicate AI replies being generated
-          setNotifications(prev => prev.filter(n => 
+          setNotifications(prev => safeFilter(prev, n => 
             !((n.message_id && n.message_id === notification.message_id) || 
               (n.comment_id && n.comment_id === notification.comment_id))
           ));
@@ -836,7 +837,7 @@ Image Description: ${response.post.image_prompt}
           console.error(`[${new Date().toISOString()}] Error marking notification as handled:`, markError);
           
           // Even if marking failed, still remove the original notification to prevent duplicates
-          setNotifications(prev => prev.filter(n => 
+          setNotifications(prev => safeFilter(prev, n => 
             !((n.message_id && n.message_id === notification.message_id) || 
               (n.comment_id && n.comment_id === notification.comment_id))
           ));
@@ -880,7 +881,7 @@ Image Description: ${response.post.image_prompt}
           try {
             // Call the original endpoint
             const result = await axios.post(
-              `http://localhost:3000/ai-reply/${accountHolder}`,
+              `/ai-reply/${accountHolder}`,
               notification,
               {
                 headers: {
@@ -902,7 +903,7 @@ Image Description: ${response.post.image_prompt}
             try {
               console.log(`[${new Date().toISOString()}] Marking notification ${notifId} as handled permanently`);
               
-              await axios.post(`http://localhost:3000/mark-notification-handled/${userId}`, {
+              await axios.post(`/mark-notification-handled/${userId}`, {
                 notification_id: notifId,
                 type: notification.type,
                 handled_by: 'ai-fallback'
@@ -1019,7 +1020,7 @@ Image Description: ${response.post.image_prompt}
         console.log(`[Dashboard] ✅ AI reply tracked: Instagram AI reply sent`);
         
         // QUICK FIX 2: Immediately remove the notification on successful send
-        setNotifications(prev => prev.filter(n => 
+        setNotifications(prev => safeFilter(prev, n => 
           !((n.message_id && n.message_id === notification.message_id) || 
             (n.comment_id && n.comment_id === notification.comment_id))
         ));
@@ -1055,7 +1056,7 @@ Image Description: ${response.post.image_prompt}
             console.log(`[${new Date().toISOString()}] Message marked as handled but not sent: ${responseData.warning || 'unknown reason'}`);
             
             // Remove from notifications to prevent duplicate sends
-            setNotifications(prev => prev.filter(n => 
+            setNotifications(prev => safeFilter(prev, n => 
               !((n.message_id && n.message_id === notification.message_id) || 
                 (n.comment_id && n.comment_id === notification.comment_id))
             ));
@@ -1113,13 +1114,13 @@ Image Description: ${response.post.image_prompt}
     
     try {
       // First update UI for immediate feedback
-      setNotifications(prev => prev.filter(n => 
+      setNotifications(prev => safeFilter(prev, n => 
         !((n.message_id && n.message_id === notification.message_id) || 
           (n.comment_id && n.comment_id === notification.comment_id))
       ));
       
       // Then call the server to permanently ignore
-      const res = await fetch(`http://localhost:3000/ignore-ai-reply/${accountHolder}`, {
+      const res = await fetch(`/ignore-ai-reply/${accountHolder}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -1244,13 +1245,15 @@ Image Description: ${response.post.image_prompt}
         )
       ]);
 
-      setResponses(responsesData.data);
-      setStrategies(strategiesData.data);
-      setPosts(postsData.data);
+      // Defensive checks for array data before setting state
+      setResponses(Array.isArray(responsesData.data) ? responsesData.data : []);
+      setStrategies(Array.isArray(strategiesData.data) ? strategiesData.data : []);
+      setPosts(Array.isArray(postsData.data) ? postsData.data : []);
       
-      // Always set competitor data
+      // Always set competitor data with defensive check
       const competitorResponses = competitorData as any[];
-      setCompetitorData(competitorResponses.flatMap(res => res.data));
+      const flatData = competitorResponses.flatMap(res => Array.isArray(res.data) ? res.data : []);
+      setCompetitorData(flatData);
 
       if (firstLoadRef.current) {
         firstLoadRef.current = false;
@@ -1306,7 +1309,7 @@ Image Description: ${response.post.image_prompt}
         const { prefix } = data;
         if (prefix.startsWith(`queries/${accountHolder}/`)) {
           axios.get(`/api/responses/${accountHolder}`).then(res => {
-            setResponses(res.data);
+            setResponses(Array.isArray(res.data) ? res.data : []);
             setToast('New response received!');
           }).catch(err => {
             console.error('Error fetching responses:', err);
@@ -1318,7 +1321,7 @@ Image Description: ${response.post.image_prompt}
             : `/api/retrieve-engagement-strategies/${accountHolder}`;
           
           axios.get(endpoint).then(res => {
-            setStrategies(res.data);
+            setStrategies(Array.isArray(res.data) ? res.data : []);
             setToast('New strategies available!');
           }).catch(err => {
             console.error('Error fetching strategies:', err);
@@ -1326,7 +1329,7 @@ Image Description: ${response.post.image_prompt}
         }
         if (prefix.startsWith(`ready_post/${accountHolder}/`)) {
           axios.get(`/api/posts/${accountHolder}`).then(res => {
-            setPosts(res.data);
+            setPosts(Array.isArray(res.data) ? res.data : []);
             setToast('New post cooked!');
           }).catch(err => {
             console.error('Error fetching posts:', err);
@@ -1342,7 +1345,8 @@ Image Description: ${response.post.image_prompt}
             )
           )
             .then(res => {
-              setCompetitorData(res.flatMap(r => r.data));
+              const flatData = res.flatMap(r => Array.isArray(r.data) ? r.data : []);
+              setCompetitorData(flatData);
               setToast('New competitor analysis available!');
             })
             .catch(err => {
@@ -1370,7 +1374,7 @@ Image Description: ${response.post.image_prompt}
         
         if (!isRecentlySent) {
           setNotifications(prev => {
-            const updated = [data.data, ...prev.filter(n => 
+            const updated = [data.data, ...safeFilter(prev, (n: any) => 
               n.message_id !== data.data.message_id && 
               n.comment_id !== data.data.comment_id
             )];
@@ -1518,7 +1522,7 @@ Image Description: ${response.post.image_prompt}
     try {
       console.log(`[Dashboard] Checking campaign status for ${accountHolder}`);
       // Add bypass_cache=true to ensure we get fresh data from the server
-      const response = await axios.get(`http://localhost:3000/campaign-status/${accountHolder}?platform=instagram&bypass_cache=true`);
+      const response = await axios.get(`/campaign-status/${accountHolder}?platform=instagram&bypass_cache=true`);
       const statusData = response.data;
       
       console.log(`[Dashboard] Campaign status response:`, statusData);
@@ -1577,7 +1581,7 @@ Image Description: ${response.post.image_prompt}
   useEffect(() => {
     const cleanInterval = setInterval(() => {
       const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
-      setReplySentTracker(prev => prev.filter(reply => reply.timestamp > tenMinutesAgo));
+              setReplySentTracker(prev => safeFilter(prev, reply => reply.timestamp > tenMinutesAgo));
     }, 60000); // Check every minute
     
     return () => clearInterval(cleanInterval);

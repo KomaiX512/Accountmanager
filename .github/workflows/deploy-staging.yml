@@ -1,0 +1,245 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [staging]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '18'
+  DEPLOY_PATH: '/var/www/sentientm/Accountmanager-staging'
+  CURRENT_PATH: '/var/www/sentientm/Accountmanager-current'
+  PM2_APP_NAME: 'sentientm-staging'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linting
+        run: npm run lint
+
+      - name: Build application
+        run: npm run build
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/staging'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Create deployment package
+        run: |
+          tar -czf deployment-staging.tar.gz \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='.github' \
+            --exclude='*.log' \
+            --exclude='temp-images' \
+            --exclude='image_cache' \
+            --exclude='local_storage' \
+            --exclude='test-output' \
+            --exclude='test_data' \
+            .
+
+      - name: Upload deployment package
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          source: "deployment-staging.tar.gz"
+          target: "/tmp/"
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            set -e
+            
+            echo "🚀 Starting staging deployment..."
+            
+            # Create backup of current staging deployment
+            if [ -d "${{ env.DEPLOY_PATH }}" ]; then
+              echo "📦 Creating backup of current staging deployment..."
+              cp -r "${{ env.DEPLOY_PATH }}" "${{ env.DEPLOY_PATH }}.backup.$(date +%Y%m%d_%H%M%S)"
+            fi
+            
+            # Create staging directory if it doesn't exist
+            mkdir -p "${{ env.DEPLOY_PATH }}"
+            
+            # Stop current processes (if staging is currently active)
+            echo "🛑 Stopping current processes..."
+            pm2 stop sentientm-main-server sentientm-rag-server sentientm-proxy-server || true
+            pm2 delete sentientm-main-server sentientm-rag-server sentientm-proxy-server || true
+            
+            # Clean staging directory
+            echo "🧹 Cleaning staging directory..."
+            rm -rf "${{ env.DEPLOY_PATH }}"/*
+            
+            # Extract deployment package
+            echo "📦 Extracting deployment package..."
+            tar -xzf /tmp/deployment-staging.tar.gz -C "${{ env.DEPLOY_PATH }}"
+            
+            # Set proper permissions
+            chmod -R 755 "${{ env.DEPLOY_PATH }}"
+            
+            # Install dependencies
+            echo "📦 Installing dependencies..."
+            cd "${{ env.DEPLOY_PATH }}"
+            npm ci --production
+            
+            # Create logs directory
+            mkdir -p "${{ env.DEPLOY_PATH }}/logs"
+            
+            # Create staging-specific ecosystem config (same ports as production)
+            cat > "${{ env.DEPLOY_PATH }}/ecosystem.staging.js" << 'EOF'
+            export default {
+              apps: [
+                {
+                  name: 'sentientm-main-server',
+                  script: './server/server.js',
+                  cwd: '${{ env.DEPLOY_PATH }}',
+                  instances: 1,
+                  exec_mode: 'fork',
+                  env: {
+                    NODE_ENV: 'staging',
+                    MAIN_SERVER_PORT: 3000,
+                    HOST: '0.0.0.0'
+                  },
+                  autorestart: true,
+                  watch: false,
+                  max_memory_restart: '2G',
+                  min_uptime: '10s',
+                  max_restarts: 10,
+                  restart_delay: 5000,
+                  log_file: './logs/staging-main-server-combined.log',
+                  out_file: './logs/staging-main-server-out.log',
+                  error_file: './logs/staging-main-server-error.log',
+                  log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+                  kill_timeout: 5000,
+                  listen_timeout: 10000,
+                  shutdown_with_message: true
+                },
+                {
+                  name: 'sentientm-rag-server',
+                  script: './rag-server.js',
+                  cwd: '${{ env.DEPLOY_PATH }}',
+                  instances: 1,
+                  exec_mode: 'fork',
+                  env: {
+                    NODE_ENV: 'staging',
+                    RAG_SERVER_PORT: 3001,
+                    HOST: '0.0.0.0'
+                  },
+                  autorestart: true,
+                  watch: false,
+                  max_memory_restart: '2G',
+                  min_uptime: '10s',
+                  max_restarts: 10,
+                  restart_delay: 5000,
+                  log_file: './logs/staging-rag-server-combined.log',
+                  out_file: './logs/staging-rag-server-out.log',
+                  error_file: './logs/staging-rag-server-error.log',
+                  log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+                  kill_timeout: 5000,
+                  listen_timeout: 10000,
+                  shutdown_with_message: true
+                },
+                {
+                  name: 'sentientm-proxy-server',
+                  script: './server.js',
+                  cwd: '${{ env.DEPLOY_PATH }}',
+                  instances: 1,
+                  exec_mode: 'fork',
+                  env: {
+                    NODE_ENV: 'staging',
+                    PROXY_SERVER_PORT: 3002,
+                    HOST: '0.0.0.0'
+                  },
+                  autorestart: true,
+                  watch: false,
+                  max_memory_restart: '1G',
+                  min_uptime: '10s',
+                  max_restarts: 10,
+                  restart_delay: 5000,
+                  log_file: './logs/staging-proxy-server-combined.log',
+                  out_file: './logs/staging-proxy-server-out.log',
+                  error_file: './logs/staging-proxy-server-error.log',
+                  log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+                  kill_timeout: 5000,
+                  listen_timeout: 10000,
+                  shutdown_with_message: true
+                }
+              ]
+            };
+            EOF
+            
+            # Start staging processes
+            echo "🚀 Starting staging processes..."
+            pm2 start ecosystem.staging.js
+            
+            # Save PM2 configuration
+            pm2 save
+            
+            # Wait for services to be ready
+            echo "⏳ Waiting for services to be ready..."
+            sleep 10
+            
+            # Health check
+            echo "🏥 Performing health checks..."
+            if curl -f http://localhost:3000/health && curl -f http://localhost:3001/health && curl -f http://localhost:3002/health; then
+              echo "✅ Staging deployment successful!"
+              
+              # Switch symlink to staging (for staging domain access)
+              echo "🔄 Switching symlink to staging..."
+              ln -sfn "${{ env.DEPLOY_PATH }}" "${{ env.CURRENT_PATH }}"
+              
+              echo "🎉 Staging deployment completed successfully!"
+              echo "🌐 Staging accessible at: https://staging.sentientm.com"
+            else
+              echo "❌ Health check failed, rolling back..."
+              pm2 stop sentientm-main-server sentientm-rag-server sentientm-proxy-server
+              pm2 delete sentientm-main-server sentientm-rag-server sentientm-proxy-server
+              if [ -d "${{ env.DEPLOY_PATH }}.backup" ]; then
+                rm -rf "${{ env.DEPLOY_PATH }}"
+                mv "${{ env.DEPLOY_PATH }}.backup" "${{ env.DEPLOY_PATH }}"
+                cd "${{ env.DEPLOY_PATH }}"
+                pm2 start ecosystem.staging.js
+              fi
+              exit 1
+            fi
+
+      - name: Cleanup deployment package
+        run: rm -f deployment-staging.tar.gz 

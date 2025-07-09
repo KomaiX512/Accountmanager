@@ -1,0 +1,314 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '18'
+  DEPLOY_PATH: '/var/www/sentientm/Accountmanager-production'
+  CURRENT_PATH: '/var/www/sentientm/Accountmanager-current'
+  BACKUP_PATH: '/var/www/sentientm/Accountmanager-backup'
+  PM2_APP_NAME: 'sentientm-production'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linting
+        run: npm run lint
+
+      - name: Build application
+        run: npm run build
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Create deployment package
+        run: |
+          tar -czf deployment-production.tar.gz \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='.github' \
+            --exclude='*.log' \
+            --exclude='temp-images' \
+            --exclude='image_cache' \
+            --exclude='local_storage' \
+            --exclude='test-output' \
+            --exclude='test_data' \
+            .
+
+      - name: Upload deployment package
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          source: "deployment-production.tar.gz"
+          target: "/tmp/"
+
+      - name: Deploy to VPS with Zero Downtime
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            set -e
+            
+            echo "🚀 Starting production deployment with zero downtime..."
+            
+            # Create timestamp for this deployment
+            DEPLOY_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+            NEW_DEPLOY_PATH="${{ env.DEPLOY_PATH }}-$DEPLOY_TIMESTAMP"
+            
+            # Create new deployment directory
+            echo "📦 Creating new deployment directory: $NEW_DEPLOY_PATH"
+            mkdir -p "$NEW_DEPLOY_PATH"
+            
+            # Extract deployment package to new directory
+            echo "📦 Extracting deployment package..."
+            tar -xzf /tmp/deployment-production.tar.gz -C "$NEW_DEPLOY_PATH"
+            
+            # Set proper permissions
+            chmod -R 755 "$NEW_DEPLOY_PATH"
+            
+            # Install dependencies
+            echo "📦 Installing dependencies..."
+            cd "$NEW_DEPLOY_PATH"
+            npm ci --production
+            
+            # Create logs directory
+            mkdir -p "$NEW_DEPLOY_PATH/logs"
+            
+            # Create production-specific ecosystem config (same ports as staging)
+            cat > "$NEW_DEPLOY_PATH/ecosystem.production.js" << 'EOF'
+            export default {
+              apps: [
+                {
+                  name: 'sentientm-main-server',
+                  script: './server/server.js',
+                  cwd: '$NEW_DEPLOY_PATH',
+                  instances: 1,
+                  exec_mode: 'fork',
+                  env: {
+                    NODE_ENV: 'production',
+                    MAIN_SERVER_PORT: 3000,
+                    HOST: '0.0.0.0'
+                  },
+                  autorestart: true,
+                  watch: false,
+                  max_memory_restart: '2G',
+                  min_uptime: '10s',
+                  max_restarts: 10,
+                  restart_delay: 5000,
+                  log_file: './logs/production-main-server-combined.log',
+                  out_file: './logs/production-main-server-out.log',
+                  error_file: './logs/production-main-server-error.log',
+                  log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+                  kill_timeout: 5000,
+                  listen_timeout: 10000,
+                  shutdown_with_message: true
+                },
+                {
+                  name: 'sentientm-rag-server',
+                  script: './rag-server.js',
+                  cwd: '$NEW_DEPLOY_PATH',
+                  instances: 1,
+                  exec_mode: 'fork',
+                  env: {
+                    NODE_ENV: 'production',
+                    RAG_SERVER_PORT: 3001,
+                    HOST: '0.0.0.0'
+                  },
+                  autorestart: true,
+                  watch: false,
+                  max_memory_restart: '2G',
+                  min_uptime: '10s',
+                  max_restarts: 10,
+                  restart_delay: 5000,
+                  log_file: './logs/production-rag-server-combined.log',
+                  out_file: './logs/production-rag-server-out.log',
+                  error_file: './logs/production-rag-server-error.log',
+                  log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+                  kill_timeout: 5000,
+                  listen_timeout: 10000,
+                  shutdown_with_message: true
+                },
+                {
+                  name: 'sentientm-proxy-server',
+                  script: './server.js',
+                  cwd: '$NEW_DEPLOY_PATH',
+                  instances: 1,
+                  exec_mode: 'fork',
+                  env: {
+                    NODE_ENV: 'production',
+                    PROXY_SERVER_PORT: 3002,
+                    HOST: '0.0.0.0'
+                  },
+                  autorestart: true,
+                  watch: false,
+                  max_memory_restart: '1G',
+                  min_uptime: '10s',
+                  max_restarts: 10,
+                  restart_delay: 5000,
+                  log_file: './logs/production-proxy-server-combined.log',
+                  out_file: './logs/production-proxy-server-out.log',
+                  error_file: './logs/production-proxy-server-error.log',
+                  log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+                  kill_timeout: 5000,
+                  listen_timeout: 10000,
+                  shutdown_with_message: true
+                }
+              ]
+            };
+            EOF
+            
+            # Start new production processes
+            echo "🚀 Starting new production processes..."
+            pm2 start ecosystem.production.js
+            
+            # Wait for new services to be ready
+            echo "⏳ Waiting for new services to be ready..."
+            sleep 15
+            
+            # Health check new deployment
+            echo "🏥 Performing health checks on new deployment..."
+            if curl -f http://localhost:3000/health && curl -f http://localhost:3001/health && curl -f http://localhost:3002/health; then
+              echo "✅ New deployment health check passed!"
+              
+              # Create backup of current production
+              if [ -d "/var/www/sentientm/Accountmanager" ]; then
+                echo "📦 Creating backup of current production..."
+                cp -r "/var/www/sentientm/Accountmanager" "${{ env.BACKUP_PATH }}.$DEPLOY_TIMESTAMP"
+              fi
+              
+              # Stop old production processes gracefully
+              echo "🛑 Stopping old production processes..."
+              pm2 stop sentientm-main-server sentientm-rag-server sentientm-proxy-server || true
+              pm2 delete sentientm-main-server sentientm-rag-server sentientm-proxy-server || true
+              
+              # Move new deployment to production location
+              echo "🔄 Moving new deployment to production location..."
+              rm -rf "/var/www/sentientm/Accountmanager"
+              mv "$NEW_DEPLOY_PATH" "/var/www/sentientm/Accountmanager"
+              
+              # Update PM2 configuration to point to new directory
+              cd "/var/www/sentientm/Accountmanager"
+              pm2 delete sentientm-main-server sentientm-rag-server sentientm-proxy-server
+              
+              # Update ecosystem config with correct path
+              sed -i "s|$NEW_DEPLOY_PATH|/var/www/sentientm/Accountmanager|g" ecosystem.production.js
+              pm2 start ecosystem.production.js
+              
+              # Switch symlink to production
+              echo "🔄 Switching symlink to production..."
+              ln -sfn "/var/www/sentientm/Accountmanager" "${{ env.CURRENT_PATH }}"
+              
+              # Save PM2 configuration
+              pm2 save
+              
+              # Cleanup old backups (keep last 3)
+              echo "🧹 Cleaning up old backups..."
+              ls -dt "${{ env.BACKUP_PATH }}".* | tail -n +4 | xargs -r rm -rf
+              
+              echo "🎉 Production deployment completed successfully!"
+              echo "🌐 Production accessible at: https://sentientm.com"
+              
+            else
+              echo "❌ New deployment health check failed, rolling back..."
+              
+              # Stop new processes
+              pm2 stop sentientm-main-server sentientm-rag-server sentientm-proxy-server || true
+              pm2 delete sentientm-main-server sentientm-rag-server sentientm-proxy-server || true
+              
+              # Remove failed deployment
+              rm -rf "$NEW_DEPLOY_PATH"
+              
+              # Restart old processes if they exist
+              if [ -d "/var/www/sentientm/Accountmanager" ]; then
+                cd "/var/www/sentientm/Accountmanager"
+                pm2 start ecosystem.config.js --env production || true
+              fi
+              
+              exit 1
+            fi
+
+      - name: Cleanup deployment package
+        run: rm -f deployment-production.tar.gz
+
+  rollback:
+    runs-on: ubuntu-latest
+    if: failure()
+    steps:
+      - name: Rollback to previous deployment
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            echo "🔄 Rolling back to previous deployment..."
+            
+            # Find the most recent backup
+            LATEST_BACKUP=$(ls -dt "${{ env.BACKUP_PATH }}".* | head -n 1)
+            
+            if [ -n "$LATEST_BACKUP" ] && [ -d "$LATEST_BACKUP" ]; then
+              echo "📦 Restoring from backup: $LATEST_BACKUP"
+              
+              # Stop current processes
+              pm2 stop sentientm-main-server sentientm-rag-server sentientm-proxy-server || true
+              pm2 delete sentientm-main-server sentientm-rag-server sentientm-proxy-server || true
+              
+              # Remove current deployment
+              rm -rf "/var/www/sentientm/Accountmanager"
+              
+              # Restore from backup
+              mv "$LATEST_BACKUP" "/var/www/sentientm/Accountmanager"
+              
+              # Start processes
+              cd "/var/www/sentientm/Accountmanager"
+              pm2 start ecosystem.config.js --env production
+              pm2 save
+              
+              # Switch symlink to production
+              ln -sfn "/var/www/sentientm/Accountmanager" "${{ env.CURRENT_PATH }}"
+              
+              echo "✅ Rollback completed successfully!"
+            else
+              echo "❌ No backup found for rollback!"
+            fi 

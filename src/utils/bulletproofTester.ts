@@ -142,7 +142,7 @@ class BulletproofTester {
     // Attack 1: Clear timer
     localStorage.removeItem(`${this.platform}_processing_countdown`);
     await new Promise(resolve => setTimeout(resolve, 100));
-    let blocked1 = localStorage.getItem(`${this.platform}_processing_countdown`) !== null;
+    const blocked1 = localStorage.getItem(`${this.platform}_processing_countdown`) !== null;
     
     // Restore for next test
     if (originalEndTime) localStorage.setItem(`${this.platform}_processing_countdown`, originalEndTime);

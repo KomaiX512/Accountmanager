@@ -62,12 +62,12 @@ const FacebookConnect: React.FC<FacebookConnectProps> = ({ onConnected, classNam
           connectionDataRef.current.facebook_page_id === event.data.facebookId;
         
         // Store in backend for persistence across devices, but only if not already storing
-        if (currentUser?.uid && !isStoringConnectionRef.current && !isEqualToCurrentData) {
+        if (currentUser?.uid && !isStoringConnectionRef.current && !isEqualToCurrentData && event.data.accessToken) {
           const connectionData = {
             facebook_user_id: event.data.userId || event.data.facebookId, // User ID (may be same as page ID for now)
             facebook_page_id: event.data.facebookId, // Page ID (this is what OAuth sends as facebookId)
             username: event.data.username || event.data.facebookId,
-            access_token: event.data.accessToken || 'temp-token' // Temporary token for now
+            access_token: event.data.accessToken // Use real access token from OAuth
           };
           
           // Update ref to prevent duplicate requests
@@ -84,6 +84,8 @@ const FacebookConnect: React.FC<FacebookConnectProps> = ({ onConnected, classNam
             .finally(() => {
               isStoringConnectionRef.current = false;
             });
+        } else if (!event.data.accessToken) {
+          console.error(`[${new Date().toISOString()}] Facebook OAuth completed but no access token received. This indicates an OAuth error.`);
         }
         
         // Update local state
@@ -114,10 +116,10 @@ const FacebookConnect: React.FC<FacebookConnectProps> = ({ onConnected, classNam
     
     // Facebook OAuth configuration
     const appId = '581584257679639';
-    const redirectUri = 'https://1d68-121-52-146-243.ngrok-free.app/facebook/callback';
-    const scope = 'pages_messaging,pages_show_list,pages_manage_posts,pages_manage_metadata,pages_manage_engagement,pages_read_engagement,pages_read_user_content,instagram_manage_messages,instagram_content_publish,instagram_manage_comments,instagram_manage_insights';
+    const redirectUri = 'https://www.sentientm.com/facebook/callback';
+    const scope = 'pages_messaging,pages_show_list,pages_manage_posts,pages_manage_metadata,pages_manage_engagement,pages_read_engagement,pages_read_user_content,pages_manage_metadata,instagram_manage_messages,instagram_content_publish,instagram_manage_comments,instagram_manage_insights,read_insights,publish_video,instagram_basic,instagram_manage_comments,instagram_manage_insights,instagram_content_publish,instagram_manage_messages,pages_read_engagement,pages_manage_metadata,whatsapp_business_messaging,public_profile';
     
-    const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code&state=${currentUser.uid}`;
+    const authUrl = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code&state=${currentUser.uid}`;
 
     setIsConnecting(true);
     

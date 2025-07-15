@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import UserService from '../../services/UserService';
 import { useAdminStatus } from './AdminLogin';
+import { getApiUrl } from '../../config/api';
 import './AdminDashboard.css';
 
 interface AdminStats {
@@ -51,8 +51,8 @@ const AdminDashboard: React.FC = () => {
     setError(null);
 
     try {
-      // Fetch admin analytics
-      const statsResponse = await fetch('http://localhost:3002/api/admin/analytics');
+      // Fetch admin analytics using getApiUrl
+      const statsResponse = await fetch(getApiUrl('/api/admin/analytics'));
       if (statsResponse.ok) {
         const statsData = await statsResponse.json();
         setStats(statsData);
@@ -67,8 +67,8 @@ const AdminDashboard: React.FC = () => {
     }
 
     try {
-      // Test system health
-      const healthResponse = await fetch('http://localhost:3002/api/admin/test');
+      // Test system health using getApiUrl
+      const healthResponse = await fetch(getApiUrl('/api/admin/test'));
       if (healthResponse.ok) {
         const healthData = await healthResponse.json();
         setHealth(healthData);

@@ -105,14 +105,41 @@ export const schedulePost = async (options: ScheduleOptions): Promise<ScheduleRe
         };
       }
     } else {
-      // Instagram/Facebook scheduling
+      // Instagram/Facebook scheduling - SIMPLIFIED: Send image key instead of blob
       formData.append('caption', caption);
       formData.append('scheduleDate', scheduleTime.toISOString());
       formData.append('platform', platform);
       
-      if (imageBlob) {
+      // Extract image key from post key instead of sending blob
+      if (postKey) {
+        let imageKey = '';
+        
+        // Extract image key from post key (same logic as PostCooked)
+        if (postKey.includes('campaign_ready_post_') && postKey.endsWith('.json')) {
+          // Campaign pattern: campaign_ready_post_1752000987874_9c14f1fd.json -> image_1752000987874_9c14f1fd.jpg
+          const baseName = postKey.replace(/^.*\/([^\/]+)\.json$/, '$1');
+          imageKey = `${baseName}.jpg`;
+        } else if (postKey.match(/ready_post_\d+\.json$/)) {
+          // Traditional pattern: ready_post_1234567890.json -> image_1234567890.jpg
+          const postIdMatch = postKey.match(/ready_post_(\d+)\.json$/);
+          if (postIdMatch) {
+            imageKey = `image_${postIdMatch[1]}.jpg`;
+          }
+        }
+        
+        if (imageKey) {
+          console.log(`[ScheduleHelper] 🔑 Using existing image key: ${imageKey}`);
+          formData.append('imageKey', imageKey);
+        } else {
+          console.warn(`[ScheduleHelper] ⚠️ Could not extract image key from postKey: ${postKey}`);
+        }
+      }
+      
+      // Only send image blob if we couldn't extract image key
+      if (imageBlob && !formData.has('imageKey')) {
         const filename = postKey ? `${platform}_post_${postKey}.jpg` : `${platform}_${Date.now()}.jpg`;
         formData.append('image', imageBlob, filename);
+        console.log(`[ScheduleHelper] 📤 Sending image blob as fallback`);
       }
       
       const response = await fetch(resolveEndpoint('SCHEDULE_POST', `/${userId}`), {
@@ -150,80 +177,34 @@ export const fetchImageFromR2 = async (
   try {
     console.log(`[ScheduleHelper] 📤 Fetching image: ${imageKey} for platform: ${platform}`);
     
-    // Try multiple endpoints with fallbacks (same approach as PostCooked.tsx)
-    const endpoints = [
-      // Primary: Direct R2 endpoint with cache busting
-      `/api/r2-image/${username}/${imageKey}?platform=${platform}&t=${Date.now()}`,
-      // Fallback 1: Fix-image endpoint
-      `/fix-image/${username}/${imageKey}?platform=${platform}`,
-      // Fallback 2: Direct R2 without cache busting
-      `/api/r2-image/${username}/${imageKey}?platform=${platform}`
-    ];
+    // SIMPLIFIED: Use the exact same approach as PostCooked - direct fetch
+    const endpoint = `/api/r2-image/${username}/${imageKey}?platform=${platform}&t=${Date.now()}`;
     
-    let lastError: Error | null = null;
+    console.log(`[ScheduleHelper] 🎯 Fetching from: ${endpoint}`);
     
-    for (let i = 0; i < endpoints.length; i++) {
-      const endpoint = endpoints[i];
-      console.log(`[ScheduleHelper] 🎯 Trying endpoint ${i + 1}/${endpoints.length}: ${endpoint}`);
-      
-      try {
-        const response = await fetch(endpoint, {
-          method: 'GET',
-          headers: {
-            'Accept': 'image/*,*/*',
-            'Cache-Control': 'no-cache'
-          }
-        });
-        
-        console.log(`[ScheduleHelper] 📊 Response ${i + 1}: Status ${response.status}, Content-Type: ${response.headers.get('content-type')}`);
-        
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        // Check content type
-        const contentType = response.headers.get('content-type') || '';
-        if (!contentType.startsWith('image/') && !contentType.includes('octet-stream')) {
-          // If we get HTML or text, log it for debugging but try next endpoint
-          if (contentType.includes('text/html')) {
-            const htmlContent = await response.text();
-            console.warn(`[ScheduleHelper] ⚠️ Endpoint ${i + 1} returned HTML (probably error page): ${htmlContent.substring(0, 200)}...`);
-            throw new Error(`Invalid content type: ${contentType} (HTML error page)`);
-          }
-          throw new Error(`Invalid content type: ${contentType}. Expected image data.`);
-        }
-        
-        const imageBlob = await response.blob();
-        
-        // Validate image blob
-        if (!imageBlob || imageBlob.size === 0) {
-          throw new Error('Empty image blob received');
-        }
-        
-        if (imageBlob.size < 100) {
-          throw new Error(`Image too small: ${imageBlob.size} bytes (likely corrupted)`);
-        }
-        
-        // Validate image type
-        if (!['image/jpeg', 'image/png', 'image/webp', 'application/octet-stream'].includes(imageBlob.type)) {
-          console.warn(`[ScheduleHelper] ⚠️ Unusual blob type: ${imageBlob.type}, but proceeding`);
-        }
-        
-        console.log(`[ScheduleHelper] ✅ Image fetched successfully from endpoint ${i + 1}: ${imageBlob.size} bytes, type: ${imageBlob.type}`);
-        return imageBlob;
-        
-      } catch (endpointError: any) {
-        console.warn(`[ScheduleHelper] ⚠️ Endpoint ${i + 1} failed: ${endpointError.message}`);
-        lastError = endpointError;
-        continue;
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        'Accept': 'image/*,*/*',
+        'Cache-Control': 'no-cache'
       }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
     
-    // All endpoints failed
-    throw new Error(`All ${endpoints.length} endpoints failed. Last error: ${lastError?.message || 'Unknown error'}`);
+    const imageBlob = await response.blob();
     
-  } catch (error: any) {
-    console.error(`[ScheduleHelper] ❌ Failed to fetch image ${imageKey}:`, error.message);
+    if (!imageBlob || imageBlob.size === 0) {
+      throw new Error('Empty image blob received');
+    }
+    
+    console.log(`[ScheduleHelper] ✅ Image fetched successfully: ${imageBlob.size} bytes, type: ${imageBlob.type}`);
+    return imageBlob;
+    
+  } catch (error) {
+    console.error(`[ScheduleHelper] ❌ Error fetching image ${imageKey}:`, error);
     return null;
   }
 };
@@ -231,17 +212,31 @@ export const fetchImageFromR2 = async (
 export const extractImageKey = (post: any): string => {
   let imageKey = '';
   
-  // Method 1: Extract from image URL
-  if (post.data?.image_url && post.data.image_url.includes('/ready_post/')) {
-    const match = post.data.image_url.match(/ready_post\/[\w-]+\/(image_\d+\.jpg)/);
-    if (match) imageKey = match[1];
+  // SIMPLIFIED: Extract image key exactly like PostCooked
+  // Method 1: Extract from post key (most reliable)
+  if (post.key) {
+    // Campaign pattern: campaign_ready_post_1752000987874_9c14f1fd.json -> image_1752000987874_9c14f1fd.jpg
+    if (post.key.includes('campaign_ready_post_') && post.key.endsWith('.json')) {
+      const baseName = post.key.replace(/^.*\/([^\/]+)\.json$/, '$1');
+      imageKey = `${baseName}.jpg`;
+    }
+    // Regular pattern: ready_post_1234567890.json -> image_1234567890.jpg
+    else if (post.key.match(/ready_post_\d+\.json$/)) {
+      const postIdMatch = post.key.match(/ready_post_(\d+)\.json$/);
+      if (postIdMatch) {
+        imageKey = `image_${postIdMatch[1]}.jpg`;
+      }
+    }
   }
   
-  // Method 2: Extract from post key
-  if (!imageKey && post.key?.match(/ready_post_\d+\.json$/)) {
-    const postIdMatch = post.key.match(/ready_post_(\d+)\.json$/);
-    if (postIdMatch) imageKey = `image_${postIdMatch[1]}.jpg`;
+  // Method 2: Extract from image URL if available
+  if (!imageKey && post.data?.image_url) {
+    const urlMatch = post.data.image_url.match(/(image_\d+\.jpg)/);
+    if (urlMatch) {
+      imageKey = urlMatch[1];
+    }
   }
   
+  console.log(`[ScheduleHelper] 🔑 Extracted imageKey: ${imageKey} from post key: ${post.key}`);
   return imageKey;
 }; 

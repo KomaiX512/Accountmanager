@@ -107,6 +107,11 @@ export default defineConfig({
         // Preserve /api prefix so backend route '/api/user/:userId/usage' matches
         // No rewrite here
       },
+      '/api/instant-reply': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false,
+      },
       '/api/rag-instant-reply': {
         target: 'http://localhost:3000',
         changeOrigin: true,

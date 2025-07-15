@@ -116,7 +116,7 @@ async function streamToString(stream) {
 
 // Configure Gemini API with enhanced rate limiting
 const GEMINI_CONFIG = {
-  apiKey: 'AIzaSyD3vBUgwRSYPi69mb5PsJ4Ae5-g1ruZmHM',
+  apiKey: 'AIzaSyDIpv14PCIuAukCFV4CILMhYk0OzpNI6EE',
   model: 'gemini-2.0-flash',
   maxTokens: 2000, // Restored to 2000 for better responses
   temperature: 0.2,
@@ -2415,7 +2415,7 @@ IMPORTANT: Use EXACTLY the section headers shown above.`;
 }
 
 // API endpoint for post generator (updated with full image generation functionality)
-app.post('/api/post-generator', async (req, res) => {
+app.post(['/api/post-generator', '/api/rag/post-generator'], async (req, res) => {
   try {
     const { username, query, platform = 'instagram' } = req.body;
     
@@ -2468,7 +2468,6 @@ app.post('/api/post-generator', async (req, res) => {
     try {
       // Get response from AI model
       console.log(`[${new Date().toISOString()}] [RAG SERVER] Calling AI API for ${platform} post generation`);
-      
       let response;
       let usedFallback = false;
       
@@ -3264,7 +3263,7 @@ async function loadConversationHistory(username, platform) {
       Key: historyKey,
     });
     
-    const response = await s3Client.send(getCommand);
+    const response = await tasksS3.send(getCommand);
     if (response.Body) {
       const historyString = await streamToString(response.Body);
       const history = JSON.parse(historyString);
@@ -3310,7 +3309,7 @@ async function saveConversationTurn(username, platform, userMessage, assistantRe
       ContentType: 'application/json',
     });
     
-    await s3Client.send(putCommand);
+    await tasksS3.send(putCommand);
     console.log(`[RAG-Server] Saved conversation turn for ${platform}/${username}`);
   } catch (error) {
     console.error(`[RAG-Server] Error saving conversation history: ${error.message}`);
@@ -4074,7 +4073,7 @@ async function generateImageFromPrompt(imagePrompt, filename, username, platform
   console.log(`[${new Date().toISOString()}] [IMAGE-GEN] Prompt: "${imagePrompt.substring(0, 100)}..."`);
   
   const AI_HORDE_CONFIG = {
-    api_key: "VxVGZGSL20PDRbi3mW2D5Q",
+    api_key: "h643DsIpSAJQclekWrx99g",
     base_url: "https://stablehorde.net/api/v2"
   };
   

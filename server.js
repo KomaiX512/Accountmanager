@@ -11,10 +11,13 @@ import jpeg from 'jpeg-js';
 import multer from 'multer';
 import sharp from 'sharp';
 
+// Add at the top of the file
+const DEBUG_LOGS = process.env.DEBUG_LOGS === 'true';
+
 const app = express();
 const port = process.env.PROXY_SERVER_PORT || 3002;
 
-console.log('Setting up server with proxy endpoints...');
+if (DEBUG_LOGS) console.log('Setting up server with proxy endpoints...');
 
 // Enterprise-grade process management
 let server;
@@ -323,16 +326,16 @@ app.use((req, res, next) => {
     JSON.stringify(req.body).substring(0, maxBodyLength) + 
     (JSON.stringify(req.body).length > maxBodyLength ? '...' : '') : '';
   
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} ${bodyStr}`);
+  if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} ${bodyStr}`);
   
   // Track response completion
   res.on('finish', () => {
-    console.log(`[${new Date().toISOString()}] Completed ${res.statusCode} for ${req.method} ${req.url}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] Completed ${res.statusCode} for ${req.method} ${req.url}`);
   });
   
   // Track response errors
   res.on('error', (error) => {
-    console.error(`[${new Date().toISOString()}] Response error for ${req.method} ${req.url}:`, error);
+    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] Response error for ${req.method} ${req.url}:`, error);
   });
   
   next();
@@ -362,7 +365,7 @@ app.get('/health', async (req, res) => {
       pid: process.pid
     });
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] Health check error:`, error);
+    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] Health check error:`, error);
     res.status(500).json({ 
       status: 'error', 
       error: error.message,
@@ -375,7 +378,7 @@ app.get('/health', async (req, res) => {
 app.post('/admin/clear-image-cache', (req, res) => {
   const cacheSize = imageCache.size;
   imageCache.clear();
-  console.log(`[${new Date().toISOString()}] Image cache cleared (${cacheSize} items)`);
+  if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] Image cache cleared (${cacheSize} items)`);
   res.json({ success: true, message: `Image cache cleared (${cacheSize} items)` });
 });
 
@@ -399,7 +402,7 @@ app.get('/fix-image-narsissist', (req, res) => {
   
   // First check if we have a local copy
   if (fs.existsSync(localFilePath)) {
-    console.log(`[${new Date().toISOString()}] [SPECIAL HANDLER] Serving local file for problematic image`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SPECIAL HANDLER] Serving local file for problematic image`);
     // Set appropriate headers
     res.setHeader('Content-Type', 'image/jpeg');
     res.setHeader('Cache-Control', 'public, max-age=86400');
@@ -410,7 +413,7 @@ app.get('/fix-image-narsissist', (req, res) => {
     return res.sendFile(localFilePath);
   } else {
     // Generate placeholder
-    console.log(`[${new Date().toISOString()}] [SPECIAL HANDLER] Generating placeholder for problematic image`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SPECIAL HANDLER] Generating placeholder for problematic image`);
     const placeholderImage = generatePlaceholderImage('Image for narsissist');
     
     // Set headers
@@ -427,7 +430,7 @@ app.get('/fix-image-narsissist', (req, res) => {
       fs.mkdirSync(path.dirname(localFilePath), { recursive: true });
       fs.writeFileSync(localFilePath, placeholderImage);
     } catch (error) {
-      console.error(`[${new Date().toISOString()}] [SPECIAL HANDLER] Error saving placeholder:`, error);
+      if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [SPECIAL HANDLER] Error saving placeholder:`, error);
     }
   }
 });
@@ -437,7 +440,7 @@ async function convertWebPToJPEG(webpBuffer) {
   try {
     // Validate that the buffer is actually a valid WebP file
     if (!webpBuffer || webpBuffer.length < 12) {
-      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Buffer too small or empty, skipping conversion`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Buffer too small or empty, skipping conversion`);
       return webpBuffer;
     }
     
@@ -452,16 +455,16 @@ async function convertWebPToJPEG(webpBuffer) {
     
     // If this buffer is not RIFF at all, it is definitely not WebP – just return it untouched.
     if (!looksLikeRIFF) {
-      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Buffer is not RIFF/WebP, returning original without conversion`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Buffer is not RIFF/WebP, returning original without conversion`);
       return webpBuffer;
     }
     
     // If RIFF but not clearly WebP we'll still attempt conversion – Sharp might still decode.
     if (!isWebP && looksLikeRIFF) {
-      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] RIFF detected without WEBP signature, forcing conversion attempt`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] RIFF detected without WEBP signature, forcing conversion attempt`);
     }
     
-    console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Converting valid WebP to JPEG (${webpBuffer.length} bytes)`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Converting valid WebP to JPEG (${webpBuffer.length} bytes)`);
     
     // Try multiple conversion strategies
     let jpegBuffer;
@@ -472,10 +475,10 @@ async function convertWebPToJPEG(webpBuffer) {
         .jpeg({ quality: 90 })
         .toBuffer();
       
-      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Successfully converted WebP to JPEG (${webpBuffer.length} -> ${jpegBuffer.length} bytes)`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Successfully converted WebP to JPEG (${webpBuffer.length} -> ${jpegBuffer.length} bytes)`);
       return jpegBuffer;
     } catch (error) {
-      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 1 failed: ${error.message}`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 1 failed: ${error.message}`);
     }
     
     // Strategy 2: Try with different sharp options
@@ -484,10 +487,10 @@ async function convertWebPToJPEG(webpBuffer) {
         .jpeg({ quality: 85, progressive: true })
         .toBuffer();
       
-      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 2 successful (${webpBuffer.length} -> ${jpegBuffer.length} bytes)`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 2 successful (${webpBuffer.length} -> ${jpegBuffer.length} bytes)`);
       return jpegBuffer;
     } catch (error) {
-      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 2 failed: ${error.message}`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 2 failed: ${error.message}`);
     }
     
     // Strategy 3: Try to clean the buffer first
@@ -498,10 +501,10 @@ async function convertWebPToJPEG(webpBuffer) {
         .jpeg({ quality: 80 })
         .toBuffer();
       
-      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 3 successful (${webpBuffer.length} -> ${jpegBuffer.length} bytes)`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 3 successful (${webpBuffer.length} -> ${jpegBuffer.length} bytes)`);
       return jpegBuffer;
     } catch (error) {
-      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 3 failed: ${error.message}`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 3 failed: ${error.message}`);
     }
     
     // Strategy 4: Try to extract and convert as raw image data
@@ -515,30 +518,30 @@ async function convertWebPToJPEG(webpBuffer) {
         .jpeg({ quality: 75 })
         .toBuffer();
       
-      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 4 successful (${webpBuffer.length} -> ${jpegBuffer.length} bytes)`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 4 successful (${webpBuffer.length} -> ${jpegBuffer.length} bytes)`);
       return jpegBuffer;
     } catch (error) {
-      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 4 failed: ${error.message}`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 4 failed: ${error.message}`);
     }
     
     // If all strategies fail, check if the original buffer might actually be JPEG
     if (webpBuffer.length >= 2 && webpBuffer[0] === 0xFF && webpBuffer[1] === 0xD8) {
-      console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Buffer appears to be JPEG already, returning as-is`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Buffer appears to be JPEG already, returning as-is`);
       return webpBuffer;
     }
     
     // Last resort: Generate placeholder
-    console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] All conversion strategies failed, generating placeholder`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] All conversion strategies failed, generating placeholder`);
     return generatePlaceholderImage('Image Conversion Failed');
     
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] [IMAGE-CONVERT] Critical error in conversion:`, error.message);
+    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [IMAGE-CONVERT] Critical error in conversion:`, error.message);
     
     // Check if original buffer might be usable
     if (webpBuffer && webpBuffer.length > 0) {
       // If it looks like JPEG, return it
       if (webpBuffer.length >= 2 && webpBuffer[0] === 0xFF && webpBuffer[1] === 0xD8) {
-        console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Returning original buffer as it appears to be JPEG`);
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Returning original buffer as it appears to be JPEG`);
         return webpBuffer;
       }
     }
@@ -573,7 +576,7 @@ function generatePlaceholderImage(text = 'Image Not Available', width = 512, hei
     // Convert to JPEG
     return jpeg.encode(rawImageData, 90).data;
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error generating placeholder image:`, error);
+    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] Error generating placeholder image:`, error);
     // Return a minimal 1x1 transparent pixel as ultimate fallback
     return Buffer.from([
       0xFF, 0xD8, // JPEG SOI marker
@@ -596,12 +599,12 @@ async function fetchImageWithFallbacks(key, fallbackImagePath = null, username =
   if (imageCache.has(cacheKey)) {
     const { data, timestamp } = imageCache.get(cacheKey);
     if (Date.now() - timestamp < IMAGE_CACHE_TTL) {
-      console.log(`[${new Date().toISOString()}] [IMAGE] Using cached image for ${key}`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE] Using cached image for ${key}`);
       // Validate that cached data is a proper Buffer
       if (Buffer.isBuffer(data)) {
         return { data, source: 'memory-cache' };
       } else {
-        console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid cached data type for ${key}, removing from cache`);
+        if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid cached data type for ${key}, removing from cache`);
         imageCache.delete(cacheKey);
       }
     }
@@ -610,140 +613,112 @@ async function fetchImageWithFallbacks(key, fallbackImagePath = null, username =
   }
   
   // Create path for local file cache
-  const hashedKey = Buffer.from(key).toString('base64').replace(/[\/\+\=]/g, '_');
+  const hashedKey = Buffer.from(key).toString('base64').replace(/[\/\+=]/g, '_');
   const localCacheFilePath = path.join(localCacheDir, hashedKey);
   
-  try {
-    // Try local file cache first
-    if (fs.existsSync(localCacheFilePath)) {
-      console.log(`[${new Date().toISOString()}] [IMAGE] Using local cached image for ${key}`);
-      const data = fs.readFileSync(localCacheFilePath);
-      
-      // Validate the cached file is a proper Buffer
-      if (!Buffer.isBuffer(data)) {
-        console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid cached file data type for ${key}, removing cache file`);
-        fs.unlinkSync(localCacheFilePath);
-      } else {
-        // Refresh memory cache with validated data
-        imageCache.set(cacheKey, { 
-          data, 
-          timestamp: Date.now() 
-        });
-        
-        // Limit cache size
-        if (imageCache.size > IMAGE_CACHE_MAX_SIZE) {
-          const oldestKey = Array.from(imageCache.keys())[0];
-          imageCache.delete(oldestKey);
-        }
-        
-        return { data, source: 'file-cache' };
-      }
-    }
-    
-    // If not in cache, fetch from R2 using the proper s3Client wrapper
-    console.log(`[${new Date().toISOString()}] [IMAGE] Fetching from R2: ${key}`);
-    
-    // Use the s3Client wrapper (not getS3Client) for proper Buffer handling
-    const data = await s3Client.getObject({
-      Bucket: 'tasks',
-      Key: key
-    }).promise();
-    
-    // Validate that we got a proper Buffer
-    if (!data || !data.Body || !Buffer.isBuffer(data.Body)) {
-      throw new Error(`Invalid response from S3: expected Buffer, got ${typeof data?.Body}`);
-    }
-    
-    // Validate image data integrity (check for valid image headers)
-    const isValidImage = validateImageBuffer(data.Body);
-    if (!isValidImage) {
-      console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid image data detected for ${key}, not caching`);
-      return { data: data.Body, source: 'r2-invalid' };
-    }
-    
-    // Save to local file cache
-    fs.writeFileSync(localCacheFilePath, data.Body);
-    
-    // Save to memory cache
-    imageCache.set(cacheKey, {
-      data: data.Body,
-      timestamp: Date.now()
-    });
-    
-    // Limit cache size
-    if (imageCache.size > IMAGE_CACHE_MAX_SIZE) {
-      const oldestKey = Array.from(imageCache.keys())[0];
-      imageCache.delete(oldestKey);
-    }
-    
-    return { data: data.Body, source: 'r2' };
-  } catch (error) {
-    console.error(`[${new Date().toISOString()}] [IMAGE] Error fetching from R2: ${key}`, error.message);
-    
-    // Try fallback image path if provided
-    if (fallbackImagePath && fs.existsSync(fallbackImagePath)) {
-      console.log(`[${new Date().toISOString()}] [IMAGE] Using fallback image: ${fallbackImagePath}`);
-      const data = fs.readFileSync(fallbackImagePath);
-      
-      // Validate fallback image
-      if (Buffer.isBuffer(data) && validateImageBuffer(data)) {
-        return { data, source: 'fallback-file' };
-      } else {
-        console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid fallback image data: ${fallbackImagePath}`);
-      }
-    }
-    
-    // If username and filename are provided, check for alternate image names
-    if (username && filename) {
-      // Try different timestamp formats that might exist
-      const timestampMatch = filename.match(/_(\d+)\.jpg$/);
-      if (timestampMatch && timestampMatch[1]) {
-        const timestamp = parseInt(timestampMatch[1]);
-        const alternativeKeys = [
-          `ready_post/instagram/${username}/image_${timestamp}.jpg`,
-          `ready_post/instagram/${username}/image_${timestamp-1}.jpg`,
-          `ready_post/instagram/${username}/image_${timestamp+1}.jpg`
-        ];
-        
-        // Try alternative keys
-        for (const altKey of alternativeKeys) {
-          if (altKey === key) continue; // Skip the original key
-          
-          try {
-            console.log(`[${new Date().toISOString()}] [IMAGE] Trying alternative key: ${altKey}`);
-            const data = await s3Client.getObject({
-              Bucket: 'tasks',
-              Key: altKey
-            }).promise();
-            
-            // Validate alternative image data
-            if (!data || !data.Body || !Buffer.isBuffer(data.Body) || !validateImageBuffer(data.Body)) {
-              console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid alternative image data: ${altKey}`);
-              continue;
-            }
-            
-            // Cache the successful result
-            const hashedAltKey = Buffer.from(altKey).toString('base64').replace(/[\/\+\=]/g, '_');
-            const localCacheAltPath = path.join(localCacheDir, hashedAltKey);
-            fs.writeFileSync(localCacheAltPath, data.Body);
-            
-            // Also save a copy at the original path for future requests
-            fs.writeFileSync(localCacheFilePath, data.Body);
-            
-            return { data: data.Body, source: 'r2-alternative' };
-          } catch (altError) {
-            // Continue to next alternative
-          }
-        }
-      }
-    }
-    
-    // Generate placeholder as last resort
-    console.log(`[${new Date().toISOString()}] [IMAGE] Generating placeholder image for ${key}`);
-    const placeholderText = `Image Not Available${username ? `\n${username}` : ''}`;
-    const placeholderImage = generatePlaceholderImage(placeholderText);
-    return { data: placeholderImage, source: 'placeholder' };
+  // --- BEGIN ROBUST ID-BASED FALLBACK LOGIC ---
+  // If the key matches campaign_ready_post_<ID>.jpg or ready_post_<ID>.jpg or image_<ID>.jpg, try all three for the same ID
+  let fallbackKeys = [key];
+  const match = key.match(/\/(campaign_ready_post_|ready_post_|image_)(\d+)\.jpg$/);
+  if (match) {
+    const id = match[2];
+    const basePath = key.substring(0, key.lastIndexOf('/') + 1);
+    fallbackKeys = [
+      `${basePath}campaign_ready_post_${id}.jpg`,
+      `${basePath}ready_post_${id}.jpg`,
+      `${basePath}image_${id}.jpg`
+    ];
+    // Remove duplicates, keep order
+    fallbackKeys = [...new Set(fallbackKeys)];
   }
+  // --- END ROBUST ID-BASED FALLBACK LOGIC ---
+
+  for (const tryKey of fallbackKeys) {
+    try {
+      // Try local file cache first
+      const tryHashedKey = Buffer.from(tryKey).toString('base64').replace(/[\/\+=]/g, '_');
+      const tryLocalCacheFilePath = path.join(localCacheDir, tryHashedKey);
+      if (fs.existsSync(tryLocalCacheFilePath)) {
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE] Using local cached image for ${tryKey}`);
+        const data = fs.readFileSync(tryLocalCacheFilePath);
+        if (Buffer.isBuffer(data)) {
+          imageCache.set(`r2_${tryKey}`, { data, timestamp: Date.now() });
+          if (imageCache.size > IMAGE_CACHE_MAX_SIZE) {
+            const oldestKey = Array.from(imageCache.keys())[0];
+            imageCache.delete(oldestKey);
+          }
+          return { data, source: 'file-cache' };
+        } else {
+          if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid cached file data type for ${tryKey}, removing cache file`);
+          fs.unlinkSync(tryLocalCacheFilePath);
+        }
+      }
+      // Try R2
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE] Fetching from R2: ${tryKey}`);
+      const data = await s3Client.getObject({ Bucket: 'tasks', Key: tryKey }).promise();
+      if (!data || !data.Body || !Buffer.isBuffer(data.Body)) {
+        throw new Error(`Invalid response from S3: expected Buffer, got ${typeof data?.Body}`);
+      }
+      let isValidImage = validateImageBuffer(data.Body);
+      if (!isValidImage) {
+        if (Buffer.isBuffer(data.Body) && data.Body.length > 100 && data.Body[0] === 0xFF && data.Body[1] === 0xD8) {
+          if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [IMAGE] Accepting fallback JPEG (SOI) for ${tryKey} despite failed strict validation`);
+          isValidImage = true;
+        } else {
+          if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid image data detected for ${tryKey}, not caching`);
+          continue;
+        }
+      }
+      fs.writeFileSync(tryLocalCacheFilePath, data.Body);
+      imageCache.set(`r2_${tryKey}`, { data: data.Body, timestamp: Date.now() });
+      if (imageCache.size > IMAGE_CACHE_MAX_SIZE) {
+        const oldestKey = Array.from(imageCache.keys())[0];
+        imageCache.delete(oldestKey);
+      }
+      return { data: data.Body, source: 'r2' };
+    } catch (error) {
+      if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [IMAGE] Error fetching from R2: ${tryKey}`, error.message);
+      // Try next fallbackKey
+    }
+  }
+  
+  // If not in cache, fetch from R2 using the proper s3Client wrapper
+  if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE] Fetching from R2: ${key}`);
+  
+  // Use the s3Client wrapper (not getS3Client) for proper Buffer handling
+  const data = await s3Client.getObject({
+    Bucket: 'tasks',
+    Key: key
+  }).promise();
+  
+  // Validate that we got a proper Buffer
+  if (!data || !data.Body || !Buffer.isBuffer(data.Body)) {
+    throw new Error(`Invalid response from S3: expected Buffer, got ${typeof data?.Body}`);
+  }
+  
+  // Validate image data integrity (check for valid image headers)
+  const isValidImage = validateImageBuffer(data.Body);
+  if (!isValidImage) {
+    if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid image data detected for ${key}, not caching`);
+    return { data: data.Body, source: 'r2-invalid' };
+  }
+  
+  // Save to local file cache
+  fs.writeFileSync(localCacheFilePath, data.Body);
+  
+  // Save to memory cache
+  imageCache.set(cacheKey, {
+    data: data.Body,
+    timestamp: Date.now()
+  });
+  
+  // Limit cache size
+  if (imageCache.size > IMAGE_CACHE_MAX_SIZE) {
+    const oldestKey = Array.from(imageCache.keys())[0];
+    imageCache.delete(oldestKey);
+  }
+  
+  return { data: data.Body, source: 'r2' };
 }
 
 // Helper function to validate image buffer integrity
@@ -796,7 +771,7 @@ app.get('/fix-image/:username/:filename', async (req, res) => {
   const requestTimeout = setTimeout(() => {
     timeoutTriggered = true;
     try {
-      console.error(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Request timeout triggered, sending emergency placeholder`);
+      if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Request timeout triggered, sending emergency placeholder`);
       
       // Only proceed if headers haven't been sent
       if (!res.headersSent) {
@@ -811,7 +786,7 @@ app.get('/fix-image/:username/:filename', async (req, res) => {
         res.send(placeholderImage);
       }
     } catch (timeoutError) {
-      console.error(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Error in timeout handler:`, timeoutError);
+      if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Error in timeout handler:`, timeoutError);
       // If this also fails, try to end the response
       if (!res.finished) {
         res.status(500).end();
@@ -835,13 +810,13 @@ app.get('/fix-image/:username/:filename', async (req, res) => {
     
     // Add basic parameter validation with fallbacks
     if (!username) {
-      console.error(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Missing username`);
+      if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Missing username`);
       clearTimeout(requestTimeout);
       return sendPlaceholder(res, 'Missing Username');
     }
     
     if (!filename) {
-      console.error(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Missing filename`);
+      if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Missing filename`);
       clearTimeout(requestTimeout);
       return sendPlaceholder(res, 'Missing Filename');
     }
@@ -851,7 +826,7 @@ app.get('/fix-image/:username/:filename', async (req, res) => {
       // Try to extract timestamp and rebuild filename
       const timestampMatch = filename.match(/(\d+)\.jpg$/);
       if (timestampMatch) {
-        console.log(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Normalizing filename from ${filename} to image_${timestampMatch[1]}.jpg`);
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Normalizing filename from ${filename} to image_${timestampMatch[1]}.jpg`);
         filename = `image_${timestampMatch[1]}.jpg`;
       }
     }
@@ -859,7 +834,7 @@ app.get('/fix-image/:username/:filename', async (req, res) => {
     // Construct the key for R2 storage
     const key = `ready_post/${platform}/${username}/${filename}`;
     
-    console.log(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Request for ${platform}/${username}/${filename}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Request for ${platform}/${username}/${filename}`);
     
     // Create fallback path
     const localFallbackPath = path.join(process.cwd(), 'ready_post', platform, username, filename);
@@ -869,7 +844,7 @@ app.get('/fix-image/:username/:filename', async (req, res) => {
     
     // If the timeout was triggered, don't continue processing
     if (timeoutTriggered) {
-      console.log(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Timeout was triggered, abandoning response`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Timeout was triggered, abandoning response`);
       return;
     }
     
@@ -915,12 +890,12 @@ app.get('/fix-image/:username/:filename', async (req, res) => {
       
       if (contentType === 'image/webp') {
         try {
-          console.log(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Converting WebP to JPEG for compatibility`);
+          if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Converting WebP to JPEG for compatibility`);
           finalData = await convertWebPToJPEG(data);
           finalContentType = 'image/jpeg';
-          console.log(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] ✅ Successfully converted WebP to JPEG`);
+          if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] ✅ Successfully converted WebP to JPEG`);
         } catch (conversionError) {
-          console.error(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] ⚠️ WebP to JPEG conversion failed: ${conversionError.message}. Sending original WebP.`);
+          if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] ⚠️ WebP to JPEG conversion failed: ${conversionError.message}. Sending original WebP.`);
         }
       }
 
@@ -938,13 +913,13 @@ app.get('/fix-image/:username/:filename', async (req, res) => {
       
       // Log performance
       const duration = Date.now() - startTime;
-      console.log(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Served ${platform}/${username}/${filename} from ${source} in ${duration}ms`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Served ${platform}/${username}/${filename} from ${source} in ${duration}ms`);
     }
   } catch (error) {
     // Clear the timeout since we're handling the error
     clearTimeout(requestTimeout);
     
-    console.error(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Error serving image:`, error.message);
+    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Error serving image:`, error.message);
     
     // Send placeholder if headers haven't been sent
     if (!res.headersSent) {
@@ -967,10 +942,10 @@ app.get('/fix-image/:username/:filename', async (req, res) => {
       
       res.send(placeholderImage);
       
-      console.log(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Sent placeholder image with message: "${message}"`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Sent placeholder image with message: "${message}"`);
       return true;
     } catch (placeholderError) {
-      console.error(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Error generating placeholder:`, placeholderError);
+      if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Error generating placeholder:`, placeholderError);
       
       // Last resort: Send a transparent 1x1 GIF
       if (!res.headersSent) {
@@ -992,7 +967,7 @@ app.get('/r2-images/:username/:filename', async (req, res) => {
     const platform = req.query.platform || 'instagram';
     const key = `ready_post/${platform}/${username}/${filename}`;
     
-    console.log(`[${new Date().toISOString()}] [R2-IMAGES] Requesting image: ${key}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGES] Requesting image: ${key}`);
     
     // Create fallback path
     const localFallbackPath = path.join(process.cwd(), 'ready_post', platform, username, filename);
@@ -1034,7 +1009,7 @@ app.get('/r2-images/:username/:filename', async (req, res) => {
     let dataForResponse = data;
     // Check if the image is WebP and convert it to JPEG
     if (contentType === 'image/webp') {
-      console.log(`[${new Date().toISOString()}] [R2-IMAGES] Converting WebP to JPEG.`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGES] Converting WebP to JPEG.`);
       dataForResponse = await convertWebPToJPEG(data);
       contentType = 'image/jpeg'; // Update content type after conversion
     }
@@ -1052,10 +1027,10 @@ app.get('/r2-images/:username/:filename', async (req, res) => {
     
     // Log performance
     const duration = Date.now() - startTime;
-    console.log(`[${new Date().toISOString()}] [R2-IMAGES] Served ${platform}/${username}/${filename} from ${source} in ${duration}ms`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGES] Served ${platform}/${username}/${filename} from ${source} in ${duration}ms`);
     
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] [R2-IMAGES] Error:`, error);
+    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [R2-IMAGES] Error:`, error);
     
     // Generate and send placeholder
     try {
@@ -1083,7 +1058,7 @@ app.use((req, res, next) => {
   res.send = function(body) {
     // Only process HTML responses
     if (typeof body === 'string' && body.includes('<!DOCTYPE html>')) {
-      console.log(`[${new Date().toISOString()}] [HTML-INJECTOR] Injecting R2 fixer into HTML response`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [HTML-INJECTOR] Injecting R2 fixer into HTML response`);
       
       // Create a script tag that loads our R2 fixer
       const scriptInjection = `
@@ -1162,7 +1137,7 @@ app.use((req, res, next) => {
 // Update download image function to be more robust
 async function downloadImage(imageUrl, outputPath) {
   try {
-    console.log(`[${new Date().toISOString()}] [IMAGE DOWNLOAD] Downloading image from: ${imageUrl}...`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE DOWNLOAD] Downloading image from: ${imageUrl}...`);
     
     // Create directory if it doesn't exist
     const dir = path.dirname(outputPath);
@@ -1191,7 +1166,7 @@ async function downloadImage(imageUrl, outputPath) {
         throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
       }
     } catch (axiosError) {
-      console.log(`[${new Date().toISOString()}] [IMAGE DOWNLOAD] Axios download failed, trying fetch: ${axiosError.message}`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE DOWNLOAD] Axios download failed, trying fetch: ${axiosError.message}`);
       
       // Second try with fetch
       const fetchResponse = await fetch(imageUrl, {
@@ -1216,25 +1191,25 @@ async function downloadImage(imageUrl, outputPath) {
     
     // Check if it's a valid JPEG image
     if (!(imageData[0] === 0xFF && imageData[1] === 0xD8)) {
-      console.warn(`[${new Date().toISOString()}] [IMAGE DOWNLOAD] Downloaded data is not a valid JPEG image`);
+      if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [IMAGE DOWNLOAD] Downloaded data is not a valid JPEG image`);
     }
     
     // Write the image data to file
     fs.writeFileSync(outputPath, imageData);
-    console.log(`[${new Date().toISOString()}] [IMAGE DOWNLOAD] Image downloaded successfully to ${outputPath}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE DOWNLOAD] Image downloaded successfully to ${outputPath}`);
     
     return outputPath;
     
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] [IMAGE DOWNLOAD] Error downloading image: ${error.message}`);
+    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [IMAGE DOWNLOAD] Error downloading image: ${error.message}`);
     
     // Generate a placeholder image and save it instead as fallback
-    console.log(`[${new Date().toISOString()}] [IMAGE DOWNLOAD] Generating placeholder image as fallback`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE DOWNLOAD] Generating placeholder image as fallback`);
     
     try {
       const placeholderImage = generatePlaceholderImage('Download Failed');
       fs.writeFileSync(outputPath, placeholderImage);
-      console.log(`[${new Date().toISOString()}] [IMAGE DOWNLOAD] Saved placeholder image to ${outputPath}`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE DOWNLOAD] Saved placeholder image to ${outputPath}`);
       return outputPath;
     } catch (placeholderError) {
       throw new Error(`Image download failed and placeholder generation failed: ${placeholderError.message}`);
@@ -1257,12 +1232,12 @@ setInterval(() => {
     }
     
     if (expiredCount > 0) {
-      console.log(`[${new Date().toISOString()}] [CACHE] Cleared ${expiredCount} expired items from memory cache`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [CACHE] Cleared ${expiredCount} expired items from memory cache`);
     }
     
     // Clean disk cache (every hour)
     if (Math.random() < 0.01) { // ~1% chance each time this runs
-      console.log(`[${new Date().toISOString()}] [CACHE] Starting disk cache cleanup...`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [CACHE] Starting disk cache cleanup...`);
       
       // Read all cache files
       const cacheFiles = fs.readdirSync(localCacheDir);
@@ -1278,16 +1253,16 @@ setInterval(() => {
             diskExpiredCount++;
           }
         } catch (error) {
-          console.error(`[${new Date().toISOString()}] [CACHE] Error cleaning cache file ${file}:`, error.message);
+          if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [CACHE] Error cleaning cache file ${file}:`, error.message);
         }
       }
       
       if (diskExpiredCount > 0) {
-        console.log(`[${new Date().toISOString()}] [CACHE] Cleared ${diskExpiredCount} expired items from disk cache`);
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [CACHE] Cleared ${diskExpiredCount} expired items from disk cache`);
       }
     }
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] [CACHE] Error during cache cleanup:`, error);
+    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [CACHE] Error during cache cleanup:`, error);
   }
 }, 5 * 60 * 1000); // Run every 5 minutes
 
@@ -1298,7 +1273,7 @@ app.get('/api/signed-image-url/:username/:imageKey', async (req, res) => {
   
   try {
     const key = `ready_post/${platform}/${username}/${imageKey}`;
-    console.log(`[${new Date().toISOString()}] [SIGNED-URL] Generating signed URL for: ${key}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SIGNED-URL] Generating signed URL for: ${key}`);
     
     // Check if the object exists first
     const client = getS3Client();
@@ -1308,7 +1283,7 @@ app.get('/api/signed-image-url/:username/:imageKey', async (req, res) => {
         Key: key,
       }).promise();
     } catch (headError) {
-      console.error(`[${new Date().toISOString()}] [SIGNED-URL] Image not found: ${key}`, headError.message);
+      if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [SIGNED-URL] Image not found: ${key}`, headError.message);
       return res.status(404).json({ error: 'Image not found' });
     }
     
@@ -1328,10 +1303,10 @@ app.get('/api/signed-image-url/:username/:imageKey', async (req, res) => {
       key: key
     });
     
-    console.log(`[${new Date().toISOString()}] [SIGNED-URL] Generated signed URL successfully for: ${key}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SIGNED-URL] Generated signed URL successfully for: ${key}`);
     
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] [SIGNED-URL] Failed to generate signed URL for`, req.params, error?.message);
+    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [SIGNED-URL] Failed to generate signed URL for`, req.params, error?.message);
     res.status(500).json({ error: 'Failed to generate signed URL' });
   }
 });
@@ -1349,14 +1324,14 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
     // Construct the R2 key path
     const r2Key = `ready_post/${platform}/${username}/${imageKey}`;
     
-    console.log(`[${new Date().toISOString()}] [R2-IMAGE] Fetching: ${r2Key} (cache key: ${cacheKey})`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] Fetching: ${r2Key} (cache key: ${cacheKey})`);
     
     // Use enhanced fetch with all fallbacks and validation
     const { data, source } = await fetchImageWithFallbacks(r2Key, null, username, imageKey);
     
     // CRITICAL: Validate that we actually have image data (prevent white images)
     if (!data || data.length === 0) {
-      console.error(`[${new Date().toISOString()}] [R2-IMAGE] No image data returned for ${r2Key}`);
+      if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [R2-IMAGE] No image data returned for ${r2Key}`);
       throw new Error('Empty image data');
     }
     
@@ -1367,20 +1342,20 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
     if (data.length > 12) {
       // Comprehensive image format detection and validation
       const firstBytes = data.slice(0, 12);
-      console.log(`[${new Date().toISOString()}] [R2-IMAGE] DEBUG: First 12 bytes for ${imageKey}:`, Array.from(firstBytes).map(b => b.toString(16).padStart(2, '0')).join(' '));
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] DEBUG: First 12 bytes for ${imageKey}:`, Array.from(firstBytes).map(b => b.toString(16).padStart(2, '0')).join(' '));
       
       // JPEG validation (FF D8)
       if (firstBytes[0] === 0xFF && firstBytes[1] === 0xD8) {
          contentType = 'image/jpeg';
          isValidImage = true;
-         console.log(`[${new Date().toISOString()}] [R2-IMAGE] Valid JPEG detected for ${imageKey}`);
-+        console.log(`[${new Date().toISOString()}] [R2-IMAGE] JPEG bytes confirmed: ${firstBytes[0].toString(16)} ${firstBytes[1].toString(16)} ${firstBytes[2].toString(16)} ${firstBytes[3].toString(16)}`);
+         if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] Valid JPEG detected for ${imageKey}`);
+         if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] JPEG bytes confirmed: ${firstBytes[0].toString(16)} ${firstBytes[1].toString(16)} ${firstBytes[2].toString(16)} ${firstBytes[3].toString(16)}`);
        }
       // PNG validation (89 50 4E 47)
       else if (firstBytes[0] === 0x89 && firstBytes[1] === 0x50 && firstBytes[2] === 0x4E && firstBytes[3] === 0x47) {
         contentType = 'image/png';
         isValidImage = true;
-        console.log(`[${new Date().toISOString()}] [R2-IMAGE] Valid PNG detected for ${imageKey}`);
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] Valid PNG detected for ${imageKey}`);
       }
       // WebP validation (RIFF...WEBP) - More lenient validation for corrupted images
       else if (firstBytes[0] === 0x52 && firstBytes[1] === 0x49 && firstBytes[2] === 0x46 && firstBytes[3] === 0x46) {
@@ -1388,10 +1363,10 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
         if (data.length > 12 && firstBytes[8] === 0x57 && firstBytes[9] === 0x45 && firstBytes[10] === 0x42 && firstBytes[11] === 0x50) {
           contentType = 'image/webp';
           isValidImage = true;
-          console.log(`[${new Date().toISOString()}] [R2-IMAGE] Valid WebP detected for ${imageKey}`);
+          if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] Valid WebP detected for ${imageKey}`);
         } else {
           // RIFF format but WebP signature unclear - could be corrupted WebP, try to convert anyway
-          console.log(`[${new Date().toISOString()}] [R2-IMAGE] RIFF format detected but WebP signature unclear for ${imageKey}, attempting WebP conversion`);
+          if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] RIFF format detected but WebP signature unclear for ${imageKey}, attempting WebP conversion`);
           contentType = 'image/webp'; // Treat as WebP and let conversion handle it
           isValidImage = true;
         }
@@ -1401,34 +1376,34 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
         // GIF format
         contentType = 'image/gif';
         isValidImage = true;
-        console.log(`[${new Date().toISOString()}] [R2-IMAGE] Valid GIF detected for ${imageKey}`);
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] Valid GIF detected for ${imageKey}`);
       }
       else if (firstBytes[0] === 0x42 && firstBytes[1] === 0x4D) {
         // BMP format
         contentType = 'image/bmp';
         isValidImage = true;
-        console.log(`[${new Date().toISOString()}] [R2-IMAGE] Valid BMP detected for ${imageKey}`);
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] Valid BMP detected for ${imageKey}`);
       }
     }
     
     // CRITICAL: If image validation fails, try to serve anyway with basic validation
     if (!isValidImage) {
-      console.warn(`[${new Date().toISOString()}] [R2-IMAGE] Unknown image format for ${imageKey}, first 12 bytes:`, Array.from(data.slice(0, 12)).map(b => b.toString(16).padStart(2, '0')).join(' '));
+      if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [R2-IMAGE] Unknown image format for ${imageKey}, first 12 bytes:`, Array.from(data.slice(0, 12)).map(b => b.toString(16).padStart(2, '0')).join(' '));
       
       // More lenient validation - if it has some image-like characteristics, serve it
       if (data.length > 100 && (data[0] === 0xFF || data[0] === 0x89 || data[0] === 0x52 || data[0] === 0x47 || data[0] === 0x42)) {
-        console.log(`[${new Date().toISOString()}] [R2-IMAGE] Accepting unknown format as valid image for ${imageKey}`);
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] Accepting unknown format as valid image for ${imageKey}`);
         isValidImage = true;
         contentType = 'image/jpeg'; // Default to JPEG
       } else {
-        console.error(`[${new Date().toISOString()}] [R2-IMAGE] Invalid image format detected for ${imageKey}, first 12 bytes:`, Array.from(data.slice(0, 12)).map(b => b.toString(16).padStart(2, '0')).join(' '));
+        if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [R2-IMAGE] Invalid image format detected for ${imageKey}, first 12 bytes:`, Array.from(data.slice(0, 12)).map(b => b.toString(16).padStart(2, '0')).join(' '));
         throw new Error('Invalid image format detected');
       }
     }
     
     // Minimum size check (prevent tiny corrupted files)
     if (data.length < 1024) { // Less than 1KB is suspicious for a real image
-      console.warn(`[${new Date().toISOString()}] [R2-IMAGE] Suspiciously small image for ${imageKey}: ${data.length} bytes`);
+      if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [R2-IMAGE] Suspiciously small image for ${imageKey}: ${data.length} bytes`);
       // Don't fail immediately, but log for monitoring
     }
     
@@ -1469,7 +1444,7 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
     
     if (contentType === 'image/webp') {
       try {
-        console.log(`[${new Date().toISOString()}] [R2-IMAGE] Attempting WebP→JPEG conversion: ${imageKey}`);
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] Attempting WebP→JPEG conversion: ${imageKey}`);
         const jpegBuffer = await sharp(data, { failOnError: false })
           .jpeg({ quality: 90 })
           .toBuffer();
@@ -1478,12 +1453,12 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
         if (jpegBuffer && jpegBuffer.length > 1024 && jpegBuffer[0] === 0xFF && jpegBuffer[1] === 0xD8) {
           finalData = jpegBuffer;
           finalContentType = 'image/jpeg';
-          console.log(`[${new Date().toISOString()}] [R2-IMAGE] ✅ WebP→JPEG conversion succeeded for ${imageKey}`);
+          if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] ✅ WebP→JPEG conversion succeeded for ${imageKey}`);
         } else {
-          console.warn(`[${new Date().toISOString()}] [R2-IMAGE] WebP→JPEG conversion produced invalid result for ${imageKey}; serving original WebP`);
+          if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [R2-IMAGE] WebP→JPEG conversion produced invalid result for ${imageKey}; serving original WebP`);
         }
       } catch (conversionError) {
-        console.warn(`[${new Date().toISOString()}] [R2-IMAGE] WebP→JPEG conversion error for ${imageKey}: ${conversionError.message}; serving original WebP`);
+        if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [R2-IMAGE] WebP→JPEG conversion error for ${imageKey}: ${conversionError.message}; serving original WebP`);
       }
     }
     
@@ -1495,13 +1470,13 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
     // Send the validated image buffer
     res.send(finalData);
     
-    console.log(`[${new Date().toISOString()}] [R2-IMAGE] ✅ About to complete successfully: ${r2Key} (${finalData.length} bytes) from ${source}, isValidImage: ${isValidImage}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] ✅ About to complete successfully: ${r2Key} (${finalData.length} bytes) from ${source}, isValidImage: ${isValidImage}`);
     
-    console.log(`[${new Date().toISOString()}] [R2-IMAGE] ✅ Successfully served valid ${finalContentType.split('/')[1].toUpperCase()}: ${r2Key} (${finalData.length} bytes) from ${source}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] ✅ Successfully served valid ${finalContentType.split('/')[1].toUpperCase()}: ${r2Key} (${finalData.length} bytes) from ${source}`);
     
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] [R2-IMAGE] ❌ Exception caught for ${username}/${imageKey}:`, error.message, error.stack);
-    console.error(`[${new Date().toISOString()}] [R2-IMAGE] ❌ Error serving ${username}/${imageKey}:`, error.message);
+    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [R2-IMAGE] ❌ Exception caught for ${username}/${imageKey}:`, error.message, error.stack);
+    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [R2-IMAGE] ❌ Error serving ${username}/${imageKey}:`, error.message);
     
     // Enhanced error response with debugging info
     try {
@@ -1519,9 +1494,9 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
       
       res.send(placeholderImage);
       
-      console.log(`[${new Date().toISOString()}] [R2-IMAGE] 🔄 Served error placeholder for ${imageKey}`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] 🔄 Served error placeholder for ${imageKey}`);
     } catch (placeholderError) {
-      console.error(`[${new Date().toISOString()}] [R2-IMAGE] 💥 Failed to generate placeholder:`, placeholderError.message);
+      if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [R2-IMAGE] 💥 Failed to generate placeholder:`, placeholderError.message);
       
       // Ultimate fallback - send minimal valid JPEG
       const minimalJpeg = Buffer.from([
@@ -1547,7 +1522,7 @@ app.head('/api/r2-image/:username/:imageKey', async (req, res) => {
   try {
     const r2Key = `ready_post/${platform}/${username}/${imageKey}`;
     
-    console.log(`[${new Date().toISOString()}] [R2-IMAGE-HEAD] Checking image accessibility: ${r2Key}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE-HEAD] Checking image accessibility: ${r2Key}`);
     
     // Use our existing fetch mechanism to check if image exists
     const localFallbackPath = path.join(process.cwd(), 'ready_post', platform, username, imageKey);
@@ -1562,10 +1537,10 @@ app.head('/api/r2-image/:username/:imageKey', async (req, res) => {
       if (data[0] === 0x52 && data[1] === 0x49 && data[2] === 0x46 && data[3] === 0x46) {
         if (data.length > 12 && data[8] === 0x57 && data[9] === 0x45 && data[10] === 0x42 && data[11] === 0x50) {
           contentType = 'image/webp';
-          console.log(`[${new Date().toISOString()}] [R2-IMAGE-HEAD] RIFF format detected for ${imageKey}, treating as WebP`);
+          if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE-HEAD] RIFF format detected for ${imageKey}, treating as WebP`);
         } else {
           contentType = 'image/webp';
-          console.log(`[${new Date().toISOString()}] [R2-IMAGE-HEAD] RIFF format detected for ${imageKey}, treating as WebP`);
+          if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE-HEAD] RIFF format detected for ${imageKey}, treating as WebP`);
         }
       }
     }
@@ -1573,12 +1548,12 @@ app.head('/api/r2-image/:username/:imageKey', async (req, res) => {
     // Convert WebP to JPEG for better compatibility
     if (contentType === 'image/webp') {
       try {
-        console.log(`[${new Date().toISOString()}] [R2-IMAGE-HEAD] Converting WebP to JPEG for compatibility: ${imageKey}`);
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE-HEAD] Converting WebP to JPEG for compatibility: ${imageKey}`);
         finalData = await convertWebPToJPEG(data);
         contentType = 'image/jpeg';
-        console.log(`[${new Date().toISOString()}] [R2-IMAGE-HEAD] ✅ Successfully converted WebP to JPEG for ${imageKey}`);
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE-HEAD] ✅ Successfully converted WebP to JPEG for ${imageKey}`);
       } catch (conversionError) {
-        console.error(`[${new Date().toISOString()}] [R2-IMAGE-HEAD] ⚠️ WebP to JPEG conversion failed for ${imageKey}: ${conversionError.message}. Using original WebP.`);
+        if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [R2-IMAGE-HEAD] ⚠️ WebP to JPEG conversion failed for ${imageKey}: ${conversionError.message}. Using original WebP.`);
       }
     }
     
@@ -1610,10 +1585,10 @@ app.head('/api/r2-image/:username/:imageKey', async (req, res) => {
     
     res.status(200).end(); // HEAD response - no body
     
-    console.log(`[${new Date().toISOString()}] [R2-IMAGE-HEAD] Image accessible: ${r2Key} (${data.length} bytes) from ${source}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE-HEAD] Image accessible: ${r2Key} (${data.length} bytes) from ${source}`);
     
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] [R2-IMAGE-HEAD] Error checking image ${username}/${imageKey}:`, error);
+    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [R2-IMAGE-HEAD] Error checking image ${username}/${imageKey}:`, error);
     
     // Return 404 for HEAD request
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -1650,7 +1625,7 @@ async function handlePostsEndpoint(req, res) {
   const isRealTime = req.query.realtime || req.query.nocache;
   
   try {
-    console.log(`[${new Date().toISOString()}] [API-POSTS] Fetching posts for ${username} on ${platform} (forceRefresh: ${forceRefresh}, realTime: ${!!isRealTime})`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [API-POSTS] Fetching posts for ${username} on ${platform} (forceRefresh: ${forceRefresh}, realTime: ${!!isRealTime})`);
     
     // Set real-time headers if requested
     if (isRealTime) {
@@ -1658,13 +1633,13 @@ async function handlePostsEndpoint(req, res) {
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
       res.setHeader('X-Real-Time', 'true');
-      console.log(`[${new Date().toISOString()}] [API-POSTS] REAL-TIME mode activated for ${username}`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [API-POSTS] REAL-TIME mode activated for ${username}`);
     }
     
     // Clear cache if force refresh or real-time is requested
     if (forceRefresh || isRealTime) {
       const cacheKey = `ready_post/${platform}/${username}/`;
-      console.log(`[${new Date().toISOString()}] [API-POSTS] Clearing ALL caches for: ${cacheKey}`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [API-POSTS] Clearing ALL caches for: ${cacheKey}`);
       // Clear memory cache
       for (const key of imageCache.keys()) {
         if (key.startsWith(cacheKey)) {
@@ -1686,7 +1661,7 @@ async function handlePostsEndpoint(req, res) {
     const listResult = await client.listObjectsV2(listParams).promise();
     
     if (!listResult.Contents || listResult.Contents.length === 0) {
-      console.log(`[${new Date().toISOString()}] [API-POSTS] No posts found for ${username} on ${platform}`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [API-POSTS] No posts found for ${username} on ${platform}`);
       return res.json([]);
     }
     
@@ -1695,7 +1670,7 @@ async function handlePostsEndpoint(req, res) {
       .filter(obj => obj.Key.endsWith('.json'))
       .sort((a, b) => new Date(b.LastModified).getTime() - new Date(a.LastModified).getTime()); // Sort by newest first
     
-    console.log(`[${new Date().toISOString()}] [API-POSTS] Found ${jsonFiles.length} posts for ${username}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [API-POSTS] Found ${jsonFiles.length} posts for ${username}`);
     
     const posts = [];
     
@@ -1715,11 +1690,11 @@ async function handlePostsEndpoint(req, res) {
           if (bodyString.trim()) {
             postData = JSON.parse(bodyString);
           } else {
-            console.warn(`[${new Date().toISOString()}] [API-POSTS] Empty post data for ${file.Key}`);
+            if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [API-POSTS] Empty post data for ${file.Key}`);
             continue;
           }
         } else {
-          console.warn(`[${new Date().toISOString()}] [API-POSTS] No body for ${file.Key}`);
+          if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [API-POSTS] No body for ${file.Key}`);
           continue;
         }
         
@@ -1729,7 +1704,12 @@ async function handlePostsEndpoint(req, res) {
         
         // Extract image key from post data or file key
         let imageKey = null;
-        if (file.Key.includes('ready_post_') && file.Key.endsWith('.json')) {
+        if (file.Key.includes('campaign_ready_post_') && file.Key.endsWith('.json')) {
+          // Campaign pattern: campaign_ready_post_1752000987874_9c14f1fd.json -> image_1752000987874_9c14f1fd.jpg
+          const baseName = file.Key.replace(/^.*\/([^\/]+)\.json$/, '$1');
+          imageKey = `${baseName}.jpg`;
+        } else if (file.Key.includes('ready_post_') && file.Key.endsWith('.json')) {
+          // Traditional pattern: ready_post_1234567890.json -> image_1234567890.jpg
           const match = file.Key.match(/ready_post_(\d+)\.json$/);
           if (match) {
             imageKey = `image_${match[1]}.jpg`;
@@ -1772,19 +1752,19 @@ async function handlePostsEndpoint(req, res) {
         };
         
         posts.push(postEntry);
-        console.log(`[${new Date().toISOString()}] [API-POSTS] Added post: ${file.Key} with caption: "${structuredPostData.caption.substring(0, 50)}..."`);
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [API-POSTS] Added post: ${file.Key} with caption: "${structuredPostData.caption.substring(0, 50)}..."`);
         
       } catch (postError) {
-        console.error(`[${new Date().toISOString()}] [API-POSTS] Error processing post ${file.Key}:`, postError.message);
+        if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [API-POSTS] Error processing post ${file.Key}:`, postError.message);
         // Continue with other posts even if one fails
       }
     }
     
-    console.log(`[${new Date().toISOString()}] [API-POSTS] Successfully fetched ${posts.length} posts for ${username} with complete JSON data`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [API-POSTS] Successfully fetched ${posts.length} posts for ${username} with complete JSON data`);
     res.json(posts);
     
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] [API-POSTS] Error fetching posts for ${username}:`, error);
+    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [API-POSTS] Error fetching posts for ${username}:`, error);
     res.status(500).json({ 
       error: 'Failed to fetch posts', 
       details: error.message 
@@ -1802,10 +1782,10 @@ const upload = multer({
 app.post('/api/save-edited-post/:username', upload.single('image'), async (req, res) => {
   const { username } = req.params;
   
-  console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Received request for user: ${username}`);
-  console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Content-Type: ${req.get('Content-Type')}`);
-  console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] File:`, req.file ? `${req.file.size} bytes` : 'No file');
-  console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Body:`, req.body);
+  if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Received request for user: ${username}`);
+  if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Content-Type: ${req.get('Content-Type')}`);
+  if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] File:`, req.file ? `${req.file.size} bytes` : 'No file');
+  if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Body:`, req.body);
   
   try {
     const imageData = req.file ? req.file.buffer : null;
@@ -1820,12 +1800,17 @@ app.post('/api/save-edited-post/:username', upload.single('image'), async (req, 
       });
     }
     
-    console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Processing save for postKey: ${postKey}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Processing save for postKey: ${postKey}`);
     
     // Extract image key from post key
-    // Expected format: ready_post/instagram/username/ready_post_1749203937329.json
+    // Expected format: ready_post/instagram/username/ready_post_1749203937329.json or campaign_ready_post_1752000987874_9c14f1fd.json
     let imageKey = null;
-    if (postKey.includes('ready_post_') && postKey.endsWith('.json')) {
+    if (postKey.includes('campaign_ready_post_') && postKey.endsWith('.json')) {
+      // Campaign pattern: campaign_ready_post_1752000987874_9c14f1fd.json -> image_1752000987874_9c14f1fd.jpg
+      const baseName = postKey.replace(/^.*\/([^\/]+)\.json$/, '$1');
+      imageKey = `${baseName}.jpg`;
+    } else if (postKey.includes('ready_post_') && postKey.endsWith('.json')) {
+      // Traditional pattern: ready_post_1234567890.json -> image_1234567890.jpg
       const match = postKey.match(/ready_post_(\d+)\.json$/);
       if (match) {
         imageKey = `image_${match[1]}.jpg`;
@@ -1839,13 +1824,13 @@ app.post('/api/save-edited-post/:username', upload.single('image'), async (req, 
       });
     }
     
-    console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Extracted imageKey: ${imageKey}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Extracted imageKey: ${imageKey}`);
     
     // Save the edited image to R2 with the EXACT same name and location
     const imageR2Key = `ready_post/${platform}/${username}/${imageKey}`;
     const client = getS3Client();
     
-    console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Saving edited image to R2: ${imageR2Key}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Saving edited image to R2: ${imageR2Key}`);
     
     const putImageParams = {
       Bucket: 'tasks',
@@ -1856,7 +1841,7 @@ app.post('/api/save-edited-post/:username', upload.single('image'), async (req, 
     };
     
     await client.putObject(putImageParams).promise();
-    console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Successfully saved edited image to R2: ${imageR2Key}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Successfully saved edited image to R2: ${imageR2Key}`);
     
     // Also save a local copy to the exact same location for caching
     const localImagePath = path.join(process.cwd(), 'ready_post', platform, username, imageKey);
@@ -1868,12 +1853,12 @@ app.post('/api/save-edited-post/:username', upload.single('image'), async (req, 
     }
     
     fs.writeFileSync(localImagePath, imageData);
-    console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Successfully saved edited image locally: ${localImagePath}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Successfully saved edited image locally: ${localImagePath}`);
     
     // Update the post JSON data if caption was changed
     if (caption !== null && caption !== undefined) {
       try {
-        console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Updating post caption in: ${postKey}`);
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Updating post caption in: ${postKey}`);
         
         // Get the existing post data
         const getPostParams = {
@@ -1906,23 +1891,23 @@ app.post('/api/save-edited-post/:username', upload.single('image'), async (req, 
         };
         
         await client.putObject(putPostParams).promise();
-        console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Successfully updated post data: ${postKey}`);
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Successfully updated post data: ${postKey}`);
         
       } catch (postUpdateError) {
-        console.error(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Error updating post data:`, postUpdateError);
+        if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Error updating post data:`, postUpdateError);
         // Continue even if post update fails - the image was saved
       }
     }
     
     // Clear ALL caches for this user/platform to force refresh
     const cacheKey = `ready_post/${platform}/${username}/`;
-    console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Clearing all caches for: ${cacheKey}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Clearing all caches for: ${cacheKey}`);
     
     // Clear memory cache
     for (const key of imageCache.keys()) {
       if (key.startsWith(cacheKey)) {
         imageCache.delete(key);
-        console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Cleared memory cache key: ${key}`);
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Cleared memory cache key: ${key}`);
       }
     }
     
@@ -1934,13 +1919,13 @@ app.post('/api/save-edited-post/:username', upload.single('image'), async (req, 
        for (const file of cacheFiles) {
          const fullPath = path.join(localCacheDir, file);
          fs.unlinkSync(fullPath);
-         console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Cleared local cache file: ${fullPath}`);
+         if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Cleared local cache file: ${fullPath}`);
        }
      } catch (cacheError) {
-       console.warn(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Error clearing local cache:`, cacheError.message);
+       if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Error clearing local cache:`, cacheError.message);
      }
     
-    console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Successfully saved edited post for ${username}/${imageKey}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Successfully saved edited post for ${username}/${imageKey}`);
     
     // Set aggressive cache-busting headers
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -1959,7 +1944,7 @@ app.post('/api/save-edited-post/:username', upload.single('image'), async (req, 
     });
     
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Error saving edited post:`, error);
+    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Error saving edited post:`, error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to save edited post',
@@ -1995,7 +1980,7 @@ app.use((req, res, next) => {
     
     // If this was a slow response, log it
     if (duration > 5000) {
-      console.warn(`[${new Date().toISOString()}] [HEALTH] Slow response: ${req.method} ${req.url} - ${duration}ms`);
+      if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [HEALTH] Slow response: ${req.method} ${req.url} - ${duration}ms`);
     }
   });
   
@@ -2023,7 +2008,7 @@ const healthWatchdog = setInterval(() => {
       : 0;
     
     // Log health status periodically
-    console.log(`[${new Date().toISOString()}] [HEALTH] Server health check: ` +
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [HEALTH] Server health check: ` +
       `Requests: ${healthMetrics.totalRequests}, ` +
       `Failures: ${healthMetrics.failedRequests}, ` +
       `Avg Response: ${avgResponseTime.toFixed(2)}ms, ` +
@@ -2031,12 +2016,12 @@ const healthWatchdog = setInterval(() => {
     
     // Check for long idle time (no requests) - Enterprise grade allows 24h idle
     if (now - healthMetrics.lastRequestTime > WATCHDOG_MAX_IDLE) {
-      console.warn(`[${new Date().toISOString()}] [HEALTH] No requests for ${WATCHDOG_MAX_IDLE/1000} seconds (24 hours), server is stable and healthy`);
+      if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [HEALTH] No requests for ${WATCHDOG_MAX_IDLE/1000} seconds (24 hours), server is stable and healthy`);
       // In enterprise mode, we don't auto-restart for idle time - only for actual errors
       // This provides bulletproof stability for production environments
     }
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] [HEALTH] Error in health watchdog:`, error);
+    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [HEALTH] Error in health watchdog:`, error);
   }
 }, WATCHDOG_INTERVAL);
 
@@ -2047,7 +2032,7 @@ healthWatchdog.unref();
 const deadlockDetector = setInterval(() => {
   const now = Date.now();
   if (now - watchdogLastCheckin > WATCHDOG_INTERVAL * 3) {
-    console.error(`[${new Date().toISOString()}] [HEALTH] Deadlock detected! Watchdog hasn't checked in for ${(now - watchdogLastCheckin)/1000} seconds, forcing restart...`);
+    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [HEALTH] Deadlock detected! Watchdog hasn't checked in for ${(now - watchdogLastCheckin)/1000} seconds, forcing restart...`);
     process.exit(2);
   }
 }, WATCHDOG_INTERVAL);
@@ -2059,11 +2044,11 @@ app.get('/ai-replies/:username', async (req, res) => {
   const { username } = req.params;
   const platform = req.query.platform || 'instagram';
   
-  console.log(`[${new Date().toISOString()}] [AI-REPLIES-DEBUG] Route hit: ${req.method} ${req.url}`);
-  console.log(`[${new Date().toISOString()}] [AI-REPLIES-DEBUG] Username: ${username}, Platform: ${platform}`);
+  if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [AI-REPLIES-DEBUG] Route hit: ${req.method} ${req.url}`);
+  if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [AI-REPLIES-DEBUG] Username: ${username}, Platform: ${platform}`);
   
   try {
-    console.log(`[${new Date().toISOString()}] [AI-REPLIES] Fetching AI replies for ${platform}/${username}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [AI-REPLIES] Fetching AI replies for ${platform}/${username}`);
     
     // Get AI replies from R2 storage
     const listParams = {
@@ -2072,14 +2057,14 @@ app.get('/ai-replies/:username', async (req, res) => {
       MaxKeys: 50 // Limit to last 50 replies
     };
     
-    console.log(`[${new Date().toISOString()}] [AI-REPLIES-DEBUG] List params:`, listParams);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [AI-REPLIES-DEBUG] List params:`, listParams);
     
     const data = await s3Client.listObjects(listParams).promise();
     
-    console.log(`[${new Date().toISOString()}] [AI-REPLIES-DEBUG] S3 response:`, data);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [AI-REPLIES-DEBUG] S3 response:`, data);
     
     if (!data.Contents || data.Contents.length === 0) {
-      console.log(`[${new Date().toISOString()}] [AI-REPLIES] No AI replies found for ${platform}/${username}`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [AI-REPLIES] No AI replies found for ${platform}/${username}`);
       return res.json({ replies: [] });
     }
     
@@ -2109,17 +2094,17 @@ app.get('/ai-replies/:username', async (req, res) => {
           platform: reply.platform || platform
         });
       } catch (error) {
-        console.warn(`[${new Date().toISOString()}] [AI-REPLIES] Error fetching reply ${obj.Key}:`, error.message);
+        if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [AI-REPLIES] Error fetching reply ${obj.Key}:`, error.message);
       }
     }
     
-    console.log(`[${new Date().toISOString()}] [AI-REPLIES] Found ${replies.length} AI replies for ${platform}/${username}`);
-    console.log(`[${new Date().toISOString()}] [AI-REPLIES-DEBUG] Sending response:`, { replies });
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [AI-REPLIES] Found ${replies.length} AI replies for ${platform}/${username}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [AI-REPLIES-DEBUG] Sending response:`, { replies });
     res.json({ replies });
     
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] [AI-REPLIES] Error fetching AI replies:`, error);
-    console.error(`[${new Date().toISOString()}] [AI-REPLIES-DEBUG] Full error:`, error);
+    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [AI-REPLIES] Error fetching AI replies:`, error);
+    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [AI-REPLIES-DEBUG] Full error:`, error);
     res.status(500).json({ 
       error: 'Failed to fetch AI replies',
       details: error.message 
@@ -2224,7 +2209,7 @@ app.get('/api/user/:userId', async (req, res) => {
   const { userId } = req.params;
   
   try {
-    console.log(`[${new Date().toISOString()}] [USER-API] Getting user data for ${userId}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] Getting user data for ${userId}`);
     
     const params = {
       Bucket: 'admin',
@@ -2234,15 +2219,15 @@ app.get('/api/user/:userId', async (req, res) => {
     const data = await getAdminS3Client().getObject(params).promise();
     const userData = JSON.parse(data.Body.toString());
     
-    console.log(`[${new Date().toISOString()}] [USER-API] Found user data for ${userId}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] Found user data for ${userId}`);
     res.json(userData);
     
   } catch (error) {
     if (error.code === 'NoSuchKey') {
-      console.log(`[${new Date().toISOString()}] [USER-API] User ${userId} not found, creating default`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] User ${userId} not found, creating default`);
       res.status(404).json({ error: 'User not found' });
     } else {
-      console.error(`[${new Date().toISOString()}] [USER-API] Error getting user data:`, error);
+      if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [USER-API] Error getting user data:`, error);
       res.status(500).json({ error: 'Failed to get user data' });
     }
   }
@@ -2254,7 +2239,7 @@ app.put('/api/user/:userId', async (req, res) => {
   const userData = req.body;
   
   try {
-    console.log(`[${new Date().toISOString()}] [USER-API] Saving user data for ${userId}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] Saving user data for ${userId}`);
     
     const params = {
       Bucket: 'admin',
@@ -2265,11 +2250,11 @@ app.put('/api/user/:userId', async (req, res) => {
     
     await getAdminS3Client().putObject(params).promise();
     
-    console.log(`[${new Date().toISOString()}] [USER-API] Saved user data for ${userId}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] Saved user data for ${userId}`);
     res.json({ success: true });
     
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] [USER-API] Error saving user data:`, error);
+    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [USER-API] Error saving user data:`, error);
     res.status(500).json({ error: 'Failed to save user data' });
   }
 });
@@ -2280,11 +2265,11 @@ app.get('/api/user/:userId/usage', async (req, res) => {
   const currentPeriod = new Date().toISOString().substring(0, 7); // YYYY-MM
   
   try {
-    console.log(`[${new Date().toISOString()}] [USER-API] Getting usage stats for ${userId}/${currentPeriod}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] Getting usage stats for ${userId}/${currentPeriod}`);
     
     // Try R2 first
     try {
-      console.log(`[${new Date().toISOString()}] [R2-OPERATION] Attempting to get usage stats from R2`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-OPERATION] Attempting to get usage stats from R2`);
       const params = {
         Bucket: 'admin',
         Key: `usage/${userId}/${currentPeriod}.json`
@@ -2293,14 +2278,14 @@ app.get('/api/user/:userId/usage', async (req, res) => {
       const data = await getAdminS3Client().getObject(params).promise();
       const usageStats = JSON.parse(data.Body.toString());
       
-      console.log(`[${new Date().toISOString()}] [USER-API] Found usage stats from R2 for ${userId}/${currentPeriod}`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] Found usage stats from R2 for ${userId}/${currentPeriod}`);
       res.json(usageStats);
       return;
     } catch (r2Error) {
-      console.log(`[${new Date().toISOString()}] [R2-OPERATION] Error performing R2 operation: ${r2Error.message}`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-OPERATION] Error performing R2 operation: ${r2Error.message}`);
       
       if (r2Error.code === 'NoSuchKey' || r2Error.message.includes('does not exist')) {
-        console.log(`[${new Date().toISOString()}] [USER-API] R2 failed for usage stats, trying fallbacks: ${r2Error.message}`);
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] R2 failed for usage stats, trying fallbacks: ${r2Error.message}`);
         
         // Try local storage fallback
         const localStorageDir = path.join(process.cwd(), 'local_storage', 'usage', userId);
@@ -2308,17 +2293,17 @@ app.get('/api/user/:userId/usage', async (req, res) => {
         
         if (fs.existsSync(localStorageFile)) {
           try {
-            console.log(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Found usage in local storage: ${localStorageFile}`);
+            if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Found usage in local storage: ${localStorageFile}`);
             const localData = JSON.parse(fs.readFileSync(localStorageFile, 'utf8'));
             res.json(localData);
             return;
           } catch (localError) {
-            console.error(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Error reading local usage stats:`, localError);
+            if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Error reading local usage stats:`, localError);
           }
         }
         
         // If both R2 and local storage fail, create default stats
-        console.log(`[${new Date().toISOString()}] [USER-API] Using default usage stats for ${userId}/${currentPeriod}`);
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] Using default usage stats for ${userId}/${currentPeriod}`);
         const defaultStats = {
           userId,
           period: currentPeriod,
@@ -2335,12 +2320,12 @@ app.get('/api/user/:userId/usage', async (req, res) => {
             fs.mkdirSync(localStorageDir, { recursive: true });
           }
           fs.writeFileSync(localStorageFile, JSON.stringify(defaultStats, null, 2));
-          console.log(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Saved usage to local storage: ${localStorageFile}`);
+          if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Saved usage to local storage: ${localStorageFile}`);
         } catch (saveError) {
-          console.error(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Error saving to local storage:`, saveError);
+          if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Error saving to local storage:`, saveError);
         }
         
-        console.log(`[${new Date().toISOString()}] [USER-API] Creating default usage stats for ${userId}/${currentPeriod}`);
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] Creating default usage stats for ${userId}/${currentPeriod}`);
         res.json(defaultStats);
         return;
       } else {
@@ -2350,12 +2335,12 @@ app.get('/api/user/:userId/usage', async (req, res) => {
         
         if (fs.existsSync(localStorageFile)) {
           try {
-            console.log(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Using local storage due to R2 error: ${localStorageFile}`);
+            if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Using local storage due to R2 error: ${localStorageFile}`);
             const localData = JSON.parse(fs.readFileSync(localStorageFile, 'utf8'));
             res.json(localData);
             return;
           } catch (localError) {
-            console.error(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Error reading local storage:`, localError);
+            if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Error reading local storage:`, localError);
           }
         }
         
@@ -2363,7 +2348,7 @@ app.get('/api/user/:userId/usage', async (req, res) => {
       }
     }
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] [USER-API] Error getting usage stats:`, error);
+    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [USER-API] Error getting usage stats:`, error);
     
     // Ultimate fallback - return default stats
     const defaultStats = {
@@ -2386,7 +2371,7 @@ app.get('/api/user/:userId/usage/:period', async (req, res) => {
   const currentPeriod = period || new Date().toISOString().substring(0, 7); // YYYY-MM
   
   try {
-    console.log(`[${new Date().toISOString()}] [USER-API] Getting usage stats for ${userId}/${currentPeriod}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] Getting usage stats for ${userId}/${currentPeriod}`);
     
     const params = {
       Bucket: 'admin',
@@ -2396,7 +2381,7 @@ app.get('/api/user/:userId/usage/:period', async (req, res) => {
     const data = await getAdminS3Client().getObject(params).promise();
     const usageStats = JSON.parse(data.Body.toString());
     
-    console.log(`[${new Date().toISOString()}] [USER-API] Found usage stats for ${userId}/${currentPeriod}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] Found usage stats for ${userId}/${currentPeriod}`);
     res.json(usageStats);
     
   } catch (error) {
@@ -2412,10 +2397,10 @@ app.get('/api/user/:userId/usage/:period', async (req, res) => {
         lastUpdated: new Date().toISOString()
       };
       
-      console.log(`[${new Date().toISOString()}] [USER-API] Creating default usage stats for ${userId}/${currentPeriod}`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] Creating default usage stats for ${userId}/${currentPeriod}`);
       res.json(defaultStats);
     } else {
-      console.error(`[${new Date().toISOString()}] [USER-API] Error getting usage stats:`, error);
+      if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [USER-API] Error getting usage stats:`, error);
       res.status(500).json({ error: 'Failed to get usage stats' });
     }
   }
@@ -2428,7 +2413,7 @@ app.patch('/api/user/:userId/usage', async (req, res) => {
   const currentPeriod = new Date().toISOString().substring(0, 7);
   
   try {
-    console.log(`[${new Date().toISOString()}] [USER-API] Updating usage stats for ${userId}/${currentPeriod}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] Updating usage stats for ${userId}/${currentPeriod}`);
     
     // Get current stats or create default
     let currentStats;
@@ -2471,11 +2456,11 @@ app.patch('/api/user/:userId/usage', async (req, res) => {
     
     await getAdminS3Client().putObject(params).promise();
     
-    console.log(`[${new Date().toISOString()}] [USER-API] Updated usage stats for ${userId}/${currentPeriod}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] Updated usage stats for ${userId}/${currentPeriod}`);
     res.json({ success: true });
     
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] [USER-API] Error updating usage stats:`, error);
+    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [USER-API] Error updating usage stats:`, error);
     res.status(500).json({ error: 'Failed to update usage stats' });
   }
 });
@@ -2486,7 +2471,7 @@ app.post('/api/access-check/:userId', async (req, res) => {
   const { feature } = req.body;
   
   try {
-    console.log(`[${new Date().toISOString()}] [ACCESS-CHECK] Checking ${feature} access for ${userId}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [ACCESS-CHECK] Checking ${feature} access for ${userId}`);
     
     // Get user data and usage stats
     const [userResponse, usageResponse] = await Promise.allSettled([
@@ -2545,7 +2530,7 @@ app.post('/api/access-check/:userId', async (req, res) => {
     
     // Admin users have unlimited access
     if (userData.userType === 'admin') {
-      console.log(`[${new Date().toISOString()}] [ACCESS-CHECK] Admin user ${userId} has unlimited access`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [ACCESS-CHECK] Admin user ${userId} has unlimited access`);
       return res.json({ allowed: true });
     }
     
@@ -2668,11 +2653,11 @@ app.post('/api/access-check/:userId', async (req, res) => {
         accessResult = { allowed: false, reason: 'Unknown feature' };
     }
     
-    console.log(`[${new Date().toISOString()}] [ACCESS-CHECK] ${feature} access for ${userId}: ${accessResult.allowed ? 'ALLOWED' : 'DENIED'}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [ACCESS-CHECK] ${feature} access for ${userId}: ${accessResult.allowed ? 'ALLOWED' : 'DENIED'}`);
     res.json(accessResult);
     
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] [ACCESS-CHECK] Error checking access:`, error);
+    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [ACCESS-CHECK] Error checking access:`, error);
     // Allow access if there's an error to prevent app breaking
     res.json({ allowed: true });
   }
@@ -2683,17 +2668,17 @@ app.post('/api/admin/authenticate', async (req, res) => {
   const { username, password } = req.body;
   
   try {
-    console.log(`[${new Date().toISOString()}] [ADMIN-AUTH] Authentication attempt for ${username}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [ADMIN-AUTH] Authentication attempt for ${username}`);
     
     if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
-      console.log(`[${new Date().toISOString()}] [ADMIN-AUTH] Authentication successful for ${username}`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [ADMIN-AUTH] Authentication successful for ${username}`);
       res.json({ 
         success: true, 
         message: 'Authentication successful',
         adminToken: `admin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       });
     } else {
-      console.log(`[${new Date().toISOString()}] [ADMIN-AUTH] Authentication failed for ${username}`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [ADMIN-AUTH] Authentication failed for ${username}`);
       res.status(401).json({ 
         success: false, 
         message: 'Invalid credentials' 
@@ -2701,7 +2686,7 @@ app.post('/api/admin/authenticate', async (req, res) => {
     }
     
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] [ADMIN-AUTH] Error during authentication:`, error);
+    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [ADMIN-AUTH] Error during authentication:`, error);
     res.status(500).json({ 
       success: false, 
       message: 'Authentication error' 
@@ -2715,7 +2700,7 @@ app.post('/api/admin/upgrade-user/:userId', async (req, res) => {
   const { adminToken } = req.body;
   
   try {
-    console.log(`[${new Date().toISOString()}] [ADMIN-UPGRADE] Upgrading user ${userId} to admin`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [ADMIN-UPGRADE] Upgrading user ${userId} to admin`);
     
     // In production, verify adminToken here
     // For now, we'll trust the request came from authenticated admin
@@ -2766,11 +2751,11 @@ app.post('/api/admin/upgrade-user/:userId', async (req, res) => {
       throw new Error('Failed to save user data');
     }
     
-    console.log(`[${new Date().toISOString()}] [ADMIN-UPGRADE] Successfully upgraded user ${userId} to admin`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [ADMIN-UPGRADE] Successfully upgraded user ${userId} to admin`);
     res.json({ success: true, message: 'User upgraded to admin successfully' });
     
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] [ADMIN-UPGRADE] Error upgrading user:`, error);
+    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [ADMIN-UPGRADE] Error upgrading user:`, error);
     res.status(500).json({ 
       success: false, 
       message: 'Failed to upgrade user' 
@@ -2784,7 +2769,7 @@ app.post('/api/usage/increment/:userId', async (req, res) => {
   const { feature } = req.body;
   
   try {
-    console.log(`[${new Date().toISOString()}] [USAGE-INCREMENT] Incrementing ${feature} usage for ${userId}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USAGE-INCREMENT] Incrementing ${feature} usage for ${userId}`);
     
     // Get current usage stats
     const response = await fetch(`http://localhost:3002/api/user/${userId}/usage`);
@@ -2822,7 +2807,7 @@ app.post('/api/usage/increment/:userId', async (req, res) => {
         update.campaignsUsed = usageStats.campaignsUsed + 1;
         break;
       default:
-        console.warn(`[${new Date().toISOString()}] [USAGE-INCREMENT] Unknown feature: ${feature}`);
+        if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [USAGE-INCREMENT] Unknown feature: ${feature}`);
         return res.json({ success: true, message: 'Unknown feature, no increment performed' });
     }
     
@@ -2837,11 +2822,11 @@ app.post('/api/usage/increment/:userId', async (req, res) => {
       throw new Error('Failed to update usage stats');
     }
     
-    console.log(`[${new Date().toISOString()}] [USAGE-INCREMENT] Successfully incremented ${feature} usage for ${userId}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USAGE-INCREMENT] Successfully incremented ${feature} usage for ${userId}`);
     res.json({ success: true, newCount: usageStats[feature + 'Used'] + 1 });
     
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] [USAGE-INCREMENT] Error incrementing usage:`, error);
+    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [USAGE-INCREMENT] Error incrementing usage:`, error);
     // Don't fail the request - usage tracking is not critical
     res.json({ success: true, message: 'Usage tracking error, but operation continued' });
   }
@@ -2849,7 +2834,7 @@ app.post('/api/usage/increment/:userId', async (req, res) => {
 
 // Get pricing plans
 app.get('/api/pricing-plans', (req, res) => {
-  console.log(`[${new Date().toISOString()}] [PRICING] Serving pricing plans`);
+  if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [PRICING] Serving pricing plans`);
   res.json({ plans: Object.values(PRICING_PLANS) });
 });
 
@@ -2858,7 +2843,7 @@ app.post('/api/process-payment', async (req, res) => {
   const { userId, planId, paymentMethod } = req.body;
   
   try {
-    console.log(`[${new Date().toISOString()}] [PAYMENT] Processing payment for ${userId} - Plan: ${planId}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [PAYMENT] Processing payment for ${userId} - Plan: ${planId}`);
     
     // Simulate payment processing delay
     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -2912,7 +2897,7 @@ app.post('/api/process-payment', async (req, res) => {
       throw new Error('Failed to save subscription data');
     }
     
-    console.log(`[${new Date().toISOString()}] [PAYMENT] Payment processed successfully for ${userId} - Plan: ${planId}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [PAYMENT] Payment processed successfully for ${userId} - Plan: ${planId}`);
     res.json({ 
       success: true, 
       message: 'Payment processed successfully',
@@ -2920,7 +2905,7 @@ app.post('/api/process-payment', async (req, res) => {
     });
     
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] [PAYMENT] Payment processing error:`, error);
+    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [PAYMENT] Payment processing error:`, error);
     res.status(500).json({ 
       success: false, 
       message: 'Payment processing failed',
@@ -2975,7 +2960,7 @@ app.get('/api/check-username-availability/:username', async (req, res) => {
       throw error;
     }
   } catch (error) {
-    console.error(`Error checking username availability:`, error);
+    if (DEBUG_LOGS) console.error(`Error checking username availability:`, error);
     res.status(500).json({ 
       error: 'Failed to check username availability', 
       details: error.message 
@@ -3011,7 +2996,7 @@ app.get('/api/user-instagram-status/:userId', async (req, res) => {
       throw error;
     }
   } catch (error) {
-    console.error(`Error retrieving user Instagram status for ${userId}:`, error);
+    if (DEBUG_LOGS) console.error(`Error retrieving user Instagram status for ${userId}:`, error);
     res.status(500).json({ error: 'Failed to retrieve user Instagram status' });
   }
 });
@@ -3044,7 +3029,7 @@ app.post('/api/user-instagram-status/:userId', async (req, res) => {
     
     res.json({ success: true, message: 'User Instagram status updated successfully' });
   } catch (error) {
-    console.error(`Error updating user Instagram status for ${userId}:`, error);
+    if (DEBUG_LOGS) console.error(`Error updating user Instagram status for ${userId}:`, error);
     res.status(500).json({ error: 'Failed to update user Instagram status' });
   }
 });
@@ -3077,7 +3062,7 @@ app.get('/api/user-facebook-status/:userId', async (req, res) => {
       throw error;
     }
   } catch (error) {
-    console.error(`Error retrieving user Facebook status for ${userId}:`, error);
+    if (DEBUG_LOGS) console.error(`Error retrieving user Facebook status for ${userId}:`, error);
     res.status(500).json({ error: 'Failed to retrieve user Facebook status' });
   }
 });
@@ -3110,7 +3095,7 @@ app.post('/api/user-facebook-status/:userId', async (req, res) => {
     
     res.json({ success: true, message: 'User Facebook status updated successfully' });
   } catch (error) {
-    console.error(`Error updating user Facebook status for ${userId}:`, error);
+    if (DEBUG_LOGS) console.error(`Error updating user Facebook status for ${userId}:`, error);
     res.status(500).json({ error: 'Failed to update user Facebook status' });
   }
 });
@@ -3126,14 +3111,14 @@ const startServer = async () => {
     const portInUse = await checkPortInUse(port);
     
     if (portInUse) {
-      console.warn(`⚠️  Port ${port} is already in use. Attempting graceful recovery...`);
+      if (DEBUG_LOGS) console.warn(`⚠️  Port ${port} is already in use. Attempting graceful recovery...`);
       
       // Try to kill any existing process on this port
       try {
         await new Promise((resolve, reject) => {
           exec(`lsof -ti:${port} | xargs kill -9`, (error, stdout, stderr) => {
             if (error) {
-              console.log('No processes found on port or already cleaned up');
+              if (DEBUG_LOGS) console.log('No processes found on port or already cleaned up');
             }
             resolve();
           });
@@ -3148,19 +3133,19 @@ const startServer = async () => {
           throw new Error(`Port ${port} is still in use after cleanup attempt`);
         }
         
-        console.log(`✅ Port ${port} cleaned up successfully`);
+        if (DEBUG_LOGS) console.log(`✅ Port ${port} cleaned up successfully`);
       } catch (cleanupError) {
-        console.error(`Failed to clean up port ${port}:`, cleanupError.message);
+        if (DEBUG_LOGS) console.error(`Failed to clean up port ${port}:`, cleanupError.message);
         process.exit(1);
       }
     }
     
     // Start the server
     server = app.listen(port, '0.0.0.0', () => {
-      console.log(`🚀 Server running at http://localhost:${port}`);
-      console.log('✅ Ready to receive hierarchical data at POST /scrape');
-      console.log(`📊 Process ID: ${process.pid}`);
-      console.log(`🕒 Started at: ${new Date().toISOString()}`);
+      if (DEBUG_LOGS) console.log(`🚀 Server running at http://localhost:${port}`);
+      if (DEBUG_LOGS) console.log('✅ Ready to receive hierarchical data at POST /scrape');
+      if (DEBUG_LOGS) console.log(`📊 Process ID: ${process.pid}`);
+      if (DEBUG_LOGS) console.log(`🕒 Started at: ${new Date().toISOString()}`);
       
       // Set server timeout for better connection handling
       server.timeout = 300000; // 5 minutes
@@ -3171,21 +3156,21 @@ const startServer = async () => {
     // Enhanced error handling for the server
     server.on('error', (err) => {
       if (err.code === 'EADDRINUSE') {
-        console.error(`❌ Port ${port} is already in use`);
-        console.error('Please close other instances or use a different port');
+        if (DEBUG_LOGS) console.error(`❌ Port ${port} is already in use`);
+        if (DEBUG_LOGS) console.error('Please close other instances or use a different port');
         process.exit(1);
       } else {
-        console.error('❌ Server error:', err);
+        if (DEBUG_LOGS) console.error('❌ Server error:', err);
         gracefulShutdown('SERVER_ERROR');
       }
     });
     
     server.on('close', () => {
-      console.log('🔒 Server closed');
+      if (DEBUG_LOGS) console.log('🔒 Server closed');
     });
     
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
+    if (DEBUG_LOGS) console.error('❌ Failed to start server:', error);
     process.exit(1);
   }
 };
@@ -3205,13 +3190,13 @@ app.get('/test-direct-image/:username/:filename', (req, res) => {
       return res.status(404).send('File not found');
     }
     
-    console.log(`[TEST-DIRECT] Serving file: ${localPath}`);
+    if (DEBUG_LOGS) console.log(`[TEST-DIRECT] Serving file: ${localPath}`);
     
     // Read file as binary and send directly
     const imageData = fs.readFileSync(localPath);
     
-    console.log(`[TEST-DIRECT] File size: ${imageData.length} bytes`);
-    console.log(`[TEST-DIRECT] First 12 bytes:`, Array.from(imageData.slice(0, 12)).map(b => b.toString(16).padStart(2, '0')).join(' '));
+    if (DEBUG_LOGS) console.log(`[TEST-DIRECT] File size: ${imageData.length} bytes`);
+    if (DEBUG_LOGS) console.log(`[TEST-DIRECT] First 12 bytes:`, Array.from(imageData.slice(0, 12)).map(b => b.toString(16).padStart(2, '0')).join(' '));
     
     res.setHeader('Content-Type', 'image/jpeg');
     res.setHeader('Content-Length', imageData.length);
@@ -3221,7 +3206,7 @@ app.get('/test-direct-image/:username/:filename', (req, res) => {
     res.send(imageData);
     
   } catch (error) {
-    console.error(`[TEST-DIRECT] Error:`, error);
+    if (DEBUG_LOGS) console.error(`[TEST-DIRECT] Error:`, error);
     res.status(500).send('Error reading file');
   }
 });

@@ -54,9 +54,27 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
   
   // Use platform-specific context
   const platformUserId = platform === 'facebook' ? facebookId : igUserId;
-  const platformConnected = platform === 'facebook' ? isFacebookConnected : isInstagramConnected;
+  
+  // Enhanced connection detection: consider both context and prop-based connection
+  // For Facebook, if we have a userId prop, consider it connected even if context says otherwise
+  const platformConnected = platform === 'facebook' 
+    ? (isFacebookConnected || !!userId) // Facebook: connected if context says so OR if userId prop is provided
+    : isInstagramConnected; // Instagram: use context only
+  
   const userIdFromContext = platformConnected ? platformUserId : null;
   const userIdToUse = userId || userIdFromContext;
+  
+  // Debug logging for connection detection
+  if (platform === 'facebook') {
+    console.log(`[${new Date().toISOString()}] Facebook connection detection:`, {
+      isFacebookConnected,
+      hasUserIdProp: !!userId,
+      userIdProp: userId,
+      platformConnected,
+      platformUserId,
+      userIdToUse
+    });
+  }
 
   const [insights, setInsights] = useState<InsightData | null>(null);
   const [profitAnalysis, setProfitAnalysis] = useState<ProfitAnalysisData | null>(null);

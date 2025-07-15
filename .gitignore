@@ -141,6 +141,7 @@ server-monitor.js
 rag-server.js
 chromadb-service.js
 create-fallback.js
+ecosystem.*.js
 
 # Ecosystem configs (keep only the main one)
 ecosystem.config.cjs

@@ -32,26 +32,28 @@ import { ProcessingProvider } from './context/ProcessingContext';
 import Processing from './pages/Processing';
 import GlobalProcessingGuard from './components/guards/GlobalProcessingGuard';
 import RagService from './services/RagService';
-
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 // Main App component with AuthProvider
 const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <ProcessingProvider>
-        <UsageProvider>
-          <UpgradePopupProvider>
-            <InstagramProvider>
-              <TwitterProvider>
-                <FacebookProvider>
-                  <AppContent />
-                </FacebookProvider>
-              </TwitterProvider>
-            </InstagramProvider>
-          </UpgradePopupProvider>
-        </UsageProvider>
-      </ProcessingProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <ProcessingProvider>
+          <UsageProvider>
+            <UpgradePopupProvider>
+              <InstagramProvider>
+                <TwitterProvider>
+                  <FacebookProvider>
+                    <AppContent />
+                  </FacebookProvider>
+                </TwitterProvider>
+              </InstagramProvider>
+            </UpgradePopupProvider>
+          </UsageProvider>
+        </ProcessingProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 };
 

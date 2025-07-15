@@ -141,9 +141,20 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
             
             await new Promise(resolve => setTimeout(resolve, delay));
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error(`Error auto-replying to notification ${notificationId}:`, error);
-          // Continue with next notification even if one fails
+          
+          // Handle specific Instagram API errors
+          if (error.response?.data?.code === 'TIME_RESTRICTION') {
+            console.log(`Instagram time restriction for notification ${notificationId} - will retry later`);
+            // Continue with next notification - time restrictions are temporary
+          } else if (error.response?.data?.code === 'USER_NOT_FOUND') {
+            console.log(`User not found for notification ${notificationId} - skipping`);
+            // Continue with next notification - user not found is permanent
+          } else {
+            console.error(`Unknown error for notification ${notificationId}:`, error);
+            // Continue with next notification even if one fails
+          }
         }
       }
 

@@ -31,6 +31,20 @@ body {
   min-width: 320px;
   min-height: 100vh;
   background: transparent; /* No background override */
+  /* Prevent layout shifts during loading */
+  overflow-x: hidden;
+  /* Ensure proper font loading */
+  font-display: swap;
+}
+
+/* Prevent layout shifts during CSS loading */
+#root {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  /* Prevent layout shifts */
+  contain: layout style paint;
 }
 
 h1 {
@@ -55,6 +69,21 @@ button:hover {
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
+}
+
+/* Prevent FOUC (Flash of Unstyled Content) */
+* {
+  box-sizing: border-box;
+}
+
+/* Ensure proper loading states */
+.loading {
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+}
+
+.loaded {
+  opacity: 1;
 }
 
 @media (prefers-color-scheme: light) {

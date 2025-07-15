@@ -815,7 +815,23 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         
       } catch (ragError: any) {
         console.error(`[${new Date().toISOString()}] RAG service error for ${platform}:`, ragError);
-        setToast('Failed to generate AI reply via RAG service');
+        
+        // Check if RAG service is completely down - IMPROVED DETECTION
+        const isRagServerDown = 
+          ragError.message?.includes('Network Error') || 
+          ragError.message?.includes('ECONNREFUSED') ||
+          ragError.message?.includes('Failed to connect') ||
+          ragError.message?.includes('ERR_NETWORK') ||
+          ragError.message?.includes('ERR_NAME_NOT_RESOLVED') ||
+          ragError.response?.status === 503 ||
+          ragError.response?.status === 502 ||
+          ragError.response?.status === 504;
+          
+        if (isRagServerDown) {
+          setToast(`RAG server unavailable, using standard AI Manager...`);
+        } else {
+          setToast('Failed to generate AI reply via RAG service');
+        }
       }
       
     } catch (error: any) {
@@ -1026,7 +1042,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       
       try {
         // Generate AI reply using the enhanced RAG server
-        const response = await axios.post('http://localhost:3001/api/instant-reply', {
+        const response = await axios.post(getApiUrl('/api/instant-reply'), {
           username: accountHolder,
           notification: {
             type: notification.type,

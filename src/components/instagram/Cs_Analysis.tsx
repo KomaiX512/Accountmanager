@@ -8,8 +8,9 @@ import { decodeJSONToReactElements, formatCount } from '../../utils/jsonDecoder'
 import axios from 'axios';
 
 interface ProfileInfo {
-  followersCount: number;
-  followsCount: number;
+  followersCount?: number;
+  followsCount?: number;
+  [key: string]: any; // Allow for additional fields from account info
 }
 
 interface AccountInfo {

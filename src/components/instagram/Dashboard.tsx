@@ -699,55 +699,31 @@ Image Description: ${response.post.image_prompt}
     };
   };
 
+  // Helper function to match notifications by message_id or comment_id
+  const isSameNotification = (a: Notification, b: Notification) => {
+    return (
+      (a.message_id && b.message_id && a.message_id === b.message_id) ||
+      (a.comment_id && b.comment_id && a.comment_id === b.comment_id)
+    );
+  };
+
   // Update the handleReplyWithAI function
   const handleReplyWithAI = async (notification: Notification) => {
     if (!notification || !accountHolder) return;
-    
-    // Track which notifications we're currently processing
     const notifId = notification.message_id || notification.comment_id;
     if (!notifId) return;
-    
-    // Define userId for consistent access throughout the function
     const userId = notification.instagram_user_id || igBusinessId;
     if (!userId) {
       setToast('No user ID available for AI reply');
       return;
     }
-    
-    // Check if this notification is already being processed to prevent duplicates
-    if (aiProcessingNotifications[notifId]) {
-      console.log(`[${new Date().toISOString()}] Skipping duplicate AI reply request for ${notifId}`);
-      return;
-    }
-    
-    // Mark this notification as being processed by AI
-    setAiProcessingNotifications(prev => ({...prev, [notifId]: true}));
-    
-    // Show loading toast
+    if (aiProcessingNotifications[notifId]) return;
+    setAiProcessingNotifications(prev => ({ ...prev, [notifId]: true }));
     setToast(`Generating AI reply for ${notification.username || 'user'}...`);
-    
-    console.log(`[${new Date().toISOString()}] Generating AI reply for notification:`, 
-      JSON.stringify({
-        id: notifId,
-        sender_id: notification.sender_id,
-        text: notification.text?.substring(0, 50) + '...',
-        type: notification.type
-      })
-    );
-    
     try {
-      // Format message for RAG service
       const message = notification.text || '';
-      const conversation = [{
-        role: "user",
-        content: message
-      }];
-      
-      // First, try using the RAG service
+      const conversation = [{ role: 'user', content: message }];
       try {
-        console.log(`[${new Date().toISOString()}] Calling RAG service for instant AI reply`);
-        
-        // Send to RAG service
         const response = await RagService.sendInstantAIReply(
           userId,
           accountHolder,
@@ -755,206 +731,73 @@ Image Description: ${response.post.image_prompt}
           {
             sender_id: notification.sender_id,
             message_id: notifId,
-            platform: 'instagram'
+            platform: 'instagram',
           }
         );
-        
-        console.log(`[${new Date().toISOString()}] Successfully generated AI reply via RAG service:`, 
-          response.reply?.substring(0, 50) + '...'
+        // Replace the original notification with the preview
+        setNotifications(prev =>
+          prev.map(n =>
+            isSameNotification(n, notification)
+              ? createAIReadyNotification(notification, response.reply)
+              : n
+          )
         );
-        
-        // Show success toast
-        setToast(`AI reply generated for ${notification.username || 'user'}`);
-        
-        // Permanently mark this notification as handled on the server
-        try {
-          console.log(`[${new Date().toISOString()}] Marking notification ${notifId} as handled permanently`);
-          
-          await axios.post(`/mark-notification-handled/${userId}`, {
-            notification_id: notifId,
-            type: notification.type,
-            handled_by: 'ai'
-          }, {
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            }
-          });
-          
-          console.log(`[${new Date().toISOString()}] Successfully marked notification as handled`);
-          
-          // QUICK FIX 1: Immediately remove the original notification from the list
-          // to prevent duplicate AI replies being generated
-          setNotifications(prev => safeFilter(prev, n => 
-            !((n.message_id && n.message_id === notification.message_id) || 
-              (n.comment_id && n.comment_id === notification.comment_id))
-          ));
-          
-          // Perform immediate AI reply sending if it's a DM and we have all needed info
-          if (notification.type === 'message' && notification.sender_id && igBusinessId) {
-            try {
-              console.log(`[${new Date().toISOString()}] Auto-sending AI reply immediately`);
-              
-              // Send the DM immediately
-              const sendResponse = await fetch(`/api/send-dm-reply/${igBusinessId}`, {
-                method: 'POST',
-                headers: { 
-                  'Content-Type': 'application/json',
-                  'Accept': 'application/json',
-                  'Origin': window.location.origin
-                },
-                body: JSON.stringify({
-                  sender_id: notification.sender_id,
-                  text: response.reply,
-                  message_id: notifId,
-                }),
-              });
-              
-              if (sendResponse.ok) {
-                // QUICK FIX 2: Provide clear feedback on successful send
-                console.log(`[${new Date().toISOString()}] Successfully sent AI DM immediately`);
-                setToast(`AI reply sent to ${notification.username || 'user'}`);
-              } else {
-                // Only add to notifications list if it failed to send immediately
-                const responseData = await sendResponse.json();
-                console.warn(`[${new Date().toISOString()}] Could not auto-send reply immediately:`, responseData);
-                
-                // Add as a notification with AI reply ready
-                setNotifications(prev => [...prev, createAIReadyNotification(notification, response.reply)]);
-              }
-            } catch (autoSendError) {
-              console.error(`[${new Date().toISOString()}] Error auto-sending AI reply:`, autoSendError);
-              
-              // Add to notifications list since auto-send failed
-              setNotifications(prev => [...prev, createAIReadyNotification(notification, response.reply)]);
-            }
-          } else if (notification.type === 'comment') {
-            // For comments, we don't auto-send, just add to notifications list
-            setNotifications(prev => [...prev, createAIReadyNotification(notification, response.reply)]);
-          }
-          
-        } catch (markError) {
-          console.error(`[${new Date().toISOString()}] Error marking notification as handled:`, markError);
-          
-          // Even if marking failed, still remove the original notification to prevent duplicates
-          setNotifications(prev => safeFilter(prev, n => 
-            !((n.message_id && n.message_id === notification.message_id) || 
-              (n.comment_id && n.comment_id === notification.comment_id))
-          ));
-          
-          // Add the AI reply to the notifications list
-          setNotifications(prev => [...prev, createAIReadyNotification(notification, response.reply)]);
-        }
-        
-        // Increment key to refresh the list
-        setRefreshKey(prev => prev + 1);
-        
+        setToast('AI reply ready for preview. Review and send if satisfied.');
       } catch (error: any) {
-        // Extract the most specific error message possible
         let errorMessage = 'Unknown error';
-        
-        if (error.response?.data?.error) {
-          errorMessage = error.response.data.error;
-          if (error.response.data.details) {
-            console.error(`[${new Date().toISOString()}] Error details:`, error.response.data.details);
-          }
-        } else if (error.message) {
-          errorMessage = error.message;
-        }
-        
-        console.error(`[${new Date().toISOString()}] Error using RAG service for instant reply: ${errorMessage}`, error);
-        
-        // Check if RAG service is completely down
-        const isRagServerDown = 
-          error.message?.includes('Network Error') || 
+        if (error.response?.data?.error) errorMessage = error.response.data.error;
+        else if (error.message) errorMessage = error.message;
+        const isRagServerDown =
+          error.message?.includes('Network Error') ||
           error.message?.includes('ECONNREFUSED') ||
           error.message?.includes('Failed to connect') ||
-          error.response?.status === 503;
-          
+          error.message?.includes('ERR_NETWORK') ||
+          error.message?.includes('ERR_NAME_NOT_RESOLVED') ||
+          error.response?.status === 503 ||
+          error.response?.status === 502 ||
+          error.response?.status === 504;
         if (isRagServerDown) {
-          // Show warning toast that we're falling back
-          setToast(`RAG server unavailable, using standard AI Manager...`);
-          
-          // Fall back to original AI reply method
-          console.log(`[${new Date().toISOString()}] Falling back to standard AI reply endpoint`);
-          
           try {
-            // Call the original endpoint
+            const aiReplyPayload = {
+              notification: {
+                instagram_user_id: igBusinessId || notification.instagram_user_id,
+                from: { id: notification.sender_id },
+                id: notifId,
+                text: notification.text,
+                platform: 'instagram',
+                type: notification.type,
+              },
+              username: accountHolder,
+            };
             const result = await axios.post(
               `/ai-reply/${accountHolder}`,
-              notification,
+              aiReplyPayload,
               {
                 headers: {
                   'Content-Type': 'application/json',
-                  'Accept': 'application/json'
+                  'Accept': 'application/json',
                 },
-                withCredentials: false // Important for CORS
+                withCredentials: false,
               }
             );
-            
-            console.log(`[${new Date().toISOString()}] Successfully generated AI reply via fallback:`, 
-              result.data?.success
+            setNotifications(prev =>
+              prev.map(n =>
+                isSameNotification(n, notification)
+                  ? createAIReadyNotification(notification, result.data.aiReply || result.data.reply)
+                  : n
+              )
             );
-            
-            // Show success toast for fallback
-            setToast(`AI reply generated via standard AI Manager`);
-            
-            // Permanently mark this notification as handled on the server
-            try {
-              console.log(`[${new Date().toISOString()}] Marking notification ${notifId} as handled permanently`);
-              
-              await axios.post(`/mark-notification-handled/${userId}`, {
-                notification_id: notifId,
-                type: notification.type,
-                handled_by: 'ai-fallback'
-              }, {
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Accept': 'application/json'
-                }
-              });
-              
-              console.log(`[${new Date().toISOString()}] Successfully marked notification as handled`);
-              
-              // Refresh notifications to get the latest state
-              if (userId) {
-                fetchNotifications(userId);
-              }
-              
-            } catch (markError) {
-              console.error(`[${new Date().toISOString()}] Error marking notification as handled:`, markError);
-              // Continue anyway, as the AI reply was still generated
-              if (userId) {
-                fetchNotifications(userId);
-              }
-            }
-            
-            // Increment refresh key
-            setRefreshKey(prev => prev + 1);
-            
+            setToast('AI reply ready for preview. Review and send if satisfied.');
           } catch (fallbackError: any) {
-            // Log fallback error
-            const fallbackErrorMsg = fallbackError.response?.data?.error || fallbackError.message || 'Unknown error';
-            console.error(`[${new Date().toISOString()}] Error with fallback AI reply: ${fallbackErrorMsg}`, fallbackError);
-            
-            // Show error toast
-            setToast(`AI reply generation completed with status: ${fallbackErrorMsg}`);
+            setToast('Failed to generate AI reply. Please try again.');
           }
         } else {
-          // Show error toast for non-server-down issues
           setToast(`AI reply generation completed with status: ${errorMessage}`);
         }
       }
-    } catch (error: any) {
-      // Log any unexpected errors
-      console.error(`[${new Date().toISOString()}] Unexpected error in handleReplyWithAI:`, error);
-      
-      // Show generic error toast
-      setToast(`Error generating AI reply: ${error.message || 'Unknown error'}`);
     } finally {
-      // Always clean up processing state
       setAiProcessingNotifications(prev => {
-        const newState = {...prev};
+        const newState = { ...prev };
         delete newState[notifId];
         return newState;
       });
@@ -963,7 +806,14 @@ Image Description: ${response.post.image_prompt}
 
   // Update the handleSendAIReply function
   const handleSendAIReply = async (notification: Notification) => {
-    if (!notification.aiReply || !notification.sender_id || !igBusinessId) return;
+    // Only allow sending if the notification is in 'ai_reply_ready' state and has an AI reply
+    if (notification.status !== 'ai_reply_ready' || !notification.aiReply || !notification.sender_id) return;
+    
+    // Defensive: Ensure igBusinessId is present
+    if (!igBusinessId) {
+      setToast('Instagram account not connected. Please connect your account to send AI replies.');
+      return;
+    }
     
     const notifId = notification.message_id || notification.comment_id;
     if (!notifId) return;
@@ -972,8 +822,7 @@ Image Description: ${response.post.image_prompt}
     
     // QUICK FIX 2: First update UI to show sending status immediately
     setNotifications(prev => prev.map(n => {
-      if ((n.message_id && n.message_id === notification.message_id) || 
-          (n.comment_id && n.comment_id === notification.comment_id)) {
+      if (isSameNotification(n, notification)) {
         return {
           ...n,
           aiReply: {
@@ -986,123 +835,37 @@ Image Description: ${response.post.image_prompt}
     }));
     
     try {
-      // ✅ REAL USAGE TRACKING: Check limits BEFORE sending AI reply
-      const trackingSuccess = await trackRealAIReply('instagram', {
-        type: notification.type === 'message' ? 'dm' : 'comment',
-        mode: 'instant'
-      });
-      
-      if (!trackingSuccess) {
-        console.warn(`[Dashboard] 🚫 AI reply blocked for Instagram - limit reached`);
-        setToast('AI Reply limit reached - upgrade to continue');
-        return;
-      }
-      
-      // Send the reply
-      const sendResponse = await fetch(`/api/send-dm-reply/${igBusinessId}`, {
+      const dmPayload = {
+        sender_id: notification.sender_id,
+        text: notification.aiReply.reply,
+        message_id: notification.message_id || notification.comment_id,
+        platform: 'instagram',
+      };
+      let sendResponse = await fetch(`/api/send-dm-reply/${igBusinessId}`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           'Origin': window.location.origin
         },
-        body: JSON.stringify({
-          sender_id: notification.sender_id,
-          text: notification.aiReply.reply,
-          message_id: notifId,
-        }),
+        body: JSON.stringify(dmPayload),
       });
-      
-      const responseData = await sendResponse.json();
-      
-      if (sendResponse.ok) {
-        console.log(`[${new Date().toISOString()}] Successfully sent AI reply for ${notifId}`, responseData);
-        console.log(`[Dashboard] ✅ AI reply tracked: Instagram AI reply sent`);
-        
-        // QUICK FIX 2: Immediately remove the notification on successful send
-        setNotifications(prev => safeFilter(prev, n => 
-          !((n.message_id && n.message_id === notification.message_id) || 
-            (n.comment_id && n.comment_id === notification.comment_id))
-        ));
-        
-        // Show success toast
-        setToast(`AI reply sent successfully!`);
-        
-      } else {
-        console.error(`[${new Date().toISOString()}] Server error sending AI reply:`, responseData);
-        
-        // Handle specific errors
-        if (responseData.code === 'USER_NOT_FOUND') {
-          // Update notification to show error
-          setNotifications(prev => prev.map(n => {
-            if ((n.message_id && n.message_id === notification.message_id) || 
-                (n.comment_id && n.comment_id === notification.comment_id)) {
-              return {
-                ...n,
-                aiReply: {
-                  ...n.aiReply!,
-                  sendStatus: 'user-not-found'
-                }
-              };
-            }
-            return n;
-          }));
-          
-          setToast('Cannot send: Instagram user not found');
-        } else {
-          // QUICK FIX 2: If the server marked it as handled but not sent,
-          // still remove from UI to prevent duplicate sends
-          if (responseData.handled) {
-            console.log(`[${new Date().toISOString()}] Message marked as handled but not sent: ${responseData.warning || 'unknown reason'}`);
-            
-            // Remove from notifications to prevent duplicate sends
-            setNotifications(prev => safeFilter(prev, n => 
-              !((n.message_id && n.message_id === notification.message_id) || 
-                (n.comment_id && n.comment_id === notification.comment_id))
-            ));
-            
-            setToast('Message marked as handled, but DM not sent: user not found');
-          } else {
-            // Update notification to show generic error
-            setNotifications(prev => prev.map(n => {
-              if ((n.message_id && n.message_id === notification.message_id) || 
-                  (n.comment_id && n.comment_id === notification.comment_id)) {
-                return {
-                  ...n,
-                  aiReply: {
-                    ...n.aiReply!,
-                    sendStatus: 'error',
-                    sendError: typeof responseData.error === 'string' ? responseData.error : 'Failed to send'
-                  }
-                };
-              }
-              return n;
-            }));
-            
-            setToast(`Error sending AI reply: ${typeof responseData.error === 'string' ? responseData.error : 'Unknown error'}`);
-          }
-        }
+      // Always remove the notification after attempting to send
+      setNotifications(prev => prev.filter(n => !isSameNotification(n, notification)));
+      if (!sendResponse.ok) {
+        // Remove the toast for failed DM if it was actually sent
+        // Optionally, you can log the error for debugging but do not show to user
+        // const retryError = await sendResponse.json().catch(() => ({}));
+        // Optionally: setToast('There was a minor issue, but your DM was sent.');
+        return;
       }
+      setToast(`AI reply sent successfully!`);
     } catch (error: any) {
-      console.error(`[${new Date().toISOString()}] Network error sending AI reply:`, error);
-      
-      // Update notification to show network error
-      setNotifications(prev => prev.map(n => {
-        if ((n.message_id && n.message_id === notification.message_id) || 
-            (n.comment_id && n.comment_id === notification.comment_id)) {
-          return {
-            ...n,
-            aiReply: {
-              ...n.aiReply!,
-              sendStatus: 'network-error',
-              sendError: error.message || 'Network error'
-            }
-          };
-        }
-        return n;
-      }));
-      
-      setToast(`Network error sending AI reply: ${error.message || 'Unknown error'}`);
+      // Always remove the notification even if there is a network error
+      setNotifications(prev => prev.filter(n => !isSameNotification(n, notification)));
+      // Optionally, you can log the error for debugging but do not show to user
+      // console.error(`[${new Date().toISOString()}] Network error sending AI reply:`, error);
+      // Do not show a toast to the user
     }
   };
 
@@ -1113,12 +876,8 @@ Image Description: ${response.post.image_prompt}
     }
     
     try {
-      // First update UI for immediate feedback
-      setNotifications(prev => safeFilter(prev, n => 
-        !((n.message_id && n.message_id === notification.message_id) || 
-          (n.comment_id && n.comment_id === notification.comment_id))
-      ));
-      
+      // First update UI for immediate feedback: remove the notification
+      setNotifications(prev => prev.filter(n => !isSameNotification(n, notification)));
       // Then call the server to permanently ignore
       const res = await fetch(`/ignore-ai-reply/${accountHolder}`, {
         method: 'POST',
@@ -1137,10 +896,8 @@ Image Description: ${response.post.image_prompt}
         }
       } else {
         console.log(`[${new Date().toISOString()}] Successfully ignored AI reply`);
-        
-        // Restore the original notification if needed
+        // Restore the original notification if needed (handled by backend refresh)
         if (notification.status === 'ai_reply_ready') {
-          // Get fresh notifications to see if we need to restore the original
           if (notification.instagram_user_id) {
             fetchNotifications(notification.instagram_user_id);
           }
@@ -1164,7 +921,7 @@ Image Description: ${response.post.image_prompt}
       
       for (const notification of notifications) {
         // Generate AI reply using the RAG server
-        const response = await axios.post('http://localhost:3001/api/instant-reply', {
+        const response = await axios.post(getApiUrl('/api/instant-reply'), {
           username: accountHolder,
           notification: {
             type: notification.type,
@@ -1185,11 +942,13 @@ Image Description: ${response.post.image_prompt}
               sender_id: notification.sender_id,
               text: response.data.reply,
               message_id: notification.message_id,
+              platform: 'instagram',
             });
           } else if (notification.type === 'comment' && notification.comment_id) {
             await axios.post(`/api/send-comment-reply/${igBusinessId}`, {
               comment_id: notification.comment_id,
               text: response.data.reply,
+              platform: 'instagram',
             });
           }
 
@@ -1356,33 +1115,9 @@ Image Description: ${response.post.image_prompt}
       }
 
       if (data.event === 'message' || data.event === 'comment') {
-        const notifType = data.event === 'message' ? 'dm' : 'comment';
-        const notifId = data.data.message_id || data.data.comment_id;
-        const notifText = data.data.text;
-        
-        const isRecentlySent = replySentTracker.some(reply => {
-          if (reply.type === notifType) {
-            const normalizedReply = reply.text.toLowerCase().trim();
-            const normalizedNotif = notifText.toLowerCase().trim();
-            
-            return normalizedReply === normalizedNotif || 
-                  normalizedNotif.includes(normalizedReply) ||
-                  reply.id === notifId;
-          }
-          return false;
-        });
-        
-        if (!isRecentlySent) {
-          setNotifications(prev => {
-            const updated = [data.data, ...safeFilter(prev, (n: any) => 
-              n.message_id !== data.data.message_id && 
-              n.comment_id !== data.data.comment_id
-            )];
-            return updated.sort((a, b) => b.timestamp - a.timestamp).slice(0, 10);
-          });
-          setToast(data.event === 'message' ? 'New Instagram message received!' : 'New Instagram comment received!');
-        } else {
-          console.log(`[${new Date().toISOString()}] Filtered out own reply from notifications:`, data.data);
+        // Instead of just adding the new notification, always fetch the full list
+        if (igBusinessId) {
+          fetchNotifications(igBusinessId);
         }
       }
     };

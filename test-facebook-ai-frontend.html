@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facebook AI Auto-Reply Frontend Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border-color: #bee5eb;
+            color: #0c5460;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .status {
+            font-weight: bold;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Facebook AI Auto-Reply Frontend Test</h1>
+        <p>This page tests the Facebook AI auto-reply functionality from the frontend perspective.</p>
+        
+        <div class="test-section info">
+            <h3>📋 Test Information</h3>
+            <p><strong>Current URL:</strong> <span id="currentUrl"></span></p>
+            <p><strong>Origin:</strong> <span id="currentOrigin"></span></p>
+            <p><strong>User Agent:</strong> <span id="userAgent"></span></p>
+        </div>
+        
+        <div class="test-section">
+            <h3>🧪 Test 1: Direct API Call</h3>
+            <p>Test the /api/instant-reply endpoint directly from the browser.</p>
+            <button onclick="testDirectAPI()">Test Direct API Call</button>
+            <div id="directApiResult" class="log"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>🧪 Test 2: Relative URL Test</h3>
+            <p>Test using relative URLs to ensure proper base URL resolution.</p>
+            <button onclick="testRelativeURL()">Test Relative URL</button>
+            <div id="relativeUrlResult" class="log"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>🧪 Test 3: Absolute URL Test</h3>
+            <p>Test using absolute URLs with different base URLs.</p>
+            <button onclick="testAbsoluteURL()">Test Absolute URL</button>
+            <div id="absoluteUrlResult" class="log"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>🧪 Test 4: Error Handling Test</h3>
+            <p>Test error handling with invalid requests.</p>
+            <button onclick="testErrorHandling()">Test Error Handling</button>
+            <div id="errorHandlingResult" class="log"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>📊 Test Summary</h3>
+            <div id="testSummary"></div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('currentUrl').textContent = window.location.href;
+            document.getElementById('currentOrigin').textContent = window.location.origin;
+            document.getElementById('userAgent').textContent = navigator.userAgent;
+        });
+
+        // Test configuration
+        const TEST_DATA = {
+            username: 'testuser',
+            notification: {
+                type: 'message',
+                platform: 'facebook',
+                sender_id: '123456789',
+                message_id: `test_frontend_${Date.now()}`,
+                text: 'Hello! Can you help me with my question?',
+                timestamp: Date.now(),
+                received_at: new Date().toISOString(),
+                status: 'pending'
+            }
+        };
+
+        let testResults = {
+            directApi: false,
+            relativeUrl: false,
+            absoluteUrl: false,
+            errorHandling: false
+        };
+
+        function log(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}\n`;
+            element.textContent += logEntry;
+            element.scrollTop = element.scrollHeight;
+        }
+
+        function updateSummary() {
+            const summary = document.getElementById('testSummary');
+            const passed = Object.values(testResults).filter(Boolean).length;
+            const total = Object.keys(testResults).length;
+            
+            summary.innerHTML = `
+                <div class="status">
+                    ✅ Passed: ${passed}/${total} tests
+                </div>
+                <ul>
+                    <li>Direct API: ${testResults.directApi ? '✅ PASS' : '❌ FAIL'}</li>
+                    <li>Relative URL: ${testResults.relativeUrl ? '✅ PASS' : '❌ FAIL'}</li>
+                    <li>Absolute URL: ${testResults.absoluteUrl ? '✅ PASS' : '❌ FAIL'}</li>
+                    <li>Error Handling: ${testResults.errorHandling ? '✅ PASS' : '❌ FAIL'}</li>
+                </ul>
+            `;
+        }
+
+        async function testDirectAPI() {
+            const resultDiv = document.getElementById('directApiResult');
+            resultDiv.textContent = '';
+            
+            log('directApiResult', '🧪 Starting Direct API Test...');
+            
+            try {
+                log('directApiResult', '📤 Making request to /api/instant-reply...');
+                
+                const response = await fetch('/api/instant-reply', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(TEST_DATA)
+                });
+                
+                log('directApiResult', `📄 Response status: ${response.status}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log('directApiResult', `✅ SUCCESS! Response: ${JSON.stringify(data, null, 2)}`);
+                    testResults.directApi = true;
+                } else {
+                    const errorText = await response.text();
+                    log('directApiResult', `❌ ERROR: ${response.status} - ${errorText}`);
+                    testResults.directApi = false;
+                }
+                
+            } catch (error) {
+                log('directApiResult', `❌ NETWORK ERROR: ${error.message}`);
+                testResults.directApi = false;
+            }
+            
+            updateSummary();
+        }
+
+        async function testRelativeURL() {
+            const resultDiv = document.getElementById('relativeUrlResult');
+            resultDiv.textContent = '';
+            
+            log('relativeUrlResult', '🧪 Starting Relative URL Test...');
+            
+            try {
+                log('relativeUrlResult', '📤 Making request with relative URL...');
+                
+                const response = await fetch('/api/instant-reply', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(TEST_DATA)
+                });
+                
+                log('relativeUrlResult', `📄 Response status: ${response.status}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log('relativeUrlResult', `✅ SUCCESS! Response: ${JSON.stringify(data, null, 2)}`);
+                    testResults.relativeUrl = true;
+                } else {
+                    const errorText = await response.text();
+                    log('relativeUrlResult', `❌ ERROR: ${response.status} - ${errorText}`);
+                    testResults.relativeUrl = false;
+                }
+                
+            } catch (error) {
+                log('relativeUrlResult', `❌ NETWORK ERROR: ${error.message}`);
+                testResults.relativeUrl = false;
+            }
+            
+            updateSummary();
+        }
+
+        async function testAbsoluteURL() {
+            const resultDiv = document.getElementById('absoluteUrlResult');
+            resultDiv.textContent = '';
+            
+            log('absoluteUrlResult', '🧪 Starting Absolute URL Test...');
+            
+            const baseUrls = [
+                window.location.origin,
+                'https://www.sentientm.com',
+                'http://localhost:5173'
+            ];
+            
+            for (const baseUrl of baseUrls) {
+                try {
+                    log('absoluteUrlResult', `📤 Testing base URL: ${baseUrl}`);
+                    
+                    const response = await fetch(`${baseUrl}/api/instant-reply`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify(TEST_DATA)
+                    });
+                    
+                    log('absoluteUrlResult', `📄 Response status: ${response.status}`);
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        log('absoluteUrlResult', `✅ SUCCESS with ${baseUrl}!`);
+                        testResults.absoluteUrl = true;
+                        break;
+                    } else {
+                        const errorText = await response.text();
+                        log('absoluteUrlResult', `❌ ERROR with ${baseUrl}: ${response.status} - ${errorText}`);
+                    }
+                    
+                } catch (error) {
+                    log('absoluteUrlResult', `❌ NETWORK ERROR with ${baseUrl}: ${error.message}`);
+                }
+            }
+            
+            if (!testResults.absoluteUrl) {
+                log('absoluteUrlResult', '❌ All absolute URL tests failed');
+            }
+            
+            updateSummary();
+        }
+
+        async function testErrorHandling() {
+            const resultDiv = document.getElementById('errorHandlingResult');
+            resultDiv.textContent = '';
+            
+            log('errorHandlingResult', '🧪 Starting Error Handling Test...');
+            
+            // Test 1: Invalid data
+            try {
+                log('errorHandlingResult', '📤 Testing with invalid data...');
+                
+                const response = await fetch('/api/instant-reply', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ invalid: 'data' })
+                });
+                
+                log('errorHandlingResult', `📄 Response status: ${response.status}`);
+                
+                if (response.status === 400) {
+                    const data = await response.json();
+                    log('errorHandlingResult', `✅ Expected error handled correctly: ${JSON.stringify(data, null, 2)}`);
+                } else {
+                    log('errorHandlingResult', `⚠️ Unexpected status: ${response.status}`);
+                }
+                
+            } catch (error) {
+                log('errorHandlingResult', `❌ NETWORK ERROR: ${error.message}`);
+            }
+            
+            // Test 2: Non-existent endpoint
+            try {
+                log('errorHandlingResult', '📤 Testing non-existent endpoint...');
+                
+                const response = await fetch('/api/non-existent-endpoint', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(TEST_DATA)
+                });
+                
+                log('errorHandlingResult', `📄 Response status: ${response.status}`);
+                
+                if (response.status === 404) {
+                    log('errorHandlingResult', '✅ 404 error handled correctly');
+                } else {
+                    log('errorHandlingResult', `⚠️ Unexpected status: ${response.status}`);
+                }
+                
+            } catch (error) {
+                log('errorHandlingResult', `❌ NETWORK ERROR: ${error.message}`);
+            }
+            
+            testResults.errorHandling = true;
+            updateSummary();
+        }
+    </script>
+</body>
+</html> 

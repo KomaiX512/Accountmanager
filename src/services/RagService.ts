@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getApiUrl } from '../config/api';
 
 interface ChatMessage {
   role: string;
@@ -607,9 +608,6 @@ class RagService {
       platform?: string;
     }
   ): Promise<any> {
-    const urls = ['/'];
-    let lastError = null;
-
     const platform = options?.platform || 'instagram';
 
     // Validate sender_id if provided
@@ -628,6 +626,7 @@ class RagService {
       type: 'message',
       instagram_user_id: platform === 'instagram' ? userId : undefined,
       twitter_user_id: platform === 'twitter' ? userId : undefined,
+      facebook_user_id: platform === 'facebook' ? userId : undefined,
       sender_id: options?.sender_id,
       message_id: options?.message_id,
       text: userMessage,
@@ -637,56 +636,57 @@ class RagService {
       platform
     };
 
-    for (const baseUrl of urls) {
-      try {
-        if (this.VERBOSE_LOGGING) {
-        console.log(`[RagService] Trying to send instant ${platform} AI reply via ${baseUrl}/rag-instant-reply/${username}`);
-        }
-        
-        // Add validation headers to ensure the request is properly handled
-        const response = await axios.post(
-          `${baseUrl}/rag-instant-reply/${username}`,
-          notification,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            },
-            withCredentials: false, // Important for CORS
-            timeout: 30000, // 30 second timeout
-          }
-        );
-
-        if (!response.data) {
-          throw new Error('No data returned from RAG service');
-        }
-
-        // Log successful response
-        if (this.VERBOSE_LOGGING) {
-        console.log(`[RagService] Successfully received ${platform} response from ${baseUrl}`);
-        }
-        return response.data;
-      } catch (error: any) {
-        console.error(`[RagService] Failed with ${baseUrl}, trying next URL:`, error.message || 'Unknown error');
-        
-        // Check if this is a CORS error
-        if (error.message?.includes('CORS') || error.message?.includes('Network Error')) {
-          console.error('[RagService] Possible CORS issue detected');
-        }
-        
-        // Check if this is a specific error about sender_id format
-        if (error.response?.data?.error?.includes('sender_id')) {
-          const errorMessage = error.response.data.error || 'Invalid sender ID format';
-          console.error(`[RagService] Sender ID validation error:`, errorMessage);
-          throw new Error(errorMessage); // Don't try other URLs, this is a data validation issue
-        }
-        
-        lastError = error;
+    try {
+      if (this.VERBOSE_LOGGING) {
+        console.log(`[RagService] Trying to send instant ${platform} AI reply via /api/instant-reply`);
       }
-    }
+      
+      // Use relative URL to avoid DNS resolution issues
+      const timestamp = Date.now();
+      const response = await axios.post(
+        getApiUrl('/api/instant-reply'),
+        {
+          username,
+          notification
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          },
+          withCredentials: false, // Important for CORS
+          timeout: 30000, // 30 second timeout
+        }
+      );
 
-    // If we got here, all URLs failed
-    throw lastError || new Error('Failed to connect to any RAG service endpoint');
+      if (!response.data) {
+        throw new Error('No data returned from RAG service');
+      }
+
+      // Log successful response
+      if (this.VERBOSE_LOGGING) {
+        console.log(`[RagService] Successfully received ${platform} response from RAG server`);
+      }
+      return response.data;
+    } catch (error: any) {
+      console.error(`[RagService] Failed to send instant ${platform} AI reply:`, error.message || 'Unknown error');
+      
+      // Check if this is a CORS error
+      if (error.message?.includes('CORS') || error.message?.includes('Network Error')) {
+        console.error('[RagService] Possible CORS issue detected');
+      }
+      
+      // Check if this is a specific error about sender_id format
+      if (error.response?.data?.error?.includes('sender_id')) {
+        const errorMessage = error.response.data.error || 'Invalid sender ID format';
+        console.error(`[RagService] Sender ID validation error:`, errorMessage);
+        throw new Error(errorMessage);
+      }
+      
+      throw error;
+    }
   }
 }
 

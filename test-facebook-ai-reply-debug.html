@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facebook AI Reply Debug Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
+        .result { margin-top: 10px; padding: 10px; background-color: #f5f5f5; border-radius: 3px; white-space: pre-wrap; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        button { background-color: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 3px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>Facebook AI Reply Debug Test</h1>
+    
+    <div class="test-section">
+        <h2>Test 1: Direct axios.post to /api/instant-reply</h2>
+        <button onclick="testDirectAxios()">Test Direct Axios</button>
+        <div id="result1" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test 2: Fetch to /api/instant-reply</h2>
+        <button onclick="testFetch()">Test Fetch</button>
+        <div id="result2" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test 3: RagService simulation</h2>
+        <button onclick="testRagService()">Test RagService</button>
+        <div id="result3" class="result"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script>
+        async function testDirectAxios() {
+            const resultDiv = document.getElementById('result1');
+            resultDiv.textContent = 'Testing direct axios...';
+            resultDiv.className = 'result';
+            
+            try {
+                const response = await axios.post('/api/instant-reply', {
+                    username: 'testuser',
+                    notification: {
+                        text: 'Hello! This is a test Facebook message',
+                        type: 'message',
+                        platform: 'facebook'
+                    }
+                });
+                
+                resultDiv.textContent = `✅ SUCCESS!\n\nResponse: ${JSON.stringify(response.data, null, 2)}`;
+                resultDiv.className = 'result success';
+            } catch (error) {
+                resultDiv.textContent = `❌ ERROR: ${error.message}\n\nDetails: ${JSON.stringify(error, null, 2)}`;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        async function testFetch() {
+            const resultDiv = document.getElementById('result2');
+            resultDiv.textContent = 'Testing fetch...';
+            resultDiv.className = 'result';
+            
+            try {
+                const response = await fetch('/api/instant-reply', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: 'testuser',
+                        notification: {
+                            text: 'Hello! This is a test Facebook message',
+                            type: 'message',
+                            platform: 'facebook'
+                        }
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.textContent = `✅ SUCCESS!\n\nResponse: ${JSON.stringify(data, null, 2)}`;
+                    resultDiv.className = 'result success';
+                } else {
+                    resultDiv.textContent = `❌ ERROR (${response.status}): ${JSON.stringify(data, null, 2)}`;
+                    resultDiv.className = 'result error';
+                }
+            } catch (error) {
+                resultDiv.textContent = `❌ NETWORK ERROR: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        async function testRagService() {
+            const resultDiv = document.getElementById('result3');
+            resultDiv.textContent = 'Testing RagService simulation...';
+            resultDiv.className = 'result';
+            
+            try {
+                // Simulate the exact RagService call
+                const conversation = [{
+                    role: "user",
+                    content: "Hello! This is a test Facebook message"
+                }];
+                
+                const notification = {
+                    type: 'message',
+                    facebook_user_id: 'testuser',
+                    sender_id: '123456789',
+                    message_id: 'msg_123456',
+                    text: "Hello! This is a test Facebook message",
+                    timestamp: Date.now(),
+                    received_at: new Date().toISOString(),
+                    status: 'pending',
+                    platform: 'facebook'
+                };
+                
+                const response = await axios.post('/api/instant-reply', {
+                    username: 'testuser',
+                    notification
+                }, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    withCredentials: false,
+                    timeout: 30000,
+                });
+                
+                resultDiv.textContent = `✅ SUCCESS!\n\nResponse: ${JSON.stringify(response.data, null, 2)}`;
+                resultDiv.className = 'result success';
+            } catch (error) {
+                resultDiv.textContent = `❌ ERROR: ${error.message}\n\nDetails: ${JSON.stringify(error, null, 2)}`;
+                resultDiv.className = 'result error';
+            }
+        }
+    </script>
+</body>
+</html> 

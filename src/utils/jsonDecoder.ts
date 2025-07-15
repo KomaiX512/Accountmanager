@@ -473,7 +473,8 @@ export const decodeRawContent = (
 };
 
 // Export utility functions
-export const formatCount = (count: number): string => {
+export const formatCount = (count: number | undefined): string => {
+  if (count === undefined || count === null) return 'N/A';
   if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
   if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K`;
   return count.toString();

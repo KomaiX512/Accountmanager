@@ -98,7 +98,7 @@ class ChromaDBService {
       let connected = false;
       for (const pathToTry of candidatePaths) {
         console.log(`[ChromaDB] Attempting to connect at ${pathToTry} ...`);
-        // eslint-disable-next-line no-await-in-loop
+         
         if (await testPath(pathToTry)) {
           connected = true;
           break;

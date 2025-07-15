@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useFacebook } from '../../context/FacebookContext';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
@@ -7,10 +7,12 @@ import FacebookConnect from './FacebookConnect';
 import InsightsModal from '../instagram/InsightsModal';
 import { Notification } from '../../types/notifications';
 import FacebookNotificationService from '../../services/facebookNotificationService';
+import RagService from '../../services/RagService';
 import axios from 'axios';
 import '../instagram/Dashboard.css';
 import { motion } from 'framer-motion';
 import PlatformDashboard from '../dashboard/PlatformDashboard';
+import { getApiUrl } from '../../config/api';
 
 interface FacebookDashboardProps {
   accountHolder: string;
@@ -31,6 +33,7 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ accountHolder, on
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
   const [isSchedulerOpen, setIsSchedulerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isComponentMounted, setIsComponentMounted] = useState(false);
   
   // Post scheduling state
   const [scheduleForm, setScheduleForm] = useState({
@@ -47,9 +50,22 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ accountHolder, on
     FacebookNotificationService.getInstance()
   );
 
+  // Component mount effect to prevent lexical declaration issues
+  useEffect(() => {
+    setIsComponentMounted(true);
+    return () => {
+      setIsComponentMounted(false);
+      // Clean up SSE connection
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+    };
+  }, []);
+
   // Fetch Facebook notifications with proper refresh handling
-  const fetchNotifications = async (forceRefresh = false) => {
-    if (!facebookPageId || !currentUser?.uid) return;
+  const fetchNotifications = useCallback(async (forceRefresh = false) => {
+    if (!facebookPageId || !currentUser?.uid || !isComponentMounted) return;
     
     setIsLoadingNotifications(true);
     setError(null);
@@ -59,7 +75,8 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ accountHolder, on
         console.log(`[${new Date().toISOString()}] Force refreshing Facebook notifications...`);
       }
       
-      const response = await axios.get(`/events-list/${facebookPageId}?platform=facebook${forceRefresh ? '&forceRefresh=true' : ''}`);
+      // Use getApiUrl to ensure correct URL in all environments
+      const response = await axios.get(`${getApiUrl(`/events-list/${facebookPageId}`)}?platform=facebook${forceRefresh ? '&forceRefresh=true' : ''}`);
       
       if (response.data && Array.isArray(response.data)) {
         const facebookNotifications = response.data.map((notif: any) => ({
@@ -81,49 +98,55 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ accountHolder, on
     } finally {
       setIsLoadingNotifications(false);
     }
-  };
+  }, [facebookPageId, currentUser?.uid, isComponentMounted]);
 
   // Setup SSE connection for real-time updates
   useEffect(() => {
-    if (!facebookPageId || !currentUser?.uid) return;
+    if (!facebookPageId || !currentUser?.uid || !isComponentMounted) return;
 
-    const eventSource = new EventSource(`/stream/${facebookPageId}`);
-    eventSourceRef.current = eventSource;
+    try {
+      // Use getApiUrl for SSE endpoint
+      const eventSource = new EventSource(`${getApiUrl(`/events/${facebookPageId}`)}`);
+      eventSourceRef.current = eventSource;
 
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        console.log(`[${new Date().toISOString()}] Facebook SSE received:`, data);
-        
-        if (data.event === 'facebook_message' || data.event === 'facebook_comment') {
-          // Add platform info to the notification
-          const facebookNotification = {
-            ...data.data,
-            platform: 'facebook',
-            facebook_page_id: facebookPageId
-          };
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log(`[${new Date().toISOString()}] Facebook SSE received:`, data);
           
-          setNotifications(prev => [facebookNotification, ...prev]);
+          if (data.event === 'facebook_message' || data.event === 'facebook_comment') {
+            // Add platform info to the notification
+            const facebookNotification = {
+              ...data.data,
+              platform: 'facebook',
+              facebook_page_id: facebookPageId
+            };
+            
+            setNotifications(prev => [facebookNotification, ...prev]);
+          }
+        } catch (error) {
+          console.error(`[${new Date().toISOString()}] Error parsing Facebook SSE data:`, error);
         }
-      } catch (error) {
-        console.error(`[${new Date().toISOString()}] Error parsing Facebook SSE data:`, error);
-      }
-    };
+      };
 
-    eventSource.onerror = (error) => {
-      console.error(`[${new Date().toISOString()}] Facebook SSE connection error:`, error);
-    };
+      eventSource.onerror = (error) => {
+        console.error(`[${new Date().toISOString()}] Facebook SSE connection error:`, error);
+      };
 
-    return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-      }
-    };
-  }, [facebookPageId, currentUser?.uid]);
+      return () => {
+        if (eventSourceRef.current) {
+          eventSourceRef.current.close();
+          eventSourceRef.current = null;
+        }
+      };
+    } catch (error) {
+      console.error(`[${new Date().toISOString()}] Error setting up SSE connection:`, error);
+    }
+  }, [facebookPageId, currentUser?.uid, isComponentMounted]);
 
   // Initialize notifications on connection
   useEffect(() => {
-    if (isConnected && facebookPageId) {
+    if (isConnected && facebookPageId && isComponentMounted) {
       fetchNotifications();
       
       // Initialize web push notifications
@@ -131,12 +154,16 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ accountHolder, on
         if (success) {
           console.log('Facebook web push notifications initialized');
         }
+      }).catch(error => {
+        console.error('Failed to initialize Facebook web push notifications:', error);
       });
     }
-  }, [isConnected, facebookPageId, refreshKey]);
+  }, [isConnected, facebookPageId, refreshKey, isComponentMounted, fetchNotifications]);
 
   // Handle real-time notifications
   useEffect(() => {
+    if (!isComponentMounted) return;
+
     const handleNotification = (event: MessageEvent) => {
       try {
         const data = JSON.parse(event.data);
@@ -160,11 +187,11 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ accountHolder, on
         eventSourceRef.current?.removeEventListener('message', handleNotification);
       };
     }
-  }, [eventSourceRef.current]);
+  }, [isComponentMounted]);
 
   // Handle Facebook notification reply
-  const handleReply = async (notification: Notification, replyText: string) => {
-    if (!facebookPageId) return;
+  const handleReply = useCallback(async (notification: Notification, replyText: string) => {
+    if (!facebookPageId || !currentUser?.uid || !isComponentMounted) return;
     
     // ✅ PRE-ACTION CHECK: Verify discussion limits before proceeding
     const discussionAccessCheck = canUseFeature('discussions');
@@ -176,7 +203,8 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ accountHolder, on
     try {
       const endpoint = notification.type === 'message' ? 'send-dm-reply' : 'send-comment-reply';
       
-      await axios.post(`/${endpoint}/${facebookPageId}`, {
+      // Use getApiUrl for all API calls
+      await axios.post(`${getApiUrl(`/${endpoint}/${facebookPageId}`)}`, {
         sender_id: notification.sender_id,
         text: replyText,
         message_id: notification.message_id,
@@ -202,14 +230,15 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ accountHolder, on
     } catch (error: any) {
       console.error(`[${new Date().toISOString()}] Error sending Facebook reply:`, error);
     }
-  };
+  }, [facebookPageId, currentUser?.uid, isComponentMounted, canUseFeature, trackRealDiscussion]);
 
   // Handle ignore notification - permanently remove
-  const handleIgnore = async (notification: Notification) => {
-    if (!facebookPageId) return;
+  const handleIgnore = useCallback(async (notification: Notification) => {
+    if (!facebookPageId || !currentUser?.uid || !isComponentMounted) return;
     
     try {
-      await axios.post(`/ignore-notification/${facebookPageId}`, {
+      // Use getApiUrl for API calls
+      await axios.post(`${getApiUrl(`/ignore-notification/${facebookPageId}`)}`, {
         message_id: notification.message_id,
         comment_id: notification.comment_id,
         platform: 'facebook'
@@ -228,10 +257,10 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ accountHolder, on
       console.error(`[${new Date().toISOString()}] Error ignoring Facebook notification:`, error);
       setError('Failed to ignore notification');
     }
-  };
+  }, [facebookPageId, currentUser?.uid, isComponentMounted]);
 
   // Create AI ready notification helper
-  const createAIReadyNotification = (notification: Notification, reply: string): Notification => {
+  const createAIReadyNotification = useCallback((notification: Notification, reply: string): Notification => {
     return {
       ...notification,
       status: 'ai_reply_ready' as const,
@@ -244,44 +273,79 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ accountHolder, on
         sendStatus: undefined
       }
     };
-  };
+  }, []);
 
   // Handle AI reply generation with preview
-  const handleReplyWithAI = async (notification: Notification) => {
+  const handleReplyWithAI = useCallback(async (notification: Notification) => {
     const notifId = notification.message_id || notification.comment_id || '';
-    if (!notifId) return;
+    if (!notifId || !isComponentMounted) return;
 
     setAiProcessingNotifications(prev => ({ ...prev, [notifId]: true }));
 
     try {
       console.log(`[${new Date().toISOString()}] Generating Facebook AI reply for ${notifId}`);
       
-      // Use enhanced RAG service for instant reply generation
-      const message = notification.text || '';
-      const conversation = [{
-        role: "user",
-        content: message
-      }];
+      // ✅ PRE-ACTION CHECK: Verify AI reply limits before proceeding
+      const aiReplyAccessCheck = canUseFeature('aiReplies');
+      if (!aiReplyAccessCheck.allowed) {
+        console.warn(`[FacebookDashboard] AI Reply blocked: ${aiReplyAccessCheck.reason}`);
+        setError(`AI reply blocked: ${aiReplyAccessCheck.reason}`);
+        return;
+      }
       
-      // Call the RAG service directly for instant reply
-      const response = await axios.post('http://localhost:3001/api/instant-reply', {
-        username: currentUser?.uid || facebookUsername,
-        notification: {
-          type: notification.type,
-          message_id: notification.message_id,
-          comment_id: notification.comment_id,
-          text: notification.text,
-          username: notification.username,
-          timestamp: notification.timestamp,
-          platform: 'facebook'
-        },
+      // Use direct axios call to the backend endpoint instead of RagService
+      const message = notification.text || '';
+      const userId = currentUser?.uid || facebookUsername;
+      if (!userId) {
+        throw new Error('No user ID available for AI reply');
+      }
+      
+      // Format the request as expected by the backend
+      const notificationData = {
+        type: notification.type || 'message',
+        facebook_user_id: facebookPageId,
+        sender_id: notification.sender_id,
+        message_id: notification.message_id,
+        comment_id: notification.comment_id,
+        text: message,
+        timestamp: Date.now(),
+        received_at: new Date().toISOString(),
+        status: 'pending',
         platform: 'facebook'
+      };
+      
+      console.log(`[${new Date().toISOString()}] Sending AI reply request to backend for Facebook`);
+      
+      // Call the backend endpoint directly using getApiUrl
+      const response = await axios.post(getApiUrl('/api/instant-reply'), {
+        username: userId,
+        notification: notificationData
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        timeout: 30000 // 30 second timeout
       });
 
       if (response.data && response.data.success) {
         console.log(`[${new Date().toISOString()}] Successfully generated Facebook AI reply:`, 
           response.data.reply?.substring(0, 50) + '...'
         );
+        
+        // ✅ REAL USAGE TRACKING: Check limits AFTER successful generation
+        const trackingSuccess = await trackRealAIReply('facebook', {
+          type: notification.type === 'message' ? 'dm' : 'comment',
+          mode: 'instant'
+        });
+        
+        if (!trackingSuccess) {
+          console.warn(`[FacebookDashboard] 🚫 AI Reply blocked for Facebook - limit reached`);
+          setError('AI reply limit reached - upgrade to continue');
+          return;
+        }
+        
+        console.log(`[FacebookDashboard] ✅ AI Reply tracked: Facebook ${notification.type} reply`);
         
         // Remove original notification and add AI reply preview
         setNotifications(prev => prev.filter(n => 
@@ -294,7 +358,7 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ accountHolder, on
         
         // Mark notification as handled to prevent re-appearance
         try {
-          await axios.post(`/mark-notification-handled/${facebookPageId}`, {
+          await axios.post(`${getApiUrl(`/mark-notification-handled/${facebookPageId}`)}`, {
             notification_id: notifId,
             type: notification.type,
             handled_by: 'ai',
@@ -310,15 +374,25 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ accountHolder, on
 
     } catch (error: any) {
       console.error(`[${new Date().toISOString()}] Error generating Facebook AI reply:`, error);
-      setError(`Failed to generate AI reply: ${error.response?.data?.error || error.message}`);
+      
+      // Handle specific error cases
+      if (error.message?.includes('ERR_NAME_NOT_RESOLVED') || error.message?.includes('net::ERR_NAME_NOT_RESOLVED')) {
+        setError(`AI reply failed: URL resolution error. Please check your proxy configuration.`);
+      } else if (error.response?.status === 503) {
+        setError(`AI service temporarily unavailable. Please try again later.`);
+      } else if (error.response?.status === 429) {
+        setError(`Rate limit exceeded. Please try again later.`);
+      } else {
+        setError(`Failed to generate AI reply: ${error.response?.data?.error || error.message}`);
+      }
     } finally {
       setAiProcessingNotifications(prev => ({ ...prev, [notifId]: false }));
     }
-  };
+  }, [facebookPageId, currentUser?.uid, facebookUsername, isComponentMounted, canUseFeature, trackRealAIReply, createAIReadyNotification]);
 
   // Handle sending AI reply preview
-  const handleSendAIReply = async (notification: Notification, notifId: string) => {
-    if (!notification.aiReply || !notification.sender_id || !facebookPageId) return;
+  const handleSendAIReply = useCallback(async (notification: Notification, notifId: string) => {
+    if (!notification.aiReply || !notification.sender_id || !facebookPageId || !isComponentMounted) return;
     
     // ✅ PRE-ACTION CHECK: Verify AI reply limits before proceeding  
     const aiReplyAccessCheck = canUseFeature('aiReplies');
@@ -332,7 +406,8 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ accountHolder, on
     try {
       const endpoint = notification.type === 'message' ? 'send-dm-reply' : 'send-comment-reply';
       
-      const sendResponse = await fetch(`/${endpoint}/${facebookPageId}`, {
+      // Use getApiUrl for API calls
+      const sendResponse = await fetch(`${getApiUrl(`/${endpoint}/${facebookPageId}`)}`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -375,11 +450,11 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ accountHolder, on
     } catch (error: any) {
       console.error(`[${new Date().toISOString()}] Error sending Facebook AI reply:`, error);
     }
-  };
+  }, [facebookPageId, isComponentMounted, canUseFeature, trackRealAIReply]);
 
   // Handle ignoring AI reply preview
-  const handleIgnoreAIReply = async (notification: Notification) => {
-    if (!notification.aiReply) return;
+  const handleIgnoreAIReply = useCallback(async (notification: Notification) => {
+    if (!notification.aiReply || !isComponentMounted) return;
     
     try {
       // Simply remove the notification from the list
@@ -393,36 +468,76 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ accountHolder, on
     } catch (error) {
       console.error(`[${new Date().toISOString()}] Error ignoring Facebook AI reply:`, error);
     }
-  };
+  }, [isComponentMounted]);
 
   // Handle auto-reply to all notifications
-  const handleAutoReplyAll = async (notifications: Notification[]) => {
-    if (!facebookPageId || !currentUser?.uid) return;
+  const handleAutoReplyAll = useCallback(async (notifications: Notification[]) => {
+    if (!facebookPageId || !currentUser?.uid || !isComponentMounted) return;
 
     try {
       console.log(`[${new Date().toISOString()}] Starting Facebook auto-reply for ${notifications.length} notifications`);
       
       for (const notification of notifications) {
-        // Generate AI reply using the RAG server
-        const response = await axios.post('http://localhost:3001/api/instant-reply', {
-          username: currentUser.uid,
-          notification: {
-            type: notification.type,
-            message_id: notification.message_id,
-            comment_id: notification.comment_id,
-            text: notification.text,
-            username: notification.username,
-            timestamp: notification.timestamp,
-            platform: 'facebook'
-          },
+        // ✅ PRE-ACTION CHECK: Verify AI reply limits before proceeding
+        const aiReplyAccessCheck = canUseFeature('aiReplies');
+        if (!aiReplyAccessCheck.allowed) {
+          console.warn(`[FacebookDashboard] Auto-reply blocked: ${aiReplyAccessCheck.reason}`);
+          continue;
+        }
+        
+        // Generate AI reply using direct backend call
+        const message = notification.text || '';
+        const userId = currentUser?.uid || facebookUsername;
+        if (!userId) {
+          console.error('No user ID available for auto-reply');
+          continue;
+        }
+        
+        // Format the request as expected by the backend
+        const notificationData = {
+          type: notification.type || 'message',
+          facebook_user_id: facebookPageId,
+          sender_id: notification.sender_id,
+          message_id: notification.message_id,
+          comment_id: notification.comment_id,
+          text: message,
+          timestamp: Date.now(),
+          received_at: new Date().toISOString(),
+          status: 'pending',
           platform: 'facebook'
+        };
+        
+        // Use getApiUrl for API calls
+        const response = await axios.post(getApiUrl('/api/instant-reply'), {
+          username: userId,
+          notification: notificationData
+        }, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          timeout: 30000
         });
 
-        if (response.data.success && response.data.reply) {
+        if (response.data && response.data.success && response.data.reply) {
+          // ✅ REAL USAGE TRACKING: Check limits AFTER successful generation
+          const trackingSuccess = await trackRealAIReply('facebook', {
+            type: notification.type === 'message' ? 'dm' : 'comment',
+            mode: 'instant'
+          });
+          
+          if (!trackingSuccess) {
+            console.warn(`[FacebookDashboard] 🚫 Auto-reply blocked for Facebook - limit reached`);
+            continue;
+          }
+          
+          console.log(`[FacebookDashboard] ✅ Auto-reply tracked: Facebook ${notification.type} reply`);
+          
           // Send the generated reply
           const endpoint = notification.type === 'message' ? 'send-dm-reply' : 'send-comment-reply';
           
-          await axios.post(`/${endpoint}/${facebookPageId}`, {
+          // Use getApiUrl for API calls
+          await axios.post(`${getApiUrl(`/${endpoint}/${facebookPageId}`)}`, {
             sender_id: notification.sender_id,
             text: response.data.reply,
             message_id: notification.message_id,
@@ -447,12 +562,12 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ accountHolder, on
       console.error(`[${new Date().toISOString()}] Error in Facebook auto-reply:`, error);
       setError('Auto-reply failed for some notifications');
     }
-  };
+  }, [facebookPageId, currentUser?.uid, facebookUsername, isComponentMounted, canUseFeature, trackRealAIReply]);
 
   // Handle post scheduling
-  const handleSchedulePost = async (e: React.FormEvent) => {
+  const handleSchedulePost = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!facebookPageId || !scheduleForm.scheduleDate) return;
+    if (!facebookPageId || !scheduleForm.scheduleDate || !isComponentMounted) return;
 
     try {
       const formData = new FormData();
@@ -464,7 +579,8 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ accountHolder, on
         formData.append('image', scheduleForm.image);
       }
 
-      await axios.post(`/api/schedule-post/${facebookPageId}`, formData, {
+      // Use getApiUrl for API calls
+      await axios.post(`${getApiUrl(`/api/schedule-post/${facebookPageId}`)}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
@@ -479,7 +595,7 @@ const FacebookDashboard: React.FC<FacebookDashboardProps> = ({ accountHolder, on
       console.error(`[${new Date().toISOString()}] Error scheduling Facebook post:`, error);
       setError('Failed to schedule post');
     }
-  };
+  }, [facebookPageId, scheduleForm, isComponentMounted]);
 
   // Render connection screen if not connected
   if (!isConnected) {

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instant Reply API Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Instant Reply API Test</h1>
+    
+    <div class="test-section">
+        <h2>Test 1: API URL Resolution</h2>
+        <p>This test verifies that the getApiUrl helper correctly resolves URLs for different environments.</p>
+        <button onclick="testApiUrlResolution()">Test API URL Resolution</button>
+        <div id="url-test-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 2: Instant Reply Endpoint</h2>
+        <p>This test verifies that the /api/instant-reply endpoint is accessible.</p>
+        <button onclick="testInstantReplyEndpoint()">Test Instant Reply Endpoint</button>
+        <div id="endpoint-test-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 3: CORS Headers</h2>
+        <p>This test verifies that CORS headers are properly set.</p>
+        <button onclick="testCorsHeaders()">Test CORS Headers</button>
+        <div id="cors-test-result"></div>
+    </div>
+
+    <script>
+        // Mock getApiUrl function for testing
+        function getApiUrl(endpoint) {
+            const baseUrl = window.location.origin;
+            const fullEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+            return `${baseUrl}${fullEndpoint}`;
+        }
+
+        function logResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<p class="${type}">${message}</p>`;
+        }
+
+        async function testApiUrlResolution() {
+            const testEndpoints = [
+                '/api/instant-reply',
+                '/api/responses/test',
+                '/events-list/test'
+            ];
+
+            let results = '<h3>API URL Resolution Results:</h3>';
+            
+            testEndpoints.forEach(endpoint => {
+                const url = getApiUrl(endpoint);
+                results += `<p><strong>${endpoint}:</strong> ${url}</p>`;
+            });
+
+            logResult('url-test-result', results, 'success');
+        }
+
+        async function testInstantReplyEndpoint() {
+            try {
+                const url = getApiUrl('/api/instant-reply');
+                logResult('endpoint-test-result', `Testing endpoint: ${url}`, 'info');
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: 'test-user',
+                        notification: {
+                            type: 'message',
+                            text: 'Test message',
+                            platform: 'instagram'
+                        }
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    logResult('endpoint-test-result', 
+                        `✅ Endpoint accessible! Response: ${JSON.stringify(data, null, 2)}`, 
+                        'success');
+                } else {
+                    logResult('endpoint-test-result', 
+                        `❌ Endpoint returned ${response.status}: ${response.statusText}`, 
+                        'error');
+                }
+            } catch (error) {
+                logResult('endpoint-test-result', 
+                    `❌ Error testing endpoint: ${error.message}`, 
+                    'error');
+            }
+        }
+
+        async function testCorsHeaders() {
+            try {
+                const url = getApiUrl('/api/instant-reply');
+                
+                // Test OPTIONS request (preflight)
+                const optionsResponse = await fetch(url, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Origin': window.location.origin
+                    }
+                });
+
+                const corsHeaders = {
+                    'Access-Control-Allow-Origin': optionsResponse.headers.get('Access-Control-Allow-Origin'),
+                    'Access-Control-Allow-Methods': optionsResponse.headers.get('Access-Control-Allow-Methods'),
+                    'Access-Control-Allow-Headers': optionsResponse.headers.get('Access-Control-Allow-Headers')
+                };
+
+                let results = '<h3>CORS Headers Test Results:</h3>';
+                results += `<p><strong>Status:</strong> ${optionsResponse.status}</p>`;
+                
+                Object.entries(corsHeaders).forEach(([header, value]) => {
+                    const status = value ? '✅' : '❌';
+                    results += `<p>${status} <strong>${header}:</strong> ${value || 'Not set'}</p>`;
+                });
+
+                logResult('cors-test-result', results, 'info');
+            } catch (error) {
+                logResult('cors-test-result', 
+                    `❌ Error testing CORS headers: ${error.message}`, 
+                    'error');
+            }
+        }
+
+        // Auto-run URL resolution test on page load
+        window.addEventListener('load', testApiUrlResolution);
+    </script>
+</body>
+</html> 

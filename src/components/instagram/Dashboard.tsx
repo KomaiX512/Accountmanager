@@ -313,7 +313,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
     
     try {
       // Fetch notifications
-      const response = await fetch(`/events-list/${userId}`);
+      const response = await fetch(`/events-list/${userId}?platform=instagram`);
       if (!response.ok) {
         throw new Error(`Failed to fetch notifications: ${response.status} ${response.statusText}`);
       }

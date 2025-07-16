@@ -382,8 +382,11 @@ function broadcastUpdate(username, data) {
   const clients = sseClients.get(username) || [];
   const activeCount = clients.length;
   
+  console.log(`[${new Date().toISOString()}] Broadcast attempt for ${username}: ${activeCount} clients available`);
+  console.log(`[${new Date().toISOString()}] SSE clients map keys: ${Array.from(sseClients.keys()).join(', ')}`);
+  
   if (activeCount > 0) {
-    console.log(`[${new Date().toISOString()}] Broadcasting update to ${activeCount} clients for ${username}: ${data.type}`);
+    console.log(`[${new Date().toISOString()}] Broadcasting update to ${activeCount} clients for ${username}: ${data.type || data.event}`);
     
     clients.forEach(client => {
       try {
@@ -2433,12 +2436,22 @@ app.post(['/instagram/callback', '/api/instagram/callback'], async (req, res) =>
           
           console.log(`[${new Date().toISOString()}] Stored DM at ${userKey}`);
 
-          // Broadcast update
-          broadcastUpdate(storeUserId, { 
+          // Broadcast update to both user ID and username for frontend compatibility
+          const broadcastData = { 
             event: 'message', 
             data: eventData,
             timestamp: Date.now() 
-          });
+          };
+          
+          // Broadcast to user ID (frontend connects with user ID)
+          const userBroadcastResult = broadcastUpdate(storeUserId, broadcastData);
+          console.log(`[${new Date().toISOString()}] Broadcast to user ID ${storeUserId}: ${userBroadcastResult ? 'SUCCESS' : 'NO CLIENTS'}`);
+          
+          // Also broadcast to username if available (SSE endpoint expects username)
+          if (matchedToken && matchedToken.username && matchedToken.username !== 'unknown') {
+            const usernameBroadcastResult = broadcastUpdate(matchedToken.username, broadcastData);
+            console.log(`[${new Date().toISOString()}] Broadcast to username ${matchedToken.username}: ${usernameBroadcastResult ? 'SUCCESS' : 'NO CLIENTS'}`);
+          }
           
           // Clear cache
           cache.delete(`InstagramEvents/${storeUserId}`);
@@ -2484,12 +2497,22 @@ app.post(['/instagram/callback', '/api/instagram/callback'], async (req, res) =>
           
           console.log(`[${new Date().toISOString()}] Stored comment at ${userKey}`);
 
-          // Broadcast update
-          broadcastUpdate(storeUserId, { 
+          // Broadcast update to both user ID and username for frontend compatibility
+          const broadcastData = { 
             event: 'comment', 
             data: eventData,
             timestamp: Date.now() 
-          });
+          };
+          
+          // Broadcast to user ID (frontend connects with user ID)
+          const userBroadcastResult = broadcastUpdate(storeUserId, broadcastData);
+          console.log(`[${new Date().toISOString()}] Broadcast to user ID ${storeUserId}: ${userBroadcastResult ? 'SUCCESS' : 'NO CLIENTS'}`);
+          
+          // Also broadcast to username if available (SSE endpoint expects username)
+          if (matchedToken && matchedToken.username && matchedToken.username !== 'unknown') {
+            const usernameBroadcastResult = broadcastUpdate(matchedToken.username, broadcastData);
+            console.log(`[${new Date().toISOString()}] Broadcast to username ${matchedToken.username}: ${usernameBroadcastResult ? 'SUCCESS' : 'NO CLIENTS'}`);
+          }
           
           // Clear cache
           cache.delete(`InstagramEvents/${storeUserId}`);
@@ -6233,10 +6256,21 @@ app.get(['/api/system/cache-stats', '/system/cache-stats'], (req, res) => {
 // Handle disconnections/reconnections more gracefully
 app.get(['/events/:username', '/api/events/:username'], (req, res) => {
   const { username } = req.params;
-  const { since } = req.query;
+  const { since, platform } = req.query;
   
-  // Normalize username according to platform rules (e.g., lowercase for Instagram)
-  const normalizedUsername = PlatformSchemaManager.getPlatformConfig('instagram').normalizeUsername(username);
+  // Handle both username and user ID connections
+  // The frontend connects with user ID, but SSE endpoint expects username
+  // We'll normalize and handle both cases
+  let normalizedUsername = username;
+  
+  // If it looks like a user ID (numeric), use it directly as connection key
+  if (/^\d+$/.test(username)) {
+    console.log(`[${new Date().toISOString()}] SSE connection with user ID: ${username}, using as connection key`);
+    normalizedUsername = username;
+  } else {
+    // Normalize username according to platform rules (e.g., lowercase for Instagram)
+    normalizedUsername = PlatformSchemaManager.getPlatformConfig('instagram').normalizeUsername(username);
+  }
   
   let sinceTimestamp = 0;
   
@@ -6252,7 +6286,7 @@ app.get(['/events/:username', '/api/events/:username'], (req, res) => {
     }
   }
   
-  console.log(`[${new Date().toISOString()}] Handling SSE request for /events/${normalizedUsername} (reconnect since: ${sinceTimestamp || 'new connection'})`);
+  console.log(`[${new Date().toISOString()}] Handling SSE request for /events/${normalizedUsername} (reconnect since: ${sinceTimestamp || 'new connection'}, platform: ${platform || 'not specified'})`);
 
   // Set headers for SSE
   res.setHeader('Content-Type', 'text/event-stream');
@@ -6287,6 +6321,7 @@ app.get(['/events/:username', '/api/events/:username'], (req, res) => {
   activeConnections.set(res, Date.now());
   
   console.log(`[${new Date().toISOString()}] SSE client connected for ${normalizedUsername}. Total clients: ${clients.length}`);
+  console.log(`[${new Date().toISOString()}] SSE clients map keys: ${Array.from(sseClients.keys()).join(', ')}`);
 
   // If reconnecting, check for missed events
   if (sinceTimestamp > 0) {

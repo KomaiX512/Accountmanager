@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SSE Connection Test</title>
+</head>
+<body>
+    <h1>SSE Connection Test</h1>
+    <div id="status">Connecting...</div>
+    <div id="messages"></div>
+    
+    <script>
+        const testUserId = '17841471786269325';
+        const testPlatform = 'instagram';
+        
+        console.log(`[${new Date().toISOString()}] Starting SSE connection test for user ID: ${testUserId}`);
+        
+        const eventSource = new EventSource(`/events/${testUserId}?platform=${testPlatform}`);
+        
+        eventSource.onopen = () => {
+            console.log(`[${new Date().toISOString()}] SSE connection established`);
+            document.getElementById('status').textContent = 'Connected to SSE';
+        };
+        
+        eventSource.onmessage = (event) => {
+            console.log(`[${new Date().toISOString()}] SSE message received:`, event.data);
+            
+            try {
+                const data = JSON.parse(event.data);
+                const messagesDiv = document.getElementById('messages');
+                
+                const messageDiv = document.createElement('div');
+                messageDiv.style.border = '1px solid #ccc';
+                messageDiv.style.margin = '10px';
+                messageDiv.style.padding = '10px';
+                messageDiv.innerHTML = `
+                    <strong>Type:</strong> ${data.type || data.event || 'unknown'}<br>
+                    <strong>Timestamp:</strong> ${new Date(data.timestamp || Date.now()).toISOString()}<br>
+                    <strong>Data:</strong> <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+                
+                messagesDiv.appendChild(messageDiv);
+            } catch (error) {
+                console.error('Error parsing SSE message:', error);
+            }
+        };
+        
+        eventSource.onerror = (error) => {
+            console.error(`[${new Date().toISOString()}] SSE connection error:`, error);
+            document.getElementById('status').textContent = 'SSE Connection Error';
+        };
+        
+        // Test broadcast after 5 seconds
+        setTimeout(() => {
+            console.log(`[${new Date().toISOString()}] Triggering test broadcast...`);
+            fetch('/instagram/callback', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    object: "instagram",
+                    entry: [{
+                        time: Date.now(),
+                        id: "17841471786269325",
+                        messaging: [{
+                            sender: { id: "679240224685804" },
+                            recipient: { id: "17841471786269325" },
+                            timestamp: Date.now(),
+                            message: {
+                                mid: "test_sse_message_" + Date.now(),
+                                text: "Test SSE broadcast message",
+                                is_echo: false
+                            }
+                        }]
+                    }]
+                })
+            }).then(response => {
+                console.log(`[${new Date().toISOString()}] Test broadcast sent, status: ${response.status}`);
+            }).catch(error => {
+                console.error(`[${new Date().toISOString()}] Error sending test broadcast:`, error);
+            });
+        }, 5000);
+    </script>
+</body>
+</html> 

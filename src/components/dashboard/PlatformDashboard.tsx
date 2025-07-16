@@ -1176,6 +1176,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
 
     eventSource.onopen = () => {
       console.log(`[${new Date().toISOString()}] ${platform} SSE connection established for ${userId}`);
+      console.log(`[${new Date().toISOString()}] SSE URL: /events/${userId}?platform=${platform}`);
       reconnectAttempts.current = 0;
       fetchNotifications();
     };
@@ -1262,6 +1263,8 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       }
 
       if (data.event === 'message' || data.event === 'comment') {
+        console.log(`[${new Date().toISOString()}] Processing ${platform} SSE event: ${data.event}`, data.data);
+        
         const notifType = data.event === 'message' ? 'dm' : 'comment';
         const notifId = data.data.message_id || data.data.comment_id;
         const notifText = data.data.text;
@@ -1279,6 +1282,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         });
         
         if (!isRecentlySent) {
+          console.log(`[${new Date().toISOString()}] Adding new ${platform} notification to state:`, data.data);
           setNotifications(prev => {
             const updated = [data.data, ...safeFilter(prev, (n: any) => 
               n.message_id !== data.data.message_id && 

@@ -105,43 +105,33 @@ export const schedulePost = async (options: ScheduleOptions): Promise<ScheduleRe
         };
       }
     } else {
-      // Instagram/Facebook scheduling - SIMPLIFIED: Send image key instead of blob
+      // Instagram/Facebook scheduling - ALWAYS send image blob if present
       formData.append('caption', caption);
       formData.append('scheduleDate', scheduleTime.toISOString());
       formData.append('platform', platform);
       
-      // Extract image key from post key instead of sending blob
+      // Extract image key from post key (optional, for backend reference)
       if (postKey) {
         let imageKey = '';
-        
-        // Extract image key from post key (same logic as PostCooked)
         if (postKey.includes('campaign_ready_post_') && postKey.endsWith('.json')) {
-          // Campaign pattern: campaign_ready_post_1752000987874_9c14f1fd.json -> image_1752000987874_9c14f1fd.jpg
-          const baseName = postKey.replace(/^.*\/([^\/]+)\.json$/, '$1');
+          const baseName = postKey.replace(/^.*\/(.+)\.json$/, '$1');
           imageKey = `${baseName}.jpg`;
         } else if (postKey.match(/ready_post_\d+\.json$/)) {
-          // Traditional pattern: ready_post_1234567890.json -> image_1234567890.jpg
           const postIdMatch = postKey.match(/ready_post_(\d+)\.json$/);
           if (postIdMatch) {
             imageKey = `image_${postIdMatch[1]}.jpg`;
           }
         }
-        
         if (imageKey) {
-          console.log(`[ScheduleHelper] 🔑 Using existing image key: ${imageKey}`);
           formData.append('imageKey', imageKey);
-        } else {
-          console.warn(`[ScheduleHelper] ⚠️ Could not extract image key from postKey: ${postKey}`);
         }
       }
-      
-      // Only send image blob if we couldn't extract image key
-      if (imageBlob && !formData.has('imageKey')) {
+      // --- CRITICAL FIX: Always send image as file if present ---
+      if (imageBlob) {
         const filename = postKey ? `${platform}_post_${postKey}.jpg` : `${platform}_${Date.now()}.jpg`;
         formData.append('image', imageBlob, filename);
-        console.log(`[ScheduleHelper] 📤 Sending image blob as fallback`);
       }
-      
+      // ---------------------------------------------------------
       const response = await fetch(resolveEndpoint('SCHEDULE_POST', `/${userId}`), {
         method: 'POST',
         body: formData,

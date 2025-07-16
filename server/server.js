@@ -4325,6 +4325,77 @@ async function getFacebookTokenData(userId) {
   }
 }
 
+// --- ADD: Instagram getTokenData helper ---
+async function getTokenData(userId) {
+  try {
+    // 1. Check InstagramConnection for this user (efficient lookup)
+    const connectionKey = `InstagramConnection/${userId}/connection.json`;
+    try {
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: connectionKey,
+      });
+      const data = await s3Client.send(getCommand);
+      const connectionData = JSON.parse(await data.Body.transformToString());
+      if (connectionData.instagram_user_id && connectionData.instagram_graph_id) {
+        // Try to find the token by graph_id
+        const tokenKey = `InstagramTokens/${connectionData.instagram_graph_id}/token.json`;
+        try {
+          const tokenCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: tokenKey,
+          });
+          const tokenData = await s3Client.send(tokenCommand);
+          const token = JSON.parse(await tokenData.Body.transformToString());
+          return token;
+        } catch (tokenError) {
+          // Fallback to user_id search below
+        }
+      }
+    } catch (connectionError) {
+      // Fallback to user_id search below
+    }
+    // 2. Try direct lookup by userId as graph_id
+    try {
+      const tokenKey = `InstagramTokens/${userId}/token.json`;
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: tokenKey,
+      });
+      const data = await s3Client.send(getCommand);
+      const token = JSON.parse(await data.Body.transformToString());
+      return token;
+    } catch (directError) {
+      // Fallback to search all tokens
+    }
+    // 3. Search all InstagramTokens for a match by userId
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: `InstagramTokens/`,
+    });
+    const { Contents } = await s3Client.send(listCommand);
+    if (Contents) {
+      for (const obj of Contents) {
+        if (obj.Key.endsWith('/token.json')) {
+          const getCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: obj.Key,
+          });
+          const data = await s3Client.send(getCommand);
+          const token = JSON.parse(await data.Body.transformToString());
+          if (token.instagram_user_id === userId || token.instagram_graph_id === userId) {
+            return token;
+          }
+        }
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error(`[getTokenData] Error getting Instagram token for ${userId}:`, error.message);
+    return null;
+  }
+}
+
 async function sendFacebookDMReply(userId, senderId, text, messageId) {
   try {
     console.log(`[${new Date().toISOString()}] Sending Facebook DM reply from ${userId} to ${senderId}: ${text}`);
@@ -8642,6 +8713,21 @@ async function processScheduledInstagramPosts() {
       for (const object of response.Contents) {
         if (!object.Key?.endsWith('.json')) continue;
         
+        // --- SURGICAL FIX: Skip if file is being processed or already moved ---
+        try {
+          // Quick check if file still exists (not moved yet)
+          const headCommand = new HeadObjectCommand({
+            Bucket: 'tasks',
+            Key: object.Key
+          });
+          await s3Client.send(headCommand);
+        } catch (notFoundError) {
+          // File was moved/deleted, skip it
+          console.log(`[SCHEDULER-TRACE] Skipping moved/deleted file: ${object.Key}`);
+          continue;
+        }
+        // ----------------------------------------------------------------
+        
         try {
           // Get schedule data
           const getCommand = new GetObjectCommand({
@@ -8718,10 +8804,209 @@ async function executeScheduledPost(scheduleData) {
   try {
     const apiResponse = await postToInstagram(tokenData, imageBuffer, caption);
     console.log(`[SCHEDULER-TRACE] Instagram API call success: userId=${userId}, scheduleId=${scheduleId}, response=${JSON.stringify(apiResponse)}`);
+    
+    // --- CRITICAL FIX: Update schedule status to prevent reprocessing ---
+    try {
+      // Find the schedule file to update its status
+      const listCommand = new ListObjectsV2Command({
+        Bucket: 'tasks',
+        Prefix: `scheduled_posts/instagram/${userId}/`,
+      });
+      const scheduleFiles = await s3Client.send(listCommand);
+      
+      if (scheduleFiles.Contents) {
+        for (const file of scheduleFiles.Contents) {
+          if (file.Key.endsWith('.json')) {
+            try {
+              const getScheduleCommand = new GetObjectCommand({
+                Bucket: 'tasks',
+                Key: file.Key,
+              });
+              const scheduleResponse = await s3Client.send(getScheduleCommand);
+              const scheduleDataStr = await streamToString(scheduleResponse.Body);
+              const scheduleData = JSON.parse(scheduleDataStr);
+              
+              // Check if this is the matching schedule (by imageKey or scheduleId)
+              if ((scheduleData.imageKey === imageKey) || 
+                  (scheduleId && scheduleData.scheduleId === scheduleId) ||
+                  (scheduleData.caption === caption && scheduleData.userId === userId)) {
+                
+                // Update status to prevent reprocessing
+                scheduleData.status = 'posted';
+                scheduleData.posted_at = new Date().toISOString();
+                scheduleData.post_id = apiResponse.post_id;
+                
+                // Update the schedule file
+                await s3Client.send(new PutObjectCommand({
+                  Bucket: 'tasks',
+                  Key: file.Key,
+                  Body: JSON.stringify(scheduleData, null, 2),
+                  ContentType: 'application/json',
+                }));
+                
+                console.log(`[SCHEDULER-TRACE] ✅ Updated schedule status to 'posted': ${file.Key}`);
+                
+                // Optional: Move to completed folder or delete to prevent future processing
+                const completedKey = file.Key.replace('scheduled_posts/', 'completed_posts/');
+                await s3Client.send(new PutObjectCommand({
+                  Bucket: 'tasks',
+                  Key: completedKey,
+                  Body: JSON.stringify(scheduleData, null, 2),
+                  ContentType: 'application/json',
+                }));
+                
+                // Delete the original schedule file
+                await s3Client.send(new DeleteObjectCommand({
+                  Bucket: 'tasks',
+                  Key: file.Key,
+                }));
+                
+                console.log(`[SCHEDULER-TRACE] ✅ Moved schedule to completed: ${completedKey}`);
+                break; // Found and processed the matching schedule
+              }
+            } catch (updateError) {
+              console.error(`[SCHEDULER-TRACE] Error updating schedule file ${file.Key}:`, updateError.message);
+            }
+          }
+        }
+      }
+    } catch (cleanupError) {
+      console.error(`[SCHEDULER-TRACE] Error in schedule cleanup:`, cleanupError.message);
+    }
+    // ----------------------------------------------------------------
+    
     return apiResponse;
   } catch (err) {
     console.error(`[SCHEDULER-TRACE] Instagram API call failed: userId=${userId}, scheduleId=${scheduleId}, error=${err.message}`);
+    
+    // Update status to 'failed' to prevent infinite retries
+    try {
+      const listCommand = new ListObjectsV2Command({
+        Bucket: 'tasks',
+        Prefix: `scheduled_posts/instagram/${userId}/`,
+      });
+      const scheduleFiles = await s3Client.send(listCommand);
+      
+      if (scheduleFiles.Contents) {
+        for (const file of scheduleFiles.Contents) {
+          if (file.Key.endsWith('.json')) {
+            try {
+              const getScheduleCommand = new GetObjectCommand({
+                Bucket: 'tasks',
+                Key: file.Key,
+              });
+              const scheduleResponse = await s3Client.send(getScheduleCommand);
+              const scheduleDataStr = await streamToString(scheduleResponse.Body);
+              const scheduleData = JSON.parse(scheduleDataStr);
+              
+              if ((scheduleData.imageKey === imageKey) || 
+                  (scheduleId && scheduleData.scheduleId === scheduleId) ||
+                  (scheduleData.caption === caption && scheduleData.userId === userId)) {
+                
+                scheduleData.status = 'failed';
+                scheduleData.error = err.message;
+                scheduleData.failed_at = new Date().toISOString();
+                
+                await s3Client.send(new PutObjectCommand({
+                  Bucket: 'tasks',
+                  Key: file.Key,
+                  Body: JSON.stringify(scheduleData, null, 2),
+                  ContentType: 'application/json',
+                }));
+                
+                console.log(`[SCHEDULER-TRACE] ✅ Updated schedule status to 'failed': ${file.Key}`);
+                break;
+              }
+            } catch (updateError) {
+              console.error(`[SCHEDULER-TRACE] Error updating failed schedule:`, updateError.message);
+            }
+          }
+        }
+      }
+    } catch (cleanupError) {
+      console.error(`[SCHEDULER-TRACE] Error in failed schedule cleanup:`, cleanupError.message);
+    }
+    
     throw err;
+  }
+}
+
+// ... Instagram postToInstagram helper for scheduler ...
+async function postToInstagram(tokenData, imageBuffer, caption) {
+  try {
+    const { access_token, instagram_graph_id } = tokenData;
+    // Validate image size
+    if (imageBuffer.length > 8 * 1024 * 1024) {
+      throw new Error('Image too large. Maximum file size is 8MB for Instagram posts.');
+    }
+    // Upload image to R2 for short-lived public access
+    const fileExtension = 'jpg';
+    const r2Key = `temp_instagram_uploads/scheduler/${instagram_graph_id}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`;
+    await s3Client.send(new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: r2Key,
+      Body: imageBuffer,
+      ContentType: 'image/jpeg',
+      ACL: 'public-read'
+    }));
+    const publicImageUrl = await getSignedUrl(
+      s3Client,
+      new GetObjectCommand({ Bucket: 'tasks', Key: r2Key }),
+      { expiresIn: 900 }
+    );
+    // Create Instagram media object
+    const mediaResponse = await axios.post(`https://graph.instagram.com/v22.0/${instagram_graph_id}/media`, {
+      image_url: publicImageUrl,
+      caption: caption.trim(),
+      access_token: access_token
+    }, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const mediaId = mediaResponse.data.id;
+    // Publish the media
+    const publishResponse = await axios.post(`https://graph.instagram.com/v22.0/${instagram_graph_id}/media_publish`, {
+      creation_id: mediaId,
+      access_token: access_token
+    }, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const postId = publishResponse.data.id;
+    // Store post record for tracking
+    const postKey = `InstagramPosts/${instagram_graph_id}/${postId}.json`;
+    const postData = {
+      id: postId,
+      userId: instagram_graph_id,
+      platform: 'instagram',
+      caption: caption.trim(),
+      media_id: mediaId,
+      instagram_graph_id,
+      posted_at: new Date().toISOString(),
+      status: 'published',
+      type: 'scheduled_post'
+    };
+    await s3Client.send(new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: postKey,
+      Body: JSON.stringify(postData, null, 2),
+      ContentType: 'application/json',
+    }));
+    return {
+      success: true,
+      message: 'Instagram post published successfully!',
+      post_id: postId,
+      media_id: mediaId,
+      posted_at: postData.posted_at
+    };
+  } catch (error) {
+    let errorMessage = 'Failed to post to Instagram';
+    if (error.response?.data?.error?.message) {
+      errorMessage = error.response.data.error.message;
+    } else if (error.response?.data?.error) {
+      errorMessage = error.response.data.error;
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    throw new Error(errorMessage);
   }
 }
 

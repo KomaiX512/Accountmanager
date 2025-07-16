@@ -952,14 +952,21 @@ Image Description: ${response.post.image_prompt}
             });
           }
 
+          // Instantly remove the notification from state
+          setNotifications(prev => prev.filter(n =>
+            !((n.message_id && n.message_id === notification.message_id) ||
+              (n.comment_id && n.comment_id === notification.comment_id))
+          ));
+
           // Update notification status locally
-          setNotifications(prev => 
-            prev.map(notif => 
-              (notif.message_id === notification.message_id || notif.comment_id === notification.comment_id)
-                ? { ...notif, status: 'replied' as const }
-                : notif
-            )
-          );
+          // (old code, now handled by removal above)
+          // setNotifications(prev => 
+          //   prev.map(notif => 
+          //     (notif.message_id === notification.message_id || notif.comment_id === notification.comment_id)
+          //       ? { ...notif, status: 'replied' as const }
+          //       : notif
+          //   )
+          // );
 
           console.log(`[${new Date().toISOString()}] Instagram auto-reply sent for ${notification.message_id || notification.comment_id}`);
         }

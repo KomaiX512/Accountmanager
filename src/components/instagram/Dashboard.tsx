@@ -1115,9 +1115,19 @@ Image Description: ${response.post.image_prompt}
       }
 
       if (data.event === 'message' || data.event === 'comment') {
-        // Instead of just adding the new notification, always fetch the full list
+        setNotifications(prev => {
+          // If already present, do nothing
+          const exists = prev.some(n =>
+            (n.message_id && n.message_id === data.data.message_id) ||
+            (n.comment_id && n.comment_id === data.data.comment_id)
+          );
+          if (exists) return prev;
+          // Otherwise, add to the top
+          return [data.data, ...prev];
+        });
+        // Optionally, fetch the full list after a short delay to sync
         if (igBusinessId) {
-          fetchNotifications(igBusinessId);
+          setTimeout(() => fetchNotifications(igBusinessId), 1000);
         }
       }
     };

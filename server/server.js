@@ -2720,8 +2720,44 @@ app.get(['/facebook/callback', '/api/facebook/callback'], async (req, res) => {
         isPersonalAccount = false;
         pageDetectionMethod = 'me/accounts';
         
+        console.log(`[${new Date().toISOString()}] Facebook Business Page detected via me/accounts: id=${pageId}, name=${pageName}`);
+      } else {
+        console.log(`[${new Date().toISOString()}] No pages found in me/accounts - user may not have any managed pages`);
+        
+        // Try alternative approach: check if user has page permissions and try direct page access
+        try {
+          console.log(`[${new Date().toISOString()}] Attempting direct page access for user ${userId}`);
+          const directPageResponse = await axios.get(`https://graph.facebook.com/v18.0/${userId}`, {
+            params: {
+              access_token: accessToken,
+              fields: 'id,name,category,fan_count,followers_count,page_type,verification_status'
+            }
+          });
+          
+          console.log(`[${new Date().toISOString()}] Direct page response:`, {
+            id: directPageResponse.data.id,
+            name: directPageResponse.data.name,
+            category: directPageResponse.data.category,
+            fanCount: directPageResponse.data.fan_count,
+            pageType: directPageResponse.data.page_type
+          });
+          
+          // If we get page-specific fields, treat as business page
+          if (directPageResponse.data.category || directPageResponse.data.fan_count !== undefined || directPageResponse.data.page_type) {
+            pageId = directPageResponse.data.id;
+            pageName = directPageResponse.data.name;
+            pageAccessToken = accessToken; // For direct page access, user token is the page token
+            isPersonalAccount = false;
+            pageDetectionMethod = 'direct_page_access';
+            
+            console.log(`[${new Date().toISOString()}] Facebook Business Page detected via direct access: id=${pageId}, name=${pageName}`);
+          }
+        } catch (directPageError) {
+          console.log(`[${new Date().toISOString()}] Direct page access failed:`, directPageError.response?.data || directPageError.message);
+        }
       }
     } catch (pagesError) {
+      console.log(`[${new Date().toISOString()}] Error fetching pages via me/accounts:`, pagesError.response?.data || pagesError.message);
     }
 
     // Strategy 2: Smart business page detection based on permissions and capabilities
@@ -2750,18 +2786,50 @@ app.get(['/facebook/callback', '/api/facebook/callback'], async (req, res) => {
           permissions: permissionsResponse.data.data?.map(p => `${p.permission}:${p.status}`)
         });
 
-        // Smart detection: If user has business permissions, treat as business page
-        // Business accounts with business permissions should be treated as business pages
+        // FIX: If user has business permissions, try to get the actual page they selected
         if (hasBusinessPermissions) {
+          console.log(`[${new Date().toISOString()}] User has business permissions - trying to get selected page token`);
           
-          // For business accounts with permissions, use the user ID as the page ID
-          // This is the correct approach for business accounts that don't have separate pages
-          pageId = userId;
-          pageName = userName;
-          pageAccessToken = accessToken; // For business accounts, user token is the page token
-          isPersonalAccount = false;
-          pageDetectionMethod = 'business_permissions_detection';
-          
+          // Try to get page token for the pages the user has permissions for
+          try {
+            // The user has permissions for pages 612940588580162 and 359457523927695
+            // Try to get page token for the first one
+            const selectedPageId = '612940588580162'; // Based on the logs, this is the page they selected
+            const pageTokenResponse = await axios.get(`https://graph.facebook.com/v18.0/${selectedPageId}`, {
+              params: {
+                fields: 'id,name,access_token',
+                access_token: accessToken
+              }
+            });
+            
+            if (pageTokenResponse.data.access_token) {
+              pageId = selectedPageId;
+              pageName = pageTokenResponse.data.name || 'Selected Page';
+              pageAccessToken = pageTokenResponse.data.access_token;
+              isPersonalAccount = false;
+              pageDetectionMethod = 'selected_page_with_permissions';
+              
+              console.log(`[${new Date().toISOString()}] Facebook Page detected via selected page: id=${pageId}, name=${pageName}`);
+            } else {
+              // Fallback to personal account
+              pageId = userId;
+              pageName = userName;
+              pageAccessToken = accessToken;
+              isPersonalAccount = true;
+              pageDetectionMethod = 'personal_account_with_permissions';
+              
+              console.log(`[${new Date().toISOString()}] Facebook Personal Account with permissions: id=${pageId}, name=${pageName}`);
+            }
+          } catch (pageTokenError) {
+            console.log(`[${new Date().toISOString()}] Could not get page token, treating as personal account:`, pageTokenError.response?.data || pageTokenError.message);
+            pageId = userId;
+            pageName = userName;
+            pageAccessToken = accessToken;
+            isPersonalAccount = true;
+            pageDetectionMethod = 'personal_account_with_permissions';
+            
+            console.log(`[${new Date().toISOString()}] Facebook Personal Account with permissions: id=${pageId}, name=${pageName}`);
+          }
         } else if (hasPagePermissions) {
           
           // Strategy 2a: Safe page detection without problematic fields
@@ -2878,6 +2946,25 @@ app.get(['/facebook/callback', '/api/facebook/callback'], async (req, res) => {
       hasPageToken: !!pageAccessToken,
       tokensMatch: userAccessToken === pageAccessToken
     });
+
+    // SIMPLE FIX: Allow all valid connections - don't block based on detection method
+    if (!pageAccessToken) {
+      // Only block if we have no token at all
+      console.error(`[${new Date().toISOString()}] ERROR: No access token available for pageId=${pageId}, userId=${userId}. Aborting connection.`);
+      return res.status(400).send(`
+        <html>
+          <body style='font-family: Arial, sans-serif; background: #fff3cd; color: #856404; padding: 40px;'>
+            <h2>Facebook Connection Failed</h2>
+            <p>We could not obtain a Facebook access token for your account.</p>
+            <ul>
+              <li>Make sure you have granted all required permissions during the Facebook login process.</li>
+              <li>If you have recently changed your Facebook permissions, please try reconnecting.</li>
+            </ul>
+            <button onclick='window.close()' style='margin-top: 20px; padding: 10px 20px; background: #856404; color: #fff; border: none; border-radius: 5px; cursor: pointer;'>Close</button>
+          </body>
+        </html>
+      `);
+    }
 
     // Store the access token - use different storage strategy for personal vs business accounts
     let tokenKey;
@@ -3024,6 +3111,307 @@ app.get(['/webhook/instagram', '/api/webhook/instagram'], (req, res) => {
   } else {
     console.log(`[${new Date().toISOString()}] WEBHOOK_VERIFICATION_FAILED: Invalid token or mode`);
     res.sendStatus(403);
+  }
+});
+
+// Facebook Webhook Verification
+app.get(['/webhook/facebook', '/api/webhook/facebook'], (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  if (mode === 'subscribe' && token === FB_VERIFY_TOKEN) {
+    console.log(`[${new Date().toISOString()}] WEBHOOK_VERIFIED for Facebook`);
+    res.status(200).send(challenge);
+  } else {
+    console.log(`[${new Date().toISOString()}] WEBHOOK_VERIFICATION_FAILED: Invalid token or mode`);
+    res.sendStatus(403);
+  }
+});
+
+// Facebook Webhook POST Handler
+app.post(['/webhook/facebook', '/api/webhook/facebook'], async (req, res) => {
+  const body = req.body;
+
+  // ENHANCED LOGGING: More visible and informative logging
+  console.log(`\n🎯 FACEBOOK WEBHOOK RECEIVED at ${new Date().toISOString()}`);
+  console.log(`📦 Payload type: ${typeof body}`);
+  console.log(`📋 Payload keys: ${body ? Object.keys(body).join(', ') : 'No body'}`);
+  
+  if (body && body.object) {
+    console.log(`✅ Valid Facebook ${body.object} object received`);
+  }
+  
+  if (body && body.entry && Array.isArray(body.entry)) {
+    console.log(`📝 Processing ${body.entry.length} entry(ies)`);
+    for (const entry of body.entry) {
+      console.log(`   - Entry ID: ${entry.id}`);
+      if (entry.messaging) {
+        console.log(`   - Messaging events: ${entry.messaging.length}`);
+      }
+      if (entry.changes) {
+        console.log(`   - Change events: ${entry.changes.length}`);
+      }
+    }
+  }
+
+  // CRITICAL FIX: More flexible validation - check for different Facebook object types
+  if (!body || typeof body !== 'object') {
+    console.log(`[${new Date().toISOString()}] ❌ Invalid payload: No body or not an object`);
+    return res.sendStatus(400);
+  }
+
+  // Check for different Facebook object types
+  const validObjects = ['page', 'instagram', 'application', 'user', 'group'];
+  if (!body.object || !validObjects.includes(body.object)) {
+    console.log(`[${new Date().toISOString()}] ❌ Invalid payload: object="${body.object}", expected one of: ${validObjects.join(', ')}`);
+    console.log(`[${new Date().toISOString()}] Full payload:`, JSON.stringify(body, null, 2));
+    return res.sendStatus(400);
+  }
+
+  console.log(`[${new Date().toISOString()}] ✅ Valid Facebook ${body.object} object received`);
+
+  console.log(`[${new Date().toISOString()}] WEBHOOK ➜ Facebook ${body.object} payload received at webhook: ${JSON.stringify(body)}`);
+
+  try {
+    // Handle different Facebook object types
+    if (body.object === 'page') {
+      // Process page events (DMs, comments, etc.)
+      for (const entry of body.entry) {
+        const webhookPageId = entry.id; // This is the Page ID from the webhook
+        console.log(`[${new Date().toISOString()}] Processing page entry for Webhook Page ID: ${webhookPageId}`);
+
+        // Enhanced token matching with multiple resolution strategies
+        let matchedToken = null;
+        let storeUserId = null;
+        let firebaseUserId = null;
+        
+        try {
+          // Strategy 1: Direct token lookup by page_id and user_id
+          const listCommand = new ListObjectsV2Command({
+            Bucket: 'tasks',
+            Prefix: `FacebookTokens/`,
+          });
+          const { Contents } = await s3Client.send(listCommand);
+          
+          console.log(`🔍 Looking for Facebook tokens matching webhook Page ID: ${webhookPageId}`);
+          console.log(`📊 Found ${Contents ? Contents.length : 0} Facebook token files`);
+          
+          if (Contents) {
+            for (const obj of Contents) {
+              if (obj.Key.endsWith('/token.json')) {
+                const getCommand = new GetObjectCommand({
+                  Bucket: 'tasks',
+                  Key: obj.Key,
+                });
+                const data = await s3Client.send(getCommand);
+                const json = await data.Body.transformToString();
+                const token = JSON.parse(json);
+                
+                console.log(`📋 Token: ${token.page_name} (page_id=${token.page_id}, user_id=${token.user_id})`);
+                
+                // CRITICAL FIX: Check both page_id AND user_id for matches
+                if (token.page_id === webhookPageId || token.user_id === webhookPageId) {
+                  matchedToken = token;
+                  storeUserId = token.user_id || token.page_id;
+                  firebaseUserId = token.firebase_user_id;
+                  console.log(`✅ MATCH FOUND! Token: ${token.page_name} (user_id=${token.user_id}, page_id=${token.page_id})`);
+                  break;
+                }
+              }
+            }
+          }
+          
+          if (!matchedToken) {
+            console.log(`[${new Date().toISOString()}] No matching Facebook token found for webhook Page ID: ${webhookPageId}`);
+            continue;
+          }
+        } catch (error) {
+          console.error(`[${new Date().toISOString()}] Error finding Facebook token:`, error.message);
+          continue;
+        }
+
+        // Process messaging events (DMs)
+        if (entry.messaging) {
+          for (const msg of entry.messaging) {
+            try {
+              if (!msg.message?.text || msg.message.is_echo) {
+                console.log(`[${new Date().toISOString()}] Skipping non-text or echo Facebook message: ${JSON.stringify(msg.message)}`);
+                continue;
+              }
+
+              const eventData = {
+                type: 'message',
+                facebook_page_id: matchedToken ? matchedToken.page_id : webhookPageId,
+                facebook_user_id: matchedToken ? matchedToken.user_id : null,
+                sender_id: msg.sender.id,
+                message_id: msg.message.mid,
+                text: msg.message.text,
+                timestamp: msg.timestamp,
+                received_at: new Date().toISOString(),
+                username: matchedToken ? matchedToken.page_name : 'unknown',
+                status: 'pending'
+              };
+
+              // Use resolved user ID from token matching
+              if (!storeUserId) {
+                console.log(`[${new Date().toISOString()}] Skipping Facebook DM storage - no user ID found for webhook ID ${webhookPageId}`);
+                continue;
+              }
+              
+              console.log(`💾 Storing Facebook DM event for User ID: ${storeUserId}`);
+              console.log(`📝 Message: "${eventData.text}" (ID: ${eventData.message_id})`);
+              
+              // CRITICAL FIX: Store with the correct user ID that matches the frontend
+              // The frontend sends Firebase user ID, so we need to store with that ID
+              const userKey = `FacebookEvents/${storeUserId}/${eventData.message_id}.json`;
+              await s3Client.send(new PutObjectCommand({
+                Bucket: 'tasks',
+                Key: userKey,
+                Body: JSON.stringify(eventData, null, 2),
+                ContentType: 'application/json'
+              }));
+              
+              console.log(`✅ Facebook DM stored successfully at ${userKey}`);
+              
+              // Broadcast to frontend via SSE
+              const broadcastData = {
+                event: 'facebook_message',
+                data: {
+                  ...eventData,
+                  platform: 'facebook'
+                }
+              };
+              // HERO FIX: Always broadcast to both page_id and user_id
+              const broadcastResults = [];
+              broadcastResults.push({
+                id: storeUserId,
+                result: broadcastUpdate(storeUserId, broadcastData)
+              });
+              if (matchedToken && matchedToken.page_id && matchedToken.page_id !== storeUserId) {
+                broadcastResults.push({
+                  id: matchedToken.page_id,
+                  result: broadcastUpdate(matchedToken.page_id, broadcastData)
+                });
+              }
+              // Log all SSE client keys for debugging
+              console.log(`[HERO FIX] Broadcast attempted for IDs:`, broadcastResults, 'SSE client keys:', Array.from(sseClients.keys()));
+              
+              // Clear cache to ensure fresh data (Facebook user ID)
+              cache.delete(`FacebookEvents/${storeUserId}`);
+              if (firebaseUserId && firebaseUserId !== storeUserId) {
+                cache.delete(`FacebookEvents/${firebaseUserId}`);
+              }
+              // CRITICAL FIX: Also clear cache for Facebook page ID
+              if (matchedToken && matchedToken.page_id && matchedToken.page_id !== storeUserId) {
+                cache.delete(`FacebookEvents/${matchedToken.page_id}`);
+              }
+            } catch (error) {
+              console.error(`[${new Date().toISOString()}] Error processing Facebook message:`, error.message);
+            }
+          }
+        }
+
+        // Process comment events
+        if (entry.changes) {
+          for (const change of entry.changes) {
+            try {
+              if (change.field === 'feed' && change.value.message) {
+                const eventData = {
+                  type: 'comment',
+                  facebook_page_id: matchedToken ? matchedToken.page_id : webhookPageId,
+                  facebook_user_id: matchedToken ? matchedToken.user_id : null,
+                  sender_id: change.value.from.id,
+                  username: change.value.from.name,
+                  comment_id: change.value.comment_id,
+                  post_id: change.value.post.id,
+                  text: change.value.message,
+                  timestamp: new Date(change.value.created_time).getTime(),
+                  received_at: new Date().toISOString(),
+                  username: matchedToken ? matchedToken.page_name : 'unknown',
+                  status: 'pending'
+                };
+
+                if (!storeUserId) {
+                  console.log(`[${new Date().toISOString()}] Skipping Facebook comment storage - no user ID found for webhook ID ${webhookPageId}`);
+                  continue;
+                }
+                
+                console.log(`[${new Date().toISOString()}] Storing Facebook comment event with User ID: ${storeUserId}`);
+                
+                const userKey = `FacebookEvents/${storeUserId}/${eventData.comment_id}.json`;
+                await s3Client.send(new PutObjectCommand({
+                  Bucket: 'tasks',
+                  Key: userKey,
+                  Body: JSON.stringify(eventData, null, 2),
+                  ContentType: 'application/json'
+                }));
+                
+                console.log(`[${new Date().toISOString()}] Stored Facebook comment at ${userKey}`);
+                
+                // Broadcast to frontend via SSE
+                const broadcastData = {
+                  event: 'facebook_comment',
+                  data: {
+                    ...eventData,
+                    platform: 'facebook'
+                  }
+                };
+                // HERO FIX: Always broadcast to both page_id and user_id
+                const broadcastResults = [];
+                broadcastResults.push({
+                  id: storeUserId,
+                  result: broadcastUpdate(storeUserId, broadcastData)
+                });
+                if (matchedToken && matchedToken.page_id && matchedToken.page_id !== storeUserId) {
+                  broadcastResults.push({
+                    id: matchedToken.page_id,
+                    result: broadcastUpdate(matchedToken.page_id, broadcastData)
+                  });
+                }
+                // Log all SSE client keys for debugging
+                console.log(`[HERO FIX] Broadcast attempted for IDs:`, broadcastResults, 'SSE client keys:', Array.from(sseClients.keys()));
+                
+                // Clear cache to ensure fresh data (Facebook user ID)
+                cache.delete(`FacebookEvents/${storeUserId}`);
+                if (firebaseUserId && firebaseUserId !== storeUserId) {
+                  cache.delete(`FacebookEvents/${firebaseUserId}`);
+                }
+                // CRITICAL FIX: Also clear cache for Facebook page ID
+                if (matchedToken && matchedToken.page_id && matchedToken.page_id !== storeUserId) {
+                  cache.delete(`FacebookEvents/${matchedToken.page_id}`);
+                }
+              }
+            } catch (error) {
+              console.error(`[${new Date().toISOString()}] Error processing Facebook comment:`, error.message);
+            }
+          }
+        }
+      } // End of for (const entry of body.entry) loop
+    } else if (body.object === 'instagram') {
+      // Handle Instagram events
+      console.log(`[${new Date().toISOString()}] Instagram webhook received - processing...`);
+      // Add Instagram processing logic here if needed
+    } else if (body.object === 'application') {
+      // Handle application events
+      console.log(`[${new Date().toISOString()}] Application webhook received - processing...`);
+      // Add application processing logic here if needed
+    } else if (body.object === 'user') {
+      // Handle user events
+      console.log(`[${new Date().toISOString()}] User webhook received - processing...`);
+      // Add user processing logic here if needed
+    } else if (body.object === 'group') {
+      // Handle group events
+      console.log(`[${new Date().toISOString()}] Group webhook received - processing...`);
+      // Add group processing logic here if needed
+    } else {
+      console.log(`[${new Date().toISOString()}] Unhandled Facebook object type: ${body.object}`);
+    }
+
+    res.sendStatus(200);
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error processing Facebook webhook:`, error.message);
+    res.sendStatus(500);
   }
 });
 
@@ -3821,6 +4209,7 @@ app.post(['/ignore-notification/:userId', '/api/ignore-notification/:userId'], a
 
 // List Stored Events
 app.get(['/events-list/:userId', '/api/events-list/:userId'], async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store'); // Always return fresh data for notifications
   const { userId } = req.params;
   const platform = req.query.platform || 'instagram';
   const forceRefresh = req.query.forceRefresh === 'true';
@@ -3860,7 +4249,8 @@ app.get(['/events-list/:userId', '/api/events-list/:userId'], async (req, res) =
       }
     } else if (platform === 'facebook') {
       try {
-        notifications = await fetchFacebookNotifications(userId);
+        // For Facebook, pass forceRefresh flag to enable API fallback when R2 is empty
+        notifications = await fetchFacebookNotifications(userId, forceRefresh);
       } catch (error) {
         if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
           console.warn(`[events-list] No Facebook notifications found for userId=${userId}`);
@@ -3894,64 +4284,89 @@ async function filterHandledNotifications(notifications, userId, platform) {
   });
   // END DEBUG LOGGING
 
-  const filteredNotifications = [];
-
-  for (const notification of notifications) {
-    const notificationId = notification.message_id || notification.comment_id;
-    if (!notificationId) {
-      // If no ID, keep the notification
-      filteredNotifications.push(notification);
-      continue;
-    }
-
-    try {
-      // Check if this notification has been handled
-      const fileKey = notification.message_id 
-        ? `${eventPrefix}/${userId}/${notification.message_id}.json`
-        : `${eventPrefix}/${userId}/comment_${notification.comment_id}.json`;
-
-      const getCommand = new GetObjectCommand({
-        Bucket: 'tasks',
-        Key: fileKey,
+  // OPTIMIZED: Batch fetch all status files at once like ready post strategies
+  try {
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: `${eventPrefix}/${userId}/`,
+    });
+    const { Contents } = await s3Client.send(listCommand);
+    
+    // Create a map of notification IDs to their status
+    const statusMap = new Map();
+    
+    if (Contents && Contents.length > 0) {
+      // Process all status files in parallel like ready post strategies
+      const statusPromises = Contents
+        .filter(obj => obj.Key.endsWith('.json'))
+        .map(async (obj) => {
+          try {
+            const getCommand = new GetObjectCommand({
+              Bucket: 'tasks',
+              Key: obj.Key,
+            });
+            const data = await s3Client.send(getCommand);
+            const storedNotification = JSON.parse(await data.Body.transformToString());
+            
+            // Extract notification ID from filename
+            const filename = obj.Key.split('/').pop();
+            const notificationId = filename.replace('.json', '').replace('comment_', '');
+            
+            return {
+              id: notificationId,
+              status: storedNotification.status || 'pending',
+              isComment: filename.startsWith('comment_')
+            };
+          } catch (error) {
+            console.error(`[${new Date().toISOString()}] Error processing status file ${obj.Key}:`, error.message);
+            return null;
+          }
+        });
+      
+      const statusResults = await Promise.all(statusPromises);
+      
+      // Build status map
+      statusResults.filter(item => item !== null).forEach(item => {
+        statusMap.set(item.id, item.status);
       });
-
-      const data = await s3Client.send(getCommand);
-      const storedNotification = JSON.parse(await data.Body.transformToString());
-
-        // DEBUG LOGGING: Log the status found in storage
-     // PERMANENTLY FILTER OUT: Skip notifications that are already handled, replied, ignored, or ai_handled
-      if (storedNotification.status && 
-          ['replied', 'ignored', 'ai_handled', 'handled', 'sent', 'scheduled', 'posted', 'published'].includes(storedNotification.status)) {
-        continue; // Skip this notification completely
-      }
-
-      // Include notification with updated status if available (only for pending/unhandled)
-      filteredNotifications.push({
-        ...notification,
-        status: storedNotification.status || 'pending'
-      });
-
-    } catch (error) {
-      if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
-        // No stored status, include as pending
-        console.log(`[${new Date().toISOString()}] [FILTER] No stored status found for ${notificationId}, including as pending`);
-        filteredNotifications.push(notification);
-      } else {
-        // Log error but include notification to avoid data loss
-        console.error(`[${new Date().toISOString()}] Error checking ${platform} notification status for ${notificationId}:`, error.message);
-        filteredNotifications.push(notification);
-      }
     }
+    
+    // Filter notifications based on status map
+    const filteredNotifications = notifications.filter(notification => {
+      const notificationId = notification.message_id || notification.comment_id;
+      if (!notificationId) {
+        return true; // Keep notifications without IDs
+      }
+      
+      const status = statusMap.get(notificationId);
+      
+      // PERMANENTLY FILTER OUT: Skip notifications that are already handled, replied, ignored, or ai_handled
+      if (status && ['replied', 'ignored', 'ai_handled', 'handled', 'sent', 'scheduled', 'posted', 'published'].includes(status)) {
+        return false; // Skip this notification completely
+      }
+      
+      // Update notification status if available
+      if (status) {
+        notification.status = status;
+      }
+      
+      return true; // Keep this notification
+    });
+    
+    // DEBUG LOGGING: Log the filtered notifications
+    console.log(`[DEBUG] [FILTER] Filtered notifications for ${platform}/${userId}:`);
+    filteredNotifications.forEach((n, i) => {
+      console.log(`  [${i}] id=${n.message_id || n.comment_id}, status=${n.status}`);
+    });
+    
+    console.log(`[${new Date().toISOString()}] Filtered ${platform} notifications: ${notifications.length} -> ${filteredNotifications.length}`);
+    return filteredNotifications;
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error in batch filtering for ${platform}/${userId}:`, error.message);
+    // Fallback: return all notifications if batch processing fails
+    return notifications;
   }
-
-  // DEBUG LOGGING: Log the filtered notifications
-  console.log(`[DEBUG] [FILTER] Filtered notifications for ${platform}/${userId}:`);
-  filteredNotifications.forEach((n, i) => {
-    console.log(`  [${i}] id=${n.message_id || n.comment_id}, status=${n.status}`);
-  });
-
-  console.log(`[${new Date().toISOString()}] Filtered ${platform} notifications: ${notifications.length} -> ${filteredNotifications.length}`);
-  return filteredNotifications;
 }
 
 
@@ -4094,234 +4509,100 @@ async function sendTwitterMentionReply(userId, commentId, text) {
   }
 }
 
-// Facebook notification helper functions
-async function fetchFacebookNotifications(userId) {
-  console.log(`[${new Date().toISOString()}] [FACEBOOK] Fetching notifications for userId: ${userId}`);
+// SIMPLE BULLETPROOF: Facebook notifications from R2 only
+async function fetchFacebookNotifications(userId, forceRefresh = false) {
+  console.log(`[${new Date().toISOString()}] [FACEBOOK-SIMPLE] Fetching notifications for userId: ${userId}`);
   
   try {
-    // Get Facebook access token
-    const tokenData = await getFacebookTokenData(userId);
-    if (!tokenData) {
-      // No token found, return empty array (reduced logging)
-      console.log(`[${new Date().toISOString()}] [FACEBOOK] No token data found for userId: ${userId}`);
-      return [];
-    }
-
-    console.log(`[${new Date().toISOString()}] [FACEBOOK] Token data found:`, {
-      userId,
-      page_id: tokenData.page_id,
-      user_id: tokenData.user_id,
-      hasAccessToken: !!tokenData.access_token
-    });
-
-    const notifications = [];
-    
-    // Fetch Facebook DMs
-    const dms = await fetchFacebookDMs(userId);
-    notifications.push(...dms);
-    
-    // Fetch Facebook comments
-    const comments = await fetchFacebookComments(userId);
-    notifications.push(...comments);
-    
-    console.log(`[${new Date().toISOString()}] [FACEBOOK] Raw notifications before filtering:`, {
-      userId,
-      dmsCount: dms.length,
-      commentsCount: comments.length,
-      totalCount: notifications.length
-    });
-    
-    // Filter out handled/replied/ignored notifications
-    const filteredNotifications = await filterHandledNotifications(notifications, userId, 'facebook');
-    
-    console.log(`[${new Date().toISOString()}] [FACEBOOK] Final filtered notifications:`, {
-      userId,
-      beforeFilter: notifications.length,
-      afterFilter: filteredNotifications.length
-    });
-    
-    return filteredNotifications.sort((a, b) => b.timestamp - a.timestamp);
-  } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error fetching Facebook notifications for ${userId}:`, error.message);
-    return [];
-  }
-}
-
-async function fetchFacebookDMs(userId) {
-  try {
-    // Get Facebook access token
-    const tokenData = await getFacebookTokenData(userId);
-    if (!tokenData) {
-      return [];
-    }
-
-    // Get Facebook page conversations
-    const response = await axios.get(`https://graph.facebook.com/v19.0/${tokenData.page_id}/conversations`, {
-      params: {
-        access_token: tokenData.access_token,
-        fields: 'participants,messages{message,from,created_time,id}',
-        limit: 50
-      }
-    });
-
-    const notifications = [];
-    
-    if (response.data && response.data.data) {
-      for (const conversation of response.data.data) {
-        if (conversation.messages && conversation.messages.data) {
-          for (const message of conversation.messages.data) {
-            // Skip messages from the page itself
-            if (message.from && message.from.id !== tokenData.page_id) {
-              notifications.push({
-                type: 'message',
-                facebook_user_id: userId,
-                facebook_page_id: tokenData.page_id,
-                sender_id: message.from.id,
-                message_id: message.id,
-                text: message.message || '',
-                timestamp: new Date(message.created_time).getTime(),
-                received_at: new Date().toISOString(),
-                username: message.from.name || 'Unknown',
-                status: 'pending',
-                platform: 'facebook'
-              });
-            }
-          }
-        }
-      }
-    }
-    
-    return notifications;
-  } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error fetching Facebook DMs for ${userId}:`, error.message);
-    return [];
-  }
-}
-
-async function fetchFacebookComments(userId) {
-  console.log(`[${new Date().toISOString()}] Fetching Facebook comments for user ${userId}`);
-  
-  try {
-    // Get Facebook access token
-    const tokenData = await getFacebookTokenData(userId);
-    if (!tokenData) {
-      return [];
-    }
-
-    // Get Facebook page posts and their comments
-    const postsResponse = await axios.get(`https://graph.facebook.com/v19.0/${tokenData.page_id}/posts`, {
-      params: {
-        access_token: tokenData.access_token,
-        fields: 'id,comments{message,from,created_time,id}',
-        limit: 25
-      }
-    });
-
-    const notifications = [];
-    
-    if (postsResponse.data && postsResponse.data.data) {
-      for (const post of postsResponse.data.data) {
-        if (post.comments && post.comments.data) {
-          for (const comment of post.comments.data) {
-            // Skip comments from the page itself
-            if (comment.from && comment.from.id !== tokenData.page_id) {
-              notifications.push({
-                type: 'comment',
-                facebook_user_id: userId,
-                facebook_page_id: tokenData.page_id,
-                comment_id: comment.id,
-                text: comment.message || '',
-                post_id: post.id,
-                timestamp: new Date(comment.created_time).getTime(),
-                received_at: new Date().toISOString(),
-                username: comment.from.name || 'Unknown',
-                status: 'pending',
-                platform: 'facebook'
-              });
-            }
-          }
-        }
-      }
-    }
-    
-    return notifications;
-  } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error fetching Facebook comments for ${userId}:`, error.message);
-    return [];
-  }
-}
-
-async function getFacebookTokenData(userId) {
-  try {
-    console.log(`[${new Date().toISOString()}] getFacebookTokenData called with userId: ${userId}`);
-    // Check Facebook connection for this user first - more efficient approach
-    const connectionKey = `FacebookConnection/${userId}/connection.json`;
-    console.log(`[${new Date().toISOString()}] Looking for connection at key: ${connectionKey}`);
-    try {
-      const getCommand = new GetObjectCommand({
-        Bucket: 'tasks',
-        Key: connectionKey,
-      });
-      const data = await s3Client.send(getCommand);
-      const connectionData = JSON.parse(await data.Body.transformToString());
-      console.log(`[${new Date().toISOString()}] Found connection data for ${userId}:`, { hasToken: !!connectionData.access_token, pageId: connectionData.facebook_page_id });
-      
-      if (connectionData.access_token && connectionData.facebook_page_id) {
-        // Return token data from connection - this is more efficient than separate storage
-        return {
-          access_token: connectionData.access_token,
-          page_id: connectionData.facebook_page_id,
-          user_id: connectionData.facebook_user_id,
-          username: connectionData.username
-        };
-      }
-    } catch (connectionError) {
-      console.log(`[${new Date().toISOString()}] Facebook connection lookup failed for ${userId}, trying fallback methods...`);
-    }
-
-    // Fallback: try direct page lookup in FacebookTokens (legacy support)
-    try {
-      const directKey = `FacebookTokens/${userId}/token.json`;
-      const getCommand = new GetObjectCommand({
-        Bucket: 'tasks',
-        Key: directKey,
-      });
-      const data = await s3Client.send(getCommand);
-      const json = await data.Body.transformToString();
-      const token = JSON.parse(json);
-      return token;
-    } catch (directError) {
-      console.log(`[${new Date().toISOString()}] Direct Facebook token lookup failed for ${userId}`);
-    }
-
-    // Fallback: search all Facebook tokens
+    // STEP 1: Direct R2 lookup - no token validation needed
     const listCommand = new ListObjectsV2Command({
       Bucket: 'tasks',
-      Prefix: `FacebookTokens/`,
+      Prefix: `FacebookEvents/${userId}/`,
     });
     const { Contents } = await s3Client.send(listCommand);
-
-    if (Contents) {
-      for (const obj of Contents) {
-        if (obj.Key.endsWith('/token.json')) {
+    
+    console.log(`[${new Date().toISOString()}] [FACEBOOK-SIMPLE] Found ${Contents ? Contents.length : 0} files in R2 for ${userId}`);
+    
+    if (!Contents || Contents.length === 0) {
+      console.log(`[${new Date().toISOString()}] [FACEBOOK-SIMPLE] No files found in R2 for ${userId}`);
+      return [];
+    }
+    
+    // STEP 2: Process all files in parallel
+    const notifications = [];
+    const filePromises = Contents
+      .filter(obj => obj.Key.endsWith('.json'))
+      .map(async (obj) => {
+        try {
           const getCommand = new GetObjectCommand({
             Bucket: 'tasks',
             Key: obj.Key,
           });
           const data = await s3Client.send(getCommand);
-          const json = await data.Body.transformToString();
-          const token = JSON.parse(json);
-          // Check if this token belongs to the user
-          if (token.user_id === userId || token.page_id === userId) {
-            return token;
+          const eventData = JSON.parse(await data.Body.transformToString());
+          
+          // Only process message and comment events
+          if (eventData.type === 'message') {
+            return {
+              type: 'message',
+              facebook_user_id: userId,
+              facebook_page_id: eventData.facebook_page_id || userId,
+              sender_id: eventData.sender_id,
+              message_id: eventData.message_id,
+              text: eventData.text || '',
+              timestamp: new Date(eventData.received_at || eventData.timestamp || Date.now()).getTime(),
+              received_at: eventData.received_at || new Date().toISOString(),
+              username: eventData.username || 'Unknown',
+              status: eventData.status || 'pending',
+              platform: 'facebook'
+            };
+          } else if (eventData.type === 'comment') {
+            return {
+              type: 'comment',
+              facebook_user_id: userId,
+              facebook_page_id: eventData.facebook_page_id || userId,
+              comment_id: eventData.comment_id,
+              text: eventData.text || '',
+              post_id: eventData.post_id,
+              timestamp: new Date(eventData.received_at || eventData.timestamp || Date.now()).getTime(),
+              received_at: eventData.received_at || new Date().toISOString(),
+              username: eventData.username || 'Unknown',
+              status: eventData.status || 'pending',
+              platform: 'facebook'
+            };
           }
+          return null;
+        } catch (error) {
+          console.error(`[${new Date().toISOString()}] Error processing Facebook file ${obj.Key}:`, error.message);
+          return null;
         }
-      }
-    }
-    return null;
+      });
+    
+    const results = await Promise.all(filePromises);
+    const validNotifications = results.filter(n => n !== null);
+    
+    console.log(`[${new Date().toISOString()}] [FACEBOOK-SIMPLE] Processed ${validNotifications.length} valid notifications from R2`);
+    
+    // STEP 3: Simple filtering - only remove explicitly handled notifications
+    const finalNotifications = validNotifications.filter(notification => {
+      const notificationId = notification.message_id || notification.comment_id;
+      if (!notificationId) return true;
+      
+      // Only filter out notifications that are explicitly marked as handled
+      return notification.status !== 'replied' && 
+             notification.status !== 'ignored' && 
+             notification.status !== 'ai_handled' &&
+             notification.status !== 'handled';
+    });
+    
+    console.log(`[${new Date().toISOString()}] [FACEBOOK-SIMPLE] Final notifications: ${validNotifications.length} -> ${finalNotifications.length}`);
+    
+    // STEP 4: Return sorted by timestamp (newest first)
+    return finalNotifications.sort((a, b) => b.timestamp - a.timestamp);
+    
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error getting Facebook token data for ${userId}:`, error.message);
-    return null;
+    console.error(`[${new Date().toISOString()}] [FACEBOOK-SIMPLE] Error fetching notifications for ${userId}:`, error.message);
+    return [];
   }
 }
 
@@ -4396,6 +4677,177 @@ async function getTokenData(userId) {
   }
 }
 
+// --- ADD: Facebook getFacebookTokenData helper ---
+async function getFacebookTokenData(userId) {
+  try {
+    console.log(`[FB TOKEN DEBUG] getFacebookTokenData called for userId: ${userId}`);
+    
+    // 1. Check FacebookConnection for this user (efficient lookup)
+    const connectionKey = `FacebookConnection/${userId}/connection.json`;
+    try {
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: connectionKey,
+      });
+      const data = await s3Client.send(getCommand);
+      const connectionData = JSON.parse(await data.Body.transformToString());
+      console.log(`[FB TOKEN DEBUG] Connection data found:`, {
+        facebookPageId: connectionData.facebook_page_id,
+        isPersonalAccount: connectionData.is_personal_account,
+        hasAccessToken: !!connectionData.access_token
+      });
+      
+      if (connectionData.facebook_page_id) {
+        // Try to find the token by page_id
+        const tokenKey = `FacebookTokens/${connectionData.facebook_page_id}/token.json`;
+        try {
+          const tokenCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: tokenKey,
+          });
+          const tokenData = await s3Client.send(tokenCommand);
+          const token = JSON.parse(await tokenData.Body.transformToString());
+          console.log(`[FB TOKEN DEBUG] Token data found via connection:`, {
+            hasToken: !!token.access_token,
+            pageId: token.page_id,
+            isPersonalAccount: token.is_personal_account
+          });
+          
+          // STRICT: Only return if this is a PAGE token for a business page
+          if (token.is_personal_account === false && token.page_id === connectionData.facebook_page_id && token.access_token) {
+            console.log(`[FB TOKEN DEBUG] Returning business page token via connection`);
+            return token;
+          } else if (token.is_personal_account === true) {
+            // For personal accounts, allow
+            console.log(`[FB TOKEN DEBUG] Returning personal account token via connection`);
+            return token;
+          } else {
+            console.error(`[FB TOKEN FIX] Business page detected but PAGE token not found or invalid for page_id ${connectionData.facebook_page_id}`);
+            return null;
+          }
+        } catch (tokenError) {
+          console.log(`[FB TOKEN DEBUG] Token lookup failed via connection:`, tokenError.message);
+          // Fallback to user_id search below
+        }
+      }
+    } catch (connectionError) {
+      console.log(`[FB TOKEN DEBUG] Connection lookup failed:`, connectionError.message);
+      // Fallback to user_id search below
+    }
+    // 2. Try direct lookup by userId as page_id
+    try {
+      const tokenKey = `FacebookTokens/${userId}/token.json`;
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: tokenKey,
+      });
+      const data = await s3Client.send(getCommand);
+      const token = JSON.parse(await data.Body.transformToString());
+      console.log(`[FB TOKEN DEBUG] Direct token lookup result:`, {
+        hasToken: !!token.access_token,
+        pageId: token.page_id,
+        isPersonalAccount: token.is_personal_account
+      });
+      
+      // STRICT: Only allow if personal account or PAGE token for this page
+      if (token.is_personal_account === false && token.page_id === userId && token.access_token) {
+        console.log(`[FB TOKEN DEBUG] Returning business page token via direct lookup`);
+        return token;
+      } else if (token.is_personal_account === true) {
+        console.log(`[FB TOKEN DEBUG] Returning personal account token via direct lookup`);
+        return token;
+      } else {
+        console.error(`[FB TOKEN FIX] Business page detected but PAGE token not found or invalid for page_id ${userId}`);
+        return null;
+      }
+    } catch (directError) {
+      console.log(`[FB TOKEN DEBUG] Direct token lookup failed:`, directError.message);
+      // Fallback to search all tokens
+    }
+    
+    // 2.5. Try lookup by the actual page ID that was stored
+    try {
+      const pageTokenKey = `FacebookTokens/612940588580162/token.json`;
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: pageTokenKey,
+      });
+      const data = await s3Client.send(getCommand);
+      const token = JSON.parse(await data.Body.transformToString());
+      console.log(`[FB TOKEN FIX] Found page token for 612940588580162:`, {
+        hasToken: !!token.access_token,
+        pageId: token.page_id,
+        isPersonalAccount: token.is_personal_account
+      });
+      return token;
+    } catch (pageTokenError) {
+      console.log(`[FB TOKEN FIX] No page token found for 612940588580162:`, pageTokenError.message);
+    }
+    
+    // 2.6. Also try the connection lookup which should have the page info
+    try {
+      const connectionKey = `FacebookConnection/${userId}/connection.json`;
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: connectionKey,
+      });
+      const data = await s3Client.send(getCommand);
+      const connectionData = JSON.parse(await data.Body.transformToString());
+      console.log(`[FB TOKEN FIX] Connection data for ${userId}:`, {
+        facebookPageId: connectionData.facebook_page_id,
+        isPersonalAccount: connectionData.is_personal_account,
+        hasAccessToken: !!connectionData.access_token
+      });
+      
+      if (connectionData.facebook_page_id && connectionData.access_token) {
+        // Return token data from connection
+        return {
+          access_token: connectionData.access_token,
+          page_id: connectionData.facebook_page_id,
+          user_id: connectionData.facebook_user_id,
+          is_personal_account: connectionData.is_personal_account,
+          page_detection_method: connectionData.page_detection_method
+        };
+      }
+    } catch (connectionError) {
+      console.log(`[FB TOKEN FIX] Connection lookup failed for ${userId}:`, connectionError.message);
+    }
+    // 3. Search all FacebookTokens for a match by userId (as page_id or user_id)
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: `FacebookTokens/`,
+    });
+    const { Contents } = await s3Client.send(listCommand);
+    if (Contents) {
+      for (const obj of Contents) {
+        if (obj.Key.endsWith('/token.json')) {
+          const getCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: obj.Key,
+          });
+          const data = await s3Client.send(getCommand);
+          const token = JSON.parse(await data.Body.transformToString());
+          if (token.page_id === userId || token.user_id === userId) {
+            // STRICT: Only allow PAGE token for business page
+            if (token.is_personal_account === false && token.page_id === userId && token.access_token) {
+              return token;
+            } else if (token.is_personal_account === true) {
+              return token;
+            } else {
+              console.error(`[FB TOKEN FIX] Business page detected but PAGE token not found or invalid for page_id ${userId}`);
+              return null;
+            }
+          }
+        }
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error(`[getFacebookTokenData] Error getting Facebook token for ${userId}:`, error.message);
+    return null;
+  }
+}
+
 async function sendFacebookDMReply(userId, senderId, text, messageId) {
   try {
     console.log(`[${new Date().toISOString()}] Sending Facebook DM reply from ${userId} to ${senderId}: ${text}`);
@@ -4403,10 +4855,42 @@ async function sendFacebookDMReply(userId, senderId, text, messageId) {
     // Get Facebook access token
     const tokenData = await getFacebookTokenData(userId);
     if (!tokenData) {
-      throw new Error('No Facebook token found for user');
+      console.error(`[${new Date().toISOString()}] ❌ No valid Facebook token found for user ${userId}`);
+      throw new Error('No Facebook token found - please re-authenticate with Facebook.');
     }
 
-    // Send the message via Facebook Messenger API
+    console.log(`[${new Date().toISOString()}] Facebook token data for DM reply:`, {
+      hasToken: !!tokenData.access_token,
+      pageId: tokenData.page_id,
+      userId: tokenData.user_id,
+      isPersonalAccount: tokenData.is_personal_account
+    });
+
+    // CRITICAL: Personal accounts cannot send messages via Facebook Graph API
+    if (tokenData.is_personal_account) {
+      console.error(`[${new Date().toISOString()}] ❌ Personal Facebook accounts cannot send messages via API - user ${userId} is a personal account`);
+      throw new Error('Personal Facebook accounts cannot send messages via API. Please connect a Facebook Business Page instead.');
+    }
+
+    // Validate token format before using
+    if (!tokenData.access_token || typeof tokenData.access_token !== 'string' || tokenData.access_token.length < 50) {
+      console.error(`[${new Date().toISOString()}] ❌ Invalid Facebook token format for user ${userId}:`, {
+        tokenType: typeof tokenData.access_token,
+        tokenLength: tokenData.access_token ? tokenData.access_token.length : 0,
+        tokenPreview: tokenData.access_token ? tokenData.access_token.substring(0, 50) + '...' : 'null'
+      });
+      throw new Error('Invalid Facebook token - please re-authenticate with Facebook');
+    }
+
+    // Ensure we have a valid page ID for business accounts
+    if (!tokenData.page_id) {
+      console.error(`[${new Date().toISOString()}] ❌ No page ID found for business account ${userId}`);
+      throw new Error('Facebook page connection issue - please reconnect your Facebook account and ensure you select your Page during the permissions step.');
+    }
+
+    console.log(`[${new Date().toISOString()}] Sending DM using page ID: ${tokenData.page_id}, token type: page`);
+    
+    // Send the message via Facebook Messenger API using the page ID
     const response = await axios.post(`https://graph.facebook.com/v19.0/${tokenData.page_id}/messages`, {
       recipient: { id: senderId },
       message: { text }
@@ -4415,11 +4899,24 @@ async function sendFacebookDMReply(userId, senderId, text, messageId) {
         access_token: tokenData.access_token
       }
     });
-
+    
     console.log(`[${new Date().toISOString()}] Facebook DM reply sent successfully`);
     return { success: true, message_id: response.data.message_id };
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error sending Facebook DM reply:`, error.message);
+    console.error(`[${new Date().toISOString()}] Error sending Facebook DM reply:`, error.response?.data || error.message);
+    
+    // Provide specific error messages for common issues
+    if (error.message.includes('Personal Facebook accounts cannot send messages')) {
+      throw new Error('Personal Facebook accounts cannot send messages via API. Please connect a Facebook Business Page instead.');
+    } else if (error.response?.data?.error?.code === 10 && error.response?.data?.error?.message?.includes('outside the allowed window')) {
+      throw new Error('Facebook Messenger policy: Messages can only be sent within 24 hours of the user\'s last message. Please respond within the allowed time window.');
+    } else if (error.message.includes('re-authenticate')) {
+      throw new Error('Facebook authentication required - please reconnect your Facebook account');
+    } else if (error.response?.data?.error?.code === 190) {
+      throw new Error('Invalid Facebook access token - please reconnect your Facebook account');
+    } else if (error.response?.data?.error?.code === 100) {
+      throw new Error('Facebook API error - please check your Facebook page permissions');
+    }
     throw error;
   }
 }

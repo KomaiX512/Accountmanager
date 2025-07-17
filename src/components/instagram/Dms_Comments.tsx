@@ -58,6 +58,51 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
   const { userId: facebookUserId, isConnected: isFacebookConnected } = useFacebook();
   const facebookPageId = propFacebookPageId || facebookUserId;
 
+  // CRITICAL FIX: Add validation for notifications array
+  const validNotifications = React.useMemo(() => {
+    if (!Array.isArray(notifications)) {
+      console.error(`[${new Date().toISOString()}] [${platform.toUpperCase()}] Invalid notifications data:`, notifications);
+      return [];
+    }
+
+    return notifications.filter((notif: any, index: number) => {
+      // Basic validation
+      if (!notif || typeof notif !== 'object') {
+        console.warn(`[${new Date().toISOString()}] [${platform.toUpperCase()}] Invalid notification at index ${index}:`, notif);
+        return false;
+      }
+
+      // Check for required fields
+      const hasRequiredFields = notif.type && 
+                              (notif.message_id || notif.comment_id) && 
+                              typeof notif.text === 'string' && 
+                              typeof notif.timestamp === 'number';
+      if (!hasRequiredFields) {
+        console.warn(`[${new Date().toISOString()}] [${platform.toUpperCase()}] Notification missing required fields at index ${index}:`, notif);
+        return false;
+      }
+
+      // Platform-specific validation
+      if (platform === 'facebook') {
+        // Additional Facebook-specific validation
+        if (!notif.facebook_page_id && !notif.facebook_user_id) {
+          console.warn(`[${new Date().toISOString()}] [FACEBOOK] Notification missing Facebook ID at index ${index}:`, notif);
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [notifications, platform]);
+
+  console.log(`[${new Date().toISOString()}] [${platform.toUpperCase()}] Dms_Comments render:`, {
+    originalCount: notifications?.length || 0, validCount: validNotifications.length,
+    platform,
+    isConnected: platform === 'instagram' ? isInstagramConnected : 
+                 platform === 'twitter' ? !!twitterId : 
+                 platform === 'facebook' ? isFacebookConnected : false
+  });
+
   const formatTimestamp = (timestamp: number) => {
     const date = new Date(timestamp);
     return date.toLocaleString();
@@ -244,14 +289,14 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
       )}
 
       {/* Auto-Reply Button */}
-      {notifications.length > 0 && onAutoReplyAll && (
+      {validNotifications.length > 0 && onAutoReplyAll && (
         <div className="auto-reply-section">
           <button 
             onClick={handleAutoReplyAll}
             disabled={isAutoReplying || isLoading}
             className="auto-reply-all-btn"
           >
-            {isAutoReplying ? 'Auto-Replying...' : `Auto-Reply All (${safeFilter(notifications, (n: any) => !n.status || n.status === 'pending').length})`}
+            {isAutoReplying ? 'Auto-Replying...' : `Auto-Reply All (${safeFilter(validNotifications, (n: any) => !n.status || n.status === 'pending').length})`}
           </button>
           <span className="auto-reply-info">
             AI will reply to all pending Comments and Dms based on rule set and according to yours personalization.
@@ -259,10 +304,10 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
         </div>
       )}
 
-      {notifications.length === 0 ? (
+      {validNotifications.length === 0 ? (
         <div className="no-notifications">No new notifications</div>
       ) : (
-        notifications.map((notif) => (
+        validNotifications.map((notif) => (
           <div key={notif.message_id || notif.comment_id} className="notification-item">
             <div className="notification-header">
               <span className="notification-type">

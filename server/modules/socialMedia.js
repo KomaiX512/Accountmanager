@@ -2206,9 +2206,9 @@ async function fetchFacebookNotifications(userId, forceRefresh = false) {
 
     const notifications = [];
     
-    // PRIORITY 1: Fetch from R2 bucket (where webhook events are stored)
-    const r2Dms = await fetchFacebookDMsFromR2(userId);
-    const r2Comments = await fetchFacebookCommentsFromR2(userId);
+    // OPTIMIZED: Fast R2 fetching like ready post strategies
+    const r2Dms = await fetchFacebookDMsFromR2Optimized(userId);
+    const r2Comments = await fetchFacebookCommentsFromR2Optimized(userId);
     
     notifications.push(...r2Dms);
     notifications.push(...r2Comments);
@@ -2267,169 +2267,24 @@ async function fetchFacebookNotifications(userId, forceRefresh = false) {
   }
 }
 
-// Fetch Facebook DMs from R2 bucket (where webhook events are stored)
-async function fetchFacebookDMsFromR2(userId) {
+// OPTIMIZED: Fast Facebook DMs fetching like ready post strategies
+async function fetchFacebookDMsFromR2Optimized(userId) {
   try {
-    console.log(`[${new Date().toISOString()}] [FACEBOOK-R2] Fetching DMs from R2 for userId: ${userId}`);
+    console.log(`[${new Date().toISOString()}] [FACEBOOK-R2-OPTIMIZED] Fetching DMs from R2 for userId: ${userId}`);
     
-    // Enhanced user ID resolution for Facebook events
-    let resolvedUserId = userId;
-    let listCommand = new ListObjectsV2Command({
+    // SIMPLE DIRECT LOOKUP: Use the userId directly like ready post strategies
+    const listCommand = new ListObjectsV2Command({
       Bucket: 'tasks',
       Prefix: `FacebookEvents/${userId}/`,
     });
-    let { Contents } = await s3Client.send(listCommand);
+    const { Contents } = await s3Client.send(listCommand);
     
-    if (!Contents || Contents.length === 0) {
-      // Strategy 1: Try to resolve user_id from Facebook tokens
-      try {
-        const tokenListCommand = new ListObjectsV2Command({
-          Bucket: 'tasks',
-          Prefix: `FacebookTokens/`,
-        });
-        const { Contents: tokenContents } = await s3Client.send(tokenListCommand);
-        if (tokenContents) {
-          for (const obj of tokenContents) {
-            if (obj.Key.endsWith('/token.json')) {
-              try {
-                const getCommand = new GetObjectCommand({
-                  Bucket: 'tasks',
-                  Key: obj.Key,
-                });
-                const data = await s3Client.send(getCommand);
-                const token = JSON.parse(await data.Body.transformToString());
-                
-                // CRITICAL FIX: The userId is the Facebook user ID, and events are stored under that ID
-                // We need to check if this token belongs to the Facebook user ID
-                if (token.user_id === userId) {
-                  // Events are stored under the Facebook user ID, so use that
-                  resolvedUserId = token.user_id;
-                  console.log(`[${new Date().toISOString()}] [FACEBOOK-R2] Found token for Facebook user ${userId}, using Facebook user ID for event lookup`);
-                  listCommand = new ListObjectsV2Command({
-                    Bucket: 'tasks',
-                    Prefix: `FacebookEvents/${resolvedUserId}/`,
-                  });
-                  const result = await s3Client.send(listCommand);
-                  Contents = result.Contents;
-                  break;
-                }
-                
-                // CRITICAL FIX: Also check if the Facebook page_id matches the userId (for frontend compatibility)
-                if (token.page_id === userId) {
-                  // Events might be stored under the Facebook page ID
-                  resolvedUserId = token.page_id;
-                  console.log(`[${new Date().toISOString()}] [FACEBOOK-R2] Found token for Facebook page ${userId}, using Facebook page ID for event lookup`);
-                  listCommand = new ListObjectsV2Command({
-                    Bucket: 'tasks',
-                    Prefix: `FacebookEvents/${resolvedUserId}/`,
-                  });
-                  const result = await s3Client.send(listCommand);
-                  Contents = result.Contents;
-                  break;
-                }
-                
-                // CRITICAL FIX: Also check if the Facebook page_id matches the userId (for frontend compatibility)
-                if (token.page_id === userId) {
-                  // Events might be stored under the Facebook page ID
-                  resolvedUserId = token.page_id;
-                  console.log(`[${new Date().toISOString()}] [FACEBOOK-R2] Found token for Facebook page ${userId}, using Facebook page ID for event lookup`);
-                  listCommand = new ListObjectsV2Command({
-                    Bucket: 'tasks',
-                    Prefix: `FacebookEvents/${resolvedUserId}/`,
-                  });
-                  const result = await s3Client.send(listCommand);
-                  Contents = result.Contents;
-                  break;
-                }
-              } catch (tokenError) {
-                console.error(`[${new Date().toISOString()}] Error reading token file ${obj.Key}:`, tokenError.message);
-                continue;
-              }
-            }
-          }
-        }
-      } catch (tokenSearchError) {
-        console.error(`[${new Date().toISOString()}] Error searching Facebook tokens:`, tokenSearchError.message);
-      }
-      
-      // Strategy 2: Try to resolve from Facebook connections
-      if (!Contents || Contents.length === 0) {
-        try {
-          const connectionListCommand = new ListObjectsV2Command({
-            Bucket: 'tasks',
-            Prefix: `FacebookConnection/`,
-          });
-          const { Contents: connectionContents } = await s3Client.send(connectionListCommand);
-          
-          if (connectionContents) {
-            for (const obj of connectionContents) {
-              if (obj.Key.endsWith('/connection.json')) {
-                try {
-                  const getCommand = new GetObjectCommand({
-                    Bucket: 'tasks',
-                    Key: obj.Key,
-                  });
-                  const data = await s3Client.send(getCommand);
-                  const connection = JSON.parse(await data.Body.transformToString());
-                  
-                  // CRITICAL FIX: The userId is the Facebook user ID, and events are stored under that ID
-                  // We need to check if this connection belongs to the Facebook user ID
-                  if (connection.facebook_user_id === userId) {
-                    // Events are stored under the Facebook user ID, so use that
-                    resolvedUserId = connection.facebook_user_id;
-                    console.log(`[${new Date().toISOString()}] [FACEBOOK-R2] Found connection for Facebook user ${userId}, using Facebook user ID for event lookup`);
-                    listCommand = new ListObjectsV2Command({
-                      Bucket: 'tasks',
-                      Prefix: `FacebookEvents/${resolvedUserId}/`,
-                    });
-                    const result = await s3Client.send(listCommand);
-                    Contents = result.Contents;
-                    break;
-                  }
-                  
-                  // CRITICAL FIX: Also check if the Facebook page_id matches the userId (for frontend compatibility)
-                  if (connection.facebook_page_id === userId) {
-                    // Events might be stored under the Facebook page ID
-                    resolvedUserId = connection.facebook_page_id;
-                    console.log(`[${new Date().toISOString()}] [FACEBOOK-R2] Found connection for Facebook page ${userId}, using Facebook page ID for event lookup`);
-                    listCommand = new ListObjectsV2Command({
-                      Bucket: 'tasks',
-                      Prefix: `FacebookEvents/${resolvedUserId}/`,
-                    });
-                    const result = await s3Client.send(listCommand);
-                    Contents = result.Contents;
-                    break;
-                  }
-                  
-                  // CRITICAL FIX: Also check if the Facebook page_id matches the userId (for frontend compatibility)
-                  if (connection.facebook_page_id === userId) {
-                    // Events might be stored under the Facebook page ID
-                    resolvedUserId = connection.facebook_page_id;
-                    console.log(`[${new Date().toISOString()}] [FACEBOOK-R2] Found connection for Facebook page ${userId}, using Facebook page ID for event lookup`);
-                    listCommand = new ListObjectsV2Command({
-                      Bucket: 'tasks',
-                      Prefix: `FacebookEvents/${resolvedUserId}/`,
-                    });
-                    const result = await s3Client.send(listCommand);
-                    Contents = result.Contents;
-                    break;
-                  }
-                } catch (connectionError) {
-                  console.error(`[${new Date().toISOString()}] Error reading connection file ${obj.Key}:`, connectionError.message);
-                  continue;
-                }
-              }
-            }
-          }
-        } catch (connectionSearchError) {
-          console.error(`[${new Date().toISOString()}] Error searching Facebook connections:`, connectionSearchError.message);
-        }
-      }
-    }
     const dms = [];
     if (Contents && Contents.length > 0) {
-      for (const obj of Contents) {
-        if (obj.Key.endsWith('.json') && !obj.Key.includes('reply_') && !obj.Key.includes('comment_')) {
+      // Process all files in parallel like ready post strategies
+      const dmPromises = Contents
+        .filter(obj => obj.Key.endsWith('.json') && !obj.Key.includes('reply_') && !obj.Key.includes('comment_'))
+        .map(async (obj) => {
           try {
             const getCommand = new GetObjectCommand({
               Bucket: 'tasks',
@@ -2437,10 +2292,11 @@ async function fetchFacebookDMsFromR2(userId) {
             });
             const data = await s3Client.send(getCommand);
             const eventData = JSON.parse(await data.Body.transformToString());
+            
             if (eventData.type === 'message') {
-              dms.push({
+              return {
                 type: 'message',
-                facebook_user_id: resolvedUserId,
+                facebook_user_id: userId,
                 facebook_page_id: eventData.facebook_page_id,
                 sender_id: eventData.sender_id,
                 message_id: eventData.message_id,
@@ -2450,13 +2306,20 @@ async function fetchFacebookDMsFromR2(userId) {
                 username: eventData.username || 'Unknown',
                 status: eventData.status || 'pending',
                 platform: 'facebook'
-              });
+              };
             }
-          } catch {}
-        }
-      }
+            return null;
+          } catch (error) {
+            console.error(`[${new Date().toISOString()}] Error processing Facebook DM file ${obj.Key}:`, error.message);
+            return null;
+          }
+        });
+      
+      const results = await Promise.all(dmPromises);
+      dms.push(...results.filter(item => item !== null));
     }
-    console.log(`[${new Date().toISOString()}] [FACEBOOK-R2] Found ${dms.length} DMs in R2 for user ${resolvedUserId}`);
+    
+    console.log(`[${new Date().toISOString()}] [FACEBOOK-R2-OPTIMIZED] Found ${dms.length} DMs in R2 for user ${userId}`);
     return dms;
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Error fetching Facebook DMs from R2 for ${userId}:`, error.message);
@@ -2464,168 +2327,24 @@ async function fetchFacebookDMsFromR2(userId) {
   }
 }
 
-// Fetch Facebook comments from R2 bucket (where webhook events are stored)
-async function fetchFacebookCommentsFromR2(userId) {
+// OPTIMIZED: Fast Facebook comments fetching like ready post strategies
+async function fetchFacebookCommentsFromR2Optimized(userId) {
   try {
-    console.log(`[${new Date().toISOString()}] [FACEBOOK-R2] Fetching comments from R2 for userId: ${userId}`);
-    // Enhanced user ID resolution for Facebook events
-    let resolvedUserId = userId;
-    let listCommand = new ListObjectsV2Command({
+    console.log(`[${new Date().toISOString()}] [FACEBOOK-R2-OPTIMIZED] Fetching comments from R2 for userId: ${userId}`);
+    
+    // SIMPLE DIRECT LOOKUP: Use the userId directly like ready post strategies
+    const listCommand = new ListObjectsV2Command({
       Bucket: 'tasks',
       Prefix: `FacebookEvents/${userId}/`,
     });
-    let { Contents } = await s3Client.send(listCommand);
+    const { Contents } = await s3Client.send(listCommand);
     
-    if (!Contents || Contents.length === 0) {
-      // Strategy 1: Try to resolve user_id from Facebook tokens
-      try {
-        const tokenListCommand = new ListObjectsV2Command({
-          Bucket: 'tasks',
-          Prefix: `FacebookTokens/`,
-        });
-        const { Contents: tokenContents } = await s3Client.send(tokenListCommand);
-        if (tokenContents) {
-          for (const obj of tokenContents) {
-            if (obj.Key.endsWith('/token.json')) {
-              try {
-                const getCommand = new GetObjectCommand({
-                  Bucket: 'tasks',
-                  Key: obj.Key,
-                });
-                const data = await s3Client.send(getCommand);
-                const token = JSON.parse(await data.Body.transformToString());
-                
-                // CRITICAL FIX: The userId is the Facebook user ID, and events are stored under that ID
-                // We need to check if this token belongs to the Facebook user ID
-                if (token.user_id === userId) {
-                  // Events are stored under the Facebook user ID, so use that
-                  resolvedUserId = token.user_id;
-                  console.log(`[${new Date().toISOString()}] [FACEBOOK-R2] Found token for Facebook user ${userId}, using Facebook user ID for comment lookup`);
-                  listCommand = new ListObjectsV2Command({
-                    Bucket: 'tasks',
-                    Prefix: `FacebookEvents/${resolvedUserId}/`,
-                  });
-                  const result = await s3Client.send(listCommand);
-                  Contents = result.Contents;
-                  break;
-                }
-                
-                // CRITICAL FIX: Also check if the Facebook page_id matches the userId (for frontend compatibility)
-                if (token.page_id === userId) {
-                  // Events might be stored under the Facebook page ID
-                  resolvedUserId = token.page_id;
-                  console.log(`[${new Date().toISOString()}] [FACEBOOK-R2] Found token for Facebook page ${userId}, using Facebook page ID for comment lookup`);
-                  listCommand = new ListObjectsV2Command({
-                    Bucket: 'tasks',
-                    Prefix: `FacebookEvents/${resolvedUserId}/`,
-                  });
-                  const result = await s3Client.send(listCommand);
-                  Contents = result.Contents;
-                  break;
-                }
-                
-                // CRITICAL FIX: Also check if the Facebook page_id matches the userId (for frontend compatibility)
-                if (token.page_id === userId) {
-                  // Events might be stored under the Facebook page ID
-                  resolvedUserId = token.page_id;
-                  console.log(`[${new Date().toISOString()}] [FACEBOOK-R2] Found token for Facebook page ${userId}, using Facebook page ID for comment lookup`);
-                  listCommand = new ListObjectsV2Command({
-                    Bucket: 'tasks',
-                    Prefix: `FacebookEvents/${resolvedUserId}/`,
-                  });
-                  const result = await s3Client.send(listCommand);
-                  Contents = result.Contents;
-                  break;
-                }
-              } catch (tokenError) {
-                console.error(`[${new Date().toISOString()}] Error reading token file ${obj.Key}:`, tokenError.message);
-                continue;
-              }
-            }
-          }
-        }
-      } catch (tokenSearchError) {
-        console.error(`[${new Date().toISOString()}] Error searching Facebook tokens for comments:`, tokenSearchError.message);
-      }
-      
-      // Strategy 2: Try to resolve from Facebook connections
-      if (!Contents || Contents.length === 0) {
-        try {
-          const connectionListCommand = new ListObjectsV2Command({
-            Bucket: 'tasks',
-            Prefix: `FacebookConnection/`,
-          });
-          const { Contents: connectionContents } = await s3Client.send(connectionListCommand);
-          
-          if (connectionContents) {
-            for (const obj of connectionContents) {
-              if (obj.Key.endsWith('/connection.json')) {
-                try {
-                  const getCommand = new GetObjectCommand({
-                    Bucket: 'tasks',
-                    Key: obj.Key,
-                  });
-                  const data = await s3Client.send(getCommand);
-                  const connection = JSON.parse(await data.Body.transformToString());
-                  
-                  // CRITICAL FIX: The userId is the Facebook user ID, and events are stored under that ID
-                  // We need to check if this connection belongs to the Facebook user ID
-                  if (connection.facebook_user_id === userId) {
-                    // Events are stored under the Facebook user ID, so use that
-                    resolvedUserId = connection.facebook_user_id;
-                    console.log(`[${new Date().toISOString()}] [FACEBOOK-R2] Found connection for Facebook user ${userId}, using Facebook user ID for comment lookup`);
-                    listCommand = new ListObjectsV2Command({
-                      Bucket: 'tasks',
-                      Prefix: `FacebookEvents/${resolvedUserId}/`,
-                    });
-                    const result = await s3Client.send(listCommand);
-                    Contents = result.Contents;
-                    break;
-                  }
-                  
-                  // CRITICAL FIX: Also check if the Facebook page_id matches the userId (for frontend compatibility)
-                  if (connection.facebook_page_id === userId) {
-                    // Events might be stored under the Facebook page ID
-                    resolvedUserId = connection.facebook_page_id;
-                    console.log(`[${new Date().toISOString()}] [FACEBOOK-R2] Found connection for Facebook page ${userId}, using Facebook page ID for comment lookup`);
-                    listCommand = new ListObjectsV2Command({
-                      Bucket: 'tasks',
-                      Prefix: `FacebookEvents/${resolvedUserId}/`,
-                    });
-                    const result = await s3Client.send(listCommand);
-                    Contents = result.Contents;
-                    break;
-                  }
-                  
-                  // CRITICAL FIX: Also check if the Facebook page_id matches the userId (for frontend compatibility)
-                  if (connection.facebook_page_id === userId) {
-                    // Events might be stored under the Facebook page ID
-                    resolvedUserId = connection.facebook_page_id;
-                    console.log(`[${new Date().toISOString()}] [FACEBOOK-R2] Found connection for Facebook page ${userId}, using Facebook page ID for comment lookup`);
-                    listCommand = new ListObjectsV2Command({
-                      Bucket: 'tasks',
-                      Prefix: `FacebookEvents/${resolvedUserId}/`,
-                    });
-                    const result = await s3Client.send(listCommand);
-                    Contents = result.Contents;
-                    break;
-                  }
-                } catch (connectionError) {
-                  console.error(`[${new Date().toISOString()}] Error reading connection file ${obj.Key}:`, connectionError.message);
-                  continue;
-                }
-              }
-            }
-          }
-        } catch (connectionSearchError) {
-          console.error(`[${new Date().toISOString()}] Error searching Facebook connections for comments:`, connectionSearchError.message);
-        }
-      }
-    }
     const comments = [];
     if (Contents && Contents.length > 0) {
-      for (const obj of Contents) {
-        if (obj.Key.endsWith('.json') && obj.Key.includes('comment_') && !obj.Key.includes('reply_')) {
+      // Process all files in parallel like ready post strategies
+      const commentPromises = Contents
+        .filter(obj => obj.Key.endsWith('.json') && obj.Key.includes('comment_') && !obj.Key.includes('reply_'))
+        .map(async (obj) => {
           try {
             const getCommand = new GetObjectCommand({
               Bucket: 'tasks',
@@ -2633,10 +2352,11 @@ async function fetchFacebookCommentsFromR2(userId) {
             });
             const data = await s3Client.send(getCommand);
             const eventData = JSON.parse(await data.Body.transformToString());
+            
             if (eventData.type === 'comment') {
-              comments.push({
+              return {
                 type: 'comment',
-                facebook_user_id: resolvedUserId,
+                facebook_user_id: userId,
                 facebook_page_id: eventData.facebook_page_id,
                 comment_id: eventData.comment_id,
                 text: eventData.text,
@@ -2646,13 +2366,20 @@ async function fetchFacebookCommentsFromR2(userId) {
                 username: eventData.username || 'Unknown',
                 status: eventData.status || 'pending',
                 platform: 'facebook'
-              });
+              };
             }
-          } catch {}
-        }
-      }
+            return null;
+          } catch (error) {
+            console.error(`[${new Date().toISOString()}] Error processing Facebook comment file ${obj.Key}:`, error.message);
+            return null;
+          }
+        });
+      
+      const results = await Promise.all(commentPromises);
+      comments.push(...results.filter(item => item !== null));
     }
-    console.log(`[${new Date().toISOString()}] [FACEBOOK-R2] Found ${comments.length} comments in R2 for user ${resolvedUserId}`);
+    
+    console.log(`[${new Date().toISOString()}] [FACEBOOK-R2-OPTIMIZED] Found ${comments.length} comments in R2 for user ${userId}`);
     return comments;
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Error fetching Facebook comments from R2 for ${userId}:`, error.message);
@@ -6453,4 +6180,98 @@ function getNextInstagramTimeWindow() {
   tomorrow.setHours(9, 0, 0, 0); // 9 AM tomorrow
   
   return tomorrow;
+}
+
+// OPTIMIZED: Fast filtering like ready post strategies
+async function filterHandledNotifications(notifications, userId, platform) {
+  console.log(`[${new Date().toISOString()}] [FILTER] Starting filter for ${platform} notifications:`, {
+    userId,
+    totalNotifications: notifications?.length || 0
+  });
+
+  if (!notifications || notifications.length === 0) {
+    return notifications;
+  }
+
+  const eventPrefix = platform === 'twitter' ? 'TwitterEvents' : 
+                     platform === 'facebook' ? 'FacebookEvents' :
+                     'InstagramEvents';
+
+  // OPTIMIZED: Batch fetch all status files at once like ready post strategies
+  try {
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: `${eventPrefix}/${userId}/`,
+    });
+    const { Contents } = await s3Client.send(listCommand);
+    
+    // Create a map of notification IDs to their status
+    const statusMap = new Map();
+    
+    if (Contents && Contents.length > 0) {
+      // Process all status files in parallel like ready post strategies
+      const statusPromises = Contents
+        .filter(obj => obj.Key.endsWith('.json'))
+        .map(async (obj) => {
+          try {
+            const getCommand = new GetObjectCommand({
+              Bucket: 'tasks',
+              Key: obj.Key,
+            });
+            const data = await s3Client.send(getCommand);
+            const storedNotification = JSON.parse(await data.Body.transformToString());
+            
+            // Extract notification ID from filename
+            const filename = obj.Key.split('/').pop();
+            const notificationId = filename.replace('.json', '').replace('comment_', '');
+            
+            return {
+              id: notificationId,
+              status: storedNotification.status || 'pending',
+              isComment: filename.startsWith('comment_')
+            };
+          } catch (error) {
+            console.error(`[${new Date().toISOString()}] Error processing status file ${obj.Key}:`, error.message);
+            return null;
+          }
+        });
+      
+      const statusResults = await Promise.all(statusPromises);
+      
+      // Build status map
+      statusResults.filter(item => item !== null).forEach(item => {
+        statusMap.set(item.id, item.status);
+      });
+    }
+    
+    // Filter notifications based on status map
+    const filteredNotifications = notifications.filter(notification => {
+      const notificationId = notification.message_id || notification.comment_id;
+      if (!notificationId) {
+        return true; // Keep notifications without IDs
+      }
+      
+      const status = statusMap.get(notificationId);
+      
+      // PERMANENTLY FILTER OUT: Skip notifications that are already handled, replied, ignored, or ai_handled
+      if (status && ['replied', 'ignored', 'ai_handled', 'handled', 'sent', 'scheduled', 'posted', 'published'].includes(status)) {
+        return false; // Skip this notification completely
+      }
+      
+      // Update notification status if available
+      if (status) {
+        notification.status = status;
+      }
+      
+      return true; // Keep this notification
+    });
+    
+    console.log(`[${new Date().toISOString()}] Filtered ${platform} notifications: ${notifications.length} -> ${filteredNotifications.length}`);
+    return filteredNotifications;
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error in batch filtering for ${platform}/${userId}:`, error.message);
+    // Fallback: return all notifications if batch processing fails
+    return notifications;
+  }
 }

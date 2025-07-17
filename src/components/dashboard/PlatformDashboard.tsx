@@ -70,16 +70,13 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const loadingCheckRef = useRef(false);
   const { processingState } = useProcessing();
 
-  if (guard.active) {
-    // React Router will have already redirected inside the hook, but return null to avoid rendering.
-    return null;
-  }
+
 
   // ALL CONTEXT HOOKS MUST BE CALLED FIRST - Rules of Hooks
   const { currentUser } = useAuth();
   const { userId: igUserId, isConnected: isInstagramConnected, connectInstagram } = useInstagram();
   const { userId: twitterId, isConnected: isTwitterConnected, connectTwitter } = useTwitter();
-  const { userId: facebookId, isConnected: isFacebookConnected, connectFacebook } = useFacebook();
+  const { userId: facebookPageId, isConnected: isFacebookConnected, connectFacebook } = useFacebook();
   const { trackRealDiscussion, trackRealAIReply, trackRealPostCreation, canUseFeature } = useFeatureTracking();
   const { showUpgradePopup, blockedFeature, handleFeatureAttempt, closeUpgradePopup, currentUsage } = useUpgradeHandler();
 
@@ -141,24 +138,426 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const baseReconnectDelay = 5000;
   const maxImageRetryAttempts = 3;
 
-  // Helper function to get viewed storage key
-  const getViewedStorageKey = (section: string) => `viewed_${section}_${platform}_${accountHolder}`;
-
   // Initialize viewed sets from localStorage
   const [viewedStrategies, setViewedStrategies] = useState<Set<string>>(() => {
-    const stored = localStorage.getItem(getViewedStorageKey('strategies'));
+    const storageKey = `viewed_strategies_${platform}_${accountHolder}`;
+    const stored = localStorage.getItem(storageKey);
     return stored ? new Set(JSON.parse(stored)) : new Set();
   });
   
   const [viewedCompetitorData, setViewedCompetitorData] = useState<Set<string>>(() => {
-    const stored = localStorage.getItem(getViewedStorageKey('competitor'));
+    const storageKey = `viewed_competitor_${platform}_${accountHolder}`;
+    const stored = localStorage.getItem(storageKey);
     return stored ? new Set(JSON.parse(stored)) : new Set();
   });
   
   const [viewedPosts, setViewedPosts] = useState<Set<string>>(() => {
-    const stored = localStorage.getItem(getViewedStorageKey('posts'));
+    const storageKey = `viewed_posts_${platform}_${accountHolder}`;
+    const stored = localStorage.getItem(storageKey);
     return stored ? new Set(JSON.parse(stored)) : new Set();
   });
+
+  // Helper function to get viewed storage key
+  const getViewedStorageKey = (section: string) => `viewed_${section}_${platform}_${accountHolder}`;
+
+  // Helper functions to get unseen counts for each section
+  const getUnseenStrategiesCount = () => {
+    return safeLength(safeFilter(strategies, (strategy: { key: string }) => !viewedStrategies.has(strategy.key)));
+  };
+
+  const getUnseenCompetitorCount = () => {
+    return safeLength(safeFilter(competitorData, (data: { key: string }) => !viewedCompetitorData.has(data.key)));
+  };
+
+  const getUnseenPostsCount = () => {
+    return safeLength(safeFilter(posts, (post: { key: string }) => !viewedPosts.has(post.key)));
+  };
+
+  // Function to mark content as viewed with localStorage persistence
+  const markStrategiesAsViewed = () => {
+    const newViewedStrategies = new Set(Array.isArray(strategies) ? strategies.map(s => s.key) : []);
+    setViewedStrategies(newViewedStrategies);
+    localStorage.setItem(`viewed_strategies_${platform}_${accountHolder}`, JSON.stringify(Array.from(newViewedStrategies)));
+  };
+
+  const markCompetitorDataAsViewed = () => {
+    const newViewedCompetitorData = new Set(Array.isArray(competitorData) ? competitorData.map(c => c.key) : []);
+    setViewedCompetitorData(newViewedCompetitorData);
+    localStorage.setItem(`viewed_competitor_data_${platform}_${accountHolder}`, JSON.stringify(Array.from(newViewedCompetitorData)));
+  };
+
+  const markPostsAsViewed = () => {
+    const newViewedPosts = new Set(Array.isArray(posts) ? posts.map(p => p.key) : []);
+    setViewedPosts(newViewedPosts);
+    localStorage.setItem(`viewed_posts_${platform}_${accountHolder}`, JSON.stringify(Array.from(newViewedPosts)));
+  };
+
+  // Define functions before useEffect hooks to avoid hoisting issues
+  async function refreshAllData() {
+    if (!accountHolder) {
+      return;
+    }
+    try {
+      const forceRefresh = firstLoadRef.current;
+      const platformParam = `?platform=${platform}${forceRefresh ? '&forceRefresh=true' : ''}`;
+      
+      const [responsesData, strategiesData, postsData, competitorData] = await Promise.all([
+        axios.get(`/api/responses/${accountHolder}${platformParam}`).catch(err => {
+          if (err.response?.status === 404) return { data: [] };
+          throw err;
+        }),
+        axios.get(getApiUrl(`/${accountType === 'branding' ? 'retrieve-strategies' : 'retrieve-engagement-strategies'}/${accountHolder}${platformParam}`)).catch(err => {
+          if (err.response?.status === 404) return { data: [] };
+          throw err;
+        }),
+        axios.get(`/api/posts/${accountHolder}${platformParam}`).catch(err => {
+          if (err.response?.status === 404) return { data: [] };
+          throw err;
+        }),
+        // Always fetch competitor data for both account types
+        Promise.all(
+          competitors.map(comp =>
+            axios.get(getApiUrl(`/retrieve/${accountHolder}/${comp}${platformParam}`)).catch(err => {
+              if (err.response?.status === 404) {
+                console.warn(`No ${platform} competitor data found for ${comp}`);
+                return { data: [] };
+              }
+              throw err;
+            })
+          )
+        )
+      ]);
+
+      // Defensive checks for array data before setting state
+      setResponses(Array.isArray(responsesData.data) ? responsesData.data : []);
+      setStrategies(Array.isArray(strategiesData.data) ? strategiesData.data : []);
+      setPosts(Array.isArray(postsData.data) ? postsData.data : []);
+      
+      // Always set competitor data with defensive check
+      const competitorResponses = competitorData as any[];
+      const flatData = competitorResponses.flatMap(res => Array.isArray(res.data) ? res.data : []);
+      setCompetitorData(flatData);
+
+      if (firstLoadRef.current) {
+        firstLoadRef.current = false;
+      }
+    } catch (error: any) {
+      console.error(`Error refreshing ${platform} data:`, error);
+      setToast(`Failed to load ${platform} dashboard data.`);
+    }
+  }
+
+  async function fetchProfileInfo() {
+    if (!accountHolder) return;
+    setProfileLoading(true);
+    setProfileError(null);
+    setImageError(false);
+    try {
+      const platformParam = `?platform=${platform}`;
+      const response = await axios.get(`/api/profile-info/${accountHolder}${platformParam}&forceRefresh=true`);
+      // Defensive check: ensure response data is a valid object
+      if (response.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
+        setProfileInfo(response.data);
+        console.log(`Profile Info Fetched:`, response.data);
+      } else {
+        setProfileInfo(null);
+        setProfileError(`Invalid profile data received.`);
+      }
+    } catch (err: any) {
+      if (err.response?.status === 404) {
+        setProfileInfo(null);
+        setProfileError(`Profile info not available.`);
+      } else {
+        setProfileError(`Failed to load profile info.`);
+      }
+    } finally {
+      setProfileLoading(false);
+    }
+  }
+
+  const fetchNotifications = async (attempt = 1, maxAttempts = 3) => {
+    const currentUserId = platform === 'twitter' ? twitterId : 
+                         platform === 'facebook' ? facebookPageId :
+                         igUserId;
+    if (!currentUserId) {
+      console.log(`[${new Date().toISOString()}] No ${platform} user ID available for notifications`);
+      return;
+    }
+    
+    console.log(`[${new Date().toISOString()}] Fetching ${platform} notifications for ${currentUserId} (attempt ${attempt}/${maxAttempts})`);
+    
+    try {
+      const response = await fetch(`/events-list/${currentUserId}?platform=${platform}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${platform} notifications: ${response.status} ${response.statusText}`);
+      }
+      
+      let data = await response.json();
+      console.log(`[${new Date().toISOString()}] Received ${data.length} ${platform} notifications`);
+
+      // CRITICAL FIX: Add defensive checks for Facebook notifications
+      if (platform === 'facebook') {
+        console.log(`[${new Date().toISOString()}] [FACEBOOK] Raw notifications data:`, {
+          dataType: typeof data,
+          isArray: Array.isArray(data),
+          length: Array.isArray(data) ? data.length : 'N/A',
+          sampleData: Array.isArray(data) && data.length > 0 ? data[0] : null
+        });
+        
+        // Ensure data is an array
+        if (!Array.isArray(data)) {
+          console.error(`[${new Date().toISOString()}] [FACEBOOK] Invalid notifications data type:`, typeof data);
+          setNotifications([]);
+          return;
+        }
+        
+        // Validate each notification for required fields
+        const validNotifications = data.filter((notif: any, index: number) => {
+          if (!notif || typeof notif !== 'object') {
+            console.warn(`[${new Date().toISOString()}] [FACEBOOK] Invalid notification at index ${index}:`, notif);
+            return false;
+          }
+          
+          // Check for required fields
+          const hasRequiredFields = notif.type && 
+                                  (notif.message_id || notif.comment_id) && 
+                                  notif.text !== undefined && 
+                                  notif.timestamp !== undefined;
+          
+          if (!hasRequiredFields) {
+            console.warn(`[${new Date().toISOString()}] [FACEBOOK] Notification missing required fields at index ${index}:`, notif);
+            return false;
+          }
+          
+          return true;
+        });
+        
+        console.log(`[${new Date().toISOString()}] [FACEBOOK] Validated notifications:`, {
+          originalCount: data.length,
+          validCount: validNotifications.length,
+          filteredCount: data.length - validNotifications.length
+        });
+        
+        // Use validated notifications
+        data = validNotifications;
+      }
+
+      const aiReplies = await RagService.fetchAIReplies(accountHolder, platform);
+      console.log(`[${new Date().toISOString()}] Received ${aiReplies.length} ${platform} AI replies`);
+      
+      const processedNotifications = data.map((notif: any) => {
+        const matchingAiReply = aiReplies.find(pair => {
+          const isMatchingType = pair.type === (notif.type === 'message' ? 'dm' : 'comment');
+          const isMatchingId = 
+            (notif.type === 'message' && pair.request.message_id === notif.message_id) ||
+            (notif.type === 'comment' && pair.request.comment_id === notif.comment_id);
+          
+          return isMatchingType && isMatchingId;
+        });
+        
+        if (matchingAiReply) {
+          return {
+            ...notif,
+            status: 'ai_reply_ready',
+            aiReply: {
+              reply: matchingAiReply.reply.reply,
+              replyKey: matchingAiReply.replyKey,
+              reqKey: matchingAiReply.reqKey,
+              timestamp: matchingAiReply.timestamp || Date.now(),
+              generated_at: matchingAiReply.reply.generated_at || new Date().toISOString()
+            }
+          };
+        }
+        
+        return notif;
+      });
+      
+      // CRITICAL FIX: Add final validation before setting state
+      if (platform === 'facebook') {
+        const finalValidNotifications = processedNotifications.filter((notif: any) => {
+          // Ensure all required fields are present and valid
+          const isValid = notif && 
+                         typeof notif === 'object' &&
+                         notif.type && 
+                         (notif.message_id || notif.comment_id) && 
+                         typeof notif.text === 'string' && 
+                         typeof notif.timestamp === 'number';
+          
+          if (!isValid) {
+            console.error(`[${new Date().toISOString()}] [FACEBOOK] Final validation failed for notification:`, notif);
+          }
+          
+          return isValid;
+        });
+        
+        console.log(`[${new Date().toISOString()}] [FACEBOOK] Final notifications ready for state:`, {
+          processedCount: processedNotifications.length,
+          finalCount: finalValidNotifications.length,
+          sampleNotification: finalValidNotifications.length > 0 ? finalValidNotifications[0] : null
+        });
+        
+        setNotifications(finalValidNotifications);
+      } else {
+        setNotifications(processedNotifications);
+      }
+    } catch (error) {
+      console.error(`[${new Date().toISOString()}] Error fetching ${platform} notifications (attempt ${attempt}/${maxAttempts}):`, error);
+      if (attempt < maxAttempts) {
+        setTimeout(() => fetchNotifications(attempt + 1, maxAttempts), 2000);
+      } else {
+        // CRITICAL FIX: Set empty array on final failure to prevent crashes
+        console.error(`[${new Date().toISOString()}] [${platform.toUpperCase()}] All attempts failed, setting empty notifications array`);
+        setNotifications([]);
+      }
+    }
+  };
+
+  const setupSSE = (userId: string, attempt = 1) => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+
+    const eventSource = new EventSource(`/events/${userId}?platform=${platform}`);
+    eventSourceRef.current = eventSource;
+
+    eventSource.onopen = () => {
+      console.log(`[${new Date().toISOString()}] ${platform} SSE connection established for ${userId}`);
+      console.log(`[${new Date().toISOString()}] SSE URL: /events/${userId}?platform=${platform}`);
+      reconnectAttempts.current = 0;
+      fetchNotifications();
+    };
+
+    eventSource.onmessage = (event) => {
+      reconnectAttempts.current = 0;
+      let data;
+      try {
+        data = JSON.parse(event.data);
+      } catch (err) {
+        console.error(`Failed to parse ${platform} SSE message:`, event.data, err);
+        return;
+      }
+
+      console.log(`[${new Date().toISOString()}] ${platform} SSE message received:`, data);
+
+      if (data.type === 'heartbeat') return;
+      if (data.type === 'connection') {
+        console.log(data.message);
+        return;
+      }
+
+      if (data.type === 'usernameChanged') {
+        if (data.username === accountHolder) {
+          refreshAllData();
+          setToast('Dashboard updated!');
+        }
+        return;
+      }
+
+      if (data.type === 'update' && data.prefix) {
+        const { prefix } = data;
+        const platformParam = `?platform=${platform}`;
+        
+        if (prefix.startsWith(`queries/${platform}/${accountHolder}/`)) {
+          axios.get(`/api/responses/${accountHolder}${platformParam}`).then(res => {
+            setResponses(Array.isArray(res.data) ? res.data : []);
+            setToast(`New ${platform} response received!`);
+          }).catch(err => {
+            console.error(`Error fetching ${platform} responses:`, err);
+          });
+        }
+        
+        if (prefix.startsWith(`recommendations/${platform}/${accountHolder}/`) || prefix.startsWith(`engagement_strategies/${platform}/${accountHolder}/`)) {
+          const endpoint = accountType === 'branding' 
+            ? `/api/retrieve-strategies/${accountHolder}${platformParam}`
+            : `/api/retrieve-engagement-strategies/${accountHolder}${platformParam}`;
+          
+          axios.get(endpoint).then(res => {
+            setStrategies(Array.isArray(res.data) ? res.data : []);
+            setToast(`New ${platform} strategies available!`);
+          }).catch(err => {
+            console.error(`Error fetching ${platform} strategies:`, err);
+          });
+        }
+        
+        if (prefix.startsWith(`ready_post/${platform}/${accountHolder}/`)) {
+          axios.get(`/api/posts/${accountHolder}${platformParam}`).then(res => {
+            setPosts(Array.isArray(res.data) ? res.data : []);
+            setToast(`New ${platform} post cooked!`);
+          }).catch(err => {
+            console.error(`Error fetching ${platform} posts:`, err);
+          });
+        }
+        
+        if (prefix.startsWith(`competitor_analysis/${platform}/${accountHolder}/`)) {
+          Promise.all(
+            competitors.map(comp =>
+              axios.get(`/retrieve/${accountHolder}/${comp}${platformParam}`).catch(err => {
+                if (err.response?.status === 404) return { data: [] };
+                throw err;
+              })
+            )
+          )
+            .then(res => {
+              const flatData = res.flatMap(r => Array.isArray(r.data) ? r.data : []);
+              setCompetitorData(flatData);
+              setToast(`New ${platform} competitor analysis available!`);
+            })
+            .catch(err => {
+              console.error(`Error fetching ${platform} competitor data:`, err);
+            });
+        }
+      }
+
+      if (data.event === 'message' || data.event === 'comment') {
+        console.log(`[${new Date().toISOString()}] Processing ${platform} SSE event: ${data.event}`, data.data);
+        
+        const notifType = data.event === 'message' ? 'dm' : 'comment';
+        const notifId = data.data.message_id || data.data.comment_id;
+        const notifText = data.data.text;
+        
+        const isRecentlySent = replySentTracker.some(reply => {
+          if (reply.type === notifType) {
+            const normalizedReply = reply.text.toLowerCase().trim();
+            const normalizedNotif = notifText.toLowerCase().trim();
+            
+            return normalizedReply === normalizedNotif || 
+                  normalizedNotif.includes(normalizedReply) ||
+                  reply.id === notifId;
+          }
+          return false;
+        });
+        
+        if (!isRecentlySent) {
+          console.log(`[${new Date().toISOString()}] Adding new ${platform} notification to state:`, data.data);
+          setNotifications(prev => {
+            const updated = [data.data, ...safeFilter(prev, (n: any) => 
+              n.message_id !== data.data.message_id && 
+              n.comment_id !== data.data.comment_id
+            )];
+            return updated.sort((a, b) => b.timestamp - a.timestamp).slice(0, 10);
+          });
+          setToast(data.event === 'message' 
+            ? `New ${platform === 'twitter' ? 'Twitter DM' : platform === 'facebook' ? 'Facebook message' : 'Instagram message'} received!` 
+            : `New ${platform === 'twitter' ? 'Twitter mention' : platform === 'facebook' ? 'Facebook comment' : 'Instagram comment'} received!`);
+        } else {
+          console.log(`[${new Date().toISOString()}] Filtered out own ${platform} reply from notifications:`, data.data);
+        }
+      }
+    };
+
+    eventSource.onerror = (error) => {
+      console.error(`[${new Date().toISOString()}] ${platform} SSE error (attempt ${attempt}/${maxReconnectAttempts}):`, error);
+      eventSource.close();
+      eventSourceRef.current = null;
+
+      if (reconnectAttempts.current < maxReconnectAttempts) {
+        reconnectAttempts.current += 1;
+        const delay = baseReconnectDelay * Math.pow(2, reconnectAttempts.current);
+        setTimeout(() => setupSSE(userId, attempt + 1), delay);
+      }
+    };
+  };
 
   // ALL useEffect HOOKS MUST BE CALLED FIRST - Rules of Hooks
   useEffect(() => {
@@ -168,7 +567,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           setIsLoading(false);
         } else if (platform === 'twitter' && twitterId) {
           setIsLoading(false);
-        } else if (platform === 'facebook' && facebookId) {
+        } else if (platform === 'facebook' && facebookPageId) {
           setIsLoading(false);
         } else if (loadingCheckRef.current) {
           // If we've already checked and still loading, stop checking
@@ -180,7 +579,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       };
       checkLoadingState();
     }
-  }, [isLoading, platform, igUserId, twitterId, facebookId]);
+  }, [isLoading, platform, igUserId, twitterId, facebookPageId]);
 
   useEffect(() => {
     const handleFocus = () => {
@@ -233,25 +632,60 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
 
   // Initialize notifications and SSE for the current platform
   useEffect(() => {
-    const currentUserId = platform === 'twitter' ? twitterId : igUserId;
-    if (currentUserId) {
-      fetchNotifications();
-      setupSSE(currentUserId);
-
-      // Fallback polling every 5 minutes
-      const interval = setInterval(() => {
-        fetchNotifications();
-      }, 300000);
-
-      return () => {
-        clearInterval(interval);
-        if (eventSourceRef.current) {
-          eventSourceRef.current.close();
-          eventSourceRef.current = null;
-        }
-      };
+    // Only run when loading is complete and userId is available
+    if (isLoading) return;
+    const currentUserId = platform === 'twitter' ? twitterId : 
+                         platform === 'facebook' ? facebookPageId :
+                         igUserId;
+    if (!currentUserId) {
+      console.warn(`[PlatformDashboard] Skipping notification/SSE setup: userId not available for ${platform}`);
+      return;
     }
-  }, [platform === 'twitter' ? twitterId : igUserId, platform]);
+    console.log(`[PlatformDashboard] Setting up notifications and SSE for ${platform} userId:`, currentUserId);
+    fetchNotifications();
+    setupSSE(currentUserId);
+
+    // Fallback polling every 5 minutes
+    const interval = setInterval(() => {
+      fetchNotifications();
+    }, 300000);
+
+    return () => {
+      clearInterval(interval);
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+    };
+  }, [isLoading, platform, twitterId, facebookPageId, igUserId]);
+
+  // --- NEW: Watch for userId changes and always set up notifications/SSE when available ---
+  useEffect(() => {
+    const currentUserId = platform === 'twitter' ? twitterId : 
+                         platform === 'facebook' ? facebookPageId :
+                         igUserId;
+    if (platform === 'facebook') {
+      console.log('[PlatformDashboard] Using Facebook Page ID for SSE:', facebookPageId);
+    }
+    if (!currentUserId) {
+      console.log(`[PlatformDashboard] [userId effect] userId not available for ${platform}, skipping SSE/notifications setup.`);
+      return;
+    }
+    console.log(`[PlatformDashboard] [userId effect] userId became available for ${platform}:`, currentUserId);
+    fetchNotifications();
+    setupSSE(currentUserId);
+    // Fallback polling every 5 minutes
+    const interval = setInterval(() => {
+      fetchNotifications();
+    }, 300000);
+    return () => {
+      clearInterval(interval);
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+    };
+  }, [facebookPageId, twitterId, igUserId, platform]);
 
   // Clean old entries from reply tracker
   useEffect(() => {
@@ -357,37 +791,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     checkCampaignStatus();
   }, [accountHolder, platform]);
 
-  // Helper function to get unseen count for each section
-  const getUnseenStrategiesCount = () => {
-    return safeLength(safeFilter(strategies, (strategy: { key: string }) => !viewedStrategies.has(strategy.key)));
-  };
 
-  const getUnseenCompetitorCount = () => {
-    return safeLength(safeFilter(competitorData, (data: { key: string }) => !viewedCompetitorData.has(data.key)));
-  };
-
-  const getUnseenPostsCount = () => {
-    return safeLength(safeFilter(posts, (post: { key: string }) => !viewedPosts.has(post.key)));
-  };
-
-  // Function to mark content as viewed with localStorage persistence
-  const markStrategiesAsViewed = () => {
-    const newViewedStrategies = new Set(Array.isArray(strategies) ? strategies.map(s => s.key) : []);
-    setViewedStrategies(newViewedStrategies);
-    localStorage.setItem(`viewed_strategies_${platform}_${accountHolder}`, JSON.stringify(Array.from(newViewedStrategies)));
-  };
-
-  const markCompetitorDataAsViewed = () => {
-    const newViewedCompetitorData = new Set(Array.isArray(competitorData) ? competitorData.map(c => c.key) : []);
-    setViewedCompetitorData(newViewedCompetitorData);
-    localStorage.setItem(`viewed_competitor_data_${platform}_${accountHolder}`, JSON.stringify(Array.from(newViewedCompetitorData)));
-  };
-
-  const markPostsAsViewed = () => {
-    const newViewedPosts = new Set(Array.isArray(posts) ? posts.map(p => p.key) : []);
-    setViewedPosts(newViewedPosts);
-    localStorage.setItem(`viewed_posts_${platform}_${accountHolder}`, JSON.stringify(Array.from(newViewedPosts)));
-  };
 
   // Auto-mark strategies as viewed when they're accessed/opened (via intersection observer)
   useEffect(() => {
@@ -553,38 +957,15 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     }
   }, [processingState, navigate, platform]);
 
-  // Show loading indicator while checking state
-  if (isLoading) {
-    return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh',
-        backgroundColor: '#f5f5f5'
-      }}>
-        <div style={{
-          textAlign: 'center',
-          color: '#666'
-        }}>
-          <div style={{
-            border: '4px solid #f3f3f3',
-            borderTop: '4px solid #00ffcc',
-            borderRadius: '50%',
-            width: '40px',
-            height: '40px',
-            animation: 'spin 1s linear infinite',
-            margin: '0 auto 20px'
-          }} />
-          <div>Loading dashboard...</div>
-        </div>
-      </div>
-    );
+  // Check guard after all hooks are called
+  if (guard.active) {
+    // React Router will have already redirected inside the hook, but return null to avoid rendering.
+    return null;
   }
 
   // Determine current platform connection info
   const userId = platform === 'twitter' ? twitterId : 
-               platform === 'facebook' ? facebookId : // Use Facebook context userId
+               platform === 'facebook' ? facebookPageId : // Use Facebook Page ID
                igUserId;
   const isConnected = platform === 'twitter' ? isTwitterConnected : 
                      platform === 'facebook' ? isFacebookConnected : // Use Facebook context connection status
@@ -624,6 +1005,35 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   // Platform-specific query parameter
   const platformParam = `?platform=${platform}`;
 
+  // Show loading indicator while checking state
+  if (isLoading) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        backgroundColor: '#f5f5f5'
+      }}>
+        <div style={{
+          textAlign: 'center',
+          color: '#666'
+        }}>
+          <div style={{
+            border: '4px solid #f3f3f3',
+            borderTop: '4px solid #00ffcc',
+            borderRadius: '50%',
+            width: '40px',
+            height: '40px',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 20px'
+          }} />
+          <div>Loading dashboard...</div>
+        </div>
+      </div>
+    );
+  }
+
   const handleOpenChatFromMessages = (messageContent: string) => {
     console.log(`[PlatformDashboard] Opening chat for ${platform} with message: "${messageContent}"`);
     
@@ -657,7 +1067,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   // Platform-specific notification handlers
   const handleReply = async (notification: any, replyText: string) => {
     const currentUserId = platform === 'twitter' ? twitterId : 
-                         platform === 'facebook' ? facebookId :
+                         platform === 'facebook' ? facebookPageId :
                          igUserId;
     if (!currentUserId || !replyText.trim()) return;
 
@@ -699,10 +1109,20 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         setToast(`${platform === 'twitter' ? 'Reply' : platform === 'facebook' ? 'Facebook comment reply' : 'Comment reply'} sent!`);
       }
     } catch (error: any) {
-      // Note: Only log actual connection/network errors, not functional issues
-      if (error.code === 'NETWORK_ERROR' || error.name === 'TypeError') {
+      // Handle specific Facebook errors
+      if (error.response?.data?.error && error.response.data.error.includes('Personal Facebook accounts cannot send messages')) {
+        console.error('Facebook personal account error:', error.response.data.error);
+        setToast('Personal Facebook accounts cannot send messages. Please connect a Facebook Business Page instead.');
+      } else if (error.response?.data?.error && error.response.data.error.includes('outside the allowed window')) {
+        console.error('Facebook Messenger policy error:', error.response.data.error);
+        setToast('Facebook policy: Messages can only be sent within 24 hours of the user\'s last message.');
+      } else if (error.code === 'NETWORK_ERROR' || error.name === 'TypeError') {
         console.error('Network error sending reply:', error);
         setToast('Network error while sending reply.');
+      } else if (error.response?.data?.error) {
+        // Handle other API errors
+        console.error('API error sending reply:', error.response.data.error);
+        setToast(`Error: ${error.response.data.error}`);
       } else {
         // For functional errors, use debug level logging instead of error
         console.debug('Reply operation completed with response:', error);
@@ -713,7 +1133,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
 
   const handleIgnore = async (notification: any) => {
     const currentUserId = platform === 'twitter' ? twitterId : 
-                         platform === 'facebook' ? facebookId :
+                         platform === 'facebook' ? facebookPageId :
                          igUserId;
     if (!currentUserId || (!notification.message_id && !notification.comment_id)) return;
     
@@ -787,7 +1207,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         console.log(`[${new Date().toISOString()}] Calling RAG service for instant ${platform} AI reply`);
         
         const currentUserId = platform === 'twitter' ? twitterId : 
-                               platform === 'facebook' ? facebookId :
+                               platform === 'facebook' ? facebookPageId :
                                igUserId;
         const response = await RagService.sendInstantAIReply(
           currentUserId || notification.twitter_user_id || notification.instagram_user_id || notification.facebook_page_id || 'unknown',
@@ -850,7 +1270,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     if (!notification.aiReply || !notification.sender_id) return;
     
     const currentUserId = platform === 'twitter' ? twitterId : 
-                         platform === 'facebook' ? facebookId :
+                         platform === 'facebook' ? facebookPageId :
                          igUserId;
     if (!currentUserId) return;
     
@@ -920,6 +1340,40 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           }));
           
           setToast(`Cannot send: ${platform === 'twitter' ? 'Twitter' : 'Instagram'} user not found`);
+        } else if (responseData.error && responseData.error.includes('Personal Facebook accounts cannot send messages')) {
+          setNotifications(prev => prev.map(n => {
+            if ((n.message_id && n.message_id === notification.message_id) || 
+                (n.comment_id && n.comment_id === notification.comment_id)) {
+              return {
+                ...n,
+                aiReply: {
+                  ...n.aiReply!,
+                  sendStatus: 'personal-account-error',
+                  sendError: 'Personal Facebook accounts cannot send messages via API'
+                }
+              };
+            }
+            return n;
+          }));
+          
+          setToast('Personal Facebook accounts cannot send messages. Please connect a Facebook Business Page instead.');
+        } else if (responseData.error && responseData.error.includes('outside the allowed window')) {
+          setNotifications(prev => prev.map(n => {
+            if ((n.message_id && n.message_id === notification.message_id) || 
+                (n.comment_id && n.comment_id === notification.comment_id)) {
+              return {
+                ...n,
+                aiReply: {
+                  ...n.aiReply!,
+                  sendStatus: 'policy-error',
+                  sendError: 'Facebook policy: Messages can only be sent within 24 hours of the user\'s last message'
+                }
+              };
+            }
+            return n;
+          }));
+          
+          setToast('Facebook policy: Messages can only be sent within 24 hours of the user\'s last message.');
         } else {
           if (responseData.handled) {
             console.log(`[${new Date().toISOString()}] ${platform} message marked as handled but not sent: ${responseData.warning || 'unknown reason'}`);
@@ -1034,7 +1488,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     let failCount = 0;
     
     const currentUserId = platform === 'twitter' ? twitterId : 
-                         platform === 'facebook' ? facebookId :
+                         platform === 'facebook' ? facebookPageId :
                          igUserId;
     
     for (const notification of notifications) {
@@ -1094,8 +1548,17 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         } else {
           failCount++;
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error(`Error auto-replying to ${notification.type}:`, error);
+        
+        // Handle specific Facebook personal account error
+        if (error.response?.data?.error && error.response.data.error.includes('Personal Facebook accounts cannot send messages')) {
+          console.error('Facebook personal account error in auto-reply:', error.response.data.error);
+          setToast('Personal Facebook accounts cannot send messages. Please connect a Facebook Business Page instead.');
+        } else if (error.response?.data?.error) {
+          console.error('API error in auto-reply:', error.response.data.error);
+        }
+        
         failCount++;
       }
     }
@@ -1107,209 +1570,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     setTimeout(() => {
       setRefreshKey(prev => prev + 1);
     }, 2000);
-  };
-
-  const fetchNotifications = async (attempt = 1, maxAttempts = 3) => {
-    const currentUserId = platform === 'twitter' ? twitterId : 
-                         platform === 'facebook' ? facebookId :
-                         igUserId;
-    if (!currentUserId) return;
-    
-    console.log(`[${new Date().toISOString()}] Fetching ${platform} notifications for ${currentUserId} (attempt ${attempt}/${maxAttempts})`);
-    
-    try {
-      const response = await fetch(`/events-list/${currentUserId}?platform=${platform}`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch ${platform} notifications: ${response.status} ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      console.log(`[${new Date().toISOString()}] Received ${data.length} ${platform} notifications`);
-
-      const aiReplies = await RagService.fetchAIReplies(accountHolder, platform);
-      console.log(`[${new Date().toISOString()}] Received ${aiReplies.length} ${platform} AI replies`);
-      
-      const processedNotifications = data.map((notif: any) => {
-        const matchingAiReply = aiReplies.find(pair => {
-          const isMatchingType = pair.type === (notif.type === 'message' ? 'dm' : 'comment');
-          const isMatchingId = 
-            (notif.type === 'message' && pair.request.message_id === notif.message_id) ||
-            (notif.type === 'comment' && pair.request.comment_id === notif.comment_id);
-          
-          return isMatchingType && isMatchingId;
-        });
-        
-        if (matchingAiReply) {
-          return {
-            ...notif,
-            status: 'ai_reply_ready',
-            aiReply: {
-              reply: matchingAiReply.reply.reply,
-              replyKey: matchingAiReply.replyKey,
-              reqKey: matchingAiReply.reqKey,
-              timestamp: matchingAiReply.timestamp || Date.now(),
-              generated_at: matchingAiReply.reply.generated_at || new Date().toISOString()
-            }
-          };
-        }
-        
-        return notif;
-      });
-      
-      setNotifications(processedNotifications);
-    } catch (error) {
-      console.error(`[${new Date().toISOString()}] Error fetching ${platform} notifications (attempt ${attempt}/${maxAttempts}):`, error);
-      if (attempt < maxAttempts) {
-        setTimeout(() => fetchNotifications(attempt + 1, maxAttempts), 2000);
-      }
-    }
-  };
-
-  const setupSSE = (userId: string, attempt = 1) => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
-
-    const eventSource = new EventSource(`/events/${userId}?platform=${platform}`);
-    eventSourceRef.current = eventSource;
-
-    eventSource.onopen = () => {
-      console.log(`[${new Date().toISOString()}] ${platform} SSE connection established for ${userId}`);
-      console.log(`[${new Date().toISOString()}] SSE URL: /events/${userId}?platform=${platform}`);
-      reconnectAttempts.current = 0;
-      fetchNotifications();
-    };
-
-    eventSource.onmessage = (event) => {
-      reconnectAttempts.current = 0;
-      let data;
-      try {
-        data = JSON.parse(event.data);
-      } catch (err) {
-        console.error(`Failed to parse ${platform} SSE message:`, event.data, err);
-        return;
-      }
-
-      console.log(`[${new Date().toISOString()}] ${platform} SSE message received:`, data);
-
-      if (data.type === 'heartbeat') return;
-      if (data.type === 'connection') {
-        console.log(data.message);
-        return;
-      }
-
-      if (data.type === 'usernameChanged') {
-        if (data.username === accountHolder) {
-          refreshAllData();
-          setToast('Dashboard updated!');
-        }
-        return;
-      }
-
-      if (data.type === 'update' && data.prefix) {
-        const { prefix } = data;
-        const platformParam = `?platform=${platform}`;
-        
-        if (prefix.startsWith(`queries/${platform}/${accountHolder}/`)) {
-          axios.get(`/api/responses/${accountHolder}${platformParam}`).then(res => {
-            setResponses(Array.isArray(res.data) ? res.data : []);
-            setToast(`New ${platform} response received!`);
-          }).catch(err => {
-            console.error(`Error fetching ${platform} responses:`, err);
-          });
-        }
-        
-        if (prefix.startsWith(`recommendations/${platform}/${accountHolder}/`) || prefix.startsWith(`engagement_strategies/${platform}/${accountHolder}/`)) {
-          const endpoint = accountType === 'branding' 
-            ? `/api/retrieve-strategies/${accountHolder}${platformParam}`
-            : `/api/retrieve-engagement-strategies/${accountHolder}${platformParam}`;
-          
-          axios.get(endpoint).then(res => {
-            setStrategies(Array.isArray(res.data) ? res.data : []);
-            setToast(`New ${platform} strategies available!`);
-          }).catch(err => {
-            console.error(`Error fetching ${platform} strategies:`, err);
-          });
-        }
-        
-        if (prefix.startsWith(`ready_post/${platform}/${accountHolder}/`)) {
-          axios.get(`/api/posts/${accountHolder}${platformParam}`).then(res => {
-            setPosts(Array.isArray(res.data) ? res.data : []);
-            setToast(`New ${platform} post cooked!`);
-          }).catch(err => {
-            console.error(`Error fetching ${platform} posts:`, err);
-          });
-        }
-        
-        if (prefix.startsWith(`competitor_analysis/${platform}/${accountHolder}/`)) {
-          Promise.all(
-            competitors.map(comp =>
-              axios.get(`/retrieve/${accountHolder}/${comp}${platformParam}`).catch(err => {
-                if (err.response?.status === 404) return { data: [] };
-                throw err;
-              })
-            )
-          )
-            .then(res => {
-              const flatData = res.flatMap(r => Array.isArray(r.data) ? r.data : []);
-              setCompetitorData(flatData);
-              setToast(`New ${platform} competitor analysis available!`);
-            })
-            .catch(err => {
-              console.error(`Error fetching ${platform} competitor data:`, err);
-            });
-        }
-      }
-
-      if (data.event === 'message' || data.event === 'comment') {
-        console.log(`[${new Date().toISOString()}] Processing ${platform} SSE event: ${data.event}`, data.data);
-        
-        const notifType = data.event === 'message' ? 'dm' : 'comment';
-        const notifId = data.data.message_id || data.data.comment_id;
-        const notifText = data.data.text;
-        
-        const isRecentlySent = replySentTracker.some(reply => {
-          if (reply.type === notifType) {
-            const normalizedReply = reply.text.toLowerCase().trim();
-            const normalizedNotif = notifText.toLowerCase().trim();
-            
-            return normalizedReply === normalizedNotif || 
-                  normalizedNotif.includes(normalizedReply) ||
-                  reply.id === notifId;
-          }
-          return false;
-        });
-        
-        if (!isRecentlySent) {
-          console.log(`[${new Date().toISOString()}] Adding new ${platform} notification to state:`, data.data);
-          setNotifications(prev => {
-            const updated = [data.data, ...safeFilter(prev, (n: any) => 
-              n.message_id !== data.data.message_id && 
-              n.comment_id !== data.data.comment_id
-            )];
-            return updated.sort((a, b) => b.timestamp - a.timestamp).slice(0, 10);
-          });
-          setToast(data.event === 'message' 
-            ? `New ${platform === 'twitter' ? 'Twitter DM' : platform === 'facebook' ? 'Facebook message' : 'Instagram message'} received!` 
-            : `New ${platform === 'twitter' ? 'Twitter mention' : platform === 'facebook' ? 'Facebook comment' : 'Instagram comment'} received!`);
-        } else {
-          console.log(`[${new Date().toISOString()}] Filtered out own ${platform} reply from notifications:`, data.data);
-        }
-      }
-    };
-
-    eventSource.onerror = (error) => {
-      console.error(`[${new Date().toISOString()}] ${platform} SSE error (attempt ${attempt}/${maxReconnectAttempts}):`, error);
-      eventSource.close();
-      eventSourceRef.current = null;
-
-      if (reconnectAttempts.current < maxReconnectAttempts) {
-        reconnectAttempts.current += 1;
-        const delay = baseReconnectDelay * Math.pow(2, reconnectAttempts.current);
-        setTimeout(() => setupSSE(userId, attempt + 1), delay);
-      }
-    };
   };
 
   const handleSendQuery = async () => {
@@ -1508,86 +1768,7 @@ Image Description: ${response.post.image_prompt}
     }
   };
 
-  async function refreshAllData() {
-    if (!accountHolder) {
-      return;
-    }
-    try {
-      const forceRefresh = firstLoadRef.current;
-      const platformParam = `?platform=${platform}${forceRefresh ? '&forceRefresh=true' : ''}`;
-      
-      const [responsesData, strategiesData, postsData, competitorData] = await Promise.all([
-        axios.get(`/api/responses/${accountHolder}${platformParam}`).catch(err => {
-          if (err.response?.status === 404) return { data: [] };
-          throw err;
-        }),
-        axios.get(getApiUrl(`/${accountType === 'branding' ? 'retrieve-strategies' : 'retrieve-engagement-strategies'}/${accountHolder}${platformParam}`)).catch(err => {
-          if (err.response?.status === 404) return { data: [] };
-          throw err;
-        }),
-        axios.get(`/api/posts/${accountHolder}${platformParam}`).catch(err => {
-          if (err.response?.status === 404) return { data: [] };
-          throw err;
-        }),
-        // Always fetch competitor data for both account types
-        Promise.all(
-          competitors.map(comp =>
-            axios.get(getApiUrl(`/retrieve/${accountHolder}/${comp}${platformParam}`)).catch(err => {
-              if (err.response?.status === 404) {
-                console.warn(`No ${platform} competitor data found for ${comp}`);
-                return { data: [] };
-              }
-              throw err;
-            })
-          )
-        )
-      ]);
 
-      // Defensive checks for array data before setting state
-      setResponses(Array.isArray(responsesData.data) ? responsesData.data : []);
-      setStrategies(Array.isArray(strategiesData.data) ? strategiesData.data : []);
-      setPosts(Array.isArray(postsData.data) ? postsData.data : []);
-      
-      // Always set competitor data with defensive check
-      const competitorResponses = competitorData as any[];
-      const flatData = competitorResponses.flatMap(res => Array.isArray(res.data) ? res.data : []);
-      setCompetitorData(flatData);
-
-      if (firstLoadRef.current) {
-        firstLoadRef.current = false;
-      }
-    } catch (error: any) {
-      console.error(`Error refreshing ${platform} data:`, error);
-      setToast(`Failed to load ${platform} dashboard data.`);
-    }
-  };
-
-  async function fetchProfileInfo() {
-    if (!accountHolder) return;
-    setProfileLoading(true);
-    setProfileError(null);
-    setImageError(false);
-    try {
-      const response = await axios.get(`/api/profile-info/${accountHolder}${platformParam ? `${platformParam}&forceRefresh=true` : '?forceRefresh=true'}`);
-      // Defensive check: ensure response data is a valid object
-      if (response.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
-        setProfileInfo(response.data);
-        console.log(`${config.name} Profile Info Fetched:`, response.data);
-      } else {
-        setProfileInfo(null);
-        setProfileError(`Invalid ${config.name} profile data received.`);
-      }
-    } catch (err: any) {
-      if (err.response?.status === 404) {
-        setProfileInfo(null);
-        setProfileError(`${config.name} profile info not available.`);
-      } else {
-        setProfileError(`Failed to load ${config.name} profile info.`);
-      }
-    } finally {
-      setProfileLoading(false);
-    }
-  };
 
   if (!accountHolder) {
     return null;
@@ -1689,17 +1870,17 @@ Image Description: ${response.post.image_prompt}
 
   // Facebook handlers
   const handleOpenFacebookScheduler = () => {
-    console.log(`[${new Date().toISOString()}] Opening Facebook PostScheduler for user ${facebookId}`);
+    console.log(`[${new Date().toISOString()}] Opening Facebook PostScheduler for user ${facebookPageId}`);
     setIsFacebookSchedulerOpen(true);
   };
 
   const handleOpenFacebookInsights = () => {
-    console.log(`[${new Date().toISOString()}] Opening Facebook InsightsModal for user ${facebookId}`);
+    console.log(`[${new Date().toISOString()}] Opening Facebook InsightsModal for user ${facebookPageId}`);
     setIsFacebookInsightsOpen(true);
   };
 
   const handleOpenFacebookCompose = () => {
-    console.log(`[${new Date().toISOString()}] Opening Facebook Compose for user ${facebookId}`);
+    console.log(`[${new Date().toISOString()}] Opening Facebook Compose for user ${facebookPageId}`);
     setIsFacebookComposeOpen(true);
   };
 
@@ -1967,7 +2148,7 @@ Image Description: ${response.post.image_prompt}
                 refreshKey={refreshKey}
                 igBusinessId={platform === 'instagram' ? igUserId : undefined}
                 twitterId={platform === 'twitter' ? twitterId : undefined}
-                facebookPageId={platform === 'facebook' ? facebookId : undefined}
+                facebookPageId={platform === 'facebook' ? facebookPageId : undefined}
                 aiRepliesRefreshKey={refreshKey}
                 onAIRefresh={() => setRefreshKey(prev => prev + 1)}
                 aiProcessingNotifications={aiProcessingNotifications}
@@ -2194,7 +2375,7 @@ Image Description: ${response.post.image_prompt}
       
       {isFacebookSchedulerOpen && (
         <PostScheduler 
-          userId={facebookId!} 
+          userId={facebookPageId!} 
           platform="facebook"
           onClose={() => {
             console.log(`[${new Date().toISOString()}] Closing Facebook PostScheduler`);
@@ -2205,7 +2386,7 @@ Image Description: ${response.post.image_prompt}
       
       {isFacebookInsightsOpen && (
         <InsightsModal 
-          userId={facebookId!} 
+          userId={facebookPageId!} 
           platform="facebook"
           onClose={() => {
             console.log(`[${new Date().toISOString()}] Closing Facebook InsightsModal`);
@@ -2216,7 +2397,7 @@ Image Description: ${response.post.image_prompt}
       
       {isFacebookComposeOpen && (
         <TwitterCompose 
-          userId={facebookId!} 
+          userId={facebookPageId!} 
           onClose={() => {
             console.log(`[${new Date().toISOString()}] Closing Facebook Compose`);
             setIsFacebookComposeOpen(false);

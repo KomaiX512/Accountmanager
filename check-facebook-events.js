@@ -17,24 +17,28 @@ const s3Client = new S3Client({
 async function checkFacebookEvents() {
   console.log('🔍 Checking Facebook events in R2...\n');
   
-  const userIds = ['612940588580162', '681487244693083'];
-  
-  for (const userId of userIds) {
-    console.log(`📋 Checking events for user ID: ${userId}`);
+  try {
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: `FacebookEvents/`,
+    });
     
-    try {
-      const listCommand = new ListObjectsV2Command({
-        Bucket: 'tasks',
-        Prefix: `FacebookEvents/${userId}/`,
-      });
+    const { Contents } = await s3Client.send(listCommand);
+    
+    console.log(`📊 Found ${Contents ? Contents.length : 0} Facebook event files`);
+    
+    if (Contents) {
+      // Group events by user ID
+      const eventsByUser = {};
       
-      const { Contents } = await s3Client.send(listCommand);
-      
-      console.log(`   📊 Found ${Contents ? Contents.length : 0} events`);
-      
-      if (Contents && Contents.length > 0) {
-        for (const obj of Contents) {
-          console.log(`   📄 Event file: ${obj.Key}`);
+      for (const obj of Contents) {
+        if (obj.Key.endsWith('.json')) {
+          const keyParts = obj.Key.split('/');
+          const userId = keyParts[1]; // FacebookEvents/{userId}/{eventId}.json
+          
+          if (!eventsByUser[userId]) {
+            eventsByUser[userId] = [];
+          }
           
           try {
             const getCommand = new GetObjectCommand({
@@ -42,28 +46,34 @@ async function checkFacebookEvents() {
               Key: obj.Key,
             });
             const data = await s3Client.send(getCommand);
-            const eventData = JSON.parse(await data.Body.transformToString());
+            const event = JSON.parse(await data.Body.transformToString());
             
-            console.log(`      - type: ${eventData.type}`);
-            console.log(`      - facebook_page_id: ${eventData.facebook_page_id}`);
-            console.log(`      - facebook_user_id: ${eventData.facebook_user_id}`);
-            console.log(`      - message_id: ${eventData.message_id || 'N/A'}`);
-            console.log(`      - comment_id: ${eventData.comment_id || 'N/A'}`);
-            console.log(`      - text: ${eventData.text ? eventData.text.substring(0, 50) + '...' : 'N/A'}`);
-            console.log(`      - status: ${eventData.status || 'pending'}`);
-            console.log('');
+            eventsByUser[userId].push({
+              key: obj.Key,
+              event: event
+            });
           } catch (error) {
-            console.error(`      ❌ Error reading event ${obj.Key}:`, error.message);
+            console.error(`❌ Error reading event from ${obj.Key}:`, error.message);
           }
         }
       }
       
-      console.log('');
-    } catch (error) {
-      console.error(`❌ Error checking events for ${userId}:`, error.message);
+      // Display events by user
+      for (const [userId, events] of Object.entries(eventsByUser)) {
+        console.log(`\n👤 User ID: ${userId}`);
+        console.log(`   📝 Events: ${events.length}`);
+        
+        // Show recent events (last 5)
+        const recentEvents = events.slice(-5);
+        for (const { key, event } of recentEvents) {
+          console.log(`   - ${event.type || 'unknown'}: ${event.text || event.message_id || 'no text'} (${event.received_at || 'no timestamp'})`);
+        }
+      }
     }
+    
+  } catch (error) {
+    console.error('❌ Error checking Facebook events:', error.message);
   }
 }
 
-// Run the check
 checkFacebookEvents(); 

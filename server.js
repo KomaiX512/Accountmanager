@@ -297,6 +297,87 @@ app.use(cors({
 
 app.use(express.json({ limit: '50mb' })); // Increased limit for larger images
 
+// =============================================================================
+// STRICT PROXY SERVER PROTECTION - PREVENT NOTIFICATION INTERFERENCE
+// =============================================================================
+// This middleware ensures the proxy server NEVER handles notification/social media requests
+// All such requests should be handled ONLY by the main server (port 3000)
+app.use((req, res, next) => {
+  const url = req.url.toLowerCase();
+  const prohibitedPaths = [
+    'events-list',
+    'facebook-connection', 
+    'instagram-connection',
+    'twitter-connection',
+    'user-facebook-status',
+    'user-instagram-status', 
+    'user-twitter-status',
+    'send-dm-reply',
+    'send-comment-reply',
+    'ignore-notification',
+    'webhook/facebook',
+    'webhook/instagram', 
+    'ai-replies',
+    'rag-instant-reply',
+    'instant-reply',
+    'facebook/callback',
+    'instagram/callback',
+    'twitter/callback',
+    'mark-notification-handled',
+    'access-check',
+    'user/',
+    'usage/'
+  ];
+  
+  // Check if this request should be handled by main server
+  for (const prohibitedPath of prohibitedPaths) {
+    if (url.includes(prohibitedPath)) {
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] PROXY-PROTECTION: Rejecting ${req.method} ${req.url} - should go to main server`);
+      return res.status(404).json({ 
+        error: 'Endpoint not available on proxy server',
+        message: 'This endpoint should be handled by the main server (port 3000)',
+        redirectTo: 'http://localhost:3000' + req.url
+      });
+    }
+  }
+  
+  // Define allowed paths for proxy server (whitelist approach)
+  const allowedPaths = [
+    '/health',
+    '/fix-image',
+    '/r2-images',
+    '/proxy-image',
+    '/api/r2-image',
+    '/api/signed-image-url',
+    '/posts/',
+    '/api/posts/',
+    '/api/save-edited-post',
+    '/placeholder',
+    '/handle-r2-images.js',
+    '/admin/clear-image-cache'
+  ];
+  
+  // Check if this is an allowed path
+  const isAllowed = allowedPaths.some(allowedPath => url.includes(allowedPath.toLowerCase()));
+  
+  // If not in allowed paths and contains /api/, reject it (except for specific image APIs)
+  if (!isAllowed && url.includes('/api/')) {
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] PROXY-PROTECTION: Rejecting API request ${req.method} ${req.url} - not in whitelist`);
+    return res.status(404).json({ 
+      error: 'API endpoint not available on proxy server',
+      message: 'This API endpoint should be handled by the main server (port 3000)',
+      redirectTo: 'http://localhost:3000' + req.url
+    });
+  }
+  
+  // Allow image processing and valid proxy endpoints to continue
+  next();
+});
+
+// =============================================================================
+// END PROXY SERVER PROTECTION
+// =============================================================================
+
 // Create directory for local image caching if it doesn't exist
 const localCacheDir = path.join(process.cwd(), 'image_cache');
 if (!fs.existsSync(localCacheDir)) {
@@ -2204,901 +2285,40 @@ const PRICING_PLANS = {
   }
 };
 
-// Get user data from admin R2 bucket
-app.get('/api/user/:userId', async (req, res) => {
-  const { userId } = req.params;
-  
-  try {
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] Getting user data for ${userId}`);
-    
-    const params = {
-      Bucket: 'admin',
-      Key: `users/${userId}.json`
-    };
-    
-    const data = await getAdminS3Client().getObject(params).promise();
-    const userData = JSON.parse(data.Body.toString());
-    
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] Found user data for ${userId}`);
-    res.json(userData);
-    
-  } catch (error) {
-    if (error.code === 'NoSuchKey') {
-      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] User ${userId} not found, creating default`);
-      res.status(404).json({ error: 'User not found' });
-    } else {
-      if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [USER-API] Error getting user data:`, error);
-      res.status(500).json({ error: 'Failed to get user data' });
-    }
-  }
-});
-
-// Save user data to admin R2 bucket
-app.put('/api/user/:userId', async (req, res) => {
-  const { userId } = req.params;
-  const userData = req.body;
-  
-  try {
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] Saving user data for ${userId}`);
-    
-    const params = {
-      Bucket: 'admin',
-      Key: `users/${userId}.json`,
-      Body: JSON.stringify(userData, null, 2),
-      ContentType: 'application/json'
-    };
-    
-    await getAdminS3Client().putObject(params).promise();
-    
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] Saved user data for ${userId}`);
-    res.json({ success: true });
-    
-  } catch (error) {
-    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [USER-API] Error saving user data:`, error);
-    res.status(500).json({ error: 'Failed to save user data' });
-  }
-});
-
-// Get usage stats for current period (no period specified)
-app.get('/api/user/:userId/usage', async (req, res) => {
-  const { userId } = req.params;
-  const currentPeriod = new Date().toISOString().substring(0, 7); // YYYY-MM
-  
-  try {
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] Getting usage stats for ${userId}/${currentPeriod}`);
-    
-    // Try R2 first
-    try {
-      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-OPERATION] Attempting to get usage stats from R2`);
-      const params = {
-        Bucket: 'admin',
-        Key: `usage/${userId}/${currentPeriod}.json`
-      };
-      
-      const data = await getAdminS3Client().getObject(params).promise();
-      const usageStats = JSON.parse(data.Body.toString());
-      
-      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] Found usage stats from R2 for ${userId}/${currentPeriod}`);
-      res.json(usageStats);
-      return;
-    } catch (r2Error) {
-      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-OPERATION] Error performing R2 operation: ${r2Error.message}`);
-      
-      if (r2Error.code === 'NoSuchKey' || r2Error.message.includes('does not exist')) {
-        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] R2 failed for usage stats, trying fallbacks: ${r2Error.message}`);
-        
-        // Try local storage fallback
-        const localStorageDir = path.join(process.cwd(), 'local_storage', 'usage', userId);
-        const localStorageFile = path.join(localStorageDir, `${currentPeriod}.json`);
-        
-        if (fs.existsSync(localStorageFile)) {
-          try {
-            if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Found usage in local storage: ${localStorageFile}`);
-            const localData = JSON.parse(fs.readFileSync(localStorageFile, 'utf8'));
-            res.json(localData);
-            return;
-          } catch (localError) {
-            if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Error reading local usage stats:`, localError);
-          }
-        }
-        
-        // If both R2 and local storage fail, create default stats
-        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] Using default usage stats for ${userId}/${currentPeriod}`);
-        const defaultStats = {
-          userId,
-          period: currentPeriod,
-          postsUsed: 0,
-          discussionsUsed: 0,
-          aiRepliesUsed: 0,
-          campaignsUsed: 0,
-          lastUpdated: new Date().toISOString()
-        };
-        
-        // Save default stats to local storage
-        try {
-          if (!fs.existsSync(localStorageDir)) {
-            fs.mkdirSync(localStorageDir, { recursive: true });
-          }
-          fs.writeFileSync(localStorageFile, JSON.stringify(defaultStats, null, 2));
-          if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Saved usage to local storage: ${localStorageFile}`);
-        } catch (saveError) {
-          if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Error saving to local storage:`, saveError);
-        }
-        
-        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] Creating default usage stats for ${userId}/${currentPeriod}`);
-        res.json(defaultStats);
-        return;
-      } else {
-        // For other R2 errors, fall back to local storage if available
-        const localStorageDir = path.join(process.cwd(), 'local_storage', 'usage', userId);
-        const localStorageFile = path.join(localStorageDir, `${currentPeriod}.json`);
-        
-        if (fs.existsSync(localStorageFile)) {
-          try {
-            if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Using local storage due to R2 error: ${localStorageFile}`);
-            const localData = JSON.parse(fs.readFileSync(localStorageFile, 'utf8'));
-            res.json(localData);
-            return;
-          } catch (localError) {
-            if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Error reading local storage:`, localError);
-          }
-        }
-        
-        throw r2Error; // Re-throw if no local fallback available
-      }
-    }
-  } catch (error) {
-    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [USER-API] Error getting usage stats:`, error);
-    
-    // Ultimate fallback - return default stats
-    const defaultStats = {
-      userId,
-      period: currentPeriod,
-      postsUsed: 0,
-      discussionsUsed: 0,
-      aiRepliesUsed: 0,
-      campaignsUsed: 0,
-      lastUpdated: new Date().toISOString()
-    };
-    
-    res.json(defaultStats);
-  }
-});
-
-// Get usage stats for specific period
-app.get('/api/user/:userId/usage/:period', async (req, res) => {
-  const { userId, period } = req.params;
-  const currentPeriod = period || new Date().toISOString().substring(0, 7); // YYYY-MM
-  
-  try {
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] Getting usage stats for ${userId}/${currentPeriod}`);
-    
-    const params = {
-      Bucket: 'admin',
-      Key: `usage/${userId}/${currentPeriod}.json`
-    };
-    
-    const data = await getAdminS3Client().getObject(params).promise();
-    const usageStats = JSON.parse(data.Body.toString());
-    
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] Found usage stats for ${userId}/${currentPeriod}`);
-    res.json(usageStats);
-    
-  } catch (error) {
-    if (error.code === 'NoSuchKey') {
-      // Create default usage stats
-      const defaultStats = {
-        userId,
-        period: currentPeriod,
-        postsUsed: 0,
-        discussionsUsed: 0,
-        aiRepliesUsed: 0,
-        campaignsUsed: 0,
-        lastUpdated: new Date().toISOString()
-      };
-      
-      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] Creating default usage stats for ${userId}/${currentPeriod}`);
-      res.json(defaultStats);
-    } else {
-      if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [USER-API] Error getting usage stats:`, error);
-      res.status(500).json({ error: 'Failed to get usage stats' });
-    }
-  }
-});
-
-// Update usage stats
-app.patch('/api/user/:userId/usage', async (req, res) => {
-  const { userId } = req.params;
-  const statsUpdate = req.body;
-  const currentPeriod = new Date().toISOString().substring(0, 7);
-  
-  try {
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] Updating usage stats for ${userId}/${currentPeriod}`);
-    
-    // Get current stats or create default
-    let currentStats;
-    try {
-      const data = await getAdminS3Client().getObject({
-        Bucket: 'admin',
-        Key: `usage/${userId}/${currentPeriod}.json`
-      }).promise();
-      currentStats = JSON.parse(data.Body.toString());
-    } catch (error) {
-      if (error.code === 'NoSuchKey') {
-        currentStats = {
-          userId,
-          period: currentPeriod,
-          postsUsed: 0,
-          discussionsUsed: 0,
-          aiRepliesUsed: 0,
-          campaignsUsed: 0,
-          lastUpdated: new Date().toISOString()
-        };
-      } else {
-        throw error;
-      }
-    }
-    
-    // Update stats
-    const updatedStats = {
-      ...currentStats,
-      ...statsUpdate,
-      lastUpdated: new Date().toISOString()
-    };
-    
-    // Save updated stats
-    const params = {
-      Bucket: 'admin',
-      Key: `usage/${userId}/${currentPeriod}.json`,
-      Body: JSON.stringify(updatedStats, null, 2),
-      ContentType: 'application/json'
-    };
-    
-    await getAdminS3Client().putObject(params).promise();
-    
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USER-API] Updated usage stats for ${userId}/${currentPeriod}`);
-    res.json({ success: true });
-    
-  } catch (error) {
-    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [USER-API] Error updating usage stats:`, error);
-    res.status(500).json({ error: 'Failed to update usage stats' });
-  }
-});
-
-// Check access for a specific feature
-app.post('/api/access-check/:userId', async (req, res) => {
-  const { userId } = req.params;
-  const { feature } = req.body;
-  
-  try {
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [ACCESS-CHECK] Checking ${feature} access for ${userId}`);
-    
-    // Get user data and usage stats
-    const [userResponse, usageResponse] = await Promise.allSettled([
-      fetch(`http://localhost:3002/api/user/${userId}`),
-      fetch(`http://localhost:3002/api/user/${userId}/usage`)
-    ]);
-    
-    let userData = null;
-    let usageStats = null;
-    
-    if (userResponse.status === 'fulfilled' && userResponse.value.ok) {
-      userData = await userResponse.value.json();
-    }
-    
-    if (usageResponse.status === 'fulfilled' && usageResponse.value.ok) {
-      usageStats = await usageResponse.value.json();
-    }
-    
-    // If no user data, create default freemium user
-    if (!userData) {
-      userData = {
-        id: userId,
-        userType: 'freemium', // Changed from 'free' to 'freemium'
-        subscription: {
-          planId: 'basic',
-          status: 'trial',
-          startDate: new Date().toISOString(),
-          endDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-          limits: PRICING_PLANS.basic.limits,
-          trialDaysRemaining: 3
-        },
-        trialEndsAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-        isTrialActive: true
-      };
-      
-      // Save the new user
-      await fetch(`http://localhost:3002/api/user/${userId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userData)
-      });
-    }
-    
-    // Default usage stats if not found
-    if (!usageStats) {
-      usageStats = {
-        userId,
-        period: new Date().toISOString().substring(0, 7),
-        postsUsed: 0,
-        discussionsUsed: 0,
-        aiRepliesUsed: 0,
-        campaignsUsed: 0,
-        lastUpdated: new Date().toISOString()
-      };
-    }
-    
-    // Admin users have unlimited access
-    if (userData.userType === 'admin') {
-      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [ACCESS-CHECK] Admin user ${userId} has unlimited access`);
-      return res.json({ allowed: true });
-    }
-    
-    const subscription = userData.subscription;
-    if (!subscription) {
-      return res.json({ 
-        allowed: false, 
-        reason: 'No active subscription', 
-        upgradeRequired: true 
-      });
-    }
-    
-    // Check if trial is expired
-    if (subscription.status === 'trial' && userData.trialEndsAt) {
-      const trialEnd = new Date(userData.trialEndsAt);
-      if (new Date() > trialEnd) {
-        return res.json({ 
-          allowed: false, 
-          reason: 'Trial expired', 
-          upgradeRequired: true,
-          redirectToPricing: true 
-        });
-      }
-    }
-    
-    // Check subscription status
-    if (subscription.status === 'cancelled' || subscription.status === 'expired') {
-      return res.json({ 
-        allowed: false, 
-        reason: 'Subscription inactive', 
-        upgradeRequired: true,
-        redirectToPricing: true 
-      });
-    }
-    
-    const limits = subscription.limits;
-    
-    // Check feature-specific access
-    let accessResult = { allowed: true };
-    
-    switch (feature) {
-      case 'posts':
-        if (typeof limits.posts === 'number' && usageStats.postsUsed >= limits.posts) {
-          accessResult = { 
-            allowed: false, 
-            reason: `Post limit reached (${usageStats.postsUsed}/${limits.posts})`, 
-            limitReached: true,
-            upgradeRequired: true 
-          };
-        }
-        break;
-        
-      case 'discussions':
-        if (typeof limits.discussions === 'number' && usageStats.discussionsUsed >= limits.discussions) {
-          accessResult = { 
-            allowed: false, 
-            reason: `Discussion limit reached (${usageStats.discussionsUsed}/${limits.discussions})`, 
-            limitReached: true,
-            upgradeRequired: true 
-          };
-        }
-        break;
-        
-      case 'aiReplies':
-        if (limits.aiReplies !== 'unlimited' && usageStats.aiRepliesUsed >= limits.aiReplies) {
-          accessResult = { 
-            allowed: false, 
-            reason: `AI Reply limit reached (${usageStats.aiRepliesUsed}/${limits.aiReplies})`, 
-            limitReached: true,
-            upgradeRequired: true 
-          };
-        }
-        break;
-        
-      case 'campaigns':
-        if (typeof limits.campaigns === 'number' && usageStats.campaignsUsed >= limits.campaigns) {
-          accessResult = { 
-            allowed: false, 
-            reason: `Campaign limit reached (${usageStats.campaignsUsed}/${limits.campaigns})`, 
-            limitReached: true,
-            upgradeRequired: true 
-          };
-        }
-        break;
-        
-      case 'autoSchedule':
-        if (!limits.autoSchedule) {
-          accessResult = { 
-            allowed: false, 
-            reason: 'Auto Schedule not available in your plan', 
-            upgradeRequired: true 
-          };
-        }
-        break;
-        
-      case 'autoReply':
-        if (!limits.autoReply) {
-          accessResult = { 
-            allowed: false, 
-            reason: 'Auto Reply not available in your plan', 
-            upgradeRequired: true 
-          };
-        }
-        break;
-        
-      case 'goalModel':
-        if (userData.userType !== 'premium' && userData.userType !== 'admin') {
-          const goalModelDays = limits.goalModelDays;
-          if (typeof goalModelDays === 'number' && goalModelDays <= 0) {
-            accessResult = { 
-              allowed: false, 
-              reason: 'Goal Model is a Premium feature', 
-              upgradeRequired: true 
-            };
-          }
-        }
-        break;
-        
-      default:
-        accessResult = { allowed: false, reason: 'Unknown feature' };
-    }
-    
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [ACCESS-CHECK] ${feature} access for ${userId}: ${accessResult.allowed ? 'ALLOWED' : 'DENIED'}`);
-    res.json(accessResult);
-    
-  } catch (error) {
-    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [ACCESS-CHECK] Error checking access:`, error);
-    // Allow access if there's an error to prevent app breaking
-    res.json({ allowed: true });
-  }
-});
-
-// Admin authentication endpoint
-app.post('/api/admin/authenticate', async (req, res) => {
-  const { username, password } = req.body;
-  
-  try {
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [ADMIN-AUTH] Authentication attempt for ${username}`);
-    
-    if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
-      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [ADMIN-AUTH] Authentication successful for ${username}`);
-      res.json({ 
-        success: true, 
-        message: 'Authentication successful',
-        adminToken: `admin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-      });
-    } else {
-      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [ADMIN-AUTH] Authentication failed for ${username}`);
-      res.status(401).json({ 
-        success: false, 
-        message: 'Invalid credentials' 
-      });
-    }
-    
-  } catch (error) {
-    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [ADMIN-AUTH] Error during authentication:`, error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Authentication error' 
-    });
-  }
-});
-
-// Upgrade user to admin
-app.post('/api/admin/upgrade-user/:userId', async (req, res) => {
-  const { userId } = req.params;
-  const { adminToken } = req.body;
-  
-  try {
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [ADMIN-UPGRADE] Upgrading user ${userId} to admin`);
-    
-    // In production, verify adminToken here
-    // For now, we'll trust the request came from authenticated admin
-    
-    // Get current user data or create new
-    let userData;
-    try {
-      const response = await fetch(`http://localhost:3002/api/user/${userId}`);
-      if (response.ok) {
-        userData = await response.json();
-      } else {
-        userData = {
-          id: userId,
-          email: '',
-          displayName: '',
-          createdAt: new Date().toISOString(),
-          lastLogin: new Date().toISOString()
-        };
-      }
-    } catch (error) {
-      userData = {
-        id: userId,
-        email: '',
-        displayName: '',
-        createdAt: new Date().toISOString(),
-        lastLogin: new Date().toISOString()
-      };
-    }
-    
-    // Upgrade to admin
-    userData.userType = 'admin';
-    userData.subscription = {
-      planId: 'enterprise',
-      status: 'active',
-      startDate: new Date().toISOString(),
-      limits: PRICING_PLANS.enterprise.limits
-    };
-    userData.lastLogin = new Date().toISOString();
-    
-    // Save updated user data
-    const response = await fetch(`http://localhost:3002/api/user/${userId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(userData)
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to save user data');
-    }
-    
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [ADMIN-UPGRADE] Successfully upgraded user ${userId} to admin`);
-    res.json({ success: true, message: 'User upgraded to admin successfully' });
-    
-  } catch (error) {
-    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [ADMIN-UPGRADE] Error upgrading user:`, error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to upgrade user' 
-    });
-  }
-});
-
-// Increment usage counter
-app.post('/api/usage/increment/:userId', async (req, res) => {
-  const { userId } = req.params;
-  const { feature } = req.body;
-  
-  try {
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USAGE-INCREMENT] Incrementing ${feature} usage for ${userId}`);
-    
-    // Get current usage stats
-    const response = await fetch(`http://localhost:3002/api/user/${userId}/usage`);
-    let usageStats;
-    
-    if (response.ok) {
-      usageStats = await response.json();
-    } else {
-      const currentPeriod = new Date().toISOString().substring(0, 7);
-      usageStats = {
-        userId,
-        period: currentPeriod,
-        postsUsed: 0,
-        discussionsUsed: 0,
-        aiRepliesUsed: 0,
-        campaignsUsed: 0,
-        lastUpdated: new Date().toISOString()
-      };
-    }
-    
-    // Increment the appropriate counter
-    const update = { lastUpdated: new Date().toISOString() };
-    
-    switch (feature) {
-      case 'posts':
-        update.postsUsed = usageStats.postsUsed + 1;
-        break;
-      case 'discussions':
-        update.discussionsUsed = usageStats.discussionsUsed + 1;
-        break;
-      case 'aiReplies':
-        update.aiRepliesUsed = usageStats.aiRepliesUsed + 1;
-        break;
-      case 'campaigns':
-        update.campaignsUsed = usageStats.campaignsUsed + 1;
-        break;
-      default:
-        if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [USAGE-INCREMENT] Unknown feature: ${feature}`);
-        return res.json({ success: true, message: 'Unknown feature, no increment performed' });
-    }
-    
-    // Update usage stats
-    const updateResponse = await fetch(`http://localhost:3002/api/user/${userId}/usage`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(update)
-    });
-    
-    if (!updateResponse.ok) {
-      throw new Error('Failed to update usage stats');
-    }
-    
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [USAGE-INCREMENT] Successfully incremented ${feature} usage for ${userId}`);
-    res.json({ success: true, newCount: usageStats[feature + 'Used'] + 1 });
-    
-  } catch (error) {
-    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [USAGE-INCREMENT] Error incrementing usage:`, error);
-    // Don't fail the request - usage tracking is not critical
-    res.json({ success: true, message: 'Usage tracking error, but operation continued' });
-  }
-});
-
-// Get pricing plans
-app.get('/api/pricing-plans', (req, res) => {
-  if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [PRICING] Serving pricing plans`);
-  res.json({ plans: Object.values(PRICING_PLANS) });
-});
-
-// Mock payment processing endpoint (for testing)
-app.post('/api/process-payment', async (req, res) => {
-  const { userId, planId, paymentMethod } = req.body;
-  
-  try {
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [PAYMENT] Processing payment for ${userId} - Plan: ${planId}`);
-    
-    // Simulate payment processing delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // For demo/testing, all payments succeed
-    const plan = PRICING_PLANS[planId];
-    if (!plan) {
-      throw new Error('Invalid plan selected');
-    }
-    
-    // Get current user data
-    const userResponse = await fetch(`http://localhost:3002/api/user/${userId}`);
-    let userData = userResponse.ok ? await userResponse.json() : {
-      id: userId,
-      email: '',
-      displayName: '',
-      createdAt: new Date().toISOString(),
-      lastLogin: new Date().toISOString()
-    };
-    
-    // Update subscription
-    userData.userType = planId === 'basic' ? 'freemium' : planId === 'premium' ? 'premium' : 'enterprise';
-    userData.subscription = {
-      planId,
-      status: 'active',
-      startDate: new Date().toISOString(),
-      endDate: planId === 'basic' ? 
-        new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString() : 
-        new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      limits: plan.limits
-    };
-    userData.lastLogin = new Date().toISOString();
-    
-    if (planId === 'basic') {
-      userData.isTrialActive = true;
-      userData.trialEndsAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
-      userData.subscription.trialDaysRemaining = 3;
-    } else {
-      userData.isTrialActive = false;
-      userData.trialEndsAt = null;
-    }
-    
-    // Save updated user data
-    const saveResponse = await fetch(`http://localhost:3002/api/user/${userId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(userData)
-    });
-    
-    if (!saveResponse.ok) {
-      throw new Error('Failed to save subscription data');
-    }
-    
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [PAYMENT] Payment processed successfully for ${userId} - Plan: ${planId}`);
-    res.json({ 
-      success: true, 
-      message: 'Payment processed successfully',
-      subscription: userData.subscription 
-    });
-    
-  } catch (error) {
-    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [PAYMENT] Payment processing error:`, error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Payment processing failed',
-      error: error.message 
-    });
-  }
-});
+// =============================================================================
+// REMOVED: User Management & Billing Endpoints - these belong to main server (port 3000)
+// =============================================================================
+//
+// REMOVED ENDPOINTS:
+// - /api/user/:userId (GET, PUT) - User data retrieval and storage
+// - /api/user/:userId/usage (GET, PATCH) - Usage statistics
+// - /api/user/:userId/usage/:period (GET) - Period-specific usage
+// - /api/access-check/:userId (POST) - Feature access checks
+// - /api/usage/increment/:userId (POST) - Usage increment
+// - /api/admin/authenticate (POST) - Admin authentication
+// - /api/admin/upgrade-user/:userId (POST) - Admin user upgrades
+// - /api/pricing-plans (GET) - Pricing plans
+// - /api/process-payment (POST) - Payment processing
+//
+// REASON: These endpoints create conflicts with the main server and should only
+// be handled by the main server (port 3000) for proper user management.
+// =============================================================================
 
 // ============================================================
-// MISSING API ENDPOINTS FOR COMPATIBILITY
+// REMOVED: All conflicting API endpoints have been moved to main server (port 3000)
 // ============================================================
-
-// Check username availability endpoint
-app.get('/api/check-username-availability/:username', async (req, res) => {
-  try {
-    const { username } = req.params;
-    const platform = req.query.platform || 'instagram'; // Default to Instagram
-    
-    if (!username || username.trim() === '') {
-      return res.status(400).json({ 
-        available: false, 
-        message: 'Username is required' 
-      });
-    }
-    
-    // Normalize the username based on platform
-    const normalizedUsername = platform === 'twitter' ? username.trim() : username.trim().toLowerCase();
-    
-    // Create platform-specific key using new schema: AccountInfo/<platform>/<username>/info.json
-    const key = `AccountInfo/${platform}/${normalizedUsername}/info.json`;
-    
-    try {
-      const result = await s3Client.getObject({
-        Bucket: 'tasks',
-        Key: key,
-      }).promise();
-      
-      // If we get here, the file exists, meaning the username is already in use
-      return res.json({
-        available: false,
-        message: `This ${platform} username is already in use by another account. If you wish to proceed, you may continue, but you will be using an already assigned username.`
-      });
-      
-    } catch (error) {
-      if (error.code === 'NoSuchKey' || error.statusCode === 404) {
-        // Username is available
-        return res.json({
-          available: true,
-          message: `${platform.charAt(0).toUpperCase() + platform.slice(1)} username is available`
-        });
-      }
-      throw error;
-    }
-  } catch (error) {
-    if (DEBUG_LOGS) console.error(`Error checking username availability:`, error);
-    res.status(500).json({ 
-      error: 'Failed to check username availability', 
-      details: error.message 
-    });
-  }
-});
-
-// User Instagram status endpoints
-app.get('/api/user-instagram-status/:userId', async (req, res) => {
-  const { userId } = req.params;
-  
-  try {
-    const key = `UserInstagramStatus/${userId}/status.json`;
-    
-    try {
-      const result = await s3Client.getObject({
-        Bucket: 'tasks',
-        Key: key,
-      }).promise();
-      
-      const body = result.Body.toString();
-      
-      if (!body || body.trim() === '') {
-        return res.json({ hasEnteredInstagramUsername: false });
-      }
-      
-      const userData = JSON.parse(body);
-      return res.json(userData);
-    } catch (error) {
-      if (error.code === 'NoSuchKey' || error.statusCode === 404) {
-        return res.json({ hasEnteredInstagramUsername: false });
-      }
-      throw error;
-    }
-  } catch (error) {
-    if (DEBUG_LOGS) console.error(`Error retrieving user Instagram status for ${userId}:`, error);
-    res.status(500).json({ error: 'Failed to retrieve user Instagram status' });
-  }
-});
-
-app.post('/api/user-instagram-status/:userId', async (req, res) => {
-  const { userId } = req.params;
-  const { instagram_username, accountType, competitors } = req.body;
-  
-  if (!instagram_username || !instagram_username.trim()) {
-    return res.status(400).json({ error: 'Instagram username is required' });
-  }
-  
-  try {
-    const key = `UserInstagramStatus/${userId}/status.json`;
-    const userData = {
-      uid: userId,
-      hasEnteredInstagramUsername: true,
-      instagram_username: instagram_username.trim(),
-      accountType: accountType || 'branding',
-      competitors: competitors || [],
-      lastUpdated: new Date().toISOString()
-    };
-    
-    await s3Client.putObject({
-      Bucket: 'tasks',
-      Key: key,
-      Body: JSON.stringify(userData, null, 2),
-      ContentType: 'application/json',
-    }).promise();
-    
-    res.json({ success: true, message: 'User Instagram status updated successfully' });
-  } catch (error) {
-    if (DEBUG_LOGS) console.error(`Error updating user Instagram status for ${userId}:`, error);
-    res.status(500).json({ error: 'Failed to update user Instagram status' });
-  }
-});
-
-// User Facebook status endpoints
-app.get('/api/user-facebook-status/:userId', async (req, res) => {
-  const { userId } = req.params;
-  
-  try {
-    const key = `UserFacebookStatus/${userId}/status.json`;
-    
-    try {
-      const result = await s3Client.getObject({
-        Bucket: 'tasks',
-        Key: key,
-      }).promise();
-      
-      const body = result.Body.toString();
-      
-      if (!body || body.trim() === '') {
-        return res.json({ hasEnteredFacebookUsername: false });
-      }
-      
-      const userData = JSON.parse(body);
-      return res.json(userData);
-    } catch (error) {
-      if (error.code === 'NoSuchKey' || error.statusCode === 404) {
-        return res.json({ hasEnteredFacebookUsername: false });
-      }
-      throw error;
-    }
-  } catch (error) {
-    if (DEBUG_LOGS) console.error(`Error retrieving user Facebook status for ${userId}:`, error);
-    res.status(500).json({ error: 'Failed to retrieve user Facebook status' });
-  }
-});
-
-app.post('/api/user-facebook-status/:userId', async (req, res) => {
-  const { userId } = req.params;
-  const { facebook_username, accountType, competitors } = req.body;
-  
-  if (!facebook_username || !facebook_username.trim()) {
-    return res.status(400).json({ error: 'Facebook username is required' });
-  }
-  
-  try {
-    const key = `UserFacebookStatus/${userId}/status.json`;
-    const userData = {
-      uid: userId,
-      hasEnteredFacebookUsername: true,
-      facebook_username: facebook_username.trim(),
-      accountType: accountType || 'branding',
-      competitors: competitors || [],
-      lastUpdated: new Date().toISOString()
-    };
-    
-    await s3Client.putObject({
-      Bucket: 'tasks',
-      Key: key,
-      Body: JSON.stringify(userData, null, 2),
-      ContentType: 'application/json',
-    }).promise();
-    
-    res.json({ success: true, message: 'User Facebook status updated successfully' });
-  } catch (error) {
-    if (DEBUG_LOGS) console.error(`Error updating user Facebook status for ${userId}:`, error);
-    res.status(500).json({ error: 'Failed to update user Facebook status' });
-  }
-});
+//
+// REMOVED ENDPOINTS from proxy server to prevent conflicts:
+// - /api/check-username-availability/:username - Username checking
+// - All user management endpoints 
+// - All social media connection endpoints
+// - All notification endpoints
+// 
+// PROXY SERVER (port 3002) ONLY HANDLES:
+// - Image processing (/proxy-image, /r2-images, etc.)
+// - Post generation functionality  
+// - Image upload/download functionality
+// ============================================================
 
 // ============================================================
 // END USER MANAGEMENT & PROTECTION LAYER API
@@ -3142,8 +2362,10 @@ const startServer = async () => {
     
     // Start the server
     server = app.listen(port, '0.0.0.0', () => {
-      if (DEBUG_LOGS) console.log(`🚀 Server running at http://localhost:${port}`);
-      if (DEBUG_LOGS) console.log('✅ Ready to receive hierarchical data at POST /scrape');
+      if (DEBUG_LOGS) console.log(`🚀 PROXY SERVER (Image Processing Only) running at http://localhost:${port}`);
+      if (DEBUG_LOGS) console.log('🖼️  ONLY handles: Image processing, R2 images, post generation');
+      if (DEBUG_LOGS) console.log('❌ NEVER handles: Notifications, DMs, social media connections');
+      if (DEBUG_LOGS) console.log('🔗 Main server (notifications): http://localhost:3000');
       if (DEBUG_LOGS) console.log(`📊 Process ID: ${process.pid}`);
       if (DEBUG_LOGS) console.log(`🕒 Started at: ${new Date().toISOString()}`);
       

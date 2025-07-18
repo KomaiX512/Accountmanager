@@ -560,26 +560,30 @@ class RagService {
   ): Promise<any[]> {
     const cacheKey = `ai_replies_${platform}_${username}`;
     
+    // Add validation for username
+    if (!username || typeof username !== 'string' || username.trim() === '') {
+      console.error(`[RagService] Invalid username provided to fetchAIReplies: "${username}"`);
+      return [];
+    }
+    
     return await this.deduplicatedRequest(
       cacheKey,
       async () => {
         try {
-          if (this.VERBOSE_LOGGING) {
-            console.log(`[RagService] Fetching AI replies for ${platform}/${username}`);
-          }
+          console.log(`[RagService] Fetching AI replies for ${platform}/${username}`);
           
-          return await this.tryServerUrls(`/ai-replies/${username}?platform=${platform}`, (url) => 
-            axios.get(url, {
+          return await this.tryServerUrls(`/ai-replies/${username}?platform=${platform}`, (url) => {
+            console.log(`[RagService] Trying URL: ${url}`);
+            return axios.get(url, {
               timeout: 10000,
               withCredentials: false,
               headers: {
                 'Accept': 'application/json'
               }
-            }), this.AI_REPLIES_URLS
+            });
+          }, this.AI_REPLIES_URLS
           ).then(response => {
-            if (this.VERBOSE_LOGGING) {
-              console.log(`[RagService] Retrieved ${response.data.replies?.length || 0} AI replies for ${platform}/${username}`);
-            }
+            console.log(`[RagService] Retrieved ${response.data.replies?.length || 0} AI replies for ${platform}/${username}`);
             return response.data.replies || [];
           });
           

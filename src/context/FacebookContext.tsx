@@ -51,6 +51,17 @@ export const FacebookProvider: React.FC<FacebookProviderProps> = ({ children }) 
           username: response.data.username,
           isConnected: true
         });
+        
+        // CRITICAL FIX: Dispatch event when existing connection is restored
+        const event = new CustomEvent('facebookConnected', { 
+          detail: { 
+            facebookId: response.data.facebook_page_id, 
+            facebookUsername: response.data.username,
+            timestamp: Date.now(),
+            restored: true
+          } 
+        });
+        window.dispatchEvent(event);
       } else {
         console.log(`[${new Date().toISOString()}] No Facebook connection data found for user ${currentUser.uid}`);
         setUserId(null);
@@ -122,7 +133,18 @@ export const FacebookProvider: React.FC<FacebookProviderProps> = ({ children }) 
       localStorage.setItem(`facebook_accessed_${currentUser.uid}`, 'true');
     }
     
+    // CRITICAL FIX: Dispatch event to trigger notification refresh in PlatformDashboard
     console.log(`[${new Date().toISOString()}] Facebook connected via context: ${facebookId} (@${facebookUsername})`);
+    
+    // Dispatch custom event to notify PlatformDashboard that Facebook connection is ready
+    const event = new CustomEvent('facebookConnected', { 
+      detail: { 
+        facebookId, 
+        facebookUsername,
+        timestamp: Date.now()
+      } 
+    });
+    window.dispatchEvent(event);
   }, [currentUser?.uid]);
 
   const disconnectFacebook = useCallback(() => {

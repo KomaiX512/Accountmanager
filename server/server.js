@@ -1,5 +1,5 @@
 import express from 'express';
-import { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, ListObjectsV2Command, ListObjectsCommand, GetObjectCommand, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import axios from 'axios';
 import cors from 'cors';
@@ -1732,6 +1732,75 @@ app.post('/api/instant-reply', async (req, res) => {
   } catch (error) {
     console.error(`[INSTANT-REPLY] Proxy error:`, error?.response?.data || error.message);
     res.status(500).json({ error: 'Failed to get AI reply', details: error.message });
+  }
+});
+
+// AI Replies endpoint for Dashboard - Fetch AI replies for Facebook and other platforms
+app.get(['/ai-replies/:username', '/api/ai-replies/:username'], async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  const { username } = req.params;
+  const platform = req.query.platform || 'instagram';
+  
+  console.log(`[${new Date().toISOString()}] [AI-REPLIES] Fetching AI replies for ${platform}/${username}`);
+  
+  try {
+    // Get AI replies from R2 storage
+    const listParams = {
+      Bucket: 'tasks',
+      Prefix: `AI.replies/${platform}/${username}/`,
+      MaxKeys: 50 // Limit to last 50 replies
+    };
+    
+    console.log(`[${new Date().toISOString()}] [AI-REPLIES] List params:`, listParams);
+    
+    const data = await s3Client.send(new ListObjectsCommand(listParams));
+    
+    if (!data.Contents || data.Contents.length === 0) {
+      console.log(`[${new Date().toISOString()}] [AI-REPLIES] No AI replies found for ${platform}/${username}`);
+      return res.json({ replies: [] });
+    }
+    
+    // Sort by last modified and get the most recent replies
+    const sortedObjects = data.Contents
+      .sort((a, b) => new Date(b.LastModified) - new Date(a.LastModified))
+      .slice(0, 20); // Get last 20 replies
+    
+    const replies = [];
+    
+    // Fetch each reply data
+    for (const obj of sortedObjects) {
+      try {
+        const replyData = await s3Client.send(new GetObjectCommand({
+          Bucket: 'tasks',
+          Key: obj.Key
+        }));
+        
+        const bodyStream = await streamToString(replyData.Body);
+        const reply = JSON.parse(bodyStream);
+        
+        replies.push({
+          id: obj.Key.split('/').pop().replace('.json', ''),
+          timestamp: reply.timestamp,
+          notification: reply.notification,
+          reply: reply.reply,
+          mode: reply.mode || 'instant',
+          usedFallback: reply.usedFallback || false,
+          platform: reply.platform || platform
+        });
+      } catch (error) {
+        console.warn(`[${new Date().toISOString()}] [AI-REPLIES] Error fetching reply ${obj.Key}:`, error.message);
+      }
+    }
+    
+    console.log(`[${new Date().toISOString()}] [AI-REPLIES] Found ${replies.length} AI replies for ${platform}/${username}`);
+    res.json({ replies });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [AI-REPLIES] Error fetching AI replies:`, error);
+    res.status(500).json({ 
+      error: 'Failed to fetch AI replies',
+      details: error.message 
+    });
   }
 });
 
@@ -7262,11 +7331,25 @@ app.post(['/rag-instant-reply/:username', '/api/rag-instant-reply/:username'], a
           const sender_id = notification.sender_id;
           let userId = null;
           
-          // Map username to Instagram userId
+          // Map username to platform-specific userId
           try {
+            let tokenPrefix = '';
+            let userIdField = '';
+            
+            if (platform === 'facebook') {
+              tokenPrefix = 'FacebookTokens/';
+              userIdField = 'page_id';
+            } else if (platform === 'twitter') {
+              tokenPrefix = 'TwitterTokens/';
+              userIdField = 'user_id';
+            } else {
+              tokenPrefix = 'InstagramTokens/';
+              userIdField = 'instagram_user_id';
+            }
+            
             const listTokens = new ListObjectsV2Command({
               Bucket: 'tasks',
-              Prefix: `InstagramTokens/`,
+              Prefix: tokenPrefix,
             });
             const { Contents: tokenContents } = await s3Client.send(listTokens);
             if (tokenContents) {
@@ -7280,82 +7363,114 @@ app.post(['/rag-instant-reply/:username', '/api/rag-instant-reply/:username'], a
                   const json = await tokenData.Body.transformToString();
                   const token = JSON.parse(json);
                   if (token.username === username) {
-                    userId = token.instagram_user_id;
+                    userId = token[userIdField];
                     break;
                   }
                 }
               }
             }
           } catch (err) {
-            console.error(`[RAG-INSTANT-REPLY] Error mapping username to userId:`, err);
+            console.error(`[RAG-INSTANT-REPLY] Error mapping username to userId for ${platform}:`, err);
           }
           
           // Send the reply if all info is available
           if (userId && sender_id && message_id) {
             try {
-              // Find access token
-              let access_token = null;
-              let instagram_graph_id = null;
-              const listTokens = new ListObjectsV2Command({
-                Bucket: 'tasks',
-                Prefix: `InstagramTokens/`,
-              });
-              const { Contents: tokenContents } = await s3Client.send(listTokens);
-              if (tokenContents) {
-                for (const obj of tokenContents) {
-                  if (obj.Key.endsWith('/token.json')) {
-                    const getCommand = new GetObjectCommand({
-                      Bucket: 'tasks',
-                      Key: obj.Key,
-                    });
-                    const tokenData = await s3Client.send(getCommand);
-                    const json = await tokenData.Body.transformToString();
-                    const token = JSON.parse(json);
-                    if (token.instagram_user_id === userId) {
-                      access_token = token.access_token;
-                      instagram_graph_id = token.instagram_graph_id;
-                      break;
+              console.log(`[RAG-INSTANT-REPLY] Auto-sending ${platform} AI reply for user ${userId}`);
+              
+              if (platform === 'facebook') {
+                // Use existing Facebook DM reply function
+                await sendFacebookDMReply(userId, sender_id, data.reply, message_id);
+                console.log(`[RAG-INSTANT-REPLY] Facebook AI reply sent successfully`);
+              } else if (platform === 'twitter') {
+                // Use existing Twitter DM reply function
+                await sendTwitterDMReply(userId, sender_id, data.reply, message_id);
+                console.log(`[RAG-INSTANT-REPLY] Twitter AI reply sent successfully`);
+              } else {
+                // Instagram logic (existing)
+                let access_token = null;
+                let instagram_graph_id = null;
+                const listTokens = new ListObjectsV2Command({
+                  Bucket: 'tasks',
+                  Prefix: `InstagramTokens/`,
+                });
+                const { Contents: tokenContents } = await s3Client.send(listTokens);
+                if (tokenContents) {
+                  for (const obj of tokenContents) {
+                    if (obj.Key.endsWith('/token.json')) {
+                      const getCommand = new GetObjectCommand({
+                        Bucket: 'tasks',
+                        Key: obj.Key,
+                      });
+                      const tokenData = await s3Client.send(getCommand);
+                      const json = await tokenData.Body.transformToString();
+                      const token = JSON.parse(json);
+                      if (token.instagram_user_id === userId) {
+                        access_token = token.access_token;
+                        instagram_graph_id = token.instagram_graph_id;
+                        break;
+                      }
                     }
                   }
                 }
-              }
-              if (access_token && instagram_graph_id) {
-                await axios({
-                  method: 'post',
-                  url: `https://graph.instagram.com/v22.0/${instagram_graph_id}/messages`,
-                  headers: {
-                    Authorization: `Bearer ${access_token}`,
-                    'Content-Type': 'application/json',
-                  },
-                  data: {
-                    recipient: { id: sender_id },
-                    message: { text: data.reply },
-                  },
-                });
-                // Update original message status
-                const messageKey = `InstagramEvents/${userId}/${message_id}.json`;
-                try {
-                  const getCommand = new GetObjectCommand({
-                    Bucket: 'tasks',
-                    Key: messageKey,
+                if (access_token && instagram_graph_id) {
+                  await axios({
+                    method: 'post',
+                    url: `https://graph.instagram.com/v22.0/${instagram_graph_id}/messages`,
+                    headers: {
+                      Authorization: `Bearer ${access_token}`,
+                      'Content-Type': 'application/json',
+                    },
+                    data: {
+                      recipient: { id: sender_id },
+                      message: { text: data.reply },
+                    },
                   });
-                  const messageData = await s3Client.send(getCommand);
-                  const updatedMessage = JSON.parse(await messageData.Body.transformToString());
-                  updatedMessage.status = 'replied';
-                  updatedMessage.updated_at = new Date().toISOString();
-                  await s3Client.send(new PutObjectCommand({
-                    Bucket: 'tasks',
-                    Key: messageKey,
-                    Body: JSON.stringify(updatedMessage, null, 2),
-                    ContentType: 'application/json',
-                  }));
-                } catch (error) {
-                  console.error(`[RAG-INSTANT-REPLY] Error updating DM status:`, error);
+                  console.log(`[RAG-INSTANT-REPLY] Instagram AI reply sent successfully`);
                 }
               }
+              
+              // Update original message status for all platforms
+              const messageKey = `${platform.charAt(0).toUpperCase() + platform.slice(1)}Events/${userId}/${message_id}.json`;
+              try {
+                const getCommand = new GetObjectCommand({
+                  Bucket: 'tasks',
+                  Key: messageKey,
+                });
+                const messageData = await s3Client.send(getCommand);
+                const updatedMessage = JSON.parse(await messageData.Body.transformToString());
+                updatedMessage.status = 'replied';
+                updatedMessage.updated_at = new Date().toISOString();
+                await s3Client.send(new PutObjectCommand({
+                  Bucket: 'tasks',
+                  Key: messageKey,
+                  Body: JSON.stringify(updatedMessage, null, 2),
+                  ContentType: 'application/json',
+                }));
+                
+                // Broadcast status update
+                const statusUpdate = {
+                  type: 'message_status',
+                  message_id,
+                  status: 'replied',
+                  updated_at: updatedMessage.updated_at,
+                  timestamp: Date.now(),
+                  platform
+                };
+                broadcastUpdate(userId, { event: 'status_update', data: statusUpdate });
+                
+              } catch (error) {
+                console.error(`[RAG-INSTANT-REPLY] Error updating ${platform} message status:`, error);
+              }
             } catch (err) {
-              console.error(`[RAG-INSTANT-REPLY] Error sending AI DM reply:`, err);
+              console.error(`[RAG-INSTANT-REPLY] Error sending ${platform} AI DM reply:`, err);
             }
+          } else {
+            console.warn(`[RAG-INSTANT-REPLY] Missing required data for ${platform} auto-reply:`, {
+              userId: !!userId,
+              sender_id: !!sender_id,
+              message_id: !!message_id
+            });
           }
         }
       } catch (saveError) {
@@ -7442,7 +7557,8 @@ app.post(['/rag-instant-reply/:username', '/api/rag-instant-reply/:username'], a
         url: `http://localhost:3001/api/instant-reply`,
         data: {
           username,
-          notification
+          notification,
+          platform: notification.platform || 'instagram'
         },
         timeout,
         headers: {
@@ -7462,46 +7578,38 @@ app.post(['/rag-instant-reply/:username', '/api/rag-instant-reply/:username'], a
       // Extract platform from notification, default to instagram
       const platform = notification.platform || 'instagram';
       
-      // Generate a unique key for this request
+      // Generate a unique key for this request-reply pair
       const timestamp = Date.now();
-      const requestKey = `ai_reply/${platform}/${username}/ai_${type}_${timestamp}.json`;
-      const replyKey = `ai_reply/${platform}/${username}/ai_${type}_replied_${timestamp}.json`;
+      const aiReplyKey = `AI.replies/${platform}/${username}/${timestamp}.json`;
       
-      // Store request
-      const requestData = {
-        type,
-        text: notification.text,
+      // Store the complete AI reply data in the format expected by fetchAIReplies
+      const aiReplyData = {
         timestamp,
-        sender_id: notification.sender_id || '',
-        message_id: notification.message_id || ''
-      };
-      
-      // Store reply
-      const replyData = {
-        type,
-        reply,
-        timestamp,
+        notification: {
+          type: notification.type,
+          text: notification.text,
+          sender_id: notification.sender_id || '',
+          message_id: notification.message_id || '',
+          comment_id: notification.comment_id || '',
+          platform: platform
+        },
+        reply: reply,
+        mode: 'instant',
+        usedFallback: false,
+        platform: platform,
         generated_at: new Date().toISOString()
       };
       
       try {
-        // Store the request
+        // Store the complete AI reply data
         await s3Client.send(new PutObjectCommand({
           Bucket: 'tasks',
-          Key: requestKey,
-          Body: JSON.stringify(requestData, null, 2),
+          Key: aiReplyKey,
+          Body: JSON.stringify(aiReplyData, null, 2),
           ContentType: 'application/json'
         }));
         
-        // Store the reply
-        await s3Client.send(new PutObjectCommand({
-          Bucket: 'tasks',
-          Key: replyKey,
-          Body: JSON.stringify(replyData, null, 2),
-          ContentType: 'application/json'
-        }));
-        
-        console.log(`[${new Date().toISOString()}] AI reply stored for ${username} (${type})`);
+        console.log(`[${new Date().toISOString()}] AI reply stored for ${username} (${type}) at ${aiReplyKey}`);
       } catch (storageError) {
         console.error(`[${new Date().toISOString()}] Error storing AI reply:`, storageError);
         // Continue anyway as the reply was generated successfully

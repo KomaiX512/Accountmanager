@@ -1,3 +1,4 @@
+import { NetworkHelper } from '../../utils/NetworkHelper';
 import React, { useState, useEffect, useRef } from 'react';
 import '../instagram/Dashboard.css'; // Reuse the same styles
 import Cs_Analysis from '../instagram/Cs_Analysis';
@@ -275,76 +276,98 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     }
   }
 
-  const fetchNotifications = async (attempt = 1, maxAttempts = 3) => {
+  const fetchNotifications = async () => {
     const currentUserId = platform === 'twitter' ? twitterId : 
                          platform === 'facebook' ? facebookPageId :
                          igUserId;
+    
+    // CRITICAL FIX: For Facebook, if facebookPageId is not available yet, try to fetch it
+    if (platform === 'facebook' && !currentUserId) {
+      console.log(`[${new Date().toISOString()}] [FACEBOOK-FETCH-FIX] Facebook pageId not available, attempting to get connection info`);
+      
+      // Try to get Facebook connection info directly
+      if (currentUser?.uid) {
+        try {
+          const response = await fetch(`/api/facebook-connection/${currentUser.uid}`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.facebook_page_id) {
+              console.log(`[${new Date().toISOString()}] [FACEBOOK-FETCH-FIX] Retrieved Facebook pageId: ${data.facebook_page_id}`);
+              // Use the retrieved pageId for this fetch
+              const retrievedPageId = data.facebook_page_id;
+              await fetchNotificationsWithUserId(retrievedPageId);
+              return;
+            }
+          }
+        } catch (error) {
+          console.error(`[${new Date().toISOString()}] [FACEBOOK-FETCH-FIX] Error fetching Facebook connection:`, error);
+        }
+      }
+      
+      console.log(`[${new Date().toISOString()}] No Facebook pageId available and couldn't retrieve connection info`);
+      return;
+    }
+    
     if (!currentUserId) {
       console.log(`[${new Date().toISOString()}] No ${platform} user ID available for notifications`);
       return;
     }
     
-    console.log(`[${new Date().toISOString()}] Fetching ${platform} notifications for ${currentUserId} (attempt ${attempt}/${maxAttempts})`);
+    await fetchNotificationsWithUserId(currentUserId);
+  };
+
+  const fetchNotificationsWithUserId = async (userId: string) => {
+    if (!accountHolder || accountHolder.trim() === '') {
+      console.log(`[${new Date().toISOString()}] No accountHolder available for ${platform} notifications`);
+      return;
+    }
+    
+    console.log(`[${new Date().toISOString()}] Fetching ${platform} notifications for ${userId}`);
     
     try {
-      const response = await fetch(`/events-list/${currentUserId}?platform=${platform}`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch ${platform} notifications: ${response.status} ${response.statusText}`);
-      }
+      // CRITICAL FIX: Use NetworkHelper for robust network requests
+      let data = await NetworkHelper.fetchJson(`/events-list/${userId}?platform=${platform}`, {}, {
+        timeout: 30000,
+        maxRetries: 3,
+        backoffBase: 1000,
+        maxBackoffDelay: 10000
+      });
       
-      let data = await response.json();
-      console.log(`[${new Date().toISOString()}] Received ${data.length} ${platform} notifications`);
+      console.log(`[${new Date().toISOString()}] Successfully received ${data.length} ${platform} notifications`);
 
-      // CRITICAL FIX: Add defensive checks for Facebook notifications
+      // CRITICAL FIX: Platform-specific data normalization
       if (platform === 'facebook') {
-        console.log(`[${new Date().toISOString()}] [FACEBOOK] Raw notifications data:`, {
-          dataType: typeof data,
-          isArray: Array.isArray(data),
-          length: Array.isArray(data) ? data.length : 'N/A',
-          sampleData: Array.isArray(data) && data.length > 0 ? data[0] : null
-        });
+        console.log(`[${new Date().toISOString()}] [FACEBOOK] Processing ${data.length} notifications`);
         
         // Ensure data is an array
         if (!Array.isArray(data)) {
-          console.error(`[${new Date().toISOString()}] [FACEBOOK] Invalid notifications data type:`, typeof data);
+          console.error(`[${new Date().toISOString()}] [FACEBOOK] Invalid data format - expected array, got:`, typeof data);
           setNotifications([]);
           return;
         }
         
-        // Validate each notification for required fields
-        const validNotifications = data.filter((notif: any, index: number) => {
-          if (!notif || typeof notif !== 'object') {
-            console.warn(`[${new Date().toISOString()}] [FACEBOOK] Invalid notification at index ${index}:`, notif);
-            return false;
-          }
-          
-          // Check for required fields
-          const hasRequiredFields = notif.type && 
-                                  (notif.message_id || notif.comment_id) && 
-                                  notif.text !== undefined && 
-                                  notif.timestamp !== undefined;
-          
-          if (!hasRequiredFields) {
-            console.warn(`[${new Date().toISOString()}] [FACEBOOK] Notification missing required fields at index ${index}:`, notif);
-            return false;
-          }
-          
-          return true;
-        });
+        // Normalize Facebook notifications for consistent rendering
+        data = data.map((notif: any) => ({
+          ...notif,
+          // Ensure required fields exist
+          type: notif.type || (notif.message_id ? 'message' : 'comment'),
+          text: notif.text || '',
+          timestamp: typeof notif.timestamp === 'number' ? notif.timestamp : Date.now(),
+          sender_id: notif.sender_id || notif.from?.id || 'unknown',
+          platform: 'facebook',
+          // Keep original data for debugging
+          _original: notif
+        })).filter((notif: any) => notif.type && (notif.message_id || notif.comment_id));
         
-        console.log(`[${new Date().toISOString()}] [FACEBOOK] Validated notifications:`, {
-          originalCount: data.length,
-          validCount: validNotifications.length,
-          filteredCount: data.length - validNotifications.length
-        });
-        
-        // Use validated notifications
-        data = validNotifications;
+        console.log(`[${new Date().toISOString()}] [FACEBOOK] Normalized ${data.length} notifications for rendering`);
       }
 
+      // Fetch AI replies for all platforms
+      console.log(`[${new Date().toISOString()}] Fetching AI replies for ${platform}`);
       const aiReplies = await RagService.fetchAIReplies(accountHolder, platform);
       console.log(`[${new Date().toISOString()}] Received ${aiReplies.length} ${platform} AI replies`);
       
+      // Process notifications with AI replies
       const processedNotifications = data.map((notif: any) => {
         const matchingAiReply = aiReplies.find(pair => {
           const isMatchingType = pair.type === (notif.type === 'message' ? 'dm' : 'comment');
@@ -372,42 +395,26 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         return notif;
       });
       
-      // CRITICAL FIX: Add final validation before setting state
-      if (platform === 'facebook') {
-        const finalValidNotifications = processedNotifications.filter((notif: any) => {
-          // Ensure all required fields are present and valid
-          const isValid = notif && 
-                         typeof notif === 'object' &&
-                         notif.type && 
-                         (notif.message_id || notif.comment_id) && 
-                         typeof notif.text === 'string' && 
-                         typeof notif.timestamp === 'number';
-          
-          if (!isValid) {
-            console.error(`[${new Date().toISOString()}] [FACEBOOK] Final validation failed for notification:`, notif);
-          }
-          
-          return isValid;
-        });
-        
-        console.log(`[${new Date().toISOString()}] [FACEBOOK] Final notifications ready for state:`, {
-          processedCount: processedNotifications.length,
-          finalCount: finalValidNotifications.length,
-          sampleNotification: finalValidNotifications.length > 0 ? finalValidNotifications[0] : null
-        });
-        
-        setNotifications(finalValidNotifications);
-      } else {
-        setNotifications(processedNotifications);
-      }
-    } catch (error) {
-      console.error(`[${new Date().toISOString()}] Error fetching ${platform} notifications (attempt ${attempt}/${maxAttempts}):`, error);
-      if (attempt < maxAttempts) {
-        setTimeout(() => fetchNotifications(attempt + 1, maxAttempts), 2000);
-      } else {
-        // CRITICAL FIX: Set empty array on final failure to prevent crashes
-        console.error(`[${new Date().toISOString()}] [${platform.toUpperCase()}] All attempts failed, setting empty notifications array`);
-        setNotifications([]);
+      console.log(`[${new Date().toISOString()}] [${platform.toUpperCase()}] Setting ${processedNotifications.length} processed notifications`);
+      setNotifications(processedNotifications);
+      
+    } catch (error: any) {
+      console.error(`[${new Date().toISOString()}] Error fetching ${platform} notifications:`, error);
+      
+      // CRITICAL FIX: Enhanced error handling with user-friendly messages
+      const errorMessage = NetworkHelper.getErrorMessage(error);
+      console.error(`[${new Date().toISOString()}] [${platform.toUpperCase()}] ${errorMessage}`);
+      
+      // Set empty notifications array on failure
+      setNotifications([]);
+      
+      // CRITICAL FIX: Set up fallback retry for network errors only
+      if (NetworkHelper.isNetworkError(error)) {
+        console.log(`[${new Date().toISOString()}] [${platform.toUpperCase()}] Network error detected, setting up fallback retry in 30s`);
+        setTimeout(() => {
+          console.log(`[${new Date().toISOString()}] [${platform.toUpperCase()}] Fallback retry attempt...`);
+          fetchNotificationsWithUserId(userId);
+        }, 30000);
       }
     }
   };
@@ -567,7 +574,10 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           setIsLoading(false);
         } else if (platform === 'twitter' && twitterId) {
           setIsLoading(false);
-        } else if (platform === 'facebook' && facebookPageId) {
+        } else if (platform === 'facebook') {
+          // CRITICAL FIX: For Facebook, don't wait for facebookPageId to load notifications
+          // This prevents the issue where notifications don't load on direct refresh
+          console.log(`[${new Date().toISOString()}] [FACEBOOK-LOAD-FIX] Setting Facebook dashboard as loaded without waiting for pageId`);
           setIsLoading(false);
         } else if (loadingCheckRef.current) {
           // If we've already checked and still loading, stop checking
@@ -632,18 +642,33 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
 
   // Initialize notifications and SSE for the current platform
   useEffect(() => {
-    // Only run when loading is complete and userId is available
+    // Only run when loading is complete
     if (isLoading) return;
+    
     const currentUserId = platform === 'twitter' ? twitterId : 
                          platform === 'facebook' ? facebookPageId :
                          igUserId;
-    if (!currentUserId) {
-      console.warn(`[PlatformDashboard] Skipping notification/SSE setup: userId not available for ${platform}`);
-      return;
+    
+    // CRITICAL FIX: For Facebook, always attempt to fetch notifications even if pageId is not available yet
+    // This ensures notifications are fetched on direct refresh
+    if (platform === 'facebook') {
+      console.log(`[PlatformDashboard] [FACEBOOK-INIT-FIX] Setting up Facebook notifications (pageId: ${facebookPageId || 'not available yet'})`);
+      fetchNotifications(); // This will handle the case where pageId is not available yet
+      
+      // Only setup SSE if we have pageId
+      if (facebookPageId) {
+        setupSSE(facebookPageId);
+      }
+    } else {
+      // For other platforms, maintain existing behavior
+      if (!currentUserId) {
+        console.warn(`[PlatformDashboard] Skipping notification/SSE setup: userId not available for ${platform}`);
+        return;
+      }
+      console.log(`[PlatformDashboard] Setting up notifications and SSE for ${platform} userId:`, currentUserId);
+      fetchNotifications();
+      setupSSE(currentUserId);
     }
-    console.log(`[PlatformDashboard] Setting up notifications and SSE for ${platform} userId:`, currentUserId);
-    fetchNotifications();
-    setupSSE(currentUserId);
 
     // Fallback polling every 5 minutes
     const interval = setInterval(() => {
@@ -664,20 +689,33 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     const currentUserId = platform === 'twitter' ? twitterId : 
                          platform === 'facebook' ? facebookPageId :
                          igUserId;
+    
+    // CRITICAL FIX: For Facebook, only set up SSE when pageId becomes available
+    // but don't duplicate notification fetching (it's already handled in main effect)
     if (platform === 'facebook') {
-      console.log('[PlatformDashboard] Using Facebook Page ID for SSE:', facebookPageId);
+      console.log('[PlatformDashboard] [FACEBOOK-USERID-EFFECT] Facebook Page ID changed:', facebookPageId);
+      if (facebookPageId) {
+        console.log('[PlatformDashboard] [FACEBOOK-USERID-EFFECT] Setting up SSE for Facebook pageId:', facebookPageId);
+        setupSSE(facebookPageId);
+      }
+      return; // Don't duplicate notification fetching for Facebook
     }
+    
+    // For other platforms, maintain existing behavior
     if (!currentUserId) {
       console.log(`[PlatformDashboard] [userId effect] userId not available for ${platform}, skipping SSE/notifications setup.`);
       return;
     }
+    
     console.log(`[PlatformDashboard] [userId effect] userId became available for ${platform}:`, currentUserId);
     fetchNotifications();
     setupSSE(currentUserId);
+    
     // Fallback polling every 5 minutes
     const interval = setInterval(() => {
       fetchNotifications();
     }, 300000);
+    
     return () => {
       clearInterval(interval);
       if (eventSourceRef.current) {
@@ -696,6 +734,64 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     
     return () => clearInterval(cleanInterval);
   }, []);
+
+  // CRITICAL FIX: Handle Facebook connection event for immediate notification refresh
+  useEffect(() => {
+    if (platform !== 'facebook') return;
+    
+    const handleFacebookConnected = (event: CustomEvent) => {
+      console.log(`[${new Date().toISOString()}] [FACEBOOK-EVENT-FIX] Facebook connected event received:`, event.detail);
+      
+      // Force refresh notifications immediately when Facebook connection is established
+      setTimeout(() => {
+        console.log(`[${new Date().toISOString()}] [FACEBOOK-EVENT-FIX] Triggering notification refresh after Facebook connection`);
+        fetchNotifications();
+      }, 1000); // Small delay to ensure backend connection is ready
+    };
+    
+    window.addEventListener('facebookConnected', handleFacebookConnected as EventListener);
+    
+    return () => {
+      window.removeEventListener('facebookConnected', handleFacebookConnected as EventListener);
+    };
+  }, [platform, fetchNotifications]);
+
+  // CRITICAL FIX: Additional fallback for Facebook - retry notifications if empty and connection exists
+  useEffect(() => {
+    if (platform !== 'facebook' || !facebookPageId) return;
+    
+    // If we have pageId but no notifications, try fetching again after a short delay
+    const retryTimer = setTimeout(() => {
+      if (notifications.length === 0 && facebookPageId) {
+        console.log(`[${new Date().toISOString()}] [FACEBOOK-RETRY-FIX] Retrying Facebook notifications fetch - have pageId but no notifications`);
+        fetchNotifications();
+      }
+    }, 3000); // 3 second delay to allow for initial load
+    
+    return () => clearTimeout(retryTimer);
+  }, [platform, facebookPageId, notifications.length, fetchNotifications]);
+
+  // CRITICAL FIX: Monitor Facebook notification state and force refresh if needed
+  useEffect(() => {
+    if (platform === 'facebook') {
+      console.log(`[${new Date().toISOString()}] [FACEBOOK-MONITOR] Notification state change:`, {
+        count: notifications.length,
+        hasPageId: !!facebookPageId,
+        isConnected: isFacebookConnected,
+        platform
+      });
+      
+      // If Facebook is connected but no notifications after 5 seconds, force refresh
+      if (facebookPageId && isFacebookConnected && notifications.length === 0) {
+        const forceRefreshTimer = setTimeout(() => {
+          console.log(`[${new Date().toISOString()}] [FACEBOOK-MONITOR] Force refreshing notifications...`);
+          fetchNotifications();
+        }, 5000);
+        
+        return () => clearTimeout(forceRefreshTimer);
+      }
+    }
+  }, [platform, notifications.length, facebookPageId, isFacebookConnected, fetchNotifications]);
 
   // Handle custom event for opening campaign modal
   useEffect(() => {
@@ -1221,17 +1317,20 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         );
         
         console.log(`[${new Date().toISOString()}] Successfully generated ${platform} AI reply via RAG service:`, 
-          response.reply?.substring(0, 50) + '...'
+          response.aiReply?.substring(0, 50) + '...'
         );
         
         console.log(`[PlatformDashboard] ✅ AI Reply tracked: ${platform} ${notification.type} reply`);
         setToast(`AI reply generated for ${notification.username || 'user'}`);
         
         // Remove the original notification to prevent duplicates
-        setNotifications(prev => safeFilter(prev, n => 
-          !((n.message_id && n.message_id === notification.message_id) || 
-            (n.comment_id && n.comment_id === notification.comment_id))
-        ));
+        setNotifications(prev => prev.map(n => {
+          if ((n.message_id && n.message_id === notification.message_id) ||
+              (n.comment_id && n.comment_id === notification.comment_id)) {
+            return createAIReadyNotification(n, response.aiReply || '');
+          }
+          return n;
+        }));
         
       } catch (ragError: any) {
         console.error(`[${new Date().toISOString()}] RAG service error for ${platform}:`, ragError);
@@ -1919,6 +2018,7 @@ Image Description: ${response.post.image_prompt}
           
           {profileInfo?.biography && profileInfo.biography.trim() && (
             <motion.div
+
               className="bio-text"
               animate={{ 
                 opacity: showBio ? 1 : 0,
@@ -2136,7 +2236,7 @@ Image Description: ${response.post.image_prompt}
                 onIgnore={handleIgnore} 
                 onRefresh={() => {
                   setRefreshKey(prev => prev + 1);
-                  fetchNotifications(1, 3);
+                  fetchNotifications();
                 }} 
                 onReplyWithAI={(notification: Notification) => {
                   const notifId = notification.message_id || notification.comment_id || 'unknown';
@@ -2149,11 +2249,11 @@ Image Description: ${response.post.image_prompt}
                 igBusinessId={platform === 'instagram' ? igUserId : undefined}
                 twitterId={platform === 'twitter' ? twitterId : undefined}
                 facebookPageId={platform === 'facebook' ? facebookPageId : undefined}
+                platform={platform}
                 aiRepliesRefreshKey={refreshKey}
                 onAIRefresh={() => setRefreshKey(prev => prev + 1)}
                 aiProcessingNotifications={aiProcessingNotifications}
                 onSendAIReply={handleSendAIReply}
-                platform={platform}
               />
             </div>
           )}
@@ -2429,4 +2529,4 @@ Image Description: ${response.post.image_prompt}
   );
 };
 
-export default PlatformDashboard; 
+export default PlatformDashboard;

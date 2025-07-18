@@ -72,7 +72,29 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
         return false;
       }
 
-      // Check for required fields
+      // CRITICAL FIX: Platform-specific validation to handle Facebook notifications correctly
+      if (platform === 'facebook') {
+        // For Facebook, only require type and either message_id or comment_id
+        const hasFacebookRequiredFields = notif.type && 
+                                        (notif.message_id || notif.comment_id);
+        
+        if (!hasFacebookRequiredFields) {
+          console.warn(`[${new Date().toISOString()}] [FACEBOOK] Notification missing required fields at index ${index}:`, notif);
+          return false;
+        }
+        
+        // Log successful Facebook notification validation
+        console.log(`[${new Date().toISOString()}] [FACEBOOK] Valid notification passed:`, {
+          type: notif.type,
+          id: notif.message_id || notif.comment_id,
+          hasText: !!notif.text,
+          hasTimestamp: !!notif.timestamp
+        });
+        
+        return true;
+      }
+
+      // For Instagram and Twitter, use stricter validation
       const hasRequiredFields = notif.type && 
                               (notif.message_id || notif.comment_id) && 
                               typeof notif.text === 'string' && 
@@ -80,15 +102,6 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
       if (!hasRequiredFields) {
         console.warn(`[${new Date().toISOString()}] [${platform.toUpperCase()}] Notification missing required fields at index ${index}:`, notif);
         return false;
-      }
-
-      // Platform-specific validation
-      if (platform === 'facebook') {
-        // Additional Facebook-specific validation
-        if (!notif.facebook_page_id && !notif.facebook_user_id) {
-          console.warn(`[${new Date().toISOString()}] [FACEBOOK] Notification missing Facebook ID at index ${index}:`, notif);
-          return false;
-        }
       }
 
       return true;

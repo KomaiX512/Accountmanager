@@ -9,11 +9,13 @@ export default {
       env: {
         NODE_ENV: 'production',
         MAIN_SERVER_PORT: 3000,
+        RAG_SERVER_URL: 'http://localhost:3001',
         HOST: '0.0.0.0'
       },
       env_production: {
         NODE_ENV: 'production',
         MAIN_SERVER_PORT: 3000,
+        RAG_SERVER_URL: 'http://localhost:3001',
         HOST: '0.0.0.0'
       },
       autorestart: true,

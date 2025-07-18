@@ -1,4 +1,3 @@
-import { NetworkHelper } from '../../utils/NetworkHelper';
 import React, { useState, useEffect, useRef } from 'react';
 import '../instagram/Dashboard.css'; // Reuse the same styles
 import Cs_Analysis from '../instagram/Cs_Analysis';
@@ -120,6 +119,10 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const [aiRepliesRefreshKey, setAiRepliesRefreshKey] = useState(0);
   const [processingNotifications, setProcessingNotifications] = useState<Record<string, boolean>>({});
   const [isAutoReplying, setIsAutoReplying] = useState(false);
+  
+  // 🛑 STOP OPERATION: Add stop flag and timeout reference for PlatformDashboard
+  const [shouldStopAutoReply, setShouldStopAutoReply] = useState(false);
+  const autoReplyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [isTwitterSchedulerOpen, setIsTwitterSchedulerOpen] = useState(false);
   const [isTwitterInsightsOpen, setIsTwitterInsightsOpen] = useState(false);
   const [isTwitterComposeOpen, setIsTwitterComposeOpen] = useState(false);
@@ -276,7 +279,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     }
   }
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = async (attempt = 1, maxAttempts = 3) => {
     const currentUserId = platform === 'twitter' ? twitterId : 
                          platform === 'facebook' ? facebookPageId :
                          igUserId;
@@ -295,7 +298,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
               console.log(`[${new Date().toISOString()}] [FACEBOOK-FETCH-FIX] Retrieved Facebook pageId: ${data.facebook_page_id}`);
               // Use the retrieved pageId for this fetch
               const retrievedPageId = data.facebook_page_id;
-              await fetchNotificationsWithUserId(retrievedPageId);
+              await fetchNotificationsWithUserId(retrievedPageId, attempt, maxAttempts);
               return;
             }
           }
@@ -313,61 +316,77 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       return;
     }
     
-    await fetchNotificationsWithUserId(currentUserId);
+    await fetchNotificationsWithUserId(currentUserId, attempt, maxAttempts);
   };
 
-  const fetchNotificationsWithUserId = async (userId: string) => {
+  const fetchNotificationsWithUserId = async (userId: string, attempt = 1, maxAttempts = 3) => {
     if (!accountHolder || accountHolder.trim() === '') {
       console.log(`[${new Date().toISOString()}] No accountHolder available for ${platform} notifications`);
       return;
     }
     
-    console.log(`[${new Date().toISOString()}] Fetching ${platform} notifications for ${userId}`);
+    console.log(`[${new Date().toISOString()}] Fetching ${platform} notifications for ${userId} (attempt ${attempt}/${maxAttempts})`);
     
     try {
-      // CRITICAL FIX: Use NetworkHelper for robust network requests
-      let data = await NetworkHelper.fetchJson(`/events-list/${userId}?platform=${platform}`, {}, {
-        timeout: 30000,
-        maxRetries: 3,
-        backoffBase: 1000,
-        maxBackoffDelay: 10000
-      });
+      const response = await fetch(`/events-list/${userId}?platform=${platform}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${platform} notifications: ${response.status} ${response.statusText}`);
+      }
       
-      console.log(`[${new Date().toISOString()}] Successfully received ${data.length} ${platform} notifications`);
+      let data = await response.json();
+      console.log(`[${new Date().toISOString()}] Received ${data.length} ${platform} notifications`);
 
-      // CRITICAL FIX: Platform-specific data normalization
+      // CRITICAL FIX: Add defensive checks for Facebook notifications
       if (platform === 'facebook') {
-        console.log(`[${new Date().toISOString()}] [FACEBOOK] Processing ${data.length} notifications`);
+        console.log(`[${new Date().toISOString()}] [FACEBOOK] Raw notifications data:`, {
+          dataType: typeof data,
+          isArray: Array.isArray(data),
+          length: Array.isArray(data) ? data.length : 'N/A',
+          sampleData: Array.isArray(data) && data.length > 0 ? data[0] : null
+        });
         
         // Ensure data is an array
         if (!Array.isArray(data)) {
-          console.error(`[${new Date().toISOString()}] [FACEBOOK] Invalid data format - expected array, got:`, typeof data);
+          console.error(`[${new Date().toISOString()}] [FACEBOOK] Invalid notifications data type:`, typeof data);
           setNotifications([]);
           return;
         }
         
-        // Normalize Facebook notifications for consistent rendering
-        data = data.map((notif: any) => ({
-          ...notif,
-          // Ensure required fields exist
-          type: notif.type || (notif.message_id ? 'message' : 'comment'),
-          text: notif.text || '',
-          timestamp: typeof notif.timestamp === 'number' ? notif.timestamp : Date.now(),
-          sender_id: notif.sender_id || notif.from?.id || 'unknown',
-          platform: 'facebook',
-          // Keep original data for debugging
-          _original: notif
-        })).filter((notif: any) => notif.type && (notif.message_id || notif.comment_id));
+        // Validate each notification for required fields
+        const validNotifications = data.filter((notif: any, index: number) => {
+          if (!notif || typeof notif !== 'object') {
+            console.warn(`[${new Date().toISOString()}] [FACEBOOK] Invalid notification at index ${index}:`, notif);
+            return false;
+          }
+          
+          // Check for required fields
+          const hasRequiredFields = notif.type && 
+                                  (notif.message_id || notif.comment_id) && 
+                                  notif.text !== undefined && 
+                                  notif.timestamp !== undefined;
+          
+          if (!hasRequiredFields) {
+            console.warn(`[${new Date().toISOString()}] [FACEBOOK] Notification missing required fields at index ${index}:`, notif);
+            return false;
+          }
+          
+          return true;
+        });
         
-        console.log(`[${new Date().toISOString()}] [FACEBOOK] Normalized ${data.length} notifications for rendering`);
+        console.log(`[${new Date().toISOString()}] [FACEBOOK] Validated notifications:`, {
+          originalCount: data.length,
+          validCount: validNotifications.length,
+          filteredCount: data.length - validNotifications.length
+        });
+        
+        // Use validated notifications
+        data = validNotifications;
       }
 
-      // Fetch AI replies for all platforms
-      console.log(`[${new Date().toISOString()}] Fetching AI replies for ${platform}`);
+      console.log(`[${new Date().toISOString()}] Fetching AI replies for ${platform} with accountHolder: "${accountHolder}"`);
       const aiReplies = await RagService.fetchAIReplies(accountHolder, platform);
       console.log(`[${new Date().toISOString()}] Received ${aiReplies.length} ${platform} AI replies`);
       
-      // Process notifications with AI replies
       const processedNotifications = data.map((notif: any) => {
         const matchingAiReply = aiReplies.find(pair => {
           const isMatchingType = pair.type === (notif.type === 'message' ? 'dm' : 'comment');
@@ -395,26 +414,42 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         return notif;
       });
       
-      console.log(`[${new Date().toISOString()}] [${platform.toUpperCase()}] Setting ${processedNotifications.length} processed notifications`);
-      setNotifications(processedNotifications);
-      
-    } catch (error: any) {
-      console.error(`[${new Date().toISOString()}] Error fetching ${platform} notifications:`, error);
-      
-      // CRITICAL FIX: Enhanced error handling with user-friendly messages
-      const errorMessage = NetworkHelper.getErrorMessage(error);
-      console.error(`[${new Date().toISOString()}] [${platform.toUpperCase()}] ${errorMessage}`);
-      
-      // Set empty notifications array on failure
-      setNotifications([]);
-      
-      // CRITICAL FIX: Set up fallback retry for network errors only
-      if (NetworkHelper.isNetworkError(error)) {
-        console.log(`[${new Date().toISOString()}] [${platform.toUpperCase()}] Network error detected, setting up fallback retry in 30s`);
-        setTimeout(() => {
-          console.log(`[${new Date().toISOString()}] [${platform.toUpperCase()}] Fallback retry attempt...`);
-          fetchNotificationsWithUserId(userId);
-        }, 30000);
+      // CRITICAL FIX: Add final validation before setting state
+      if (platform === 'facebook') {
+        const finalValidNotifications = processedNotifications.filter((notif: any) => {
+          // Ensure all required fields are present and valid
+          const isValid = notif && 
+                         typeof notif === 'object' &&
+                         notif.type && 
+                         (notif.message_id || notif.comment_id) && 
+                         typeof notif.text === 'string' && 
+                         typeof notif.timestamp === 'number';
+          
+          if (!isValid) {
+            console.error(`[${new Date().toISOString()}] [FACEBOOK] Final validation failed for notification:`, notif);
+          }
+          
+          return isValid;
+        });
+        
+        console.log(`[${new Date().toISOString()}] [FACEBOOK] Final notifications ready for state:`, {
+          processedCount: processedNotifications.length,
+          finalCount: finalValidNotifications.length,
+          sampleNotification: finalValidNotifications.length > 0 ? finalValidNotifications[0] : null
+        });
+        
+        setNotifications(finalValidNotifications);
+      } else {
+        setNotifications(processedNotifications);
+      }
+    } catch (error) {
+      console.error(`[${new Date().toISOString()}] Error fetching ${platform} notifications (attempt ${attempt}/${maxAttempts}):`, error);
+      if (attempt < maxAttempts) {
+        setTimeout(() => fetchNotificationsWithUserId(userId, attempt + 1, maxAttempts), 2000);
+      } else {
+        // CRITICAL FIX: Set empty array on final failure to prevent crashes
+        console.error(`[${new Date().toISOString()}] [${platform.toUpperCase()}] All attempts failed, setting empty notifications array`);
+        setNotifications([]);
       }
     }
   };
@@ -770,28 +805,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     
     return () => clearTimeout(retryTimer);
   }, [platform, facebookPageId, notifications.length, fetchNotifications]);
-
-  // CRITICAL FIX: Monitor Facebook notification state and force refresh if needed
-  useEffect(() => {
-    if (platform === 'facebook') {
-      console.log(`[${new Date().toISOString()}] [FACEBOOK-MONITOR] Notification state change:`, {
-        count: notifications.length,
-        hasPageId: !!facebookPageId,
-        isConnected: isFacebookConnected,
-        platform
-      });
-      
-      // If Facebook is connected but no notifications after 5 seconds, force refresh
-      if (facebookPageId && isFacebookConnected && notifications.length === 0) {
-        const forceRefreshTimer = setTimeout(() => {
-          console.log(`[${new Date().toISOString()}] [FACEBOOK-MONITOR] Force refreshing notifications...`);
-          fetchNotifications();
-        }, 5000);
-        
-        return () => clearTimeout(forceRefreshTimer);
-      }
-    }
-  }, [platform, notifications.length, facebookPageId, isFacebookConnected, fetchNotifications]);
 
   // Handle custom event for opening campaign modal
   useEffect(() => {
@@ -1582,7 +1595,18 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       return;
     }
     
+    // CRITICAL FIX: Filter only pending notifications like Instagram implementation
+    const pendingNotifications = notifications.filter((notif: any) => 
+      !notif.status || notif.status === 'pending'
+    );
+    
+    if (pendingNotifications.length === 0) {
+      setToast('No pending notifications to reply to');
+      return;
+    }
+    
     setIsAutoReplying(true);
+    setShouldStopAutoReply(false); // 🛑 STOP OPERATION: Reset stop flag
     let successCount = 0;
     let failCount = 0;
     
@@ -1590,85 +1614,183 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
                          platform === 'facebook' ? facebookPageId :
                          igUserId;
     
-    for (const notification of notifications) {
-      if (!notification.text) continue;
-      
-      try {
-        // Generate AI reply using the enhanced RAG server
-        const response = await axios.post(getApiUrl('/api/instant-reply'), {
-          username: accountHolder,
-          notification: {
-            type: notification.type,
-            message_id: notification.message_id,
-            comment_id: notification.comment_id,
-            text: notification.text,
-            username: notification.username,
-            timestamp: notification.timestamp,
-            platform: platform
-          },
-          platform: platform
-        });
-
-        if (response.data.success && response.data.reply) {
-          // Send the generated reply
-          const endpoint = notification.type === 'message' ? 'send-dm-reply' : 'send-comment-reply';
+    try {
+      // 🛡️ CRITICAL BUG FIX: Process notifications ONE AT A TIME with proper rate limiting
+      // This prevents the Facebook bug where all messages were sent simultaneously
+      for (let i = 0; i < pendingNotifications.length; i++) {
+        // 🛑 STOP OPERATION: Check if user requested to stop
+        if (shouldStopAutoReply) {
+          console.log(`[PlatformDashboard] Auto-reply stopped by user at ${i + 1}/${pendingNotifications.length} for ${platform}`);
+          setToast(`Auto-reply stopped (${i}/${pendingNotifications.length} completed)`);
+          break;
+        }
+        
+        const notification = pendingNotifications[i];
+        const notificationId = notification.message_id || notification.comment_id || '';
+        
+        if (!notification.text) {
+          failCount++;
+          continue;
+        }
+        
+        try {
+          console.log(`[PlatformDashboard] 🔄 Processing notification ${i + 1}/${pendingNotifications.length} for ${platform}`);
           
-          await axios.post(`/${endpoint}/${currentUserId}`, {
-            sender_id: notification.sender_id,
-            text: response.data.reply,
-            message_id: notification.message_id,
-            comment_id: notification.comment_id,
-            platform: platform
-          });
-
-          // Mark notification as handled permanently
-          await axios.post(`/mark-notification-handled/${currentUserId}`, {
-            notification_id: notification.message_id || notification.comment_id,
-            type: notification.type,
-            handled_by: 'ai_auto_reply',
-            platform: platform
-          });
-
-          // ✅ REAL USAGE TRACKING: Track actual auto-reply generation and sending
-          const trackingSuccess = await trackRealAIReply(platform, {
-            type: notification.type === 'message' ? 'dm' : 'comment',
-            mode: 'auto'
-          });
+          // 🛑 STOP OPERATION: Check stop flag before making RAG request
+          if (shouldStopAutoReply) break;
           
-          if (!trackingSuccess) {
-            console.warn(`[PlatformDashboard] 🚫 Auto AI Reply blocked for ${platform} - limit reached`);
+          // Generate AI reply using the enhanced RAG server
+          const response = await axios.post(getApiUrl('/api/instant-reply'), {
+            username: accountHolder,
+            notification: {
+              type: notification.type,
+              message_id: notification.message_id,
+              comment_id: notification.comment_id,
+              text: notification.text,
+              username: notification.username,
+              timestamp: notification.timestamp,
+              platform: platform
+            },
+            platform: platform
+          });
+
+          // 🛑 STOP OPERATION: Check stop flag after RAG response
+          if (shouldStopAutoReply) break;
+
+          if (response.data.success && response.data.reply) {
+            // Send the generated reply
+            const endpoint = notification.type === 'message' ? 'send-dm-reply' : 'send-comment-reply';
+            
+            await axios.post(`/${endpoint}/${currentUserId}`, {
+              sender_id: notification.sender_id,
+              text: response.data.reply,
+              message_id: notification.message_id,
+              comment_id: notification.comment_id,
+              platform: platform
+            });
+
+            // Mark notification as handled permanently
+            await axios.post(`/mark-notification-handled/${currentUserId}`, {
+              notification_id: notification.message_id || notification.comment_id,
+              type: notification.type,
+              handled_by: 'ai_auto_reply',
+              platform: platform
+            });
+
+            // ✅ REAL USAGE TRACKING: Track actual auto-reply generation and sending
+            const trackingSuccess = await trackRealAIReply(platform, {
+              type: notification.type === 'message' ? 'dm' : 'comment',
+              mode: 'auto'
+            });
+            
+            if (!trackingSuccess) {
+              console.warn(`[PlatformDashboard] 🚫 Auto AI Reply blocked for ${platform} - limit reached`);
+              failCount++;
+              continue; // Skip to next notification
+            }
+            
+            console.log(`[PlatformDashboard] ✅ Auto AI Reply tracked: ${platform} ${notification.type}`);
+
+            successCount++;
+          } else {
             failCount++;
-            continue; // Skip to next notification
           }
           
-          console.log(`[PlatformDashboard] ✅ Auto AI Reply tracked: ${platform} ${notification.type}`);
-
-          successCount++;
-        } else {
+          // 🛑 STOP OPERATION: Check stop flag before delay
+          if (shouldStopAutoReply) break;
+          
+          // 🚀 CRITICAL RATE LIMITING FIX: Wait between requests to prevent simultaneous sending
+          // This is the key fix that prevents the Facebook bug
+          if (i < pendingNotifications.length - 1) {
+            const delay = platform === 'twitter' ? 90000 : // 1.5 minutes for Twitter (strict limits)
+                         platform === 'facebook' ? 60000 : // 1 minute for Facebook  
+                         45000; // 45 seconds for Instagram
+            
+            console.log(`[PlatformDashboard] ⏱️ Waiting ${delay/1000}s before next ${platform} reply (${i + 1}/${pendingNotifications.length} completed)`);
+            setToast(`Processing ${i + 1}/${pendingNotifications.length} - waiting ${delay/1000}s before next reply...`);
+            
+            // 🛑 STOP OPERATION: Use cancellable timeout for PlatformDashboard
+            await new Promise<void>((resolve) => {
+              autoReplyTimeoutRef.current = setTimeout(() => {
+                autoReplyTimeoutRef.current = null;
+                resolve();
+              }, delay);
+            });
+            
+            // 🛑 STOP OPERATION: Final check after delay
+            if (shouldStopAutoReply) break;
+          }
+          
+        } catch (error: any) {
+          console.error(`Error auto-replying to ${notification.type} ${notificationId}:`, error);
+          
+          // Handle specific Facebook personal account error
+          if (error.response?.data?.error && error.response.data.error.includes('Personal Facebook accounts cannot send messages')) {
+            console.error('Facebook personal account error in auto-reply:', error.response.data.error);
+            setToast('Personal Facebook accounts cannot send messages. Please connect a Facebook Business Page instead.');
+          } else if (error.response?.data?.error) {
+            console.error('API error in auto-reply:', error.response.data.error);
+          }
+          
           failCount++;
+          
+          // 🛑 STOP OPERATION: Check stop flag before error delay
+          if (shouldStopAutoReply) break;
+          
+          // Continue with next notification even if one fails, but still respect rate limiting
+          if (i < pendingNotifications.length - 1) {
+            const delay = platform === 'facebook' ? 30000 : 15000; // Shorter delay on errors
+            console.log(`[PlatformDashboard] ⚠️ Error occurred, waiting ${delay/1000}s before next attempt`);
+            
+            // 🛑 STOP OPERATION: Use cancellable timeout for error delays
+            await new Promise<void>((resolve) => {
+              autoReplyTimeoutRef.current = setTimeout(() => {
+                autoReplyTimeoutRef.current = null;
+                resolve();
+              }, delay);
+            });
+          }
         }
-      } catch (error: any) {
-        console.error(`Error auto-replying to ${notification.type}:`, error);
-        
-        // Handle specific Facebook personal account error
-        if (error.response?.data?.error && error.response.data.error.includes('Personal Facebook accounts cannot send messages')) {
-          console.error('Facebook personal account error in auto-reply:', error.response.data.error);
-          setToast('Personal Facebook accounts cannot send messages. Please connect a Facebook Business Page instead.');
-        } else if (error.response?.data?.error) {
-          console.error('API error in auto-reply:', error.response.data.error);
-        }
-        
-        failCount++;
+      }
+    } catch (error) {
+      console.error('Auto-reply operation failed:', error);
+      setToast('Auto-reply operation failed. Please try again.');
+    } finally {
+      setIsAutoReplying(false);
+      setShouldStopAutoReply(false); // 🛑 STOP OPERATION: Reset stop flag
+      
+      // 🛑 STOP OPERATION: Cancel any pending timeout
+      if (autoReplyTimeoutRef.current) {
+        clearTimeout(autoReplyTimeoutRef.current);
+        autoReplyTimeoutRef.current = null;
       }
     }
     
-    setIsAutoReplying(false);
-    setToast(`Auto-reply completed: ${successCount} sent, ${failCount} failed`);
+    // 🛑 STOP OPERATION: Final status message
+    if (shouldStopAutoReply) {
+      setToast(`Auto-reply stopped by user: ${successCount} sent, ${failCount} failed`);
+    } else {
+      setToast(`Auto-reply completed: ${successCount} sent, ${failCount} failed`);
+    }
     
     // Refresh notifications
     setTimeout(() => {
       setRefreshKey(prev => prev + 1);
     }, 2000);
+  };
+
+  // 🛑 STOP OPERATION: Handle stop button click for PlatformDashboard
+  const handleStopAutoReply = () => {
+    console.log(`[PlatformDashboard] Stop auto-reply requested by user for ${platform}`);
+    setShouldStopAutoReply(true);
+    
+    // Cancel any pending timeout immediately
+    if (autoReplyTimeoutRef.current) {
+      clearTimeout(autoReplyTimeoutRef.current);
+      autoReplyTimeoutRef.current = null;
+    }
+    
+    setToast('Stopping auto-reply...');
   };
 
   const handleSendQuery = async () => {
@@ -2236,24 +2358,26 @@ Image Description: ${response.post.image_prompt}
                 onIgnore={handleIgnore} 
                 onRefresh={() => {
                   setRefreshKey(prev => prev + 1);
-                  fetchNotifications();
+                  fetchNotifications(1, 3);
                 }} 
                 onReplyWithAI={(notification: Notification) => {
                   const notifId = notification.message_id || notification.comment_id || 'unknown';
                   handleReplyWithAI(notification, notifId);
                 }}
                 onAutoReplyAll={handleAutoReplyAll}
+                onStopAutoReply={handleStopAutoReply}
+                isAutoReplying={isAutoReplying}
                 username={accountHolder}
                 onIgnoreAIReply={handleIgnoreAIReply}
                 refreshKey={refreshKey}
                 igBusinessId={platform === 'instagram' ? igUserId : undefined}
                 twitterId={platform === 'twitter' ? twitterId : undefined}
                 facebookPageId={platform === 'facebook' ? facebookPageId : undefined}
-                platform={platform}
                 aiRepliesRefreshKey={refreshKey}
                 onAIRefresh={() => setRefreshKey(prev => prev + 1)}
                 aiProcessingNotifications={aiProcessingNotifications}
                 onSendAIReply={handleSendAIReply}
+                platform={platform}
               />
             </div>
           )}

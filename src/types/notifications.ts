@@ -21,6 +21,7 @@ export interface Notification {
   timestamp: number;
   received_at: string;
   username?: string;
+  page_name?: string; // Facebook page name for enhanced display
   status: 'pending' | 'replied' | 'ignored' | 'sent' | 'ai_reply_ready';
   aiProcessing?: boolean;
   aiReply?: {

@@ -26,7 +26,94 @@ if (platform === 'facebook' && facebookPageId) {
 
 // After: Don't wait for facebookPageId for Facebook platform
 if (platform === 'facebook') {
-  console.log(`[FACEBOOK-LOAD-FIX] Setting Facebook dashboard as loaded without waiting for pageId`);
+  console.log(`[# 🔧 Facebook Notification Fix Summary
+
+## 🎯 **ROOT CAUSE IDENTIFIED**
+
+**The Problem**: Facebook webhooks were storing notifications under user ID `681487244693083` but the frontend was fetching from page ID `612940588580162`, causing:
+- ❌ New messages not appearing in notification count  
+- ❌ SSE broadcasts failing (no clients connected to user ID)
+- ❌ Cache mismatches preventing real-time updates
+
+## 📋 **Evidence from Logs**
+
+```
+[WEBHOOK] Stored: FacebookEvents/681487244693083/m_ctskhZ...json
+[FRONTEND] Fetched: /events-list/612940588580162?platform=facebook  
+[SSE] Broadcast: 681487244693083: 0 clients available ❌
+[SSE] Broadcast: 612940588580162: 3 clients available ✅
+```
+
+## ✅ **SOLUTION IMPLEMENTED**
+
+### **Key Change**: Store notifications under **PAGE ID** instead of **USER ID**
+
+**Before Fix**:
+```javascript
+const storeUserId = token.user_id; // 681487244693083
+const userKey = `FacebookEvents/${storeUserId}/${message_id}.json`;
+```
+
+**After Fix**:
+```javascript
+const storageUserId = webhookPageId; // 612940588580162  
+const userKey = `FacebookEvents/${storageUserId}/${message_id}.json`;
+```
+
+### **Changes Made**:
+
+1. **Webhook Storage** (Lines ~3350-3380):
+   - Changed from `storeUserId` to `storageUserId = webhookPageId`
+   - Now stores under page ID `612940588580162`
+
+2. **SSE Broadcasting** (Lines ~3390-3420):
+   - Primary target is now page ID where frontend connects
+   - Secondary targets for redundancy
+
+3. **Notification Count Updates**:
+   - Uses same `storageUserId` for count updates
+   - Ensures consistency between storage and broadcast
+
+4. **Cache Invalidation**:
+   - Clears cache for correct page ID path
+   - Prevents stale data issues
+
+## 🚀 **Expected Results**
+
+After this fix:
+- ✅ New Facebook messages stored under page ID `612940588580162`
+- ✅ SSE broadcasts reach connected clients immediately  
+- ✅ Notification count updates from 1 → 2 → 3 correctly
+- ✅ Real-time display like Instagram notifications
+- ✅ Cache cleared for correct path
+
+## 🧪 **How to Verify**
+
+1. **Send a Facebook message** to the connected page
+2. **Check server logs** for:
+   ```
+   💾 Storing Facebook DM event for Page ID: 612940588580162
+   [INSTANT-NOTIFICATION] Broadcast attempted for IDs: [612940588580162]
+   ✅ Successfully broadcast to 3/3 clients
+   ```
+3. **Frontend should**:
+   - Show new notification immediately
+   - Update count correctly
+   - Display in notification list
+
+## 📝 **Files Modified**
+
+- `/home/komail/Accountmanager/server/server.js` (Lines ~3350-3450)
+- `/home/komail/Accountmanager/test-facebook-fix.sh` (Test script)
+
+## 🔍 **Debug Command**
+
+To test the fix:
+```bash
+./test-facebook-fix.sh
+```
+
+This targeted fix resolves the core issue: **storage/broadcast mismatch** between user ID and page ID, ensuring Facebook notifications work exactly like Instagram notifications with instant real-time updates.] Setting Facebook dashboard as loaded without waiting for pageId`);
   setIsLoading(false);
 }
 ```

@@ -377,7 +377,7 @@ function scheduleSSEHeartbeats() {
 // Start the heartbeat scheduler
 scheduleSSEHeartbeats();
 
-// Broadcast update to all connected clients for a user
+// ENHANCED BROADCAST: Immediate notification delivery
 function broadcastUpdate(username, data) {
   const clients = sseClients.get(username) || [];
   const activeCount = clients.length;
@@ -388,17 +388,42 @@ function broadcastUpdate(username, data) {
   if (activeCount > 0) {
     console.log(`[${new Date().toISOString()}] Broadcasting update to ${activeCount} clients for ${username}: ${data.type || data.event}`);
     
+    // INSTANT DELIVERY: Send to all clients immediately
+    let successCount = 0;
+    const activeClients = [];
+    
     clients.forEach(client => {
       try {
-        client.write(`data: ${JSON.stringify(data)}\n\n`);
+        // ENHANCED SSE FORMAT: Include event type and ensure proper formatting
+        const eventType = data.event || 'notification';
+        const messageData = JSON.stringify({
+          ...data,
+          timestamp: Date.now(),
+          delivered_at: new Date().toISOString()
+        });
+        
+        // Send with proper SSE format
+        client.write(`event: ${eventType}\n`);
+        client.write(`data: ${messageData}\n\n`);
+        
         // Update activity timestamp
         activeConnections.set(client, Date.now());
+        activeClients.push(client);
+        successCount++;
       } catch (err) {
         console.error(`[${new Date().toISOString()}] Error broadcasting to client:`, err.message);
-        // Will be cleaned up by the heartbeat cycle
+        // Client will be cleaned up by heartbeat cycle
       }
     });
-    return true;
+    
+    // Update the active clients list
+    if (activeClients.length !== clients.length) {
+      sseClients.set(username, activeClients);
+      console.log(`[${new Date().toISOString()}] Updated active clients for ${username}: ${activeClients.length}/${clients.length}`);
+    }
+    
+    console.log(`[${new Date().toISOString()}] Successfully broadcast to ${successCount}/${activeCount} clients for ${username}`);
+    return successCount > 0;
   }
   
   return false;
@@ -3309,6 +3334,34 @@ app.post(['/webhook/facebook', '/api/webhook/facebook'], async (req, res) => {
                 continue;
               }
 
+              // ENHANCED USER EXPERIENCE: Fetch sender's real name from Facebook Graph API
+              let senderName = 'Unknown User';
+              let pageName = matchedToken ? matchedToken.page_name : 'Sentient AI';
+              
+              try {
+                if (matchedToken && matchedToken.access_token) {
+                  console.log(`🔍 Fetching sender details for ID: ${msg.sender.id}`);
+                  
+                  // Fetch sender's profile information
+                  const senderResponse = await axios.get(`https://graph.facebook.com/v18.0/${msg.sender.id}`, {
+                    params: {
+                      fields: 'name,first_name,last_name',
+                      access_token: matchedToken.access_token
+                    },
+                    timeout: 5000
+                  });
+                  
+                  if (senderResponse.data && senderResponse.data.name) {
+                    senderName = senderResponse.data.name;
+                    console.log(`✅ Sender details fetched: ${senderName}`);
+                  }
+                }
+              } catch (senderError) {
+                console.log(`⚠️ Could not fetch sender details (using fallback): ${senderError.message}`);
+                // Fallback: Use partial sender ID as identifier if name fetch fails
+                senderName = `User ${msg.sender.id.slice(-6)}`;
+              }
+
               const eventData = {
                 type: 'message',
                 facebook_page_id: matchedToken ? matchedToken.page_id : webhookPageId,
@@ -3318,22 +3371,24 @@ app.post(['/webhook/facebook', '/api/webhook/facebook'], async (req, res) => {
                 text: msg.message.text,
                 timestamp: msg.timestamp,
                 received_at: new Date().toISOString(),
-                username: matchedToken ? matchedToken.page_name : 'unknown',
+                username: senderName, // Real sender name
+                page_name: pageName,   // Page name for context
                 status: 'pending'
               };
 
-              // Use resolved user ID from token matching
-              if (!storeUserId) {
-                console.log(`[${new Date().toISOString()}] Skipping Facebook DM storage - no user ID found for webhook ID ${webhookPageId}`);
+              // CRITICAL FIX: Store under PAGE ID (not user ID) to match frontend expectations
+              const storageUserId = webhookPageId; // Use page ID as primary storage key
+              
+              if (!storageUserId) {
+                console.log(`[${new Date().toISOString()}] Skipping Facebook DM storage - no page ID found for webhook ID ${webhookPageId}`);
                 continue;
               }
               
-              console.log(`💾 Storing Facebook DM event for User ID: ${storeUserId}`);
+              console.log(`💾 Storing Facebook DM event for Page ID: ${storageUserId}`);
               console.log(`📝 Message: "${eventData.text}" (ID: ${eventData.message_id})`);
               
-              // CRITICAL FIX: Store with the correct user ID that matches the frontend
-              // The frontend sends Firebase user ID, so we need to store with that ID
-              const userKey = `FacebookEvents/${storeUserId}/${eventData.message_id}.json`;
+              // Store with PAGE ID to match frontend expectations
+              const userKey = `FacebookEvents/${storageUserId}/${eventData.message_id}.json`;
               await s3Client.send(new PutObjectCommand({
                 Bucket: 'tasks',
                 Key: userKey,
@@ -3343,38 +3398,65 @@ app.post(['/webhook/facebook', '/api/webhook/facebook'], async (req, res) => {
               
               console.log(`✅ Facebook DM stored successfully at ${userKey}`);
               
-              // Broadcast to frontend via SSE
-              const broadcastData = {
-                event: 'facebook_message',
-                data: {
-                  ...eventData,
-                  platform: 'facebook'
+              // INSTANT NOTIFICATION TRIGGER: Immediate broadcast before any delays
+              setImmediate(() => {
+                console.log(`[INSTANT-TRIGGER] Processing immediate notification for new Facebook message`);
+                
+                // INSTANT NOTIFICATION FIX: Broadcast immediately to SSE clients
+                const broadcastData = {
+                  event: 'facebook_message',
+                  data: {
+                    ...eventData,
+                    platform: 'facebook'
+                  }
+                };
+                
+                // NOTIFICATION COUNT UPDATE: Send updated count immediately
+                const notificationCountData = {
+                  event: 'notification_count_update',
+                  data: {
+                    platform: 'facebook',
+                    user_id: storageUserId, // Use the same ID as storage
+                    increment: 1,
+                    message: 'New Facebook message received'
+                  }
+                };
+                
+                // ENHANCED BROADCAST: Send to all possible client IDs
+                const broadcastResults = [];
+                const broadcastTargets = new Set();
+                
+                // PRIMARY TARGET: Use page ID (where frontend connects)
+                broadcastTargets.add(storageUserId);
+                
+                // SECONDARY TARGETS: Add other IDs for redundancy
+                if (storeUserId && storeUserId !== storageUserId) {
+                  broadcastTargets.add(storeUserId);
                 }
-              };
-              // HERO FIX: Always broadcast to both page_id and user_id
-              const broadcastResults = [];
-              broadcastResults.push({
-                id: storeUserId,
-                result: broadcastUpdate(storeUserId, broadcastData)
-              });
-              if (matchedToken && matchedToken.page_id && matchedToken.page_id !== storeUserId) {
-                broadcastResults.push({
-                  id: matchedToken.page_id,
-                  result: broadcastUpdate(matchedToken.page_id, broadcastData)
+                
+                if (firebaseUserId && firebaseUserId !== storageUserId) {
+                  broadcastTargets.add(firebaseUserId);
+                }
+                
+                // Broadcast to all targets
+                broadcastTargets.forEach(targetId => {
+                  const result = broadcastUpdate(targetId, broadcastData);
+                  broadcastResults.push({ id: targetId, result });
+                  
+                  // ALSO SEND NOTIFICATION COUNT UPDATE
+                  const countResult = broadcastUpdate(targetId, notificationCountData);
+                  console.log(`[NOTIFICATION-COUNT] Sent count update to ${targetId}: ${countResult}`);
                 });
-              }
-              // Log all SSE client keys for debugging
-              console.log(`[HERO FIX] Broadcast attempted for IDs:`, broadcastResults, 'SSE client keys:', Array.from(sseClients.keys()));
-              
-              // Clear cache to ensure fresh data (Facebook user ID)
-              cache.delete(`FacebookEvents/${storeUserId}`);
-              if (firebaseUserId && firebaseUserId !== storeUserId) {
-                cache.delete(`FacebookEvents/${firebaseUserId}`);
-              }
-              // CRITICAL FIX: Also clear cache for Facebook page ID
-              if (matchedToken && matchedToken.page_id && matchedToken.page_id !== storeUserId) {
-                cache.delete(`FacebookEvents/${matchedToken.page_id}`);
-              }
+                
+                console.log(`[INSTANT-NOTIFICATION] Broadcast attempted for IDs:`, broadcastResults, 'SSE client keys:', Array.from(sseClients.keys()));
+                
+                // CACHE INVALIDATION FIX: Clear all possible cache keys
+                const cacheKeys = Array.from(broadcastTargets).map(id => `FacebookEvents/${id}`);
+                cacheKeys.forEach(key => {
+                  cache.delete(key);
+                  console.log(`[CACHE-CLEAR] Cleared cache for key: ${key}`);
+                });
+              });
             } catch (error) {
               console.error(`[${new Date().toISOString()}] Error processing Facebook message:`, error.message);
             }
@@ -3386,29 +3468,36 @@ app.post(['/webhook/facebook', '/api/webhook/facebook'], async (req, res) => {
           for (const change of entry.changes) {
             try {
               if (change.field === 'feed' && change.value.message) {
+                // Get commenter's name from Facebook's provided data
+                const commenterName = change.value.from.name || `User ${change.value.from.id.slice(-6)}`;
+                const pageName = matchedToken ? matchedToken.page_name : 'Sentient AI';
+                
                 const eventData = {
                   type: 'comment',
                   facebook_page_id: matchedToken ? matchedToken.page_id : webhookPageId,
                   facebook_user_id: matchedToken ? matchedToken.user_id : null,
                   sender_id: change.value.from.id,
-                  username: change.value.from.name,
+                  username: commenterName, // Real commenter name
+                  page_name: pageName,     // Page name for context
                   comment_id: change.value.comment_id,
                   post_id: change.value.post.id,
                   text: change.value.message,
                   timestamp: new Date(change.value.created_time).getTime(),
                   received_at: new Date().toISOString(),
-                  username: matchedToken ? matchedToken.page_name : 'unknown',
                   status: 'pending'
                 };
 
-                if (!storeUserId) {
-                  console.log(`[${new Date().toISOString()}] Skipping Facebook comment storage - no user ID found for webhook ID ${webhookPageId}`);
+                // CRITICAL FIX: Store under PAGE ID (not user ID) to match frontend expectations
+                const storageUserId = webhookPageId; // Use page ID as primary storage key
+                
+                if (!storageUserId) {
+                  console.log(`[${new Date().toISOString()}] Skipping Facebook comment storage - no page ID found for webhook ID ${webhookPageId}`);
                   continue;
                 }
                 
-                console.log(`[${new Date().toISOString()}] Storing Facebook comment event with User ID: ${storeUserId}`);
+                console.log(`[${new Date().toISOString()}] Storing Facebook comment event with Page ID: ${storageUserId}`);
                 
-                const userKey = `FacebookEvents/${storeUserId}/${eventData.comment_id}.json`;
+                const userKey = `FacebookEvents/${storageUserId}/${eventData.comment_id}.json`;
                 await s3Client.send(new PutObjectCommand({
                   Bucket: 'tasks',
                   Key: userKey,
@@ -3418,38 +3507,65 @@ app.post(['/webhook/facebook', '/api/webhook/facebook'], async (req, res) => {
                 
                 console.log(`[${new Date().toISOString()}] Stored Facebook comment at ${userKey}`);
                 
-                // Broadcast to frontend via SSE
-                const broadcastData = {
-                  event: 'facebook_comment',
-                  data: {
-                    ...eventData,
-                    platform: 'facebook'
+                // INSTANT NOTIFICATION TRIGGER: Immediate broadcast before any delays
+                setImmediate(() => {
+                  console.log(`[INSTANT-TRIGGER] Processing immediate notification for new Facebook comment`);
+                  
+                  // INSTANT NOTIFICATION FIX: Broadcast immediately to SSE clients
+                  const broadcastData = {
+                    event: 'facebook_comment',
+                    data: {
+                      ...eventData,
+                      platform: 'facebook'
+                    }
+                  };
+                  
+                  // NOTIFICATION COUNT UPDATE: Send updated count immediately
+                  const notificationCountData = {
+                    event: 'notification_count_update',
+                    data: {
+                      platform: 'facebook',
+                      user_id: storageUserId, // Use the same ID as storage
+                      increment: 1,
+                      message: 'New Facebook comment received'
+                    }
+                  };
+                  
+                  // ENHANCED BROADCAST: Send to all possible client IDs
+                  const broadcastResults = [];
+                  const broadcastTargets = new Set();
+                  
+                  // PRIMARY TARGET: Use page ID (where frontend connects)
+                  broadcastTargets.add(storageUserId);
+                  
+                  // SECONDARY TARGETS: Add other IDs for redundancy
+                  if (storeUserId && storeUserId !== storageUserId) {
+                    broadcastTargets.add(storeUserId);
                   }
-                };
-                // HERO FIX: Always broadcast to both page_id and user_id
-                const broadcastResults = [];
-                broadcastResults.push({
-                  id: storeUserId,
-                  result: broadcastUpdate(storeUserId, broadcastData)
-                });
-                if (matchedToken && matchedToken.page_id && matchedToken.page_id !== storeUserId) {
-                  broadcastResults.push({
-                    id: matchedToken.page_id,
-                    result: broadcastUpdate(matchedToken.page_id, broadcastData)
+                  
+                  if (firebaseUserId && firebaseUserId !== storageUserId) {
+                    broadcastTargets.add(firebaseUserId);
+                  }
+                  
+                  // Broadcast to all targets
+                  broadcastTargets.forEach(targetId => {
+                    const result = broadcastUpdate(targetId, broadcastData);
+                    broadcastResults.push({ id: targetId, result });
+                    
+                    // ALSO SEND NOTIFICATION COUNT UPDATE
+                    const countResult = broadcastUpdate(targetId, notificationCountData);
+                    console.log(`[NOTIFICATION-COUNT] Sent count update to ${targetId}: ${countResult}`);
                   });
-                }
-                // Log all SSE client keys for debugging
-                console.log(`[HERO FIX] Broadcast attempted for IDs:`, broadcastResults, 'SSE client keys:', Array.from(sseClients.keys()));
-                
-                // Clear cache to ensure fresh data (Facebook user ID)
-                cache.delete(`FacebookEvents/${storeUserId}`);
-                if (firebaseUserId && firebaseUserId !== storeUserId) {
-                  cache.delete(`FacebookEvents/${firebaseUserId}`);
-                }
-                // CRITICAL FIX: Also clear cache for Facebook page ID
-                if (matchedToken && matchedToken.page_id && matchedToken.page_id !== storeUserId) {
-                  cache.delete(`FacebookEvents/${matchedToken.page_id}`);
-                }
+                  
+                  console.log(`[INSTANT-NOTIFICATION] Broadcast attempted for IDs:`, broadcastResults, 'SSE client keys:', Array.from(sseClients.keys()));
+                  
+                  // CACHE INVALIDATION FIX: Clear all possible cache keys
+                  const cacheKeys = Array.from(broadcastTargets).map(id => `FacebookEvents/${id}`);
+                  cacheKeys.forEach(key => {
+                    cache.delete(key);
+                    console.log(`[CACHE-CLEAR] Cleared cache for key: ${key}`);
+                  });
+                });
               }
             } catch (error) {
               console.error(`[${new Date().toISOString()}] Error processing Facebook comment:`, error.message);
@@ -4622,6 +4738,7 @@ async function fetchFacebookNotifications(userId, forceRefresh = false) {
               timestamp: new Date(eventData.received_at || eventData.timestamp || Date.now()).getTime(),
               received_at: eventData.received_at || new Date().toISOString(),
               username: eventData.username || 'Unknown',
+              page_name: eventData.page_name || 'Sentient AI', // Include page name for enhanced display
               status: eventData.status || 'pending',
               platform: 'facebook'
             };
@@ -4636,6 +4753,7 @@ async function fetchFacebookNotifications(userId, forceRefresh = false) {
               timestamp: new Date(eventData.received_at || eventData.timestamp || Date.now()).getTime(),
               received_at: eventData.received_at || new Date().toISOString(),
               username: eventData.username || 'Unknown',
+              page_name: eventData.page_name || 'Sentient AI', // Include page name for enhanced display
               status: eventData.status || 'pending',
               platform: 'facebook'
             };
@@ -4652,19 +4770,24 @@ async function fetchFacebookNotifications(userId, forceRefresh = false) {
     
     console.log(`[${new Date().toISOString()}] [FACEBOOK-SIMPLE] Processed ${validNotifications.length} valid notifications from R2`);
     
-    // STEP 3: Simple filtering - only remove explicitly handled notifications
+    // STEP 3: NOTIFICATION COUNT FIX - Include 'pending' status in notification count
     const finalNotifications = validNotifications.filter(notification => {
       const notificationId = notification.message_id || notification.comment_id;
       if (!notificationId) return true;
       
-      // Only filter out notifications that are explicitly marked as handled
-      return notification.status !== 'replied' && 
-             notification.status !== 'ignored' && 
-             notification.status !== 'ai_handled' &&
-             notification.status !== 'handled';
+      // CRITICAL FIX: Include 'pending' status in visible notifications
+      // Only filter out notifications that are explicitly handled/processed
+      const excludedStatuses = ['replied', 'ignored', 'ai_handled', 'handled'];
+      return !excludedStatuses.includes(notification.status);
     });
     
     console.log(`[${new Date().toISOString()}] [FACEBOOK-SIMPLE] Final notifications: ${validNotifications.length} -> ${finalNotifications.length}`);
+    console.log(`[${new Date().toISOString()}] [FACEBOOK-SIMPLE] Status breakdown:`, 
+      validNotifications.reduce((acc, n) => {
+        acc[n.status] = (acc[n.status] || 0) + 1;
+        return acc;
+      }, {})
+    );
     
     // STEP 4: Return sorted by timestamp (newest first)
     return finalNotifications.sort((a, b) => b.timestamp - a.timestamp);
@@ -6938,7 +7061,7 @@ app.get(['/events/:username', '/api/events/:username'], (req, res) => {
   // Generate unique connection ID
   const connectionId = randomUUID();
   
-  // Send initial connection confirmation
+  // Send initial connection confirmation with heartbeat
   const initialEvent = {
     type: 'connection',
     message: `Connected to events for ${normalizedUsername}`,
@@ -6946,7 +7069,24 @@ app.get(['/events/:username', '/api/events/:username'], (req, res) => {
     connectionId
   };
   
+  res.write(`event: connection\n`);
   res.write(`data: ${JSON.stringify(initialEvent)}\n\n`);
+  
+  // Start heartbeat to keep connection alive
+  const heartbeatInterval = setInterval(() => {
+    try {
+      const heartbeat = {
+        type: 'heartbeat',
+        timestamp: Date.now(),
+        connectionId
+      };
+      res.write(`event: heartbeat\n`);
+      res.write(`data: ${JSON.stringify(heartbeat)}\n\n`);
+    } catch (err) {
+      console.error(`[${new Date().toISOString()}] Heartbeat error for ${normalizedUsername}:`, err.message);
+      clearInterval(heartbeatInterval);
+    }
+  }, 30000); // Every 30 seconds
   
   // Register this client
   if (!sseClients.has(normalizedUsername)) {
@@ -7114,6 +7254,9 @@ app.get(['/events/:username', '/api/events/:username'], (req, res) => {
   
   // Setup connection close handler
   req.on('close', () => {
+    // Clear heartbeat interval
+    clearInterval(heartbeatInterval);
+    
     const updatedClients = sseClients.get(normalizedUsername)?.filter(client => client !== res) || [];
     sseClients.set(normalizedUsername, updatedClients);
     activeConnections.delete(res);
@@ -7333,42 +7476,103 @@ app.post(['/rag-instant-reply/:username', '/api/rag-instant-reply/:username'], a
           
           // Map username to platform-specific userId
           try {
-            let tokenPrefix = '';
-            let userIdField = '';
+            console.log(`[RAG-INSTANT-REPLY] Mapping username "${username}" to userId for ${platform}`);
             
             if (platform === 'facebook') {
-              tokenPrefix = 'FacebookTokens/';
-              userIdField = 'page_id';
+              // For Facebook, check connections first since tokens don't have username
+              const listConnections = new ListObjectsV2Command({
+                Bucket: 'tasks',
+                Prefix: 'FacebookConnection/',
+              });
+              const { Contents: connectionContents } = await s3Client.send(listConnections);
+              
+              if (connectionContents) {
+                for (const obj of connectionContents) {
+                  if (obj.Key.endsWith('/connection.json')) {
+                    const getCommand = new GetObjectCommand({
+                      Bucket: 'tasks',
+                      Key: obj.Key,
+                    });
+                    const connectionData = await s3Client.send(getCommand);
+                    const json = await connectionData.Body.transformToString();
+                    const connection = JSON.parse(json);
+                    
+                    // Try multiple username matching strategies
+                    const isUsernameMatch = (
+                      connection.username === username ||
+                      connection.username?.toLowerCase() === username.toLowerCase() ||
+                      connection.username?.replace(/\s+/g, '').toLowerCase() === username.toLowerCase() ||
+                      // Also try matching without spaces and special characters
+                      connection.username?.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === username.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
+                    );
+                    
+                    if (isUsernameMatch) {
+                      userId = connection.facebook_page_id;
+                      console.log(`[RAG-INSTANT-REPLY] Found Facebook connection match: "${connection.username}" -> ${userId}`);
+                      break;
+                    }
+                  }
+                }
+              }
+              
+              // Fallback: If no username match found, try to use the notification's page ID
+              if (!userId && notification.facebook_page_id) {
+                userId = notification.facebook_page_id;
+                console.log(`[RAG-INSTANT-REPLY] Using Facebook page ID from notification: ${userId}`);
+              }
+              
             } else if (platform === 'twitter') {
-              tokenPrefix = 'TwitterTokens/';
-              userIdField = 'user_id';
+              // Twitter token mapping
+              const listTokens = new ListObjectsV2Command({
+                Bucket: 'tasks',
+                Prefix: 'TwitterTokens/',
+              });
+              const { Contents: tokenContents } = await s3Client.send(listTokens);
+              if (tokenContents) {
+                for (const obj of tokenContents) {
+                  if (obj.Key.endsWith('/token.json')) {
+                    const getCommand = new GetObjectCommand({
+                      Bucket: 'tasks',
+                      Key: obj.Key,
+                    });
+                    const tokenData = await s3Client.send(getCommand);
+                    const json = await tokenData.Body.transformToString();
+                    const token = JSON.parse(json);
+                    if (token.username === username) {
+                      userId = token.user_id;
+                      break;
+                    }
+                  }
+                }
+              }
             } else {
-              tokenPrefix = 'InstagramTokens/';
-              userIdField = 'instagram_user_id';
-            }
-            
-            const listTokens = new ListObjectsV2Command({
-              Bucket: 'tasks',
-              Prefix: tokenPrefix,
-            });
-            const { Contents: tokenContents } = await s3Client.send(listTokens);
-            if (tokenContents) {
-              for (const obj of tokenContents) {
-                if (obj.Key.endsWith('/token.json')) {
-                  const getCommand = new GetObjectCommand({
-                    Bucket: 'tasks',
-                    Key: obj.Key,
-                  });
-                  const tokenData = await s3Client.send(getCommand);
-                  const json = await tokenData.Body.transformToString();
-                  const token = JSON.parse(json);
-                  if (token.username === username) {
-                    userId = token[userIdField];
-                    break;
+              // Instagram token mapping
+              const listTokens = new ListObjectsV2Command({
+                Bucket: 'tasks',
+                Prefix: 'InstagramTokens/',
+              });
+              const { Contents: tokenContents } = await s3Client.send(listTokens);
+              if (tokenContents) {
+                for (const obj of tokenContents) {
+                  if (obj.Key.endsWith('/token.json')) {
+                    const getCommand = new GetObjectCommand({
+                      Bucket: 'tasks',
+                      Key: obj.Key,
+                    });
+                    const tokenData = await s3Client.send(getCommand);
+                    const json = await tokenData.Body.transformToString();
+                    const token = JSON.parse(json);
+                    if (token.username === username) {
+                      userId = token.instagram_user_id;
+                      break;
+                    }
                   }
                 }
               }
             }
+            
+            console.log(`[RAG-INSTANT-REPLY] Username mapping result: "${username}" -> ${userId} (${platform})`);
+            
           } catch (err) {
             console.error(`[RAG-INSTANT-REPLY] Error mapping username to userId for ${platform}:`, err);
           }
@@ -8002,6 +8206,19 @@ function handleErrorResponse(res, error) {
   const message = error.response?.data?.message || error.message || 'Internal server error';
   res.status(status).json({ error: message });
 }
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  setCorsHeaders(res);
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    port: port,
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
 
 // Start the server
 app.listen(port, () => {

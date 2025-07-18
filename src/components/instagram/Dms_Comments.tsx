@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './Dms_Comments.css';
 import { useInstagram } from '../../context/InstagramContext';
 import { useTwitter } from '../../context/TwitterContext';
@@ -23,6 +23,8 @@ interface DmsCommentsProps {
   onSendAIReply?: (notification: Notification) => void;
   onIgnoreAIReply?: (notification: Notification) => void;
   onAutoReplyAll?: (notifications: Notification[]) => void;
+  onStopAutoReply?: () => void; // 🛑 STOP OPERATION: Add stop callback prop
+  isAutoReplying?: boolean; // 🛑 STOP OPERATION: Add auto-reply status prop
   platform?: 'instagram' | 'twitter' | 'facebook';
 }
 
@@ -43,6 +45,8 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
   onSendAIReply,
   onIgnoreAIReply,
   onAutoReplyAll,
+  onStopAutoReply, // 🛑 STOP OPERATION: Add stop callback prop
+  isAutoReplying: parentIsAutoReplying = false, // 🛑 STOP OPERATION: Parent auto-reply status
   platform = 'instagram'
 }) => {
   const [replyText, setReplyText] = useState<Record<string, string>>({});
@@ -51,6 +55,10 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isAutoReplying, setIsAutoReplying] = useState(false);
   const [autoReplyProgress, setAutoReplyProgress] = useState<{ current: number; total: number; currentMessage: string } | null>(null);
+  
+  // 🛑 STOP OPERATION: Add stop flag and timeout reference for cancellation
+  const [shouldStopAutoReply, setShouldStopAutoReply] = useState(false);
+  const autoReplyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const { userId: contextIgBusinessId, isConnected: isInstagramConnected } = useInstagram();
   const igBusinessId = propIgBusinessId || contextIgBusinessId;
@@ -72,29 +80,7 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
         return false;
       }
 
-      // CRITICAL FIX: Platform-specific validation to handle Facebook notifications correctly
-      if (platform === 'facebook') {
-        // For Facebook, only require type and either message_id or comment_id
-        const hasFacebookRequiredFields = notif.type && 
-                                        (notif.message_id || notif.comment_id);
-        
-        if (!hasFacebookRequiredFields) {
-          console.warn(`[${new Date().toISOString()}] [FACEBOOK] Notification missing required fields at index ${index}:`, notif);
-          return false;
-        }
-        
-        // Log successful Facebook notification validation
-        console.log(`[${new Date().toISOString()}] [FACEBOOK] Valid notification passed:`, {
-          type: notif.type,
-          id: notif.message_id || notif.comment_id,
-          hasText: !!notif.text,
-          hasTimestamp: !!notif.timestamp
-        });
-        
-        return true;
-      }
-
-      // For Instagram and Twitter, use stricter validation
+      // Check for required fields
       const hasRequiredFields = notif.type && 
                               (notif.message_id || notif.comment_id) && 
                               typeof notif.text === 'string' && 
@@ -102,6 +88,15 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
       if (!hasRequiredFields) {
         console.warn(`[${new Date().toISOString()}] [${platform.toUpperCase()}] Notification missing required fields at index ${index}:`, notif);
         return false;
+      }
+
+      // Platform-specific validation
+      if (platform === 'facebook') {
+        // Additional Facebook-specific validation
+        if (!notif.facebook_page_id && !notif.facebook_user_id) {
+          console.warn(`[${new Date().toISOString()}] [FACEBOOK] Notification missing Facebook ID at index ${index}:`, notif);
+          return false;
+        }
       }
 
       return true;
@@ -167,11 +162,23 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
 
     try {
       setIsAutoReplying(true);
+      setShouldStopAutoReply(false); // 🛑 STOP OPERATION: Reset stop flag
       setAutoReplyProgress({ current: 0, total: pendingNotifications.length, currentMessage: 'Starting auto-reply...' });
       setError(null);
 
       // Process notifications with intelligent rate limiting
       for (let i = 0; i < pendingNotifications.length; i++) {
+        // 🛑 STOP OPERATION: Check if user requested to stop
+        if (shouldStopAutoReply) {
+          console.log(`[${platform.toUpperCase()}] Auto-reply stopped by user at ${i + 1}/${pendingNotifications.length}`);
+          setAutoReplyProgress({ 
+            current: i, 
+            total: pendingNotifications.length, 
+            currentMessage: `Auto-reply stopped (${i}/${pendingNotifications.length} completed)` 
+          });
+          break;
+        }
+        
         const notification = pendingNotifications[i];
         const notificationId = notification.message_id || notification.comment_id || '';
         
@@ -182,8 +189,14 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
         });
 
         try {
+          // 🛑 STOP OPERATION: Check stop flag before making request
+          if (shouldStopAutoReply) break;
+          
           // Generate and send AI reply for this notification
           await onAutoReplyAll([notification]);
+          
+          // 🛑 STOP OPERATION: Check stop flag before delay
+          if (shouldStopAutoReply) break;
           
           // Rate limiting: Wait between requests to avoid platform limits
           if (i < pendingNotifications.length - 1) {
@@ -197,7 +210,16 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
               currentMessage: `Waiting ${delay/1000}s before next reply...` 
             });
             
-            await new Promise(resolve => setTimeout(resolve, delay));
+            // 🛑 STOP OPERATION: Use cancellable timeout
+            await new Promise<void>((resolve) => {
+              autoReplyTimeoutRef.current = setTimeout(() => {
+                autoReplyTimeoutRef.current = null;
+                resolve();
+              }, delay);
+            });
+            
+            // 🛑 STOP OPERATION: Final check after delay
+            if (shouldStopAutoReply) break;
           }
         } catch (error: any) {
           console.error(`Error auto-replying to notification ${notificationId}:`, error);
@@ -216,11 +238,20 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
         }
       }
 
-      setAutoReplyProgress({ 
-        current: pendingNotifications.length, 
-        total: pendingNotifications.length, 
-        currentMessage: 'Auto-reply complete!' 
-      });
+      // 🛑 STOP OPERATION: Set final message based on completion status
+      if (shouldStopAutoReply) {
+        setAutoReplyProgress({ 
+          current: pendingNotifications.length, 
+          total: pendingNotifications.length, 
+          currentMessage: 'Auto-reply stopped by user' 
+        });
+      } else {
+        setAutoReplyProgress({ 
+          current: pendingNotifications.length, 
+          total: pendingNotifications.length, 
+          currentMessage: 'Auto-reply complete!' 
+        });
+      }
 
       // Clear progress after 3 seconds
       setTimeout(() => {
@@ -232,7 +263,31 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
       console.error('Auto-reply error:', error);
     } finally {
       setIsAutoReplying(false);
+      setShouldStopAutoReply(false); // 🛑 STOP OPERATION: Reset stop flag
+      
+      // 🛑 STOP OPERATION: Cancel any pending timeout
+      if (autoReplyTimeoutRef.current) {
+        clearTimeout(autoReplyTimeoutRef.current);
+        autoReplyTimeoutRef.current = null;
+      }
     }
+  };
+
+  // 🛑 STOP OPERATION: Handle stop button click
+  const handleStopAutoReply = () => {
+    console.log(`[${platform.toUpperCase()}] Stop auto-reply requested by user`);
+    setShouldStopAutoReply(true);
+    
+    // Cancel any pending timeout immediately
+    if (autoReplyTimeoutRef.current) {
+      clearTimeout(autoReplyTimeoutRef.current);
+      autoReplyTimeoutRef.current = null;
+    }
+    
+    setAutoReplyProgress(prev => prev ? {
+      ...prev,
+      currentMessage: 'Stopping auto-reply...'
+    } : null);
   };
 
   const renderNotConnectedMessage = () => {
@@ -289,7 +344,21 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
         <div className="auto-reply-progress">
           <div className="progress-header">
             <span>Auto-Reply Progress</span>
-            <span>{autoReplyProgress.current}/{autoReplyProgress.total}</span>
+            <div className="progress-controls">
+              <span>{autoReplyProgress.current}/{autoReplyProgress.total}</span>
+              {/* 🛑 STOP BUTTON: Beautiful stop button for cancelling auto-reply */}
+              {isAutoReplying && (
+                <button 
+                  onClick={handleStopAutoReply}
+                  className="stop-auto-reply-btn"
+                  title="Stop auto-reply operation"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/>
+                  </svg>
+                </button>
+              )}
+            </div>
           </div>
           <div className="progress-bar">
             <div 
@@ -326,7 +395,15 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
               <span className="notification-type">
                 {notif.type === 'message' 
                   ? (platform === 'twitter' ? 'Tweet' : platform === 'facebook' ? 'Message' : 'DM')
-                  : 'Comment'} from {notif.username || 'Unknown'}
+                  : 'Comment'} from {/* Enhanced Facebook sender display */}
+                {platform === 'facebook' && notif.page_name ? (
+                  <span className="facebook-sender-info">
+                    <strong className="sender-name">{notif.username || 'Unknown User'}</strong>
+                    <span className="page-tag">via {notif.page_name}</span>
+                  </span>
+                ) : (
+                  notif.username || 'Unknown'
+                )}
               </span>
               <span className="notification-time">{formatTimestamp(notif.timestamp)}</span>
             </div>

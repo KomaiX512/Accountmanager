@@ -20,6 +20,7 @@ import { useUsage } from '../../context/UsageContext';
 import GlobalUpgradeHandler from '../common/GlobalUpgradeHandler';
 import { useProcessing } from '../../context/ProcessingContext';
 import { safeFilter, safeMap, safeLength } from '../../utils/safeArrayUtils';
+import useDashboardRefresh from '../../hooks/useDashboardRefresh';
 
 interface PlatformLoadingState {
   startTime: number;
@@ -436,6 +437,39 @@ const MainDashboard: React.FC = () => {
     setRealTimeNotifications(counts);
     isFetchingNotificationsRef.current = false;
   }, [currentUser?.uid, instagramUserId, twitterUserId, facebookUserId, getPlatformAccessStatus]);
+
+  // 🔄 MAIN DASHBOARD AUTO-REFRESH: Implement dashboard switching refresh
+  const handleMainDashboardRefresh = useCallback(() => {
+    console.log('[MainDashboard] 🔄 Auto-refresh triggered - refreshing all data');
+    
+    // Refresh usage data
+    refreshUsage();
+    
+    // Refresh notification counts
+    if (currentUser?.uid) {
+      console.log('[MainDashboard] 🔔 Triggering fresh notification fetch');
+      // Call the notification fetch function directly
+      fetchRealTimeNotifications();
+    }
+  }, [refreshUsage, currentUser?.uid, fetchRealTimeNotifications]);
+
+  // Use dashboard refresh hook for automatic refresh on route changes
+  const { forceRefresh: forceMainDashboardRefresh } = useDashboardRefresh({
+    onRefresh: handleMainDashboardRefresh,
+    dashboardType: 'main',
+    dependencies: [currentUser?.uid]
+  });
+
+  // 🔥 FORCE HARD REFRESH ON EVERY MAIN DASHBOARD ENTRY
+  useEffect(() => {
+    console.log(`[MainDashboard] 🚀 Main dashboard mounted/accessed - forcing hard refresh`);
+    
+    // Always trigger hard refresh when main dashboard is accessed
+    if (currentUser?.uid) {
+      handleMainDashboardRefresh();
+    }
+    
+  }, [currentUser?.uid, handleMainDashboardRefresh]); // Trigger when user changes or component mounts
 
   // ✅ PLATFORM STATE MANAGEMENT FIX: Improved platform data structure
   const [platforms, setPlatforms] = useState<PlatformData[]>([

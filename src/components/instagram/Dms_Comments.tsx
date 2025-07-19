@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import './Dms_Comments.css';
 import { useInstagram } from '../../context/InstagramContext';
 import { useTwitter } from '../../context/TwitterContext';
@@ -26,6 +26,8 @@ interface DmsCommentsProps {
   onStopAutoReply?: () => void; // 🛑 STOP OPERATION: Add stop callback prop
   isAutoReplying?: boolean; // 🛑 STOP OPERATION: Add auto-reply status prop
   platform?: 'instagram' | 'twitter' | 'facebook';
+  onEditAIReply?: (notification: Notification, editedReply: string) => void; // NEW: Edit AI reply functionality
+  autoReplyProgress?: { current: number; total: number; nextReplyIn?: number }; // NEW: Auto-reply progress
 }
 
 const Dms_Comments: React.FC<DmsCommentsProps> = ({ 
@@ -47,18 +49,24 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
   onAutoReplyAll,
   onStopAutoReply, // 🛑 STOP OPERATION: Add stop callback prop
   isAutoReplying: parentIsAutoReplying = false, // 🛑 STOP OPERATION: Parent auto-reply status
-  platform = 'instagram'
+  platform = 'instagram',
+  onEditAIReply, // NEW: Edit AI reply functionality
+  autoReplyProgress: parentAutoReplyProgress // NEW: Auto-reply progress from parent
 }) => {
   const [replyText, setReplyText] = useState<Record<string, string>>({});
   const [showReplyInput, setShowReplyInput] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isAutoReplying, setIsAutoReplying] = useState(false);
-  const [autoReplyProgress, setAutoReplyProgress] = useState<{ current: number; total: number; currentMessage: string } | null>(null);
   
-  // 🛑 STOP OPERATION: Add stop flag and timeout reference for cancellation
-  const [shouldStopAutoReply, setShouldStopAutoReply] = useState(false);
+  // NEW: State for editing AI replies
+  const [editingAIReply, setEditingAIReply] = useState<Record<string, boolean>>({});
+  const [aiReplyEditText, setAiReplyEditText] = useState<Record<string, string>>({});
+  
+  // 🛑 STOP OPERATION: Simple timeout reference for cancellation
   const autoReplyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 🛑 STOP OPERATION: Use parent's isAutoReplying state
+  const isAutoReplying = parentIsAutoReplying;
 
   const { userId: contextIgBusinessId, isConnected: isInstagramConnected } = useInstagram();
   const igBusinessId = propIgBusinessId || contextIgBusinessId;
@@ -147,6 +155,42 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
     onIgnoreAIReply(notification);
   };
 
+  // NEW: Handle editing AI reply
+  const handleEditAIReply = (notification: Notification) => {
+    const notifId = notification.message_id || notification.comment_id || '';
+    setEditingAIReply(prev => ({ ...prev, [notifId]: true }));
+    setAiReplyEditText(prev => ({ 
+      ...prev, 
+      [notifId]: notification.aiReply?.reply || '' 
+    }));
+  };
+
+  // NEW: Handle saving edited AI reply
+  const handleSaveEditedAIReply = (notification: Notification) => {
+    const notifId = notification.message_id || notification.comment_id || '';
+    const editedText = aiReplyEditText[notifId];
+    
+    if (!editedText || !editedText.trim()) {
+      setError('Please enter a valid reply');
+      return;
+    }
+
+    if (onEditAIReply) {
+      onEditAIReply(notification, editedText.trim());
+    }
+
+    // Exit edit mode
+    setEditingAIReply(prev => ({ ...prev, [notifId]: false }));
+    setAiReplyEditText(prev => ({ ...prev, [notifId]: '' }));
+  };
+
+  // NEW: Handle canceling edit
+  const handleCancelEditAIReply = (notification: Notification) => {
+    const notifId = notification.message_id || notification.comment_id || '';
+    setEditingAIReply(prev => ({ ...prev, [notifId]: false }));
+    setAiReplyEditText(prev => ({ ...prev, [notifId]: '' }));
+  };
+
   const handleAutoReplyAll = async () => {
     if (!onAutoReplyAll || isAutoReplying) return;
     
@@ -161,133 +205,29 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
     }
 
     try {
-      setIsAutoReplying(true);
-      setShouldStopAutoReply(false); // 🛑 STOP OPERATION: Reset stop flag
-      setAutoReplyProgress({ current: 0, total: pendingNotifications.length, currentMessage: 'Starting auto-reply...' });
-      setError(null);
-
-      // Process notifications with intelligent rate limiting
-      for (let i = 0; i < pendingNotifications.length; i++) {
-        // 🛑 STOP OPERATION: Check if user requested to stop
-        if (shouldStopAutoReply) {
-          console.log(`[${platform.toUpperCase()}] Auto-reply stopped by user at ${i + 1}/${pendingNotifications.length}`);
-          setAutoReplyProgress({ 
-            current: i, 
-            total: pendingNotifications.length, 
-            currentMessage: `Auto-reply stopped (${i}/${pendingNotifications.length} completed)` 
-          });
-          break;
-        }
-        
-        const notification = pendingNotifications[i];
-        const notificationId = notification.message_id || notification.comment_id || '';
-        
-        setAutoReplyProgress({ 
-          current: i + 1, 
-          total: pendingNotifications.length, 
-          currentMessage: `Replying to ${notification.username || 'user'}...` 
-        });
-
-        try {
-          // 🛑 STOP OPERATION: Check stop flag before making request
-          if (shouldStopAutoReply) break;
-          
-          // Generate and send AI reply for this notification
-          await onAutoReplyAll([notification]);
-          
-          // 🛑 STOP OPERATION: Check stop flag before delay
-          if (shouldStopAutoReply) break;
-          
-          // Rate limiting: Wait between requests to avoid platform limits
-          if (i < pendingNotifications.length - 1) {
-            const delay = platform === 'twitter' ? 90000 : // 1.5 minutes for Twitter (strict limits)
-                         platform === 'facebook' ? 60000 : // 1 minute for Facebook  
-                         45000; // 45 seconds for Instagram
-            
-            setAutoReplyProgress({ 
-              current: i + 1, 
-              total: pendingNotifications.length, 
-              currentMessage: `Waiting ${delay/1000}s before next reply...` 
-            });
-            
-            // 🛑 STOP OPERATION: Use cancellable timeout
-            await new Promise<void>((resolve) => {
-              autoReplyTimeoutRef.current = setTimeout(() => {
-                autoReplyTimeoutRef.current = null;
-                resolve();
-              }, delay);
-            });
-            
-            // 🛑 STOP OPERATION: Final check after delay
-            if (shouldStopAutoReply) break;
-          }
-        } catch (error: any) {
-          console.error(`Error auto-replying to notification ${notificationId}:`, error);
-          
-          // Handle specific Instagram API errors
-          if (error.response?.data?.code === 'TIME_RESTRICTION') {
-            console.log(`Instagram time restriction for notification ${notificationId} - will retry later`);
-            // Continue with next notification - time restrictions are temporary
-          } else if (error.response?.data?.code === 'USER_NOT_FOUND') {
-            console.log(`User not found for notification ${notificationId} - skipping`);
-            // Continue with next notification - user not found is permanent
-          } else {
-            console.error(`Unknown error for notification ${notificationId}:`, error);
-            // Continue with next notification even if one fails
-          }
-        }
-      }
-
-      // 🛑 STOP OPERATION: Set final message based on completion status
-      if (shouldStopAutoReply) {
-        setAutoReplyProgress({ 
-          current: pendingNotifications.length, 
-          total: pendingNotifications.length, 
-          currentMessage: 'Auto-reply stopped by user' 
-        });
-      } else {
-        setAutoReplyProgress({ 
-          current: pendingNotifications.length, 
-          total: pendingNotifications.length, 
-          currentMessage: 'Auto-reply complete!' 
-        });
-      }
-
-      // Clear progress after 3 seconds
-      setTimeout(() => {
-        setAutoReplyProgress(null);
-      }, 3000);
-
+      // 🛑 STOP OPERATION: Just call parent's auto-reply function
+      // Parent handles the state management
+      await onAutoReplyAll(pendingNotifications);
     } catch (error) {
+      console.error('Error in handleAutoReplyAll:', error);
       setError('Auto-reply failed. Please try again.');
-      console.error('Auto-reply error:', error);
-    } finally {
-      setIsAutoReplying(false);
-      setShouldStopAutoReply(false); // 🛑 STOP OPERATION: Reset stop flag
-      
-      // 🛑 STOP OPERATION: Cancel any pending timeout
-      if (autoReplyTimeoutRef.current) {
-        clearTimeout(autoReplyTimeoutRef.current);
-        autoReplyTimeoutRef.current = null;
-      }
     }
   };
 
-  // 🛑 STOP OPERATION: Handle stop button click
+  // 🛑 STOP OPERATION: Handle stop button click  
   const handleStopAutoReply = () => {
     console.log(`[${platform.toUpperCase()}] Stop auto-reply requested by user`);
-    setShouldStopAutoReply(true);
+    
+    // Call parent's stop function if available
+    if (onStopAutoReply) {
+      onStopAutoReply();
+    }
     
     // Cancel any pending timeout immediately
     if (autoReplyTimeoutRef.current) {
       clearTimeout(autoReplyTimeoutRef.current);
       autoReplyTimeoutRef.current = null;
     }
-    
-    setAutoReplyProgress(prev => prev ? {
-      ...prev,
-      currentMessage: 'Stopping auto-reply...'
-    } : null);
   };
 
   const renderNotConnectedMessage = () => {
@@ -339,34 +279,43 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
         </button>
       </div>
       
-      {/* Auto-Reply Progress */}
-      {autoReplyProgress && (
+            {/* Auto-Reply Progress - Show when parent is auto-replying */}
+      {isAutoReplying && (
         <div className="auto-reply-progress">
           <div className="progress-header">
             <span>Auto-Reply Progress</span>
             <div className="progress-controls">
-              <span>{autoReplyProgress.current}/{autoReplyProgress.total}</span>
-              {/* 🛑 STOP BUTTON: Beautiful stop button for cancelling auto-reply */}
-              {isAutoReplying && (
-                <button 
-                  onClick={handleStopAutoReply}
-                  className="stop-auto-reply-btn"
-                  title="Stop auto-reply operation"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/>
-                  </svg>
-                </button>
-              )}
+              <button 
+                className="stop-auto-reply-btn" 
+                onClick={handleStopAutoReply}
+                title="Stop Auto-Reply"
+              >
+                🛑
+              </button>
             </div>
           </div>
           <div className="progress-bar">
             <div 
               className="progress-fill" 
-              style={{ width: `${(autoReplyProgress.current / autoReplyProgress.total) * 100}%` }}
+              style={{ 
+                width: parentAutoReplyProgress && parentAutoReplyProgress.total > 0 
+                  ? `${(parentAutoReplyProgress.current / parentAutoReplyProgress.total) * 100}%` 
+                  : '50%' 
+              }} 
             />
           </div>
-          <div className="progress-message">{autoReplyProgress.currentMessage}</div>
+          <div className="progress-message">
+            {parentAutoReplyProgress && parentAutoReplyProgress.total > 0 ? (
+              <>
+                Processing {parentAutoReplyProgress.current} of {parentAutoReplyProgress.total} notifications
+                {parentAutoReplyProgress.nextReplyIn && parentAutoReplyProgress.nextReplyIn > 0 && (
+                  <span className="next-reply-timer"> • Next reply in {parentAutoReplyProgress.nextReplyIn}s</span>
+                )}
+              </>
+            ) : (
+              'Processing auto-replies...'
+            )}
+          </div>
         </div>
       )}
 
@@ -411,22 +360,75 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
             
             {notif.status === 'ai_reply_ready' && notif.aiReply ? (
               <div className="ai-reply-container">
-                <div className="ai-reply-content">{notif.aiReply.reply}</div>
-                <div className="ai-reply-actions">
-                  <button 
-                    onClick={() => handleSendAIReply(notif)}
-                    disabled={isLoading || notif.aiReply.sendStatus === 'sending'}
-                    className="send-ai-reply-btn"
-                  >
-                    {notif.aiReply.sendStatus === 'sending' ? 'Sending...' : 'Send AI Reply'}
-                  </button>
-                  <button 
-                    onClick={() => handleIgnoreAIReply(notif)}
-                    className="ignore-ai-reply-btn"
-                  >
-                    Ignore
-                  </button>
-                </div>
+                {editingAIReply[notif.message_id || notif.comment_id || ''] ? (
+                  // Edit mode for AI reply
+                  <div className="ai-reply-edit-container">
+                    <div className="ai-reply-label">Edit AI Reply:</div>
+                    <textarea
+                      value={aiReplyEditText[notif.message_id || notif.comment_id || ''] || ''}
+                      onChange={(e) => setAiReplyEditText(prev => ({
+                        ...prev,
+                        [notif.message_id || notif.comment_id || '']: e.target.value
+                      }))}
+                      placeholder="Edit your AI reply..."
+                      className="ai-reply-edit-textarea"
+                      rows={3}
+                    />
+                    <div className="ai-reply-edit-actions">
+                      <button 
+                        onClick={() => handleSaveEditedAIReply(notif)}
+                        className="save-ai-reply-btn"
+                        disabled={!aiReplyEditText[notif.message_id || notif.comment_id || '']?.trim()}
+                      >
+                        Save Changes
+                      </button>
+                      <button 
+                        onClick={() => handleCancelEditAIReply(notif)}
+                        className="cancel-ai-reply-edit-btn"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  // Preview mode for AI reply
+                  <>
+                    <div className="ai-reply-label">AI Reply Preview:</div>
+                    <div className="ai-reply-content">{notif.aiReply.reply}</div>
+                    <div className="ai-reply-actions">
+                      <button 
+                        onClick={() => handleSendAIReply(notif)}
+                        disabled={isLoading || notif.aiReply.sendStatus === 'sending'}
+                        className={`send-ai-reply-btn ${notif.aiReply.sendStatus === 'sending' ? 'loading' : ''}`}
+                      >
+                        {notif.aiReply.sendStatus === 'sending' ? (
+                          <>
+                            <span className="loading-spinner"></span>
+                            Sending...
+                          </>
+                        ) : (
+                          'Send AI Reply'
+                        )}
+                      </button>
+                      <button 
+                        onClick={() => handleEditAIReply(notif)}
+                        className="edit-ai-reply-btn"
+                        title="Edit this AI reply"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="m18.5 2.5 a 2.121 2.121 0 0 1 3 3 l -9.5 9.5 l -4 1 l 1 -4 l 9.5 -9.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+                      <button 
+                        onClick={() => handleIgnoreAIReply(notif)}
+                        className="ignore-ai-reply-btn"
+                      >
+                        Ignore
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             ) : (
               <div className="notification-actions">
@@ -470,10 +472,15 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
                     <button
                       onClick={() => onReplyWithAI(notif)}
                       disabled={aiProcessingNotifications[notif.message_id || notif.comment_id || '']}
-                      className="ai-reply-btn"
+                      className={`ai-reply-btn ${aiProcessingNotifications[notif.message_id || notif.comment_id || ''] ? 'loading' : ''}`}
                     >
                       {aiProcessingNotifications[notif.message_id || notif.comment_id || ''] 
-                        ? 'Generating...' 
+                        ? (
+                          <>
+                            <span className="loading-spinner"></span>
+                            Generating...
+                          </>
+                        ) 
                         : 'AI Reply'}
                     </button>
                     <button onClick={() => handleIgnore(notif)} className="ignore-btn">

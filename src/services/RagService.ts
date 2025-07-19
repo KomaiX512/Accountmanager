@@ -100,8 +100,8 @@ axios.interceptors.response.use(
 );
 
 class RagService {
-  // Enable/disable verbose logging (set to true for debugging)
-  private static readonly VERBOSE_LOGGING = true; // ENABLED FOR DEBUGGING
+  // Enable/disable verbose logging (set to false to reduce console spam)
+  private static readonly VERBOSE_LOGGING = false;
   
   /**
    * Process markdown formatting in RAG responses
@@ -131,13 +131,13 @@ class RagService {
     return processed;
   }
   
-  // Use relative URLs to go through vite proxy for proper CORS handling
+  // Use relative URLs to go through vite proxy like post-generator
   private static readonly RAG_SERVER_URLS = [
     '',  // Use relative URLs to go through vite proxy
   ];
   
   private static readonly MAIN_SERVER_URLS = [
-    '',  // Use relative URLs to go through vite proxy
+    '',  // Use relative URLs to go through vite proxy  
   ];
   
   private static readonly AI_REPLIES_URLS = [
@@ -283,7 +283,7 @@ class RagService {
       }
 
       return this.tryServerUrls(
-        '/api/discussion',
+        '/api/rag/discussion',
         async (serverUrl) => {
           try {
             const requestData = {
@@ -297,10 +297,12 @@ class RagService {
             };
 
             if (this.VERBOSE_LOGGING) {
-              console.log(`[RagService] 📤 Sending to ${serverUrl}/api/discussion`);
+              console.log(`[RagService] 📤 Sending to ${serverUrl || '/api/rag/discussion'}`);
             }
 
-            const response = await axios.post(`${serverUrl}/api/discussion`, requestData, {
+            // Use getApiUrl for proper URL construction instead of empty baseUrl
+            const url = serverUrl || getApiUrl('/api/rag/discussion');
+            const response = await axios.post(url, requestData, {
               timeout: 120000, // 2 minute timeout for complex queries
               headers: {
                 'Content-Type': 'application/json'
@@ -334,7 +336,7 @@ class RagService {
             };
 
           } catch (error: any) {
-            console.error(`[RagService] 🚨 Error calling ${serverUrl}/api/discussion:`, {
+            console.error(`[RagService] 🚨 Error calling ${serverUrl}:`, {
               error: error.message,
               status: error.response?.status,
               data: error.response?.data
@@ -621,8 +623,6 @@ class RagService {
         console.warn(`[RagService] Invalid Instagram sender_id format: ${options.sender_id}`);
       } else if (platform === 'twitter' && !/^[a-zA-Z0-9_]+$/.test(options.sender_id)) {
         console.warn(`[RagService] Invalid Twitter sender_id format: ${options.sender_id}`);
-      } else if (platform === 'facebook' && !/^[0-9]+$/.test(options.sender_id)) {
-        console.warn(`[RagService] Invalid Facebook sender_id format: ${options.sender_id} - Facebook IDs must be numeric`);
       }
     }
 
@@ -632,7 +632,7 @@ class RagService {
       type: 'message',
       instagram_user_id: platform === 'instagram' ? userId : undefined,
       twitter_user_id: platform === 'twitter' ? userId : undefined,
-      facebook_page_id: platform === 'facebook' ? userId : undefined, // Use facebook_page_id for Facebook
+      facebook_user_id: platform === 'facebook' ? userId : undefined,
       sender_id: options?.sender_id,
       message_id: options?.message_id,
       text: userMessage,
@@ -643,25 +643,18 @@ class RagService {
     };
 
     try {
-      console.log(`[RagService] 🚀 STARTING INSTANT AI REPLY FOR ${platform.toUpperCase()}`);
-      console.log(`[RagService] 📊 Request Details:`, {
-        userId,
-        username,
-        platform,
-        sender_id: options?.sender_id,
-        message_id: options?.message_id,
-        conversationLength: conversation?.length,
-        userMessage: userMessage?.substring(0, 100) + '...'
-      });
+      if (this.VERBOSE_LOGGING) {
+        console.log(`[RagService] Trying to send instant ${platform} AI reply via /api/instant-reply`);
+      }
       
-      console.log(`[RagService] 📝 Notification Object:`, notification);
-      console.log(`[RagService] 🌐 API URL:`, getApiUrl(`/api/rag-instant-reply/${username}`));
-      
-      // Use the correct endpoint with username parameter for proper Facebook handling
+      // Use relative URL to avoid DNS resolution issues
       const timestamp = Date.now();
       const response = await axios.post(
-        getApiUrl(`/api/rag-instant-reply/${username}`),
-        notification,
+        getApiUrl('/api/instant-reply'),
+        {
+          username,
+          notification
+        },
         {
           headers: {
             'Content-Type': 'application/json',
@@ -674,53 +667,28 @@ class RagService {
         }
       );
 
-      console.log(`[RagService] ✅ RESPONSE RECEIVED:`, {
-        status: response.status,
-        statusText: response.statusText,
-        data: response.data,
-        responseTime: Date.now() - timestamp + 'ms'
-      });
-
       if (!response.data) {
         throw new Error('No data returned from RAG service');
       }
 
-      console.log(`[RagService] 🎉 Successfully received ${platform} response from RAG server`);
+      // Log successful response
+      if (this.VERBOSE_LOGGING) {
+        console.log(`[RagService] Successfully received ${platform} response from RAG server`);
+      }
       return response.data;
     } catch (error: any) {
-      console.error(`[RagService] 💥 FAILED TO SEND INSTANT ${platform.toUpperCase()} AI REPLY:`);
-      console.error(`[RagService] 📊 Error Details:`, {
-        message: error.message,
-        code: error.code,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        responseData: error.response?.data,
-        requestUrl: error.config?.url,
-        requestMethod: error.config?.method,
-        requestHeaders: error.config?.headers,
-        stack: error.stack?.split('\n').slice(0, 5) // First 5 lines of stack
-      });
+      console.error(`[RagService] Failed to send instant ${platform} AI reply:`, error.message || 'Unknown error');
       
       // Check if this is a CORS error
       if (error.message?.includes('CORS') || error.message?.includes('Network Error')) {
-        console.error('[RagService] 🚨 CORS ISSUE DETECTED - Check server CORS configuration');
+        console.error('[RagService] Possible CORS issue detected');
       }
       
       // Check if this is a specific error about sender_id format
       if (error.response?.data?.error?.includes('sender_id')) {
         const errorMessage = error.response.data.error || 'Invalid sender ID format';
-        console.error(`[RagService] 🚨 SENDER ID VALIDATION ERROR:`, errorMessage);
+        console.error(`[RagService] Sender ID validation error:`, errorMessage);
         throw new Error(errorMessage);
-      }
-      
-      // Check for timeout
-      if (error.code === 'ECONNABORTED') {
-        console.error(`[RagService] ⏰ REQUEST TIMEOUT - Server took longer than 30 seconds`);
-      }
-      
-      // Check for network connection issues
-      if (error.code === 'ECONNREFUSED') {
-        console.error(`[RagService] 🔌 CONNECTION REFUSED - Server may be down`);
       }
       
       throw error;

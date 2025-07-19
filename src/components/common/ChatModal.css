@@ -43,6 +43,25 @@
   gap: 4px;
 }
 
+.chat-mode-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mode-icon {
+  color: #00ffcc;
+  flex-shrink: 0;
+}
+
+.mode-icon.discussion-icon {
+  color: #00ffcc;
+}
+
+.mode-icon.post-icon {
+  color: #ff6b6b;
+}
+
 .chat-header-info h3 {
   margin: 0;
   color: #e0e0ff;
@@ -98,6 +117,17 @@
   text-align: center;
   padding: 40px 20px;
   color: #a0a0cc;
+}
+
+.welcome-icon {
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.mode-icon-large {
+  color: #00ffcc;
+  opacity: 0.8;
 }
 
 .welcome-message h4 {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import '../instagram/Dashboard.css'; // Reuse the same styles
 import Cs_Analysis from '../instagram/Cs_Analysis';
 import OurStrategies from '../instagram/OurStrategies';
@@ -23,9 +23,9 @@ import FacebookRequiredButton from '../common/FacebookRequiredButton';
 import { useInstagram } from '../../context/InstagramContext';
 import { useTwitter } from '../../context/TwitterContext';
 import { useFacebook } from '../../context/FacebookContext';
-import ChatModal from '../instagram/ChatModal';
+import ChatModal from '../common/ChatModal';
 import RagService from '../../services/RagService';
-import type { ChatMessage as ChatModalMessage } from '../instagram/ChatModal';
+import type { ChatMessage as ChatModalMessage } from '../common/ChatModal';
 import { Notification, ProfileInfo, LinkedAccount } from '../../types/notifications';
 // Import icons from react-icons
 import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaTwitter, FaInstagram, FaPen, FaFacebook, FaBell } from 'react-icons/fa';
@@ -41,6 +41,7 @@ import { useNavigate } from 'react-router-dom';
 import useProcessingGuard from '../../hooks/useProcessingGuard';
 import { useProcessing } from '../../context/ProcessingContext';
 import { safeFilter, safeMap, safeLength } from '../../utils/safeArrayUtils';
+import useDashboardRefresh from '../../hooks/useDashboardRefresh';
 
 // Define RagService compatible ChatMessage
 interface RagChatMessage {
@@ -123,6 +124,13 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   // 🛑 STOP OPERATION: Add stop flag and timeout reference for PlatformDashboard
   const [shouldStopAutoReply, setShouldStopAutoReply] = useState(false);
   const autoReplyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // NEW: Auto-reply progress tracking
+  const [autoReplyProgress, setAutoReplyProgress] = useState<{
+    current: number;
+    total: number;
+    nextReplyIn: number;
+  }>({ current: 0, total: 0, nextReplyIn: 0 });
   const [isTwitterSchedulerOpen, setIsTwitterSchedulerOpen] = useState(false);
   const [isTwitterInsightsOpen, setIsTwitterInsightsOpen] = useState(false);
   const [isTwitterComposeOpen, setIsTwitterComposeOpen] = useState(false);
@@ -160,6 +168,87 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     const stored = localStorage.getItem(storageKey);
     return stored ? new Set(JSON.parse(stored)) : new Set();
   });
+
+  // 🔄 PLATFORM DASHBOARD AUTO-REFRESH: Enhanced refresh for dashboard switching
+  const handlePlatformDashboardRefresh = useCallback(() => {
+    console.log(`[PlatformDashboard] 🔄 Auto-refresh triggered for ${platform} dashboard - refreshing all data`);
+    
+    // Close any existing SSE connections
+    if (eventSourceRef.current) {
+      console.log(`[PlatformDashboard] 🔌 Closing existing SSE connection for refresh`);
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+    
+    // Reset state to ensure clean slate
+    setNotifications([]);
+    setProfileInfo(null);
+    setResponses([]);
+    setStrategies([]);
+    setPosts([]);
+    setCompetitorData([]);
+    setLinkedAccounts([]);
+    
+    // Reset viewed content tracking for new platform context
+    const strategiesKey = `viewed_strategies_${platform}_${accountHolder}`;
+    const competitorKey = `viewed_competitor_${platform}_${accountHolder}`;
+    const postsKey = `viewed_posts_${platform}_${accountHolder}`;
+    
+    const storedStrategies = localStorage.getItem(strategiesKey);
+    const storedCompetitor = localStorage.getItem(competitorKey);
+    const storedPosts = localStorage.getItem(postsKey);
+    
+    setViewedStrategies(storedStrategies ? new Set(JSON.parse(storedStrategies)) : new Set());
+    setViewedCompetitorData(storedCompetitor ? new Set(JSON.parse(storedCompetitor)) : new Set());
+    setViewedPosts(storedPosts ? new Set(JSON.parse(storedPosts)) : new Set());
+    
+    // Reset loading state to trigger fresh data fetch
+    setIsLoading(true);
+    firstLoadRef.current = true;
+    
+    // Trigger fresh data fetch
+    if (accountHolder) {
+      console.log(`[PlatformDashboard] 📊 Fetching fresh data for ${platform} dashboard`);
+      refreshAllData();
+      fetchProfileInfo();
+    }
+  }, [platform, accountHolder, setViewedStrategies, setViewedCompetitorData, setViewedPosts]);
+
+  // Use dashboard refresh hook for automatic refresh on route changes
+  const { forceRefresh: forcePlatformDashboardRefresh } = useDashboardRefresh({
+    onRefresh: handlePlatformDashboardRefresh,
+    dashboardType: 'platform',
+    platform,
+    dependencies: [accountHolder, platform]
+  });
+
+  // 🔥 FORCE HARD REFRESH ON EVERY PLATFORM DASHBOARD ENTRY
+  useEffect(() => {
+    console.log(`[PlatformDashboard] 🚀 Platform dashboard mounted/accessed - forcing hard refresh for ${platform}`);
+    
+    // Always trigger hard refresh when platform dashboard is accessed
+    // Use a small timeout to ensure all hooks are initialized
+    const refreshTimer = setTimeout(() => {
+      console.log(`[PlatformDashboard] 💥 Executing forced hard refresh for ${platform} platform`);
+      handlePlatformDashboardRefresh();
+    }, 50);
+    
+    return () => clearTimeout(refreshTimer);
+    
+  }, []); // Empty dependency array means this runs only once when component mounts
+
+  // 🔄 ADDITIONAL REFRESH TRIGGER: When accountHolder or platform changes
+  useEffect(() => {
+    if (accountHolder && platform) {
+      console.log(`[PlatformDashboard] 🔄 AccountHolder or platform changed - triggering refresh`);
+      // Small delay to prevent double refresh with the mount effect
+      const changeRefreshTimer = setTimeout(() => {
+        handlePlatformDashboardRefresh();
+      }, 100);
+      
+      return () => clearTimeout(changeRefreshTimer);
+    }
+  }, [accountHolder, platform, handlePlatformDashboardRefresh]);
 
   // Helper function to get viewed storage key
   const getViewedStorageKey = (section: string) => `viewed_${section}_${platform}_${accountHolder}`;
@@ -653,13 +742,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     }
   }, [toast]);
 
-  useEffect(() => {
-    if (accountHolder) {
-      refreshAllData();
-      fetchProfileInfo();
-    }
-  }, [accountHolder, competitors, platform]);
-
   // Load previous conversations when the component mounts
   useEffect(() => {
     if (accountHolder) {
@@ -675,10 +757,12 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     }
   }, [accountHolder, platform]);
 
-  // Initialize notifications and SSE for the current platform
+  // Initialize notifications and SSE for the current platform - Enhanced for platform switching
   useEffect(() => {
     // Only run when loading is complete
     if (isLoading) return;
+    
+    console.log(`[PlatformDashboard] 🚀 Initializing ${platform} dashboard connections...`);
     
     const currentUserId = platform === 'twitter' ? twitterId : 
                          platform === 'facebook' ? facebookPageId :
@@ -711,6 +795,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     }, 300000);
 
     return () => {
+      console.log(`[PlatformDashboard] 🧹 Cleaning up ${platform} connections...`);
       clearInterval(interval);
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
@@ -1581,6 +1666,29 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     }
   };
 
+  // NEW: Handle editing AI replies
+  const handleEditAIReply = (notification: any, editedReply: string) => {
+    console.log(`[${new Date().toISOString()}] [${platform.toUpperCase()}] Editing AI reply for notification:`, notification.message_id || notification.comment_id);
+    
+    setNotifications(prev => prev.map(n => {
+      if ((n.message_id && n.message_id === notification.message_id) || 
+          (n.comment_id && n.comment_id === notification.comment_id)) {
+        return {
+          ...n,
+          aiReply: {
+            ...n.aiReply!,
+            reply: editedReply,
+            timestamp: Date.now(),
+            generated_at: new Date().toISOString()
+          }
+        };
+      }
+      return n;
+    }));
+    
+    setToast(`${platform === 'twitter' ? 'Tweet' : platform === 'facebook' ? 'Facebook' : 'AI'} reply updated successfully!`);
+  };
+
   // Handle auto-reply to all notifications  
   const handleAutoReplyAll = async () => {
     if (notifications.length === 0) {
@@ -1607,6 +1715,10 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     
     setIsAutoReplying(true);
     setShouldStopAutoReply(false); // 🛑 STOP OPERATION: Reset stop flag
+    
+    // NEW: Initialize progress tracking
+    setAutoReplyProgress({ current: 0, total: pendingNotifications.length, nextReplyIn: 0 });
+    
     let successCount = 0;
     let failCount = 0;
     
@@ -1784,13 +1896,17 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     console.log(`[PlatformDashboard] Stop auto-reply requested by user for ${platform}`);
     setShouldStopAutoReply(true);
     
+    // NEW: Instant frontend state reset
+    setIsAutoReplying(false);
+    setAutoReplyProgress({ current: 0, total: 0, nextReplyIn: 0 });
+    
     // Cancel any pending timeout immediately
     if (autoReplyTimeoutRef.current) {
       clearTimeout(autoReplyTimeoutRef.current);
       autoReplyTimeoutRef.current = null;
     }
     
-    setToast('Stopping auto-reply...');
+    setToast(`${platform === 'twitter' ? 'Twitter' : platform === 'facebook' ? 'Facebook' : 'Platform'} auto-reply stopped`);
   };
 
   const handleSendQuery = async () => {
@@ -1860,6 +1976,12 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         }
         
         setChatMessages(updatedMessages);
+        
+        // 🚀 AUTO-OPEN: Open chat modal when discussion response arrives
+        if (!isChatModalOpen) {
+          setIsChatModalOpen(true);
+        }
+        
         console.log(`[PlatformDashboard] ✅ Discussion tracked: ${platform} chat engagement`);
         
         // Log response quality indicators
@@ -2377,6 +2499,8 @@ Image Description: ${response.post.image_prompt}
                 onAIRefresh={() => setRefreshKey(prev => prev + 1)}
                 aiProcessingNotifications={aiProcessingNotifications}
                 onSendAIReply={handleSendAIReply}
+                onEditAIReply={handleEditAIReply}
+                autoReplyProgress={autoReplyProgress}
                 platform={platform}
               />
             </div>
@@ -2537,6 +2661,8 @@ Image Description: ${response.post.image_prompt}
           messages={chatMessages}
           onClose={() => setIsChatModalOpen(false)}
           username={`${accountHolder} (${config.name})`}
+          platform={platform}
+          mode={chatMode}
           onSendMessage={(message: string) => {
             if (!message.trim() || !accountHolder) return;
             setIsProcessing(true);
@@ -2562,7 +2688,6 @@ Image Description: ${response.post.image_prompt}
           }}
           isProcessing={isProcessing}
           linkedAccounts={linkedAccounts}
-          platform={platform}
         />
       )}
       {isTwitterSchedulerOpen && (

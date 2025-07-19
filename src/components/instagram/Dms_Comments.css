@@ -129,6 +129,12 @@
   font-style: italic;
 }
 
+.next-reply-timer {
+  color: #00d4ff;
+  font-weight: 600;
+  font-style: normal;
+}
+
 .notification-item {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -316,20 +322,46 @@
   background: linear-gradient(135deg, #5856d6, #4c44d4);
   color: white;
   box-shadow: 0 2px 8px rgba(88, 86, 214, 0.3);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: center;
 }
 
-.ai-reply-btn:hover {
+.ai-reply-btn:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 4px 16px rgba(88, 86, 214, 0.4);
   background: linear-gradient(135deg, #4c44d4, #3f37c9);
 }
 
-.ai-reply-btn:disabled {
+.ai-reply-btn:disabled,
+.ai-reply-btn.loading {
   background: linear-gradient(135deg, #6c6c70, #48484a);
   color: #8e8e93;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
+}
+
+.ai-reply-btn.loading {
+  pointer-events: none;
+}
+
+/* Loading Spinner for AI Reply Button */
+.loading-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 /* Send AI Reply Button */
@@ -337,20 +369,29 @@
   background: linear-gradient(135deg, #34c759, #30d158);
   color: white;
   box-shadow: 0 2px 8px rgba(52, 199, 89, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: center;
 }
 
-.send-ai-reply-btn:hover {
+.send-ai-reply-btn:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 4px 16px rgba(52, 199, 89, 0.4);
   background: linear-gradient(135deg, #30d158, #28cd41);
 }
 
-.send-ai-reply-btn:disabled {
+.send-ai-reply-btn:disabled,
+.send-ai-reply-btn.loading {
   background: linear-gradient(135deg, #6c6c70, #48484a);
   color: #8e8e93;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
+}
+
+.send-ai-reply-btn.loading {
+  pointer-events: none;
 }
 
 /* Send Reply Button */
@@ -392,6 +433,150 @@
   transform: translateY(-1px);
   box-shadow: 0 4px 16px rgba(255, 59, 48, 0.4);
   background: linear-gradient(135deg, #ff2d20, #d70015);
+}
+
+/* NEW: AI Reply Edit Functionality */
+.ai-reply-label {
+  font-weight: 600;
+  font-size: 13px;
+  color: #00d4ff;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ai-reply-edit-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ai-reply-edit-textarea {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 12px;
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 1.4;
+  resize: vertical;
+  min-height: 80px;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.ai-reply-edit-textarea:focus {
+  outline: none;
+  border-color: #00d4ff;
+  box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ai-reply-edit-textarea::placeholder {
+  color: #8e8e93;
+}
+
+.ai-reply-edit-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.save-ai-reply-btn {
+  background: linear-gradient(135deg, #34c759, #30d158);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(52, 199, 89, 0.3);
+}
+
+.save-ai-reply-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(52, 199, 89, 0.4);
+  background: linear-gradient(135deg, #30d158, #28cd41);
+}
+
+.save-ai-reply-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.cancel-ai-reply-edit-btn {
+  background: linear-gradient(135deg, #8e8e93, #6d6d70);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(142, 142, 147, 0.3);
+}
+
+.cancel-ai-reply-edit-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(142, 142, 147, 0.4);
+  background: linear-gradient(135deg, #6d6d70, #48484a);
+}
+
+.edit-ai-reply-btn {
+  background: linear-gradient(135deg, #007aff, #0056b3);
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.edit-ai-reply-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 122, 255, 0.4);
+  background: linear-gradient(135deg, #0056b3, #003d82);
+}
+
+.edit-ai-reply-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Responsive Design for Edit Features */
+@media (max-width: 768px) {
+  .ai-reply-edit-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .ai-reply-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .save-ai-reply-btn,
+  .cancel-ai-reply-edit-btn,
+  .edit-ai-reply-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .ai-reply-edit-textarea {
+    min-height: 60px;
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
 }
 
 /* Button Loading States */

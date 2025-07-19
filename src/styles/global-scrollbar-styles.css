@@ -1,0 +1,69 @@
+/* Global Scrollbar Styling
+ * This file provides consistent, clean scrollbar styling across the entire application
+ */
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(128, 128, 128, 0.6) rgba(128, 128, 128, 0.1);
+}
+
+/* WebKit browsers (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px; /* For horizontal scrollbars */
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(128, 128, 128, 0.1);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.6);
+  border-radius: 3px;
+  border: none;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.8);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Ensure no horizontal scrolling on main containers */
+html, body, #root, .app-container, .content-wrapper, .main-content {
+  overflow-x: hidden;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Auto-adjusting content containers */
+.content-container, 
+.main-dashboard, 
+.page-content, 
+.homepage-content,
+.legal-content,
+.pricing-content {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  padding-right: 1px; /* Prevent unwanted horizontal scrollbar */
+}
+
+/* Responsive adjustments for all screen sizes */
+@media screen and (max-width: 1440px) {
+  html, body {
+    overflow-x: hidden;
+  }
+}
+
+@media screen and (max-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+}

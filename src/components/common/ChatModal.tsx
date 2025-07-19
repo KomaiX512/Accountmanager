@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { MessageCircle, Image, Send, X } from 'lucide-react';
 import './ChatModal.css';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
 
@@ -24,6 +25,7 @@ interface ChatModalProps {
   isProcessing?: boolean;
   linkedAccounts?: LinkedAccount[];
   platform?: string;
+  mode?: 'discussion' | 'post';
 }
 
 const ChatModal: React.FC<ChatModalProps> = ({
@@ -34,7 +36,8 @@ const ChatModal: React.FC<ChatModalProps> = ({
   onSendMessage,
   isProcessing = false,
   linkedAccounts = [],
-  platform = 'instagram'
+  platform = 'instagram',
+  mode = 'discussion'
 }) => {
   const [message, setMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -116,19 +119,43 @@ const ChatModal: React.FC<ChatModalProps> = ({
       >
         <div className="chat-modal-header">
           <div className="chat-header-info">
-            <h3>AI Discussion with {username}</h3>
+            <div className="chat-mode-indicator">
+              {mode === 'discussion' ? (
+                <MessageCircle size={20} className="mode-icon discussion-icon" />
+              ) : (
+                <Image size={20} className="mode-icon post-icon" />
+              )}
+              <h3>
+                {mode === 'discussion' ? 'AI Discussion' : 'Post Creation'} with {username}
+              </h3>
+            </div>
             <span className="platform-badge">{platform}</span>
           </div>
           <button className="chat-close-btn" onClick={onClose}>
-            ✕
+            <X size={18} />
           </button>
         </div>
 
         <div className="chat-messages">
           {messages.length === 0 ? (
             <div className="welcome-message">
-              <h4>Start a new AI discussion</h4>
-              <p>Ask questions, get strategic insights, or discuss your {platform} growth!</p>
+              <div className="welcome-icon">
+                {mode === 'discussion' ? (
+                  <MessageCircle size={32} className="mode-icon-large" />
+                ) : (
+                  <Image size={32} className="mode-icon-large" />
+                )}
+              </div>
+              <h4>
+                {mode === 'discussion' 
+                  ? 'Start an AI Discussion' 
+                  : 'Create AI-Powered Content'}
+              </h4>
+              <p>
+                {mode === 'discussion'
+                  ? `Ask questions, get strategic insights, or discuss your ${platform} growth strategy!`
+                  : `Generate engaging posts with AI assistance for your ${platform} account!`}
+              </p>
             </div>
           ) : (
             messages.map((msg, index) => (
@@ -185,9 +212,7 @@ const ChatModal: React.FC<ChatModalProps> = ({
               {isProcessing ? (
                 <div className="btn-spinner"></div>
               ) : (
-                <svg viewBox="0 0 24 24" width="20" height="20">
-                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" fill="currentColor"/>
-                </svg>
+                <Send size={18} />
               )}
             </button>
           </div>

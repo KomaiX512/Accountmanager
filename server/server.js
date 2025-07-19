@@ -1494,6 +1494,82 @@ app.post(['/save-account-info', '/api/save-account-info'], async (req, res) => {
   }
 });
 
+// Reset account info endpoint - clears account data and allows re-entry
+app.post(['/reset-account-info', '/api/reset-account-info'], async (req, res) => {
+  try {
+    const { username, platform } = req.body;
+    const platformParam = req.query.platform || platform || 'instagram';
+
+    if (!username) {
+      return res.status(400).json({ error: 'Username is required' });
+    }
+
+    // Use centralized platform management for normalization
+    const platformConfig = PlatformSchemaManager.getPlatformConfig(platformParam);
+    const normalizedUsername = platformConfig.normalizeUsername(username);
+
+    // Create platform-specific key using centralized schema manager
+    const key = PlatformSchemaManager.buildPath('AccountInfo', platformParam, normalizedUsername, 'info.json');
+
+    console.log(`Resetting ${platformParam} account info for: ${normalizedUsername}`);
+    console.log(`Attempting to delete key: ${key}`);
+
+    try {
+      // Check if the account info exists
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: key,
+      });
+      await s3Client.send(getCommand);
+      
+      // If it exists, delete it
+      const deleteCommand = new DeleteObjectCommand({
+        Bucket: 'tasks',
+        Key: key,
+      });
+      await s3Client.send(deleteCommand);
+      
+      console.log(`Successfully deleted account info for ${normalizedUsername} on ${platformParam}`);
+    } catch (error) {
+      if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+        console.log(`Account info for ${normalizedUsername} on ${platformParam} was not found (already reset or never existed)`);
+      } else {
+        throw error;
+      }
+    }
+
+    // Clear related caches
+    const cacheKey = PlatformSchemaManager.buildPath('AccountInfo', platformParam, normalizedUsername);
+    cache.delete(cacheKey);
+    
+    // Clear processing-related caches
+    const processingCacheKeys = [
+      `${platformParam}Events/${normalizedUsername}`,
+      `events-list/${normalizedUsername}`,
+      `events-list/${normalizedUsername}?platform=${platformParam}`,
+      `${platformParam}_processing_${normalizedUsername}`,
+      `${platformParam}_processing_countdown`,
+      `${platformParam}_processing_info`
+    ];
+    
+    processingCacheKeys.forEach(key => {
+      cache.delete(key);
+    });
+
+    console.log(`Successfully reset ${platformParam} account for ${normalizedUsername}`);
+
+    res.json({ 
+      success: true, 
+      message: `${platformParam} account reset successfully`,
+      platform: platformParam,
+      username: normalizedUsername
+    });
+  } catch (error) {
+    console.error('Reset account info error:', error);
+    handleErrorResponse(res, error);
+  }
+});
+
 app.post(['/scrape', '/api/scrape'], async (req, res) => {
   try {
     const { parent, children } = req.body;
@@ -1757,6 +1833,36 @@ app.post('/api/instant-reply', async (req, res) => {
   } catch (error) {
     console.error(`[INSTANT-REPLY] Proxy error:`, error?.response?.data || error.message);
     res.status(500).json({ error: 'Failed to get AI reply', details: error.message });
+  }
+});
+
+// Proxy POST /api/rag/discussion to RAG server
+app.post(['/api/rag/discussion', '/api/discussion'], async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  try {
+    const response = await axios.post('http://localhost:3001/api/discussion', req.body, {
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 120000 // 2 minute timeout for complex queries
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error(`[DISCUSSION] Proxy error:`, error?.response?.data || error.message);
+    res.status(500).json({ error: 'Failed to get discussion response', details: error.message });
+  }
+});
+
+// Proxy POST /api/rag/post-generator to RAG server
+app.post(['/api/rag/post-generator', '/api/post-generator'], async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  try {
+    const response = await axios.post('http://localhost:3001/api/post-generator', req.body, {
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 180000 // 3 minute timeout for image generation
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error(`[POST-GENERATOR] Proxy error:`, error?.response?.data || error.message);
+    res.status(500).json({ error: 'Failed to generate post', details: error.message });
   }
 });
 

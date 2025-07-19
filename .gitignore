@@ -138,7 +138,7 @@ server-*.js
 server.js.bak
 server-direct-fix.js
 server-monitor.js
-rag-server.js
+# rag-server.js
 chromadb-service.js
 create-fallback.js
 ecosystem.*.js

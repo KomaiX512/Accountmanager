@@ -1,4 +1,5 @@
 @import './styles/global-ui-refinements.css';
+@import './styles/global-scrollbar-styles.css';
 
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;

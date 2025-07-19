@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './PostCooked.css';
 import { motion } from 'framer-motion';
 import { saveFeedback } from '../../utils/FeedbackHandler';
@@ -10,56 +10,15 @@ import FacebookRequiredButton from '../common/FacebookRequiredButton';
 import { useInstagram } from '../../context/InstagramContext';
 import { useTwitter } from '../../context/TwitterContext';
 import { useFacebook } from '../../context/FacebookContext';
-import { schedulePost, fetchImageFromR2, extractImageKey } from '../../utils/scheduleHelpers';
+import { schedulePost, fetchImageFromR2 } from '../../utils/scheduleHelpers';
 import axios from 'axios';
 import { safeFilter } from '../../utils/safeArrayUtils';
-import {
-  Avatar,
-  Box,
-  Button,
-  Card,
-  CardContent,
-  CardMedia,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Grid,
-  IconButton,
-  Menu,
-  MenuItem,
-  TextField,
-  Typography,
-  useTheme
-} from '@mui/material';
-import FavoriteIcon from '@mui/icons-material/Favorite';
-import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
-import ShareIcon from '@mui/icons-material/Share';
-import ThumbDownIcon from '@mui/icons-material/ThumbDown';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
-import EventIcon from '@mui/icons-material/Event';
-import EditIcon from '@mui/icons-material/Edit';
-import CloseIcon from '@mui/icons-material/Close';
-import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { BsLightbulb } from 'react-icons/bs';
 import { FaBell } from 'react-icons/fa';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
 import { getApiUrl } from '../../config/api';
 // Missing modules - comment out until they're available
-// import EditCaption from '../common/EditCaption';
-// import { ScheduleItem } from '../../types/schedule';
 
-// Type definition for ScheduleItem as a temporary replacement
-interface ScheduleItem {
-  id: string;
-  postKey: string;
-  scheduledTime: Date;
-  status: 'pending' | 'posted' | 'failed';
-  platform: string;
-  username: string;
-}
 
 interface PostCookedProps {
   username: string;
@@ -104,6 +63,16 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   const [showIntervalModal, setShowIntervalModal] = useState(false);
   const [intervalInput, setIntervalInput] = useState('');
   const [rejectedPosts, setRejectedPosts] = useState<string[]>([]);
+  
+  // ✨ NEW: Auto-schedule progress tracking similar to auto-replies
+  const [autoScheduleTracking, setAutoScheduleTracking] = useState<{
+    current: number;
+    total: number;
+    successCount: number;
+    failureCount: number;
+    isRunning: boolean;
+    processedPosts: string[];
+  }>({ current: 0, total: 0, successCount: 0, failureCount: 0, isRunning: false, processedPosts: [] });
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [selectedPostKey, setSelectedPostKey] = useState<string | null>(null);
   const [scheduleDateTime, setScheduleDateTime] = useState<string>('');
@@ -111,16 +80,6 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   const [editingPost, setEditingPost] = useState<{ key: string; imageUrl: string; caption: string } | null>(null);
   const [editingCaption, setEditingCaption] = useState<{ key: string; caption: string } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [activeKey, setActiveKey] = useState<string | null>(null);
-  const [scheduleDialog, setScheduleDialog] = useState(false);
-  const [scheduledDate, setScheduledDate] = useState<Date | null>(new Date());
-  const [scheduleKeyToPost, setScheduleKeyToPost] = useState<string | null>(null);
-  const [editCaptionOpen, setEditCaptionOpen] = useState(false);
-  const [editCaptionKey, setEditCaptionKey] = useState<string | null>(null);
-  const [postDialogOpen, setPostDialogOpen] = useState(false);
-  const [dialogPostKey, setDialogPostKey] = useState<string | null>(null);
-  const [interval, setInterval] = useState<number>(180);
   const [showPostNowModal, setShowPostNowModal] = useState(false);
   const [selectedPostForPosting, setSelectedPostForPosting] = useState<any>(null);
   const [isPosting, setIsPosting] = useState(false);
@@ -166,13 +125,67 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     return await requestPromise;
   }, []);
 
-  // Viewed posts tracking with localStorage persistence 
+  // ✨ BULLETPROOF: Comprehensive processed posts tracking
+  const getProcessedStorageKey = () => `${platform}_processed_posts_${username}`;
   const getViewedStorageKey = () => `${platform}_viewed_posts_${username}`;
   
+  const [processedPosts, setProcessedPosts] = useState<Set<string>>(() => {
+    const stored = localStorage.getItem(getProcessedStorageKey());
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  });
+
   const [viewedPosts, setViewedPosts] = useState<Set<string>>(() => {
     const stored = localStorage.getItem(getViewedStorageKey());
     return stored ? new Set(JSON.parse(stored)) : new Set();
   });
+
+  // ✨ BULLETPROOF: Function to mark posts as permanently processed
+  const markPostAsProcessed = useCallback((postKey: string, reason: string) => {
+    console.log(`[ProcessedPosts] 🚫 Marking post as processed: ${postKey} (${reason})`);
+    
+    setProcessedPosts(prev => {
+      const newProcessedPosts = new Set(prev);
+      newProcessedPosts.add(postKey);
+      localStorage.setItem(getProcessedStorageKey(), JSON.stringify(Array.from(newProcessedPosts)));
+      return newProcessedPosts;
+    });
+    
+    // Also mark as viewed to double-ensure it doesn't reappear
+    setViewedPosts((prev: Set<string>) => {
+      const newViewedPosts = new Set(prev);
+      newViewedPosts.add(postKey);
+      localStorage.setItem(getViewedStorageKey(), JSON.stringify(Array.from(newViewedPosts)));
+      return newViewedPosts;
+    });
+    
+    // Immediately remove from current UI
+    setLocalPosts(prev => prev.filter(p => p.key !== postKey));
+  }, [platform, username, getViewedStorageKey, getProcessedStorageKey]);
+
+  // ✨ BULLETPROOF: Filter out ALL processed posts from display
+  const getFilteredPosts = useCallback(() => {
+    return safeFilter(localPosts, (post: any) => {
+      // Filter out rejected posts
+      if (rejectedPosts.includes(post.key)) return false;
+      
+      // Filter out permanently processed posts
+      if (processedPosts.has(post.key)) return false;
+      
+      // Filter out posts with processed status
+      if (post.data?.status === 'scheduled' || 
+          post.data?.status === 'posted' || 
+          post.data?.status === 'rejected' ||
+          post.data?.status === 'ignored') {
+        // Mark as processed if not already
+        if (!processedPosts.has(post.key)) {
+          markPostAsProcessed(post.key, `status: ${post.data.status}`);
+        }
+        return false;
+      }
+      
+      return true;
+    });
+  }, [localPosts, rejectedPosts, processedPosts, markPostAsProcessed]);
 
   // Helper function to get unseen count
   const getUnseenPostsCount = () => {
@@ -308,7 +321,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   // Listen for post updates from Canvas Editor
   useEffect(() => {
     const handlePostUpdate = (event: CustomEvent) => {
-      const { postKey, platform: updatedPlatform, timestamp } = event.detail;
+      const { postKey, platform: updatedPlatform } = event.detail;
       
       if (updatedPlatform === platform) {
         // console.log(`[PostCooked] INSTANT UPDATE for ${postKey}`); // Uncomment for debugging
@@ -353,6 +366,22 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     window.addEventListener('postUpdated', handlePostUpdate as EventListener);
     return () => window.removeEventListener('postUpdated', handlePostUpdate as EventListener);
   }, [platform, localPosts, username]);
+
+  // ✨ BULLETPROOF: Listen for post scheduling events from Canvas Editor
+  useEffect(() => {
+    const handlePostScheduled = (event: CustomEvent) => {
+      const { postKey, platform: scheduledPlatform, success } = event.detail;
+      
+      if (scheduledPlatform === platform && success) {
+        console.log(`[PostCooked] 🚫 Canvas Editor scheduled post ${postKey} - marking as permanently processed`);
+        markPostAsProcessed(postKey, 'canvas-editor-scheduled');
+        setToastMessage('✅ Post scheduled from editor and permanently removed!');
+      }
+    };
+
+    window.addEventListener('postScheduled', handlePostScheduled as EventListener);
+    return () => window.removeEventListener('postScheduled', handlePostScheduled as EventListener);
+  }, [platform, markPostAsProcessed]);
 
   useEffect(() => {
     if (toastMessage) {
@@ -435,12 +464,6 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     }, 500 * currentRetries); // Progressive delay
     
   }, [imageErrors, localPosts, getReliableImageUrl]);
-
-  // CACHE OPTIMIZATION: Get optimized image URL for a post
-  const getCachedImageUrl = useCallback((post: any) => {
-    // Use the new reliable URL system
-    return getReliableImageUrl(post, false);
-  }, [getReliableImageUrl]);
 
   // Client-side image validation to prevent white/corrupted images
   const validateImageOnLoad = useCallback((post: any, imgElement: HTMLImageElement) => {
@@ -577,7 +600,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     setLoadingImages(prev => new Set([...prev, postKey]));
   }, []);
 
-  const handleLike = (key: string) => {
+  const handleLike = () => {
     setToastMessage('Liked! Thanks for the love! ❤️');
   };
 
@@ -585,11 +608,11 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     setIsFeedbackOpen(key);
   };
 
-  const handleComment = (key: string) => {
+  const handleComment = () => {
     setToastMessage('Comment feature coming soon! 📝');
   };
 
-  const handleShare = (key: string) => {
+  const handleShare = () => {
     setToastMessage('Share feature coming soon! 📲');
   };
 
@@ -752,6 +775,12 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     
     setToastMessage(result.message);
     
+    // ✨ BULLETPROOF: Mark post as permanently processed if successfully scheduled
+    if (result.success) {
+      console.log(`[Schedule] 🚫 Marking post ${selectedPostKey} as permanently processed (manually scheduled)`);
+      markPostAsProcessed(selectedPostKey, 'manually-scheduled');
+    }
+    
     setShowScheduleModal(false);
     setSelectedPostKey(null);
     setScheduleDateTime('');
@@ -857,6 +886,9 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     setRejectedPosts(prev => [...prev, key]);
     setToastMessage('Post rejected and removed.');
 
+    // ✨ BULLETPROOF: Mark rejected post as permanently processed
+    markPostAsProcessed(key, 'rejected');
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/update-post-status/${username}`, {
         method: 'POST',
@@ -939,12 +971,24 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     setAutoScheduling(true);
     setAutoScheduleProgress('🔍 Determining scheduling interval...');
     
+    // ✨ ENHANCED: Initialize comprehensive progress tracking
+    const totalPosts = localPosts.length;
+    setAutoScheduleTracking({
+      current: 0,
+      total: totalPosts,
+      successCount: 0,
+      failureCount: 0,
+      isRunning: true,
+      processedPosts: []
+    });
+    
     let successCount = 0;
     let failureCount = 0;
+    const processedPostKeys: string[] = [];
     
     try {
       // Enhanced time delay fetching with better error handling
-      console.log(`[AutoSchedule] 🚀 Starting auto-schedule for ${localPosts.length} ${platform} posts`);
+      console.log(`[AutoSchedule] 🚀 Starting auto-schedule for ${totalPosts} ${platform} posts`);
       let delayHours = await fetchTimeDelay(intervalOverride);
       
       // Final sanity-check: never allow zero or negative intervals
@@ -954,14 +998,22 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       }
       
       console.log(`[AutoSchedule] ⏰ Using interval: ${delayHours} hours`);
-      setAutoScheduleProgress(`⏰ Scheduling ${localPosts.length} ${platform === 'twitter' ? 'tweets' : 'posts'} every ${delayHours} hours...`);
+      setAutoScheduleProgress(`⏰ Scheduling ${totalPosts} ${platform === 'twitter' ? 'tweets' : 'posts'} every ${delayHours} hours...`);
       
-      // ENHANCED SCHEDULING LOOP with better error handling and progress tracking
+      // ENHANCED SCHEDULING LOOP with real-time progress tracking
       for (let i = 0; i < localPosts.length; i++) {
         const post = localPosts[i];
         const postNumber = i + 1;
         
-        setAutoScheduleProgress(`📝 Processing ${platform === 'twitter' ? 'tweet' : 'post'} ${postNumber}/${localPosts.length}...`);
+        // ✨ ENHANCED: Update progress tracking in real-time
+        setAutoScheduleTracking(prev => ({
+          ...prev,
+          current: postNumber,
+          successCount,
+          failureCount
+        }));
+        
+        setAutoScheduleProgress(`📝 Processing ${platform === 'twitter' ? 'tweet' : 'post'} ${postNumber}/${totalPosts}...`);
         
         // Calculate schedule time for this post
         const baseTime = Date.now() + 60 * 1000; // Start 1 minute from now
@@ -990,6 +1042,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             if (response.data.success) {
               console.log(`[AutoSchedule] ✅ Tweet ${postNumber} scheduled successfully`);
               successCount++;
+              processedPostKeys.push(post.key);
               setToastMessage(`✅ Tweet ${postNumber} scheduled for ${scheduleTime.toLocaleString()}`);
             } else {
               throw new Error(response.data.message || 'Unknown Twitter API error');
@@ -1032,9 +1085,10 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
               throw new Error(errData.error || `HTTP ${resp.status}: ${resp.statusText}`);
             }
 
-            const respData = await resp.json();
+            await resp.json();
             console.log(`[AutoSchedule] ✅ Facebook post ${postNumber} scheduled successfully`);
             successCount++;
+            processedPostKeys.push(post.key);
             setToastMessage(`✅ Facebook post ${postNumber} scheduled for ${scheduleTime.toLocaleString()}`);
             
           } else {
@@ -1083,6 +1137,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             const respData = await resp.json();
             console.log(`[AutoSchedule] ✅ Instagram post ${postNumber} scheduled successfully:`, respData.scheduleId);
             successCount++;
+            processedPostKeys.push(post.key);
             setToastMessage(`✅ Instagram post ${postNumber} scheduled for ${scheduleTime.toLocaleString()}`);
           }
           
@@ -1099,15 +1154,50 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
       
-      // Final results
+      // ✨ BULLETPROOF: Mark successfully processed posts as permanently processed
+      if (processedPostKeys.length > 0) {
+        console.log(`[AutoSchedule] 🧹 Permanently marking ${processedPostKeys.length} successfully scheduled posts as processed`);
+        
+        // Mark each post as permanently processed
+        processedPostKeys.forEach(postKey => {
+          markPostAsProcessed(postKey, 'auto-scheduled');
+        });
+        
+        console.log(`[AutoSchedule] ✅ All ${processedPostKeys.length} posts marked as permanently processed`);
+      }
+      
+      // Final results with enhanced completion tracking
       setAutoScheduleProgress(null);
+      setAutoScheduleTracking(prev => ({
+        ...prev,
+        isRunning: false,
+        processedPosts: processedPostKeys
+      }));
+      
       const resultMessage = `🎉 Auto-schedule completed! ✅ ${successCount} scheduled, ❌ ${failureCount} failed. Interval: ${delayHours}h`;
       setToastMessage(resultMessage);
-      console.log(`[AutoSchedule] 🏁 COMPLETED: ${successCount}/${localPosts.length} posts scheduled successfully`);
+      console.log(`[AutoSchedule] 🏁 COMPLETED: ${successCount}/${totalPosts} posts scheduled successfully`);
+      
+      // ✨ ENHANCED: Track usage if any posts were successfully scheduled
+      if (successCount > 0) {
+        console.log(`[AutoSchedule] 📊 Tracking usage for ${successCount} scheduled posts...`);
+        const trackingSuccess = await trackRealPostCreation(platform, {
+          scheduled: true,
+          immediate: false,
+          type: 'auto_schedule_batch'
+        });
+        
+        if (!trackingSuccess) {
+          console.warn(`[AutoSchedule] 🚫 Usage tracking failed for ${platform} - but posts were scheduled successfully`);
+        } else {
+          console.log(`[AutoSchedule] ✅ Usage tracking successful: ${successCount} posts tracked`);
+        }
+      }
       
     } catch (err: any) {
       console.error('[AutoSchedule] 💥 Fatal error during auto-scheduling:', err);
       setAutoScheduleProgress(null);
+      setAutoScheduleTracking(prev => ({ ...prev, isRunning: false }));
       setToastMessage(`💥 Auto-scheduling failed: ${err.message}`);
     } finally {
       setAutoScheduling(false);
@@ -1541,7 +1631,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     );
   }
 
-  const filteredPosts = safeFilter(localPosts, (post: any) => !rejectedPosts.includes(post.key));
+  // ✨ BULLETPROOF: Use comprehensive filtering for final display
+  const filteredPosts = getFilteredPosts();
 
   return (
     <ErrorBoundary>
@@ -1733,6 +1824,69 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         {autoScheduleProgress && (
           <div className="loading">{autoScheduleProgress}</div>
         )}
+        
+        {/* ✨ NEW: Auto-Schedule Progress Bar - Similar to Auto-Reply Progress */}
+        {autoScheduleTracking.isRunning && (
+          <motion.div
+            className="auto-schedule-progress"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+            style={{
+              background: 'linear-gradient(135deg, rgba(0, 255, 204, 0.1), rgba(0, 123, 255, 0.1))',
+              border: '1px solid rgba(0, 255, 204, 0.3)',
+              borderRadius: '12px',
+              padding: '16px',
+              margin: '16px 0',
+              backdropFilter: 'blur(10px)'
+            }}
+          >
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              marginBottom: '12px',
+              color: '#00ffcc',
+              fontWeight: 600
+            }}>
+              <span>🚀 Auto-Schedule Progress</span>
+              <span>{autoScheduleTracking.current}/{autoScheduleTracking.total}</span>
+            </div>
+            
+            <div style={{
+              width: '100%',
+              height: '8px',
+              background: 'rgba(255, 255, 255, 0.1)',
+              borderRadius: '4px',
+              overflow: 'hidden',
+              marginBottom: '12px'
+            }}>
+              <motion.div
+                style={{
+                  height: '100%',
+                  background: 'linear-gradient(90deg, #00ffcc, #007bff)',
+                  borderRadius: '4px',
+                  width: `${autoScheduleTracking.total > 0 ? (autoScheduleTracking.current / autoScheduleTracking.total) * 100 : 0}%`
+                }}
+                initial={{ width: 0 }}
+                animate={{ width: `${autoScheduleTracking.total > 0 ? (autoScheduleTracking.current / autoScheduleTracking.total) * 100 : 0}%` }}
+                transition={{ duration: 0.3 }}
+              />
+            </div>
+            
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              fontSize: '14px', 
+              color: '#e0e0ff' 
+            }}>
+              <span>✅ Scheduled: {autoScheduleTracking.successCount}</span>
+              <span>❌ Failed: {autoScheduleTracking.failureCount}</span>
+              <span>⏳ Remaining: {autoScheduleTracking.total - autoScheduleTracking.current}</span>
+            </div>
+          </motion.div>
+        )}
         {filteredPosts.length === 0 ? (
           <p className="no-posts">No posts ready yet. Stay tuned!</p>
         ) : (
@@ -1793,7 +1947,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                       className="like-button"
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.98 }}
-                      onClick={() => handleLike(post.key)}
+                      onClick={() => handleLike()}
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -1813,7 +1967,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                       className="comment-button"
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.98 }}
-                      onClick={() => handleComment(post.key)}
+                      onClick={() => handleComment()}
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -1833,7 +1987,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                       className="share-button"
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.98 }}
-                      onClick={() => handleShare(post.key)}
+                      onClick={() => handleShare()}
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"

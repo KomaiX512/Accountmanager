@@ -252,7 +252,8 @@ export default defineConfig({
               path.includes('/api/twitter-connection') ||
               path.includes('/api/user-facebook-status') ||
               path.includes('/api/user-instagram-status') ||
-              path.includes('/api/user-twitter-status')) {
+              path.includes('/api/user-twitter-status') ||
+              path.includes('/api/reset-account-info')) {
             return path; // Keep /api prefix for these endpoints
           }
           return path.replace(/^\/api/, ''); // Strip /api for others

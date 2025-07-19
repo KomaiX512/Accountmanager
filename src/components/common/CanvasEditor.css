@@ -21,11 +21,15 @@
 .canvas-editor-container {
   background-color: #151521 !important;
   border-radius: 12px !important;
-  width: 100% !important;
-  max-width: min(1000px, 90vw) !important; /* Reduced from 1400px to 1200px */
-  height: auto !important;
-  max-height: min(115vh, calc(100vh - 20px)) !important; /* Increased from 0vh to 95vh */
-  min-height: min(1050px, 80vh) !important; /* Increased from 500px to 600px and 70vh to 80vh */
+  
+  /* SIMPLE SCALING APPROACH: Scale the entire container as one unit */
+  width: 1000px !important; /* Fixed ideal width */
+  height: 1050px !important; /* Fixed ideal height */
+  
+  /* Scale the entire container with more conservative scaling to ensure all toolbars are visible */
+  transform: scale(min(85vw / 1000px, 80vh / 1050px)) !important;
+  transform-origin: center !important;
+  
   display: flex !important;
   flex-direction: column !important;
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5) !important;
@@ -51,14 +55,15 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 24px;
+  padding: 16px 24px; /* Fixed padding - will scale with container */
   border-bottom: 1px solid #2d2d42;
+  flex-shrink: 0;
 }
 
 .canvas-editor-header h2 {
   color: #e0e0ff;
   margin: 0;
-  font-size: 20px;
+  font-size: 20px; /* Fixed size - will scale with container */
 }
 
 .canvas-upload-container {
@@ -69,9 +74,9 @@
 .upload-button {
   background: linear-gradient(90deg, #007bff, #00ffcc);
   color: #000000;
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-size: 14px;
+  padding: 8px 16px; /* Fixed padding - will scale with container */
+  border-radius: 6px; /* Fixed radius - will scale with container */
+  font-size: 14px; /* Fixed size - will scale with container */
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -105,27 +110,29 @@
   height: 100%;
   position: relative;
   overflow: hidden;
-  min-height: 400px;
+  min-height: 400px; /* Restore fixed height - will scale with container */
   border-radius: 8px;
-  max-height: calc(100% - 120px); /* Account for header and footer */
+  flex-shrink: 1;
+  flex-grow: 1;
 }
 
 .canvas-editor-footer {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  padding: 16px 24px;
+  padding: 16px 24px; /* Fixed padding - will scale with container */
   border-top: 1px solid #2d2d42;
-  gap: 16px;
+  gap: 16px; /* Fixed gap - will scale with container */
+  flex-shrink: 0;
 }
 
 .cancel-button {
   background-color: transparent;
   color: #8a8aaa;
   border: 1px solid #2d2d42;
-  padding: 8px 20px;
-  border-radius: 6px;
-  font-size: 14px;
+  padding: 8px 20px; /* Fixed padding - will scale with container */
+  border-radius: 6px; /* Fixed radius - will scale with container */
+  font-size: 14px; /* Fixed size - will scale with container */
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -139,8 +146,8 @@
   background: linear-gradient(90deg, #007bff, #00ffcc);
   color: #000000;
   border: none;
-  padding: 8px 20px;
-  border-radius: 6px;
+  padding: 8px 20px; /* Fixed padding - will scale with container */
+  border-radius: 6px; /* Fixed radius - will scale with container */
   font-size: 14px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -669,6 +676,7 @@
 
 .property-group input[type="range"] {
   flex: 1;
+  appearance: none;
   -webkit-appearance: none;
   height: 4px;
   background: #0a9a6c;
@@ -676,6 +684,7 @@
 }
 
 .property-group input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
   -webkit-appearance: none;
   width: 16px;
   height: 16px;
@@ -1091,30 +1100,12 @@
   font-weight: bold;
 }
 
-@media (max-width: 768px) {
-  .canvas-editor-container {
-    max-width: min(95vw, 1000px) !important;
-    max-height: min(95vh, calc(100vh - 20px)) !important;
-    min-height: min(400px, 60vh) !important;
-  }
+/* SIMPLE RESPONSIVE SCALING: Scale entire container as one unit */
 
-  .tui-image-editor-container {
-    min-height: 300px;
-  }
-}
-
-@media (max-width: 480px) {
+/* No complex breakpoints needed - the transform scale handles everything */
+@media (max-width: 1200px), (max-height: 800px) {
+  /* Container automatically scales down via transform */
   .canvas-editor-overlay {
-    padding: clamp(5px, 1.5vw, 10px) !important;
-  }
-
-  .canvas-editor-container {
-    max-width: min(98vw, 800px) !important;
-    max-height: min(98vh, calc(100vh - 10px)) !important;
-    min-height: min(300px, 50vh) !important;
-  }
-
-  .tui-image-editor-container {
-    min-height: 250px;
+    padding: 5px !important; /* Minimal padding for very small screens */
   }
 } 

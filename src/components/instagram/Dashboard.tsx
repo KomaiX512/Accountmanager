@@ -79,6 +79,18 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
   const [chatMessages, setChatMessages] = useState<ChatModalMessage[]>([]);
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   
+  // 🛑 STOP OPERATION: Auto-reply state management for Instagram
+  const [isAutoReplying, setIsAutoReplying] = useState(false);
+  const [shouldStopAutoReply, setShouldStopAutoReply] = useState(false);
+  const autoReplyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // NEW: Auto-reply progress tracking
+  const [autoReplyProgress, setAutoReplyProgress] = useState<{
+    current: number;
+    total: number;
+    nextReplyIn: number;
+  }>({ current: 0, total: 0, nextReplyIn: 0 });
+  
   // Content viewed tracking - track what has been seen vs unseen with localStorage persistence
   const getViewedStorageKey = (section: string) => `viewed_${section}_instagram_${accountHolder}`;
   
@@ -869,6 +881,28 @@ Image Description: ${response.post.image_prompt}
     }
   };
 
+  // NEW: Handle editing AI replies
+  const handleEditAIReply = (notification: Notification, editedReply: string) => {
+    console.log(`[${new Date().toISOString()}] Editing AI reply for notification:`, notification.message_id || notification.comment_id);
+    
+    setNotifications(prev => prev.map(n => {
+      if (isSameNotification(n, notification)) {
+        return {
+          ...n,
+          aiReply: {
+            ...n.aiReply!,
+            reply: editedReply,
+            timestamp: Date.now(),
+            generated_at: new Date().toISOString()
+          }
+        };
+      }
+      return n;
+    }));
+    
+    setToast('AI reply updated successfully!');
+  };
+
   const handleIgnoreAIReply = async (notification: Notification) => {
     if (!notification.aiReply || !notification.aiReply.replyKey || !notification.aiReply.reqKey) {
       console.error(`[${new Date().toISOString()}] Cannot ignore AI reply: missing replyKey or reqKey`);
@@ -912,70 +946,252 @@ Image Description: ${response.post.image_prompt}
     }
   };
 
-  // Handle auto-reply to all notifications
+  // 🛑 STOP OPERATION: Handle stop button click for Instagram
+  const handleStopAutoReply = () => {
+    console.log(`[Instagram] Stop auto-reply requested by user`);
+    setShouldStopAutoReply(true);
+    
+    // NEW: Instant frontend state reset
+    setIsAutoReplying(false);
+    setAutoReplyProgress({ current: 0, total: 0, nextReplyIn: 0 });
+    
+    // Cancel any pending timeout immediately
+    if (autoReplyTimeoutRef.current) {
+      clearTimeout(autoReplyTimeoutRef.current);
+      autoReplyTimeoutRef.current = null;
+    }
+    
+    setToast('Auto-reply stopped');
+  };
+
+  // Handle auto-reply to all notifications with defensive UX like Facebook
   const handleAutoReplyAll = async (notifications: Notification[]) => {
-    if (!igBusinessId || !accountHolder) return;
+    if (!igBusinessId || !accountHolder) {
+      setToast('Instagram account not properly connected');
+      return;
+    }
 
+    if (notifications.length === 0) {
+      setToast('No notifications to auto-reply to');
+      return;
+    }
+    
+    // ✅ PRE-ACTION CHECK: Verify AI reply limits before proceeding
+    const aiReplyAccessCheck = canUseFeature('aiReplies');
+    if (!aiReplyAccessCheck.allowed) {
+      setToast(aiReplyAccessCheck.reason || 'AI Replies feature is not available');
+      return;
+    }
+    
+    // CRITICAL FIX: Filter only pending notifications
+    const pendingNotifications = notifications.filter((notif: any) => 
+      !notif.status || notif.status === 'pending'
+    );
+    
+    if (pendingNotifications.length === 0) {
+      setToast('No pending notifications to reply to');
+      return;
+    }
+    
+    setIsAutoReplying(true);
+    setShouldStopAutoReply(false); // 🛑 STOP OPERATION: Reset stop flag
+    
+    // NEW: Initialize progress tracking
+    setAutoReplyProgress({ current: 0, total: pendingNotifications.length, nextReplyIn: 0 });
+    
+    let successCount = 0;
+    let failCount = 0;
+    
     try {
-      console.log(`[${new Date().toISOString()}] Starting Instagram auto-reply for ${notifications.length} notifications`);
+      console.log(`[Instagram] 🔄 Starting auto-reply for ${pendingNotifications.length} notifications`);
       
-      for (const notification of notifications) {
-        // Generate AI reply using the RAG server
-        const response = await axios.post(getApiUrl('/api/instant-reply'), {
-          username: accountHolder,
-          notification: {
-            type: notification.type,
-            message_id: notification.message_id,
-            comment_id: notification.comment_id,
-            text: notification.text,
-            username: notification.username,
-            timestamp: notification.timestamp,
-            platform: 'instagram'
-          },
-          platform: 'instagram'
-        });
-
-        if (response.data.success && response.data.reply) {
-          // Send the generated reply
-          if (notification.type === 'message' && notification.sender_id) {
-            await axios.post(`/api/send-dm-reply/${igBusinessId}`, {
-              sender_id: notification.sender_id,
-              text: response.data.reply,
+      // 🛡️ CRITICAL BUG FIX: Process notifications ONE AT A TIME with proper rate limiting
+      // This prevents the simultaneous sending bug that we fixed for Facebook
+      for (let i = 0; i < pendingNotifications.length; i++) {
+        // 🛑 STOP OPERATION: Check if user requested to stop
+        if (shouldStopAutoReply) {
+          console.log(`[Instagram] Auto-reply stopped by user at ${i + 1}/${pendingNotifications.length}`);
+          setToast(`Auto-reply stopped (${i}/${pendingNotifications.length} completed)`);
+          break;
+        }
+        
+        const notification = pendingNotifications[i];
+        const notificationId = notification.message_id || notification.comment_id || '';
+        
+        if (!notification.text) {
+          failCount++;
+          // NEW: Update progress
+          setAutoReplyProgress(prev => ({ ...prev, current: i + 1 }));
+          continue;
+        }
+        
+        try {
+          console.log(`[Instagram] 🔄 Processing notification ${i + 1}/${pendingNotifications.length}`);
+          
+          // NEW: Update progress - processing current
+          setAutoReplyProgress(prev => ({ ...prev, current: i + 1 }));
+          
+          // 🛑 STOP OPERATION: Check stop flag before making RAG request
+          if (shouldStopAutoReply) break;
+          
+          // Generate AI reply using the enhanced RAG server
+          const response = await axios.post(getApiUrl('/api/instant-reply'), {
+            username: accountHolder,
+            notification: {
+              type: notification.type,
               message_id: notification.message_id,
-              platform: 'instagram',
-            });
-          } else if (notification.type === 'comment' && notification.comment_id) {
-            await axios.post(`/api/send-comment-reply/${igBusinessId}`, {
               comment_id: notification.comment_id,
-              text: response.data.reply,
-              platform: 'instagram',
+              text: notification.text,
+              username: notification.username,
+              timestamp: notification.timestamp,
+              platform: 'instagram'
+            },
+            platform: 'instagram'
+          });
+
+          // 🛑 STOP OPERATION: Check stop flag after RAG response
+          if (shouldStopAutoReply) break;
+
+          if (response.data.success && response.data.reply) {
+            // Send the generated reply
+            if (notification.type === 'message' && notification.sender_id) {
+              await axios.post(`/api/send-dm-reply/${igBusinessId}`, {
+                sender_id: notification.sender_id,
+                text: response.data.reply,
+                message_id: notification.message_id,
+                platform: 'instagram',
+              });
+            } else if (notification.type === 'comment' && notification.comment_id) {
+              await axios.post(`/api/send-comment-reply/${igBusinessId}`, {
+                comment_id: notification.comment_id,
+                text: response.data.reply,
+                platform: 'instagram',
+              });
+            }
+
+            // ✅ REAL USAGE TRACKING: Track actual auto-reply generation and sending
+            const trackingSuccess = await trackRealAIReply('instagram', {
+              type: notification.type === 'message' ? 'dm' : 'comment',
+              mode: 'auto'
+            });
+            
+            if (!trackingSuccess) {
+              console.warn(`[Instagram] 🚫 Auto AI Reply blocked - limit reached`);
+              failCount++;
+              continue; // Skip to next notification
+            }
+            
+            console.log(`[Instagram] ✅ Auto AI Reply tracked: ${notification.type}`);
+
+            // Instantly remove the notification from state for immediate UI feedback
+            setNotifications(prev => prev.filter(n =>
+              !((n.message_id && n.message_id === notification.message_id) ||
+                (n.comment_id && n.comment_id === notification.comment_id))
+            ));
+
+            successCount++;
+          } else {
+            failCount++;
+          }
+          
+          // 🛑 STOP OPERATION: Check stop flag before delay
+          if (shouldStopAutoReply) break;
+          
+          // 🚀 CRITICAL RATE LIMITING FIX: Wait between requests to prevent simultaneous sending
+          // This is the key fix that prevents the simultaneous sending bug
+          if (i < pendingNotifications.length - 1) {
+            const delay = 45000; // 45 seconds for Instagram
+            
+            console.log(`[Instagram] ⏱️ Waiting ${delay/1000}s before next reply (${i + 1}/${pendingNotifications.length} completed)`);
+            setToast(`Processing ${i + 1}/${pendingNotifications.length} - waiting ${delay/1000}s before next reply...`);
+            
+            // NEW: Countdown timer for next reply
+            let remainingTime = Math.floor(delay / 1000);
+            const countdownInterval = setInterval(() => {
+              setAutoReplyProgress(prev => ({ ...prev, nextReplyIn: remainingTime }));
+              remainingTime--;
+              if (remainingTime < 0) {
+                clearInterval(countdownInterval);
+                setAutoReplyProgress(prev => ({ ...prev, nextReplyIn: 0 }));
+              }
+            }, 1000);
+            
+            // 🛑 STOP OPERATION: Use cancellable timeout for Instagram
+            await new Promise<void>((resolve) => {
+              autoReplyTimeoutRef.current = setTimeout(() => {
+                clearInterval(countdownInterval);
+                setAutoReplyProgress(prev => ({ ...prev, nextReplyIn: 0 }));
+                autoReplyTimeoutRef.current = null;
+                resolve();
+              }, delay);
+            });
+            
+            // 🛑 STOP OPERATION: Final check after delay
+            if (shouldStopAutoReply) {
+              clearInterval(countdownInterval);
+              break;
+            }
+          }
+          
+        } catch (error: any) {
+          console.error(`Error auto-replying to ${notification.type} ${notificationId}:`, error);
+          
+          // Handle specific Instagram API errors
+          if (error.response?.data?.code === 'TIME_RESTRICTION') {
+            console.log(`Instagram time restriction for notification ${notificationId} - will retry later`);
+          } else if (error.response?.data?.code === 'USER_NOT_FOUND') {
+            console.log(`User not found for notification ${notificationId} - skipping`);
+          } else if (error.response?.data?.error) {
+            console.error('API error in auto-reply:', error.response.data.error);
+          }
+          
+          failCount++;
+          
+          // 🛑 STOP OPERATION: Check stop flag before error delay
+          if (shouldStopAutoReply) break;
+          
+          // Continue with next notification even if one fails, but still respect rate limiting
+          if (i < pendingNotifications.length - 1) {
+            const delay = 15000; // Shorter delay on errors
+            console.log(`[Instagram] ⚠️ Error occurred, waiting ${delay/1000}s before next attempt`);
+            
+            // 🛑 STOP OPERATION: Use cancellable timeout for error delays
+            await new Promise<void>((resolve) => {
+              autoReplyTimeoutRef.current = setTimeout(() => {
+                autoReplyTimeoutRef.current = null;
+                resolve();
+              }, delay);
             });
           }
-
-          // Instantly remove the notification from state
-          setNotifications(prev => prev.filter(n =>
-            !((n.message_id && n.message_id === notification.message_id) ||
-              (n.comment_id && n.comment_id === notification.comment_id))
-          ));
-
-          // Update notification status locally
-          // (old code, now handled by removal above)
-          // setNotifications(prev => 
-          //   prev.map(notif => 
-          //     (notif.message_id === notification.message_id || notif.comment_id === notification.comment_id)
-          //       ? { ...notif, status: 'replied' as const }
-          //       : notif
-          //   )
-          // );
-
-          console.log(`[${new Date().toISOString()}] Instagram auto-reply sent for ${notification.message_id || notification.comment_id}`);
         }
       }
-
-    } catch (error: any) {
-      console.error(`[${new Date().toISOString()}] Error in Instagram auto-reply:`, error);
-      setToast('Auto-reply failed for some notifications');
+    } catch (error) {
+      console.error('Instagram auto-reply operation failed:', error);
+      setToast('Auto-reply operation failed. Please try again.');
+    } finally {
+      setIsAutoReplying(false);
+      setShouldStopAutoReply(false); // 🛑 STOP OPERATION: Reset stop flag
+      
+      // 🛑 STOP OPERATION: Cancel any pending timeout
+      if (autoReplyTimeoutRef.current) {
+        clearTimeout(autoReplyTimeoutRef.current);
+        autoReplyTimeoutRef.current = null;
+      }
     }
+    
+    // 🛑 STOP OPERATION: Final status message
+    if (shouldStopAutoReply) {
+      setToast(`Instagram auto-reply stopped by user: ${successCount} sent, ${failCount} failed`);
+    } else {
+      setToast(`Instagram auto-reply completed: ${successCount} sent, ${failCount} failed`);
+    }
+    
+    // Refresh notifications
+    setTimeout(() => {
+      if (igBusinessId) {
+        fetchNotifications(igBusinessId);
+      }
+    }, 2000);
   };
 
   const refreshAllData = async () => {
@@ -1650,6 +1866,8 @@ Image Description: ${response.post.image_prompt}
               }} 
               onReplyWithAI={handleReplyWithAI}
               onAutoReplyAll={handleAutoReplyAll}
+              onStopAutoReply={handleStopAutoReply}
+              isAutoReplying={isAutoReplying}
               username={accountHolder}
               onIgnoreAIReply={handleIgnoreAIReply}
               refreshKey={refreshKey}
@@ -1658,6 +1876,9 @@ Image Description: ${response.post.image_prompt}
               onAIRefresh={() => setRefreshKey(prev => prev + 1)}
               aiProcessingNotifications={aiProcessingNotifications}
               onSendAIReply={handleSendAIReply}
+              onEditAIReply={handleEditAIReply}
+              autoReplyProgress={autoReplyProgress}
+              platform="instagram"
             />
           </div>
 

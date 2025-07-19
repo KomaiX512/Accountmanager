@@ -93,13 +93,13 @@
 
 .popup-main::-webkit-scrollbar-thumb,
 .modal-body::-webkit-scrollbar-thumb {
-  background: rgba(0, 255, 204, 0.5) !important;
+  background: rgba(128, 128, 128, 0.6) !important;
   border-radius: 3px !important;
 }
 
 .popup-main::-webkit-scrollbar-thumb:hover,
 .modal-body::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 255, 204, 0.7) !important;
+  background: rgba(128, 128, 128, 0.8) !important;
 }
 
 @keyframes modalAppear {
@@ -361,6 +361,44 @@ button:active,
   display: none !important;
 }
 
+/* Fix #4: Global Scrollbar Styling - Clean, thin, gray scrollbars */
+/* Global scrollbar for all elements */
+* {
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(128, 128, 128, 0.6) rgba(128, 128, 128, 0.1) !important;
+}
+
+/* WebKit browsers (Chrome, Safari, etc.) */
+::-webkit-scrollbar {
+  width: 6px !important;
+  height: 6px !important; /* For horizontal scrollbars */
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(128, 128, 128, 0.1) !important;
+  border-radius: 3px !important;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.6) !important;
+  border-radius: 3px !important;
+  border: none !important;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.8) !important;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent !important;
+}
+
+/* Ensure no horizontal scrolling on main containers */
+body, #root, .app-container, .content-wrapper, .main-content {
+  overflow-x: hidden !important;
+  max-width: 100% !important;
+}
+
 /* Enhanced scrollbar styling for popups */
 .popup-content::-webkit-scrollbar,
 .modal-content::-webkit-scrollbar {
@@ -373,7 +411,7 @@ button:active,
   border-radius: 3px !important;
 }
 
-/* Fix #4: Left Sidebar Logic and Styling - Hide on login/entry screens */
+/* Fix #5: Left Sidebar Logic and Styling - Hide on login/entry screens */
 .left-bar.hidden-for-auth,
 .content-area.auth-page {
   display: none !important;
@@ -418,11 +456,11 @@ button:active,
 
 .popup-content::-webkit-scrollbar-thumb,
 .modal-content::-webkit-scrollbar-thumb {
-  background: rgba(0, 255, 204, 0.6) !important;
+  background: rgba(128, 128, 128, 0.6) !important;
   border-radius: 3px !important;
 }
 
 .popup-content::-webkit-scrollbar-thumb:hover,
 .modal-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 255, 204, 0.8) !important;
+  background: rgba(128, 128, 128, 0.8) !important;
 } 

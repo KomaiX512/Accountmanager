@@ -15,6 +15,7 @@ interface ProcessingContextType {
   processingState: ProcessingState;
   startProcessing: (platform: 'instagram' | 'twitter' | 'facebook', username: string, durationMinutes: number, preventNavigation?: boolean) => void;
   completeProcessing: () => void;
+  resetDashboard: (platform: 'instagram' | 'twitter' | 'facebook', username: string) => Promise<boolean>;
   isProcessingActive: boolean;
 }
 
@@ -179,6 +180,89 @@ export const ProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   }, [navigate]);
 
+  const resetDashboard = useCallback(async (
+    platform: 'instagram' | 'twitter' | 'facebook',
+    username: string
+  ): Promise<boolean> => {
+    try {
+      // Call backend to reset account info
+      const response = await fetch('/api/reset-account-info', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username,
+          platform
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Reset failed: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('Account reset successful:', result);
+
+      // Clear ALL platform-specific localStorage data
+      const keysToRemove = [
+        'processingState',
+        `${platform}_processing_countdown`,
+        `${platform}_processing_info`,
+        `${platform}_processing_${currentUser?.uid ?? ''}`,
+        'completedPlatforms',
+        // Clear account info and username data
+        `${platform}_accountInfo`,
+        `${platform}_username`,
+        `${platform}_accountHolder`,
+        `saved_${platform}_username`,
+        `${platform}_dashboard_data`,
+        `${platform}_user_data`,
+        // Clear any cached data
+        `${platform}_cache`,
+        `${platform}_posts_cache`,
+        `${platform}_events_cache`
+      ];
+
+      // Clear all localStorage keys that might contain platform or username data
+      try {
+        const allKeys = Object.keys(localStorage);
+        const platformLower = platform.toLowerCase();
+        const usernameLower = username.toLowerCase();
+        
+        allKeys.forEach(key => {
+          const keyLower = key.toLowerCase();
+          if (keyLower.includes(platformLower) || keyLower.includes(usernameLower)) {
+            localStorage.removeItem(key);
+            console.log(`Cleared localStorage key: ${key}`);
+          }
+        });
+        
+        // Also clear the specific keys
+        keysToRemove.forEach(key => {
+          localStorage.removeItem(key);
+        });
+      } catch (err) {
+        console.warn('Failed to clear localStorage:', err);
+      }
+
+      // Reset processing state completely
+      setProcessingState(initialProcessingState);
+
+      // Navigate to the appropriate entry form
+      console.log('Resetting dashboard - redirecting to entry form');
+      const entryPath = `/${platform === 'instagram' ? 'ig' : platform === 'twitter' ? 'tw' : 'fb'}-entry-usernames`;
+      
+      // Use React Router navigation with replace to prevent back navigation
+      safeNavigate(navigate, entryPath, { replace: true }, 10);
+
+      return true;
+    } catch (error) {
+      console.error('Reset dashboard error:', error);
+      return false;
+    }
+  }, [navigate, currentUser?.uid]);
+
   const completeProcessing = useCallback(() => {
     if (processingState.platform) {
       try {
@@ -193,6 +277,7 @@ export const ProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     processingState,
     startProcessing,
     completeProcessing,
+    resetDashboard,
     isProcessingActive: processingState.isProcessing,
   };
 

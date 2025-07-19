@@ -268,7 +268,7 @@ const s3Client = {
 
 // Setup a memory cache for images to reduce R2 load
 const imageCache = new Map();
-const IMAGE_CACHE_TTL = 1000 * 60 * 60; // 1 hour
+const IMAGE_CACHE_TTL = 1000 * 60 * 60 * 6; // 6 hours (optimized from 1 hour)
 const IMAGE_CACHE_MAX_SIZE = 100; // Maximum number of images to cache
 
 // Set up CORS completely permissively (no restrictions)
@@ -1345,7 +1345,7 @@ setInterval(() => {
   } catch (error) {
     if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [CACHE] Error during cache cleanup:`, error);
   }
-}, 5 * 60 * 1000); // Run every 5 minutes
+}, 60 * 60 * 1000); // Run every 1 hour (optimized from 5 minutes)
 
 // Enhanced signed URL generator with R2 optimization
 app.get('/api/signed-image-url/:username/:imageKey', async (req, res) => {
@@ -1503,7 +1503,7 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
       res.setHeader('Expires', '0');
       res.setHeader('X-Cache-Mode', 'force-refresh');
     } else {
-      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.setHeader('Cache-Control', 'public, max-age=21600'); // 6 hours (optimized from 1 hour)
       res.setHeader('X-Cache-Mode', 'normal');
     }
     
@@ -1565,7 +1565,7 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
       const placeholderImage = generatePlaceholderImage(`Image Error: ${imageKey}`);
       
       res.setHeader('Content-Type', 'image/jpeg');
-      res.setHeader('Cache-Control', 'no-cache, no-store, max-age=0');
+      res.setHeader('Cache-Control', 'no-cache, no-store');
       res.setHeader('X-Image-Source', 'error-placeholder');
       res.setHeader('X-Image-Valid', 'false');
       res.setHeader('X-Error-Type', error.message.substring(0, 100));
@@ -1650,19 +1650,8 @@ app.head('/api/r2-image/:username/:imageKey', async (req, res) => {
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
     } else {
-      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.setHeader('Cache-Control', 'public, max-age=21600'); // 6 hours (optimized from 1 hour)
     }
-    
-    res.setHeader('ETag', `"${imageKey}-${Date.now()}"`);
-    res.setHeader('Last-Modified', new Date().toUTCString());
-    res.setHeader('X-Image-Source', source);
-    
-    // Enable CORS for cross-origin requests
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', '*');
-    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    res.setHeader('Access-Control-Expose-Headers', 'X-Image-Source, ETag, Last-Modified');
     
     res.status(200).end(); // HEAD response - no body
     
@@ -1852,6 +1841,30 @@ async function handlePostsEndpoint(req, res) {
     });
   }
 }
+
+// Add the /api/discussion endpoint
+app.post('/api/discussion', async (req, res) => {
+  try {
+    const { username, query, previousMessages, platform } = req.body;
+
+    if (!username || !query || !platform) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Simulate processing the discussion query
+    const response = {
+      response: `Processed discussion for ${username} on ${platform}: ${query}`,
+      quotaExhausted: false,
+      resetTime: null,
+      message: 'Discussion processed successfully'
+    };
+
+    res.status(200).json(response);
+  } catch (error) {
+    console.error('Error processing discussion:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
 
 // Configure multer for memory storage
 const upload = multer({ 

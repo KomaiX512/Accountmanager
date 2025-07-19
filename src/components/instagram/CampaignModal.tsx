@@ -35,7 +35,7 @@ interface EngagementMetrics {
 const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isConnected, onClose, onCampaignStopped }) => {
   const [summary, setSummary] = useState<CampaignSummary | null>(null);
   const [generatedSummary, setGeneratedSummary] = useState<GeneratedContentSummary | null>(null);
-  const [postCooked, setPostCooked] = useState<number>(0);
+  // Removed postCooked metric state
   const [engagement, setEngagement] = useState<EngagementMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -94,9 +94,7 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
         }
       }
 
-      // Fetch post cooked count
-      const postsResponse = await axios.get(`/campaign-posts-count/${username}?platform=${platform}`);
-      setPostCooked(postsResponse.data.postCooked || 0);
+      // Removed fetching post cooked count since Post Cooked metric is no longer displayed
 
       // Fetch engagement metrics
       const engagementResponse = await axios.get(`/engagement-metrics/${username}?platform=${platform}&connected=${isConnected}`);
@@ -302,7 +300,7 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
               {/* Post Metrics */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
+                gridTemplateColumns: '1fr',
                 gap: '16px'
               }}>
                 <div style={{
@@ -315,19 +313,6 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
                   <h4 style={{ color: '#007bff', margin: '0 0 8px 0', fontSize: '14px' }}>Post Estimated</h4>
                   <p style={{ color: '#e0e0ff', fontSize: '20px', fontWeight: 'bold', margin: 0 }}>
                     {postEstimated || (generatedSummary?.postCount ? generatedSummary.postCount : '-')}
-                  </p>
-                </div>
-
-                <div style={{
-                  border: '1px solid #333',
-                  borderRadius: '8px',
-                  padding: '16px',
-                  textAlign: 'center',
-                  background: 'rgba(255, 107, 107, 0.05)'
-                }}>
-                  <h4 style={{ color: '#ff6b6b', margin: '0 0 8px 0', fontSize: '14px' }}>Post Cooked</h4>
-                  <p style={{ color: '#e0e0ff', fontSize: '20px', fontWeight: 'bold', margin: 0 }}>
-                    {postCooked}
                   </p>
                 </div>
               </div>

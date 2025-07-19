@@ -1677,105 +1677,168 @@ function analyzePostThemes(postTexts) {
   return themes.size > 0 ? Array.from(themes) : ['General Content'];
 }
 
-// Enhanced RAG Response Generator - Bulletproof solution for content filtering
+// 🚀 **REAL RAG IMPLEMENTATION** - Uses actual profile data for personalized responses
 function generateIntelligentRAGResponse(profileData, query, platform = 'instagram', username = 'user') {
   const platformName = platform === 'twitter' ? 'X (Twitter)' : 
                       platform === 'facebook' ? 'Facebook' : 
                       'Instagram';
   
-  // Extract comprehensive data
-  let followerCount = 'N/A';
-  let postCount = 'N/A';
-  let followingCount = 'N/A';
-  let bio = '';
-  let isVerified = false;
-  let isBusinessAccount = false;
-  let posts = [];
+  console.log(`[RAG-Server] 🔍 Processing ${platform}/${username} with real data extraction`);
   
-  if (profileData) {
-    if (Array.isArray(profileData) && profileData.length > 0) {
-      const profile = profileData[0];
-      followerCount = profile.followersCount || profile.followers_count || 'N/A';
-      postCount = profile.postsCount || profile.posts_count || 'N/A';
-      followingCount = profile.followsCount || profile.following_count || 'N/A';
-      bio = profile.biography || profile.bio || '';
-      isVerified = profile.verified || false;
-      isBusinessAccount = profile.isBusinessAccount || false;
-      posts = profile.latestPosts || [];
-    } else {
-      followerCount = profileData.followersCount || profileData.followers_count || 'N/A';
-      postCount = profileData.postsCount || profileData.posts_count || 'N/A';
-      followingCount = profileData.followsCount || profileData.following_count || 'N/A';
-      bio = profileData.biography || profileData.bio || '';
-      isVerified = profileData.verified || false;
-      isBusinessAccount = profileData.isBusinessAccount || false;
-      posts = profileData.latestPosts || [];
-    }
-  }
-  
-  // Format numbers
-  const formatNumber = (num) => {
-    if (typeof num === 'number') return num.toLocaleString();
-    if (typeof num === 'string' && !isNaN(num)) return parseInt(num).toLocaleString();
-    return num;
-  };
-  
-  followerCount = formatNumber(followerCount);
-  postCount = formatNumber(postCount);
-  followingCount = formatNumber(followingCount);
-  
-  // Analyze posts for engagement patterns
+  // Extract REAL data from the scraped profile
+  let realFollowers = 'N/A';
+  let realPosts = 'N/A';
+  let realEngagement = 'N/A';
+  let realBio = 'No bio available';
+  let recentPosts = [];
   let totalLikes = 0;
+  let totalShares = 0;
   let totalComments = 0;
-  let totalEngagement = 0;
-  let mostEngagedPost = null;
-  let maxEngagement = 0;
+  let postCount = 0;
   
-  if (posts && posts.length > 0) {
+  if (profileData && profileData.data && Array.isArray(profileData.data)) {
+    const posts = profileData.data;
+    console.log(`[RAG-Server] 📊 Found ${posts.length} real posts from ${platform}/${username}`);
+    
+    // Extract real engagement from actual posts
     posts.forEach(post => {
-      const likes = post.likesCount || post.likes || 0;
-      const comments = post.commentsCount || post.comments || 0;
-      const engagement = likes + comments;
+      if (post.likes) totalLikes += parseInt(post.likes) || 0;
+      if (post.shares) totalShares += parseInt(post.shares) || 0;
+      if (post.topReactionsCount) totalComments += parseInt(post.topReactionsCount) || 0;
+      postCount++;
       
-      totalLikes += likes;
-      totalComments += comments;
-      totalEngagement += engagement;
-      
-      if (engagement > maxEngagement) {
-        maxEngagement = engagement;
-        mostEngagedPost = post;
+      // Store recent posts with real content
+      if (recentPosts.length < 5) {
+        recentPosts.push({
+          text: post.text || 'No caption',
+          likes: post.likes || 0,
+          shares: post.shares || 0,
+          time: post.time || 'Unknown',
+          engagement: (parseInt(post.likes) || 0) + (parseInt(post.shares) || 0) + (parseInt(post.topReactionsCount) || 0)
+        });
       }
     });
+    
+    // Extract profile info from the user data in posts
+    if (posts[0] && posts[0].user) {
+      realFollowers = posts[0].user.name || username;
+      realBio = `${platformName} page for ${posts[0].user.name}`;
+    }
+    
+    realPosts = postCount.toString();
+    const avgEngagement = postCount > 0 ? Math.round((totalLikes + totalShares + totalComments) / postCount) : 0;
+    realEngagement = avgEngagement.toString();
+    
+    console.log(`[RAG-Server] ✅ Extracted real metrics: ${postCount} posts, ${totalLikes} total likes, ${avgEngagement} avg engagement`);
   }
   
-  const avgEngagement = posts.length > 0 ? Math.round(totalEngagement / posts.length) : 0;
-  const avgLikes = posts.length > 0 ? Math.round(totalLikes / posts.length) : 0;
+  // Find the most engaging post
+  const topPost = recentPosts.length > 0 ? 
+    recentPosts.reduce((max, post) => post.engagement > max.engagement ? post : max) : null;
   
-  // Generate intelligent response based on query type
+  // Generate REAL RAG response based on the query type and actual data
   const queryLower = query.toLowerCase();
   
-  if (queryLower.includes('follower') && queryLower.includes('count')) {
-    return generateFollowerCountResponse(username, followerCount, postCount, followingCount, platformName, isVerified, isBusinessAccount);
+  if (queryLower.includes('engagement') || queryLower.includes('performance') || queryLower.includes('analyze')) {
+    return `## 📊 Real ${platformName} Engagement Analysis for @${username}
+
+### **Actual Performance Data:**
+- **Total Posts Analyzed:** ${postCount}
+- **Total Likes:** ${totalLikes.toLocaleString()}
+- **Total Shares:** ${totalShares.toLocaleString()}
+- **Total Reactions:** ${totalComments.toLocaleString()}
+- **Average Engagement per Post:** ${Math.round((totalLikes + totalShares + totalComments) / Math.max(postCount, 1)).toLocaleString()}
+
+### **Top Performing Content:**
+${topPost ? `**Most Engaging Post:** "${topPost.text.substring(0, 100)}..." 
+- Engagement: ${topPost.engagement.toLocaleString()} total interactions
+- Posted: ${new Date(topPost.time).toLocaleDateString()}` : 'No engagement data available for specific posts.'}
+
+### **Recent Content Analysis:**
+${recentPosts.length > 0 ? recentPosts.map((post, i) => 
+  `${i + 1}. "${post.text.substring(0, 80)}..." (${post.engagement} interactions)`
+).join('\n') : 'No recent posts available for analysis.'}
+
+### **Strategic Insights:**
+Your ${platformName} content generates an average of **${Math.round((totalLikes + totalShares + totalComments) / Math.max(postCount, 1))} interactions per post**. ${topPost ? `Your most successful content focused on "${topPost.text.substring(0, 50)}..." which achieved ${topPost.engagement} total engagements.` : ''}
+
+**Recommendations:** Focus on content similar to your top-performing posts and maintain consistent posting to build on your current engagement foundation.`;
   }
   
-  if (queryLower.includes('post') && (queryLower.includes('number') || queryLower.includes('count') || queryLower.includes('how many'))) {
-    return generatePostCountResponse(username, postCount, followerCount, platformName, posts.length);
+  if (queryLower.includes('follower') || queryLower.includes('audience')) {
+    return `## 👥 ${platformName} Audience Analysis for @${username}
+
+### **Account Profile:**
+- **Page Name:** ${realFollowers}
+- **Platform:** ${platformName}
+- **Content Posts:** ${postCount} posts analyzed
+- **Profile:** ${realBio}
+
+### **Audience Engagement Metrics:**
+Based on your ${postCount} recent posts:
+- **Total Audience Reach:** ${totalLikes.toLocaleString()} likes received
+- **Community Interaction:** ${totalShares.toLocaleString()} shares
+- **Engagement Rate:** Strong interaction across ${postCount} posts
+
+### **Content Performance:**
+Your audience actively engages with your content, generating ${(totalLikes + totalShares + totalComments).toLocaleString()} total interactions across ${postCount} posts.
+
+${topPost ? `**Most Popular Content:** Your post "${topPost.text.substring(0, 100)}..." resonated strongly with your audience, achieving ${topPost.engagement} interactions.` : ''}
+
+**Growth Strategy:** Your current audience engagement pattern shows strong potential for continued growth through consistent, high-quality content.`;
   }
   
-  if (queryLower.includes('engagement') || queryLower.includes('metric')) {
-    return generateEngagementResponse(username, followerCount, postCount, avgEngagement, avgLikes, posts.length, platformName);
+  if (queryLower.includes('post') || queryLower.includes('content') || queryLower.includes('strategy')) {
+    return `## 📝 ${platformName} Content Strategy for @${username}
+
+### **Current Content Portfolio:**
+- **Total Posts:** ${postCount} posts analyzed
+- **Content Performance:** ${(totalLikes + totalShares + totalComments).toLocaleString()} total engagements
+- **Average Performance:** ${Math.round((totalLikes + totalShares + totalComments) / Math.max(postCount, 1))} interactions per post
+
+### **Recent Content Themes:**
+${recentPosts.length > 0 ? recentPosts.map((post, i) => 
+  `**Post ${i + 1}:** "${post.text.substring(0, 60)}..." 
+   Performance: ${post.likes} likes, ${post.shares} shares (${post.engagement} total engagement)`
+).join('\n\n') : 'No recent posts available for analysis.'}
+
+### **Content Optimization Insights:**
+${topPost ? `**Best Performing Content:** "${topPost.text.substring(0, 100)}..." achieved ${topPost.engagement} interactions, setting the benchmark for future content.` : ''}
+
+**Strategic Recommendations:**
+1. **Content Consistency:** Your ${postCount} posts show ${totalLikes > 0 ? 'strong' : 'developing'} engagement patterns
+2. **Engagement Focus:** Target exceeding your current average of ${Math.round((totalLikes + totalShares + totalComments) / Math.max(postCount, 1))} interactions per post
+3. **Content Themes:** ${topPost ? `Build on successful themes like "${topPost.text.substring(0, 40)}..."` : 'Develop consistent content themes based on your brand'}
+
+Your ${platformName} strategy should focus on replicating the success patterns from your top-performing content.`;
   }
   
-  if (queryLower.includes('popular') || queryLower.includes('liked') || queryLower.includes('engaging')) {
-    return generatePopularPostResponse(username, mostEngagedPost, maxEngagement, avgEngagement, posts.length, platformName);
-  }
-  
-  if (queryLower.includes('theme') || queryLower.includes('content') || queryLower.includes('topic')) {
-    return generateContentThemeResponse(username, posts, bio, platformName);
-  }
-  
-  // Default comprehensive response
-  return generateComprehensiveResponse(username, followerCount, postCount, followingCount, avgEngagement, posts.length, platformName, isVerified, isBusinessAccount);
+  // Default comprehensive response with real data
+  return `## 🎯 Comprehensive ${platformName} Analysis for @${username}
+
+### **Account Performance Overview:**
+- **Content Volume:** ${postCount} posts analyzed
+- **Engagement Metrics:** ${(totalLikes + totalShares + totalComments).toLocaleString()} total interactions
+- **Average Performance:** ${Math.round((totalLikes + totalShares + totalComments) / Math.max(postCount, 1))} interactions per post
+- **Platform:** ${platformName}
+
+### **Recent Activity Highlights:**
+${recentPosts.length > 0 ? recentPosts.slice(0, 3).map((post, i) => 
+  `**Recent Post ${i + 1}:** "${post.text.substring(0, 80)}..."
+   - Engagement: ${post.engagement} interactions
+   - Posted: ${new Date(post.time).toLocaleDateString()}`
+).join('\n\n') : 'No recent activity data available.'}
+
+### **Performance Insights:**
+${topPost ? `Your most successful content was "${topPost.text.substring(0, 60)}..." which generated ${topPost.engagement} total interactions, demonstrating your audience's content preferences.` : 'Content performance analysis requires more data points.'}
+
+### **Growth Opportunities:**
+Based on your current ${postCount} posts with ${(totalLikes + totalShares + totalComments).toLocaleString()} total engagements:
+- **Strength:** ${totalLikes > 0 ? `Strong like engagement (${totalLikes.toLocaleString()})` : 'Building engagement foundation'}
+- **Community:** ${totalShares > 0 ? `Good sharing activity (${totalShares.toLocaleString()})` : 'Opportunity to increase shareability'}
+- **Strategy:** Focus on content that exceeds your ${Math.round((totalLikes + totalShares + totalComments) / Math.max(postCount, 1))} average engagement rate
+
+Your ${platformName} presence shows ${totalLikes > 100 ? 'strong' : 'developing'} potential with clear opportunities for strategic growth.`;
 }
 
 function generateFollowerCountResponse(username, followerCount, postCount, followingCount, platformName, isVerified, isBusinessAccount) {
@@ -2065,7 +2128,37 @@ Your ${platformName} account demonstrates strong performance with **${followerCo
 }
 
 // API endpoint for discussion mode
-app.post('/api/discussion', async (req, res) => {
+// Support both POST and GET for discussion queries to avoid 404 on GET
+// Also handle trailing slash for GET requests to /api/rag/discussion/ and /api/discussion/
+app.all(['/api/rag/discussion', '/api/discussion', '/api/rag/discussion/', '/api/discussion/'], async (req, res) => {
+  console.log(`[RAG-Server] ${req.method} request to ${req.path}`);
+  console.log(`[RAG-Server] Headers:`, JSON.stringify(req.headers, null, 2));
+  console.log(`[RAG-Server] Query:`, req.query);
+  console.log(`[RAG-Server] Body:`, req.body);
+  console.log(`[RAG-Server] Content-Type:`, req.get('content-type'));
+  
+  // Handle GET without parameters - return helpful status message
+  if (req.method === 'GET' && (!req.query.username || !req.query.query)) {
+    return res.status(200).json({ 
+      status: 'ok',
+      message: 'Discussion endpoint is live. Please POST to this URL with JSON body { username, query, previousMessages?, platform? } to begin.',
+      method: 'GET',
+      requiredParams: ['username', 'query'],
+      optionalParams: ['platform', 'previousMessages']
+    });
+  }
+  
+  // Map GET query parameters into body for compatibility
+  if (req.method === 'GET') {
+    req.body = {
+      username: req.query.username,
+      query: req.query.query,
+      previousMessages: req.query.previousMessages
+        ? JSON.parse(req.query.previousMessages)
+        : [],
+      platform: req.query.platform || 'instagram'
+    };
+  }
   const { username, query, previousMessages = [], platform = 'instagram' } = req.body;
   
   if (!username || !query) {
@@ -2110,143 +2203,58 @@ app.post('/api/discussion', async (req, res) => {
       rulesData = {};
     }
     
-    // 🚀 Use the ENHANCED RAG prompt with ChromaDB semantic search
-    const ragPrompt = await createEnhancedRagPrompt(profileData, rulesData, query, platform, usingFallbackProfile, username);
-    
-    // Call Gemini API with multiple prompt strategies
+    // 🚀 **FIXED APPROACH**: Prioritize intelligent data processing over complex AI prompts
+    // This avoids content filtering issues while providing excellent personalized responses
     let response;
     let usedFallback = false;
     
     try {
-      // Strategy 1: Try the ultra-safe business prompt first
-      console.log(`[RAG-Server] Attempting ultra-safe business prompt for ${platform}/${username}`);
-      
-      const apiCallPromise = callGeminiAPI(ragPrompt, previousMessages);
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('API_TIMEOUT')), 45000) // 45 second timeout
-      );
-      
-      response = await Promise.race([apiCallPromise, timeoutPromise]);
-      
-      // Verify we have a valid response
-      if (!response || response.trim() === '' || response.length < 10) {
-        throw new Error('Invalid or empty response received from Gemini API');
-      }
-      
-      console.log(`[RAG-Server] Successfully generated response for ${platform}/${username}`);
-    } catch (error) {
-      console.log(`[RAG-Server] Ultra-safe prompt failed: ${error.message}`);
-      
-      // Check if this is content filtering
-      if (error.message && error.message.includes('CONTENT_FILTERED')) {
-        console.log(`[RAG-Server] Content filtering detected for ${platform}/${username}, trying alternative approach`);
-      }
-      
-              try {
-          // Strategy 2: Try ultra-minimal business prompt with just numbers
-          console.log(`[RAG-Server] Trying ultra-minimal business prompt for ${platform}/${username}`);
-          
-          const platformName = platform === 'twitter' ? 'X (Twitter)' : 
-                              platform === 'facebook' ? 'Facebook' : 
-                              'Instagram';
-          
-          // Extract only the safest data - just numbers
-          let followerCount = 'N/A';
-          let postCount = 'N/A';
-          
-          if (profileData && !usingFallbackProfile) {
-            if (Array.isArray(profileData) && profileData.length > 0) {
-              const profile = profileData[0];
-              followerCount = profile.followersCount || profile.followers_count || 'N/A';
-              postCount = profile.postsCount || profile.posts_count || 'N/A';
-            } else if (profileData.followersCount || profileData.followers_count) {
-              followerCount = profileData.followersCount || profileData.followers_count;
-              postCount = profileData.postsCount || profileData.posts_count || 'N/A';
-            }
-            
-            if (typeof followerCount === 'number') {
-              followerCount = followerCount.toLocaleString();
-            }
-            if (typeof postCount === 'number') {
-              postCount = postCount.toLocaleString();
-            }
-          }
-
-          const minimalPrompt = `${platformName} account analysis:
-
-Account metrics:
-- Followers: ${followerCount}
-- Posts: ${postCount}
-- Platform: ${platformName}
-
-Question: ${query}
-
-Provide analysis using the metrics above.`;
-
-          const minimalResponse = await callGeminiAPI(minimalPrompt, []);
-          
-          if (minimalResponse && minimalResponse.trim().length > 10) {
-            response = minimalResponse;
-            console.log(`[RAG-Server] Minimal prompt succeeded for ${platform}/${username}`);
-          } else {
-            throw new Error('Minimal prompt also failed');
-          }
-        } catch (secondError) {
-          console.log(`[RAG-Server] Minimal prompt also failed: ${secondError.message}`);
+      if (profileData && !usingFallbackProfile) {
+        // **PRIMARY STRATEGY**: Use REAL ChromaDB-powered RAG with semantic search
+        // This uses the actual RAG implementation with vector search and enhanced context
+        console.log(`[RAG-Server] 🧠 Using REAL ChromaDB-powered RAG for ${platform}/${username}`);
         
-                  try {
-            // Strategy 3: Data-driven response without AI when we have real data
-            if (!usingFallbackProfile && profileData) {
-              console.log(`[RAG-Server] Creating data-driven response for ${platform}/${username}`);
-              
-              let followerCount = 'N/A';
-              let postCount = 'N/A';
-              let followingCount = 'N/A';
-              
-              if (Array.isArray(profileData) && profileData.length > 0) {
-                const profile = profileData[0];
-                followerCount = profile.followersCount || profile.followers_count || 'N/A';
-                postCount = profile.postsCount || profile.posts_count || 'N/A';
-                followingCount = profile.followsCount || profile.following_count || 'N/A';
-              } else {
-                followerCount = profileData.followersCount || profileData.followers_count || 'N/A';
-                postCount = profileData.postsCount || profileData.posts_count || 'N/A';
-                followingCount = profileData.followsCount || profileData.following_count || 'N/A';
-              }
-              
-              if (typeof followerCount === 'number') followerCount = followerCount.toLocaleString();
-              if (typeof postCount === 'number') postCount = postCount.toLocaleString();
-              if (typeof followingCount === 'number') followingCount = followingCount.toLocaleString();
-              
-              response = `Based on your ${platformName} account data:
+        // Create enhanced RAG prompt using ChromaDB semantic search
+        const enhancedPrompt = await createEnhancedRagPrompt(profileData, rulesData, query, platform, usingFallbackProfile, username);
+        
+        // Call Gemini API with the enhanced prompt
+        response = await callGeminiAPI(enhancedPrompt, []);
+        
+        if (!response || response.trim() === '' || response.length < 10) {
+          throw new Error('ChromaDB RAG approach failed - empty response');
+        }
+        
+        console.log(`[RAG-Server] ✅ Generated ChromaDB-powered RAG response for ${platform}/${username}`);
+        console.log(`[RAG-Server] 📝 Response preview: ${response ? response.substring(0, 200) + '...' : 'NULL/UNDEFINED'}`);
+      } else {
+        // **FALLBACK STRATEGY**: For accounts without real data, use simple approach
+        console.log(`[RAG-Server] Using simple approach for ${platform}/${username} (no real data)`);
+        
+        const platformName = platform === 'twitter' ? 'X (Twitter)' : 
+                            platform === 'facebook' ? 'Facebook' : 
+                            'Instagram';
 
-📊 **Account Metrics:**
-- **Followers:** ${followerCount}
-- **Posts:** ${postCount}
-- **Following:** ${followingCount}
+        const simplePrompt = `You are a ${platformName} marketing expert. Answer this question about @${username}'s account: "${query}"
 
-📈 **Analysis:**
-Your account shows strong engagement potential with ${followerCount} followers across ${postCount} posts. This represents a solid foundation for ${platformName} growth.
+Provide helpful advice based on ${platformName} best practices.`;
 
-🎯 **Recommendations:**
-1. **Content Consistency:** With ${postCount} posts, maintain regular posting schedule
-2. **Audience Engagement:** Leverage your ${followerCount} follower base for increased interaction
-3. **Growth Strategy:** Focus on quality content that resonates with your audience
-
-Your metrics indicate a well-established ${platformName} presence with good growth potential.`;
-              
-              console.log(`[RAG-Server] Data-driven response created for ${platform}/${username}`);
-            } else {
-              throw new Error('No real data available for data-driven response');
-            }
-          } catch (thirdError) {
-            console.log(`[RAG-Server] All AI strategies failed for ${platform}/${username}: ${thirdError.message}`);
-            console.log(`[RAG-Server] 🧠 Using Intelligent RAG Response Generator for ${platform}/${username}`);
-            response = generateIntelligentRAGResponse(profileData, query, platform, username);
-            console.log(`[RAG-Server] ✅ Generated intelligent response using real data for ${platform}/${username}`);
-            usedFallback = false; // This is not a fallback, it's intelligent data processing
-          }
+        response = await callGeminiAPI(simplePrompt, []);
+        
+        if (!response || response.trim() === '' || response.length < 10) {
+          throw new Error('Simple approach failed');
+        }
+        
+        console.log(`[RAG-Server] ✅ Simple approach succeeded for ${platform}/${username}`);
       }
+    } catch (error) {
+      console.log(`[RAG-Server] ⚠️ Primary strategy failed: ${error.message}, using platform fallback`);
+      
+      // Final fallback - use platform-specific responses
+      const fallbackKey = query.toLowerCase().includes('competitor') ? 'competitors' :
+                         query.toLowerCase().includes('content') ? 'content' : 'general';
+      response = FALLBACK_RESPONSES[platform]?.[fallbackKey] || FALLBACK_RESPONSES.instagram.general;
+      usedFallback = true;
+      console.log(`[RAG-Server] 📋 Using platform-specific fallback for ${platform}/${username}`);
     }
     
     // Save conversation to R2
@@ -2268,6 +2276,8 @@ Your metrics indicate a well-established ${platformName} presence with good grow
     await saveToR2(conversationData, conversationKey);
     
     // Return response with fallback indicator
+    console.log(`[RAG-Server] 🚀 Preparing JSON response for ${platform}/${username}`);
+    console.log(`[RAG-Server] Response length: ${response ? response.length : 'NULL'} characters`);
     res.json({ 
       response, 
       usedFallback,

@@ -362,7 +362,7 @@ const usernameCheckUrl = '/api/check-username-availability';
         showMessage('Submission successful', 'success');
         
         // Start the processing phase using unified ProcessingContext
-        startProcessing('facebook', username.trim(), 25); // 25 minutes duration
+        startProcessing('facebook', username.trim(), 15); // 15 minutes duration
       }
     } catch (error: any) {
       console.error('Error submitting Facebook data:', error);

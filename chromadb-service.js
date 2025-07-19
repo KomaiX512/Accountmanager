@@ -766,9 +766,42 @@ Performance: ${this.categorizePerformance(engagement.engagementRate)}`;
       const relevantDocs = await this.semanticSearch(query, username, platform, 8);
       
       if (relevantDocs.length === 0) {
-        console.log(`[ChromaDB] No relevant documents found for ${platform}/${username}, but continuing with empty context`);
-        // Return minimal context instead of null to prevent fallback
-        return `Profile Analysis Data for ${username} on ${platform}:\n\nNo specific data found for this query, but account exists.\n`;
+        console.log(`[ChromaDB] No relevant documents found for ${platform}/${username}, checking for any available data`);
+        
+        // Try to get any documents for this user/platform combination
+        try {
+          const collectionName = `${platform}_profiles`;
+          const collection = await this.client.getCollection({ name: collectionName });
+          
+          // Get all documents for this user
+          const allDocs = await collection.get({
+            where: { username: username }
+          });
+          
+          if (allDocs && allDocs.ids && allDocs.ids.length > 0) {
+            console.log(`[ChromaDB] Found ${allDocs.ids.length} documents for ${platform}/${username}, using general context`);
+            
+            // Create general context from available data
+            let generalContext = `Profile Analysis Data for ${username} on ${platform}:\n\n`;
+            
+            if (allDocs.documents && allDocs.documents.length > 0) {
+              generalContext += "Available Account Data:\n";
+              allDocs.documents.slice(0, 3).forEach((doc, index) => {
+                const cleanContent = doc.replace(/🚀|📊|💡|🎯|📈|🔥|❤️|📋|✅/g, '').trim();
+                if (cleanContent.length > 10) {
+                  generalContext += `${cleanContent}\n\n`;
+                }
+              });
+            }
+            
+            return generalContext;
+          }
+        } catch (error) {
+          console.log(`[ChromaDB] Error retrieving general data for ${platform}/${username}:`, error.message);
+        }
+        
+        // Return minimal context if no data found
+        return `Profile Analysis Data for ${username} on ${platform}:\n\nAccount exists but no specific data available for this query.\n`;
       }
 
       // Group documents by type for better organization
@@ -788,25 +821,25 @@ Performance: ${this.categorizePerformance(engagement.engagementRate)}`;
         }
       });
 
-      // Build clean, academic context without triggering language
+      // Build comprehensive context with preserved data
       let context = `Profile Analysis Data for ${username} on ${platform}:\n\n`;
 
-      // Profile context - clean format
+      // Profile context - preserve important data
       if (groupedDocs.profile.length > 0) {
         context += "Account Information:\n";
         groupedDocs.profile.forEach(doc => {
-          // Clean the content of any business jargon
+          // Keep important data, only remove problematic jargon
           const cleanContent = doc.content
             .replace(/🚀|📊|💡|🎯|📈|🔥|❤️|📋|✅/g, '')
             .replace(/STRATEGIC|INTELLIGENCE|COMPETITIVE|VIRAL|HIGH-PERFORMING/gi, '')
-            .replace(/OPPORTUNITIES|BRAND PARTNERSHIPS|MONETIZATION/gi, '')
+            .replace(/BRAND DNA|PERSONALITY MATRIX/gi, '')
             .trim();
           context += `${cleanContent}\n`;
         });
         context += "\n";
       }
 
-      // Bio context - simple format
+      // Bio context - preserve description
       if (groupedDocs.bio.length > 0) {
         context += "Profile Description:\n";
         groupedDocs.bio.forEach(doc => {

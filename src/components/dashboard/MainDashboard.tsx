@@ -401,7 +401,7 @@ const MainDashboard: React.FC = () => {
             
             // Fetch competitor analysis count
             try {
-              const accountInfoResponse = await fetch(`/api/retrieve-account-info/${platformUsername}?platform=${platform}`);
+              const accountInfoResponse = await fetch(`/api/profile-info/${platformUsername}?platform=${platform}`);
               if (accountInfoResponse.ok) {
                 const accountInfo = await accountInfoResponse.json();
                 const competitors = accountInfo.competitors || [];

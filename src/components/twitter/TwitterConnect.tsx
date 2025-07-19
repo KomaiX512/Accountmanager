@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './TwitterConnect.css';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import { useTwitter } from '../../context/TwitterContext';
 
@@ -105,18 +105,30 @@ const TwitterConnect: React.FC<TwitterConnectProps> = ({ onConnected, className 
   }, [onConnected, currentUser?.uid]); // Only depend on currentUser?.uid
 
   const connectToTwitter = async () => {
+    console.log(`[${new Date().toISOString()}] connectToTwitter called`);
+    console.log(`[${new Date().toISOString()}] currentUser:`, currentUser);
+    
     if (!currentUser) {
       console.error(`[${new Date().toISOString()}] Cannot connect Twitter: No authenticated user`);
+      alert('Please log in to connect Twitter.');
+      return;
+    }
+    
+    if (!currentUser.uid) {
+      console.error(`[${new Date().toISOString()}] Cannot connect Twitter: No user UID`);
+      alert('User authentication incomplete. Please refresh the page and try again.');
       return;
     }
     
     setIsConnecting(true);
     
     try {
-      console.log(`[${new Date().toISOString()}] Initiating Twitter OAuth flow...`);
+      console.log(`[${new Date().toISOString()}] Initiating Twitter OAuth flow for user: ${currentUser.uid}`);
       
       // Step 1: Get authorization URL from backend
-      const response = await axios.get(`/twitter/auth?userId=${currentUser.uid}`);
+      const response = await axios.get(`/api/twitter/auth?userId=${currentUser.uid}`);
+      console.log(`[${new Date().toISOString()}] Auth response:`, response.data);
+      
       const { authUrl } = response.data;
       
       if (!authUrl) {
@@ -131,18 +143,32 @@ const TwitterConnect: React.FC<TwitterConnectProps> = ({ onConnected, className 
       const left = window.screen.width / 2 - width / 2;
       const top = window.screen.height / 2 - height / 2;
 
-      window.open(
+      const popup = window.open(
         authUrl,
         'twitter-auth',
-        `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no`
+        `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,scrollbars=yes,resizable=yes`
       );
+      
+      if (!popup) {
+        throw new Error('Popup blocked by browser. Please allow popups for this site.');
+      }
+      
+      console.log(`[${new Date().toISOString()}] Twitter OAuth popup opened successfully`);
       
     } catch (error) {
       console.error(`[${new Date().toISOString()}] Error initiating Twitter OAuth:`, error);
       setIsConnecting(false);
       
-      // Show user-friendly error message
-      alert('Failed to connect to Twitter. Please try again.');
+      // Show more specific error messages
+      if (error instanceof Error && error.message.includes('popup')) {
+        alert('Please allow popups for this site to connect Twitter.');
+      } else if (error instanceof AxiosError && error.response?.status === 500) {
+        alert('Server error. Please try again later.');
+      } else if (error instanceof Error && error.message.includes('blocked')) {
+        alert('Popup blocked by browser. Please allow popups for this site.');
+      } else {
+        alert('Failed to connect to Twitter. Please try again.');
+      }
     }
   };
 
@@ -204,4 +230,4 @@ const TwitterConnect: React.FC<TwitterConnectProps> = ({ onConnected, className 
   );
 };
 
-export default TwitterConnect; 
+export default TwitterConnect;

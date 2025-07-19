@@ -138,6 +138,8 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const [isFacebookComposeOpen, setIsFacebookComposeOpen] = useState(false);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  // ✅ ADDED: Track auto-replied notifications to prevent redundancy
+  const [autoRepliedNotifications, setAutoRepliedNotifications] = useState<Set<string>>(new Set());
 
   // ALL REF HOOKS
   const firstLoadRef = useRef(true);
@@ -849,6 +851,21 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
       setReplySentTracker(prev => safeFilter(prev, reply => reply.timestamp > tenMinutesAgo));
     }, 60000);
+    
+    return () => clearInterval(cleanInterval);
+  }, []);
+
+  // ✅ ADDED: Clean old auto-replied notifications to prevent memory bloat
+  useEffect(() => {
+    const cleanInterval = setInterval(() => {
+      setAutoRepliedNotifications(prev => {
+        if (prev.size > 1000) {
+          console.log(`[${new Date().toISOString()}] Clearing auto-replied notifications set (size: ${prev.size})`);
+          return new Set();
+        }
+        return prev;
+      });
+    }, 300000); // Clean every 5 minutes
     
     return () => clearInterval(cleanInterval);
   }, []);

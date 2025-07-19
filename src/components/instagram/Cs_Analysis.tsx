@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import ErrorBoundary from '../ErrorBoundary';
 import { decodeJSONToReactElements, formatCount } from '../../utils/jsonDecoder';
 import axios from 'axios';
+import { useProcessing } from '../../context/ProcessingContext';
 
 interface ProfileInfo {
   followersCount?: number;
@@ -27,6 +28,7 @@ interface Cs_AnalysisProps {
 }
 
 const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, platform = 'instagram' }) => {
+  const normalizedAccountHolder = accountHolder;
   const [selectedCompetitor, setSelectedCompetitor] = useState<string | null>(null);
   const [currentAnalysisIndex, setCurrentAnalysisIndex] = useState(0);
   const [competitorProfiles, setCompetitorProfiles] = useState<Record<string, ProfileInfo>>({});
@@ -41,18 +43,38 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [needsRefresh, setNeedsRefresh] = useState(false);
-
-  const normalizedAccountHolder = accountHolder;
+  // Add state for accountType and postingStyle
+  const [accountType, setAccountType] = useState<string>('branding');
+  const [postingStyle, setPostingStyle] = useState<string>('I post about NewYork lives');
+  // Fetch account info on mount to get accountType and postingStyle
+  useEffect(() => {
+    const fetchAccountInfo = async () => {
+      try {
+        const response = await axios.get(`/api/profile-info/${normalizedAccountHolder}?platform=${platform}`);
+        const info = response.data;
+        if (info.accountType) setAccountType(info.accountType);
+        if (info.postingStyle) setPostingStyle(info.postingStyle);
+      } catch {}
+    };
+    fetchAccountInfo();
+  }, [normalizedAccountHolder, platform]);
 
   const competitorsQuery = localCompetitors.length > 0 ? localCompetitors.join(',') : '';
   const competitorEndpoint = competitorsQuery 
     ? `/api/retrieve-multiple/${normalizedAccountHolder}?competitors=${competitorsQuery}&platform=${platform}` 
     : '';
   
-  const allCompetitorsFetch = useR2Fetch<any[]>(competitorEndpoint);
+
+    const allCompetitorsFetch = useR2Fetch<any[]>(competitorEndpoint);
 
   const competitorData = localCompetitors.map(competitor => {
     const dataForCompetitor = allCompetitorsFetch.data?.find(item => item.competitor === competitor) || null;
+    
+    // Simple debug log to check if data is being fetched
+    if (allCompetitorsFetch.data && allCompetitorsFetch.data.length > 0) {
+      console.log(`Competitor ${competitor} data:`, dataForCompetitor?.data?.length || 0, 'items');
+    }
+
     return {
       competitor,
       fetch: {
@@ -66,6 +88,8 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
   const selectedData = selectedCompetitor
     ? competitorData.find(data => data.competitor === selectedCompetitor)?.fetch.data
     : null;
+  
+
 
   const lastFetchTimeRef = React.useRef<Record<string, number>>({});
 
@@ -99,7 +123,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
   const fetchAccountInfoWithRetry = useCallback(async (retries = 3, delay = 1000): Promise<string[] | null> => {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
-        const response = await axios.get(`/api/retrieve-account-info/${normalizedAccountHolder}?platform=${platform}`);
+        const response = await axios.get(`/api/profile-info/${normalizedAccountHolder}?platform=${platform}`);
         const accountInfo: AccountInfo = response.data;
         setError(null);
         setNeedsRefresh(false);
@@ -122,8 +146,8 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     try {
       const response = await axios.post(`/api/save-account-info?platform=${platform}`, {
         username: normalizedAccountHolder,
-        accountType: 'branding',
-        postingStyle: 'I post about NewYork lives',
+        accountType,
+        postingStyle,
         competitors: updatedCompetitors,
         platform: platform
       });
@@ -132,7 +156,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
       console.error(`Error updating ${platform} competitors:`, error);
       return false;
     }
-  }, [normalizedAccountHolder, platform]);
+  }, [normalizedAccountHolder, platform, accountType, postingStyle]);
 
   useEffect(() => {
     const syncInitialState = async () => {
@@ -178,6 +202,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
 
     const success = await updateCompetitors(updatedCompetitors);
     if (success) {
+      startProcessing(platform, normalizedAccountHolder, 15);
       const serverCompetitors = await fetchAccountInfoWithRetry();
       if (serverCompetitors) {
         setLocalCompetitors(serverCompetitors);
@@ -218,6 +243,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
 
     const success = await updateCompetitors(updatedCompetitors);
     if (success) {
+      startProcessing(platform, normalizedAccountHolder, 15);
       const serverCompetitors = await fetchAccountInfoWithRetry();
       if (serverCompetitors) {
         setLocalCompetitors(serverCompetitors);
@@ -306,6 +332,8 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     }
   };
 
+  const { startProcessing, processingState } = useProcessing();
+
   return (
     <ErrorBoundary>
       <motion.div
@@ -357,84 +385,95 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
           </motion.button>
         </div>
 
-        {competitorData.map(({ competitor, fetch }, index) => (
-          <motion.div
-            key={competitor}
-            className={`competitor-sub-container ${fetch.data !== undefined ? 'loaded' : ''} ${fetch.data?.length === 0 ? 'no-data' : ''}`}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: index * 0.1, duration: 0.2 }}
-            whileHover={{ scale: 1.02 }}
-          >
-            <div className="competitor-actions">
-              <motion.button
-                className="action-btn edit-btn"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => {
-                  setCurrentCompetitor(competitor);
-                  setEditCompetitor(competitor);
-                  setShowEditModal(true);
-                }}
-                disabled={loading}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#e0e0ff"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                </svg>
-              </motion.button>
-              <motion.button
-                className="action-btn delete-btn"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => handleDeleteCompetitor(competitor)}
-                disabled={loading}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#ff4444"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polyline points="3 6 5 6 21 6" />
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                  <line x1="10" y1="11" x2="10" y2="17" />
-                  <line x1="14" y1="11" x2="14" y2="17" />
-                </svg>
-              </motion.button>
-            </div>
-            <span
-              className="overlay-text"
-              onClick={() => fetch.data !== undefined && setSelectedCompetitor(competitor)}
-            >
-              {competitor}
-            </span>
-            {fetch.loading && (
-              <div className="futuristic-loading">
-                <span className="loading-text">Analyzing {competitor}...</span>
-                <div className="particle-effect" />
+        {/* Refactor competitor list container to be fixed-size and scrollable */}
+        <div className="competitor-list-scrollable">
+          {competitorData.map(({ competitor, fetch }, index) => (
+            // Show loading card if processingState.isProcessing && processingState.platform === platform && processingState.username === normalizedAccountHolder && (new/edited competitor)
+            (processingState.isProcessing && processingState.platform === platform && processingState.username === normalizedAccountHolder && (!fetch.data || fetch.data.length === 0)) ? (
+              <div className="competitor-loading-card" key={competitor}>
+                <div className="loading-spinner" />
+                <div className="loading-message">Analysis will be available in ~10 minutes.</div>
               </div>
-            )}
-            {fetch.data?.length === 0 && !fetch.loading && (
-              <span className="no-data-text">No data available</span>
-            )}
-          </motion.div>
-        ))}
+            ) : (
+              <motion.div
+                key={competitor}
+                className={`competitor-sub-container ${fetch.data && fetch.data.length > 0 ? 'loaded' : ''} ${(!fetch.data || fetch.data.length === 0) ? 'no-data' : ''}`}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: index * 0.1, duration: 0.2 }}
+                whileHover={{ scale: 1.02 }}
+              >
+                <div className="competitor-actions">
+                  <motion.button
+                    className="action-btn edit-btn"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      setCurrentCompetitor(competitor);
+                      setEditCompetitor(competitor);
+                      setShowEditModal(true);
+                    }}
+                    disabled={loading}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#e0e0ff"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                  </motion.button>
+                  <motion.button
+                    className="action-btn delete-btn"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => handleDeleteCompetitor(competitor)}
+                    disabled={loading}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#ff4444"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      <line x1="10" y1="11" x2="10" y2="17" />
+                      <line x1="14" y1="11" x2="14" y2="17" />
+                    </svg>
+                  </motion.button>
+                </div>
+                <span
+                  className="overlay-text"
+                  onClick={() => fetch.data && fetch.data.length > 0 && setSelectedCompetitor(competitor)}
+                >
+                  {competitor}
+                </span>
+                {fetch.loading && (
+                  <div className="futuristic-loading">
+                    <span className="loading-text">Analyzing {competitor}...</span>
+                    <div className="particle-effect" />
+                  </div>
+                )}
+                {fetch.data?.length === 0 && !fetch.loading && (
+                  <span className="no-data-text">No data available</span>
+                )}
+              </motion.div>
+            )
+          ))}
+        </div>
 
         {showAddModal && (
           <motion.div
@@ -594,7 +633,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
                     transition={{ duration: 0.3 }}
                   >
                     <h5>Analysis {currentAnalysisIndex + 1}</h5>
-                    {renderAnalysisContent(selectedData[currentAnalysisIndex])}
+                    {renderAnalysisContent(selectedData[currentAnalysisIndex]?.data || selectedData[currentAnalysisIndex])}
                     <div className="navigation-buttons">
                       <motion.button
                         className="nav-btn"

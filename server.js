@@ -708,22 +708,72 @@ async function fetchImageWithFallbacks(key, fallbackImagePath = null, username =
   const hashedKey = Buffer.from(key).toString('base64').replace(/[\/\+=]/g, '_');
   const localCacheFilePath = path.join(localCacheDir, hashedKey);
   
-  // --- BEGIN ROBUST ID-BASED FALLBACK LOGIC ---
-  // If the key matches campaign_ready_post_<ID>.jpg or ready_post_<ID>.jpg or image_<ID>.jpg, try all three for the same ID
+  // --- BEGIN ROBUST ID-BASED FALLBACK LOGIC WITH MULTI-FORMAT SUPPORT ---
+  // If the key matches various patterns, try all possible formats for the same ID
   let fallbackKeys = [key];
-  const match = key.match(/\/(campaign_ready_post_|ready_post_|image_)(\d+)\.jpg$/);
-  if (match) {
-    const id = match[2];
-    const basePath = key.substring(0, key.lastIndexOf('/') + 1);
-    fallbackKeys = [
-      `${basePath}campaign_ready_post_${id}.jpg`,
-      `${basePath}ready_post_${id}.jpg`,
-      `${basePath}image_${id}.jpg`
-    ];
-    // Remove duplicates, keep order
-    fallbackKeys = [...new Set(fallbackKeys)];
+  
+  // Handle campaign_ready_post_<ID>.(jpg|png|webp), ready_post_<ID>.(jpg|png|webp), image_<ID>.(jpg|png|webp)
+  const patterns = [
+    /\/(campaign_ready_post_)(\d+)\.(jpg|jpeg|png|webp)$/i,
+    /\/(ready_post_)(\d+)\.(jpg|jpeg|png|webp)$/i,
+    /\/(image_)(\d+)\.(jpg|jpeg|png|webp)$/i
+  ];
+  
+  let foundPattern = false;
+  for (const pattern of patterns) {
+    const match = key.match(pattern);
+    if (match) {
+      const prefix = match[1]; // e.g., 'campaign_ready_post_', 'ready_post_', 'image_'
+      const id = match[2]; // e.g., '1752914138472'
+      const basePath = key.substring(0, key.lastIndexOf('/') + 1);
+      const extensions = ['png', 'jpg', 'jpeg', 'webp']; // PNG first since it's more common for AI-generated images
+      
+      fallbackKeys = [];
+      
+      // Add the original key first
+      fallbackKeys.push(key);
+      
+      // Add all possible format variations
+      for (const ext of extensions) {
+        const fallbackKey = `${basePath}${prefix}${id}.${ext}`;
+        if (!fallbackKeys.includes(fallbackKey)) {
+          fallbackKeys.push(fallbackKey);
+        }
+      }
+      
+      // Also try cross-pattern fallbacks (e.g., campaign -> ready_post -> image)
+      if (prefix === 'campaign_ready_post_') {
+        for (const ext of extensions) {
+          const readyPostKey = `${basePath}ready_post_${id}.${ext}`;
+          const imageKey = `${basePath}image_${id}.${ext}`;
+          if (!fallbackKeys.includes(readyPostKey)) fallbackKeys.push(readyPostKey);
+          if (!fallbackKeys.includes(imageKey)) fallbackKeys.push(imageKey);
+        }
+      } else if (prefix === 'ready_post_') {
+        for (const ext of extensions) {
+          const campaignKey = `${basePath}campaign_ready_post_${id}.${ext}`;
+          const imageKey = `${basePath}image_${id}.${ext}`;
+          if (!fallbackKeys.includes(campaignKey)) fallbackKeys.push(campaignKey);
+          if (!fallbackKeys.includes(imageKey)) fallbackKeys.push(imageKey);
+        }
+      } else if (prefix === 'image_') {
+        for (const ext of extensions) {
+          const campaignKey = `${basePath}campaign_ready_post_${id}.${ext}`;
+          const readyPostKey = `${basePath}ready_post_${id}.${ext}`;
+          if (!fallbackKeys.includes(campaignKey)) fallbackKeys.push(campaignKey);
+          if (!fallbackKeys.includes(readyPostKey)) fallbackKeys.push(readyPostKey);
+        }
+      }
+      
+      foundPattern = true;
+      break;
+    }
   }
-  // --- END ROBUST ID-BASED FALLBACK LOGIC ---
+  
+  if (DEBUG_LOGS && foundPattern) {
+    console.log(`[${new Date().toISOString()}] [IMAGE] Generated ${fallbackKeys.length} fallback keys for ${key}: ${fallbackKeys.slice(0, 5).join(', ')}${fallbackKeys.length > 5 ? '...' : ''}`);
+  }
+  // --- END ROBUST ID-BASED FALLBACK LOGIC WITH MULTI-FORMAT SUPPORT ---
 
   for (const tryKey of fallbackKeys) {
     try {
@@ -1794,17 +1844,56 @@ async function handlePostsEndpoint(req, res) {
         let imageUrl = null;
         let r2ImageUrl = null;
         
-        // Extract image key from post data or file key
+        // Extract image key from post data or file key with proper extension detection
         let imageKey = null;
         if (file.Key.includes('campaign_ready_post_') && file.Key.endsWith('.json')) {
-          // Campaign pattern: campaign_ready_post_1752000987874_9c14f1fd.json -> image_1752000987874_9c14f1fd.jpg
+          // Campaign pattern: campaign_ready_post_1752000987874_9c14f1fd.json -> image_1752000987874_9c14f1fd.(jpg|png|webp)
           const baseName = file.Key.replace(/^.*\/([^\/]+)\.json$/, '$1');
-          imageKey = `${baseName}.jpg`;
+          
+          // Check for multiple possible extensions
+          const possibleExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+          for (const ext of possibleExtensions) {
+            const testKey = `${baseName}.${ext}`;
+            // We'll use this key and let the R2 endpoint handle fallbacks
+            imageKey = testKey;
+            break; // Use first extension as default, R2 endpoint will handle fallbacks
+          }
         } else if (file.Key.includes('ready_post_') && file.Key.endsWith('.json')) {
-          // Traditional pattern: ready_post_1234567890.json -> image_1234567890.jpg
+          // Traditional pattern: ready_post_1234567890.json -> image_1234567890.(jpg|png|webp)
           const match = file.Key.match(/ready_post_(\d+)\.json$/);
           if (match) {
-            imageKey = `image_${match[1]}.jpg`;
+            const imageId = match[1];
+            
+            // Try to determine actual extension by checking what exists in R2
+            const possibleExtensions = ['png', 'jpg', 'jpeg', 'webp'];
+            let actualExtension = 'jpg'; // Default fallback
+            
+            // Check if we can find the actual file extension
+            const imagePrefix = `ready_post/${platform}/${username}/image_${imageId}.`;
+            try {
+              const imageListParams = {
+                Bucket: 'tasks',
+                Prefix: imagePrefix,
+                MaxKeys: 10
+              };
+              const imageListResult = await client.listObjectsV2(imageListParams).promise();
+              
+              if (imageListResult.Contents && imageListResult.Contents.length > 0) {
+                // Find the actual image file
+                for (const imageFile of imageListResult.Contents) {
+                  const extMatch = imageFile.Key.match(/\.(png|jpg|jpeg|webp)$/i);
+                  if (extMatch) {
+                    actualExtension = extMatch[1].toLowerCase();
+                    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [API-POSTS] Detected actual image extension: ${actualExtension} for ${imageFile.Key}`);
+                    break;
+                  }
+                }
+              }
+            } catch (extError) {
+              if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [API-POSTS] Could not detect extension for ${imageId}, using default: ${extError.message}`);
+            }
+            
+            imageKey = `image_${imageId}.${actualExtension}`;
           }
         }
         
@@ -1838,6 +1927,7 @@ async function handlePostsEndpoint(req, res) {
             status: structuredPostData.status,
             image_url: imageUrl,
             r2_image_url: r2ImageUrl,
+            image_path: imageKey ? `ready_post/${platform}/${username}/${imageKey}` : null, // Add image_path for extension detection
             created_at: structuredPostData.created_at,
             updated_at: structuredPostData.updated_at
           }

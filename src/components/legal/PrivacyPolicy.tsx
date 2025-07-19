@@ -18,7 +18,7 @@ const PrivacyPolicy: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.2 }}
         >
-          Last updated: {new Date().toLocaleDateString()}
+          Last Updated: July 19, 2025
         </motion.p>
       </div>
 
@@ -32,178 +32,166 @@ const PrivacyPolicy: React.FC = () => {
           <section className="privacy-section">
             <h2>1. Introduction</h2>
             <p>
-              Welcome to Sentient Marketting ("we," "our," or "us"). We are committed to protecting your privacy and ensuring the security of your personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our AI-powered social media management platform and related services.
+              Sentient Marketting we operates an AI-powered social media management platform ("Platform") that enables clients to manage their Instagram accounts by generating and scheduling posts, comments, and replies, managing direct messages (DMs), and providing analytics. As a Tech Provider under Meta's Platform Terms, we process Instagram Graph API data ("Platform Data") on behalf of our clients (Instagram account holders) to deliver these services. This Privacy Policy explains how we collect, use, store, and protect data, including Platform Data, in compliance with Meta's Platform Terms (effective February 3, 2025), applicable laws (e.g., GDPR, CCPA), and our obligations as a Tech Provider. By using our Platform, you agree to this Privacy Policy. If you do not agree, please do not use our services.
             </p>
             <p>
-              By using Sentient Marketting, you agree to the collection and use of information in accordance with this Privacy Policy. If you do not agree with our policies and practices, please do not use our services.
+              This Privacy Policy is publicly available at [insert non-geoblocked URL] and disclosed in our Meta App Dashboard.
             </p>
           </section>
 
           <section className="privacy-section">
-            <h2>2. Information We Collect</h2>
+            <h2>2. Data We Collect</h2>
+            <p>We collect the following data to provide our services:</p>
             
-            <h3>2.1 Personal Information</h3>
-            <p>We may collect the following types of personal information:</p>
+            <h3>2.1 Instagram Platform Data</h3>
+            <p>With your explicit consent, we access and process the following Platform Data via the Instagram Graph API:</p>
             <ul>
-              <li><strong>Account Information:</strong> Name, email address, username, password, and profile information</li>
-              <li><strong>Contact Information:</strong> Phone number, billing address, and communication preferences</li>
-              <li><strong>Payment Information:</strong> Credit card details, billing information (processed securely through third-party payment processors)</li>
-              <li><strong>Social Media Account Data:</strong> When you connect your social media accounts (Instagram, Twitter, Facebook, LinkedIn), we access and store relevant data as authorized by you</li>
+              <li><strong>Direct Messages (DMs):</strong> To manage and respond to messages on your behalf.</li>
+              <li><strong>Comments:</strong> To generate replies or provide analytics on post engagement.</li>
+              <li><strong>Profile Information:</strong> Usernames, user IDs, and profile details to authenticate and manage your Instagram account.</li>
+              <li><strong>Insights:</strong> Post performance and engagement metrics to provide analytics.</li>
+              <li><strong>Access Tokens:</strong> To securely connect your Instagram account to our Platform.</li>
             </ul>
 
-            <h3>2.2 Usage Information</h3>
-            <p>We automatically collect information about how you use our services:</p>
+            <h3>2.2 Client-Provided Data</h3>
             <ul>
-              <li><strong>Device Information:</strong> IP address, browser type, operating system, device identifiers</li>
-              <li><strong>Usage Analytics:</strong> Pages visited, features used, time spent on platform, click patterns</li>
-              <li><strong>Performance Data:</strong> System performance metrics, error logs, and diagnostic information</li>
-              <li><strong>Content Data:</strong> Posts, comments, media files, and other content you create or manage through our platform</li>
+              <li><strong>Account Information:</strong> Name, email address, and account settings (e.g., rules for AI-generated content).</li>
+              <li><strong>Payment Information:</strong> Billing details processed securely via third-party payment processors (we do not store payment data).</li>
             </ul>
 
-            <h3>2.3 AI-Generated Data</h3>
-            <p>Our AI systems generate and process:</p>
+            <h3>2.3 Usage Data</h3>
             <ul>
-              <li>Content recommendations and suggestions</li>
-              <li>Performance analytics and insights</li>
-              <li>Automated responses and engagement data</li>
-              <li>Competitor analysis and market intelligence</li>
+              <li><strong>Technical Data:</strong> IP address, device type, browser, and usage logs to ensure Platform functionality and security.</li>
+              <li><strong>Analytics Data:</strong> Feature usage and performance metrics to optimize our services.</li>
             </ul>
           </section>
 
           <section className="privacy-section">
-            <h2>3. How We Use Your Information</h2>
-            <p>We use the collected information for the following purposes:</p>
-            
-            <h3>3.1 Service Provision</h3>
+            <h2>3. How We Use Your Data</h2>
+            <p>We process data solely for the purposes authorized by you (our client) to provide social media management services, as follows:</p>
             <ul>
-              <li>Provide, operate, and maintain our AI-powered social media management services</li>
-              <li>Process transactions and manage your account</li>
-              <li>Generate AI-driven content recommendations and insights</li>
-              <li>Schedule and publish content across your connected social media platforms</li>
-              <li>Provide customer support and respond to your inquiries</li>
+              <li><strong>Content Generation:</strong> Using Retrieval-Augmented Generation (RAG) AI to create and schedule posts, comments, and replies based on your predefined rules.</li>
+              <li><strong>Message Management:</strong> Managing and responding to DMs and comments on your behalf, as directed.</li>
+              <li><strong>Analytics:</strong> Providing insights on post performance and engagement metrics.</li>
+              <li><strong>Authentication:</strong> Using access tokens to connect and manage your Instagram account.</li>
+              <li><strong>Platform Improvement:</strong> Analyzing usage data to enhance Platform functionality (excluding Platform Data unless authorized).</li>
+              <li><strong>Legal Compliance:</strong> Complying with applicable laws or responding to legal requests.</li>
             </ul>
+            <p>We do not process Platform Data to build or augment user profiles, train AI models, or for any unauthorized purpose unless explicitly consented to by you.</p>
+          </section>
 
-            <h3>3.2 Service Improvement</h3>
+          <section className="privacy-section">
+            <h2>4. Legal Basis for Processing</h2>
+            <p>We process data based on:</p>
             <ul>
-              <li>Analyze usage patterns to improve our AI algorithms and platform functionality</li>
-              <li>Develop new features and enhance existing services</li>
-              <li>Conduct research and analytics to better understand user needs</li>
-              <li>Optimize platform performance and user experience</li>
+              <li><strong>Consent:</strong> Your explicit consent to access and process Platform Data via the Instagram Graph API.</li>
+              <li><strong>Contract:</strong> To fulfill our agreement to provide social media management services.</li>
+              <li><strong>Legal Obligation:</strong> To comply with laws like GDPR and CCPA.</li>
             </ul>
+            <p>Before processing Platform Data, we obtain your consent through a clear mechanism (e.g., a checkbox during account setup). You may withdraw consent at any time by contacting us or disconnecting your Instagram account.</p>
+          </section>
 
-            <h3>3.3 Communication</h3>
+          <section className="privacy-section">
+            <h2>5. Data Storage and Security</h2>
             <ul>
-              <li>Send you service-related notifications and updates</li>
-              <li>Provide technical support and customer service</li>
-              <li>Send marketing communications (with your consent)</li>
-              <li>Notify you about changes to our services or policies</li>
+              <li><strong>Storage:</strong> Platform Data (e.g., DMs, tokens) is stored in Cloudflare's R2-bucket, a third-party cloud storage service. Access is restricted to our authorized administrators and protected by encryption and strict access controls.</li>
+              <li><strong>Security Measures:</strong> We implement industry-standard safeguards, including:
+                <ul>
+                  <li>Encryption of data in transit and at rest.</li>
+                  <li>Role-based access controls limiting access to authorized personnel.</li>
+                  <li>Regular security audits and vulnerability assessments.</li>
+                  <li>Secure infrastructure hosted on compliant cloud systems.</li>
+                </ul>
+              </li>
+              <li><strong>Service Provider Compliance:</strong> Cloudflare, our Service Provider, operates under a written agreement ensuring compliance with Meta's Platform Terms and this Privacy Policy. Cloudflare processes Platform Data only at our direction and for your authorized purposes.</li>
+            </ul>
+            <p>If we detect unauthorized access or a data breach, we will notify Meta and affected clients promptly using Meta's designated form and take immediate remedial action, as required by Section IK6.b of Meta's Platform Terms.</p>
+          </section>
+
+          <section className="privacy-section">
+            <h2>6. Data Sharing</h2>
+            <p>We only share Platform Data in the following circumstances:</p>
+            <ul>
+              <li><strong>With Clients:</strong> To provide services (e.g., sharing analytics with you).</li>
+              <li><strong>With Cloudflare:</strong> For secure storage in R2-bucket, as described above.</li>
+              <li><strong>With Your Consent:</strong> When you direct us to share data with a third party (e.g., a client's service provider), with proof of consent retained.</li>
+              <li><strong>Legal Requirements:</strong> When required by law, with proof of the legal requirement retained.</li>
+            </ul>
+            <p>We do not sell, license, or share Platform Data for unauthorized purposes, and we contractually prohibit third parties from using shared data in violation of Meta's terms.</p>
+          </section>
+
+
+
+          <section className="privacy-section">
+            <h2>7. Data Retention and Deletion</h2>
+            <ul>
+              <li><strong>Retention:</strong> We retain Platform Data only as long as necessary to provide our services or as required by law. Client data is maintained separately to ensure compliance with Meta's Tech Provider requirements.</li>
+              <li><strong>Deletion:</strong> We delete Platform Data promptly when:
+                <ul>
+                  <li>You or Meta request deletion.</li>
+                  <li>You terminate your account.</li>
+                  <li>The data is no longer necessary for the authorized purpose.</li>
+                  <li>Required by law.</li>
+                </ul>
+              </li>
+              <li><strong>Deletion Process:</strong> To request deletion of your Platform Data, contact us at tech.nucleus25@gmail.com. We will delete or anonymize data within 30 days, except where retention is required by law (proof of which will be retained).</li>
             </ul>
           </section>
 
           <section className="privacy-section">
-            <h2>4. Information Sharing and Disclosure</h2>
-            <p>We do not sell, trade, or rent your personal information to third parties. We may share your information in the following circumstances:</p>
-
-            <h3>4.1 Service Providers</h3>
-            <p>We may share information with trusted third-party service providers who assist us in:</p>
+            <h2>8. Your Data Rights</h2>
+            <p>You have the following rights under GDPR, CCPA, and other applicable laws:</p>
             <ul>
-              <li>Cloud hosting and data storage</li>
-              <li>Payment processing</li>
-              <li>Analytics and performance monitoring</li>
-              <li>Customer support services</li>
-              <li>Email and communication services</li>
+              <li><strong>Access:</strong> Request a copy of your data.</li>
+              <li><strong>Correction:</strong> Update or correct your data.</li>
+              <li><strong>Deletion:</strong> Request deletion of your data.</li>
+              <li><strong>Restriction:</strong> Restrict processing of your data.</li>
+              <li><strong>Portability:</strong> Obtain your data in a portable format.</li>
+              <li><strong>Objection:</strong> Object to certain data processing.</li>
             </ul>
+            <p>To exercise these rights, contact us at privacy@sentientai.com. We will respond within 30 days. As a Tech Provider, we notify clients of user data rights requests, as required by Meta's Platform Terms.</p>
+          </section>
 
-            <h3>4.2 Social Media Platforms</h3>
-            <p>When you connect your social media accounts, we share necessary information with these platforms to:</p>
+          <section className="privacy-section">
+            <h2>9. International Data Transfers</h2>
+            <p>Platform Data may be transferred to Cloudflare's R2-bucket servers outside the EEA or UK. We ensure compliance with GDPR and UK GDPR by:</p>
             <ul>
-              <li>Publish content on your behalf</li>
-              <li>Retrieve analytics and performance data</li>
-              <li>Manage your social media presence</li>
+              <li>Using Standard Contractual Clauses (Module One) for EEA data transfers, as required by Meta's Platform Terms (Section 10).</li>
+              <li>Using the UK Addendum for UK data transfers, as required by Section 10A.</li>
             </ul>
+            <p>Contact us for details on these safeguards. We retain proof of compliance and provide it to Meta upon request.</p>
+          </section>
 
-            <h3>4.3 Legal Requirements</h3>
-            <p>We may disclose your information if required by law or in response to:</p>
+          <section className="privacy-section">
+            <h2>10. Tech Provider Role</h2>
+            <p>As a Tech Provider under Meta's Platform Terms, we:</p>
             <ul>
-              <li>Legal processes, subpoenas, or court orders</li>
-              <li>Government investigations or regulatory requests</li>
-              <li>Protection of our rights, property, or safety</li>
-              <li>Prevention of fraud or illegal activities</li>
+              <li>Process Platform Data only on behalf of and at the direction of our clients for their authorized purposes (e.g., social media management).</li>
+              <li>Maintain client data separately to prevent cross-client processing.</li>
+              <li>Notify clients of user data rights requests or Meta communications regarding Platform Data.</li>
+              <li>Ensure clients comply with Meta's terms, terminating non-compliant clients if requested by Meta.</li>
             </ul>
           </section>
 
           <section className="privacy-section">
-            <h2>5. Data Security</h2>
-            <p>We implement comprehensive security measures to protect your information:</p>
-            <ul>
-              <li><strong>Encryption:</strong> All data is encrypted in transit and at rest using industry-standard encryption protocols</li>
-              <li><strong>Access Controls:</strong> Strict access controls and authentication mechanisms protect your data</li>
-              <li><strong>Regular Audits:</strong> We conduct regular security audits and vulnerability assessments</li>
-              <li><strong>Secure Infrastructure:</strong> Our systems are hosted on secure, compliant cloud infrastructure</li>
-              <li><strong>Employee Training:</strong> Our team receives regular security and privacy training</li>
-            </ul>
-            <p>
-              While we strive to protect your information, no method of transmission over the internet or electronic storage is 100% secure. We cannot guarantee absolute security but are committed to maintaining the highest security standards.
-            </p>
+            <h2>11. Children's Privacy</h2>
+            <p>Our services are not intended for children under 13. We do not knowingly collect data from children under 13. If we discover such data, we will delete it promptly, as required by COPPA.</p>
           </section>
 
           <section className="privacy-section">
-            <h2>6. Your Rights and Choices</h2>
-            <p>You have the following rights regarding your personal information:</p>
-
-            <h3>6.1 Access and Portability</h3>
+            <h2>12. Contact Us</h2>
+            <p>For questions, data rights requests, or to report security vulnerabilities, contact:</p>
             <ul>
-              <li>Request access to your personal information</li>
-              <li>Obtain a copy of your data in a portable format</li>
-              <li>Review how your information is being used</li>
+              <li><strong>Email:</strong> tech.nucleus25@gmail.com</li>
+              <li><strong>Address:</strong> Ghulam Ishaq Khan Institute of Science and Technology, Tarbela Road, District Swabi, Khyber Pakhtoon Khwa, Topi, 23640</li>
+              <li><strong>Phone:</strong> +92 303 5233321</li>
             </ul>
-
-            <h3>6.2 Correction and Updates</h3>
-            <ul>
-              <li>Update or correct your personal information</li>
-              <li>Modify your account settings and preferences</li>
-              <li>Change your communication preferences</li>
-            </ul>
-
-            <h3>6.3 Deletion and Restriction</h3>
-            <ul>
-              <li>Request deletion of your personal information</li>
-              <li>Restrict processing of your data</li>
-              <li>Withdraw consent for data processing</li>
-            </ul>
-
-            <h3>6.4 Opt-Out Options</h3>
-            <ul>
-              <li>Unsubscribe from marketing communications</li>
-              <li>Disable certain data collection features</li>
-              <li>Disconnect social media accounts</li>
-            </ul>
+            <p>We will respond within 30 days. Report security vulnerabilities to the above email for prompt resolution.</p>
           </section>
 
           <section className="privacy-section">
-            <h2>7. Data Retention</h2>
-            <p>We retain your information for as long as necessary to:</p>
-            <ul>
-              <li>Provide our services to you</li>
-              <li>Comply with legal obligations</li>
-              <li>Resolve disputes and enforce agreements</li>
-              <li>Improve our AI algorithms and services</li>
-            </ul>
-            <p>
-              When you delete your account, we will delete or anonymize your personal information within 30 days, except where we are required to retain certain information for legal or regulatory purposes.
-            </p>
-          </section>
-
-          <section className="privacy-section">
-            <h2>8. International Data Transfers</h2>
-            <p>
-              Your information may be transferred to and processed in countries other than your country of residence. We ensure that such transfers comply with applicable data protection laws and implement appropriate safeguards, including:
-            </p>
-            <ul>
-              <li>Standard contractual clauses approved by regulatory authorities</li>
-              <li>Adequacy decisions by relevant data protection authorities</li>
-              <li>Certification schemes and codes of conduct</li>
-            </ul>
+            <h2>13. Changes to This Privacy Policy</h2>
+            <p>We may update this Privacy Policy to reflect changes in our practices or legal requirements. We will notify you of material changes via email or in-app notifications. Your continued use of our Platform after changes indicates acceptance of the updated policy.</p>
           </section>
 
           <section className="privacy-section">

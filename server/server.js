@@ -2218,9 +2218,9 @@ app.get(['/posts/:username', '/api/posts/:username'], async (req, res) => {
     
     // First, collect all files
     const jsonFiles = files.filter(file => file.Key.endsWith('.json'));
-    const jpgFiles = files.filter(file => file.Key.endsWith('.jpg'));
+    const imageFiles = files.filter(file => file.Key.endsWith('.jpg') || file.Key.endsWith('.png'));
     
-    console.log(`[${new Date().toISOString()}] Found ${jsonFiles.length} JSON files and ${jpgFiles.length} JPG files in ${prefix}/ for ${platform}`);
+    console.log(`[${new Date().toISOString()}] Found ${jsonFiles.length} JSON files and ${imageFiles.length} image files in ${prefix}/ for ${platform}`);
     
     // Store the post data
     const posts = await Promise.all(
@@ -2262,15 +2262,18 @@ app.get(['/posts/:username', '/api/posts/:username'], async (req, res) => {
           }
           
           // Look for matching image file
-          // Always check all three possible image key patterns for the same ID
+          // Always check all possible image key patterns for the same ID (both jpg and png)
           const potentialImageKeys = [
             `${prefix}/image_${fileId}.jpg`,
+            `${prefix}/image_${fileId}.png`,
             `${prefix}/ready_post_${fileId}.jpg`,
-            `${prefix}/campaign_ready_post_${fileId}.jpg`
+            `${prefix}/ready_post_${fileId}.png`,
+            `${prefix}/campaign_ready_post_${fileId}.jpg`,
+            `${prefix}/campaign_ready_post_${fileId}.png`
           ];
           
           // Find the first matching image file
-          const imageFile = jpgFiles.find(img => 
+          const imageFile = imageFiles.find(img => 
             potentialImageKeys.includes(img.Key)
           );
           
@@ -6678,9 +6681,9 @@ async function warmupCacheForActiveUsers() {
           
           // First, collect all files
           const jsonFiles = files.filter(file => file.Key.endsWith('.json'));
-          const jpgFiles = files.filter(file => file.Key.endsWith('.jpg'));
+          const imageFiles = files.filter(file => file.Key.endsWith('.jpg') || file.Key.endsWith('.png'));
           
-          console.log(`[${new Date().toISOString()}] Found ${jsonFiles.length} JSON files and ${jpgFiles.length} JPG files in ${postsPrefix} for ${platform}`);
+          console.log(`[${new Date().toISOString()}] Found ${jsonFiles.length} JSON files and ${imageFiles.length} image files in ${postsPrefix} for ${platform}`);
           
           // Process posts similar to the /posts/:username endpoint but without returning the data
           const posts = await Promise.all(
@@ -6722,14 +6725,17 @@ async function warmupCacheForActiveUsers() {
                 }
                 
                 // Look for matching image file
-                // Always check all three possible image key patterns for the same ID
+                // Always check all possible image key patterns for the same ID (both jpg and png)
                 const potentialImageKeys = [
                   `${postsPrefix}image_${fileId}.jpg`,
+                  `${postsPrefix}image_${fileId}.png`,
                   `${postsPrefix}ready_post_${fileId}.jpg`,
-                  `${postsPrefix}campaign_ready_post_${fileId}.jpg`
+                  `${postsPrefix}ready_post_${fileId}.png`,
+                  `${postsPrefix}campaign_ready_post_${fileId}.jpg`,
+                  `${postsPrefix}campaign_ready_post_${fileId}.png`
                 ];
                 // Find the first matching image file
-                const imageFile = jpgFiles.find(img => 
+                const imageFile = imageFiles.find(img => 
                   potentialImageKeys.includes(img.Key)
                 );
                 

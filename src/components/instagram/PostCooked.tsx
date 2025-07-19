@@ -23,7 +23,7 @@ import { getApiUrl } from '../../config/api';
 interface PostCookedProps {
   username: string;
   profilePicUrl: string;
-  posts?: { key: string; data: { post: any; status: string; image_url: string; r2_image_url?: string }; imageFailed?: boolean }[];
+  posts?: { key: string; data: { post: any; status: string; image_url: string; r2_image_url?: string; image_path?: string }; imageFailed?: boolean }[];
   userId?: string;
   platform?: 'instagram' | 'twitter' | 'facebook';
 }
@@ -394,17 +394,37 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   const getReliableImageUrl = useCallback((post: any, forceRefresh: boolean = false) => {
     const postKey = post.key;
     let imageId = '';
+    let imageExtension = 'jpg'; // Default to jpg
     
     // Extract image ID from post key (most reliable method)
     const match = postKey.match(/ready_post_(\d+)\.json$/);
     if (match) {
       imageId = match[1];
+      
+      // Try to determine extension from post data
+      if (post.data?.image_path) {
+        const pathMatch = post.data.image_path.match(/\.(jpg|jpeg|png|webp)$/i);
+        if (pathMatch) {
+          imageExtension = pathMatch[1].toLowerCase();
+        }
+      } else if (post.data?.image_url) {
+        const urlMatch = post.data.image_url.match(/\.(jpg|jpeg|png|webp)(\?|$)/i);
+        if (urlMatch) {
+          imageExtension = urlMatch[1].toLowerCase();
+        }
+      } else if (post.data?.r2_image_url) {
+        const urlMatch = post.data.r2_image_url.match(/\.(jpg|jpeg|png|webp)(\?|$)/i);
+        if (urlMatch) {
+          imageExtension = urlMatch[1].toLowerCase();
+        }
+      }
     } else {
-      // Fallback: try to extract from existing URLs
+      // Fallback: try to extract from existing URLs with support for multiple formats
       const imageUrl = post.data.image_url || post.data.r2_image_url || '';
-      const urlMatch = imageUrl.match(/(image_\d+\.jpg)/);
+      const urlMatch = imageUrl.match(/(image_\d+)\.(jpg|jpeg|png|webp)/i);
       if (urlMatch) {
-        imageId = urlMatch[1].replace(/^image_|\.jpg$/g, '');
+        imageId = urlMatch[1].replace(/^image_/, '');
+        imageExtension = urlMatch[2].toLowerCase();
       }
     }
     
@@ -416,8 +436,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     // Create timestamp for cache busting
     const timestamp = forceRefresh ? Date.now() : Math.floor(Date.now() / 60000); // 1-minute cache
     
-    // Use our reliable direct R2 endpoint with comprehensive parameters
-    const reliableUrl = `${API_BASE_URL}/api/r2-image/${username}/image_${imageId}.jpg` +
+    // Use our reliable direct R2 endpoint with comprehensive parameters and correct extension
+    const reliableUrl = `${API_BASE_URL}/api/r2-image/${username}/image_${imageId}.${imageExtension}` +
       `?platform=${platform}&t=${timestamp}&v=${imageRefreshKey}&post=${encodeURIComponent(postKey)}`;
     
     return reliableUrl;
@@ -804,18 +824,35 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     // Primary: Extract image key from the post key itself (most reliable)
     if (key.match(/ready_post_\d+\.json$/)) {
       const postIdMatch = key.match(/ready_post_(\d+)\.json$/);
-      if (postIdMatch) imageKey = `image_${postIdMatch[1]}.jpg`;
+      if (postIdMatch) {
+        const imageId = postIdMatch[1];
+        
+        // Determine the correct extension from post data
+        let extension = 'jpg'; // Default
+        if (post.data?.image_path) {
+          const pathMatch = post.data.image_path.match(/\.(jpg|jpeg|png|webp)$/i);
+          if (pathMatch) extension = pathMatch[1].toLowerCase();
+        } else if (post.data?.image_url) {
+          const urlMatch = post.data.image_url.match(/\.(jpg|jpeg|png|webp)(\?|$)/i);
+          if (urlMatch) extension = urlMatch[1].toLowerCase();
+        } else if (post.data?.r2_image_url) {
+          const urlMatch = post.data.r2_image_url.match(/\.(jpg|jpeg|png|webp)(\?|$)/i);
+          if (urlMatch) extension = urlMatch[1].toLowerCase();
+        }
+        
+        imageKey = `image_${imageId}.${extension}`;
+      }
     }
     
     // Fallback: extract from image URL if available (handle both original and proxied URLs)
     if (!imageKey && post.data.image_url) {
-      const urlMatch = post.data.image_url.match(/(image_\d+\.jpg)/);
+      const urlMatch = post.data.image_url.match(/(image_\d+\.(jpg|jpeg|png|webp))/i);
       if (urlMatch) imageKey = urlMatch[1];
     }
     
     // Additional fallback: extract from r2_image_url if available
     if (!imageKey && post.data.r2_image_url) {
-      const urlMatch = post.data.r2_image_url.match(/(image_\d+\.jpg)/);
+      const urlMatch = post.data.r2_image_url.match(/(image_\d+\.(jpg|jpeg|png|webp))/i);
       if (urlMatch) imageKey = urlMatch[1];
     }
 
@@ -1492,7 +1529,22 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       if (post.key && post.key.match(/ready_post_\d+\.json$/)) {
         const postIdMatch = post.key.match(/ready_post_(\d+)\.json$/);
         if (postIdMatch) {
-          const imageKey = `image_${postIdMatch[1]}.jpg`;
+          const imageId = postIdMatch[1];
+          
+          // Determine the correct extension from post data
+          let extension = 'jpg'; // Default
+          if (post.data?.image_path) {
+            const pathMatch = post.data.image_path.match(/\.(jpg|jpeg|png|webp)$/i);
+            if (pathMatch) extension = pathMatch[1].toLowerCase();
+          } else if (post.data?.image_url) {
+            const urlMatch = post.data.image_url.match(/\.(jpg|jpeg|png|webp)(\?|$)/i);
+            if (urlMatch) extension = urlMatch[1].toLowerCase();
+          } else if (post.data?.r2_image_url) {
+            const urlMatch = post.data.r2_image_url.match(/\.(jpg|jpeg|png|webp)(\?|$)/i);
+            if (urlMatch) extension = urlMatch[1].toLowerCase();
+          }
+          
+          const imageKey = `image_${imageId}.${extension}`;
           console.log(`[PostCooked] 🔑 Extracted imageKey from post key: ${imageKey}`);
           return imageKey;
         }
@@ -1501,20 +1553,24 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       // Method 2: Extract from existing image URLs
       const imageUrl = post.data.image_url || post.data.r2_image_url || '';
       if (imageUrl) {
-        // Handle both direct R2 URLs and our proxy URLs
+        // Handle both direct R2 URLs and our proxy URLs with multiple formats
         const urlPatterns = [
-          /(image_\d+\.jpg)/,           // Direct filename match
-          /\/([^\/]+\.jpg)$/,           // Last segment ending in .jpg
-          /image_(\d+)/                 // Image ID pattern
+          /(image_\d+\.(jpg|jpeg|png|webp))/i,    // Direct filename match with extension
+          /\/([^\/]+\.(jpg|jpeg|png|webp))$/i,    // Last segment ending in image extension
+          /image_(\d+)/                           // Image ID pattern (fallback)
         ];
         
         for (const pattern of urlPatterns) {
           const match = imageUrl.match(pattern);
           if (match) {
             let imageKey = match[1];
-            // If we only got the ID, format it properly
-            if (pattern.source.includes('image_(\\d+)') && !imageKey.includes('.jpg')) {
-              imageKey = `image_${imageKey}.jpg`;
+            // If we only got the ID, format it properly with detected extension
+            if (pattern.source.includes('image_(\\d+)') && !imageKey.includes('.')) {
+              // Try to detect extension from URL
+              let extension = 'jpg'; // Default
+              const extMatch = imageUrl.match(/\.(jpg|jpeg|png|webp)(\?|$)/i);
+              if (extMatch) extension = extMatch[1].toLowerCase();
+              imageKey = `image_${imageKey}.${extension}`;
             }
             console.log(`[PostCooked] 🔑 Extracted imageKey from URL: ${imageKey}`);
             return imageKey;

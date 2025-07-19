@@ -9,6 +9,7 @@ interface FacebookContextType {
   hasAccessed: boolean;
   connectFacebook: (facebookId: string, username: string) => void;
   disconnectFacebook: () => void;
+  resetFacebookAccess: () => void;
 }
 
 const FacebookContext = createContext<FacebookContextType>({
@@ -18,6 +19,7 @@ const FacebookContext = createContext<FacebookContextType>({
   hasAccessed: false,
   connectFacebook: () => {},
   disconnectFacebook: () => {},
+  resetFacebookAccess: () => {},
 });
 
 export const useFacebook = () => useContext(FacebookContext);
@@ -155,6 +157,20 @@ export const FacebookProvider: React.FC<FacebookProviderProps> = ({ children }) 
     console.log(`[${new Date().toISOString()}] Facebook disconnected via context`);
   }, []);
 
+  const resetFacebookAccess = useCallback(() => {
+    setUserId(null);
+    setUsername(null);
+    setIsConnected(false);
+    setHasAccessed(false);
+    
+    // Clear localStorage
+    if (currentUser?.uid) {
+      localStorage.removeItem(`facebook_accessed_${currentUser.uid}`);
+    }
+    
+    console.log(`[${new Date().toISOString()}] Facebook access reset via context`);
+  }, [currentUser?.uid]);
+
   const value: FacebookContextType = useMemo(() => ({
     userId,
     username,
@@ -162,7 +178,8 @@ export const FacebookProvider: React.FC<FacebookProviderProps> = ({ children }) 
     hasAccessed,
     connectFacebook,
     disconnectFacebook,
-  }), [userId, username, isConnected, hasAccessed, connectFacebook, disconnectFacebook]);
+    resetFacebookAccess,
+  }), [userId, username, isConnected, hasAccessed, connectFacebook, disconnectFacebook, resetFacebookAccess]);
 
   return (
     <FacebookContext.Provider value={value}>

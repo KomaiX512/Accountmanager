@@ -40,9 +40,7 @@ export default defineConfig({
       ]
     },
     proxy: {
-      // ================================================================
-      // PRIORITY 1: RAG server endpoints (port 3001) - MUST come first
-      // ================================================================
+      // RAG server endpoints (port 3001) - MUST come before general /api rule
       '/api/rag/post-generator': {
         target: 'http://localhost:3001',
         changeOrigin: true,
@@ -85,19 +83,9 @@ export default defineConfig({
         secure: false,
         rewrite: (path) => path.replace('/api/rag', ''),
       },
-      // Image endpoints (port 3000 - MAIN SERVER ONLY) - CRITICAL: No proxy server interference
+      // Image endpoints (port 3002) - MUST come before general /api rule  
       '/api/r2-image': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api/signed-image-url': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api/save-edited-post': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:3002',
         changeOrigin: true,
         secure: false,
       },
@@ -134,55 +122,6 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
-      // ================================================================
-      // PRIORITY 2: CRITICAL DM/Notification endpoints (port 3000) - MUST come before catch-all
-      // ================================================================
-      // These endpoints are essential for notifications and should NEVER go to proxy server
-      '/api/events-list': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-        secure: false,
-        // NO REWRITE - preserve /api prefix for proper backend routing
-      },
-      '/api/send-dm-reply': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api/send-comment-reply': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api/ignore-notification': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api/mark-notification-handled': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-        secure: false,
-      },
-      // Facebook/Instagram connection endpoints - MUST go to main server ONLY
-      '/api/facebook-connection': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-        secure: false,
-        // NO REWRITE - preserve /api prefix for proper backend routing
-      },
-      '/api/instagram-connection': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-        secure: false,
-        // NO REWRITE - preserve /api prefix for proper backend routing
-      },
-      '/api/twitter-connection': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-        secure: false,
-        // NO REWRITE - preserve /api prefix for proper backend routing
-      },
       // Connection status endpoints (port 3000) - Main server contains these endpoints
       '/api/user-instagram-status': {
         target: 'http://localhost:3000',
@@ -203,6 +142,34 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
         // Preserve /api prefix so backend route '/api/user-twitter-status/:userId' matches
+        // No rewrite here
+      },
+      '/api/platform-reset': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+        // Preserve /api prefix so backend route '/api/platform-reset/:userId' matches
+        // No rewrite here
+      },
+      '/api/instagram-connection': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+        // Preserve /api prefix so backend route '/api/instagram-connection/:userId' matches
+        // No rewrite here
+      },
+      '/api/twitter-connection': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+        // Preserve /api prefix so backend route '/api/twitter-connection/:userId' matches
+        // No rewrite here
+      },
+      '/api/facebook-connection': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+        // Preserve /api prefix so backend route '/api/facebook-connection/:userId' matches
         // No rewrite here
       },
       // Post-now endpoint (port 3000) - critical for PostNow functionality
@@ -234,32 +201,14 @@ export default defineConfig({
         secure: false,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
-      // CATCH-ALL: All other /api endpoints go to main server (port 3000) - strip /api prefix
-      // NOTE: This rule comes AFTER all specific notification/DM endpoints to avoid conflicts
+      // All other /api endpoints go to main server (port 3000) - strip /api prefix
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => {
-          // Do NOT rewrite notification endpoints - they need /api prefix
-          if (path.includes('/api/events-list') || 
-              path.includes('/api/send-dm-reply') || 
-              path.includes('/api/send-comment-reply') ||
-              path.includes('/api/ignore-notification') ||
-              path.includes('/api/mark-notification-handled') ||
-              path.includes('/api/facebook-connection') ||
-              path.includes('/api/instagram-connection') ||
-              path.includes('/api/twitter-connection') ||
-              path.includes('/api/user-facebook-status') ||
-              path.includes('/api/user-instagram-status') ||
-              path.includes('/api/user-twitter-status') ||
-              path.includes('/api/reset-account-info')) {
-            return path; // Keep /api prefix for these endpoints
-          }
-          return path.replace(/^\/api/, ''); // Strip /api for others
-        },
+        rewrite: (path) => path.replace(/^\/api/, ''),
       },
-      // Events endpoints (port 3000) - CRITICAL for DMs/notifications
+      // Events endpoints (port 3000)
       '/events': {
         target: 'http://localhost:3000',
         changeOrigin: true,
@@ -292,8 +241,11 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
-      // REMOVED: All proxy server (port 3002) routing for images to prevent DM/notification interference
-      // Images now go to main server (port 3000) only
+      '/images': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+        secure: false,
+      },
       '/profit-analysis': {
         target: 'http://localhost:3000',
         changeOrigin: true,
@@ -304,8 +256,11 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
-      // REMOVED: All proxy server (port 3002) routing - Now using main server only
-      // '/fix-image': goes to main server through general /api rule
+      '/fix-image': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+        secure: false,
+      },
       // Twitter OAuth endpoints (port 3000)
       '/twitter/auth': {
         target: 'http://localhost:3000',

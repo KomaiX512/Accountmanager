@@ -595,6 +595,44 @@ h2 {
   border-color: #1877f2;
 }
 
+/* Reset Button Styles */
+.dashboard-btn.reset-btn {
+  background: linear-gradient(135deg, #8b3a3a, #a04747);
+  border-color: #8b3a3a;
+  color: #e8e8e8;
+  opacity: 0.8;
+}
+
+.dashboard-btn.reset-btn:hover {
+  background: linear-gradient(135deg, #9e4545, #b85454);
+  border-color: #9e4545;
+  box-shadow: 0 0 8px rgba(139, 58, 58, 0.3);
+  opacity: 1;
+}
+
+.dashboard-btn.reset-btn.twitter {
+  background: linear-gradient(135deg, #7a4035, #8b4a3f);
+  border-color: #7a4035;
+}
+
+.dashboard-btn.reset-btn.facebook {
+  background: linear-gradient(135deg, #7d5a5a, #8e6565);
+  border-color: #7d5a5a;
+}
+
+.dashboard-btn.reset-btn.instagram {
+  background: linear-gradient(135deg, #7a3d42, #8b4850);
+  border-color: #7a3d42;
+}
+
+.dashboard-btn.reset-btn:disabled {
+  background: linear-gradient(135deg, #555, #777);
+  border-color: #555;
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+
 .facebook-status {
   display: flex;
   align-items: center;
@@ -620,29 +658,32 @@ h2 {
 
 .toast-notification {
   position: fixed;
-  top: 24px;
-  right: 24px;
-  background: rgba(26, 26, 58, 0.95);
-  backdrop-filter: blur(8px);
+  top: 20px;
+  right: 20px;
+  background: linear-gradient(135deg, rgba(26, 26, 58, 0.98), rgba(30, 30, 47, 0.98));
+  backdrop-filter: blur(12px);
   border-radius: 12px;
-  padding: 16px 24px;
+  padding: 12px 16px;
   color: #ffffff;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 500;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   box-shadow: 
-    0 4px 12px rgba(0, 0, 0, 0.1),
-    0 2px 4px rgba(0, 0, 0, 0.05),
-    0 0 1px rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    0 4px 16px rgba(0, 255, 204, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(0, 255, 204, 0.5);
   z-index: 1000;
   max-width: 380px;
+  min-width: 280px;
   width: auto;
   transform-origin: top right;
-  animation: toast-appear 0.3s cubic-bezier(0.21, 1.02, 0.73, 1) forwards;
+  animation: slideInNotificationProfessional 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
   will-change: transform, opacity;
+  /* Professional dimensions */
+  min-height: 60px;
 }
 
 .toast-notification + .toast-notification {
@@ -654,16 +695,17 @@ h2 {
   color: #00ffcc;
   width: 18px;
   height: 18px;
+  filter: drop-shadow(0 0 6px rgba(0, 255, 204, 0.6));
 }
 
-@keyframes toast-appear {
-  0% { 
+@keyframes slideInNotificationProfessional {
+  from {
+    transform: translate3d(100%, -20px, 0) scale(0.8);
     opacity: 0;
-    transform: translateY(-16px) scale(0.95);
   }
-  100% { 
+  to {
+    transform: translate3d(0, 0, 0) scale(1);
     opacity: 1;
-    transform: translateY(0) scale(1);
   }
 }
 
@@ -688,8 +730,11 @@ h2 {
     max-width: calc(100vw - 32px);
     margin: 0 16px;
     right: 0;
-    font-size: 0.9rem;
-    padding: 14px 20px;
+    top: 15px;
+    font-size: 0.85rem;
+    padding: 10px 14px;
+    min-height: 50px;
+    min-width: 250px;
   }
 }
 
@@ -1302,9 +1347,201 @@ h2 {
 
 .connection-card p {
   margin-bottom: 32px;
-  color: #b0b0e0;
+  color: #e0e0ff;
   font-size: 1.1rem;
   line-height: 1.6;
+}
+
+/* Reset Confirmation Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+}
+
+.reset-confirm-modal {
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  border: 2px solid rgba(255, 71, 87, 0.3);
+  border-radius: 16px;
+  max-width: 500px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(255, 71, 87, 0.3);
+  overflow: hidden;
+}
+
+.reset-confirm-content {
+  padding: 30px;
+}
+
+.reset-confirm-header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 25px;
+  text-align: center;
+  justify-content: center;
+}
+
+.reset-confirm-header .reset-icon {
+  color: #ff4757;
+  font-size: 2rem;
+  animation: spin-reset 2s linear infinite;
+}
+
+.reset-confirm-header h2 {
+  color: #ff4757;
+  font-size: 1.6rem;
+  margin: 0;
+  text-shadow: 0 0 10px rgba(255, 71, 87, 0.5);
+}
+
+.reset-confirm-body p {
+  color: #e0e0ff;
+  font-size: 1.1rem;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.reset-warning {
+  background: rgba(255, 71, 87, 0.1);
+  border: 1px solid rgba(255, 71, 87, 0.3);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 25px;
+}
+
+.reset-warning strong {
+  color: #ff4757;
+  display: block;
+  margin-bottom: 10px;
+}
+
+.reset-warning ul {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0;
+}
+
+.reset-warning li {
+  color: #e0e0ff;
+  padding: 5px 0;
+  position: relative;
+  padding-left: 20px;
+}
+
+.reset-warning li:before {
+  content: "•";
+  color: #ff4757;
+  font-weight: bold;
+  position: absolute;
+  left: 0;
+}
+
+.reset-warning p:last-child {
+  margin-top: 15px;
+  font-style: italic;
+  color: #b0b0d0;
+}
+
+.reset-confirm-actions {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+}
+
+.cancel-btn, .reset-btn-confirm {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 120px;
+  justify-content: center;
+}
+
+.cancel-btn {
+  background: linear-gradient(135deg, #666, #888);
+  color: white;
+  border: 2px solid #666;
+}
+
+.cancel-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #777, #999);
+  border-color: #777;
+}
+
+.reset-btn-confirm {
+  background: linear-gradient(135deg, #ff4757, #ff6b81);
+  color: white;
+  border: 2px solid #ff4757;
+}
+
+.reset-btn-confirm:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ff3742, #ff5764);
+  border-color: #ff3742;
+  box-shadow: 0 0 15px rgba(255, 71, 87, 0.5);
+}
+
+.reset-btn-confirm:disabled, .cancel-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin-reset {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .reset-confirm-modal {
+    margin: 20px;
+    max-width: calc(100vw - 40px);
+  }
+  
+  .reset-confirm-content {
+    padding: 20px;
+  }
+  
+  .reset-confirm-header h2 {
+    font-size: 1.3rem;
+  }
+  
+  .reset-confirm-actions {
+    flex-direction: column;
+  }
+  
+  .cancel-btn, .reset-btn-confirm {
+    width: 100%;
+  }
 }
 
 /* Logo styling for dashboard headers */

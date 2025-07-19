@@ -16,6 +16,31 @@ const TopBar: React.FC = () => {
       initial={{ y: -80 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.5 }}
+      style={{
+        // 🔒 BULLETPROOF STATIC POSITIONING - Always visible, highest priority
+        position: 'fixed',
+        top: '0',
+        left: '0',
+        right: '0',
+        zIndex: 999999, // FIXED: Much higher z-index to stay above everything
+        height: '70px',
+        background: 'rgba(26, 26, 46, 0.95)', // FIXED: More opaque for better visibility
+        borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
+        transform: 'translateZ(0)',
+        willChange: 'transform',
+        boxSizing: 'border-box',
+        // FIXED: Additional bulletproof properties
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingLeft: '100px',
+        paddingRight: '30px',
+        // Prevent any layout shifts
+        minHeight: '70px',
+        maxHeight: '70px'
+      }}
     >
       <div className="logo" onClick={() => navigate('/')}>
         <img 
@@ -23,10 +48,6 @@ const TopBar: React.FC = () => {
           alt="Logo" 
           className="logo-image"
         />
-      </div>
-
-      <div className="platform-title">
-        <span>Dashboard</span>
       </div>
 
       <div className="nav-links">

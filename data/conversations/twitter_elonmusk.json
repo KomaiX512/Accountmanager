@@ -14,5 +14,13 @@
   {
     "role": "assistant",
     "content": "<br><br>Based on the data provided, I am unable to determine your most engaging post. The provided data includes the following information about the @elonmusk Twitter account:<br><br>*   <strong>Profile:</strong> Elon Musk<br>*   <strong>Username:</strong> @elonmusk<br>*   <strong>Followers:</strong> 220,243,049<br>*   <strong>Following:</strong> 1,140<br>*   <strong>Posts:</strong> 79,481<br><br>The data also states \"Analysis based on 1 relevant data points from the elonmusk account.\" However, the actual post content, engagement metrics (likes, comments, etc.), and \"Most Engaging Post\" data are not included in the provided information. Without this information, I cannot identify which post had the highest engagement.<br>"
+  },
+  {
+    "role": "user",
+    "content": "tell me about my high engaging post counts upto now"
+  },
+  {
+    "role": "assistant",
+    "content": "Based on the provided data for @elonmusk, I can tell you about the recent posts and engagement.\n\nThe data includes the following posts:\n\n*   Post 1: \"Let’s make Twitter maximum fun!\"\n*   Post 2: \"You are the media now\"\n*   Post 3: \"Listen, I can’t do miracles ok https://t.co/z7dvLMUXy8\"\n*   Post 4: \"It is morning in America again https://t.co/GNTE0cUWoc\"\n\nUnfortunately, the provided data does not include any engagement metrics (likes, comments, totals) or information about which post is the \"Most Engaging Post.\" Therefore, I cannot tell you about high-engaging post counts.\n"
   }
 ]

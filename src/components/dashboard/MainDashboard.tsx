@@ -1139,11 +1139,23 @@ const MainDashboard: React.FC = () => {
                       </div>
                       
                       <div 
-                        className={`connection-indicator ${platform.connected ? 'connected' : 'disconnected'} ${platform.id === 'linkedin' && !platform.connected ? 'coming-soon' : ''}`}
-                        onClick={() => !platform.connected && platform.id !== 'linkedin' && handleConnectionButtonClick(platform)}
-                        style={{ cursor: platform.connected || platform.id === 'linkedin' ? 'default' : 'pointer' }}
+                        className={`connection-indicator ${
+                          platform.id === 'linkedin' && !platform.connected 
+                            ? 'coming-soon' 
+                            : platform.claimed 
+                              ? (platform.connected ? 'connected' : 'disconnected')
+                              : 'not-applicable'
+                        }`}
+                        onClick={() => platform.claimed && !platform.connected && platform.id !== 'linkedin' && handleConnectionButtonClick(platform)}
+                        style={{ cursor: platform.claimed && !platform.connected && platform.id !== 'linkedin' ? 'pointer' : 'default' }}
                       >
-                        {platform.id === 'linkedin' && !platform.connected ? 'Coming Soon' : platform.connected ? 'Connected' : 'Connect'}
+                        {platform.id === 'linkedin' && !platform.connected 
+                          ? 'Coming Soon' 
+                          : !platform.claimed 
+                            ? 'Not Applicable'
+                            : platform.connected 
+                              ? 'Connected' 
+                              : 'Connect'}
                       </div>
                     </div>
                   </div>

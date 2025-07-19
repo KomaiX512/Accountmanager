@@ -138,5 +138,13 @@
   {
     "role": "assistant",
     "content": "## 📝 Instagram Content Strategy for @fentybeauty\n\n### **Current Content Portfolio:**\n- **Total Posts:** 0 posts analyzed\n- **Content Performance:** 0 total engagements\n- **Average Performance:** 0 interactions per post\n\n### **Recent Content Themes:**\nNo recent posts available for analysis.\n\n### **Content Optimization Insights:**\n\n\n**Strategic Recommendations:**\n1. **Content Consistency:** Your 0 posts show developing engagement patterns\n2. **Engagement Focus:** Target exceeding your current average of 0 interactions per post\n3. **Content Themes:** Develop consistent content themes based on your brand\n\nYour Instagram strategy should focus on replicating the success patterns from your top-performing content."
+  },
+  {
+    "role": "user",
+    "content": "tell me about activities of our posts"
+  },
+  {
+    "role": "assistant",
+    "content": "Based on the recent posts, @fentybeauty's activities include promoting sales, new product lines, and celebrity appearances.\n\nFor example, one post promotes \"@sephora’s Major Summer Deals Sale,\" encouraging followers to \"shop the sale & score up to 50% OFF some of your Fenty Faves now until 7/8.\" This post received 3,786 likes and 30 comments, totaling 3,816 in engagement.\n\nAnother post highlights a new product line: \"Get your inner Smurf unlocked with our limited-edition #SmurfCrewCollection 🩵 ​.\" This post generated 37,723 likes and 179 comments, for a total engagement of 37,902.\n\nA third post, \"It’s Gloss Bomb o’clock somewhere ,\" received 10,527 likes and 71 comments, totaling 10,598 in engagement.\n\nThe most engaging post is: \"We’re seeing double @badgalriri and Smurfette spotted together at the @smurfsmovie World Premiere in Brussels 🩵\". This post received 414,123 likes and 2,002 comments, with a total engagement of 416,125. This post highlights a celebrity appearance and ties it to a product or collaboration (likely the SmurfCrewCollection).\n"
   }
 ]

@@ -1032,24 +1032,35 @@
   position: fixed;
   top: 20px;
   right: 20px;
-  background: rgba(30, 30, 45, 0.95);
-  color: #e0e0ff;
+  background: linear-gradient(135deg, rgba(26, 26, 58, 0.98), rgba(30, 30, 47, 0.98));
+  color: #ffffff;
   padding: 12px 16px;
-  border-radius: 8px;
-  border: 1px solid #00ffcc;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 255, 204, 0.5);
   z-index: 2000;
-  max-width: 300px;
+  max-width: 380px;
+  min-width: 280px;
   word-wrap: break-word;
-  animation: slideIn 0.3s ease;
+  animation: slideInNotificationProfessional 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 0.9rem;
+  font-weight: 500;
+  /* Professional dimensions */
+  min-height: 60px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    0 4px 16px rgba(0, 255, 204, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
-@keyframes slideIn {
+@keyframes slideInNotificationProfessional {
   from {
-    transform: translateX(100%);
+    transform: translate3d(100%, -20px, 0) scale(0.8);
     opacity: 0;
   }
   to {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0) scale(1);
     opacity: 1;
   }
 }

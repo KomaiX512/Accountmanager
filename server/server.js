@@ -11988,3 +11988,119 @@ buildTokenIndex();
 setInterval(buildTokenIndex, 300000);
 
 // ===============================================================
+// PLATFORM DASHBOARD RESET ENDPOINT
+// ===============================================================
+
+app.options(['/platform-reset/:userId', '/api/platform-reset/:userId'], (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+
+app.delete(['/platform-reset/:userId', '/api/platform-reset/:userId'], async (req, res) => {
+  setCorsHeaders(res);
+  
+  const { userId } = req.params;
+  const { platform } = req.body;
+  
+  if (!platform || !['instagram', 'twitter', 'facebook'].includes(platform)) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Valid platform (instagram, twitter, facebook) is required' 
+    });
+  }
+  
+  console.log(`[${new Date().toISOString()}] Platform reset requested for user ${userId} on ${platform}`);
+  
+  try {
+    // Clear platform-specific user status
+    const statusKey = `User${platform.charAt(0).toUpperCase() + platform.slice(1)}Status/${userId}/status.json`;
+    
+    try {
+      const deleteStatusCommand = new DeleteObjectCommand({
+        Bucket: 'tasks',
+        Key: statusKey,
+      });
+      await s3Client.send(deleteStatusCommand);
+      console.log(`[${new Date().toISOString()}] Deleted ${platform} status for user ${userId}`);
+    } catch (error) {
+      if (error.name !== 'NoSuchKey') {
+        console.error(`[${new Date().toISOString()}] Error deleting ${platform} status:`, error);
+      }
+    }
+    
+    // Clear platform connection data
+    const connectionKey = `${platform.charAt(0).toUpperCase() + platform.slice(1)}Connection/${userId}/connection.json`;
+    
+    try {
+      const deleteConnectionCommand = new DeleteObjectCommand({
+        Bucket: 'tasks',
+        Key: connectionKey,
+      });
+      await s3Client.send(deleteConnectionCommand);
+      console.log(`[${new Date().toISOString()}] Deleted ${platform} connection for user ${userId}`);
+    } catch (error) {
+      if (error.name !== 'NoSuchKey') {
+        console.error(`[${new Date().toISOString()}] Error deleting ${platform} connection:`, error);
+      }
+    }
+    
+    // Clear scheduled posts for this platform
+    const scheduledPostsPrefix = `scheduled_posts/${platform}/${userId}/`;
+    
+    try {
+      const listCommand = new ListObjectsV2Command({
+        Bucket: 'tasks',
+        Prefix: scheduledPostsPrefix,
+      });
+      
+      const listResponse = await s3Client.send(listCommand);
+      
+      if (listResponse.Contents && listResponse.Contents.length > 0) {
+        const deletePromises = listResponse.Contents.map(async (obj) => {
+          const deleteCommand = new DeleteObjectCommand({
+            Bucket: 'tasks',
+            Key: obj.Key,
+          });
+          return s3Client.send(deleteCommand);
+        });
+        
+        await Promise.all(deletePromises);
+        console.log(`[${new Date().toISOString()}] Deleted ${listResponse.Contents.length} scheduled posts for ${platform}/${userId}`);
+      }
+    } catch (error) {
+      console.error(`[${new Date().toISOString()}] Error deleting scheduled posts for ${platform}/${userId}:`, error);
+    }
+    
+    // Clear any cached data for this user and platform
+    if (cache) {
+      const cacheKeysToDelete = [
+        `events-list/${userId}?platform=${platform}`,
+        `notifications/${userId}?platform=${platform}`,
+        `profile-info/${userId}?platform=${platform}`,
+      ];
+      
+      cacheKeysToDelete.forEach(key => {
+        cache.delete(key);
+      });
+      
+      console.log(`[${new Date().toISOString()}] Cleared cache for ${platform}/${userId}`);
+    }
+    
+    console.log(`[${new Date().toISOString()}] Successfully reset ${platform} dashboard for user ${userId}`);
+    
+    res.json({ 
+      success: true, 
+      message: `${platform.charAt(0).toUpperCase() + platform.slice(1)} dashboard reset successfully`,
+      platform: platform
+    });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error resetting ${platform} dashboard for user ${userId}:`, error);
+    res.status(500).json({ 
+      success: false, 
+      error: `Failed to reset ${platform} dashboard` 
+    });
+  }
+});
+
+// ===============================================================

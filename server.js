@@ -312,6 +312,7 @@ app.use((req, res, next) => {
     'user-facebook-status',
     'user-instagram-status', 
     'user-twitter-status',
+    'platform-reset',
     'send-dm-reply',
     'send-comment-reply',
     'ignore-notification',
@@ -453,6 +454,16 @@ app.get('/health', async (req, res) => {
       timestamp: new Date().toISOString()
     });
   }
+});
+
+// Simple API health check endpoint
+app.get('/api/health-check', (req, res) => {
+  res.status(200).json({
+    status: 'success',
+    message: 'API endpoint working correctly',
+    timestamp: new Date().toISOString(),
+    server: 'sentientm.com'
+  });
 });
 
 // Clear image cache endpoint for administrators
@@ -1565,7 +1576,7 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
       const placeholderImage = generatePlaceholderImage(`Image Error: ${imageKey}`);
       
       res.setHeader('Content-Type', 'image/jpeg');
-      res.setHeader('Cache-Control', 'no-cache, no-store');
+      res.setHeader('Cache-Control', 'no-cache, no-store, max-age=0');
       res.setHeader('X-Image-Source', 'error-placeholder');
       res.setHeader('X-Image-Valid', 'false');
       res.setHeader('X-Error-Type', error.message.substring(0, 100));
@@ -1652,6 +1663,17 @@ app.head('/api/r2-image/:username/:imageKey', async (req, res) => {
     } else {
       res.setHeader('Cache-Control', 'public, max-age=21600'); // 6 hours (optimized from 1 hour)
     }
+    
+    res.setHeader('ETag', `"${imageKey}-${Date.now()}"`);
+    res.setHeader('Last-Modified', new Date().toUTCString());
+    res.setHeader('X-Image-Source', source);
+    
+    // Enable CORS for cross-origin requests
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Access-Control-Expose-Headers', 'X-Image-Source, ETag, Last-Modified');
     
     res.status(200).end(); // HEAD response - no body
     
@@ -1841,30 +1863,6 @@ async function handlePostsEndpoint(req, res) {
     });
   }
 }
-
-// Add the /api/discussion endpoint
-app.post('/api/discussion', async (req, res) => {
-  try {
-    const { username, query, previousMessages, platform } = req.body;
-
-    if (!username || !query || !platform) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    // Simulate processing the discussion query
-    const response = {
-      response: `Processed discussion for ${username} on ${platform}: ${query}`,
-      quotaExhausted: false,
-      resetTime: null,
-      message: 'Discussion processed successfully'
-    };
-
-    res.status(200).json(response);
-  } catch (error) {
-    console.error('Error processing discussion:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-});
 
 // Configure multer for memory storage
 const upload = multer({ 

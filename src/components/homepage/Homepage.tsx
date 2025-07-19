@@ -5,7 +5,7 @@ import './Homepage.css';
 import NeuralNetwork from './NeuralNetwork';
 
 // Feature flag to control neural network rendering
-const ENABLE_NEURAL_NETWORK = true;
+const ENABLE_NEURAL_NETWORK = false;
 
 const Homepage: React.FC = () => {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });

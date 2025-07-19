@@ -90,14 +90,53 @@ const ChatModal: React.FC<ChatModalProps> = ({
     }
   };
 
-  // Format message content for better display
+  // Format message content for better display and JSON handling
   const formatMessageContent = (content: string) => {
-    // Convert URLs to clickable links
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    const formattedContent = content.replace(urlRegex, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
-    
-    // Convert line breaks to proper HTML
-    return formattedContent.replace(/\n/g, '<br>');
+    try {
+      // Clean the content first
+      let cleanContent = content.trim();
+      
+      // Try to detect and format JSON responses
+      if (cleanContent.startsWith('{') || cleanContent.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(cleanContent);
+          return `<div style="background: rgba(0,0,0,0.4); padding: 16px; border-radius: 12px; overflow-x: auto; margin: 8px 0; border-left: 4px solid #00ffcc;">
+            <div style="color: #00ffcc; font-size: 12px; font-weight: 600; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">JSON Response</div>
+            <pre style="white-space: pre-wrap; font-family: 'SF Mono', 'Monaco', 'Consolas', monospace; font-size: 13px; line-height: 1.4; margin: 0; color: #e8e8ff;">${JSON.stringify(parsed, null, 2)}</pre>
+          </div>`;
+        } catch {
+          // If not valid JSON, continue with normal formatting
+        }
+      }
+      
+      // Format lists and bullet points
+      let formattedContent = cleanContent;
+      
+      // Convert numbered lists
+      formattedContent = formattedContent.replace(/^\d+\.\s+(.+)$/gm, '<div style="margin: 6px 0; padding-left: 20px; position: relative;"><span style="position: absolute; left: 0; color: #00ffcc; font-weight: 600;">•</span>$1</div>');
+      
+      // Convert bullet points
+      formattedContent = formattedContent.replace(/^[-*]\s+(.+)$/gm, '<div style="margin: 6px 0; padding-left: 20px; position: relative;"><span style="position: absolute; left: 0; color: #00ffcc; font-weight: 600;">•</span>$1</div>');
+      
+      // Convert URLs to clickable links
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      formattedContent = formattedContent.replace(urlRegex, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color: #00ffcc; text-decoration: underline; font-weight: 500;">$1</a>');
+      
+      // Convert **bold** text
+      formattedContent = formattedContent.replace(/\*\*(.*?)\*\*/g, '<strong style="font-weight: 600; color: #ffffff;">$1</strong>');
+      
+      // Convert *italic* text (but use emphasis color instead of italic)
+      formattedContent = formattedContent.replace(/\*(.*?)\*/g, '<span style="color: #00ffcc; font-weight: 500;">$1</span>');
+      
+      // Convert line breaks to proper HTML
+      formattedContent = formattedContent.replace(/\n\n/g, '<br><br>');
+      formattedContent = formattedContent.replace(/\n/g, '<br>');
+      
+      return formattedContent;
+    } catch (error) {
+      console.error('Error formatting message content:', error);
+      return content.replace(/\n/g, '<br>');
+    }
   };
 
   if (!open) return null;

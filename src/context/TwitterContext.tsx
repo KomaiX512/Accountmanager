@@ -9,6 +9,7 @@ interface TwitterContextType {
   hasAccessed: boolean;
   connectTwitter: (twitterId: string, username: string) => void;
   disconnectTwitter: () => void;
+  resetTwitterAccess: () => void;
   refreshConnection: () => void;
 }
 
@@ -132,6 +133,20 @@ export const TwitterProvider: React.FC<TwitterProviderProps> = ({ children }) =>
     console.log(`[${new Date().toISOString()}] Twitter disconnected via context`);
   }, []);
 
+  const resetTwitterAccess = useCallback(() => {
+    setUserId(null);
+    setUsername(null);
+    setIsConnected(false);
+    setHasAccessed(false);
+    
+    // Clear localStorage
+    if (currentUser?.uid) {
+      localStorage.removeItem(`twitter_accessed_${currentUser.uid}`);
+    }
+    
+    console.log(`[${new Date().toISOString()}] Twitter access reset via context`);
+  }, [currentUser?.uid]);
+
   const refreshConnection = useCallback(() => {
     if (currentUser?.uid && !isCheckingRef.current) {
       checkExistingConnection();
@@ -145,8 +160,9 @@ export const TwitterProvider: React.FC<TwitterProviderProps> = ({ children }) =>
     hasAccessed,
     connectTwitter,
     disconnectTwitter,
+    resetTwitterAccess,
     refreshConnection,
-  }), [userId, username, isConnected, hasAccessed, connectTwitter, disconnectTwitter, refreshConnection]);
+  }), [userId, username, isConnected, hasAccessed, connectTwitter, disconnectTwitter, resetTwitterAccess, refreshConnection]);
 
   return (
     <TwitterContext.Provider value={value}>

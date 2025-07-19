@@ -14,6 +14,7 @@ interface InstagramContextType {
   hasAccessed: boolean;
   connectInstagram: (userId: string, graphId: string) => void;
   disconnectInstagram: () => void;
+  resetInstagramAccess: () => void;
 }
 
 const InstagramContext = createContext<InstagramContextType>({
@@ -23,6 +24,7 @@ const InstagramContext = createContext<InstagramContextType>({
   hasAccessed: false,
   connectInstagram: () => {},
   disconnectInstagram: () => {},
+  resetInstagramAccess: () => {},
 });
 
 export const useInstagram = () => useContext(InstagramContext);
@@ -123,6 +125,19 @@ export const InstagramProvider: React.FC<InstagramProviderProps> = ({ children }
     // Keep hasAccessed true even after disconnecting
   };
 
+  const resetInstagramAccess = () => {
+    console.log(`[${new Date().toISOString()}] Instagram access reset`);
+    setIsConnected(false);
+    setUserId(null);
+    setGraphId(null);
+    setHasAccessed(false);
+    
+    // Clear localStorage
+    if (currentUser) {
+      localStorage.removeItem(`instagram_accessed_${currentUser.uid}`);
+    }
+  };
+
   return (
     <InstagramContext.Provider 
       value={{ 
@@ -131,7 +146,8 @@ export const InstagramProvider: React.FC<InstagramProviderProps> = ({ children }
         graphId, 
         hasAccessed,
         connectInstagram, 
-        disconnectInstagram 
+        disconnectInstagram,
+        resetInstagramAccess
       }}
     >
       {children}

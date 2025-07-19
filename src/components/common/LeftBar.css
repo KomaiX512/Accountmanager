@@ -1,15 +1,38 @@
-.left-bar {
-  position: fixed;
-  top: 80px;
-  left: 0;
-  width: 80px;
-  height: calc(100vh - 80px);
-  background: rgba(26, 26, 46, 0.8);
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
-  z-index: 100;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+/* 🔒 BULLETPROOF VIEWPORT LOCK - Maximum CSS specificity and priority */
+.left-bar,
+div.left-bar,
+motion.div.left-bar,
+.main-content .left-bar,
+.App .left-bar {
+  position: fixed !important;
+  top: 70px !important; /* FIXED: Match TopBar height */
+  left: 0 !important;
+  width: 80px !important;
+  height: calc(100vh - 70px) !important; /* FIXED: Match TopBar height */
+  background: rgba(26, 26, 46, 0.95) !important; /* FIXED: More opaque */
+  border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+  z-index: 999998 !important; /* FIXED: Just below TopBar but above everything else */
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  /* Ensure always visible when scrolling - professional solution */
+  transform: translateZ(0) !important;
+  will-change: transform !important;
+  /* Lock to viewport - overrides any conflicting styles */
+  bottom: 0 !important;
+  overflow: visible !important;
+  /* Override any external styles that might interfere */
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  min-width: 80px !important;
+  max-width: 80px !important;
+  box-sizing: border-box !important;
+  /* Additional bulletproof properties */
+  min-height: calc(100vh - 70px) !important;
+  max-height: calc(100vh - 70px) !important;
 }
 
 .icon-container {

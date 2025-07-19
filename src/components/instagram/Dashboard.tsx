@@ -26,7 +26,7 @@ import type { ChatMessage as ChatModalMessage } from './ChatModal';
 import type { Notification, ProfileInfo, LinkedAccount } from '../../types/notifications';
 import { safeFilter, safeMap, safeLength } from '../../utils/safeArrayUtils';
 // Import icons from react-icons
-import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaLock, FaBell } from 'react-icons/fa';
+import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaLock, FaBell, FaUndo } from 'react-icons/fa';
 import { MdAnalytics, MdOutlineSchedule, MdOutlineAutoGraph } from 'react-icons/md';
 import { BsLightningChargeFill, BsBinoculars, BsLightbulb } from 'react-icons/bs';
 import { IoMdAnalytics } from 'react-icons/io';
@@ -62,7 +62,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const { userId: igBusinessId, isConnected: isInstagramConnected, connectInstagram } = useInstagram();
+  const { userId: igBusinessId, isConnected: isInstagramConnected, connectInstagram, resetInstagramAccess } = useInstagram();
   const [isSchedulerOpen, setIsSchedulerOpen] = useState(false);
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
@@ -90,6 +90,10 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accou
     total: number;
     nextReplyIn: number;
   }>({ current: 0, total: 0, nextReplyIn: 0 });
+  
+  // Reset functionality state
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   
   // Content viewed tracking - track what has been seen vs unseen with localStorage persistence
   const getViewedStorageKey = (section: string) => `viewed_${section}_instagram_${accountHolder}`;
@@ -1485,6 +1489,72 @@ Image Description: ${response.post.image_prompt}
     checkCampaignStatus();
   };
 
+  // Reset functionality handlers
+  const handleOpenResetConfirm = () => {
+    setIsResetConfirmOpen(true);
+  };
+
+  const handleCloseResetConfirm = () => {
+    setIsResetConfirmOpen(false);
+  };
+
+  const handleConfirmReset = async () => {
+    setIsResetting(true);
+    try {
+      // Call Instagram context reset function
+      resetInstagramAccess();
+      
+      // Clear local frontend data
+      clearInstagramFrontendData();
+      
+      setToast('Instagram dashboard reset successfully!');
+      
+      // Close the modal
+      setIsResetConfirmOpen(false);
+      
+      // Optional: Navigate back to setup or refresh
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Error resetting Instagram dashboard:', error);
+      setToast('Failed to reset dashboard. Please try again.');
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  const clearInstagramFrontendData = () => {
+    // Clear all Instagram-specific data
+    setNotifications([]);
+    setResponses([]);
+    setStrategies([]);
+    setPosts([]);
+    setCompetitorData([]);
+    setNews([]);
+    setProfileInfo(null);
+    setChatMessages([]);
+    setResult('');
+    
+    // Clear localStorage for Instagram
+    if (accountHolder) {
+      const keysToRemove = [
+        `viewed_strategies_instagram_${accountHolder}`,
+        `viewed_competitor_instagram_${accountHolder}`,
+        `viewed_posts_instagram_${accountHolder}`,
+        `instagram_conversation_${accountHolder}`,
+        `instagram_profile_${accountHolder}`
+      ];
+      
+      keysToRemove.forEach(key => {
+        localStorage.removeItem(key);
+      });
+    }
+    
+    console.log('Instagram frontend data cleared');
+  };
+
   // Function to check campaign status from the server
   const checkCampaignStatus = async () => {
     try {
@@ -1836,6 +1906,15 @@ Image Description: ${response.post.image_prompt}
                       <span>Goal</span>
                     </button>
                     
+                    <button
+                      onClick={handleOpenResetConfirm}
+                      className="dashboard-btn reset-btn instagram"
+                      disabled={isResetting}
+                    >
+                      <FaUndo className="btn-icon" />
+                      <span>{isResetting ? 'Resetting...' : 'Reset'}</span>
+                    </button>
+                    
                     {showCampaignButton && (
                       <button
                         onClick={handleOpenCampaignModal}
@@ -2039,6 +2118,37 @@ Image Description: ${response.post.image_prompt}
           onClose={() => setIsCampaignModalOpen(false)}
           onCampaignStopped={handleCampaignStopped}
         />
+      )}
+      {isResetConfirmOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3>Reset Instagram Dashboard</h3>
+            <p>This will clear all your Instagram dashboard data including:</p>
+            <ul>
+              <li>Profile information and connection</li>
+              <li>Notifications and conversations</li>
+              <li>Generated content (strategies, posts, analysis)</li>
+              <li>Cached data and viewing history</li>
+            </ul>
+            <p><strong>This action cannot be undone.</strong> Are you sure you want to continue?</p>
+            <div className="modal-actions">
+              <button 
+                className="cancel-btn"
+                onClick={handleCloseResetConfirm}
+                disabled={isResetting}
+              >
+                Cancel
+              </button>
+              <button 
+                className="reset-btn-confirm"
+                onClick={handleConfirmReset}
+                disabled={isResetting}
+              >
+                {isResetting ? 'Resetting...' : 'Reset Dashboard'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {isChatModalOpen && (
         <ChatModal 

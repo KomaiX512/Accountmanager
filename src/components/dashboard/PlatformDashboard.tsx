@@ -28,7 +28,7 @@ import RagService from '../../services/RagService';
 import type { ChatMessage as ChatModalMessage } from '../common/ChatModal';
 import { Notification, ProfileInfo, LinkedAccount } from '../../types/notifications';
 // Import icons from react-icons
-import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaTwitter, FaInstagram, FaPen, FaFacebook, FaBell } from 'react-icons/fa';
+import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaTwitter, FaInstagram, FaPen, FaFacebook, FaBell, FaUndo } from 'react-icons/fa';
 import { MdAnalytics, MdOutlineSchedule, MdOutlineAutoGraph } from 'react-icons/md';
 import { BsLightningChargeFill, BsBinoculars, BsLightbulb } from 'react-icons/bs';
 import { IoMdAnalytics } from 'react-icons/io';
@@ -41,7 +41,6 @@ import { useNavigate } from 'react-router-dom';
 import useProcessingGuard from '../../hooks/useProcessingGuard';
 import { useProcessing } from '../../context/ProcessingContext';
 import { safeFilter, safeMap, safeLength } from '../../utils/safeArrayUtils';
-import useDashboardRefresh from '../../hooks/useDashboardRefresh';
 
 // Define RagService compatible ChatMessage
 interface RagChatMessage {
@@ -75,9 +74,9 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
 
   // ALL CONTEXT HOOKS MUST BE CALLED FIRST - Rules of Hooks
   const { currentUser } = useAuth();
-  const { userId: igUserId, isConnected: isInstagramConnected, connectInstagram } = useInstagram();
-  const { userId: twitterId, isConnected: isTwitterConnected, connectTwitter } = useTwitter();
-  const { userId: facebookPageId, isConnected: isFacebookConnected, connectFacebook } = useFacebook();
+  const { userId: igUserId, isConnected: isInstagramConnected, connectInstagram, resetInstagramAccess } = useInstagram();
+  const { userId: twitterId, isConnected: isTwitterConnected, connectTwitter, resetTwitterAccess } = useTwitter();
+  const { userId: facebookPageId, isConnected: isFacebookConnected, connectFacebook, resetFacebookAccess } = useFacebook();
   const { trackRealDiscussion, trackRealAIReply, trackRealPostCreation, canUseFeature } = useFeatureTracking();
   const { showUpgradePopup, blockedFeature, handleFeatureAttempt, closeUpgradePopup, currentUsage } = useUpgradeHandler();
 
@@ -137,6 +136,8 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const [isFacebookSchedulerOpen, setIsFacebookSchedulerOpen] = useState(false);
   const [isFacebookInsightsOpen, setIsFacebookInsightsOpen] = useState(false);
   const [isFacebookComposeOpen, setIsFacebookComposeOpen] = useState(false);
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   // ALL REF HOOKS
   const firstLoadRef = useRef(true);
@@ -169,86 +170,54 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     return stored ? new Set(JSON.parse(stored)) : new Set();
   });
 
-  // 🔄 PLATFORM DASHBOARD AUTO-REFRESH: Enhanced refresh for dashboard switching
-  const handlePlatformDashboardRefresh = useCallback(() => {
-    console.log(`[PlatformDashboard] 🔄 Auto-refresh triggered for ${platform} dashboard - refreshing all data`);
+  // 🎯 SINGLE STRATEGIC REFRESH: Clean, efficient, one-time refresh mechanism
+  const platformRef = useRef<string | null>(null);
+  const accountHolderRef = useRef<string | null>(null);
+  const hasInitialized = useRef(false);
+
+  const handleSingleRefresh = useCallback(() => {
+    if (!accountHolder || !platform) return;
     
-    // Close any existing SSE connections
-    if (eventSourceRef.current) {
-      console.log(`[PlatformDashboard] 🔌 Closing existing SSE connection for refresh`);
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
+    console.log(`[PlatformDashboard] ⚡ Single refresh triggered for ${platform}`);
     
-    // Reset state to ensure clean slate
-    setNotifications([]);
-    setProfileInfo(null);
-    setResponses([]);
-    setStrategies([]);
-    setPosts([]);
-    setCompetitorData([]);
-    setLinkedAccounts([]);
-    
-    // Reset viewed content tracking for new platform context
-    const strategiesKey = `viewed_strategies_${platform}_${accountHolder}`;
-    const competitorKey = `viewed_competitor_${platform}_${accountHolder}`;
-    const postsKey = `viewed_posts_${platform}_${accountHolder}`;
-    
-    const storedStrategies = localStorage.getItem(strategiesKey);
-    const storedCompetitor = localStorage.getItem(competitorKey);
-    const storedPosts = localStorage.getItem(postsKey);
-    
-    setViewedStrategies(storedStrategies ? new Set(JSON.parse(storedStrategies)) : new Set());
-    setViewedCompetitorData(storedCompetitor ? new Set(JSON.parse(storedCompetitor)) : new Set());
-    setViewedPosts(storedPosts ? new Set(JSON.parse(storedPosts)) : new Set());
-    
-    // Reset loading state to trigger fresh data fetch
-    setIsLoading(true);
-    firstLoadRef.current = true;
-    
-    // Trigger fresh data fetch
-    if (accountHolder) {
-      console.log(`[PlatformDashboard] 📊 Fetching fresh data for ${platform} dashboard`);
+    // Only fetch fresh data - no state resets to avoid performance issues
+    if (firstLoadRef.current) {
+      firstLoadRef.current = false;
       refreshAllData();
       fetchProfileInfo();
     }
-  }, [platform, accountHolder, setViewedStrategies, setViewedCompetitorData, setViewedPosts]);
+  }, [platform, accountHolder]);
 
-  // Use dashboard refresh hook for automatic refresh on route changes
-  const { forceRefresh: forcePlatformDashboardRefresh } = useDashboardRefresh({
-    onRefresh: handlePlatformDashboardRefresh,
-    dashboardType: 'platform',
-    platform,
-    dependencies: [accountHolder, platform]
-  });
-
-  // 🔥 FORCE HARD REFRESH ON EVERY PLATFORM DASHBOARD ENTRY
+  // 🎯 STRATEGIC REFRESH: Only refresh when platform actually changes
   useEffect(() => {
-    console.log(`[PlatformDashboard] 🚀 Platform dashboard mounted/accessed - forcing hard refresh for ${platform}`);
+    const platformChanged = platformRef.current !== platform;
+    const accountChanged = accountHolderRef.current !== accountHolder;
     
-    // Always trigger hard refresh when platform dashboard is accessed
-    // Use a small timeout to ensure all hooks are initialized
-    const refreshTimer = setTimeout(() => {
-      console.log(`[PlatformDashboard] 💥 Executing forced hard refresh for ${platform} platform`);
-      handlePlatformDashboardRefresh();
-    }, 50);
-    
-    return () => clearTimeout(refreshTimer);
-    
-  }, []); // Empty dependency array means this runs only once when component mounts
-
-  // 🔄 ADDITIONAL REFRESH TRIGGER: When accountHolder or platform changes
-  useEffect(() => {
-    if (accountHolder && platform) {
-      console.log(`[PlatformDashboard] 🔄 AccountHolder or platform changed - triggering refresh`);
-      // Small delay to prevent double refresh with the mount effect
-      const changeRefreshTimer = setTimeout(() => {
-        handlePlatformDashboardRefresh();
+    if ((platformChanged || accountChanged) && accountHolder && platform) {
+      console.log(`[PlatformDashboard] � Platform changed: ${platformRef.current} → ${platform}`);
+      
+      // Update refs immediately to prevent duplicate calls
+      platformRef.current = platform;
+      accountHolderRef.current = accountHolder;
+      
+      // Reset first load flag for new platform/account
+      firstLoadRef.current = true;
+      
+      // Single strategic refresh with minimal delay
+      const refreshTimer = setTimeout(() => {
+        handleSingleRefresh();
       }, 100);
       
-      return () => clearTimeout(changeRefreshTimer);
+      return () => clearTimeout(refreshTimer);
+    } else if (!hasInitialized.current && accountHolder && platform) {
+      // Initial load only
+      hasInitialized.current = true;
+      platformRef.current = platform;
+      accountHolderRef.current = accountHolder;
+      firstLoadRef.current = true;
+      handleSingleRefresh();
     }
-  }, [accountHolder, platform, handlePlatformDashboardRefresh]);
+  }, [platform, accountHolder, handleSingleRefresh]);
 
   // Helper function to get viewed storage key
   const getViewedStorageKey = (section: string) => `viewed_${section}_${platform}_${accountHolder}`;
@@ -291,8 +260,8 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       return;
     }
     try {
-      const forceRefresh = firstLoadRef.current;
-      const platformParam = `?platform=${platform}${forceRefresh ? '&forceRefresh=true' : ''}`;
+      console.log(`[PlatformDashboard] ⚡ Fetching data efficiently for ${platform}`);
+      const platformParam = `?platform=${platform}`;
       
       const [responsesData, strategiesData, postsData, competitorData] = await Promise.all([
         axios.get(`/api/responses/${accountHolder}${platformParam}`).catch(err => {
@@ -331,9 +300,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       const flatData = competitorResponses.flatMap(res => Array.isArray(res.data) ? res.data : []);
       setCompetitorData(flatData);
 
-      if (firstLoadRef.current) {
-        firstLoadRef.current = false;
-      }
     } catch (error: any) {
       console.error(`Error refreshing ${platform} data:`, error);
       setToast(`Failed to load ${platform} dashboard data.`);
@@ -346,8 +312,9 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     setProfileError(null);
     setImageError(false);
     try {
+      console.log(`[PlatformDashboard] ⚡ Fetching profile info for ${platform}`);
       const platformParam = `?platform=${platform}`;
-      const response = await axios.get(`/api/profile-info/${accountHolder}${platformParam}&forceRefresh=true`);
+      const response = await axios.get(`/api/profile-info/${accountHolder}${platformParam}`);
       // Defensive check: ensure response data is a valid object
       if (response.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
         setProfileInfo(response.data);
@@ -757,46 +724,39 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     }
   }, [accountHolder, platform]);
 
-  // Initialize notifications and SSE for the current platform - Enhanced for platform switching
+  // Initialize notifications and SSE for the current platform - Optimized and efficient
   useEffect(() => {
-    // Only run when loading is complete
+    // Only run when loading is complete and we have the required userId
     if (isLoading) return;
     
-    console.log(`[PlatformDashboard] 🚀 Initializing ${platform} dashboard connections...`);
+    console.log(`[PlatformDashboard] ⚡ Setting up ${platform} connections efficiently...`);
     
     const currentUserId = platform === 'twitter' ? twitterId : 
                          platform === 'facebook' ? facebookPageId :
                          igUserId;
     
-    // CRITICAL FIX: For Facebook, always attempt to fetch notifications even if pageId is not available yet
-    // This ensures notifications are fetched on direct refresh
     if (platform === 'facebook') {
-      console.log(`[PlatformDashboard] [FACEBOOK-INIT-FIX] Setting up Facebook notifications (pageId: ${facebookPageId || 'not available yet'})`);
-      fetchNotifications(); // This will handle the case where pageId is not available yet
+      console.log(`[PlatformDashboard] 📘 Setting up Facebook efficiently (pageId: ${facebookPageId || 'pending'})`);
+      fetchNotifications(); // This handles cases where pageId is not available yet
       
       // Only setup SSE if we have pageId
       if (facebookPageId) {
         setupSSE(facebookPageId);
       }
     } else {
-      // For other platforms, maintain existing behavior
+      // For other platforms, require userId
       if (!currentUserId) {
-        console.warn(`[PlatformDashboard] Skipping notification/SSE setup: userId not available for ${platform}`);
+        console.warn(`[PlatformDashboard] ⚠️ Skipping setup: userId not available for ${platform}`);
         return;
       }
-      console.log(`[PlatformDashboard] Setting up notifications and SSE for ${platform} userId:`, currentUserId);
+      console.log(`[PlatformDashboard] ⚡ Setting up ${platform} with userId:`, currentUserId);
       fetchNotifications();
       setupSSE(currentUserId);
     }
 
-    // Fallback polling every 5 minutes
-    const interval = setInterval(() => {
-      fetchNotifications();
-    }, 300000);
-
+    // Cleanup on unmount only
     return () => {
       console.log(`[PlatformDashboard] 🧹 Cleaning up ${platform} connections...`);
-      clearInterval(interval);
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
@@ -804,46 +764,14 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     };
   }, [isLoading, platform, twitterId, facebookPageId, igUserId]);
 
-  // --- NEW: Watch for userId changes and always set up notifications/SSE when available ---
+  // Optimized userId effect - Only handle Facebook pageId changes
   useEffect(() => {
-    const currentUserId = platform === 'twitter' ? twitterId : 
-                         platform === 'facebook' ? facebookPageId :
-                         igUserId;
-    
-    // CRITICAL FIX: For Facebook, only set up SSE when pageId becomes available
-    // but don't duplicate notification fetching (it's already handled in main effect)
-    if (platform === 'facebook') {
-      console.log('[PlatformDashboard] [FACEBOOK-USERID-EFFECT] Facebook Page ID changed:', facebookPageId);
-      if (facebookPageId) {
-        console.log('[PlatformDashboard] [FACEBOOK-USERID-EFFECT] Setting up SSE for Facebook pageId:', facebookPageId);
-        setupSSE(facebookPageId);
-      }
-      return; // Don't duplicate notification fetching for Facebook
+    // Only for Facebook: Set up SSE when pageId becomes available
+    if (platform === 'facebook' && facebookPageId && !eventSourceRef.current) {
+      console.log('[PlatformDashboard] 📘 Facebook pageId available, setting up SSE:', facebookPageId);
+      setupSSE(facebookPageId);
     }
-    
-    // For other platforms, maintain existing behavior
-    if (!currentUserId) {
-      console.log(`[PlatformDashboard] [userId effect] userId not available for ${platform}, skipping SSE/notifications setup.`);
-      return;
-    }
-    
-    console.log(`[PlatformDashboard] [userId effect] userId became available for ${platform}:`, currentUserId);
-    fetchNotifications();
-    setupSSE(currentUserId);
-    
-    // Fallback polling every 5 minutes
-    const interval = setInterval(() => {
-      fetchNotifications();
-    }, 300000);
-    
-    return () => {
-      clearInterval(interval);
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-      }
-    };
-  }, [facebookPageId, twitterId, igUserId, platform]);
+  }, [facebookPageId, platform]);
 
   // Clean old entries from reply tracker
   useEffect(() => {
@@ -855,18 +783,17 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     return () => clearInterval(cleanInterval);
   }, []);
 
-  // CRITICAL FIX: Handle Facebook connection event for immediate notification refresh
+  // Optimized Facebook connection handling
   useEffect(() => {
     if (platform !== 'facebook') return;
     
-    const handleFacebookConnected = (event: CustomEvent) => {
-      console.log(`[${new Date().toISOString()}] [FACEBOOK-EVENT-FIX] Facebook connected event received:`, event.detail);
+    const handleFacebookConnected = () => {
+      console.log(`[PlatformDashboard] 📘 Facebook connected - refreshing notifications`);
       
-      // Force refresh notifications immediately when Facebook connection is established
+      // Single refresh after Facebook connection
       setTimeout(() => {
-        console.log(`[${new Date().toISOString()}] [FACEBOOK-EVENT-FIX] Triggering notification refresh after Facebook connection`);
         fetchNotifications();
-      }, 1000); // Small delay to ensure backend connection is ready
+      }, 1000);
     };
     
     window.addEventListener('facebookConnected', handleFacebookConnected as EventListener);
@@ -874,22 +801,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     return () => {
       window.removeEventListener('facebookConnected', handleFacebookConnected as EventListener);
     };
-  }, [platform, fetchNotifications]);
-
-  // CRITICAL FIX: Additional fallback for Facebook - retry notifications if empty and connection exists
-  useEffect(() => {
-    if (platform !== 'facebook' || !facebookPageId) return;
-    
-    // If we have pageId but no notifications, try fetching again after a short delay
-    const retryTimer = setTimeout(() => {
-      if (notifications.length === 0 && facebookPageId) {
-        console.log(`[${new Date().toISOString()}] [FACEBOOK-RETRY-FIX] Retrying Facebook notifications fetch - have pageId but no notifications`);
-        fetchNotifications();
-      }
-    }, 3000); // 3 second delay to allow for initial load
-    
-    return () => clearTimeout(retryTimer);
-  }, [platform, facebookPageId, notifications.length, fetchNotifications]);
+  }, [platform]);
 
   // Handle custom event for opening campaign modal
   useEffect(() => {
@@ -2227,6 +2139,83 @@ Image Description: ${response.post.image_prompt}
     setIsFacebookComposeOpen(true);
   };
 
+  // Reset functionality handlers
+  const handleOpenResetConfirm = () => {
+    setIsResetConfirmOpen(true);
+  };
+
+  const handleCloseResetConfirm = () => {
+    setIsResetConfirmOpen(false);
+  };
+
+  const handleConfirmReset = async () => {
+    if (!currentUser) {
+      setToast('User not authenticated');
+      return;
+    }
+
+    setIsResetting(true);
+    setIsResetConfirmOpen(false);
+
+    try {
+      console.log(`[${new Date().toISOString()}] Resetting ${platform} dashboard for user ${currentUser.uid}`);
+
+      // Call backend API to reset platform dashboard
+      const response = await axios.delete(`/api/platform-reset/${currentUser.uid}`, {
+        data: { platform }
+      });
+
+      if (response.data.success) {
+        console.log(`[${new Date().toISOString()}] ${platform} dashboard reset successful`);
+
+        // Clear all frontend data for this platform
+        clearPlatformFrontendData();
+
+        // Navigate back to main dashboard
+        setToast(`${platform.charAt(0).toUpperCase() + platform.slice(1)} dashboard reset successfully!`);
+        
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 1500);
+      } else {
+        throw new Error(response.data.error || 'Reset failed');
+      }
+    } catch (error: any) {
+      console.error(`[${new Date().toISOString()}] Error resetting ${platform} dashboard:`, error);
+      setToast(error.response?.data?.error || 'Failed to reset dashboard. Please try again.');
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  const clearPlatformFrontendData = () => {
+    const userId = currentUser?.uid;
+    if (!userId) return;
+
+    // Clear localStorage data for this platform
+    const keysToRemove = [
+      `${platform}_accessed_${userId}`,
+      `viewed_strategies_${platform}_${accountHolder}`,
+      `viewed_competitor_data_${platform}_${accountHolder}`,
+      `viewed_posts_${platform}_${accountHolder}`,
+    ];
+
+    keysToRemove.forEach(key => {
+      localStorage.removeItem(key);
+    });
+
+    // Reset platform access using the new reset methods
+    if (platform === 'instagram') {
+      resetInstagramAccess();
+    } else if (platform === 'twitter') {
+      resetTwitterAccess();
+    } else if (platform === 'facebook') {
+      resetFacebookAccess();
+    }
+
+    console.log(`[${new Date().toISOString()}] Cleared frontend data for ${platform} platform`);
+  };
+
   return (
     <motion.div
       className="dashboard-wrapper"
@@ -2450,16 +2439,25 @@ Image Description: ${response.post.image_prompt}
                   
                   <button
                     onClick={handleOpenGoalModal}
-                    className={`dashboard-btn goal-btn ${platform === 'twitter' ? 'twitter' : platform === 'facebook' ? 'facebook' : ''}`}
+                    className={`dashboard-btn goal-btn ${platform === 'twitter' ? 'twitter' : platform === 'facebook' ? 'facebook' : platform === 'instagram' ? 'instagram' : ''}`}
                   >
                     <TbTargetArrow className="btn-icon" />
                     <span>Goal</span>
                   </button>
                   
+                  <button
+                    onClick={handleOpenResetConfirm}
+                    className={`dashboard-btn reset-btn ${platform === 'twitter' ? 'twitter' : platform === 'facebook' ? 'facebook' : platform === 'instagram' ? 'instagram' : ''}`}
+                    disabled={isResetting}
+                  >
+                    <FaUndo className="btn-icon" />
+                    <span>{isResetting ? 'Resetting...' : 'Reset'}</span>
+                  </button>
+                  
                   {showCampaignButton && (
                     <button
                       onClick={handleOpenCampaignModal}
-                      className={`dashboard-btn campaign-btn ${platform === 'twitter' ? 'twitter' : platform === 'facebook' ? 'facebook' : ''}`}
+                      className={`dashboard-btn campaign-btn ${platform === 'twitter' ? 'twitter' : platform === 'facebook' ? 'facebook' : platform === 'instagram' ? 'instagram' : ''}`}
                     >
                       <FaBullhorn className="btn-icon" />
                       <span>Campaign</span>
@@ -2774,6 +2772,68 @@ Image Description: ${response.post.image_prompt}
         redirectToPricing={true}
         currentUsage={currentUsage}
       />
+
+      {/* Reset Confirmation Popup */}
+      {isResetConfirmOpen && (
+        <div className="modal-overlay" onClick={handleCloseResetConfirm}>
+          <motion.div 
+            className="reset-confirm-modal"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ duration: 0.3 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="reset-confirm-content">
+              <div className="reset-confirm-header">
+                <FaUndo className="reset-icon" />
+                <h2>Reset {platform.charAt(0).toUpperCase() + platform.slice(1)} Dashboard</h2>
+              </div>
+              
+              <div className="reset-confirm-body">
+                <p>Are you sure you want to reset your {platform.charAt(0).toUpperCase() + platform.slice(1)} dashboard?</p>
+                <div className="reset-warning">
+                  <strong>This will:</strong>
+                  <ul>
+                    <li>Remove your current platform dashboard access</li>
+                    <li>Clear all connection data for this platform</li>
+                    <li>Reset your platform to "not acquired" status</li>
+                    <li>Require you to enter username details again</li>
+                  </ul>
+                  <p><strong>Note:</strong> Your post history and backend data will be preserved.</p>
+                </div>
+              </div>
+              
+              <div className="reset-confirm-actions">
+                <button 
+                  className="cancel-btn"
+                  onClick={handleCloseResetConfirm}
+                  disabled={isResetting}
+                >
+                  Cancel
+                </button>
+                <button 
+                  className="reset-btn-confirm"
+                  onClick={handleConfirmReset}
+                  disabled={isResetting}
+                >
+                  {isResetting ? (
+                    <>
+                      <div className="loading-spinner"></div>
+                      Resetting...
+                    </>
+                  ) : (
+                    <>
+                      <FaUndo />
+                      Yes, Reset Dashboard
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </motion.div>
   );
 };

@@ -41,6 +41,34 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
       initial={{ x: -80 }}
       animate={{ x: 0 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
+      style={{
+        // 🔒 BULLETPROOF VIEWPORT LOCK - Ultimate override system
+        position: 'fixed',
+        top: '70px', // FIXED: Match TopBar height
+        left: '0',
+        zIndex: 999998, // FIXED: Just below TopBar but above everything else
+        height: 'calc(100vh - 70px)', // FIXED: Match TopBar height
+        width: '80px',
+        overflow: 'visible',
+        transform: 'translateZ(0)', // Hardware acceleration
+        willChange: 'transform',
+        // Anti-interference protection
+        margin: '0',
+        padding: '0',
+        minWidth: '80px',
+        maxWidth: '80px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        background: 'rgba(26, 26, 46, 0.95)', // FIXED: More opaque for better visibility
+        borderRight: '1px solid rgba(255, 255, 255, 0.1)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
+        boxSizing: 'border-box',
+        // Additional bulletproof properties
+        minHeight: 'calc(100vh - 70px)',
+        maxHeight: 'calc(100vh - 70px)'
+      }}
     >
       <div className="icon-container">
         {menuItems.map((item, index) => (

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reset Button Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .platform-selector {
+            margin: 10px 0;
+        }
+        .platform-selector label {
+            margin-right: 15px;
+        }
+        .dashboard-btn {
+            padding: 10px 20px;
+            border: 2px solid;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .dashboard-btn.reset-btn {
+            background: linear-gradient(135deg, #8b3a3a, #a04747);
+            border-color: #8b3a3a;
+            color: #e8e8e8;
+            opacity: 0.8;
+        }
+        .dashboard-btn.reset-btn:hover {
+            background: linear-gradient(135deg, #9e4545, #b85454);
+            border-color: #9e4545;
+            box-shadow: 0 0 8px rgba(139, 58, 58, 0.3);
+            opacity: 1;
+        }
+        .dashboard-btn.reset-btn.twitter {
+            background: linear-gradient(135deg, #7a4035, #8b4a3f);
+            border-color: #7a4035;
+        }
+        .dashboard-btn.reset-btn.facebook {
+            background: linear-gradient(135deg, #7d5a5a, #8e6565);
+            border-color: #7d5a5a;
+        }
+        .dashboard-btn.reset-btn.instagram {
+            background: linear-gradient(135deg, #7a3d42, #8b4850);
+            border-color: #7a3d42;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            background: #e8f5e8;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Reset Button Test - sentientm.com</h1>
+    
+    <div class="test-section">
+        <h2>Test Platform Reset Buttons</h2>
+        <p>This test verifies that reset buttons appear correctly for all platforms with the new dim styling.</p>
+        
+        <div class="platform-selector">
+            <label><input type="radio" name="platform" value="instagram" checked> Instagram</label>
+            <label><input type="radio" name="platform" value="twitter"> Twitter</label>
+            <label><input type="radio" name="platform" value="facebook"> Facebook</label>
+        </div>
+        
+        <div id="button-container">
+            <!-- Buttons will be generated here -->
+        </div>
+        
+        <div class="result" id="result">
+            Select a platform to see the reset button styling.
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>API Endpoint Test</h2>
+        <button onclick="testApiEndpoint()" class="dashboard-btn">Test API Connection</button>
+        <div id="api-result"></div>
+    </div>
+
+    <script>
+        function updateButtons() {
+            const platform = document.querySelector('input[name="platform"]:checked').value;
+            const container = document.getElementById('button-container');
+            const result = document.getElementById('result');
+            
+            container.innerHTML = `
+                <button class="dashboard-btn reset-btn ${platform}" onclick="testReset('${platform}')">
+                    🔄 Reset
+                </button>
+            `;
+            
+            result.innerHTML = `Reset button displayed for ${platform} with platform-specific styling.`;
+        }
+        
+        function testReset(platform) {
+            const result = document.getElementById('result');
+            result.innerHTML = `✅ Reset button clicked for ${platform}! The styling is dim and non-distracting as requested.`;
+        }
+        
+        async function testApiEndpoint() {
+            const result = document.getElementById('api-result');
+            result.innerHTML = 'Testing API connection...';
+            
+            try {
+                const response = await fetch('/api/health-check', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.text();
+                    result.innerHTML = `✅ API connection successful! Response: ${data}`;
+                } else {
+                    result.innerHTML = `⚠️ API responded with status: ${response.status}`;
+                }
+            } catch (error) {
+                result.innerHTML = `❌ API connection failed: ${error.message}`;
+            }
+        }
+        
+        // Initialize
+        document.querySelectorAll('input[name="platform"]').forEach(radio => {
+            radio.addEventListener('change', updateButtons);
+        });
+        updateButtons();
+    </script>
+</body>
+</html>

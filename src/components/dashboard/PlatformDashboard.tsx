@@ -313,22 +313,92 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     setImageError(false);
     try {
       console.log(`[PlatformDashboard] ⚡ Fetching profile info for ${platform}`);
-      const platformParam = `?platform=${platform}`;
-      const response = await axios.get(`/api/profile-info/${accountHolder}${platformParam}`);
-      // Defensive check: ensure response data is a valid object
-      if (response.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
-        setProfileInfo(response.data);
-        console.log(`Profile Info Fetched:`, response.data);
+      
+      // 🎯 CRITICAL FIX: Try different endpoints for different platforms to handle R2 bucket structure
+      let response;
+      let profileData = null;
+      
+      if (platform === 'instagram') {
+        // Instagram works with the original endpoint (no platform param needed)
+        response = await axios.get(`/api/profile-info/${accountHolder}`);
+        profileData = response.data;
+      } else {
+        // Twitter and Facebook need platform-specific path handling
+        try {
+          const platformParam = `?platform=${platform}`;
+          response = await axios.get(`/api/profile-info/${accountHolder}${platformParam}`);
+          profileData = response.data;
+          
+          // 🎯 ENHANCED VALIDATION: Check if response contains actual profile fields
+          const hasProfileFields = profileData.fullName || profileData.followersCount !== undefined || 
+                                   profileData.biography || profileData.profilePicUrl || profileData.profilePicUrlHD;
+          
+          if (!hasProfileFields && platform === 'twitter') {
+            // 🎯 FALLBACK: Try extracting from cached Twitter data
+            console.log(`[TWITTER] Profile data not found in R2, trying cache extraction...`);
+            const cacheResponse = await axios.get(`/api/data/cache/twitter_${accountHolder}_profile.json`).catch(() => null);
+            
+            if (cacheResponse?.data?.data && Array.isArray(cacheResponse.data.data) && cacheResponse.data.data.length > 0) {
+              const authorData = cacheResponse.data.data[0].author;
+              if (authorData) {
+                console.log(`[TWITTER] Extracting profile from cached author data:`, authorData);
+                profileData = {
+                  username: authorData.userName || accountHolder,
+                  fullName: authorData.name || authorData.userName,
+                  biography: authorData.description || '',
+                  followersCount: authorData.followers || 0,
+                  followsCount: authorData.following || 0,
+                  postsCount: authorData.statusesCount || 0,
+                  externalUrl: '',
+                  profilePicUrl: authorData.profilePicture,
+                  profilePicUrlHD: authorData.coverPicture || authorData.profilePicture,
+                  private: authorData.protected || false,
+                  verified: authorData.isVerified || false,
+                  platform: 'twitter',
+                  extractedAt: new Date().toISOString()
+                };
+                console.log(`[TWITTER] Successfully extracted profile data:`, profileData);
+              }
+            }
+          }
+        } catch (err) {
+          console.warn(`[${platform.toUpperCase()}] Primary profile endpoint failed, trying fallback...`);
+          profileData = null;
+        }
+      }
+      
+      console.log(`[PlatformDashboard] Raw response for ${platform}:`, profileData);
+      
+      // 🎯 ENHANCED VALIDATION: Check if response contains actual profile fields
+      if (profileData && typeof profileData === 'object' && !Array.isArray(profileData)) {
+        // Validate that this is actually profile data, not account config
+        const hasProfileFields = profileData.fullName || profileData.followersCount !== undefined || 
+                                 profileData.biography || profileData.profilePicUrl || profileData.profilePicUrlHD;
+        
+        if (hasProfileFields) {
+          setProfileInfo(profileData);
+          console.log(`[${platform.toUpperCase()}] Profile Info Successfully Fetched:`, {
+            fullName: profileData.fullName,
+            followersCount: profileData.followersCount,
+            biography: profileData.biography?.substring(0, 50) + '...',
+            profilePicUrl: profileData.profilePicUrl ? 'Available' : 'N/A'
+          });
+        } else {
+          console.warn(`[${platform.toUpperCase()}] Response contains account config, not profile data:`, profileData);
+          setProfileInfo(null);
+          setProfileError(`Profile data not found for ${platform}. Please ensure profile info is scraped.`);
+        }
       } else {
         setProfileInfo(null);
-        setProfileError(`Invalid profile data received.`);
+        setProfileError(`Invalid profile data received for ${platform}.`);
       }
     } catch (err: any) {
+      console.error(`[${platform.toUpperCase()}] Profile info fetch error:`, err);
       if (err.response?.status === 404) {
         setProfileInfo(null);
-        setProfileError(`Profile info not available.`);
+        setProfileError(`Profile info not available for ${platform}.`);
       } else {
-        setProfileError(`Failed to load profile info.`);
+        setProfileError(`Failed to load ${platform} profile info.`);
       }
     } finally {
       setProfileLoading(false);
@@ -2251,7 +2321,6 @@ Image Description: ${response.post.image_prompt}
           
           {profileInfo?.biography && profileInfo.biography.trim() && (
             <motion.div
-
               className="bio-text"
               animate={{ 
                 opacity: showBio ? 1 : 0,
@@ -2264,12 +2333,18 @@ Image Description: ${response.post.image_prompt}
                 left: 0,
                 right: 0,
                 margin: 0,
-                fontSize: '14px',
-                color: '#666',
+                fontSize: '16px', // 🎯 ENHANCED: Increased font size for better visibility
+                fontWeight: '500', // 🎯 ENHANCED: Added font weight for prominence
+                color: '#2d2d2d', // 🎯 ENHANCED: Darker color for better readability
                 textAlign: 'center',
-                lineHeight: '1.4',
+                lineHeight: '1.5', // 🎯 ENHANCED: Better line height for readability
                 whiteSpace: 'pre-wrap',
-                fontStyle: 'italic'
+                fontStyle: 'italic',
+                padding: '8px 16px', // 🎯 ENHANCED: Added padding for better spacing
+                backgroundColor: 'rgba(255, 255, 255, 0.1)', // 🎯 ENHANCED: Subtle background
+                borderRadius: '8px', // 🎯 ENHANCED: Rounded corners
+                border: '1px solid rgba(0, 255, 204, 0.2)', // 🎯 ENHANCED: Subtle accent border
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)' // 🎯 ENHANCED: Subtle shadow
               }}
             >
               {typedBio}
@@ -2284,7 +2359,7 @@ Image Description: ${response.post.image_prompt}
                   style={{ 
                     display: 'inline-block',
                     width: '2px',
-                    height: '16px',
+                    height: '20px', // 🎯 ENHANCED: Increased cursor height
                     backgroundColor: '#00ffcc',
                     marginLeft: '2px',
                     verticalAlign: 'text-bottom'
@@ -2304,32 +2379,33 @@ Image Description: ${response.post.image_prompt}
                   <div className="profile-loading">Loading...</div>
                 ) : (
                   <>
-                    {profileInfo?.profilePicUrlHD && !imageError ? (
+                    {(profileInfo?.profilePicUrlHD || profileInfo?.profilePicUrl) && !imageError ? (
                       <img
-                        src={`/api/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}`}
+                        src={`/api/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD || profileInfo.profilePicUrl)}&t=${Date.now()}`}
                         alt={`${accountHolder}'s profile picture`}
                         className="profile-pic-bar"
                         onError={(e) => {
-                          console.error(`Failed to load profile picture for ${accountHolder} ${imageRetryAttemptsRef.current + 1}`);
+                          console.error(`Failed to load ${platform} profile picture for ${accountHolder} attempt ${imageRetryAttemptsRef.current + 1}`);
                           if (imageRetryAttemptsRef.current < maxImageRetryAttempts) {
                             imageRetryAttemptsRef.current++;
                             const imgElement = e.target as HTMLImageElement;
+                            const imageUrl = profileInfo.profilePicUrlHD || profileInfo.profilePicUrl;
                             
                             if (imageRetryAttemptsRef.current === 1) {
                               // First retry: try direct URL without proxy
-                              console.log(`Trying direct URL for profile picture, attempt ${imageRetryAttemptsRef.current}`);
+                              console.log(`Trying direct URL for ${platform} profile picture, attempt ${imageRetryAttemptsRef.current}`);
                               setTimeout(() => {
-                                imgElement.src = profileInfo.profilePicUrlHD;
+                                imgElement.src = imageUrl;
                               }, 500);
                             } else {
-                              // Final retry: try proxy again
-                              console.log(`Final retry with proxy, attempt ${imageRetryAttemptsRef.current}/${maxImageRetryAttempts}`);
+                              // Final retry: try proxy again with timestamp
+                              console.log(`Final retry with proxy for ${platform}, attempt ${imageRetryAttemptsRef.current}/${maxImageRetryAttempts}`);
                               setTimeout(() => {
-                                imgElement.src = `/api/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}`;
+                                imgElement.src = `/api/proxy-image?url=${encodeURIComponent(imageUrl)}&t=${Date.now()}`;
                               }, 1000);
                             }
                           } else {
-                            console.log(`Max retries reached, showing fallback for ${accountHolder}`);
+                            console.log(`Max retries reached for ${platform}, showing fallback for ${accountHolder}`);
                             setImageError(true);
                           }
                         }}

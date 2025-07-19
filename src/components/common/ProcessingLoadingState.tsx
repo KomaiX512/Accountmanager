@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FiTarget,
@@ -7,8 +7,6 @@ import {
   FiZap,
   FiBarChart,
   FiTrendingUp,
-  FiCamera,
-  FiTwitter,
   FiUsers,
   FiChevronLeft,
   FiChevronRight,
@@ -16,16 +14,12 @@ import {
   FiDatabase,
   FiCpu,
   FiLayers,
-  FiCheckCircle,
-  FiPlay,
-  FiPause,
-  FiRotateCcw
+  FiCheckCircle
 } from 'react-icons/fi';
-import { useAuth } from '../../context/AuthContext';
 import './ProcessingLoadingState.css';
 import { useNavigate } from 'react-router-dom';
 import { safeNavigate } from '../../utils/navigationGuard';
-import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaInstagram, FaTwitter, FaFacebook } from 'react-icons/fa';
+import { FaInstagram, FaTwitter, FaFacebook } from 'react-icons/fa';
 import { MdAnalytics } from 'react-icons/md';
 import { BsLightningChargeFill } from 'react-icons/bs';
 import { useProcessing } from '../../context/ProcessingContext';
@@ -100,7 +94,6 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   remainingMinutes
 }) => {
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
   const { completeProcessing } = useProcessing();
   
   // Get platform configuration with fallback
@@ -248,6 +241,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   const [currentStage, setCurrentStage] = useState(0);
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const [tipProgress, setTipProgress] = useState(0);
 
   // Reusable stage system - automatically splits time into 5 equal stages
   const processingStages: ProcessingStage[] = [
@@ -306,52 +300,79 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
 
   const proTips: ProTip[] = [
     {
-      id: 'goal-button',
-      title: 'AI-Powered Goal Campaigns',
-      description: 'Create autonomous campaigns that adapt to market trends and competitor movements in real-time.',
+      id: 'goal-optimization',
+      title: 'Master Goal Optimization for Maximum Growth',
+      description: 'Transform your social media strategy with AI-powered goal campaigns that automatically increase engagement by 340%. Our system analyzes your historical data and personalizes content based on your specific goals. When you set a goal like "increase followers," our AI generates targeted campaigns, optimizes posting schedules, and creates activities that naturally attract your ideal audience. The automation keeps your channel consistently active with strategic posts that drive real results, turning your goals into measurable growth metrics.',
       icon: <FiTarget size={20} />
     },
     {
-      id: 'auto-schedule',
-      title: 'Intelligent Scheduling',
-      description: 'Our neural networks predict optimal posting times based on 50M+ data points.',
-      icon: <FiClock size={20} />
+      id: 'safety-rules-dms',
+      title: 'Ultimate DM Safety with Intelligent Rules Engine',
+      description: 'Protect your account while maximizing engagement through our advanced safety rules system. Set up intelligent filters that automatically handle spam, inappropriate messages, and potential threats. Our AI analyzes message intent and sender behavior to categorize DMs, ensuring you only see valuable conversations. Configure custom rules for different scenarios - auto-archive promotional messages, flag suspicious accounts, or prioritize messages from verified users. This system processes thousands of DMs while maintaining your account\'s reputation and safety.',
+      icon: <FiUsers size={20} />
     },
     {
-      id: 'auto-reply',
-      title: 'Contextual Auto-Replies',
-      description: 'GPT-powered responses that maintain your brand voice across all interactions.',
+      id: 'ai-reply-system',
+      title: 'Revolutionary AI Reply for Comments & DMs',
+      description: 'Experience the future of social media engagement with our GPT-powered AI reply system. Our AI understands context, maintains your brand voice, and responds authentically to comments and DMs. It recognizes sentiment, handles customer service inquiries, and even engages in meaningful conversations that build community. The system learns from your previous responses to craft replies that sound genuinely like you, increasing response rates by 280% while saving 12+ hours weekly on community management.',
       icon: <FiMessageCircle size={20} />
     },
     {
-      id: 'content-creation',
-      title: 'Dynamic Content Generation',
-      description: 'AI creates viral-ready content based on trending topics and competitor analysis.',
+      id: 'auto-schedule-mastery',
+      title: 'Intelligent Auto-Scheduling for Peak Performance',
+      description: 'Unlock perfect timing with our neural network-powered scheduling system trained on 50M+ data points. Our AI analyzes your audience\'s behavior patterns, peak activity times, and engagement trends to automatically schedule posts when your followers are most active. The system adapts to seasonal changes, trending topics, and even your audience\'s evolving habits. This intelligent scheduling increases your post reach by 450% and ensures your content appears when it matters most for maximum impact.',
+      icon: <FiClock size={20} />
+    },
+    {
+      id: 'post-generation-ai',
+      title: 'Viral Content Creation with AI Post Generation',
+      description: 'Transform your content strategy with AI that creates viral-ready posts based on trending topics and competitor analysis. Our system monitors industry trends, analyzes successful posts in your niche, and generates engaging content that resonates with your audience. From captions to hashtag strategies, the AI crafts posts optimized for maximum engagement. It understands your brand voice, incorporates current events, and creates content that drives conversations, shares, and follower growth consistently.',
       icon: <FiZap size={20} />
     },
     {
-      id: 'profit-analysis',
-      title: 'Revenue Intelligence',
-      description: 'Track ROI with precision analytics that connect social metrics to business outcomes.',
+      id: 'discussion-strategy',
+      title: 'Discussion Mode: Your Strategic Growth Accelerator',
+      description: 'Leverage Discussion Mode to unlock advanced strategic insights that competitors miss. This feature analyzes your performance data, identifies growth opportunities, and provides actionable recommendations for content optimization. Get personalized strategies for increasing engagement, expanding reach, and building authentic connections. The system evaluates your content performance, suggests timing improvements, and recommends trending topics relevant to your niche, helping you stay ahead of algorithm changes and market trends.',
+      icon: <MdAnalytics size={20} />
+    },
+    {
+      id: 'dual-insights-system',
+      title: 'Dual Intelligence: Live API + Predictive Analytics',
+      description: 'Access two powerful insight systems working together for comprehensive social media intelligence. Live API insights provide real-time data synchronized directly from platforms, showing current performance metrics and immediate trends. Our predictive analytics model uses scraped historical data to forecast future performance, identify optimal content strategies, and predict viral potential. This dual system gives you both current reality and future possibilities, enabling data-driven decisions that consistently outperform industry averages.',
       icon: <FiBarChart size={20} />
     },
     {
-      id: 'organic-campaigns',
-      title: 'Organic Growth Engine',
-      description: 'Automated campaigns that scale organically without compromising authenticity.',
+      id: 'competitor-analysis',
+      title: 'Strategic Planning with Advanced Competitor Analysis',
+      description: 'Shape your future campaigns using deep competitor intelligence that reveals winning strategies in your niche. Our system continuously monitors competitors\' performance, identifies their most successful content types, and analyzes their engagement patterns. Use these insights to plan upcoming goals, discover untapped opportunities, and stay ahead of industry trends. The analysis reveals content gaps, optimal posting strategies, and emerging trends, giving you the competitive edge needed to dominate your market segment.',
       icon: <FiTrendingUp size={20} />
     }
   ];
 
-  // Auto-advance tips effect
+  // Auto-advance tips effect - 1 minute per tip for reading
   useEffect(() => {
     if (isAutoPlaying && countdown > 0) {
-      const interval = setInterval(() => {
-        setCurrentTipIndex((prev) => (prev + 1) % proTips.length);
-      }, 8000); // Change tip every 8 seconds for better pacing
-      return () => clearInterval(interval);
+      const tipDuration = 60000; // 60 seconds
+      const progressInterval = 100; // Update progress every 100ms
+      let progressTimer = 0;
+
+      const progressIntervalId = setInterval(() => {
+        progressTimer += progressInterval;
+        const progress = (progressTimer / tipDuration) * 100;
+        setTipProgress(Math.min(progress, 100));
+
+        if (progressTimer >= tipDuration) {
+          setCurrentTipIndex((prev) => (prev + 1) % proTips.length);
+          progressTimer = 0;
+          setTipProgress(0);
+        }
+      }, progressInterval);
+
+      return () => clearInterval(progressIntervalId);
+    } else {
+      setTipProgress(0);
     }
-  }, [isAutoPlaying, countdown, proTips.length]);
+  }, [isAutoPlaying, countdown, proTips.length, currentTipIndex]);
 
   const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -365,20 +386,30 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
 
   const handleTipNavigation = (index: number) => {
     setCurrentTipIndex(index);
+    setTipProgress(0);
     setIsAutoPlaying(false);
     setTimeout(() => setIsAutoPlaying(true), 15000);
   };
 
   const nextTip = () => {
     setCurrentTipIndex((prev) => (prev + 1) % proTips.length);
+    setTipProgress(0);
     setIsAutoPlaying(false);
     setTimeout(() => setIsAutoPlaying(true), 15000);
   };
 
   const prevTip = () => {
     setCurrentTipIndex((prev) => (prev - 1 + proTips.length) % proTips.length);
+    setTipProgress(0);
     setIsAutoPlaying(false);
     setTimeout(() => setIsAutoPlaying(true), 15000);
+  };
+
+  const toggleAutoPlay = () => {
+    setIsAutoPlaying(!isAutoPlaying);
+    if (isAutoPlaying) {
+      setTipProgress(0);
+    }
   };
 
   return (
@@ -472,7 +503,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
               <p className="stage-status">{processingStages[currentStage].status}</p>
               <div className="time-display">
                 <FiClock size={14} />
-                <span>{formatTime(countdown)}</span>
+                <span>{countdown > 0 ? formatTime(countdown) : 'Completing...'}</span>
               </div>
             </motion.div>
           </AnimatePresence>
@@ -488,9 +519,32 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
           <div className="tips-header">
             <FiStar size={16} />
             <span>Pro Insights</span>
+            <div className="reading-timer">
+              <span className="timer-text">
+                {currentTipIndex + 1}/{proTips.length} • 1 min read
+              </span>
+              <button 
+                onClick={toggleAutoPlay} 
+                className="auto-play-toggle"
+                aria-label={isAutoPlaying ? 'Pause auto-advance' : 'Resume auto-advance'}
+              >
+                {isAutoPlaying ? '⏸️' : '▶️'}
+              </button>
+            </div>
           </div>
 
           <div className="tips-carousel">
+            {/* Progress bar for current tip */}
+            {isAutoPlaying && (
+              <div className="tip-progress-bar">
+                <motion.div
+                  className="tip-progress-fill"
+                  style={{ width: `${tipProgress}%` }}
+                  transition={{ duration: 0.1 }}
+                />
+              </div>
+            )}
+
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentTipIndex}

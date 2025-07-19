@@ -1427,6 +1427,38 @@ app.get(['/profile-info/:username', '/api/profile-info/:username'], async (req, 
   return res.status(404).json({ error: 'Profile info not found' });
 });
 
+// 🎯 NEW: API route to serve cached profile data for extraction
+app.get(['/api/data/cache/:filename', '/data/cache/:filename'], async (req, res) => {
+  const { filename } = req.params;
+  
+  try {
+    console.log(`[${new Date().toISOString()}] Serving cached data: ${filename}`);
+    
+    // Security check: only allow specific patterns
+    if (!filename.match(/^(twitter|facebook|instagram)_[a-zA-Z0-9_-]+_profile\.json$/)) {
+      return res.status(400).json({ error: 'Invalid filename pattern' });
+    }
+    
+    const filePath = path.join(__dirname, '..', 'data', 'cache', filename);
+    
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      console.log(`[${new Date().toISOString()}] Cached file not found: ${filePath}`);
+      return res.status(404).json({ error: 'Cached data not found' });
+    }
+    
+    // Read and return the cached data
+    const data = fs.readFileSync(filePath, 'utf8');
+    const jsonData = JSON.parse(data);
+    
+    console.log(`[${new Date().toISOString()}] Successfully served cached data: ${filename}`);
+    return res.json(jsonData);
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error serving cached data ${filename}:`, error);
+    return res.status(500).json({ error: 'Failed to read cached data' });
+  }
+});
+
 app.post(['/save-account-info', '/api/save-account-info'], async (req, res) => {
   try {
     const { username, accountType, postingStyle, competitors, platform } = req.body;

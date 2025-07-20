@@ -1,0 +1,72 @@
+.platform-icon {
+  width: 20px;
+  height: 20px;
+  margin-right: 8px;
+  filter: brightness(1.2);
+  transition: filter 0.2s ease;
+  vertical-align: middle;
+}
+
+.nav-link:hover .platform-icon {
+  filter: brightness(1.4);
+}
+
+.nav-link.active .platform-icon {
+  filter: brightness(1.5);
+}
+
+/* Ensure platform buttons have exactly the same dimensions as dashboard button */
+.nav-link.platform-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(0.9rem, 2.2vw, 1.1rem);
+  font-weight: 700;
+  padding: clamp(10px, 2.5vw, 12px) clamp(16px, 4vw, 20px);
+  border-radius: clamp(8px, 2vw, 10px);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  height: auto;
+  min-width: auto;
+  line-height: 1;
+  box-sizing: border-box;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #e0e0ff;
+}
+
+.nav-link.platform-button:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.nav-link.platform-button.active {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.nav-link.platform-button::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.5);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateX(-50%);
+  opacity: 0;
+  border-radius: 1px;
+}
+
+.nav-link.platform-button:hover::after,
+.nav-link.platform-button.active::after {
+  width: 30%;
+  opacity: 1;
+}

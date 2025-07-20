@@ -4,46 +4,42 @@
   left: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
+  width: 100% !important;
+  height: 100% !important;
   background-color: rgba(0, 0, 0, 0.7) !important;
   backdrop-filter: blur(8px) !important;
-  z-index: 99999 !important;
+  z-index: 999 !important; /* Below top bar */
   display: flex !important;
-  justify-content: flex-start !important; /* Changed from center to flex-start */
-  align-items: flex-start !important; /* Changed from center to flex-start */
-  padding: 15vh 0 5vh 0 !important; /* Added top padding to lower the content */
+  justify-content: center !important;
+  align-items: flex-start !important; /* Align to top */
+  padding-top: 70px !important; /* Space for top bar */
   margin: 0 !important;
   box-sizing: border-box !important;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
+  overflow: auto !important; /* Ensure scrollability */
 }
 
 .canvas-editor-container {
   background-color: #151521 !important;
   border-radius: 12px !important;
-  
-  /* ENHANCED RESPONSIVE SCALING - Better for all screen sizes */
-  width: 85vw !important;
-  height: 50vw !important; /* Maintain aspect ratio closer to 16:9, slightly larger */
-  max-width: 1800px !important;
-  max-height: 80vh !important; /* Reduced max-height to fit better */
-  min-width: 900px !important;
-  min-height: 530px !important;
-  background-color: #000080 !important; /* Dark blue */
-  transform: scale(var(--canvas-editor-scale, 1)) !important;
-  transform-origin: top center !important; /* Changed from center to top center */
-  
-  display: flex !important;
-  flex-direction: column !important;
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5) !important;
-  position: relative !important;
-  overflow: hidden !important;
   z-index: 100000 !important;
   animation: modalAppear 0.2s ease-out !important;
   box-sizing: border-box !important;
-  margin: 0 auto 5vh auto !important; /* Added bottom margin and removed top auto */
   flex-shrink: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important; /* Changed from auto to hidden to prevent double scrollbars */
+  
+  /* Positioning and Sizing to prevent overlap */
+  position: absolute !important;
+  width: calc(100% - 280px) !important; /* Adjust width to account for left bar */
+  height: 85vh !important;
+  max-width: 1200px !important;
+  max-height: 900px !important;
+  top: 55% !important;
+  left: 55% !important;
+  transform: translate(-50%, -50%) !important;
+  margin: 0 !important;
 }
 
 @keyframes modalAppear {
@@ -1008,6 +1004,15 @@
   overflow: auto;
 }
 
+/* Adjusted image editor container to prevent overlapping */
+.canvas-editor-container {
+  width: 65% !important;
+  max-width: 550px !important;
+  margin-left: auto !important;
+  margin-right: 20px !important; /* Move rightward */
+  position: relative !important;
+}
+
 .tui-image-editor-container {
   min-height: 500px;
   border-radius: 8px;
@@ -1077,322 +1082,24 @@
   }
 }
 
-/* Responsive Design */
-/* ENHANCED RESPONSIVE SCALING FOR SMALLER LAPTOP SCREENS */
-
-/* Large laptops and small desktops */
-@media (max-width: 1440px) {
-  .canvas-editor-container {
-    width: clamp(300px, 85vw, 900px) !important;
-    height: clamp(380px, 80vh, 950px) !important;
-    transform: scale(min(
-      min(90vw, 900px) / 900, 
-      min(80vh, 950px) / 950,
-      1
-    )) !important;
-  }
-  
-  .canvas-editor-header {
-    padding: clamp(12px, 1.8vw, 20px) clamp(18px, 2.5vw, 22px);
-  }
-  
-  .canvas-editor-header h2 {
-    font-size: clamp(16px, 2vw, 18px);
-  }
-  
-  .upload-button {
-    padding: clamp(6px, 1.2vw, 14px) clamp(12px, 2vw, 14px);
-    font-size: clamp(12px, 1.4vw, 13px);
-  }
-  
-  .canvas-editor-footer {
-    padding: clamp(12px, 1.8vw, 20px) clamp(18px, 2.5vw, 22px);
-    gap: clamp(12px, 2vw, 14px);
-  }
-  
-  .cancel-button,
-  .schedule-button {
-    padding: clamp(6px, 1.2vw, 8px) clamp(16px, 2.4vw, 18px);
-    font-size: clamp(12px, 1.4vw, 13px);
-  }
+/* Removed responsiveness and added proportional scaling */
+.canvas-editor-container {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow: auto !important; /* Ensure scrollability */
 }
 
-/* Standard laptops */
-@media (max-width: 1366px) {
-  .canvas-editor-container {
-    width: clamp(280px, 82vw, 820px) !important;
-    height: clamp(360px, 78vh, 880px) !important;
-    transform: scale(min(
-      min(88vw, 820px) / 820, 
-      min(78vh, 880px) / 880,
-      1
-    )) !important;
-  }
-  
-  .canvas-editor-header {
-    padding: clamp(10px, 1.5vw, 18px) clamp(16px, 2.2vw, 20px);
-  }
-  
-  .canvas-editor-header h2 {
-    font-size: clamp(14px, 1.8vw, 16px);
-  }
-  
-  .upload-button {
-    padding: clamp(5px, 1vw, 12px) clamp(10px, 1.8vw, 12px);
-    font-size: clamp(11px, 1.2vw, 12px);
-  }
-  
-  .canvas-editor-footer {
-    padding: clamp(10px, 1.5vw, 18px) clamp(16px, 2.2vw, 20px);
-    gap: clamp(10px, 1.8vw, 12px);
-  }
-  
-  .cancel-button,
-  .schedule-button {
-    padding: clamp(5px, 1vw, 7px) clamp(14px, 2.2vw, 16px);
-    font-size: clamp(11px, 1.2vw, 12px);
-  }
-}
-
-/* Smaller laptops */
-@media (max-width: 1280px) {
-  .canvas-editor-container {
-    width: clamp(260px, 80vw, 750px) !important;
-    height: clamp(340px, 75vh, 810px) !important;
-    transform: scale(min(
-      min(85vw, 750px) / 750, 
-      min(75vh, 810px) / 810,
-      1
-    )) !important;
-  }
-  
-  .canvas-editor-header {
-    padding: clamp(8px, 1.2vw, 16px) clamp(14px, 2vw, 18px);
-  }
-  
-  .canvas-editor-header h2 {
-    font-size: clamp(12px, 1.6vw, 14px);
-  }
-  
-  .upload-button {
-    padding: clamp(4px, 0.8vw, 10px) clamp(8px, 1.6vw, 10px);
-    font-size: clamp(10px, 1vw, 11px);
-  }
-  
-  .canvas-editor-footer {
-    padding: clamp(8px, 1.2vw, 16px) clamp(14px, 2vw, 18px);
-    gap: clamp(8px, 1.6vw, 10px);
-  }
-  
-  .cancel-button,
-  .schedule-button {
-    padding: clamp(4px, 0.8vw, 6px) clamp(12px, 2vw, 14px);
-    font-size: clamp(10px, 1vw, 11px);
-  }
-}
-
-/* Compact view for very small screens */
-@media (max-width: 768px) {
-  .canvas-upload-container {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-  }
-  
-  .multi-image-panel {
-    max-height: 120px;
-  }
-  
-  .image-preview-item {
-    width: 60px;
-    height: 60px;
-  }
-  
-  .canvas-editor-container {
-    margin: 10px;
-    max-width: calc(100vw - 20px);
-  }
-}
-
-/* Dark Theme Enhancements */
+/* Introduced slider for overlay */
 .canvas-editor-overlay {
-  background: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(5px);
+  overflow: auto !important;
 }
 
-.canvas-editor-header {
-  background: linear-gradient(135deg, #23234a, #1e1e2d);
-  border-bottom: 1px solid #3c3c57;
-}
-
-.canvas-editor-footer {
-  background: linear-gradient(135deg, #1e1e2d, #23234a);
-  border-top: 1px solid #3c3c57;
-}
-
-/* Brand Kit Integration */
-.brand-kit-button.active {
-  background: linear-gradient(135deg, #007bff, #00ffcc);
-  color: #000;
-  font-weight: bold;
-}
-
-/* SIMPLE RESPONSIVE SCALING: Scale entire container as one unit */
-
-/* Enhanced viewport management for all screen sizes */
-@media (max-width: 1200px), (max-height: 800px) {
-  .canvas-editor-overlay {
-    align-items: flex-start !important; /* Allow scrolling from top */
-    padding: clamp(5px, 1vw, 15px) !important;
-  }
-  
-  .canvas-editor-container {
-    width: clamp(280px, 85vw, 800px) !important;
-    height: clamp(350px, 85vh, 900px) !important;
-    max-width: 95vw !important;
-    max-height: 90vh !important;
-    margin: clamp(10px, 2vh, 20px) auto !important;
-    
-    /* Ensure proper scaling for smaller screens */
-    transform: scale(min(
-      min(90vw, 800px) / 800, 
-      min(85vh, 900px) / 900,
-      1
-    )) !important;
-  }
-  
-  .tui-image-editor-container {
-    min-height: clamp(300px, 60vh, 400px) !important;
-  }
-}
-
-/* Extra compact view for very small laptops */
-@media (max-width: 1024px), (max-height: 700px) {
-  .canvas-editor-overlay {
-    padding: clamp(3px, 0.5vw, 10px) !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-  }
-  
-  .canvas-editor-container {
-    width: clamp(260px, 90vw, 700px) !important;
-    height: clamp(320px, 80vh, 750px) !important;
-    max-width: 98vw !important;
-    max-height: 95vh !important;
-    margin: clamp(5px, 1vh, 15px) auto !important;
-    
-    transform: scale(min(
-      min(95vw, 700px) / 700, 
-      min(85vh, 750px) / 750,
-      1
-    )) !important;
-  }
-  
-  .canvas-editor-header,
-  .canvas-editor-footer {
-    padding: clamp(8px, 1.5vw, 12px) clamp(12px, 2vw, 16px) !important;
-  }
-  
-  .canvas-editor-header h2 {
-    font-size: clamp(14px, 2vw, 16px) !important;
-  }
-}
-
-/* Emergency fallback for extremely small screens */
-@media (max-width: 768px), (max-height: 600px) {
-  .canvas-editor-overlay {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    padding: 10vh 0 5vh 0 !important; /* Adjusted padding for mobile */
-    right: 0 !important;
-    bottom: 0 !important;
-    align-items: stretch !important;
-    justify-content: stretch !important;
-    padding: 0 !important;
-  }
-  
-  .canvas-editor-container {
-    width: 100vw !important;
-    height: 100vh !important;
-    max-width: 100vw !important;
-    max-height: 100vh !important;
-    margin: 0 !important;
-    border-radius: 0 !important;
-    transform: none !important;
-  }
-  
-  .tui-image-editor-container {
-    min-height: calc(100vh - 120px) !important;
-  }
-}
-
-.canvas-editor-left-toolbar,
-.canvas-editor-right-toolbar {
-  width: 80px !important; /* Slightly wider for better visibility */
-  overflow-y: auto !important; /* Ensure slider for vertical overflow */
-  overflow-x: hidden !important;
-  display: flex !important;
-  flex-direction: column !important;
-  background-color: rgba(0, 0, 0, 0.6) !important; /* Semi-transparent background for contrast */
-  height: calc(100% - 100px) !important; /* Adjust height to fit within container after accounting for header/footer */
-  position: relative !important; /* Ensure positioning context */
-  z-index: 100001 !important; /* Ensure it's above other elements */
-}
-
-.canvas-editor-left-toolbar::-webkit-scrollbar,
-.canvas-editor-right-toolbar::-webkit-scrollbar,
-.canvas-editor-header::-webkit-scrollbar,
-.canvas-editor-footer::-webkit-scrollbar {
-  width: 10px !important; /* Wider scrollbar for better visibility */
-}
-
-.canvas-editor-left-toolbar::-webkit-scrollbar-track,
-.canvas-editor-right-toolbar::-webkit-scrollbar-track,
-.canvas-editor-header::-webkit-scrollbar-track,
-.canvas-editor-footer::-webkit-scrollbar-track {
-  background: #1a1a1a !important; /* Darker track for contrast */
-}
-
-.canvas-editor-left-toolbar::-webkit-scrollbar-thumb,
-.canvas-editor-right-toolbar::-webkit-scrollbar-thumb,
-.canvas-editor-header::-webkit-scrollbar-thumb,
-.canvas-editor-footer::-webkit-scrollbar-thumb {
-  background: #5a5a5a !important; /* Lighter thumb for visibility */
-  border-radius: 5px !important;
-}
-
-/* Add sliders to toolbar menus */
-.tui-image-editor-menu,
-.tui-image-editor-submenu,
-.tui-image-editor-menu-item,
-.tui-image-editor-submenu-item {
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  max-height: calc(100vh - 250px) !important; /* Slightly lower height to fit within viewport */
-  background-color: rgba(0, 0, 0, 0.85) !important; /* Darker for visibility */
-  position: relative !important;
-  z-index: 100002 !important; /* Ensure menus appear above toolbars */
-}
-
-.tui-image-editor-menu::-webkit-scrollbar,
-.tui-image-editor-submenu::-webkit-scrollbar,
-.tui-image-editor-menu-item::-webkit-scrollbar,
-.tui-image-editor-submenu-item::-webkit-scrollbar {
-  width: 10px !important;
-}
-
-.tui-image-editor-menu::-webkit-scrollbar-track,
-.tui-image-editor-submenu::-webkit-scrollbar-track,
-.tui-image-editor-menu-item::-webkit-scrollbar-track,
-.tui-image-editor-submenu-item::-webkit-scrollbar-track {
-  background: #1a1a1a !important;
-}
-
-.tui-image-editor-menu::-webkit-scrollbar-thumb,
-.tui-image-editor-submenu::-webkit-scrollbar-thumb,
-.tui-image-editor-menu-item::-webkit-scrollbar-thumb,
-.tui-image-editor-submenu-item::-webkit-scrollbar-thumb {
-  background: #5a5a5a !important;
-  border-radius: 5px !important;
+/* Added proportional scaling */
+.canvas-editor-container {
+  transform: scale(1) !important;
+  transform-origin: center !important;
 }

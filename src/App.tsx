@@ -70,6 +70,27 @@ const AppContent: React.FC = () => {
   const [accountType, setAccountType] = useState<'branding' | 'non-branding'>(location.state?.accountType || 'branding');
   const [userId, setUserId] = useState<string | undefined>(undefined);
   const [isLoadingUserData, setIsLoadingUserData] = useState(false);
+
+  // ⚡ Ensure account info updates when switching between platform dashboards
+  useEffect(() => {
+    if (!currentUser) return;
+    const platformId = getCurrentPlatform();
+    const uid = currentUser.uid;
+
+    const username = localStorage.getItem(`${platformId}_username_${uid}`) || '';
+    const compsRaw = localStorage.getItem(`${platformId}_competitors_${uid}`) || '[]';
+    let comps: string[];
+    try {
+      comps = JSON.parse(compsRaw);
+    } catch {
+      comps = [];
+    }
+    const accT = (localStorage.getItem(`${platformId}_account_type_${uid}`) as 'branding' | 'non-branding') || 'branding';
+
+    setAccountHolder(username);
+    setCompetitors(comps);
+    setAccountType(accT);
+  }, [location.pathname, currentUser]);
   
   // Chat modal state for MessagesPopup integration
   const [chatModalData, setChatModalData] = useState<{

@@ -4,11 +4,21 @@ import { motion } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 import UserDropdown from '../auth/UserDropdown';
 import { useAuth } from '../../context/AuthContext';
+import PlatformButton from './PlatformButton';
+import { useAcquiredPlatforms } from '../../context/AcquiredPlatformsContext';
 
 const TopBar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { currentUser } = useAuth();
+  const { acquiredPlatforms } = useAcquiredPlatforms();
+
+  // Debug logging
+  console.log('[TopBar] Rendering with:', {
+    currentUser: currentUser?.uid,
+    acquiredPlatforms,
+    location: location.pathname
+  });
 
   return (
     <motion.div
@@ -52,18 +62,36 @@ const TopBar: React.FC = () => {
 
       <div className="nav-links">
         {currentUser && (
-          <motion.a
-            href="#"
-            className={`nav-link ${location.pathname === '/account' ? 'active' : ''}`}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={(e) => {
-              e.preventDefault();
-              navigate('/account');
-            }}
-          >
-            Dashboard
-          </motion.a>
+          <>
+            <motion.a
+              href="#"
+              className={`nav-link ${location.pathname === '/account' ? 'active' : ''}`}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={(e) => {
+                e.preventDefault();
+                navigate('/account');
+              }}
+            >
+              Dashboard
+            </motion.a>
+            
+            {/* Dynamic Platform Buttons */}
+            {acquiredPlatforms.map(platform => (
+              <PlatformButton
+                key={platform.id}
+                id={platform.id}
+                name={platform.name}
+                icon={platform.icon}
+                route={platform.route}
+                isActive={
+                  (platform.id === 'instagram' && location.pathname === '/dashboard') ||
+                  location.pathname.includes(platform.route)
+                }
+                showIcon={false}
+              />
+            ))}
+          </>
         )}
       </div>
 

@@ -312,3 +312,36 @@
   font-weight: 600;
   margin-right: 0.5rem;
 }
+
+/* ✅ NEW: Data ready indicators */
+.strategy-preview {
+  text-align: center;
+  padding: 10px;
+  color: #e0e0ff;
+}
+
+.data-ready-indicator {
+  color: #00ffcc;
+  font-weight: 600;
+  font-size: 1rem;
+  display: block;
+  margin-bottom: 5px;
+}
+
+.click-hint {
+  color: #a0a0ff;
+  font-size: 0.8rem;
+  margin: 0;
+  opacity: 0.8;
+}
+
+.no-data-message {
+  text-align: center;
+  padding: 15px;
+  color: #ff6b6b;
+}
+
+.no-data-text {
+  font-size: 0.9rem;
+  opacity: 0.8;
+}

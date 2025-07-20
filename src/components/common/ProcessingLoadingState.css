@@ -10,8 +10,12 @@
   right: 0;
   bottom: 0;
   background: #0a0a0a;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+  scroll-behavior: smooth;
+  padding: 1rem 0;
 }
 
 .processing-backdrop {
@@ -21,9 +25,15 @@
   right: 0;
   bottom: 0;
   background: 
-    radial-gradient(ellipse at 50% 20%, rgba(120, 119, 198, 0.04) 0%, transparent 60%),
-    radial-gradient(ellipse at 80% 80%, rgba(255, 119, 198, 0.03) 0%, transparent 60%),
+    radial-gradient(ellipse at 50% 20%, rgba(120, 119, 198, 0.06) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 80%, rgba(255, 119, 198, 0.04) 0%, transparent 60%),
+    radial-gradient(ellipse at 20% 70%, rgba(34, 197, 94, 0.03) 0%, transparent 50%),
     linear-gradient(180deg, #0a0a0a 0%, #111111 100%);
+  
+  /* Subtle dot pattern */
+  background-image: 
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.02) 1px, transparent 0);
+  background-size: 40px 40px;
 }
 
 .processing-content {
@@ -31,11 +41,13 @@
   max-width: 1000px;
   margin: 0 auto;
   padding: 4rem 2rem;
-  min-height: 100vh;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   z-index: 1;
+  min-height: calc(100vh - 2rem);
+  box-sizing: border-box;
 }
 
 /* ====================================
@@ -77,7 +89,7 @@
   font-weight: 600;
   line-height: 1.1;
   color: #ffffff;
-  margin-bottom: 1rem;
+  margin-bottom: 2rem;
   letter-spacing: -0.02em;
   background: linear-gradient(135deg, #ffffff 0%, rgba(255, 255, 255, 0.8) 100%);
   -webkit-background-clip: text;
@@ -85,16 +97,58 @@
   background-clip: text;
 }
 
-.subtitle {
-  font-size: 1.125rem;
-  color: rgba(255, 255, 255, 0.6);
-  line-height: 1.5;
-  font-weight: 400;
+.setup-message {
+  margin-bottom: 2rem;
+  text-align: center;
 }
 
-.username {
-  color: #ffffff;
+.one-time-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(34, 197, 94, 0.05) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 2rem;
+  color: rgb(34, 197, 94);
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  backdrop-filter: blur(20px);
+  animation: pulseGreen 3s ease-in-out infinite;
+}
+
+.subtitle {
+  font-size: 1.125rem;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.5;
   font-weight: 500;
+  margin-bottom: 1rem;
+}
+
+.setup-description {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.6;
+  font-weight: 400;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.username-welcome {
+  font-size: 1.125rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 400;
+  margin-bottom: 1rem;
+}
+
+.username-highlight {
+  color: #ffffff;
+  font-weight: 600;
+  background: linear-gradient(135deg, #ffffff 0%, rgba(255, 255, 255, 0.9) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 /* ====================================
@@ -203,6 +257,111 @@
   backdrop-filter: blur(20px);
 }
 
+.completion-stage {
+  text-align: center;
+  padding: 2.5rem 2rem;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.05) 0%, rgba(34, 197, 94, 0.02) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.15);
+  border-radius: 1.25rem;
+  backdrop-filter: blur(30px);
+}
+
+.completion-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.completion-check {
+  width: 4rem;
+  height: 4rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.1) 100%);
+  border: 2px solid rgba(34, 197, 94, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgb(34, 197, 94);
+  animation: completionPulse 2s ease-in-out infinite;
+}
+
+.completion-stage h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.completion-message {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.6;
+  margin-bottom: 2rem;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.continue-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 2rem;
+  border: none;
+  border-radius: 1rem;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.continue-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.continue-button:hover::before {
+  left: 100%;
+}
+
+.continue-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+}
+
+.setup-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.remaining-setup-info {
+  margin-top: 1.5rem;
+  display: flex;
+  justify-content: center;
+}
+
 .stage-header {
   display: flex;
   align-items: center;
@@ -237,13 +396,18 @@
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 0.75rem;
-  font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.8);
+  padding: 0.75rem 1.25rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
   font-variant-numeric: tabular-nums;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  min-width: 120px;
+  justify-content: center;
 }
 
 /* ====================================
@@ -265,61 +429,65 @@
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  position: relative;
 }
 
-.reading-timer {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+.reading-time {
   margin-left: auto;
-  padding: 0.4rem 0.8rem;
-  background: rgba(255, 255, 255, 0.03);
+  padding: 0.25rem 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 1rem;
   font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.6);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0.01em;
 }
 
-.timer-text {
-  font-variant-numeric: tabular-nums;
-}
-
-.auto-play-toggle {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0.2rem;
-  border-radius: 0.3rem;
-  transition: all 0.2s ease;
+.navigation-hint {
+  padding: 0.25rem 0.75rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 1rem;
   font-size: 0.7rem;
-  line-height: 1;
-  opacity: 0.7;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  font-family: 'SF Mono', 'Monaco', monospace;
 }
 
-.auto-play-toggle:hover {
-  opacity: 1;
+.tip-progress-track {
+  height: 3px;
   background: rgba(255, 255, 255, 0.1);
-}
-
-.tip-progress-bar {
-  height: 2px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 1px;
-  margin-bottom: 1rem;
+  border-radius: 2px;
+  margin: 1rem 0 1.5rem 0;
   overflow: hidden;
 }
 
 .tip-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #4ade80, #22c55e);
-  border-radius: 1px;
-  transition: width 0.1s linear;
+  border-radius: 2px;
+  transition: width 0.2s linear;
+  position: relative;
+  overflow: hidden;
+}
+
+.tip-progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  animation: shimmer 2s infinite;
 }
 
 .tips-carousel {
-  max-width: 700px;
+  max-width: 600px;
   margin: 0 auto;
+  --total-tips: 11;
 }
 
 .tip-card {
@@ -327,40 +495,72 @@
   align-items: flex-start;
   gap: 1.25rem;
   padding: 2rem;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  border-radius: 1rem;
-  backdrop-filter: blur(20px);
-  margin-bottom: 1.5rem;
-  min-height: 120px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 1.25rem;
+  backdrop-filter: blur(30px);
+  margin-bottom: 2rem;
+  transition: all 0.3s ease;
+  min-height: 200px;
+  cursor: grab;
+  user-select: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.tip-card:active {
+  cursor: grabbing;
+}
+
+.tip-card:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.tip-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.03), transparent);
+  transition: left 0.5s ease;
+  pointer-events: none;
+}
+
+.tip-card:hover::before {
+  left: 100%;
 }
 
 .tip-icon {
   flex-shrink: 0;
   width: 3rem;
   height: 3rem;
-  border-radius: 0.75rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.8);
   margin-top: 0.25rem;
 }
 
 .tip-content h4 {
-  font-size: 1.125rem;
-  font-weight: 600;
+  font-size: 1.25rem;
+  font-weight: 700;
   color: #ffffff;
-  margin: 0 0 0.75rem 0;
-  letter-spacing: -0.01em;
+  margin: 0 0 1rem 0;
+  letter-spacing: -0.02em;
   line-height: 1.3;
 }
 
 .tip-content p {
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.7);
   line-height: 1.6;
   margin: 0;
   text-align: justify;
@@ -370,7 +570,88 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.tip-indicators {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 1rem;
+  flex: 1;
+  max-width: 300px;
+}
+
+.tip-slider-track {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  position: relative;
+  overflow: hidden;
+}
+
+.tip-slider-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(100% / var(--total-tips, 11));
+  height: 100%;
+  border-radius: 2px;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.tip-slider-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: shimmer 2s infinite;
+}
+
+.tip-dots {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.tip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.tip-dot:hover {
+  background: rgba(255, 255, 255, 0.4);
+  transform: scale(1.2);
+}
+
+.tip-dot.active {
+  transform: scale(1.3);
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.4);
+}
+
+.tip-counter {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  padding: 0.25rem 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .tip-nav {
@@ -384,8 +665,9 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   backdrop-filter: blur(10px);
+  flex-shrink: 0;
 }
 
 .tip-nav:hover {
@@ -395,35 +677,35 @@
   transform: scale(1.05);
 }
 
-.tip-dots {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.tip-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(255, 255, 255, 0.2);
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.tip-dot.active {
-  background: rgba(255, 255, 255, 0.6);
-  transform: scale(1.2);
-}
-
-.tip-dot:hover {
-  background: rgba(255, 255, 255, 0.4);
+.tip-nav:active {
+  transform: scale(0.95);
 }
 
 /* ====================================
    ANIMATIONS
    ==================================== */
+
+@keyframes completionPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.3);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgba(34, 197, 94, 0);
+    transform: scale(1.05);
+  }
+}
+
+@keyframes pulseGreen {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.2);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(34, 197, 94, 0);
+    transform: scale(1.02);
+  }
+}
 
 @keyframes pulse-glow {
   0%, 100% {
@@ -459,33 +741,95 @@
   100% { transform: rotate(360deg); }
 }
 
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes tipGlow {
+  0%, 100% {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  }
+  50% {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  }
+}
+
+/* Enhanced animations for better user experience */
+.tip-card {
+  animation: fadeInUp 0.6s ease-out;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tip-card:hover {
+  animation: tipGlow 2s ease-in-out infinite;
+}
+
+.tip-progress-fill {
+  position: relative;
+  overflow: hidden;
+}
+
+.stage-indicator.current .stage-icon {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Floating particles effect for enhanced ambiance */
+.processing-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.01) 2px, transparent 2px),
+    radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.01) 1px, transparent 1px),
+    radial-gradient(circle at 40% 80%, rgba(34, 197, 94, 0.01) 1px, transparent 1px);
+  background-size: 100px 100px, 150px 150px, 200px 200px;
+  animation: floatingParticles 20s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes floatingParticles {
+  0% {
+    transform: translateY(0px);
+  }
+  100% {
+    transform: translateY(-100px);
+  }
+}
+
 /* ====================================
    RESPONSIVE DESIGN
    ==================================== */
 
+@media (max-width: 1024px) {
+  .processing-content {
+    padding: 3rem 1.5rem;
+  }
+  
+  .tip-card {
+    padding: 1.75rem;
+    gap: 1rem;
+  }
+}
+
 @media (max-width: 768px) {
   .processing-content {
     padding: 2rem 1rem;
-    gap: 2rem;
-  }
-
-  .processing-header {
-    margin-bottom: 3rem;
-  }
-
-  .main-title {
-    font-size: clamp(2rem, 8vw, 2.8rem);
-  }
-
-  .platform-badge {
-    padding: 0.6rem 1.25rem;
-    gap: 0.6rem;
   }
 
   .stage-indicators {
     padding: 0;
-    gap: 0.75rem;
-    margin-bottom: 2.5rem;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
   }
 
   .stage-icon {
@@ -506,17 +850,36 @@
   }
 
   .time-display {
-    padding: 0.75rem 1.25rem;
-    font-size: 0.9rem;
-    font-weight: 600;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 0.95rem;
+    padding: 0.65rem 1rem;
+    min-width: 110px;
+  }
+
+  .tips-header {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .reading-time {
+    margin-left: 0;
+    order: 3;
+    flex-basis: 100%;
+    text-align: center;
+    margin-top: 0.5rem;
+  }
+
+  .navigation-hint {
+    order: 4;
+    flex-basis: 100%;
+    text-align: center;
+    margin-top: 0.25rem;
+    font-size: 0.65rem;
   }
 
   .tip-card {
     padding: 1.5rem;
     gap: 1rem;
-    min-height: 100px;
+    min-height: 180px;
   }
 
   .tip-icon {
@@ -525,72 +888,58 @@
   }
 
   .tip-content h4 {
-    font-size: 1rem;
-    margin-bottom: 0.6rem;
+    font-size: 1.125rem;
   }
 
   .tip-content p {
-    font-size: 0.85rem;
-    line-height: 1.55;
+    font-size: 0.9rem;
   }
 
-  .tips-controls {
-    gap: 0.75rem;
-  }
-
-  .tip-nav {
-    width: 2.25rem;
-    height: 2.25rem;
+  .tips-carousel {
+    max-width: 100%;
   }
 }
 
 @media (max-width: 480px) {
   .processing-content {
     padding: 1.5rem 1rem;
-    gap: 1.5rem;
   }
 
-  .processing-header {
-    margin-bottom: 2.5rem;
+  .platform-badge {
+    padding: 0.5rem 1rem;
+    gap: 0.5rem;
   }
 
   .main-title {
-    font-size: clamp(1.75rem, 9vw, 2.5rem);
-    line-height: 1.2;
+    font-size: clamp(2rem, 8vw, 2.75rem);
+  }
+
+  .setup-message {
+    margin-bottom: 1.5rem;
+  }
+
+  .one-time-badge {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.8rem;
+    margin-bottom: 1rem;
   }
 
   .subtitle {
     font-size: 1rem;
   }
 
-  .platform-badge {
-    padding: 0.5rem 1rem;
-    gap: 0.5rem;
-    font-size: 0.8rem;
+  .setup-description {
+    font-size: 0.9rem;
   }
 
   .stage-indicators {
     flex-wrap: wrap;
     justify-content: center;
-    gap: 1rem 0.5rem;
-  }
-
-  .stage-indicator {
-    flex-direction: column;
-    align-items: center;
-    min-width: 60px;
-  }
-
-  .stage-icon {
-    width: 2.25rem;
-    height: 2.25rem;
+    gap: 1rem 0.75rem;
   }
 
   .stage-name {
     font-size: 0.6rem;
-    text-align: center;
-    max-width: 60px;
-    word-wrap: break-word;
   }
 
   .current-stage {
@@ -599,116 +948,128 @@
 
   .current-stage h3 {
     font-size: 1rem;
-    line-height: 1.3;
   }
 
   .stage-status {
-    font-size: 0.8rem;
-    margin-bottom: 1.25rem;
+    font-size: 0.85rem;
   }
 
   .time-display {
-    padding: 0.6rem 1rem;
-    font-size: 0.85rem;
-    font-weight: 600;
-    min-width: 80px;
-    justify-content: center;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 0.5rem;
+    font-size: 0.9rem;
+    padding: 0.6rem 0.9rem;
+    min-width: 100px;
+    margin-top: 0.5rem;
   }
 
-  .tips-section {
-    margin-top: 1rem;
+  .setup-note {
+    font-size: 0.75rem;
+    padding: 0.4rem 0.8rem;
   }
 
-  .tips-header {
-    font-size: 0.8rem;
+  .completion-stage {
+    padding: 2rem 1.5rem;
+  }
+
+  .completion-check {
+    width: 3.5rem;
+    height: 3.5rem;
+  }
+
+  .completion-stage h3 {
+    font-size: 1.25rem;
+  }
+
+  .completion-message {
+    font-size: 0.9rem;
     margin-bottom: 1.5rem;
-    flex-direction: column;
-    gap: 0.75rem;
-    align-items: center;
   }
 
-  .reading-timer {
-    margin-left: 0;
-    font-size: 0.7rem;
-    padding: 0.3rem 0.6rem;
+  .continue-button {
+    padding: 0.875rem 1.5rem;
+    font-size: 0.9rem;
   }
 
   .tip-card {
     padding: 1.25rem;
-    gap: 0.75rem;
-    min-height: 90px;
+    gap: 0.875rem;
+    min-height: 160px;
   }
 
   .tip-icon {
     width: 2.5rem;
     height: 2.5rem;
-    margin-top: 0;
+    border-radius: 0.875rem;
   }
 
   .tip-content h4 {
-    font-size: 0.95rem;
-    margin-bottom: 0.5rem;
-    line-height: 1.25;
+    font-size: 1rem;
+    margin-bottom: 0.75rem;
   }
 
   .tip-content p {
-    font-size: 0.8rem;
-    line-height: 1.5;
-    text-align: left;
+    font-size: 0.85rem;
+    line-height: 1.55;
   }
 
   .tips-controls {
-    gap: 0.5rem;
-    flex-wrap: wrap;
+    gap: 1rem;
+    margin-top: 1rem;
   }
 
-  .tip-nav {
-    width: 2rem;
-    height: 2rem;
+  .tip-indicators {
+    gap: 0.75rem;
+    max-width: 250px;
+  }
+
+  .tip-slider-track {
+    height: 3px;
   }
 
   .tip-dots {
-    gap: 0.4rem;
-    order: -1;
-    width: 100%;
-    margin-bottom: 0.5rem;
+    gap: 0.5rem;
   }
 
   .tip-dot {
-    width: 5px;
-    height: 5px;
+    width: 7px;
+    height: 7px;
+  }
+
+  .tip-counter {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.6rem;
+  }
+
+  .tip-nav {
+    width: 2.25rem;
+    height: 2.25rem;
   }
 }
 
-@media (max-width: 320px) {
+@media (max-width: 360px) {
   .processing-content {
     padding: 1rem 0.75rem;
   }
 
-  .main-title {
-    font-size: 1.5rem;
+  .one-time-badge {
+    font-size: 0.75rem;
+    padding: 0.35rem 0.7rem;
   }
 
-  .platform-badge {
-    padding: 0.4rem 0.8rem;
-    font-size: 0.75rem;
+  .setup-description {
+    font-size: 0.85rem;
   }
 
   .stage-indicators {
-    gap: 0.75rem 0.25rem;
+    gap: 0.75rem 0.5rem;
   }
 
   .stage-icon {
-    width: 2rem;
-    height: 2rem;
+    width: 2.25rem;
+    height: 2.25rem;
   }
 
   .stage-name {
-    font-size: 0.55rem;
-    max-width: 50px;
+    display: none;
   }
 
   .current-stage {
@@ -716,24 +1077,43 @@
   }
 
   .time-display {
+    font-size: 0.85rem;
     padding: 0.5rem 0.75rem;
-    font-size: 0.8rem;
+    min-width: 90px;
   }
 
-  .tips-header {
-    flex-direction: column;
+  .setup-note {
+    font-size: 0.7rem;
+    padding: 0.35rem 0.7rem;
+  }
+
+  .completion-stage {
+    padding: 1.5rem 1rem;
+  }
+
+  .completion-check {
+    width: 3rem;
+    height: 3rem;
+  }
+
+  .completion-stage h3 {
+    font-size: 1.125rem;
+  }
+
+  .completion-message {
+    font-size: 0.85rem;
+  }
+
+  .continue-button {
+    padding: 0.75rem 1.25rem;
+    font-size: 0.85rem;
     gap: 0.5rem;
-    font-size: 0.75rem;
-  }
-
-  .reading-timer {
-    font-size: 0.65rem;
-    padding: 0.25rem 0.5rem;
   }
 
   .tip-card {
     padding: 1rem;
-    gap: 0.6rem;
+    gap: 0.75rem;
+    min-height: 140px;
   }
 
   .tip-icon {
@@ -742,11 +1122,43 @@
   }
 
   .tip-content h4 {
-    font-size: 0.9rem;
+    font-size: 0.95rem;
   }
 
   .tip-content p {
-    font-size: 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  .tips-controls {
+    gap: 0.75rem;
+  }
+
+  .tip-indicators {
+    gap: 0.5rem;
+    max-width: 200px;
+  }
+
+  .tip-slider-track {
+    height: 2px;
+  }
+
+  .tip-dots {
+    gap: 0.375rem;
+  }
+
+  .tip-dot {
+    width: 6px;
+    height: 6px;
+  }
+
+  .tip-counter {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.5rem;
+  }
+
+  .tip-nav {
+    width: 2rem;
+    height: 2rem;
   }
 }
 

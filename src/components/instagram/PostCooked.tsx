@@ -390,18 +390,23 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     }
   }, [toastMessage]);
 
-  // Enhanced image URL generation with consistency and reliability
+  // 🎯 GENIUS: Enhanced image URL generation with intelligent pattern matching
   const getReliableImageUrl = useCallback((post: any, forceRefresh: boolean = false) => {
     const postKey = post.key;
-    let imageId = '';
+    let imageFilename = '';
     let imageExtension = 'jpg'; // Default to jpg
     
-    // Extract image ID from post key (most reliable method)
-    const match = postKey.match(/ready_post_(\d+)\.json$/);
-    if (match) {
-      imageId = match[1];
+    console.log(`[ImageURL] Processing post key: ${postKey}`);
+    
+    // 🔍 INTELLIGENT PATTERN DETECTION: Handle multiple file naming patterns
+    
+    // Pattern 1: Standard format - ready_post_<ID>.json → image_<ID>.(jpg|png|jpeg|webp)
+    const standardMatch = postKey.match(/ready_post_(\d+)\.json$/);
+    if (standardMatch) {
+      const imageId = standardMatch[1];
+      console.log(`[ImageURL] Standard pattern detected, ID: ${imageId}`);
       
-      // Try to determine extension from post data
+      // Try to determine extension from post data with priority order
       if (post.data?.image_path) {
         const pathMatch = post.data.image_path.match(/\.(jpg|jpeg|png|webp)$/i);
         if (pathMatch) {
@@ -418,28 +423,76 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
           imageExtension = urlMatch[1].toLowerCase();
         }
       }
-    } else {
-      // Fallback: try to extract from existing URLs with support for multiple formats
-      const imageUrl = post.data.image_url || post.data.r2_image_url || '';
-      const urlMatch = imageUrl.match(/(image_\d+)\.(jpg|jpeg|png|webp)/i);
-      if (urlMatch) {
-        imageId = urlMatch[1].replace(/^image_/, '');
-        imageExtension = urlMatch[2].toLowerCase();
+      
+      imageFilename = `image_${imageId}.${imageExtension}`;
+      console.log(`[ImageURL] Standard pattern result: ${imageFilename}`);
+    }
+    
+    // Pattern 2: Campaign format - campaign_ready_post_<ID>_<hash>.json → campaign_ready_post_<ID>_<hash>.(jpg|png|jpeg|webp)
+    else {
+      const campaignMatch = postKey.match(/campaign_ready_post_(\d+_[a-f0-9]+)\.json$/);
+      if (campaignMatch) {
+        const campaignId = campaignMatch[1]; // This includes both ID and hash
+        console.log(`[ImageURL] Campaign pattern detected, ID: ${campaignId}`);
+        
+        // For campaign posts, extract extension from post data with smart fallbacks
+        if (post.data?.image_path) {
+          const pathMatch = post.data.image_path.match(/\.(jpg|jpeg|png|webp)$/i);
+          if (pathMatch) {
+            imageExtension = pathMatch[1].toLowerCase();
+          }
+        } else if (post.data?.image_url) {
+          const urlMatch = post.data.image_url.match(/\.(jpg|jpeg|png|webp)(\?|$)/i);
+          if (urlMatch) {
+            imageExtension = urlMatch[1].toLowerCase();
+          }
+        } else if (post.data?.r2_image_url) {
+          const urlMatch = post.data.r2_image_url.match(/\.(jpg|jpeg|png|webp)(\?|$)/i);
+          if (urlMatch) {
+            imageExtension = urlMatch[1].toLowerCase();
+          }
+        }
+        
+        imageFilename = `campaign_ready_post_${campaignId}.${imageExtension}`;
+        console.log(`[ImageURL] Campaign pattern result: ${imageFilename}`);
+      }
+      
+      // Pattern 3: Legacy fallback - try to extract from existing URLs
+      else {
+        console.log(`[ImageURL] Using legacy fallback pattern detection`);
+        const imageUrl = post.data.image_url || post.data.r2_image_url || '';
+        
+        // Try campaign pattern from URL
+        const campaignUrlMatch = imageUrl.match(/campaign_ready_post_(\d+_[a-f0-9]+)\.(jpg|jpeg|png|webp)/i);
+        if (campaignUrlMatch) {
+          imageFilename = `campaign_ready_post_${campaignUrlMatch[1]}.${campaignUrlMatch[2].toLowerCase()}`;
+          console.log(`[ImageURL] Legacy campaign pattern from URL: ${imageFilename}`);
+        }
+        // Try standard pattern from URL
+        else {
+          const standardUrlMatch = imageUrl.match(/(image_\d+)\.(jpg|jpeg|png|webp)/i);
+          if (standardUrlMatch) {
+            imageFilename = `${standardUrlMatch[1]}.${standardUrlMatch[2].toLowerCase()}`;
+            console.log(`[ImageURL] Legacy standard pattern from URL: ${imageFilename}`);
+          }
+        }
       }
     }
     
-    if (!imageId) {
-      console.warn(`[PostCooked] Could not extract image ID for post ${postKey}`);
-      return `${API_BASE_URL}/placeholder.jpg?post=${encodeURIComponent(postKey)}`;
+    // 🚨 SAFETY: If no pattern matched, return placeholder
+    if (!imageFilename) {
+      console.warn(`[PostCooked] Could not determine image filename for post ${postKey}`);
+      return `${API_BASE_URL}/placeholder.jpg?post=${encodeURIComponent(postKey)}&reason=no_pattern`;
     }
     
     // Create timestamp for cache busting
     const timestamp = forceRefresh ? Date.now() : Math.floor(Date.now() / 60000); // 1-minute cache
     
-    // Use our reliable direct R2 endpoint with comprehensive parameters and correct extension
-    const reliableUrl = `${API_BASE_URL}/api/r2-image/${username}/image_${imageId}.${imageExtension}` +
+    // 🎯 GENIUS: Use the exact matched filename instead of assuming image_ prefix
+    const reliableUrl = `${API_BASE_URL}/api/r2-image/${username}/${imageFilename}` +
       `?platform=${platform}&t=${timestamp}&v=${imageRefreshKey}&post=${encodeURIComponent(postKey)}`;
     
+    console.log(`[ImageURL] Final URL: ${reliableUrl}`);
     return reliableUrl;
   }, [username, platform, imageRefreshKey]);
 
@@ -821,11 +874,38 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     }
 
     let imageKey = '';
-    // Primary: Extract image key from the post key itself (most reliable)
-    if (key.match(/ready_post_\d+\.json$/)) {
-      const postIdMatch = key.match(/ready_post_(\d+)\.json$/);
-      if (postIdMatch) {
-        const imageId = postIdMatch[1];
+    
+    // 🎯 GENIUS: Enhanced pattern matching for edit functionality
+    
+    // Pattern 1: Standard format - ready_post_<ID>.json → image_<ID>.(extension)
+    const standardMatch = key.match(/ready_post_(\d+)\.json$/);
+    if (standardMatch) {
+      const imageId = standardMatch[1];
+      console.log(`[Edit] Standard pattern detected, ID: ${imageId}`);
+      
+      // Determine the correct extension from post data
+      let extension = 'jpg'; // Default
+      if (post.data?.image_path) {
+        const pathMatch = post.data.image_path.match(/\.(jpg|jpeg|png|webp)$/i);
+        if (pathMatch) extension = pathMatch[1].toLowerCase();
+      } else if (post.data?.image_url) {
+        const urlMatch = post.data.image_url.match(/\.(jpg|jpeg|png|webp)(\?|$)/i);
+        if (urlMatch) extension = urlMatch[1].toLowerCase();
+      } else if (post.data?.r2_image_url) {
+        const urlMatch = post.data.r2_image_url.match(/\.(jpg|jpeg|png|webp)(\?|$)/i);
+        if (urlMatch) extension = urlMatch[1].toLowerCase();
+      }
+      
+      imageKey = `image_${imageId}.${extension}`;
+      console.log(`[Edit] Standard pattern result: ${imageKey}`);
+    }
+    
+    // Pattern 2: Campaign format - campaign_ready_post_<ID>_<hash>.json → campaign_ready_post_<ID>_<hash>.(extension)
+    else {
+      const campaignMatch = key.match(/campaign_ready_post_(\d+_[a-f0-9]+)\.json$/);
+      if (campaignMatch) {
+        const campaignId = campaignMatch[1]; // This includes both ID and hash
+        console.log(`[Edit] Campaign pattern detected, ID: ${campaignId}`);
         
         // Determine the correct extension from post data
         let extension = 'jpg'; // Default
@@ -840,20 +920,48 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
           if (urlMatch) extension = urlMatch[1].toLowerCase();
         }
         
-        imageKey = `image_${imageId}.${extension}`;
+        imageKey = `campaign_ready_post_${campaignId}.${extension}`;
+        console.log(`[Edit] Campaign pattern result: ${imageKey}`);
       }
-    }
-    
-    // Fallback: extract from image URL if available (handle both original and proxied URLs)
-    if (!imageKey && post.data.image_url) {
-      const urlMatch = post.data.image_url.match(/(image_\d+\.(jpg|jpeg|png|webp))/i);
-      if (urlMatch) imageKey = urlMatch[1];
-    }
-    
-    // Additional fallback: extract from r2_image_url if available
-    if (!imageKey && post.data.r2_image_url) {
-      const urlMatch = post.data.r2_image_url.match(/(image_\d+\.(jpg|jpeg|png|webp))/i);
-      if (urlMatch) imageKey = urlMatch[1];
+      
+      // Pattern 3: Legacy fallback - extract from existing URLs
+      else {
+        console.log(`[Edit] Using legacy fallback pattern detection`);
+        
+        // Try campaign pattern from URL first
+        if (post.data.image_url) {
+          const campaignUrlMatch = post.data.image_url.match(/(campaign_ready_post_\d+_[a-f0-9]+\.(jpg|jpeg|png|webp))/i);
+          if (campaignUrlMatch) {
+            imageKey = campaignUrlMatch[1];
+            console.log(`[Edit] Legacy campaign pattern from image_url: ${imageKey}`);
+          }
+          // Try standard pattern from URL
+          else {
+            const standardUrlMatch = post.data.image_url.match(/(image_\d+\.(jpg|jpeg|png|webp))/i);
+            if (standardUrlMatch) {
+              imageKey = standardUrlMatch[1];
+              console.log(`[Edit] Legacy standard pattern from image_url: ${imageKey}`);
+            }
+          }
+        }
+        
+        // Additional fallback: extract from r2_image_url if available
+        if (!imageKey && post.data.r2_image_url) {
+          const campaignUrlMatch = post.data.r2_image_url.match(/(campaign_ready_post_\d+_[a-f0-9]+\.(jpg|jpeg|png|webp))/i);
+          if (campaignUrlMatch) {
+            imageKey = campaignUrlMatch[1];
+            console.log(`[Edit] Legacy campaign pattern from r2_image_url: ${imageKey}`);
+          }
+          // Try standard pattern
+          else {
+            const standardUrlMatch = post.data.r2_image_url.match(/(image_\d+\.(jpg|jpeg|png|webp))/i);
+            if (standardUrlMatch) {
+              imageKey = standardUrlMatch[1];
+              console.log(`[Edit] Legacy standard pattern from r2_image_url: ${imageKey}`);
+            }
+          }
+        }
+      }
     }
 
     if (!imageKey) {

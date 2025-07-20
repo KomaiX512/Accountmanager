@@ -1,14 +1,14 @@
-import { StrictMode } from 'react';
+// import { StrictMode } from 'react'; // Temporarily disabled
 import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App.tsx';
 import { BrowserRouter } from 'react-router-dom';
-import './styles/global-scrollbar-styles.css';
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
+  // Temporarily disabled StrictMode to debug platform requests
+  // <StrictMode>
     <BrowserRouter>
       <App />
     </BrowserRouter>
-  </StrictMode>
+  // </StrictMode>
 );

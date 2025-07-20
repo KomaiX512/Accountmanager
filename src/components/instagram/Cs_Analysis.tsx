@@ -7,6 +7,7 @@ import ErrorBoundary from '../ErrorBoundary';
 import { decodeJSONToReactElements, formatCount } from '../../utils/jsonDecoder';
 import axios from 'axios';
 import { useProcessing } from '../../context/ProcessingContext';
+import { registerComponent, unregisterComponent } from '../../utils/componentRegistry';
 
 interface ProfileInfo {
   followersCount?: number;
@@ -29,6 +30,19 @@ interface Cs_AnalysisProps {
 
 const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, platform = 'instagram' }) => {
   const normalizedAccountHolder = accountHolder;
+  
+  // Component tracking
+  const componentId = React.useRef(Math.random().toString(36).substr(2, 9));
+  
+  // Register component on mount
+  React.useEffect(() => {
+    registerComponent('Cs_Analysis', platform, componentId.current);
+    
+    return () => {
+      unregisterComponent('Cs_Analysis', componentId.current);
+    };
+  }, [platform]);
+  
   const [selectedCompetitor, setSelectedCompetitor] = useState<string | null>(null);
   const [currentAnalysisIndex, setCurrentAnalysisIndex] = useState(0);
   const [competitorProfiles, setCompetitorProfiles] = useState<Record<string, ProfileInfo>>({});
@@ -43,6 +57,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [needsRefresh, setNeedsRefresh] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   // Add state for accountType and postingStyle
   const [accountType, setAccountType] = useState<string>('branding');
   const [postingStyle, setPostingStyle] = useState<string>('I post about NewYork lives');
@@ -52,8 +67,9 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
       try {
         const response = await axios.get(`/api/profile-info/${normalizedAccountHolder}?platform=${platform}`);
         const info = response.data;
-        if (info.accountType) setAccountType(info.accountType);
-        if (info.postingStyle) setPostingStyle(info.postingStyle);
+        // Handle both camelCase and snake_case field names
+        if (info.accountType || info.account_type) setAccountType(info.accountType || info.account_type);
+        if (info.postingStyle || info.posting_style) setPostingStyle(info.postingStyle || info.posting_style);
       } catch {}
     };
     fetchAccountInfo();
@@ -61,18 +77,28 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
 
   const competitorsQuery = localCompetitors.length > 0 ? localCompetitors.join(',') : '';
   const competitorEndpoint = competitorsQuery 
-    ? `/api/retrieve-multiple/${normalizedAccountHolder}?competitors=${competitorsQuery}&platform=${platform}` 
+    ? `/api/retrieve-multiple/${normalizedAccountHolder}?competitors=${encodeURIComponent(competitorsQuery)}&platform=${platform}&forceRefresh=true&_t=${refreshKey}` 
     : '';
   
+  const allCompetitorsFetch = useR2Fetch<any[]>(competitorEndpoint, platform);
 
-    const allCompetitorsFetch = useR2Fetch<any[]>(competitorEndpoint);
+  // Debug logging for endpoint and competitors
+  console.log(`[Cs_Analysis] Component state:`, {
+    localCompetitors,
+    competitorEndpoint,
+    fetchLoading: allCompetitorsFetch.loading,
+    fetchError: allCompetitorsFetch.error,
+    fetchDataLength: allCompetitorsFetch.data?.length || 0
+  });
 
   const competitorData = localCompetitors.map(competitor => {
     const dataForCompetitor = allCompetitorsFetch.data?.find(item => item.competitor === competitor) || null;
     
-    // Simple debug log to check if data is being fetched
-    if (allCompetitorsFetch.data && allCompetitorsFetch.data.length > 0) {
-      console.log(`Competitor ${competitor} data:`, dataForCompetitor?.data?.length || 0, 'items');
+    // Simplified debug logging
+    if (dataForCompetitor?.data?.length > 0) {
+      console.log(`[Cs_Analysis] ✅ ${competitor} has ${dataForCompetitor.data.length} analysis items`);
+    } else {
+      console.log(`[Cs_Analysis] ❌ ${competitor} has no data - loading: ${allCompetitorsFetch.loading}, error: ${allCompetitorsFetch.error}`);
     }
 
     return {
@@ -123,7 +149,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
   const fetchAccountInfoWithRetry = useCallback(async (retries = 3, delay = 1000): Promise<string[] | null> => {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
-        const response = await axios.get(`/api/profile-info/${normalizedAccountHolder}?platform=${platform}`);
+        const response = await axios.get(`/api/retrieve-account-info/${normalizedAccountHolder}?platform=${platform}`);
         const accountInfo: AccountInfo = response.data;
         setError(null);
         setNeedsRefresh(false);
@@ -160,10 +186,15 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
 
   useEffect(() => {
     const syncInitialState = async () => {
+      console.log(`[Cs_Analysis] Syncing initial state for ${normalizedAccountHolder} on ${platform}`);
       const serverCompetitors = await fetchAccountInfoWithRetry();
       if (serverCompetitors) {
+        console.log(`[Cs_Analysis] ✅ Loaded competitors from AccountInfo API:`, serverCompetitors);
         setLocalCompetitors(serverCompetitors);
+        // Force refresh of competitor data when competitors are loaded
+        setRefreshKey(prev => prev + 1);
       } else {
+        console.log(`[Cs_Analysis] ⚠️ Using fallback competitors from props:`, competitors);
         setLocalCompetitors(competitors);
       }
     };
@@ -291,6 +322,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     const serverCompetitors = await fetchAccountInfoWithRetry(5, 2000);
     if (serverCompetitors) {
       setLocalCompetitors(serverCompetitors);
+      setRefreshKey(prev => prev + 1); // Force refresh of competitor data
       setToast('Successfully synced with server!');
     }
     setLoading(false);

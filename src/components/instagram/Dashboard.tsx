@@ -42,11 +42,9 @@ interface RagChatMessage {
 interface DashboardProps {
   accountHolder: string;
   competitors: string[];
-  accountType: 'branding' | 'non-branding';
-  onOpenChat?: (messageContent: string, platform?: string) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors, accountType, onOpenChat }) => {
+const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => {
   const { trackPost, trackDiscussion, trackAIReply, trackCampaign, isFeatureBlocked, trackRealDiscussion, trackRealAIReply, trackRealPostCreation, canUseFeature } = useFeatureTracking();
   const { showUpgradePopup, blockedFeature, handleFeatureAttempt, closeUpgradePopup, currentUsage } = useUpgradeHandler();
   const [query, setQuery] = useState('');
@@ -1209,7 +1207,8 @@ Image Description: ${response.post.image_prompt}
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        axios.get(getApiUrl(`/${accountType === 'branding' ? 'retrieve-strategies' : 'retrieve-engagement-strategies'}/${accountHolder}${forceRefresh ? '?forceRefresh=true' : ''}`)).catch(err => {
+        // ✅ FIX: Use correct recommendations endpoint instead of retrieve-strategies
+        axios.get(`/api/recommendations/${accountHolder}?platform=instagram&forceRefresh=true`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
@@ -1217,10 +1216,10 @@ Image Description: ${response.post.image_prompt}
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        // Always fetch competitor data for both account types
+        // ✅ FIX: Use correct competitor analysis endpoint with platform parameter
         Promise.all(
           competitors.map(comp =>
-            axios.get(getApiUrl(`/retrieve/${accountHolder}/${comp}${forceRefresh ? '?forceRefresh=true' : ''}`)).catch(err => {
+            axios.get(`/api/competitor-analysis/${accountHolder}/${comp}?platform=instagram&forceRefresh=true`).catch(err => {
               if (err.response?.status === 404) {
                 console.warn(`No competitor data found for ${comp}`);
                 return { data: [] };
@@ -1302,15 +1301,14 @@ Image Description: ${response.post.image_prompt}
           });
         }
         if (prefix.startsWith(`recommendations/${accountHolder}/`) || prefix.startsWith(`engagement_strategies/${accountHolder}/`)) {
-          const endpoint = accountType === 'branding' 
-            ? `/api/retrieve-strategies/${accountHolder}`
-            : `/api/retrieve-engagement-strategies/${accountHolder}`;
+          // ✅ FIX: Use correct recommendations endpoint with platform parameter
+          const endpoint = `/api/recommendations/${accountHolder}?platform=instagram&forceRefresh=true`;
           
           axios.get(endpoint).then(res => {
             setStrategies(Array.isArray(res.data) ? res.data : []);
             setToast('New strategies available!');
           }).catch(err => {
-            console.error('Error fetching strategies:', err);
+            console.error('Error fetching recommendations:', err);
           });
         }
         if (prefix.startsWith(`ready_post/${accountHolder}/`)) {
@@ -1322,9 +1320,10 @@ Image Description: ${response.post.image_prompt}
           });
         }
         if (prefix.startsWith(`competitor_analysis/${accountHolder}/`)) {
+          // ✅ FIX: Use correct competitor analysis endpoint with platform parameter
           Promise.all(
             competitors.map(comp =>
-              axios.get(getApiUrl(`/retrieve/${accountHolder}/${comp}`)).catch(err => {
+              axios.get(`/api/competitor-analysis/${accountHolder}/${comp}?platform=instagram&forceRefresh=true`).catch(err => {
                 if (err.response?.status === 404) return { data: [] };
                 throw err;
               })
@@ -1499,34 +1498,50 @@ Image Description: ${response.post.image_prompt}
   };
 
   const handleConfirmReset = async () => {
+    if (!currentUser) {
+      setToast('User not authenticated');
+      return;
+    }
+
     setIsResetting(true);
+    setIsResetConfirmOpen(false);
+
     try {
-      // Call Instagram context reset function
-      resetInstagramAccess();
-      
-      // Clear local frontend data
-      clearInstagramFrontendData();
-      
-      setToast('Instagram dashboard reset successfully!');
-      
-      // Close the modal
-      setIsResetConfirmOpen(false);
-      
-      // Optional: Navigate back to setup or refresh
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-      
-    } catch (error) {
-      console.error('Error resetting Instagram dashboard:', error);
-      setToast('Failed to reset dashboard. Please try again.');
+      console.log(`[${new Date().toISOString()}] Resetting Instagram dashboard for user ${currentUser.uid}`);
+
+      // Call backend API to reset Instagram dashboard (same as other platforms)
+      const response = await axios.delete(`/api/platform-reset/${currentUser.uid}`, {
+        data: { platform: 'instagram' }
+      });
+
+      if (response.data.success) {
+        console.log(`[${new Date().toISOString()}] Instagram dashboard reset successful`);
+
+        // Clear all frontend data for Instagram
+        clearInstagramFrontendData();
+
+        // Call Instagram context reset function
+        resetInstagramAccess();
+
+        setToast('Instagram dashboard reset successfully!');
+        
+        // Optional: Navigate back to setup or refresh
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      } else {
+        throw new Error(response.data.error || 'Reset failed');
+      }
+    } catch (error: any) {
+      console.error(`[${new Date().toISOString()}] Error resetting Instagram dashboard:`, error);
+      setToast(error.response?.data?.error || 'Failed to reset dashboard. Please try again.');
     } finally {
       setIsResetting(false);
     }
   };
 
   const clearInstagramFrontendData = () => {
-    // Clear all Instagram-specific data
+    // Clear all Instagram-specific state data
     setNotifications([]);
     setResponses([]);
     setStrategies([]);
@@ -1537,11 +1552,12 @@ Image Description: ${response.post.image_prompt}
     setChatMessages([]);
     setResult('');
     
-    // Clear localStorage for Instagram
-    if (accountHolder) {
+    // Clear localStorage for Instagram - include all relevant keys
+    if (currentUser?.uid) {
       const keysToRemove = [
+        `instagram_accessed_${currentUser.uid}`,
         `viewed_strategies_instagram_${accountHolder}`,
-        `viewed_competitor_instagram_${accountHolder}`,
+        `viewed_competitor_data_instagram_${accountHolder}`,
         `viewed_posts_instagram_${accountHolder}`,
         `instagram_conversation_${accountHolder}`,
         `instagram_profile_${accountHolder}`
@@ -1552,7 +1568,7 @@ Image Description: ${response.post.image_prompt}
       });
     }
     
-    console.log('Instagram frontend data cleared');
+    console.log(`[${new Date().toISOString()}] Cleared frontend data for Instagram platform`);
   };
 
   // Function to check campaign status from the server
@@ -1688,36 +1704,6 @@ Image Description: ${response.post.image_prompt}
       setBioAnimationComplete(false);
     }
   }, [profileInfo]);
-
-  const handleOpenChatFromMessages = (messageContent: string) => {
-    console.log(`[Dashboard] Opening Instagram chat with message: "${messageContent}"`);
-    
-    // If parent provides onOpenChat, use it and ALWAYS pass the platform
-    if (onOpenChat) {
-      // CRITICAL FIX: Pass 'instagram' platform to ensure correct platform context
-      if (onOpenChat.length >= 2) {
-        // New signature: (messageContent: string, platform?: string) => void
-        (onOpenChat as any)(messageContent, 'instagram');
-      } else {
-        // Fallback for old signature
-        onOpenChat(messageContent);
-      }
-    } else {
-      // Set chat mode to discussion
-      setChatMode('discussion');
-      
-      // Add the message content to chat messages as an assistant message
-      const assistantMessage: ChatModalMessage = {
-        role: 'assistant',
-        content: messageContent
-      };
-      
-      setChatMessages(prev => [...prev, assistantMessage]);
-      
-      // Open the chat modal
-      setIsChatModalOpen(true);
-    }
-  };
 
   // Check campaign status when component mounts or accountHolder changes
   useEffect(() => {
@@ -1988,7 +1974,7 @@ Image Description: ${response.post.image_prompt}
                 )}
               </div>
             </h2>
-            <OurStrategies accountHolder={accountHolder} accountType={accountType} />
+            <OurStrategies accountHolder={accountHolder} />
           </div>
 
           <div className="competitor-analysis">

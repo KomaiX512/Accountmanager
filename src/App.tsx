@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import './App.css';
@@ -358,12 +359,25 @@ const AppContent: React.FC = () => {
               : isFacebookDashboard
               ? response.data.facebook_username
               : response.data.instagram_username;
-            const savedCompetitors = Array.isArray(response.data.competitors) ? response.data.competitors : [];
+            
+            // Get competitors from AccountInfo, not ProfileInfo
+            let savedCompetitors: string[] = [];
+            try {
+              const platform = isTwitterDashboard ? 'twitter' : isFacebookDashboard ? 'facebook' : 'instagram';
+              const accountInfoResponse = await axios.get(`/api/retrieve-account-info/${savedUsername}?platform=${platform}`);
+              savedCompetitors = accountInfoResponse.data.competitors || [];
+              console.log(`Retrieved competitors for ${savedUsername} on ${platform}:`, savedCompetitors);
+            } catch (error) {
+              console.error('Failed to fetch competitors from AccountInfo:', error);
+              savedCompetitors = [];
+            }
+            
             const savedAccountType = response.data.accountType || 'branding';
             
             console.log(`Retrieved saved ${isTwitterDashboard ? 'Twitter' : isFacebookDashboard ? 'Facebook' : 'Instagram'} data for ${currentUser.uid}:`, {
               username: savedUsername,
-              accountType: savedAccountType
+              accountType: savedAccountType,
+              competitors: savedCompetitors
             });
             
             // Navigate to the correct dashboard with the saved data
@@ -472,8 +486,6 @@ const AppContent: React.FC = () => {
                     <Dashboard 
                       accountHolder={accountHolder} 
                       competitors={competitors} 
-                      accountType={accountType || 'branding'}
-                      onOpenChat={handleOpenChatFromMessages}
                     />
                   </PrivateRoute>
                 }
@@ -485,8 +497,6 @@ const AppContent: React.FC = () => {
                     <Dashboard 
                       accountHolder={accountHolder} 
                       competitors={competitors} 
-                      accountType="non-branding"
-                      onOpenChat={handleOpenChatFromMessages}
                     />
                   </PrivateRoute>
                 }

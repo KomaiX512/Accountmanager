@@ -849,6 +849,148 @@ h2 {
   to { transform: rotate(360deg); }
 }
 
+/* Responsive adjustments for smaller laptop screens */
+@media (max-width: 1440px) {
+  .dashboard-wrapper {
+    padding: clamp(0.4rem, 1.8vw, 18px) 0;
+  }
+  
+  .modules-container {
+    max-width: min(calc(100vw - clamp(65px, 6.5vw, 95px)), 1400px);
+    padding: clamp(0.4rem, 1.8vw, 18px);
+    border-radius: clamp(6px, 1.8vw, 14px);
+  }
+  
+  .welcome-text {
+    font-size: clamp(1.6rem, 3.5vw, 2.2rem);
+  }
+  
+  .welcome-subtext {
+    font-size: clamp(0.9rem, 2.2vw, 1.1rem);
+  }
+  
+  .bio-text {
+    font-size: clamp(0.8rem, 1.8vw, 0.95rem);
+  }
+  
+  .dashboard-grid {
+    gap: clamp(14px, 2vw, 18px);
+  }
+  
+  .profile-metadata,
+  .notifications,
+  .post-cooked,
+  .strategies,
+  .competitor-analysis,
+  .chatbot {
+    padding: clamp(0.8rem, 2.5vw, 18px);
+    border-radius: clamp(10px, 2.5vw, 14px);
+  }
+  
+  .section-header {
+    font-size: clamp(1rem, 2.2vw, 1.3rem);
+  }
+  
+  .chatbot-input {
+    padding: clamp(8px, 1.8vw, 10px) clamp(10px, 2.5vw, 14px);
+    font-size: clamp(0.8rem, 1.8vw, 0.95rem);
+  }
+}
+
+@media (max-width: 1366px) {
+  .dashboard-wrapper {
+    padding: clamp(0.3rem, 1.5vw, 16px) 0;
+  }
+  
+  .modules-container {
+    max-width: min(calc(100vw - clamp(60px, 6vw, 90px)), 1300px);
+    padding: clamp(0.3rem, 1.5vw, 16px);
+    border-radius: clamp(5px, 1.5vw, 12px);
+  }
+  
+  .welcome-text {
+    font-size: clamp(1.4rem, 3.2vw, 2rem);
+  }
+  
+  .welcome-subtext {
+    font-size: clamp(0.85rem, 2vw, 1rem);
+  }
+  
+  .bio-text {
+    font-size: clamp(0.75rem, 1.6vw, 0.9rem);
+  }
+  
+  .dashboard-grid {
+    gap: clamp(12px, 1.8vw, 16px);
+  }
+  
+  .profile-metadata,
+  .notifications,
+  .post-cooked,
+  .strategies,
+  .competitor-analysis,
+  .chatbot {
+    padding: clamp(0.7rem, 2.2vw, 16px);
+    border-radius: clamp(8px, 2.2vw, 12px);
+  }
+  
+  .section-header {
+    font-size: clamp(0.9rem, 2vw, 1.2rem);
+  }
+  
+  .chatbot-input {
+    padding: clamp(7px, 1.5vw, 9px) clamp(8px, 2.2vw, 12px);
+    font-size: clamp(0.75rem, 1.6vw, 0.9rem);
+  }
+}
+
+@media (max-width: 1280px) {
+  .dashboard-wrapper {
+    padding: clamp(0.2rem, 1.2vw, 14px) 0;
+  }
+  
+  .modules-container {
+    max-width: min(calc(100vw - clamp(55px, 5.5vw, 85px)), 1200px);
+    padding: clamp(0.2rem, 1.2vw, 14px);
+    border-radius: clamp(4px, 1.2vw, 10px);
+  }
+  
+  .welcome-text {
+    font-size: clamp(1.2rem, 3vw, 1.8rem);
+  }
+  
+  .welcome-subtext {
+    font-size: clamp(0.8rem, 1.8vw, 0.95rem);
+  }
+  
+  .bio-text {
+    font-size: clamp(0.7rem, 1.4vw, 0.85rem);
+  }
+  
+  .dashboard-grid {
+    gap: clamp(10px, 1.6vw, 14px);
+  }
+  
+  .profile-metadata,
+  .notifications,
+  .post-cooked,
+  .strategies,
+  .competitor-analysis,
+  .chatbot {
+    padding: clamp(0.6rem, 2vw, 14px);
+    border-radius: clamp(6px, 2vw, 10px);
+  }
+  
+  .section-header {
+    font-size: clamp(0.8rem, 1.8vw, 1.1rem);
+  }
+  
+  .chatbot-input {
+    padding: clamp(6px, 1.2vw, 8px) clamp(6px, 2vw, 10px);
+    font-size: clamp(0.7rem, 1.4vw, 0.85rem);
+  }
+}
+
 /* Responsive adjustments */
 @media (max-width: 1200px) {
   .modules-container {

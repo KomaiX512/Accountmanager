@@ -4,6 +4,7 @@ import Cs_Analysis from '../instagram/Cs_Analysis';
 import OurStrategies from '../instagram/OurStrategies';
 import PostCooked from '../instagram/PostCooked';
 import { getApiUrl } from '../../config/api';
+import { PlatformProvider } from '../../context/PlatformContext';
 import InstagramConnect from '../instagram/InstagramConnect';
 import TwitterConnect from '../twitter/TwitterConnect';
 import FacebookConnect from '../facebook/FacebookConnect';

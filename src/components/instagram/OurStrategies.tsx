@@ -5,6 +5,7 @@ import useR2Fetch from '../../hooks/useR2Fetch';
 import { motion } from 'framer-motion';
 import ErrorBoundary from '../ErrorBoundary';
 import { decodeJSONToReactElements } from '../../utils/jsonDecoder';
+import { registerComponent, unregisterComponent } from '../../utils/componentRegistry';
 
 interface OurStrategiesProps {
   accountHolder: string;
@@ -12,20 +13,36 @@ interface OurStrategiesProps {
   platform?: 'instagram' | 'twitter' | 'facebook';
 }
 
-const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountType, platform = 'instagram' }) => {
+const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountType: _accountType, platform = 'instagram' }) => {
+  // NOTE: _accountType temporarily ignored - using strategies endpoint for all accounts until engagement strategies data is available
   const [showPopup, setShowPopup] = useState(false);
   const [currentStrategyIndex, setCurrentStrategyIndex] = useState(0);
 
+  // Debug logging to track component instances
+  const componentId = React.useRef(Math.random().toString(36).substr(2, 9));
+  
+  // Register component on mount
+  React.useEffect(() => {
+    registerComponent('OurStrategies', platform, componentId.current);
+    
+    return () => {
+      unregisterComponent('OurStrategies', componentId.current);
+    };
+  }, [platform]);
+  
+  console.log(`[OurStrategies] Component ${componentId.current} mounted for ${platform}/${accountHolder}`);
+
   const normalizedAccountHolder = accountHolder;
   
-  // Construct endpoint with platform parameter
-  const baseEndpoint = accountType === 'branding'
-    ? `/api/retrieve-strategies/${normalizedAccountHolder}`
-    : `/api/retrieve-engagement-strategies/${normalizedAccountHolder}`;
-  
+  // Construct endpoint - ALWAYS use strategies endpoint for now since that's where data exists
+  // This is a temporary fix until we have proper engagement strategies data
+  const baseEndpoint = `/api/retrieve-strategies/${normalizedAccountHolder}`;
   const endpoint = `${baseEndpoint}?platform=${platform}`;
 
-  const { data, loading, error } = useR2Fetch<any[]>(endpoint);
+  // Debug the endpoint being called
+  console.log(`[OurStrategies] ${componentId.current} calling endpoint: ${endpoint} (forced to strategies)`);
+
+  const { data, loading, error } = useR2Fetch<any[]>(endpoint, platform);
 
   const renderStrategyContent = (strategyData: any) => {
     if (!strategyData || typeof strategyData !== 'object') {

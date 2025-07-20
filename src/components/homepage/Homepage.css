@@ -8,7 +8,8 @@
   position: relative;
   margin: 0;
   padding: 0;
-  perspective: 1000px;
+  /* VIEWPORT LOCK FIX: Removed perspective that interferes with position: fixed */
+  /* perspective: 1000px; */
 }
 
 /* Static Background - Used when neural network is disabled */
@@ -56,7 +57,8 @@
   position: relative;
   text-align: center;
   padding: 2rem;
-  transform-style: preserve-3d;
+  /* VIEWPORT LOCK FIX: Removed transform-style that interferes with position: fixed */
+  /* transform-style: preserve-3d; */
   z-index: 2;
   background: rgba(0, 0, 0, 0.05); /* Subtle overlay for readability */
 }
@@ -84,8 +86,9 @@
     inset 0 2px 0 rgba(255, 255, 255, 0.3),
     inset 0 -2px 0 rgba(255, 255, 255, 0.15);
   
-  transform: translateZ(50px);
-  will-change: transform;
+  /* VIEWPORT LOCK FIX: Removed translateZ that interferes with position: fixed */
+  /* transform: translateZ(50px); */
+  /* will-change: transform; */
 }
 
 /* Updated gradient text without glow */

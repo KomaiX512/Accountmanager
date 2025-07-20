@@ -1,14 +1,15 @@
 /* Premium Dashboard Page with Dark Sophisticated Background */
 .dashboard-page {
-  padding: 80px 20px 20px;
+  padding: clamp(60px, 6vh, 80px) clamp(10px, 2vw, 20px) clamp(10px, 2vw, 20px);
   min-height: 100vh;
   box-sizing: border-box;
   background: radial-gradient(ellipse at center, 
     #0a0a1a 0%, 
     #000008 100%
   );
-  perspective: 1000px;
-  transform-style: preserve-3d;
+  /* VIEWPORT LOCK FIX: Removed perspective and transform-style that interfere with position: fixed */
+  /* perspective: 1000px;
+  transform-style: preserve-3d; */
 }
 
 .welcome-banner {
@@ -38,9 +39,9 @@
 
 /* ULTRA GLASSY DASHBOARD WRAPPER - $1B Startup Premium Design */
 .main-dashboard-wrapper {
-  max-width: min(calc(100vw - 100px), 1200px);
+  max-width: min(calc(100vw - clamp(60px, 6vw, 100px)), clamp(800px, 80vw, 1200px));
   margin: 0 auto;
-  padding: clamp(2rem, 4vw, 4rem);
+  padding: clamp(1.5rem, 3vw, 4rem);
   
   /* Ultra Glass Effect - Matching Homepage */
   background: rgba(255, 255, 255, 0.08);
@@ -49,7 +50,7 @@
   
   /* Refractive Border */
   border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 24px;
+  border-radius: clamp(16px, 2.5vw, 24px);
   
   /* Ultra Glass Shadow - Premium Depth */
   box-shadow: 
@@ -64,8 +65,9 @@
   min-width: 0;
   z-index: 2;
   position: relative;
-  transform: translateZ(50px);
-  will-change: transform;
+  /* VIEWPORT LOCK FIX: Removed translateZ that interferes with position: fixed */
+  /* transform: translateZ(50px); */
+  /* will-change: transform; */
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -819,8 +821,9 @@
   overflow: hidden;
   aspect-ratio: 1.2;
   gap: clamp(0.5rem, 1vw, 0.8rem);
-  transform: translateZ(20px);
-  will-change: transform;
+  /* VIEWPORT LOCK FIX: Removed translateZ that interferes with position: fixed */
+  /* transform: translateZ(20px); */
+  /* will-change: transform; */
   box-shadow: 
     0 6px 24px rgba(0, 0, 0, 0.15),
     inset 0 1px 0 rgba(255, 255, 255, 0.15),
@@ -851,7 +854,8 @@
 .platform-row:hover {
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(0, 255, 204, 0.2);
-  transform: translateZ(30px) translateY(-10px) scale(1.02);
+  /* VIEWPORT LOCK FIX: Removed translateZ that interferes with position: fixed */
+  transform: translateY(-10px) scale(1.02);
   box-shadow: 
     0 25px 80px rgba(0, 0, 0, 0.3),
     0 0 60px rgba(0, 255, 204, 0.15),
@@ -1252,6 +1256,101 @@
 
 .placeholder-chart p {
   color: #a0a0cc;
+}
+
+/* RESPONSIVE BREAKPOINTS FOR SMALLER LAPTOP SCREENS */
+
+/* Large laptops and small desktops (1440px and down) */
+@media (max-width: 1440px) {
+  .dashboard-page {
+    padding: clamp(65px, 6.5vh, 75px) clamp(8px, 1.8vw, 18px) clamp(8px, 1.8vw, 18px);
+  }
+  
+  .main-dashboard-wrapper {
+    max-width: min(calc(100vw - clamp(65px, 6.5vw, 85px)), clamp(750px, 78vw, 1100px));
+    padding: clamp(1.2rem, 2.8vw, 3.5rem);
+    border-radius: clamp(14px, 2.2vw, 22px);
+  }
+  
+  .welcome-banner {
+    max-width: min(92vw, 1100px);
+    padding: clamp(0.4rem, 1.2vw, 1.8rem);
+  }
+  
+  .welcome-banner h2 {
+    font-size: clamp(1.4rem, 2.8vw, 2rem);
+  }
+  
+  .main-dashboard-header h1 {
+    font-size: clamp(1.6rem, 3.5vw, 2.2rem);
+  }
+  
+  .tab {
+    font-size: clamp(0.85rem, 1.8vw, 1rem);
+    padding: clamp(0.7rem, 1.8vw, 0.9rem) clamp(1.2rem, 2.8vw, 1.8rem);
+  }
+}
+
+/* Standard laptops (1366px and down) */
+@media (max-width: 1366px) {
+  .dashboard-page {
+    padding: clamp(60px, 6vh, 70px) clamp(6px, 1.5vw, 16px) clamp(6px, 1.5vw, 16px);
+  }
+  
+  .main-dashboard-wrapper {
+    max-width: min(calc(100vw - clamp(60px, 6vw, 80px)), clamp(700px, 76vw, 1000px));
+    padding: clamp(1rem, 2.5vw, 3rem);
+    border-radius: clamp(12px, 2vw, 20px);
+  }
+  
+  .welcome-banner {
+    max-width: min(90vw, 1000px);
+    padding: clamp(0.3rem, 1vw, 1.6rem);
+  }
+  
+  .welcome-banner h2 {
+    font-size: clamp(1.2rem, 2.5vw, 1.8rem);
+  }
+  
+  .main-dashboard-header h1 {
+    font-size: clamp(1.4rem, 3.2vw, 2rem);
+  }
+  
+  .tab {
+    font-size: clamp(0.8rem, 1.6vw, 0.95rem);
+    padding: clamp(0.6rem, 1.6vw, 0.8rem) clamp(1rem, 2.5vw, 1.6rem);
+  }
+}
+
+/* Smaller laptops (1280px and down) */
+@media (max-width: 1280px) {
+  .dashboard-page {
+    padding: clamp(58px, 5.8vh, 68px) clamp(5px, 1.2vw, 14px) clamp(5px, 1.2vw, 14px);
+  }
+  
+  .main-dashboard-wrapper {
+    max-width: min(calc(100vw - clamp(55px, 5.5vw, 75px)), clamp(650px, 74vw, 900px));
+    padding: clamp(0.8rem, 2.2vw, 2.5rem);
+    border-radius: clamp(10px, 1.8vw, 18px);
+  }
+  
+  .welcome-banner {
+    max-width: min(88vw, 900px);
+    padding: clamp(0.2rem, 0.8vw, 1.4rem);
+  }
+  
+  .welcome-banner h2 {
+    font-size: clamp(1rem, 2.2vw, 1.6rem);
+  }
+  
+  .main-dashboard-header h1 {
+    font-size: clamp(1.2rem, 3vw, 1.8rem);
+  }
+  
+  .tab {
+    font-size: clamp(0.75rem, 1.4vw, 0.9rem);
+    padding: clamp(0.5rem, 1.4vw, 0.7rem) clamp(0.8rem, 2.2vw, 1.4rem);
+  }
 }
 
 /* Mobile Responsive - Maintaining Premium $1B Glassy Theme */

@@ -1798,6 +1798,66 @@ app.get(['/news-for-you/:accountHolder', '/api/news-for-you/:accountHolder'], as
   }
 });
 
+// ============= CORRECT SCHEMA-COMPLIANT ENDPOINTS =============
+
+// ✅ NEW: Recommendations endpoint (schema: recommendations/<platform>/<username>/recommendation_*.json)
+app.get(['/recommendations/:accountHolder', '/api/recommendations/:accountHolder'], async (req, res) => {
+  try {
+    const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
+    const forceRefresh = req.query.forceRefresh === 'true';
+
+    console.log(`[${new Date().toISOString()}] Fetching recommendations for ${username} on ${platform}`);
+    
+    const data = await fetchDataForModule(username, 'recommendations/{username}', forceRefresh, platform);
+    if (data.length === 0) {
+      res.status(404).json({ error: `No ${platform} recommendation files found` });
+    } else {
+      console.log(`[${new Date().toISOString()}] Found ${data.length} recommendations for ${username} on ${platform}`);
+      res.json(data);
+    }
+  } catch (error) {
+    console.error(`Retrieve ${req.query.platform || 'instagram'} recommendations endpoint error:`, error);
+    
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+      const platformName = (req.query.platform || 'instagram').charAt(0).toUpperCase() + (req.query.platform || 'instagram').slice(1);
+      res.status(404).json({ error: `${platformName} recommendations not ready yet` });
+    } else {
+      res.status(500).json({ 
+        error: `Error retrieving ${req.query.platform || 'instagram'} recommendations`, 
+        details: error.message 
+      });
+    }
+  }
+});
+
+// ✅ NEW: Competitor Analysis endpoint (schema: competitor_analysis/<platform>/<username>/<competitor>.json)
+app.get(['/competitor-analysis/:accountHolder/:competitor', '/api/competitor-analysis/:accountHolder/:competitor'], async (req, res) => {
+  try {
+    const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
+    const { competitor } = req.params;
+    const forceRefresh = req.query.forceRefresh === 'true';
+
+    console.log(`[${new Date().toISOString()}] Fetching competitor analysis for ${username}/${competitor} on ${platform}`);
+
+    // Use centralized schema management for competitor analysis
+    const data = await fetchDataForModule(username, `competitor_analysis/{username}/${competitor}`, forceRefresh, platform);
+    console.log(`[${new Date().toISOString()}] Found ${data.length} competitor analysis items for ${username}/${competitor} on ${platform}`);
+    res.json(data);
+  } catch (error) {
+    console.error(`Retrieve ${req.query.platform || 'instagram'} competitor analysis endpoint error:`, error);
+    
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+      const platformName = (req.query.platform || 'instagram').charAt(0).toUpperCase() + (req.query.platform || 'instagram').slice(1);
+      res.status(404).json({ error: `${platformName} competitor analysis not ready yet` });
+    } else {
+      res.status(500).json({ 
+        error: `Error retrieving ${req.query.platform || 'instagram'} competitor analysis`, 
+        details: error.message 
+      });
+    }
+  }
+});
+
 app.post(['/save-query/:accountHolder', '/api/save-query/:accountHolder'], async (req, res) => {
   // Set CORS headers explicitly for this endpoint
   setCorsHeaders(res, req.headers.origin || '*');
@@ -1805,6 +1865,32 @@ app.post(['/save-query/:accountHolder', '/api/save-query/:accountHolder'], async
   // Simply respond with success without storing in R2 bucket
   // The instant AI reply system makes this R2 storage unnecessary
   res.json({ success: true, message: 'AI instant reply system is enabled, no persistence needed' });
+});
+
+// ✅ CACHE CLEARING ENDPOINT - To fix stale cache with empty data
+app.delete(['/api/cache/clear', '/cache/clear'], async (req, res) => {
+  try {
+    const { prefix, all } = req.query;
+    
+    if (all === 'true') {
+      // Clear all cache
+      cache.clear();
+      cacheTimestamps.clear();
+      console.log(`[${new Date().toISOString()}] All cache cleared`);
+      res.json({ success: true, message: 'All cache cleared' });
+    } else if (prefix) {
+      // Clear specific prefix
+      cache.delete(prefix);
+      cacheTimestamps.delete(prefix);
+      console.log(`[${new Date().toISOString()}] Cache cleared for prefix: ${prefix}`);
+      res.json({ success: true, message: `Cache cleared for: ${prefix}` });
+    } else {
+      res.status(400).json({ error: 'Please specify prefix or all=true' });
+    }
+  } catch (error) {
+    console.error('Cache clear error:', error);
+    res.status(500).json({ error: 'Failed to clear cache' });
+  }
 });
 
 

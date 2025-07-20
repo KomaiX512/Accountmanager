@@ -3,14 +3,14 @@
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
-  height: 70px !important;
+  height: clamp(50px, 5vh, 70px) !important; /* Responsive height */
   background: rgba(26, 26, 46, 0.95) !important; /* FIXED: More opaque */
   border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
-  padding-left: 100px !important;
-  padding-right: 30px !important;
+  padding-left: clamp(60px, 8vw, 100px) !important; /* Responsive left padding */
+  padding-right: clamp(15px, 3vw, 30px) !important; /* Responsive right padding */
   z-index: 999999 !important; /* FIXED: Maximum z-index for always visible */
   transition: all 0.3s ease !important;
   backdrop-filter: blur(10px) !important;
@@ -20,15 +20,15 @@
   transform: translateZ(0) !important;
   will-change: transform !important;
   /* Additional bulletproof properties */
-  min-height: 70px !important;
-  max-height: 70px !important;
+  min-height: clamp(50px, 5vh, 70px) !important;
+  max-height: clamp(50px, 5vh, 70px) !important;
 }
 
 .social-icons {
   display: flex;
-  gap: 15px;
-  height: 70px;
-  max-height: 70px;
+  gap: clamp(8px, 1.5vw, 15px);
+  height: clamp(50px, 5vh, 70px);
+  max-height: clamp(50px, 5vh, 70px);
   align-items: center;
   padding: 0;
   margin: 0;
@@ -37,8 +37,8 @@
 }
 
 .social-icon {
-  width: 60px;
-  height: 60px;
+  width: clamp(40px, 4.5vw, 60px);
+  height: clamp(40px, 4.5vw, 60px);
   color: rgba(255, 255, 255, 0.7);
   transition: all 0.2s ease;
   cursor: pointer;
@@ -46,10 +46,10 @@
   align-items: center;
   justify-content: center;
   position: relative;
-  border-radius: 10px;
+  border-radius: clamp(6px, 1vw, 10px);
   background: transparent;
   box-sizing: border-box;
-  margin: 5px 0;
+  margin: clamp(2px, 0.5vh, 5px) 0;
 }
 
 .social-icon:hover {
@@ -78,8 +78,8 @@
 }
 
 .social-icon svg {
-  width: 36px;
-  height: 36px;
+  width: clamp(24px, 3vw, 36px);
+  height: clamp(24px, 3vw, 36px);
   fill: currentColor;
 }
 
@@ -282,6 +282,118 @@
 
 .login-button:active {
   transform: translateY(1px);
+}
+
+/* Responsive adjustments for smaller laptop screens */
+@media (max-width: 1440px) {
+  .top-bar {
+    height: clamp(55px, 5.5vh, 65px) !important;
+    padding-left: clamp(70px, 7vw, 90px) !important;
+    padding-right: clamp(20px, 2.5vw, 25px) !important;
+    min-height: clamp(55px, 5.5vh, 65px) !important;
+    max-height: clamp(55px, 5.5vh, 65px) !important;
+  }
+  
+  .social-icons {
+    gap: clamp(10px, 1.2vw, 12px);
+    height: clamp(55px, 5.5vh, 65px);
+    max-height: clamp(55px, 5.5vh, 65px);
+  }
+  
+  .social-icon {
+    width: clamp(45px, 4vw, 55px);
+    height: clamp(45px, 4vw, 55px);
+  }
+  
+  .social-icon svg {
+    width: clamp(28px, 2.8vw, 32px);
+    height: clamp(28px, 2.8vw, 32px);
+  }
+  
+  .logo-image {
+    height: clamp(28px, 3.2vw, 32px);
+    max-width: clamp(100px, 12vw, 120px);
+  }
+  
+  .nav-link,
+  .dashboard-button {
+    font-size: clamp(0.85rem, 1.8vw, 1rem);
+    padding: clamp(8px, 2vw, 10px) clamp(14px, 3.5vw, 18px);
+  }
+}
+
+@media (max-width: 1366px) {
+  .top-bar {
+    height: clamp(50px, 5vh, 60px) !important;
+    padding-left: clamp(65px, 6.5vw, 80px) !important;
+    padding-right: clamp(18px, 2.2vw, 22px) !important;
+    min-height: clamp(50px, 5vh, 60px) !important;
+    max-height: clamp(50px, 5vh, 60px) !important;
+  }
+  
+  .social-icons {
+    gap: clamp(8px, 1vw, 10px);
+    height: clamp(50px, 5vh, 60px);
+    max-height: clamp(50px, 5vh, 60px);
+  }
+  
+  .social-icon {
+    width: clamp(42px, 3.8vw, 50px);
+    height: clamp(42px, 3.8vw, 50px);
+  }
+  
+  .social-icon svg {
+    width: clamp(26px, 2.6vw, 30px);
+    height: clamp(26px, 2.6vw, 30px);
+  }
+  
+  .logo-image {
+    height: clamp(26px, 3vw, 30px);
+    max-width: clamp(90px, 11vw, 110px);
+  }
+  
+  .nav-link,
+  .dashboard-button {
+    font-size: clamp(0.8rem, 1.6vw, 0.95rem);
+    padding: clamp(7px, 1.8vw, 9px) clamp(12px, 3.2vw, 16px);
+  }
+}
+
+@media (max-width: 1280px) {
+  .top-bar {
+    height: clamp(48px, 4.8vh, 58px) !important;
+    padding-left: clamp(60px, 6vw, 75px) !important;
+    padding-right: clamp(16px, 2vw, 20px) !important;
+    min-height: clamp(48px, 4.8vh, 58px) !important;
+    max-height: clamp(48px, 4.8vh, 58px) !important;
+  }
+  
+  .social-icons {
+    gap: clamp(6px, 0.8vw, 8px);
+    height: clamp(48px, 4.8vh, 58px);
+    max-height: clamp(48px, 4.8vh, 58px);
+  }
+  
+  .social-icon {
+    width: clamp(38px, 3.5vw, 46px);
+    height: clamp(38px, 3.5vw, 46px);
+  }
+  
+  .social-icon svg {
+    width: clamp(24px, 2.4vw, 28px);
+    height: clamp(24px, 2.4vw, 28px);
+  }
+  
+  .logo-image {
+    height: clamp(24px, 2.8vw, 28px);
+    max-width: clamp(80px, 10vw, 100px);
+  }
+  
+  .nav-link,
+  .dashboard-button {
+    font-size: clamp(0.75rem, 1.4vw, 0.9rem);
+    padding: clamp(6px, 1.6vw, 8px) clamp(10px, 3vw, 14px);
+  }
 }
 
 /* Responsive adjustments */

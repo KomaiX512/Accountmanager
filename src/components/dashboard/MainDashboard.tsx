@@ -399,7 +399,7 @@ const MainDashboard: React.FC = () => {
               // Ignore posts fetch errors - don't log to reduce console noise
             }
             
-            // Fetch competitor analysis count
+            // Fetch competitor analysis count - FIXED: Use retrieve-multiple endpoint
             try {
               const accountInfoResponse = await fetch(`/api/profile-info/${platformUsername}?platform=${platform}`);
               if (accountInfoResponse.ok) {
@@ -412,10 +412,11 @@ const MainDashboard: React.FC = () => {
                     const competitorData = await competitorResponse.json();
                     // Defensive check: ensure competitorData is an array before filtering
                     if (Array.isArray(competitorData)) {
-                      // Count unseen competitor analysis
+                      // Count unseen competitor analysis - extract data from each competitor response
                       const viewedKey = `viewed_competitor_${platform}_${platformUsername}`;
                       const viewedCompetitor = JSON.parse(localStorage.getItem(viewedKey) || '[]');
-                      const unseenCompetitor = safeFilter(competitorData, (c: any) => !viewedCompetitor.includes(c.key || `${c.competitor}_${c.timestamp}`));
+                      const flatData = competitorData.flatMap((res: any) => Array.isArray(res.data) ? res.data : []);
+                      const unseenCompetitor = safeFilter(flatData, (c: any) => !viewedCompetitor.includes(c.key || `${c.competitor}_${c.timestamp}`));
                       totalCount += unseenCompetitor.length;
                     }
                   }

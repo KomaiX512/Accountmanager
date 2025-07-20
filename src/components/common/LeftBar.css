@@ -5,10 +5,10 @@ motion.div.left-bar,
 .main-content .left-bar,
 .App .left-bar {
   position: fixed !important;
-  top: 70px !important; /* FIXED: Match TopBar height */
+  top: clamp(50px, 5vh, 70px) !important; /* Responsive top to match TopBar */
   left: 0 !important;
-  width: 80px !important;
-  height: calc(100vh - 70px) !important; /* FIXED: Match TopBar height */
+  width: clamp(60px, 6vw, 80px) !important; /* Responsive width */
+  height: calc(100vh - clamp(50px, 5vh, 70px)) !important; /* Responsive height calculation */
   background: rgba(26, 26, 46, 0.95) !important; /* FIXED: More opaque */
   border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
   z-index: 999998 !important; /* FIXED: Just below TopBar but above everything else */
@@ -27,12 +27,12 @@ motion.div.left-bar,
   align-items: center !important;
   margin: 0 !important;
   padding: 0 !important;
-  min-width: 80px !important;
-  max-width: 80px !important;
+  min-width: clamp(60px, 6vw, 80px) !important;
+  max-width: clamp(60px, 6vw, 80px) !important;
   box-sizing: border-box !important;
   /* Additional bulletproof properties */
-  min-height: calc(100vh - 70px) !important;
-  max-height: calc(100vh - 70px) !important;
+  min-height: calc(100vh - clamp(50px, 5vh, 70px)) !important;
+  max-height: calc(100vh - clamp(50px, 5vh, 70px)) !important;
 }
 
 .icon-container {
@@ -108,6 +108,106 @@ motion.div.left-bar,
 @keyframes pulse-dot {
   0%, 100% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.2); opacity: 0.7; }
+}
+
+/* Responsive Design for Smaller Laptop Screens */
+@media (max-width: 1440px) {
+  .left-bar {
+    width: clamp(65px, 6.5vw, 75px) !important;
+    top: clamp(55px, 5.5vh, 65px) !important;
+    height: calc(100vh - clamp(55px, 5.5vh, 65px)) !important;
+    min-width: clamp(65px, 6.5vw, 75px) !important;
+    max-width: clamp(65px, 6.5vw, 75px) !important;
+    min-height: calc(100vh - clamp(55px, 5.5vh, 65px)) !important;
+    max-height: calc(100vh - clamp(55px, 5.5vh, 65px)) !important;
+  }
+  
+  .icon-container {
+    gap: clamp(12px, 2.5vw, 18px);
+    padding-top: clamp(12px, 2.5vw, 18px);
+  }
+  
+  .icon-button {
+    width: calc(100% - 14px);
+    margin: 0 7px;
+    padding: clamp(7px, 1.8vw, 9px) 0;
+  }
+  
+  .icon {
+    width: clamp(22px, 3.5vw, 26px);
+    height: clamp(22px, 3.5vw, 26px);
+  }
+  
+  .icon-button span {
+    font-size: clamp(9px, 1.8vw, 11px);
+    margin-top: clamp(3px, 0.8vw, 5px);
+  }
+}
+
+@media (max-width: 1366px) {
+  .left-bar {
+    width: clamp(60px, 6vw, 70px) !important;
+    top: clamp(50px, 5vh, 60px) !important;
+    height: calc(100vh - clamp(50px, 5vh, 60px)) !important;
+    min-width: clamp(60px, 6vw, 70px) !important;
+    max-width: clamp(60px, 6vw, 70px) !important;
+    min-height: calc(100vh - clamp(50px, 5vh, 60px)) !important;
+    max-height: calc(100vh - clamp(50px, 5vh, 60px)) !important;
+  }
+  
+  .icon-container {
+    gap: clamp(10px, 2.2vw, 16px);
+    padding-top: clamp(10px, 2.2vw, 16px);
+  }
+  
+  .icon-button {
+    width: calc(100% - 12px);
+    margin: 0 6px;
+    padding: clamp(6px, 1.6vw, 8px) 0;
+  }
+  
+  .icon {
+    width: clamp(20px, 3.2vw, 24px);
+    height: clamp(20px, 3.2vw, 24px);
+  }
+  
+  .icon-button span {
+    font-size: clamp(8px, 1.6vw, 10px);
+    margin-top: clamp(2px, 0.6vw, 4px);
+  }
+}
+
+@media (max-width: 1280px) {
+  .left-bar {
+    width: clamp(55px, 5.5vw, 65px) !important;
+    top: clamp(48px, 4.8vh, 58px) !important;
+    height: calc(100vh - clamp(48px, 4.8vh, 58px)) !important;
+    min-width: clamp(55px, 5.5vw, 65px) !important;
+    max-width: clamp(55px, 5.5vw, 65px) !important;
+    min-height: calc(100vh - clamp(48px, 4.8vh, 58px)) !important;
+    max-height: calc(100vh - clamp(48px, 4.8vh, 58px)) !important;
+  }
+  
+  .icon-container {
+    gap: clamp(8px, 2vw, 14px);
+    padding-top: clamp(8px, 2vw, 14px);
+  }
+  
+  .icon-button {
+    width: calc(100% - 10px);
+    margin: 0 5px;
+    padding: clamp(5px, 1.4vw, 7px) 0;
+  }
+  
+  .icon {
+    width: clamp(18px, 3vw, 22px);
+    height: clamp(18px, 3vw, 22px);
+  }
+  
+  .icon-button span {
+    font-size: clamp(7px, 1.4vw, 9px);
+    margin-top: clamp(2px, 0.5vw, 3px);
+  }
 }
 
 /* Responsive Design for Different Screen Sizes */

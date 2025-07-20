@@ -1,5 +1,6 @@
 @import './styles/global-ui-refinements.css';
 @import './styles/global-scrollbar-styles.css';
+@import './styles/responsive-refinements.css';
 
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
@@ -44,8 +45,8 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  /* Prevent layout shifts */
-  contain: layout style paint;
+  /* VIEWPORT LOCK FIX: Removed contain property that interferes with position: fixed */
+  /* contain: layout style paint; */
 }
 
 h1 {

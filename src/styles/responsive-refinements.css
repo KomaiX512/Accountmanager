@@ -1,0 +1,286 @@
+/* 🔧 RESPONSIVE DESIGN REFINEMENT UTILITY
+ * Comprehensive responsive design enhancements for smaller laptop screens
+ * Addresses oversized UI elements and improves scaling across all screen sizes
+ */
+
+/* ROOT VARIABLES FOR CONSISTENT SCALING */
+:root {
+  /* Responsive units for different screen sizes */
+  --topbar-height: clamp(50px, 5vh, 70px);
+  --sidebar-width: clamp(60px, 6vw, 80px);
+  --container-padding: clamp(0.5rem, 2vw, 2rem);
+  --border-radius: clamp(6px, 1.5vw, 12px);
+  --gap-small: clamp(8px, 1.5vw, 16px);
+  --gap-medium: clamp(12px, 2vw, 24px);
+  --gap-large: clamp(16px, 3vw, 32px);
+  
+  /* Font scaling */
+  --font-xs: clamp(0.7rem, 1.4vw, 0.875rem);
+  --font-sm: clamp(0.8rem, 1.6vw, 1rem);
+  --font-base: clamp(0.9rem, 1.8vw, 1.125rem);
+  --font-lg: clamp(1rem, 2vw, 1.25rem);
+  --font-xl: clamp(1.2rem, 2.4vw, 1.5rem);
+  --font-2xl: clamp(1.4rem, 2.8vw, 1.875rem);
+  --font-3xl: clamp(1.6rem, 3.2vw, 2.25rem);
+}
+
+/* GLOBAL LAYOUT ADJUSTMENTS FOR SMALLER LAPTOPS */
+
+/* Ultra-wide screens (1920px+) - Prevent oversized elements */
+@media (min-width: 1920px) {
+  :root {
+    --topbar-height: 70px;
+    --sidebar-width: 80px;
+    --container-padding: 2rem;
+    --border-radius: 12px;
+    --gap-small: 16px;
+    --gap-medium: 24px;
+    --gap-large: 32px;
+  }
+}
+
+/* Large laptops (1440px - 1600px) */
+@media (max-width: 1600px) and (min-width: 1441px) {
+  :root {
+    --topbar-height: clamp(60px, 4.5vh, 65px);
+    --sidebar-width: clamp(70px, 5.5vw, 75px);
+    --container-padding: clamp(1.5rem, 2.5vw, 1.8rem);
+  }
+}
+
+/* Standard laptops (1366px - 1440px) */
+@media (max-width: 1440px) and (min-width: 1367px) {
+  :root {
+    --topbar-height: clamp(55px, 4.2vh, 60px);
+    --sidebar-width: clamp(65px, 5.2vw, 70px);
+    --container-padding: clamp(1.2rem, 2.2vw, 1.5rem);
+  }
+}
+
+/* Smaller laptops (1280px - 1366px) */
+@media (max-width: 1366px) and (min-width: 1281px) {
+  :root {
+    --topbar-height: clamp(50px, 4vh, 55px);
+    --sidebar-width: clamp(60px, 5vw, 65px);
+    --container-padding: clamp(1rem, 2vw, 1.2rem);
+  }
+}
+
+/* Compact laptops (1024px - 1280px) */
+@media (max-width: 1280px) and (min-width: 1025px) {
+  :root {
+    --topbar-height: clamp(48px, 3.8vh, 52px);
+    --sidebar-width: clamp(55px, 4.8vw, 60px);
+    --container-padding: clamp(0.8rem, 1.8vw, 1rem);
+  }
+}
+
+/* VIEWPORT HEIGHT ADJUSTMENTS FOR SHORT SCREENS */
+
+/* Very short screens (height < 700px) */
+@media (max-height: 700px) {
+  :root {
+    --topbar-height: clamp(40px, 6vh, 50px);
+    --container-padding: clamp(0.5rem, 1.5vw, 0.8rem);
+    --gap-small: clamp(6px, 1.2vw, 12px);
+    --gap-medium: clamp(8px, 1.6vw, 16px);
+    --gap-large: clamp(10px, 2vw, 20px);
+  }
+  
+  /* Compact all UI elements for short screens */
+  .dashboard-page,
+  .main-dashboard-wrapper,
+  .modules-container {
+    padding: var(--container-padding) !important;
+  }
+  
+  .canvas-editor-container {
+    height: clamp(300px, 90vh, 700px) !important;
+    max-height: 90vh !important;
+  }
+  
+  /* Reduce spacing in navigation and UI elements */
+  .icon-container {
+    gap: var(--gap-small) !important;
+    padding-top: var(--gap-small) !important;
+  }
+  
+  .social-icons {
+    gap: clamp(4px, 1vw, 8px) !important;
+  }
+}
+
+/* Extremely short screens (height < 600px) - netbooks, some ultrabooks */
+@media (max-height: 600px) {
+  :root {
+    --topbar-height: clamp(35px, 5.5vh, 45px);
+    --sidebar-width: clamp(45px, 4.5vw, 55px);
+  }
+  
+  /* Make canvas editor scrollable and compact */
+  .canvas-editor-overlay {
+    align-items: flex-start !important;
+    padding: clamp(5px, 1vw, 10px) !important;
+  }
+  
+  .canvas-editor-container {
+    height: clamp(250px, 85vh, 500px) !important;
+    max-height: 85vh !important;
+    margin-top: clamp(5px, 1vh, 10px) !important;
+  }
+  
+  /* Compact dashboard elements */
+  .dashboard-grid {
+    gap: var(--gap-small) !important;
+  }
+  
+  .profile-metadata,
+  .notifications,
+  .post-cooked,
+  .strategies,
+  .competitor-analysis,
+  .chatbot {
+    padding: clamp(0.5rem, 1.5vw, 0.8rem) !important;
+    border-radius: var(--border-radius) !important;
+  }
+}
+
+/* VERY NARROW SCREENS (width < 1024px but not mobile) */
+@media (max-width: 1024px) and (min-width: 769px) {
+  :root {
+    --sidebar-width: clamp(50px, 4.5vw, 60px);
+    --container-padding: clamp(0.5rem, 1.5vw, 1rem);
+  }
+  
+  /* Adjust main content area */
+  .main-dashboard-wrapper,
+  .modules-container {
+    max-width: min(calc(100vw - var(--sidebar-width) - 20px), 900px) !important;
+    padding: var(--container-padding) !important;
+  }
+  
+  /* Make canvas editor more compact */
+  .canvas-editor-container {
+    width: clamp(250px, 85vw, 700px) !important;
+    height: clamp(300px, 80vh, 800px) !important;
+  }
+  
+  /* Adjust grid layouts */
+  .dashboard-grid {
+    grid-template-columns: 1fr !important;
+    grid-template-areas:
+      "profile"
+      "chatbot"
+      "notifications"
+      "post-cooked"
+      "strategies"
+      "competitor-analysis" !important;
+  }
+}
+
+/* HIGH DPI SCREENS - Prevent blurry scaling */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .canvas-editor-overlay,
+  .modal-overlay,
+  .popup-overlay {
+    transform: translateZ(0) !important;
+    will-change: transform !important;
+  }
+  
+  /* Ensure crisp borders and shadows */
+  .main-dashboard-wrapper,
+  .modules-container,
+  .canvas-editor-container {
+    transform: translateZ(0) !important;
+    backface-visibility: hidden !important;
+  }
+}
+
+/* ACCESSIBILITY - Reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .canvas-editor-container,
+  .main-dashboard-wrapper,
+  .modules-container {
+    animation: none !important;
+    transition: none !important;
+  }
+  
+  .canvas-editor-overlay {
+    animation: none !important;
+  }
+}
+
+/* UNIVERSAL SCROLLBAR IMPROVEMENTS FOR SMALL SCREENS */
+@media (max-width: 1440px) {
+  /* Custom scrollbar for better space utilization */
+  ::-webkit-scrollbar {
+    width: clamp(4px, 0.8vw, 8px) !important;
+    height: clamp(4px, 0.8vw, 8px) !important;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1) !important;
+    border-radius: clamp(2px, 0.4vw, 4px) !important;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: rgba(0, 255, 204, 0.3) !important;
+    border-radius: clamp(2px, 0.4vw, 4px) !important;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 255, 204, 0.5) !important;
+  }
+}
+
+/* EMERGENCY FALLBACKS - Ensure nothing breaks */
+@media (max-width: 320px) {
+  :root {
+    --topbar-height: 40px;
+    --sidebar-width: 40px;
+    --container-padding: 0.25rem;
+    --border-radius: 4px;
+    --gap-small: 4px;
+    --gap-medium: 8px;
+    --gap-large: 12px;
+  }
+  
+  .canvas-editor-container {
+    width: calc(100vw - 20px) !important;
+    height: calc(100vh - 80px) !important;
+    transform: none !important;
+  }
+  
+  .canvas-editor-overlay {
+    padding: 10px !important;
+  }
+}
+
+/* PRINT STYLES - Ensure proper scaling when printing */
+@media print {
+  .canvas-editor-overlay,
+  .modal-overlay,
+  .popup-overlay {
+    position: relative !important;
+    background: none !important;
+    backdrop-filter: none !important;
+  }
+  
+  .canvas-editor-container {
+    transform: none !important;
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+  }
+}
+
+/* LANDSCAPE ORIENTATION ADJUSTMENTS FOR TABLETS */
+@media (max-width: 1024px) and (orientation: landscape) {
+  .canvas-editor-container {
+    width: clamp(300px, 80vw, 800px) !important;
+    height: clamp(250px, 75vh, 600px) !important;
+  }
+  
+  :root {
+    --topbar-height: clamp(40px, 4vh, 50px);
+  }
+}

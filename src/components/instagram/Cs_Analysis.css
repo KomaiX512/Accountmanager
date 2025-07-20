@@ -535,3 +535,46 @@
 @keyframes spin {
   100% { transform: rotate(360deg); }
 }
+
+/* ✅ NEW: Data ready indicators for competitor analysis */
+.data-ready-indicator {
+  text-align: center;
+  padding: 10px;
+  color: #e0e0ff;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 255, 204, 0.1);
+  border-radius: 8px;
+}
+
+.success-text {
+  color: #00ffcc;
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: block;
+  margin-bottom: 5px;
+}
+
+.click-hint {
+  color: #a0a0ff;
+  font-size: 0.7rem;
+  margin: 0;
+  opacity: 0.8;
+}
+
+.no-data-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ff6b6b;
+  font-size: 0.9rem;
+  opacity: 0.8;
+  background: rgba(255, 107, 107, 0.1);
+  border-radius: 8px;
+}

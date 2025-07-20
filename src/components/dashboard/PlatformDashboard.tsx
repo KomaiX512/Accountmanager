@@ -42,6 +42,7 @@ import { useNavigate } from 'react-router-dom';
 import useProcessingGuard from '../../hooks/useProcessingGuard';
 import { useProcessing } from '../../context/ProcessingContext';
 import { safeFilter, safeMap, safeLength } from '../../utils/safeArrayUtils';
+import useDashboardRefresh from '../../hooks/useDashboardRefresh';
 
 // Define RagService compatible ChatMessage
 interface RagChatMessage {
@@ -173,54 +174,28 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     return stored ? new Set(JSON.parse(stored)) : new Set();
   });
 
-  // 🎯 SINGLE STRATEGIC REFRESH: Clean, efficient, one-time refresh mechanism
-  const platformRef = useRef<string | null>(null);
-  const accountHolderRef = useRef<string | null>(null);
-  const hasInitialized = useRef(false);
-
-  const handleSingleRefresh = useCallback(() => {
+  // Simple refresh handler for regular data updates (defined first)
+  const handleDataRefresh = useCallback(() => {
     if (!accountHolder || !platform) return;
     
-    console.log(`[PlatformDashboard] ⚡ Single refresh triggered for ${platform}`);
-    
-    // Only fetch fresh data - no state resets to avoid performance issues
-    if (firstLoadRef.current) {
-      firstLoadRef.current = false;
-      refreshAllData();
-      fetchProfileInfo();
-    }
+    console.log(`[PlatformDashboard] 🔄 Refreshing data for ${platform}`);
+    refreshAllData();
+    fetchProfileInfo();
   }, [platform, accountHolder]);
 
-  // 🎯 STRATEGIC REFRESH: Only refresh when platform actually changes
+  // ✅ BULLET-PROOF F5 INTEGRATION: Simple hook usage
+  useDashboardRefresh({
+    dashboardType: 'platform',
+    onRefresh: handleDataRefresh
+  });
+
+  // Initial load effect
   useEffect(() => {
-    const platformChanged = platformRef.current !== platform;
-    const accountChanged = accountHolderRef.current !== accountHolder;
-    
-    if ((platformChanged || accountChanged) && accountHolder && platform) {
-      console.log(`[PlatformDashboard] � Platform changed: ${platformRef.current} → ${platform}`);
-      
-      // Update refs immediately to prevent duplicate calls
-      platformRef.current = platform;
-      accountHolderRef.current = accountHolder;
-      
-      // Reset first load flag for new platform/account
-      firstLoadRef.current = true;
-      
-      // Single strategic refresh with minimal delay
-      const refreshTimer = setTimeout(() => {
-        handleSingleRefresh();
-      }, 100);
-      
-      return () => clearTimeout(refreshTimer);
-    } else if (!hasInitialized.current && accountHolder && platform) {
-      // Initial load only
-      hasInitialized.current = true;
-      platformRef.current = platform;
-      accountHolderRef.current = accountHolder;
-      firstLoadRef.current = true;
-      handleSingleRefresh();
+    if (accountHolder && platform) {
+      console.log(`[PlatformDashboard] 🚀 Initial load for ${platform}`);
+      handleDataRefresh();
     }
-  }, [platform, accountHolder, handleSingleRefresh]);
+  }, [platform, accountHolder, handleDataRefresh]);
 
   // Helper function to get viewed storage key
   const getViewedStorageKey = (section: string) => `viewed_${section}_${platform}_${accountHolder}`;

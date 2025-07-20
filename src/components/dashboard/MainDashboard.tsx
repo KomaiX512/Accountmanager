@@ -20,7 +20,6 @@ import { useUsage } from '../../context/UsageContext';
 import GlobalUpgradeHandler from '../common/GlobalUpgradeHandler';
 import { useProcessing } from '../../context/ProcessingContext';
 import { safeFilter, safeMap, safeLength } from '../../utils/safeArrayUtils';
-import useDashboardRefresh from '../../hooks/useDashboardRefresh';
 
 interface PlatformLoadingState {
   startTime: number;
@@ -399,7 +398,7 @@ const MainDashboard: React.FC = () => {
               // Ignore posts fetch errors - don't log to reduce console noise
             }
             
-            // Fetch competitor analysis count - FIXED: Use retrieve-multiple endpoint
+            // Fetch competitor analysis count
             try {
               const accountInfoResponse = await fetch(`/api/profile-info/${platformUsername}?platform=${platform}`);
               if (accountInfoResponse.ok) {
@@ -412,11 +411,10 @@ const MainDashboard: React.FC = () => {
                     const competitorData = await competitorResponse.json();
                     // Defensive check: ensure competitorData is an array before filtering
                     if (Array.isArray(competitorData)) {
-                      // Count unseen competitor analysis - extract data from each competitor response
+                      // Count unseen competitor analysis
                       const viewedKey = `viewed_competitor_${platform}_${platformUsername}`;
                       const viewedCompetitor = JSON.parse(localStorage.getItem(viewedKey) || '[]');
-                      const flatData = competitorData.flatMap((res: any) => Array.isArray(res.data) ? res.data : []);
-                      const unseenCompetitor = safeFilter(flatData, (c: any) => !viewedCompetitor.includes(c.key || `${c.competitor}_${c.timestamp}`));
+                      const unseenCompetitor = safeFilter(competitorData, (c: any) => !viewedCompetitor.includes(c.key || `${c.competitor}_${c.timestamp}`));
                       totalCount += unseenCompetitor.length;
                     }
                   }
@@ -439,38 +437,17 @@ const MainDashboard: React.FC = () => {
     isFetchingNotificationsRef.current = false;
   }, [currentUser?.uid, instagramUserId, twitterUserId, facebookUserId, getPlatformAccessStatus]);
 
-  // 🔄 MAIN DASHBOARD AUTO-REFRESH: Implement dashboard switching refresh
-  const handleMainDashboardRefresh = useCallback(() => {
-    console.log('[MainDashboard] 🔄 Auto-refresh triggered - refreshing all data');
+  // ✅ CLEAN MAIN DASHBOARD: No auto-refresh, just basic data loading
+  useEffect(() => {
+    console.log(`[MainDashboard] � Main dashboard mounted - basic data load`);
     
-    // Refresh usage data
-    refreshUsage();
-    
-    // Refresh notification counts
+    // Only fetch initial data on mount, no auto-refresh
     if (currentUser?.uid) {
-      console.log('[MainDashboard] 🔔 Triggering fresh notification fetch');
-      // Call the notification fetch function directly
+      refreshUsage();
       fetchRealTimeNotifications();
     }
-  }, [refreshUsage, currentUser?.uid, fetchRealTimeNotifications]);
-
-  // Use dashboard refresh hook for automatic refresh on route changes
-  const { forceRefresh: forceMainDashboardRefresh } = useDashboardRefresh({
-    onRefresh: handleMainDashboardRefresh,
-    dashboardType: 'main',
-    dependencies: [currentUser?.uid]
-  });
-
-  // 🔥 FORCE HARD REFRESH ON EVERY MAIN DASHBOARD ENTRY
-  useEffect(() => {
-    console.log(`[MainDashboard] 🚀 Main dashboard mounted/accessed - forcing hard refresh`);
     
-    // Always trigger hard refresh when main dashboard is accessed
-    if (currentUser?.uid) {
-      handleMainDashboardRefresh();
-    }
-    
-  }, [currentUser?.uid, handleMainDashboardRefresh]); // Trigger when user changes or component mounts
+  }, [currentUser?.uid]); // Only trigger when user changes
 
   // ✅ PLATFORM STATE MANAGEMENT FIX: Improved platform data structure
   const [platforms, setPlatforms] = useState<PlatformData[]>([

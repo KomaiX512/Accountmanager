@@ -65,12 +65,30 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
   useEffect(() => {
     const fetchAccountInfo = async () => {
       try {
-        const response = await axios.get(`/api/profile-info/${normalizedAccountHolder}?platform=${platform}`);
+        // ✅ FIXED: Use retrieve-account-info endpoint to get saved account data
+        const response = await axios.get(`/api/retrieve-account-info/${normalizedAccountHolder}?platform=${platform}`);
         const info = response.data;
-        // Handle both camelCase and snake_case field names
-        if (info.accountType || info.account_type) setAccountType(info.accountType || info.account_type);
-        if (info.postingStyle || info.posting_style) setPostingStyle(info.postingStyle || info.posting_style);
-      } catch {}
+        console.log(`[Cs_Analysis] ✅ Retrieved account info for ${normalizedAccountHolder}:`, info);
+        
+        // Update account type and posting style from saved data
+        if (info.accountType) setAccountType(info.accountType);
+        if (info.postingStyle) setPostingStyle(info.postingStyle);
+        
+        // Update competitors from saved data if available and different from props
+        if (info.competitors && Array.isArray(info.competitors) && info.competitors.length > 0) {
+          console.log(`[Cs_Analysis] ✅ Using competitors from account info:`, info.competitors);
+          setLocalCompetitors(info.competitors);
+        }
+      } catch (error: any) {
+        console.warn(`[Cs_Analysis] ⚠️ Could not fetch account info for ${normalizedAccountHolder}:`, error.response?.status);
+        // Fallback to profile-info for basic account details
+        try {
+          const profileResponse = await axios.get(`/api/profile-info/${normalizedAccountHolder}?platform=${platform}`);
+          const profileInfo = profileResponse.data;
+          if (profileInfo.accountType || profileInfo.account_type) setAccountType(profileInfo.accountType || profileInfo.account_type);
+          if (profileInfo.postingStyle || profileInfo.posting_style) setPostingStyle(profileInfo.postingStyle || profileInfo.posting_style);
+        } catch {}
+      }
     };
     fetchAccountInfo();
   }, [normalizedAccountHolder, platform]);
@@ -83,22 +101,28 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
   const allCompetitorsFetch = useR2Fetch<any[]>(competitorEndpoint, platform);
 
   // Debug logging for endpoint and competitors
-  console.log(`[Cs_Analysis] Component state:`, {
+  console.log(`[Cs_Analysis] 🔍 Component state for ${normalizedAccountHolder}:`, {
     localCompetitors,
     competitorEndpoint,
     fetchLoading: allCompetitorsFetch.loading,
     fetchError: allCompetitorsFetch.error,
-    fetchDataLength: allCompetitorsFetch.data?.length || 0
+    fetchDataLength: allCompetitorsFetch.data?.length || 0,
+    accountType,
+    postingStyle
   });
 
   const competitorData = localCompetitors.map(competitor => {
     const dataForCompetitor = allCompetitorsFetch.data?.find(item => item.competitor === competitor) || null;
     
-    // Simplified debug logging
+    // Enhanced debug logging
     if (dataForCompetitor?.data?.length > 0) {
       console.log(`[Cs_Analysis] ✅ ${competitor} has ${dataForCompetitor.data.length} analysis items`);
+    } else if (allCompetitorsFetch.loading) {
+      console.log(`[Cs_Analysis] ⏳ ${competitor} data is loading...`);
+    } else if (allCompetitorsFetch.error) {
+      console.log(`[Cs_Analysis] ❌ ${competitor} failed to load - Error:`, allCompetitorsFetch.error);
     } else {
-      console.log(`[Cs_Analysis] ❌ ${competitor} has no data - loading: ${allCompetitorsFetch.loading}, error: ${allCompetitorsFetch.error}`);
+      console.log(`[Cs_Analysis] ⚠️ ${competitor} has no data available`);
     }
 
     return {
@@ -170,6 +194,8 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
 
   const updateCompetitors = useCallback(async (updatedCompetitors: string[]) => {
     try {
+      console.log(`[Cs_Analysis] 📝 Updating competitors for ${normalizedAccountHolder} on ${platform}:`, updatedCompetitors);
+      
       const response = await axios.post(`/api/save-account-info?platform=${platform}`, {
         username: normalizedAccountHolder,
         accountType,
@@ -177,29 +203,44 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
         competitors: updatedCompetitors,
         platform: platform
       });
-      return response.status === 200;
+      
+      if (response.status === 200) {
+        console.log(`[Cs_Analysis] ✅ Successfully updated competitors for ${normalizedAccountHolder}`);
+        return true;
+      } else {
+        console.error(`[Cs_Analysis] ❌ Failed to update competitors - HTTP ${response.status}`);
+        return false;
+      }
     } catch (error: any) {
-      console.error(`Error updating ${platform} competitors:`, error);
+      console.error(`[Cs_Analysis] ❌ Error updating ${platform} competitors for ${normalizedAccountHolder}:`, error.response?.data || error.message);
       return false;
     }
   }, [normalizedAccountHolder, platform, accountType, postingStyle]);
 
   useEffect(() => {
     const syncInitialState = async () => {
-      console.log(`[Cs_Analysis] Syncing initial state for ${normalizedAccountHolder} on ${platform}`);
+      console.log(`[Cs_Analysis] 🔄 Syncing initial competitors state for ${normalizedAccountHolder} on ${platform}`);
+      
+      // First try to get competitors from the saved account info
       const serverCompetitors = await fetchAccountInfoWithRetry();
-      if (serverCompetitors) {
-        console.log(`[Cs_Analysis] ✅ Loaded competitors from AccountInfo API:`, serverCompetitors);
+      if (serverCompetitors && serverCompetitors.length > 0) {
+        console.log(`[Cs_Analysis] ✅ Loaded ${serverCompetitors.length} competitors from AccountInfo API:`, serverCompetitors);
         setLocalCompetitors(serverCompetitors);
         // Force refresh of competitor data when competitors are loaded
         setRefreshKey(prev => prev + 1);
       } else {
-        console.log(`[Cs_Analysis] ⚠️ Using fallback competitors from props:`, competitors);
-        setLocalCompetitors(competitors);
+        console.log(`[Cs_Analysis] ⚠️ No competitors found in AccountInfo, using fallback from props:`, competitors);
+        // Use competitors from props (usually from dashboard state)
+        if (competitors && competitors.length > 0) {
+          setLocalCompetitors(competitors);
+        } else {
+          console.log(`[Cs_Analysis] ❌ No competitors available from props either - account holder needs to set up competitors`);
+          setError(`No competitors configured for ${normalizedAccountHolder}. Please add competitors to enable analysis.`);
+        }
       }
     };
     syncInitialState();
-  }, [competitors, fetchAccountInfoWithRetry]);
+  }, [competitors, fetchAccountInfoWithRetry, normalizedAccountHolder, platform]);
 
   useEffect(() => {
     localCompetitors.forEach(competitor => {
@@ -233,13 +274,15 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
 
     const success = await updateCompetitors(updatedCompetitors);
     if (success) {
-      startProcessing(platform, normalizedAccountHolder, 15);
+      // ✅ FIXED: No processing wait for competitor updates - just refresh data
+      setRefreshKey(prev => prev + 1); // Force refresh of competitor data
       const serverCompetitors = await fetchAccountInfoWithRetry();
       if (serverCompetitors) {
         setLocalCompetitors(serverCompetitors);
         setToast('Competitor added successfully!');
       } else {
         setLocalCompetitors(updatedCompetitors);
+        setToast('Competitor added successfully!');
       }
     } else {
       setLocalCompetitors(originalCompetitors);
@@ -274,13 +317,15 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
 
     const success = await updateCompetitors(updatedCompetitors);
     if (success) {
-      startProcessing(platform, normalizedAccountHolder, 15);
+      // ✅ FIXED: No processing wait for competitor updates - just refresh data
+      setRefreshKey(prev => prev + 1); // Force refresh of competitor data
       const serverCompetitors = await fetchAccountInfoWithRetry();
       if (serverCompetitors) {
         setLocalCompetitors(serverCompetitors);
         setToast('Competitor updated successfully!');
       } else {
         setLocalCompetitors(updatedCompetitors);
+        setToast('Competitor updated successfully!');
       }
     } else {
       setLocalCompetitors(originalCompetitors);
@@ -301,12 +346,15 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
 
     const success = await updateCompetitors(updatedCompetitors);
     if (success) {
+      // ✅ FIXED: No processing wait for competitor deletion - just refresh data
+      setRefreshKey(prev => prev + 1); // Force refresh of competitor data
       const serverCompetitors = await fetchAccountInfoWithRetry();
       if (serverCompetitors) {
         setLocalCompetitors(serverCompetitors);
         setToast('Competitor deleted successfully!');
       } else {
         setLocalCompetitors(updatedCompetitors);
+        setToast('Competitor deleted successfully!');
       }
     } else {
       setLocalCompetitors(originalCompetitors);
@@ -364,7 +412,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     }
   };
 
-  const { startProcessing, processingState } = useProcessing();
+  const { processingState } = useProcessing();
 
   return (
     <ErrorBoundary>
@@ -376,7 +424,14 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
       >
         {error && (
           <div className="error-message">
-            {error}
+            <div className="error-content">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff6b6b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="15" y1="9" x2="9" y2="15"/>
+                <line x1="9" y1="9" x2="15" y2="15"/>
+              </svg>
+              <span>{error}</span>
+            </div>
             {needsRefresh && (
               <motion.button
                 className="refresh-btn"

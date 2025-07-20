@@ -51,18 +51,6 @@ const TopBar: React.FC = () => {
       </div>
 
       <div className="nav-links">
-        <motion.a
-          href="#"
-          className={`nav-link ${location.pathname === '/' || location.pathname === '/home' ? 'active' : ''}`}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={(e) => {
-            e.preventDefault();
-            navigate('/');
-          }}
-        >
-          Home
-        </motion.a>
         {currentUser && (
           <motion.a
             href="#"
@@ -77,30 +65,6 @@ const TopBar: React.FC = () => {
             Dashboard
           </motion.a>
         )}
-        <motion.a
-          href="#"
-          className={`nav-link ${location.pathname === '/privacy' ? 'active' : ''}`}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={(e) => {
-            e.preventDefault();
-            navigate('/privacy');
-          }}
-        >
-          Privacy Policy
-        </motion.a>
-        <motion.a
-          href="#"
-          className={`nav-link ${location.pathname === '/pricing' ? 'active' : ''}`}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={(e) => {
-            e.preventDefault();
-            navigate('/pricing');
-          }}
-        >
-          Pricing
-        </motion.a>
       </div>
 
       <div className="right-controls">

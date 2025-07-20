@@ -1,68 +1,89 @@
 .canvas-editor-overlay {
   position: fixed !important;
-  top: 0 !important;
+  top: clamp(50px, 5vh, 70px) !important; /* Respect top bar height */
   left: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  background-color: rgba(0, 0, 0, 0.7) !important;
+  width: 100vw !important;
+  height: calc(100vh - clamp(50px, 5vh, 70px)) !important; /* Subtract top bar height */
+  background-color: rgba(0, 0, 0, 0.8) !important;
   backdrop-filter: blur(8px) !important;
-  z-index: 999 !important; /* Below top bar */
+  z-index: 9999 !important;
   display: flex !important;
   justify-content: center !important;
-  align-items: flex-start !important; /* Align to top */
-  padding-top: 70px !important; /* Space for top bar */
+  align-items: center !important;
+  padding: 0 !important;
   margin: 0 !important;
   box-sizing: border-box !important;
-  overflow: auto !important; /* Ensure scrollability */
+  overflow: hidden !important;
+  /* CRITICAL: Lock dashboard scrolling when canvas editor is open */
+  touch-action: none !important;
+}
+
+/* Lock body/dashboard scrolling when canvas editor is active */
+body:has(.canvas-editor-overlay) {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Fallback for browsers that don't support :has() */
+.canvas-editor-active {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.canvas-editor-active .dashboard-container,
+.canvas-editor-active .main-dashboard,
+.canvas-editor-active .platform-dashboard {
+  overflow: hidden !important;
+  pointer-events: none !important;
 }
 
 .canvas-editor-container {
   background-color: #151521 !important;
   border-radius: 12px !important;
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5) !important;
-  z-index: 100000 !important;
-  animation: modalAppear 0.2s ease-out !important;
-  box-sizing: border-box !important;
-  flex-shrink: 0 !important;
+  width: min(95vw, 1000px) !important;
+  height: min(90vh, 700px) !important;
+  margin: 0 !important;
+  padding: 0 !important;
   display: flex !important;
   flex-direction: column !important;
-  overflow: hidden !important; /* Changed from auto to hidden to prevent double scrollbars */
-  
-  /* Positioning and Sizing to prevent overlap */
-  position: absolute !important;
-  width: calc(100% - 280px) !important; /* Adjust width to account for left bar */
-  height: 85vh !important;
-  max-width: 1200px !important;
-  max-height: 900px !important;
-  top: 55% !important;
-  left: 55% !important;
-  transform: translate(-50%, -50%) !important;
-  margin: 0 !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6) !important;
+  position: relative !important;
+  z-index: 10000 !important;
+  animation: modalAppear 0.3s ease-out !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  /* CRITICAL: Isolate canvas editor scrolling from dashboard */
+  contain: layout style paint !important;
+  isolation: isolate !important;
 }
 
 @keyframes modalAppear {
   from {
     opacity: 0;
-    transform: scale(0.95) translateY(10px);
+    transform: scale(0.9);
   }
   to {
     opacity: 1;
-    transform: scale(1) translateY(0);
+    transform: scale(1);
   }
 }
 
 .canvas-editor-header {
   display: flex;
-  height: 50px !important; /* Reduced height */
-  overflow-x: auto !important; /* Add slider for horizontal overflow */
-  overflow-y: hidden !important;
+  height: 60px !important;
+  flex-shrink: 0 !important;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 24px; /* Fixed padding - will scale with container */
+  padding: 0 24px !important;
   border-bottom: 1px solid #2d2d42;
-  flex-shrink: 0;
+  background-color: #1a1a2e !important;
+  border-radius: 12px 12px 0 0 !important;
 }
 
 .canvas-editor-header h2 {
@@ -109,29 +130,26 @@
 }
 
 .tui-image-editor-container {
-  flex: 1;
-  width: 100%;
-  max-width: 100%;
-  height: 100%;
-  position: relative;
-  overflow: hidden;
-  min-height: 400px; /* Restore fixed height - will scale with container */
-  border-radius: 8px;
-  flex-shrink: 1;
-  flex-grow: 1;
+  flex: 1 !important;
+  width: 100% !important;
+  height: 100% !important;
+  position: relative !important;
+  overflow: hidden !important;
+  border-radius: 8px !important;
+  background-color: #1a1a1a !important;
 }
 
 .canvas-editor-footer {
   display: flex;
-  height: 50px !important; /* Reduced height */
-  overflow-x: auto !important; /* Add slider for horizontal overflow */
-  overflow-y: hidden !important;
+  height: 60px !important;
+  flex-shrink: 0 !important;
   justify-content: flex-end;
   align-items: center;
-  padding: 16px 24px; /* Fixed padding - will scale with container */
+  padding: 0 24px !important;
   border-top: 1px solid #2d2d42;
-  gap: 16px; /* Fixed gap - will scale with container */
-  flex-shrink: 0;
+  gap: 16px !important;
+  background-color: #1a1a2e !important;
+  border-radius: 0 0 12px 12px !important;
 }
 
 .cancel-button {
@@ -177,6 +195,8 @@
   justify-content: center;
   align-items: center;
   z-index: 10;
+  /* Ensure scheduler doesn't overlap with top bar */
+  padding-top: clamp(10px, 2vh, 20px) !important;
 }
 
 .scheduler-container {
@@ -269,8 +289,34 @@
   height: 100% !important;
   display: flex !important;
   flex-direction: column !important;
-  justify-content: center !important;
+  justify-content: flex-start !important;
   align-items: center !important;
+  padding-top: 20px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  /* Custom scrollbar for left menu */
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(0, 255, 204, 0.6) rgba(45, 45, 66, 0.3) !important;
+}
+
+/* Webkit scrollbar for left menu */
+.tui-image-editor-container .tui-image-editor-menu::-webkit-scrollbar {
+  width: 4px !important;
+}
+
+.tui-image-editor-container .tui-image-editor-menu::-webkit-scrollbar-track {
+  background: rgba(45, 45, 66, 0.3) !important;
+  border-radius: 2px !important;
+}
+
+.tui-image-editor-container .tui-image-editor-menu::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 204, 0.6) !important;
+  border-radius: 2px !important;
+  transition: background 0.2s ease !important;
+}
+
+.tui-image-editor-container .tui-image-editor-menu::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 204, 0.8) !important;
 }
 
 .tui-image-editor-container .tui-image-editor-menu > .tui-image-editor-item {
@@ -280,6 +326,7 @@
 /* Adjust main content to make room for sidebar */
 .tui-image-editor-container .tui-image-editor-wrap {
   padding-left: 60px !important;
+  padding-right: 60px !important; /* ADDED: Make room for right toolbar */
 }
 
 /* Adjust submenu position */
@@ -293,6 +340,103 @@
   transform: translateY(-50%) !important;
   max-height: 70vh !important;
   overflow-y: auto !important;
+  overflow-x: hidden !important;
+  /* Custom scrollbar for submenu */
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(0, 123, 255, 0.6) rgba(45, 45, 66, 0.3) !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  min-width: 200px !important;
+  max-width: 300px !important;
+  /* FIXED: Ensure submenu sliders are contained within submenu */
+  position: relative !important;
+  padding: 15px !important;
+}
+
+/* Enhanced submenu container for better slider containment */
+.tui-image-editor-container .tui-image-editor-submenu .tui-image-editor-submenu-item {
+  position: relative !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  padding: 8px 0 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+.tui-image-editor-container .tui-image-editor-submenu .tui-image-editor-submenu-item:last-child {
+  border-bottom: none !important;
+}
+
+/* Submenu range and slider controls contained within submenu */
+.tui-image-editor-container .tui-image-editor-submenu .tui-image-editor-range-wrap {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+  position: relative !important;
+  padding: 5px 0 !important;
+}
+
+.tui-image-editor-container .tui-image-editor-submenu .tui-image-editor-slider-wrap {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+  position: relative !important;
+  padding: 5px 0 !important;
+}
+
+/* Individual range sliders within submenu */
+.tui-image-editor-container .tui-image-editor-submenu input[type="range"] {
+  width: 100% !important;
+  max-width: 100% !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  height: 6px !important;
+  background: linear-gradient(to right, #007bff, #00ffcc) !important;
+  border-radius: 3px !important;
+  outline: none !important;
+  cursor: pointer !important;
+}
+
+.tui-image-editor-container .tui-image-editor-submenu input[type="range"]::-webkit-slider-thumb {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  width: 16px !important;
+  height: 16px !important;
+  border-radius: 50% !important;
+  background: #ffffff !important;
+  border: 2px solid #007bff !important;
+  cursor: pointer !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+}
+
+.tui-image-editor-container .tui-image-editor-submenu input[type="range"]::-moz-range-thumb {
+  width: 16px !important;
+  height: 16px !important;
+  border-radius: 50% !important;
+  background: #ffffff !important;
+  border: 2px solid #007bff !important;
+  cursor: pointer !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Webkit scrollbar for submenu */
+.tui-image-editor-container .tui-image-editor-submenu::-webkit-scrollbar {
+  width: 6px !important;
+}
+
+.tui-image-editor-container .tui-image-editor-submenu::-webkit-scrollbar-track {
+  background: rgba(45, 45, 66, 0.3) !important;
+  border-radius: 3px !important;
+}
+
+.tui-image-editor-container .tui-image-editor-submenu::-webkit-scrollbar-thumb {
+  background: rgba(0, 123, 255, 0.6) !important;
+  border-radius: 3px !important;
+  transition: background 0.2s ease !important;
+}
+
+.tui-image-editor-container .tui-image-editor-submenu::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 123, 255, 0.8) !important;
 }
 
 .tui-image-editor-container .tui-image-editor-submenu-item label {
@@ -303,6 +447,124 @@
   color: #e0e0ff !important;
 }
 
+/* Right sidebar/panel support for TUI Image Editor tools */
+.tui-image-editor-container .tui-image-editor-right-menu,
+.tui-image-editor-container .tui-image-editor-toolbar,
+.tui-image-editor-container .tui-image-editor-controls {
+  background-color: #151521 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  /* Custom scrollbar for right tools */
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(0, 255, 204, 0.6) rgba(45, 45, 66, 0.3) !important;
+}
+
+/* ADDED: Right toolbar container with dedicated slider */
+.tui-image-editor-container .tui-image-editor-right-toolbar {
+  position: absolute !important;
+  right: 0 !important;
+  top: 0 !important;
+  width: 60px !important;
+  height: 100% !important;
+  background-color: #151521 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  padding-top: 20px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  z-index: 100 !important;
+  /* Custom scrollbar for right toolbar */
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(255, 165, 0, 0.6) rgba(45, 45, 66, 0.3) !important;
+}
+
+/* Right toolbar scrollbar styling */
+.tui-image-editor-container .tui-image-editor-right-toolbar::-webkit-scrollbar {
+  width: 4px !important;
+}
+
+.tui-image-editor-container .tui-image-editor-right-toolbar::-webkit-scrollbar-track {
+  background: rgba(45, 45, 66, 0.3) !important;
+  border-radius: 2px !important;
+}
+
+.tui-image-editor-container .tui-image-editor-right-toolbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 165, 0, 0.6) !important;
+  border-radius: 2px !important;
+  transition: background 0.2s ease !important;
+}
+
+.tui-image-editor-container .tui-image-editor-right-toolbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 165, 0, 0.8) !important;
+}
+
+/* Adjust main canvas to make room for right toolbar */
+.tui-image-editor-container .tui-image-editor-wrap {
+  padding-left: 60px !important;
+  padding-right: 60px !important; /* ADDED: Make room for right toolbar */
+}
+
+/* Webkit scrollbar for right tools */
+.tui-image-editor-container .tui-image-editor-right-menu::-webkit-scrollbar,
+.tui-image-editor-container .tui-image-editor-toolbar::-webkit-scrollbar,
+.tui-image-editor-container .tui-image-editor-controls::-webkit-scrollbar {
+  width: 4px !important;
+}
+
+.tui-image-editor-container .tui-image-editor-right-menu::-webkit-scrollbar-track,
+.tui-image-editor-container .tui-image-editor-toolbar::-webkit-scrollbar-track,
+.tui-image-editor-container .tui-image-editor-controls::-webkit-scrollbar-track {
+  background: rgba(45, 45, 66, 0.3) !important;
+  border-radius: 2px !important;
+}
+
+.tui-image-editor-container .tui-image-editor-right-menu::-webkit-scrollbar-thumb,
+.tui-image-editor-container .tui-image-editor-toolbar::-webkit-scrollbar-thumb,
+.tui-image-editor-container .tui-image-editor-controls::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 204, 0.6) !important;
+  border-radius: 2px !important;
+  transition: background 0.2s ease !important;
+}
+
+.tui-image-editor-container .tui-image-editor-right-menu::-webkit-scrollbar-thumb:hover,
+.tui-image-editor-container .tui-image-editor-toolbar::-webkit-scrollbar-thumb:hover,
+.tui-image-editor-container .tui-image-editor-controls::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 204, 0.8) !important;
+}
+
+/* Enhanced right toolbar items styling */
+.tui-image-editor-container .tui-image-editor-right-toolbar .tui-image-editor-item {
+  margin: 8px 0 !important;
+  width: 40px !important;
+  height: 40px !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-radius: 6px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.tui-image-editor-container .tui-image-editor-right-toolbar .tui-image-editor-item:hover {
+  background: rgba(255, 165, 0, 0.2) !important;
+  transform: scale(1.05) !important;
+}
+
+.tui-image-editor-container .tui-image-editor-right-toolbar .tui-image-editor-item.active {
+  background: rgba(255, 165, 0, 0.4) !important;
+  border: 2px solid rgba(255, 165, 0, 0.8) !important;
+}
+
+/* Enhanced submenu item scrollbars for individual tool panels */
+.tui-image-editor-container .tui-image-editor-submenu-item {
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+/* REMOVED: Old problematic range wrap rules that caused external slider positioning */
+
 /* Enhanced color picker container */
 .tui-colorpicker-container {
   background-color: #1e1e2d !important;
@@ -312,6 +574,76 @@
   padding: 15px !important;
   width: 280px !important;
   max-width: 100% !important;
+  max-height: 400px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  /* Custom scrollbar for color picker */
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(0, 123, 255, 0.6) rgba(45, 45, 66, 0.3) !important;
+}
+
+/* Webkit scrollbar for color picker */
+.tui-colorpicker-container::-webkit-scrollbar {
+  width: 6px !important;
+}
+
+.tui-colorpicker-container::-webkit-scrollbar-track {
+  background: rgba(45, 45, 66, 0.3) !important;
+  border-radius: 3px !important;
+}
+
+.tui-colorpicker-container::-webkit-scrollbar-thumb {
+  background: rgba(0, 123, 255, 0.6) !important;
+  border-radius: 3px !important;
+  transition: background 0.2s ease !important;
+}
+
+.tui-colorpicker-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 123, 255, 0.8) !important;
+}
+
+/* General TUI Image Editor scrollbar enhancement */
+.tui-image-editor-container .tui-image-editor-wrap,
+.tui-image-editor-container .tui-image-editor-main,
+.tui-image-editor-container .tui-image-editor-canvas-container {
+  overflow: auto !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(138, 138, 170, 0.6) rgba(45, 45, 66, 0.3) !important;
+}
+
+.tui-image-editor-container .tui-image-editor-wrap::-webkit-scrollbar,
+.tui-image-editor-container .tui-image-editor-main::-webkit-scrollbar,
+.tui-image-editor-container .tui-image-editor-canvas-container::-webkit-scrollbar {
+  width: 8px !important;
+  height: 8px !important;
+}
+
+.tui-image-editor-container .tui-image-editor-wrap::-webkit-scrollbar-track,
+.tui-image-editor-container .tui-image-editor-main::-webkit-scrollbar-track,
+.tui-image-editor-container .tui-image-editor-canvas-container::-webkit-scrollbar-track {
+  background: rgba(45, 45, 66, 0.3) !important;
+  border-radius: 4px !important;
+}
+
+.tui-image-editor-container .tui-image-editor-wrap::-webkit-scrollbar-thumb,
+.tui-image-editor-container .tui-image-editor-main::-webkit-scrollbar-thumb,
+.tui-image-editor-container .tui-image-editor-canvas-container::-webkit-scrollbar-thumb {
+  background: rgba(138, 138, 170, 0.6) !important;
+  border-radius: 4px !important;
+  transition: background 0.2s ease !important;
+}
+
+.tui-image-editor-container .tui-image-editor-wrap::-webkit-scrollbar-thumb:hover,
+.tui-image-editor-container .tui-image-editor-main::-webkit-scrollbar-thumb:hover,
+.tui-image-editor-container .tui-image-editor-canvas-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(138, 138, 170, 0.8) !important;
+}
+
+/* Corner scrollbar styling */
+.tui-image-editor-container .tui-image-editor-wrap::-webkit-scrollbar-corner,
+.tui-image-editor-container .tui-image-editor-main::-webkit-scrollbar-corner,
+.tui-image-editor-container .tui-image-editor-canvas-container::-webkit-scrollbar-corner {
+  background: rgba(45, 45, 66, 0.3) !important;
 }
 
 /* Custom preset colors container */
@@ -552,6 +884,29 @@
   color: #e0e0ff;
   border-left: 1px solid #2a2a3a;
   overflow-y: auto;
+  /* Enhanced scrollbar for brand kit sidebar */
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(10, 154, 108, 0.6) rgba(45, 45, 66, 0.3) !important;
+}
+
+/* Webkit scrollbar for brand kit sidebar */
+.brand-kit-sidebar::-webkit-scrollbar {
+  width: 6px !important;
+}
+
+.brand-kit-sidebar::-webkit-scrollbar-track {
+  background: rgba(45, 45, 66, 0.3) !important;
+  border-radius: 3px !important;
+}
+
+.brand-kit-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(10, 154, 108, 0.6) !important;
+  border-radius: 3px !important;
+  transition: background 0.2s ease !important;
+}
+
+.brand-kit-sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(10, 154, 108, 0.8) !important;
 }
 
 .brand-kit-sidebar h3 {
@@ -805,6 +1160,29 @@
   padding: 12px;
   max-height: 150px;
   overflow-y: auto;
+  /* Enhanced scrollbar for multi-image panel */
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(0, 255, 204, 0.6) rgba(45, 45, 66, 0.3) !important;
+}
+
+/* Webkit scrollbar for multi-image panel */
+.multi-image-panel::-webkit-scrollbar {
+  width: 6px !important;
+}
+
+.multi-image-panel::-webkit-scrollbar-track {
+  background: rgba(45, 45, 66, 0.3) !important;
+  border-radius: 3px !important;
+}
+
+.multi-image-panel::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 204, 0.6) !important;
+  border-radius: 3px !important;
+  transition: background 0.2s ease !important;
+}
+
+.multi-image-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 204, 0.8) !important;
 }
 
 .image-preview-header {
@@ -846,6 +1224,29 @@
   gap: 8px;
   overflow-x: auto;
   padding: 5px 0;
+  /* Enhanced scrollbar for image preview grid */
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(0, 123, 255, 0.6) rgba(45, 45, 66, 0.3) !important;
+}
+
+/* Webkit scrollbar for image preview grid */
+.image-preview-grid::-webkit-scrollbar {
+  height: 4px !important;
+}
+
+.image-preview-grid::-webkit-scrollbar-track {
+  background: rgba(45, 45, 66, 0.3) !important;
+  border-radius: 2px !important;
+}
+
+.image-preview-grid::-webkit-scrollbar-thumb {
+  background: rgba(0, 123, 255, 0.6) !important;
+  border-radius: 2px !important;
+  transition: background 0.2s ease !important;
+}
+
+.image-preview-grid::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 123, 255, 0.8) !important;
 }
 
 .image-preview-item {
@@ -997,27 +1398,71 @@
   transform: translateY(-1px);
 }
 
-/* Enhanced Editor Container */
-.canvas-editor-container {
-  max-width: 95vw;
-  max-height: 90vh;
-  overflow: auto;
-}
+/* End of Canvas Editor Styles */
 
-/* Adjusted image editor container to prevent overlapping */
-.canvas-editor-container {
-  width: 65% !important;
-  max-width: 550px !important;
-  margin-left: auto !important;
-  margin-right: 20px !important; /* Move rightward */
-  position: relative !important;
-}
-
+/* Top Bar Compatibility - Ensure all TUI components respect top bar */
 .tui-image-editor-container {
-  min-height: 500px;
-  border-radius: 8px;
-  overflow: hidden;
+  /* Ensure editor respects top bar space */
+  margin-top: 0 !important;
+  padding-top: 0 !important;
 }
+
+.tui-image-editor-container .tui-image-editor-header-buttons,
+.tui-image-editor-container .tui-image-editor-controls-buttons {
+  overflow-x: auto !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(0, 255, 204, 0.6) rgba(45, 45, 66, 0.3) !important;
+}
+
+.tui-image-editor-container .tui-image-editor-header-buttons::-webkit-scrollbar,
+.tui-image-editor-container .tui-image-editor-controls-buttons::-webkit-scrollbar {
+  height: 4px !important;
+}
+
+.tui-image-editor-container .tui-image-editor-header-buttons::-webkit-scrollbar-track,
+.tui-image-editor-container .tui-image-editor-controls-buttons::-webkit-scrollbar-track {
+  background: rgba(45, 45, 66, 0.3) !important;
+  border-radius: 2px !important;
+}
+
+.tui-image-editor-container .tui-image-editor-header-buttons::-webkit-scrollbar-thumb,
+.tui-image-editor-container .tui-image-editor-controls-buttons::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 204, 0.6) !important;
+  border-radius: 2px !important;
+}
+
+.tui-image-editor-container .tui-image-editor-header-buttons::-webkit-scrollbar-thumb:hover,
+.tui-image-editor-container .tui-image-editor-controls-buttons::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 204, 0.8) !important;
+}
+
+/* Universal TUI Image Editor scrollbar enhancement for any missed components */
+.tui-image-editor-container [class*="tui-image-editor"] {
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(138, 138, 170, 0.6) rgba(45, 45, 66, 0.3) !important;
+}
+
+.tui-image-editor-container [class*="tui-image-editor"]::-webkit-scrollbar {
+  width: 6px !important;
+  height: 6px !important;
+}
+
+.tui-image-editor-container [class*="tui-image-editor"]::-webkit-scrollbar-track {
+  background: rgba(45, 45, 66, 0.3) !important;
+  border-radius: 3px !important;
+}
+
+.tui-image-editor-container [class*="tui-image-editor"]::-webkit-scrollbar-thumb {
+  background: rgba(138, 138, 170, 0.6) !important;
+  border-radius: 3px !important;
+  transition: background 0.2s ease !important;
+}
+
+.tui-image-editor-container [class*="tui-image-editor"]::-webkit-scrollbar-thumb:hover {
+  background: rgba(138, 138, 170, 0.8) !important;
+}
+
+/* End of Canvas Editor Styles */
 
 /* Loading States */
 .editor-loading-overlay {
@@ -1082,24 +1527,4 @@
   }
 }
 
-/* Removed responsiveness and added proportional scaling */
-.canvas-editor-container {
-  width: 100% !important;
-  height: 100% !important;
-  max-width: none !important;
-  max-height: none !important;
-  min-width: 0 !important;
-  min-height: 0 !important;
-  overflow: auto !important; /* Ensure scrollability */
-}
-
-/* Introduced slider for overlay */
-.canvas-editor-overlay {
-  overflow: auto !important;
-}
-
-/* Added proportional scaling */
-.canvas-editor-container {
-  transform: scale(1) !important;
-  transform-origin: center !important;
-}
+/* Final Canvas Editor Styles - Clean Implementation */

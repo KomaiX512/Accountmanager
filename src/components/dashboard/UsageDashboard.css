@@ -327,8 +327,118 @@
   50% { opacity: 0.6; }
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
+/* COMPLETE LANDSCAPE OVERRIDE - NO RESPONSIVE BEHAVIOR, ONLY SCALING */
+@media (orientation: landscape) {
+  /* Force all clamp() and vw units to fixed values */
+  .usage-dashboard {
+    padding: 20px !important;
+    margin: 12px 0 !important;
+  }
+  
+  .usage-header {
+    gap: 16px !important;
+    padding: 20px !important;
+  }
+  
+  .usage-header h1 {
+    font-size: 1.8rem !important;
+  }
+  
+  .refresh-btn {
+    padding: 10px 16px !important;
+    font-size: 0.9rem !important;
+  }
+  
+  .usage-grid {
+    gap: 20px !important;
+  }
+  
+  .usage-card {
+    padding: 20px !important;
+    border-radius: 12px !important;
+  }
+  
+  .usage-card h2 {
+    font-size: 1.1rem !important;
+    margin-bottom: 12px !important;
+  }
+  
+  .usage-item {
+    padding: 12px !important;
+    border-radius: 8px !important;
+  }
+  
+  .usage-label {
+    font-size: 0.9rem !important;
+  }
+  
+  .usage-value {
+    font-size: 1.2rem !important;
+  }
+  
+  .usage-bar {
+    height: 6px !important;
+    border-radius: 3px !important;
+  }
+  
+  .progress-text {
+    font-size: 0.8rem !important;
+  }
+}
+
+/* Proportional scaling for different landscape screen sizes */
+@media (max-width: 1400px) and (orientation: landscape) {
+  .usage-dashboard {
+    transform: scale(0.95);
+    transform-origin: center top;
+  }
+}
+
+@media (max-width: 1200px) and (orientation: landscape) {
+  .usage-dashboard {
+    transform: scale(0.85);
+    transform-origin: center top;
+  }
+}
+
+@media (max-width: 1000px) and (orientation: landscape) {
+  .usage-dashboard {
+    transform: scale(0.75);
+    transform-origin: center top;
+  }
+}
+
+@media (max-width: 800px) and (orientation: landscape) {
+  .usage-dashboard {
+    transform: scale(0.65);
+    transform-origin: center top;
+  }
+}
+
+@media (max-width: 600px) and (orientation: landscape) {
+  .usage-dashboard {
+    transform: scale(0.55);
+    transform-origin: center top;
+  }
+}
+
+@media (max-width: 480px) and (orientation: landscape) {
+  .usage-dashboard {
+    transform: scale(0.45);
+    transform-origin: center top;
+  }
+}
+
+@media (max-width: 360px) and (orientation: landscape) {
+  .usage-dashboard {
+    transform: scale(0.35);
+    transform-origin: center top;
+  }
+}
+
+/* PRESERVE RESPONSIVE BEHAVIOR FOR PORTRAIT ONLY */
+/* Responsive Design - PORTRAIT ONLY */
+@media (max-width: 768px) and (orientation: portrait) {
   .usage-dashboard {
     padding: 16px;
     margin: 8px 0;
@@ -372,7 +482,7 @@
   }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 480px) and (orientation: portrait) {
   .usage-dashboard {
     padding: 12px;
   }

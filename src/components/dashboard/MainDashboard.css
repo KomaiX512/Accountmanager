@@ -1258,10 +1258,164 @@
   color: #a0a0cc;
 }
 
-/* RESPONSIVE BREAKPOINTS FOR SMALLER LAPTOP SCREENS */
+/* COMPLETE LANDSCAPE OVERRIDE - NO RESPONSIVE BEHAVIOR, ONLY SCALING */
+@media (orientation: landscape) {
+  /* Force all clamp() and vw units to fixed values */
+  .dashboard-page {
+    padding: 75px 18px 18px !important;
+    margin-left: 0 !important;
+  }
+  
+  .platforms-container {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)) !important;
+    gap: 15px !important;
+    margin: 0 auto 15px !important;
+    max-width: calc(100vw - 85px) !important;
+    /* ABSOLUTE LOCK - No module repositioning allowed */
+  }
+  
+  .main-dashboard-wrapper {
+    max-width: calc(100vw - 85px) !important;
+    padding: 2rem !important;
+    border-radius: 20px !important;
+    margin: 0 auto !important;
+  }
+  
+  .main-dashboard-header h1 {
+    font-size: 1.8rem !important;
+  }
+  
+  .tabs {
+    gap: 1.5rem !important;
+  }
+  
+  .tab {
+    font-size: 0.9rem !important;
+    padding: 0.7rem 1.4rem !important;
+  }
+  
+  .dashboard-grid {
+    gap: 20px !important;
+  }
+  
+  .analytics-card, .quick-actions, .recent-activity, .account-overview {
+    padding: 20px !important;
+    border-radius: 16px !important;
+  }
+  
+  .analytics-card h2, .quick-actions h2, .recent-activity h2, .account-overview h2 {
+    font-size: 1.4rem !important;
+    margin-bottom: 15px !important;
+  }
+  
+  .metric-card {
+    padding: 20px !important;
+    border-radius: 12px !important;
+  }
+  
+  .metric-value {
+    font-size: 2rem !important;
+  }
+  
+  .metric-label {
+    font-size: 0.9rem !important;
+  }
+  
+  .action-btn {
+    padding: 12px 20px !important;
+    font-size: 0.9rem !important;
+    border-radius: 8px !important;
+  }
+  
+  .activity-item {
+    padding: 15px !important;
+    border-radius: 8px !important;
+  }
+  
+  .activity-time {
+    font-size: 0.8rem !important;
+  }
+  
+  .account-card {
+    padding: 20px !important;
+    border-radius: 12px !important;
+  }
+  
+  .account-info h3 {
+    font-size: 1.1rem !important;
+  }
+  
+  .account-stats {
+    gap: 15px !important;
+  }
+  
+  .stat-item {
+    text-align: center !important;
+  }
+  
+  .stat-value {
+    font-size: 1.2rem !important;
+  }
+  
+  .stat-label {
+    font-size: 0.8rem !important;
+  }
+}
 
-/* Large laptops and small desktops (1440px and down) */
-@media (max-width: 1440px) {
+/* Proportional scaling for different landscape screen sizes */
+@media (max-width: 1400px) and (orientation: landscape) {
+  .dashboard-page {
+    transform: scale(0.95);
+    transform-origin: center top;
+  }
+}
+
+@media (max-width: 1200px) and (orientation: landscape) {
+  .dashboard-page {
+    transform: scale(0.85);
+    transform-origin: center top;
+  }
+}
+
+@media (max-width: 1000px) and (orientation: landscape) {
+  .dashboard-page {
+    transform: scale(0.75);
+    transform-origin: center top;
+  }
+}
+
+@media (max-width: 800px) and (orientation: landscape) {
+  .dashboard-page {
+    transform: scale(0.65);
+    transform-origin: center top;
+  }
+}
+
+@media (max-width: 600px) and (orientation: landscape) {
+  .dashboard-page {
+    transform: scale(0.55);
+    transform-origin: center top;
+  }
+}
+
+@media (max-width: 480px) and (orientation: landscape) {
+  .dashboard-page {
+    transform: scale(0.45);
+    transform-origin: center top;
+  }
+}
+
+@media (max-width: 360px) and (orientation: landscape) {
+  .dashboard-page {
+    transform: scale(0.35);
+    transform-origin: center top;
+  }
+}
+
+/* PRESERVE RESPONSIVE BEHAVIOR FOR PORTRAIT ONLY */
+/* Large laptops and small desktops (1440px and down) - PORTRAIT ONLY */
+@media (max-width: 1440px) and (orientation: portrait) {
   .dashboard-page {
     padding: clamp(65px, 6.5vh, 75px) clamp(8px, 1.8vw, 18px) clamp(8px, 1.8vw, 18px);
   }
@@ -1291,8 +1445,8 @@
   }
 }
 
-/* Standard laptops (1366px and down) */
-@media (max-width: 1366px) {
+/* Standard laptops (1366px and down) - PORTRAIT ONLY */
+@media (max-width: 1366px) and (orientation: portrait) {
   .dashboard-page {
     padding: clamp(60px, 6vh, 70px) clamp(6px, 1.5vw, 16px) clamp(6px, 1.5vw, 16px);
   }
@@ -1323,7 +1477,7 @@
 }
 
 /* Smaller laptops (1280px and down) */
-@media (max-width: 1280px) {
+@media (max-width: 1280px) and (orientation: portrait) {
   .dashboard-page {
     padding: clamp(58px, 5.8vh, 68px) clamp(5px, 1.2vw, 14px) clamp(5px, 1.2vw, 14px);
   }
@@ -1354,7 +1508,7 @@
 }
 
 /* Mobile Responsive - Maintaining Premium $1B Glassy Theme */
-@media (max-width: 768px) {
+@media (max-width: 768px) and (orientation: portrait) {
   .dashboard-page {
     padding: 70px 5px 5px;
     margin-left: 0;
@@ -1532,7 +1686,7 @@
 }
 
 /* Ultra-small screens (phones in portrait mode) */
-@media (max-width: 480px) {
+@media (max-width: 480px) and (orientation: portrait) {
   .dashboard-page {
     padding: 70px 2px 2px;
     margin-left: 0; /* Remove any left margin that might cause overlap */
@@ -1975,7 +2129,7 @@
 /* Removed shimmer animations for premium minimalism */
 
 /* Responsive Design for Different Screen Sizes */
-@media (max-width: 1200px) {
+@media (max-width: 1200px) and (orientation: portrait) {
   .main-dashboard-wrapper {
     max-width: min(calc(100vw - 80px), 1200px); /* Account for smaller left bar + padding */
   }
@@ -1992,7 +2146,7 @@
 
 }
 
-@media (max-width: 992px) {
+@media (max-width: 992px) and (orientation: portrait) {
   .platforms-container {
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: clamp(0.7rem, 1.4vw, 1rem);
@@ -2011,7 +2165,7 @@
 }
 
 /* Additional responsive adjustments for new features */
-@media (max-width: 768px) {
+@media (max-width: 768px) and (orientation: portrait) {
   .status-indicators.aligned {
     min-width: auto;
     flex-direction: column;

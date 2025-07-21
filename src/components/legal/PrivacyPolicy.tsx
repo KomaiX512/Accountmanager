@@ -195,14 +195,14 @@ const PrivacyPolicy: React.FC = () => {
           </section>
 
           <section className="privacy-section">
-            <h2>9. Children's Privacy</h2>
+            <h2>14. Children's Privacy</h2>
             <p>
               Our services are not intended for children under the age of 13. We do not knowingly collect personal information from children under 13. If we become aware that we have collected personal information from a child under 13, we will take steps to delete such information promptly.
             </p>
           </section>
 
           <section className="privacy-section">
-            <h2>10. Changes to This Privacy Policy</h2>
+            <h2>15. Changes to This Privacy Policy</h2>
             <p>
               We may update this Privacy Policy from time to time to reflect changes in our practices, technology, legal requirements, or other factors. We will notify you of any material changes by:
             </p>
@@ -214,38 +214,6 @@ const PrivacyPolicy: React.FC = () => {
             <p>
               Your continued use of our services after any changes indicates your acceptance of the updated Privacy Policy.
             </p>
-          </section>
-
-          <section className="privacy-section">
-            <h2>11. Contact Us</h2>
-            <p>
-              If you have any questions, concerns, or requests regarding this Privacy Policy or our data practices, please contact us:
-            </p>
-            <div className="contact-info">
-              <p><strong>Email:</strong> privacy@sentientai.com</p>
-              <p><strong>Address:</strong> Sentient Marketting Privacy Team<br />
-              123 AI Innovation Drive<br />
-              Tech Valley, CA 94000<br />
-              United States</p>
-              <p><strong>Phone:</strong> +1 (555) 123-4567</p>
-            </div>
-            <p>
-              We will respond to your inquiries within 30 days and work with you to resolve any privacy concerns.
-            </p>
-          </section>
-
-          <section className="privacy-section">
-            <h2>12. Compliance and Certifications</h2>
-            <p>
-              Sentient Marketting is committed to maintaining compliance with applicable privacy laws and regulations, including:
-            </p>
-            <ul>
-              <li>General Data Protection Regulation (GDPR)</li>
-              <li>California Consumer Privacy Act (CCPA)</li>
-              <li>Children's Online Privacy Protection Act (COPPA)</li>
-              <li>SOC 2 Type II certification</li>
-              <li>ISO 27001 information security standards</li>
-            </ul>
           </section>
         </motion.div>
       </div>

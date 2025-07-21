@@ -31,13 +31,22 @@ const PlatformButton: React.FC<PlatformButtonProps> = ({
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
     
-    // Special case for Instagram
+    // ✅ NAVIGATION LOGIC: Always use absolute paths for reliable navigation
+    let targetRoute: string;
+    
     if (id === 'instagram') {
-      safeNavigate(navigate, '/dashboard', {}, 6); // Instagram dashboard
+      targetRoute = '/dashboard'; // Instagram dashboard
+    } else if (id === 'twitter') {
+      targetRoute = '/twitter-dashboard'; // Twitter dashboard
+    } else if (id === 'facebook') {
+      targetRoute = '/facebook-dashboard'; // Facebook dashboard
     } else {
-      // For all other platforms
-      safeNavigate(navigate, `/${route}`, {}, 6);
+      // For other platforms, ensure route starts with /
+      targetRoute = route.startsWith('/') ? route : `/${route}`;
     }
+    
+    console.log(`[PlatformButton] Navigating to: ${targetRoute}`);
+    safeNavigate(navigate, targetRoute, {}, 6);
   };
 
   return (

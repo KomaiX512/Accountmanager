@@ -1,14 +1,14 @@
 .canvas-editor-overlay {
   position: fixed !important;
-  top: clamp(50px, 5vh, 70px) !important; /* Respect top bar height */
+  top: 0 !important;
   left: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
   width: 100vw !important;
-  height: calc(100vh - clamp(50px, 5vh, 70px)) !important; /* Subtract top bar height */
+  height: 100vh !important;
   background-color: rgba(0, 0, 0, 0.8) !important;
   backdrop-filter: blur(8px) !important;
-  z-index: 9999 !important;
+  z-index: 999999 !important;
   display: flex !important;
   justify-content: center !important;
   align-items: center !important;
@@ -18,6 +18,78 @@
   overflow: hidden !important;
   /* CRITICAL: Lock dashboard scrolling when canvas editor is open */
   touch-action: none !important;
+  /* CRITICAL: Ensure absolute centering regardless of scroll position */
+  inset: 0 !important;
+}
+
+/* CRITICAL: Ultra-defensive CSS to break out of ANY parent container constraints */
+.canvas-editor-overlay {
+  /* STEP 1: Break out of parent stacking contexts */
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 999999 !important;
+  
+  /* STEP 2: Force absolute viewport positioning */
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  outline: none !important;
+  
+  /* STEP 3: Reset any inherited transforms */
+  transform: none !important;
+  translate: none !important;
+  scale: none !important;
+  rotate: none !important;
+  
+  /* STEP 4: Force flex centering */
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  
+  /* STEP 5: Break out of parent overflow constraints */
+  clip: unset !important;
+  clip-path: none !important;
+  overflow: visible !important;
+  
+  /* STEP 6: Force new stacking context */
+  isolation: isolate !important;
+  contain: none !important;
+}
+
+/* CRITICAL: Additional selectors for maximum override power */
+div.canvas-editor-overlay,
+.post-cooked-container .canvas-editor-overlay,
+.left-bar .canvas-editor-overlay,
+*:has(.canvas-editor-overlay) .canvas-editor-overlay,
+* .canvas-editor-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 999999 !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: none !important;
+  translate: none !important;
+  scale: none !important;
+  rotate: none !important;
+  isolation: isolate !important;
+}
+
+/* CRITICAL: Override any parent container positioning */
+*:has(.canvas-editor-overlay) {
+  position: relative !important;
 }
 
 /* Lock body/dashboard scrolling when canvas editor is active */
@@ -47,20 +119,23 @@ body:has(.canvas-editor-overlay) {
   background-color: #151521 !important;
   border-radius: 12px !important;
   width: min(95vw, 1000px) !important;
-  height: min(90vh, 700px) !important;
-  margin: 0 !important;
+  height: min(85vh, 700px) !important;
+  max-height: calc(100vh - 60px) !important;
+  margin: 0 auto !important;
   padding: 0 !important;
   display: flex !important;
   flex-direction: column !important;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6) !important;
   position: relative !important;
-  z-index: 10000 !important;
+  z-index: 1000000 !important;
   animation: modalAppear 0.3s ease-out !important;
   box-sizing: border-box !important;
   overflow: hidden !important;
   /* CRITICAL: Isolate canvas editor scrolling from dashboard */
   contain: layout style paint !important;
   isolation: isolate !important;
+  /* CRITICAL: Ensure perfect centering */
+  transform: translate(0, 0) !important;
 }
 
 @keyframes modalAppear {

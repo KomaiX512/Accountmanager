@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import ReactDOM from 'react-dom';
 import './PostCooked.css';
 import { motion } from 'framer-motion';
 import { saveFeedback } from '../../utils/FeedbackHandler';
@@ -1974,7 +1975,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             </div>
           </div>
         )}
-        {showCanvasEditor && editingPost && (
+        {showCanvasEditor && editingPost && ReactDOM.createPortal(
           <CanvasEditor
             username={username}
             userId={userId}
@@ -1983,7 +1984,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             postKey={editingPost.key}
             postCaption={editingPost.caption}
             platform={platform}
-          />
+          />,
+          document.body
         )}
         {autoScheduleProgress && (
           <div className="loading">{autoScheduleProgress}</div>

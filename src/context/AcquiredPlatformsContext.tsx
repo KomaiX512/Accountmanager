@@ -157,8 +157,23 @@ export const AcquiredPlatformsProvider: React.FC<{ children: React.ReactNode }> 
       }
     };
 
+    // FIXED: Listen for same-tab localStorage changes as well
+    const handleSameTabStorageChange = () => {
+      if (currentUser?.uid) {
+        console.log('[AcquiredPlatforms] Same-tab storage change detected, refreshing platforms');
+        refreshPlatforms();
+      }
+    };
+
     window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    
+    // Custom event for same-tab localStorage changes
+    window.addEventListener('localStorageChanged', handleSameTabStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('localStorageChanged', handleSameTabStorageChange);
+    };
   }, [currentUser?.uid]);
 
   // Backup check every 30 seconds to ensure platforms are always visible

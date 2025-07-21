@@ -702,6 +702,12 @@ const MainDashboard: React.FC = () => {
       // Navigate to the appropriate dashboard
       if (platform.id === 'instagram') {
         safeNavigate(navigate, '/dashboard', {}, 6); // Instagram dashboard
+      } else if (platform.id === 'twitter') {
+        safeNavigate(navigate, '/twitter-dashboard', {}, 6); // Twitter dashboard - explicit path
+      } else if (platform.id === 'facebook') {
+        safeNavigate(navigate, '/facebook-dashboard', {}, 6); // Facebook dashboard - explicit path
+      } else if (platform.id === 'linkedin') {
+        safeNavigate(navigate, '/linkedin-dashboard', {}, 6); // LinkedIn dashboard - explicit path
       } else {
         safeNavigate(navigate, `/${platform.route}`, {}, 6);
       }
@@ -729,8 +735,26 @@ const MainDashboard: React.FC = () => {
       } else {
         safeNavigate(navigate, '/instagram', {}, 6); // Instagram entry form
       }
+    } else if (platform.id === 'twitter') {
+      if (platform.claimed) {
+        safeNavigate(navigate, '/twitter-dashboard', {}, 6); // Twitter dashboard - explicit path
+      } else {
+        safeNavigate(navigate, '/twitter', {}, 6); // Twitter entry form
+      }
+    } else if (platform.id === 'facebook') {
+      if (platform.claimed) {
+        safeNavigate(navigate, '/facebook-dashboard', {}, 6); // Facebook dashboard - explicit path
+      } else {
+        safeNavigate(navigate, '/facebook', {}, 6); // Facebook entry form
+      }
+    } else if (platform.id === 'linkedin') {
+      if (platform.claimed) {
+        safeNavigate(navigate, '/linkedin-dashboard', {}, 6); // LinkedIn dashboard - explicit path
+      } else {
+        safeNavigate(navigate, '/linkedin', {}, 6); // LinkedIn entry form
+      }
     } else {
-      // All other platforms: add leading slash to route
+      // Fallback for any other platforms: add leading slash to route
       safeNavigate(navigate, `/${platform.route}`, {}, 6);
     }
   };
@@ -1277,7 +1301,7 @@ const MainDashboard: React.FC = () => {
 
         {activeTab === 'agent' && (
           <div className="agent-container">
-            <div className="agent-glass-content">
+            <div className="agent-content">
               <h2 className="agent-title">Autonomous Account Manager</h2>
               <p className="agent-description">
                 The Autonomous Account Manager will arrive soon to revolutionize your social media presence. 
@@ -1286,7 +1310,7 @@ const MainDashboard: React.FC = () => {
               </p>
               
               <button 
-                className={`dashboard-glass-button ${isWishlisted ? 'wishlisted' : ''}`}
+                className={`wishlist-button ${isWishlisted ? 'wishlisted' : ''}`}
                 onClick={() => {
                   if (!isWishlisted) {
                     setIsWishlisted(true);

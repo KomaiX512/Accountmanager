@@ -10,6 +10,7 @@ import { useInstagram } from '../../context/InstagramContext';
 import { useTwitter } from '../../context/TwitterContext';
 import { useFacebook } from '../../context/FacebookContext';
 import { useAuth } from '../../context/AuthContext';
+import { useAcquiredPlatforms } from '../../context/AcquiredPlatformsContext';
 import PostScheduler from '../instagram/PostScheduler';
 import TwitterCompose from '../twitter/TwitterCompose';
 import UsageDashboard from './UsageDashboard';
@@ -60,7 +61,7 @@ interface PostContent {
 const MainDashboard: React.FC = () => {
   const { processingState } = useProcessing();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'overview' | 'usage'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'usage' | 'agent'>('overview');
   const { isConnected: isInstagramConnected, userId: instagramUserId, hasAccessed: hasAccessedInstagram = false } = useInstagram();
   const { isConnected: isTwitterConnected, userId: twitterUserId, hasAccessed: hasAccessedTwitter = false, refreshConnection: refreshTwitterConnection } = useTwitter();
   const { isConnected: isFacebookConnected, userId: facebookUserId, hasAccessed: hasAccessedFacebook = false } = useFacebook();
@@ -75,6 +76,10 @@ const MainDashboard: React.FC = () => {
   // Platform-specific modals
   const [showInstagramScheduler, setShowInstagramScheduler] = useState<boolean>(false);
   const [showTwitterComposer, setShowTwitterComposer] = useState<boolean>(false);
+  
+  // Account Agent wishlist state
+  const [isWishlisted, setIsWishlisted] = useState<boolean>(false);
+  const [showWishlistConfirmation, setShowWishlistConfirmation] = useState<boolean>(false);
   
 
   
@@ -294,6 +299,10 @@ const MainDashboard: React.FC = () => {
       // Get displayName or email from the currentUser object
       const name = currentUser.displayName || currentUser.email?.split('@')[0] || 'User';
       setUserName(name);
+      
+      // Load wishlist status from localStorage
+      const wishlistStatus = localStorage.getItem(`agent_wishlisted_${currentUser.uid}`) === 'true';
+      setIsWishlisted(wishlistStatus);
     }
   }, [currentUser]);
 
@@ -1050,6 +1059,12 @@ const MainDashboard: React.FC = () => {
             >
               Usage
             </button>
+            <button 
+              className={`tab ${activeTab === 'agent' ? 'active' : ''}`}
+              onClick={() => setActiveTab('agent')}
+            >
+              Account Agent
+            </button>
           </div>
         </div>
 
@@ -1256,6 +1271,42 @@ const MainDashboard: React.FC = () => {
                 </div>
               </div>
             </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'agent' && (
+          <div className="agent-container">
+            <div className="agent-glass-content">
+              <h2 className="agent-title">Autonomous Account Manager</h2>
+              <p className="agent-description">
+                The Autonomous Account Manager will arrive soon to revolutionize your social media presence. 
+                When you connect your platforms, it will run intelligent campaigns autonomously to achieve your goals. 
+                Our AI will handle branding, promotion, and organic growth seamlessly across all your connected accounts.
+              </p>
+              
+              <button 
+                className={`dashboard-glass-button ${isWishlisted ? 'wishlisted' : ''}`}
+                onClick={() => {
+                  if (!isWishlisted) {
+                    setIsWishlisted(true);
+                    setShowWishlistConfirmation(true);
+                    if (currentUser?.uid) {
+                      localStorage.setItem(`agent_wishlisted_${currentUser.uid}`, 'true');
+                    }
+                    setTimeout(() => setShowWishlistConfirmation(false), 3000);
+                  }
+                }}
+                disabled={isWishlisted}
+              >
+                {isWishlisted ? 'Added to Wishlist' : 'Add to Wishlist'}
+              </button>
+              
+              {showWishlistConfirmation && (
+                <div className="wishlist-confirmation">
+                  <p>Thank you for your interest! You'll be notified when the Autonomous Account Manager launches.</p>
+                </div>
+              )}
             </div>
           </div>
         )}

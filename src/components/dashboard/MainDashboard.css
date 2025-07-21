@@ -1,28 +1,30 @@
-/* Premium Dashboard Page with Dark Sophisticated Background */
+/* Premium Dashboard Page with Dark Sophisticated Background - PROPORTIONAL SCALING */
 .dashboard-page {
-  padding: clamp(60px, 6vh, 80px) clamp(10px, 2vw, 20px) clamp(10px, 2vw, 20px);
+  padding: 80px 20px 20px;
   min-height: 100vh;
   box-sizing: border-box;
   background: radial-gradient(ellipse at center, 
     #0a0a1a 0%, 
     #000008 100%
   );
+  overflow-x: auto;
+  overflow-y: auto;
   /* VIEWPORT LOCK FIX: Removed perspective and transform-style that interfere with position: fixed */
   /* perspective: 1000px;
   transform-style: preserve-3d; */
 }
 
 .welcome-banner {
-  max-width: min(95vw, 1200px);
+  max-width: 1200px;
   margin: 0 auto 20px;
-  padding: clamp(0.5rem, 1.5vw, 2rem);
+  padding: 2rem;
   text-align: center;
   box-sizing: border-box;
 }
 
 /* Premium Welcome Banner */
 .welcome-banner h2 {
-  font-size: clamp(1.5rem, 3vw, 2.2rem);
+  font-size: 2.2rem;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.9);
   margin: 0;
@@ -37,11 +39,15 @@
   display: inline-block;
 }
 
-/* ULTRA GLASSY DASHBOARD WRAPPER - $1B Startup Premium Design */
+/* ULTRA GLASSY DASHBOARD WRAPPER - $1B Startup Premium Design - PROPORTIONAL SCALING */
 .main-dashboard-wrapper {
-  max-width: min(calc(100vw - clamp(60px, 6vw, 100px)), clamp(800px, 80vw, 1200px));
+  max-width: 1200px;
   margin: 0 auto;
-  padding: clamp(1.5rem, 3vw, 4rem);
+  padding: 4rem;
+  
+  /* PROPORTIONAL SCALING SYSTEM */
+  transform-origin: center top;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   
   /* Ultra Glass Effect - Matching Homepage */
   background: rgba(255, 255, 255, 0.08);
@@ -87,10 +93,10 @@
 }
 
 .welcome-message {
-  font-size: clamp(1rem, 2vw, 1.6rem);
+  font-size: 1.6rem;
   font-weight: 500;
   color: #e0e0ff;
-  margin-bottom: clamp(0.8rem, 1.5vw, 1.5rem);
+  margin-bottom: 1.5rem;
   text-align: center;
   position: relative;
   z-index: 2;
@@ -108,15 +114,15 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: clamp(0.8rem, 2vw, 2rem);
+  margin-bottom: 2rem;
   border-bottom: 1px solid rgba(0, 255, 204, 0.3);
-  padding-bottom: clamp(0.4rem, 1.5vw, 1rem);
+  padding-bottom: 1rem;
   position: relative;
 }
 
 /* Premium Dashboard Title - $1B Gradient Text */
 .main-dashboard-header h1 {
-  font-size: clamp(1.8rem, 4vw, 2.5rem);
+  font-size: 2.5rem;
   font-weight: 700;
   margin: 0;
   background: linear-gradient(135deg, 
@@ -136,7 +142,7 @@
 
 .tabs {
   display: flex;
-  gap: clamp(0.8rem, 2vw, 2rem);
+  gap: 2rem;
   flex-wrap: wrap;
 }
 
@@ -1258,164 +1264,10 @@
   color: #a0a0cc;
 }
 
-/* COMPLETE LANDSCAPE OVERRIDE - NO RESPONSIVE BEHAVIOR, ONLY SCALING */
-@media (orientation: landscape) {
-  /* Force all clamp() and vw units to fixed values */
-  .dashboard-page {
-    padding: 75px 18px 18px !important;
-    margin-left: 0 !important;
-  }
-  
-  .platforms-container {
-    display: grid !important;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)) !important;
-    gap: 15px !important;
-    margin: 0 auto 15px !important;
-    max-width: calc(100vw - 85px) !important;
-    /* ABSOLUTE LOCK - No module repositioning allowed */
-  }
-  
-  .main-dashboard-wrapper {
-    max-width: calc(100vw - 85px) !important;
-    padding: 2rem !important;
-    border-radius: 20px !important;
-    margin: 0 auto !important;
-  }
-  
-  .main-dashboard-header h1 {
-    font-size: 1.8rem !important;
-  }
-  
-  .tabs {
-    gap: 1.5rem !important;
-  }
-  
-  .tab {
-    font-size: 0.9rem !important;
-    padding: 0.7rem 1.4rem !important;
-  }
-  
-  .dashboard-grid {
-    gap: 20px !important;
-  }
-  
-  .analytics-card, .quick-actions, .recent-activity, .account-overview {
-    padding: 20px !important;
-    border-radius: 16px !important;
-  }
-  
-  .analytics-card h2, .quick-actions h2, .recent-activity h2, .account-overview h2 {
-    font-size: 1.4rem !important;
-    margin-bottom: 15px !important;
-  }
-  
-  .metric-card {
-    padding: 20px !important;
-    border-radius: 12px !important;
-  }
-  
-  .metric-value {
-    font-size: 2rem !important;
-  }
-  
-  .metric-label {
-    font-size: 0.9rem !important;
-  }
-  
-  .action-btn {
-    padding: 12px 20px !important;
-    font-size: 0.9rem !important;
-    border-radius: 8px !important;
-  }
-  
-  .activity-item {
-    padding: 15px !important;
-    border-radius: 8px !important;
-  }
-  
-  .activity-time {
-    font-size: 0.8rem !important;
-  }
-  
-  .account-card {
-    padding: 20px !important;
-    border-radius: 12px !important;
-  }
-  
-  .account-info h3 {
-    font-size: 1.1rem !important;
-  }
-  
-  .account-stats {
-    gap: 15px !important;
-  }
-  
-  .stat-item {
-    text-align: center !important;
-  }
-  
-  .stat-value {
-    font-size: 1.2rem !important;
-  }
-  
-  .stat-label {
-    font-size: 0.8rem !important;
-  }
-}
+/* RESPONSIVE BREAKPOINTS FOR SMALLER LAPTOP SCREENS */
 
-/* Proportional scaling for different landscape screen sizes */
-@media (max-width: 1400px) and (orientation: landscape) {
-  .dashboard-page {
-    transform: scale(0.95);
-    transform-origin: center top;
-  }
-}
-
-@media (max-width: 1200px) and (orientation: landscape) {
-  .dashboard-page {
-    transform: scale(0.85);
-    transform-origin: center top;
-  }
-}
-
-@media (max-width: 1000px) and (orientation: landscape) {
-  .dashboard-page {
-    transform: scale(0.75);
-    transform-origin: center top;
-  }
-}
-
-@media (max-width: 800px) and (orientation: landscape) {
-  .dashboard-page {
-    transform: scale(0.65);
-    transform-origin: center top;
-  }
-}
-
-@media (max-width: 600px) and (orientation: landscape) {
-  .dashboard-page {
-    transform: scale(0.55);
-    transform-origin: center top;
-  }
-}
-
-@media (max-width: 480px) and (orientation: landscape) {
-  .dashboard-page {
-    transform: scale(0.45);
-    transform-origin: center top;
-  }
-}
-
-@media (max-width: 360px) and (orientation: landscape) {
-  .dashboard-page {
-    transform: scale(0.35);
-    transform-origin: center top;
-  }
-}
-
-/* PRESERVE RESPONSIVE BEHAVIOR FOR PORTRAIT ONLY */
-/* Large laptops and small desktops (1440px and down) - PORTRAIT ONLY */
-@media (max-width: 1440px) and (orientation: portrait) {
+/* Large laptops and small desktops (1440px and down) */
+@media (max-width: 1440px) {
   .dashboard-page {
     padding: clamp(65px, 6.5vh, 75px) clamp(8px, 1.8vw, 18px) clamp(8px, 1.8vw, 18px);
   }
@@ -1445,8 +1297,8 @@
   }
 }
 
-/* Standard laptops (1366px and down) - PORTRAIT ONLY */
-@media (max-width: 1366px) and (orientation: portrait) {
+/* Standard laptops (1366px and down) */
+@media (max-width: 1366px) {
   .dashboard-page {
     padding: clamp(60px, 6vh, 70px) clamp(6px, 1.5vw, 16px) clamp(6px, 1.5vw, 16px);
   }
@@ -1477,7 +1329,7 @@
 }
 
 /* Smaller laptops (1280px and down) */
-@media (max-width: 1280px) and (orientation: portrait) {
+@media (max-width: 1280px) {
   .dashboard-page {
     padding: clamp(58px, 5.8vh, 68px) clamp(5px, 1.2vw, 14px) clamp(5px, 1.2vw, 14px);
   }
@@ -1508,7 +1360,7 @@
 }
 
 /* Mobile Responsive - Maintaining Premium $1B Glassy Theme */
-@media (max-width: 768px) and (orientation: portrait) {
+@media (max-width: 768px) {
   .dashboard-page {
     padding: 70px 5px 5px;
     margin-left: 0;
@@ -1686,7 +1538,7 @@
 }
 
 /* Ultra-small screens (phones in portrait mode) */
-@media (max-width: 480px) and (orientation: portrait) {
+@media (max-width: 480px) {
   .dashboard-page {
     padding: 70px 2px 2px;
     margin-left: 0; /* Remove any left margin that might cause overlap */
@@ -2128,65 +1980,275 @@
 
 /* Removed shimmer animations for premium minimalism */
 
-/* Responsive Design for Different Screen Sizes */
-@media (max-width: 1200px) and (orientation: portrait) {
+/* PROPORTIONAL SCALING SYSTEM - NO LAYOUT REARRANGEMENT */
+/* Base scaling container */
+.dashboard-scaling-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+/* Proportional scaling based on viewport width */
+@media (max-width: 1400px) {
   .main-dashboard-wrapper {
-    max-width: min(calc(100vw - 80px), 1200px); /* Account for smaller left bar + padding */
+    transform: scale(0.95);
   }
-  
   .welcome-banner {
-    max-width: min(calc(100vw - 80px), 1200px); /* Account for smaller left bar + padding */
-  }
-  
-  .platforms-container {
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: clamp(0.8rem, 1.5vw, 1.1rem);
-  }
-  
-
-}
-
-@media (max-width: 992px) and (orientation: portrait) {
-  .platforms-container {
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: clamp(0.7rem, 1.4vw, 1rem);
-  }
-  
-  .instant-post-section {
-    aspect-ratio: 3 / 1;
-    min-height: 65px;
-    max-height: 105px;
-  }
-  
-  .platform-row {
-    aspect-ratio: 1.25;
-    padding: clamp(0.9rem, 2.2vw, 1.2rem);
+    transform: scale(0.95);
   }
 }
 
-/* Additional responsive adjustments for new features */
-@media (max-width: 768px) and (orientation: portrait) {
-  .status-indicators.aligned {
-    min-width: auto;
-    flex-direction: column;
-    gap: 4px;
+@media (max-width: 1200px) {
+  .main-dashboard-wrapper {
+    transform: scale(0.85);
   }
-
-  .platform-icon.reduced {
-    width: 28px !important;
-    height: 28px !important;
+  .welcome-banner {
+    transform: scale(0.85);
   }
+}
 
-  .dynamic-chart {
-    height: 200px;
-    padding: 10px;
+@media (max-width: 1000px) {
+  .main-dashboard-wrapper {
+    transform: scale(0.75);
   }
-
-  .chart-bar-wrapper {
-    width: 40px;
+  .welcome-banner {
+    transform: scale(0.75);
   }
+}
 
-  .chart-bars {
-    gap: 10px;
+@media (max-width: 800px) {
+  .main-dashboard-wrapper {
+    transform: scale(0.65);
+  }
+  .welcome-banner {
+    transform: scale(0.65);
+  }
+}
+
+@media (max-width: 600px) {
+  .main-dashboard-wrapper {
+    transform: scale(0.55);
+  }
+  .welcome-banner {
+    transform: scale(0.55);
+  }
+}
+
+@media (max-width: 480px) {
+  .main-dashboard-wrapper {
+    transform: scale(0.45);
+  }
+  .welcome-banner {
+    transform: scale(0.45);
+  }
+}
+
+@media (max-width: 360px) {
+  .main-dashboard-wrapper {
+    transform: scale(0.35);
+  }
+  .welcome-banner {
+    transform: scale(0.35);
+  }
+}
+
+/* ============================
+   ACCOUNT AGENT TAB STYLES - PREMIUM GLASSY DESIGN
+   ============================ */
+
+/* Premium Agent Container - Ultra Glassy - Matching Usage Tab */
+.agent-container {
+  padding: clamp(2rem, 4vw, 3rem);
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  transform: translateZ(20px);
+  will-change: transform;
+  box-shadow: 
+    0 12px 40px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.agent-content {
+  max-width: 600px;
+  margin: 0 auto;
+  text-align: center;
+  padding: clamp(2rem, 4vw, 3rem);
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(15px) saturate(160%);
+  -webkit-backdrop-filter: blur(15px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  transform: translateZ(20px);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.agent-content:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(0, 255, 204, 0.15);
+  transform: translateZ(30px) translateY(-5px);
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.25),
+    0 0 40px rgba(0, 255, 204, 0.1),
+    inset 0 2px 0 rgba(255, 255, 255, 0.25);
+}
+
+.agent-title {
+  font-size: clamp(1.8rem, 4vw, 2.2rem);
+  font-weight: 700;
+  margin: 0 0 1.5rem 0;
+  background: linear-gradient(45deg, #00ffcc, #007bff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 0 0 40px rgba(0, 255, 204, 0.3);
+}
+
+.agent-description {
+  font-size: clamp(0.95rem, 2vw, 1.1rem);
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0 0 2.5rem 0;
+  font-weight: 400;
+}
+
+.wishlist-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(0.875rem, 2vw, 1rem) clamp(2rem, 4vw, 2.5rem);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(15px) saturate(160%);
+  -webkit-backdrop-filter: blur(15px) saturate(160%);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50px;
+  font-size: clamp(0.9rem, 2vw, 1rem);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateZ(10px);
+  box-shadow: 
+    0 4px 20px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.1);
+  margin-bottom: 1rem;
+}
+
+.wishlist-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(0, 255, 204, 0.4);
+  transform: translateZ(20px) translateY(-2px);
+  box-shadow: 
+    0 8px 30px rgba(0, 255, 204, 0.2),
+    0 0 20px rgba(0, 255, 204, 0.1),
+    inset 0 2px 0 rgba(255, 255, 255, 0.2);
+  color: #006d57;
+}
+
+.wishlist-button:disabled {
+  background: rgba(76, 175, 80, 0.15);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  cursor: default;
+  color: #4CAF50;
+  transform: translateZ(10px);
+}
+
+.wishlist-confirmation {
+  margin-top: 1rem;
+  padding: clamp(0.875rem, 2vw, 1rem) clamp(1.25rem, 3vw, 1.5rem);
+  background: rgba(76, 175, 80, 0.12);
+  backdrop-filter: blur(15px) saturate(160%);
+  -webkit-backdrop-filter: blur(15px) saturate(160%);
+  border: 1px solid rgba(76, 175, 80, 0.25);
+  border-radius: 12px;
+  color: #4CAF50;
+  box-shadow: 
+    0 4px 20px rgba(76, 175, 80, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  animation: confirmationSlideIn 0.3s ease-out;
+  transform: translateZ(10px);
+}
+
+@keyframes confirmationSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.wishlist-confirmation p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+/* Responsive Design for Agent Tab */
+@media (max-width: 768px) {
+  .agent-container {
+    padding: clamp(1.5rem, 3vw, 2rem);
+  }
+  
+  .agent-content {
+    padding: clamp(1.5rem, 3vw, 2rem);
+    margin: 0;
+  }
+  
+  .agent-title {
+    font-size: clamp(1.4rem, 3.5vw, 1.8rem);
+    margin-bottom: 1rem;
+  }
+  
+  .agent-description {
+    font-size: clamp(0.9rem, 2.2vw, 1rem);
+    margin-bottom: 2rem;
+  }
+  
+  .wishlist-button {
+    padding: clamp(0.75rem, 2vw, 0.875rem) clamp(1.5rem, 4vw, 2rem);
+    font-size: clamp(0.85rem, 2vw, 0.95rem);
+  }
+}
+
+@media (max-width: 480px) {
+  .agent-container {
+    padding: clamp(1rem, 2.5vw, 1.5rem);
+  }
+  
+  .agent-content {
+    padding: clamp(1rem, 2.5vw, 1.5rem);
+  }
+  
+  .agent-title {
+    font-size: clamp(1.2rem, 3vw, 1.4rem);
+    margin-bottom: 0.875rem;
+  }
+  
+  .agent-description {
+    font-size: clamp(0.85rem, 2vw, 0.9rem);
+    margin-bottom: 1.5rem;
+  }
+  
+  .wishlist-button {
+    padding: clamp(0.625rem, 2vw, 0.75rem) clamp(1.25rem, 3vw, 1.5rem);
+    font-size: clamp(0.8rem, 2vw, 0.9rem);
+  }
+  
+  .wishlist-confirmation {
+    padding: clamp(0.75rem, 2vw, 0.875rem) clamp(1rem, 2.5vw, 1.25rem);
   }
 } 

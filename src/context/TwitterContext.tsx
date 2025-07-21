@@ -35,6 +35,26 @@ export const TwitterProvider: React.FC<TwitterProviderProps> = ({ children }) =>
   const { currentUser } = useAuth();
   const isCheckingRef = useRef(false);
 
+  const decodeTwitterProfileInfo = (profileData: any) => {
+    if (!profileData || typeof profileData !== 'object') return null;
+
+    return {
+      username: profileData.username || '',
+      fullName: profileData.fullName || '',
+      biography: profileData.biography || '',
+      followersCount: profileData.followersCount || 0,
+      followsCount: profileData.followsCount || 0,
+      postsCount: profileData.postsCount || 0,
+      externalUrl: profileData.externalUrl || '',
+      profilePicUrl: profileData.profilePicUrl || '',
+      profilePicUrlHD: profileData.profilePicUrlHD || '',
+      private: profileData.private || false,
+      verified: profileData.verified || false,
+      platform: profileData.platform || 'twitter',
+      extractedAt: profileData.extractedAt || '',
+    };
+  };
+
   const checkExistingConnection = useCallback(async () => {
     if (!currentUser?.uid || isCheckingRef.current) return;
     
@@ -164,9 +184,25 @@ export const TwitterProvider: React.FC<TwitterProviderProps> = ({ children }) =>
     refreshConnection,
   }), [userId, username, isConnected, hasAccessed, connectTwitter, disconnectTwitter, resetTwitterAccess, refreshConnection]);
 
+  useEffect(() => {
+    if (currentUser?.uid) {
+      const fetchTwitterProfileInfo = async () => {
+        try {
+          const response = await axios.get(`/api/twitter-profile/${currentUser.uid}`);
+          const decodedProfileInfo = decodeTwitterProfileInfo(response.data);
+          console.log(`[${new Date().toISOString()}] Decoded Twitter profile info:`, decodedProfileInfo);
+        } catch (error) {
+          console.error(`[${new Date().toISOString()}] Error fetching Twitter profile info:`, error);
+        }
+      };
+
+      fetchTwitterProfileInfo();
+    }
+  }, [currentUser?.uid]);
+
   return (
     <TwitterContext.Provider value={value}>
       {children}
     </TwitterContext.Provider>
   );
-}; 
+};

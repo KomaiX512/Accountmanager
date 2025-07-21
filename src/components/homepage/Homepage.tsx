@@ -9,7 +9,6 @@ const ENABLE_NEURAL_NETWORK = false;
 
 const Homepage: React.FC = () => {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-  const [scrollY, setScrollY] = useState(0);
 
   useEffect(() => {
     // Only add mouse tracking if neural network is enabled
@@ -22,16 +21,10 @@ const Homepage: React.FC = () => {
       setMousePosition({ x: x * 5, y: y * 5 });
     };
 
-    const handleScroll = () => {
-      setScrollY(window.scrollY);
-    };
-
     window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('scroll', handleScroll);
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('scroll', handleScroll);
     };
   }, []);
 
@@ -279,9 +272,9 @@ const Homepage: React.FC = () => {
             </div>
           </motion.section>
 
-          {/* CTA Section */}
-          <motion.section 
-            className="cta-section"
+          {/* Footer Section */}
+          <motion.footer 
+            className="footer-section"
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             transition={{ duration: 1 }}
@@ -289,31 +282,36 @@ const Homepage: React.FC = () => {
           >
             <div className="container">
               <motion.div 
-                className="glassy-cta"
-                initial={{ opacity: 0, y: 50 }}
+                className="footer-content"
+                initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8 }}
+                transition={{ duration: 0.8, delay: 0.2 }}
                 viewport={{ once: true }}
               >
-                <h2>Ready to Transform Your Social Media?</h2>
-                <p>Join thousands of brands already leveraging our sentient AI to dominate social media across all platforms. Experience the future of marketing today.</p>
-                <div className="hero-buttons">
-                  <button 
-                    className="glassy-button btn-primary large"
-                    onClick={() => window.location.href = '/account'}
+                <div className="footer-links">
+                  <motion.a 
+                    href="/privacy" 
+                    className="footer-link"
+                    whileHover={{ scale: 1.05, color: '#00ffcc' }}
+                    whileTap={{ scale: 0.95 }}
                   >
-                    Start Free Trial
-                  </button>
-                  <button 
-                    className="glassy-button btn-secondary large"
-                    onClick={() => window.location.href = '/account'}
+                    Privacy Policy
+                  </motion.a>
+                  <motion.a 
+                    href="/pricing" 
+                    className="footer-link"
+                    whileHover={{ scale: 1.05, color: '#00ccff' }}
+                    whileTap={{ scale: 0.95 }}
                   >
-                    Schedule Demo
-                  </button>
+                    Pricing
+                  </motion.a>
                 </div>
+                <p className="footer-copyright">
+                  &copy; {new Date().getFullYear()} Sentient AI. All rights reserved.
+                </p>
               </motion.div>
             </div>
-          </motion.section>
+          </motion.footer>
         </div>
       </div>
     </>

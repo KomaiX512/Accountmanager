@@ -1,27 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import IG_EntryUsernames from '../components/instagram/IG_EntryUsernames';
 import { useAuth } from '../context/AuthContext';
+import { useAcquiredPlatforms } from '../context/AcquiredPlatformsContext';
 import axios from 'axios';
 import { AnimatePresence, motion } from 'framer-motion';
 import { safeNavigate } from '../utils/navigationGuard';
 
 const Instagram: React.FC = () => {
   const { currentUser } = useAuth();
+  const { markPlatformAsAcquired } = useAcquiredPlatforms();
   const navigate = useNavigate();
-  const location = useLocation();
   const [isLoading, setIsLoading] = useState(true);
   const [hasChecked, setHasChecked] = useState(false);
-
-  // Get platformId from navigation state (instead of markPlatformAccessed function)
-  const platformId = location.state?.platformId;
-
-  // Create a markPlatformAccessed function that uses localStorage
-  const markPlatformAccessed = (platformId: string) => {
-    if (currentUser?.uid) {
-      localStorage.setItem(`${platformId}_accessed_${currentUser.uid}`, 'true');
-    }
-  };
 
   useEffect(() => {
     // Prevent multiple API calls
@@ -161,7 +152,7 @@ const Instagram: React.FC = () => {
           key="entry"
           onSubmitSuccess={handleSubmitSuccess}
           redirectIfCompleted={false}
-          markPlatformAccessed={markPlatformAccessed}
+          markPlatformAccessed={(id) => markPlatformAsAcquired(id)}
           onComplete={() => {}}
         />
       </AnimatePresence>

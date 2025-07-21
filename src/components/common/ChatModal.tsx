@@ -1,19 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { MessageCircle, Image, Send, X } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { MessageCircle, Send, X } from 'lucide-react';
 import './ChatModal.css';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
-}
-
-export interface LinkedAccount {
-  platform: string;
-  username: string;
-  url: string;
-  addedAt: string;
 }
 
 interface ChatModalProps {
@@ -23,9 +16,7 @@ interface ChatModalProps {
   username: string;
   onSendMessage: (message: string) => void;
   isProcessing?: boolean;
-  linkedAccounts?: LinkedAccount[];
   platform?: string;
-  mode?: 'discussion' | 'post';
 }
 
 const ChatModal: React.FC<ChatModalProps> = ({
@@ -35,9 +26,7 @@ const ChatModal: React.FC<ChatModalProps> = ({
   username,
   onSendMessage,
   isProcessing = false,
-  linkedAccounts = [],
-  platform = 'instagram',
-  mode = 'discussion'
+  platform = 'instagram'
 }) => {
   const [message, setMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -159,13 +148,9 @@ const ChatModal: React.FC<ChatModalProps> = ({
         <div className="chat-modal-header">
           <div className="chat-header-info">
             <div className="chat-mode-indicator">
-              {mode === 'discussion' ? (
-                <MessageCircle size={20} className="mode-icon discussion-icon" />
-              ) : (
-                <Image size={20} className="mode-icon post-icon" />
-              )}
+              <MessageCircle size={20} className="mode-icon discussion-icon" />
               <h3>
-                {mode === 'discussion' ? 'AI Discussion' : 'Post Creation'} with {username}
+                AI Discussion with {username}
               </h3>
             </div>
             <span className="platform-badge">{platform}</span>
@@ -179,21 +164,13 @@ const ChatModal: React.FC<ChatModalProps> = ({
           {messages.length === 0 ? (
             <div className="welcome-message">
               <div className="welcome-icon">
-                {mode === 'discussion' ? (
-                  <MessageCircle size={32} className="mode-icon-large" />
-                ) : (
-                  <Image size={32} className="mode-icon-large" />
-                )}
+                <MessageCircle size={32} className="mode-icon-large" />
               </div>
               <h4>
-                {mode === 'discussion' 
-                  ? 'Start an AI Discussion' 
-                  : 'Create AI-Powered Content'}
+                Start an AI Discussion
               </h4>
               <p>
-                {mode === 'discussion'
-                  ? `Ask questions, get strategic insights, or discuss your ${platform} growth strategy!`
-                  : `Generate engaging posts with AI assistance for your ${platform} account!`}
+                Ask questions, get strategic insights, or discuss your {platform} growth strategy!
               </p>
             </div>
           ) : (

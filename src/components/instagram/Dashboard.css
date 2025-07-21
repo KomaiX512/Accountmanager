@@ -109,15 +109,13 @@
     "notifications post-cooked competitor-analysis"
     "chatbot chatbot chatbot";
   grid-template-columns: 1fr 1.5fr 1fr;
-  grid-template-rows: auto 1fr 1fr auto;
-  gap: 20px;
-  min-height: 100vh;
+  grid-template-rows: auto 1.2fr 1fr auto;
+  gap: 18px;
+  min-height: calc(100vh - 40px);
   height: 100%;
   box-sizing: border-box;
   padding: 20px;
-  /* Ensure grid takes full height of container */
   align-content: stretch;
-  /* Prevent horizontal scrollbar */
   overflow-x: hidden;
 }
 
@@ -127,8 +125,9 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  min-height: 0; /* Allow shrinking below content size */
+  min-height: 0;
   box-sizing: border-box;
+  align-self: stretch;
 }
 
 /* Ensure inner content is scrollable if needed */
@@ -702,49 +701,48 @@ h2 {
 
 .toast-notification {
   position: fixed;
-  top: 20px;
-  right: 20px;
+  top: 15px;
+  right: 15px;
   background: linear-gradient(135deg, rgba(26, 26, 58, 0.98), rgba(30, 30, 47, 0.98));
   backdrop-filter: blur(12px);
-  border-radius: 12px;
-  padding: 12px 16px;
+  border-radius: 8px;
+  padding: 8px 12px;
   color: #ffffff;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 500;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   box-shadow: 
-    0 8px 32px rgba(0, 0, 0, 0.4),
-    0 4px 16px rgba(0, 255, 204, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(0, 255, 204, 0.5);
+    0 4px 20px rgba(0, 0, 0, 0.3),
+    0 2px 8px rgba(0, 255, 204, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(0, 255, 204, 0.3);
   z-index: 1000;
-  max-width: 380px;
-  min-width: 280px;
-  width: auto;
+  max-width: 320px;
+  min-width: 200px;
+  width: max-content;
   transform-origin: top right;
-  animation: slideInNotificationProfessional 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: slideInNotificationProfessional 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
   will-change: transform, opacity;
-  /* Professional dimensions */
-  min-height: 60px;
+  line-height: 1.4;
 }
 
 .toast-notification + .toast-notification {
-  margin-top: 12px;
+  margin-top: 8px;
 }
 
 .toast-icon {
   flex-shrink: 0;
   color: #00ffcc;
-  width: 18px;
-  height: 18px;
-  filter: drop-shadow(0 0 6px rgba(0, 255, 204, 0.6));
+  width: 16px;
+  height: 16px;
+  filter: drop-shadow(0 0 4px rgba(0, 255, 204, 0.4));
 }
 
 @keyframes slideInNotificationProfessional {
   from {
-    transform: translate3d(100%, -20px, 0) scale(0.8);
+    transform: translate3d(100%, -10px, 0) scale(0.95);
     opacity: 0;
   }
   to {
@@ -771,14 +769,13 @@ h2 {
 
 @media (max-width: 480px) {
   .toast-notification {
-    max-width: calc(100vw - 32px);
-    margin: 0 16px;
+    max-width: calc(100vw - 24px);
+    margin: 0 12px;
     right: 0;
-    top: 15px;
-    font-size: 0.85rem;
-    padding: 10px 14px;
-    min-height: 50px;
-    min-width: 250px;
+    top: 12px;
+    font-size: 0.8rem;
+    padding: 6px 10px;
+    min-width: 200px;
   }
 }
 
@@ -847,32 +844,40 @@ h2 {
 }
 
 .chat-mode-dropdown {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(0, 255, 204, 0.3);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(0, 255, 204, 0.2);
   border-radius: 8px;
-  padding: 12px 16px;
+  padding: 10px 40px 10px 16px;
   color: #e0e0ff;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 500;
   outline: none;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
-  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2300ffcc' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2300ffcc' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 12px center;
-  padding-right: 35px;
+  background-position: right 14px center;
+  min-width: 140px;
+  height: 40px;
+  display: flex;
+  align-items: center;
 }
 
 .chat-mode-dropdown:hover {
-  background-color: rgba(255, 255, 255, 0.08);
-  border-color: rgba(0, 255, 204, 0.5);
+  background-color: rgba(255, 255, 255, 0.06);
+  border-color: rgba(0, 255, 204, 0.4);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 255, 204, 0.15);
 }
 
 .chat-mode-dropdown:focus {
   border-color: #00ffcc;
-  box-shadow: 0 0 10px rgba(0, 255, 204, 0.4);
+  box-shadow: 0 0 16px rgba(0, 255, 204, 0.3);
+  background-color: rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
 }
 
 .chatbot-send-btn.processing {
@@ -1157,7 +1162,7 @@ h2 {
   .notifications, .post-cooked, .strategies, .competitor-analysis {
     padding: 20px !important;
     border-radius: 12px !important;
-    max-height: 600px !important;
+    max-height: 1000px !important;
   }
   
   .chatbot {

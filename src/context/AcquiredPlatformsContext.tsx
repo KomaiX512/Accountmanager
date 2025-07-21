@@ -16,12 +16,14 @@ interface AcquiredPlatformsContextType {
   acquiredPlatforms: PlatformInfo[];
   isLoading: boolean;
   refreshPlatforms: () => void;
+  markPlatformAsAcquired: (platformId: string) => void;
 }
 
 const AcquiredPlatformsContext = createContext<AcquiredPlatformsContextType>({
   acquiredPlatforms: [],
   isLoading: true,
-  refreshPlatforms: () => {}
+  refreshPlatforms: () => {},
+  markPlatformAsAcquired: () => {}
 });
 
 export const useAcquiredPlatforms = () => useContext(AcquiredPlatformsContext);
@@ -36,26 +38,32 @@ export const AcquiredPlatformsProvider: React.FC<{ children: React.ReactNode }> 
 
   const refreshPlatforms = () => {
     if (!currentUser?.uid) {
-      console.log('[AcquiredPlatforms] No current user, clearing platforms');
       setAcquiredPlatforms([]);
       setIsLoading(false);
       return;
     }
 
-    console.log('[AcquiredPlatforms] Refreshing platforms for user:', currentUser.uid);
     const platforms: PlatformInfo[] = [];
     
-    // Check Instagram access
-    const instagramAccessed = hasAccessedInstagram || 
-      localStorage.getItem(`instagram_accessed_${currentUser.uid}`) === 'true';
+    // Get consolidated list as backup
+    const consolidatedList = JSON.parse(
+      localStorage.getItem(`acquired_platforms_${currentUser.uid}`) || 
+      sessionStorage.getItem(`acquired_platforms_${currentUser.uid}`) || 
+      '[]'
+    );
     
-    console.log('[AcquiredPlatforms] Instagram check:', {
-      hasAccessedInstagram,
-      localStorage: localStorage.getItem(`instagram_accessed_${currentUser.uid}`),
-      final: instagramAccessed
-    });
+    // PERMANENT STORAGE: Check localStorage first (most reliable)
+    // Instagram access - prioritize localStorage for persistence
+    const instagramAccessed = 
+      localStorage.getItem(`instagram_accessed_${currentUser.uid}`) === 'true' || 
+      sessionStorage.getItem(`instagram_accessed_${currentUser.uid}`) === 'true' ||
+      consolidatedList.includes('instagram') ||
+      hasAccessedInstagram;
     
     if (instagramAccessed) {
+      // Ensure the localStorage is set for future persistence
+      localStorage.setItem(`instagram_accessed_${currentUser.uid}`, 'true');
+      sessionStorage.setItem(`instagram_accessed_${currentUser.uid}`, 'true');
       platforms.push({
         id: 'instagram',
         name: 'Instagram',
@@ -64,17 +72,17 @@ export const AcquiredPlatformsProvider: React.FC<{ children: React.ReactNode }> 
       });
     }
     
-    // Check Twitter access
-    const twitterAccessed = hasAccessedTwitter || 
-      localStorage.getItem(`twitter_accessed_${currentUser.uid}`) === 'true';
-    
-    console.log('[AcquiredPlatforms] Twitter check:', {
-      hasAccessedTwitter,
-      localStorage: localStorage.getItem(`twitter_accessed_${currentUser.uid}`),
-      final: twitterAccessed
-    });
+    // Twitter access - prioritize localStorage for persistence
+    const twitterAccessed = 
+      localStorage.getItem(`twitter_accessed_${currentUser.uid}`) === 'true' || 
+      sessionStorage.getItem(`twitter_accessed_${currentUser.uid}`) === 'true' ||
+      consolidatedList.includes('twitter') ||
+      hasAccessedTwitter;
     
     if (twitterAccessed) {
+      // Ensure the localStorage is set for future persistence
+      localStorage.setItem(`twitter_accessed_${currentUser.uid}`, 'true');
+      sessionStorage.setItem(`twitter_accessed_${currentUser.uid}`, 'true');
       platforms.push({
         id: 'twitter',
         name: 'Twitter',
@@ -83,17 +91,17 @@ export const AcquiredPlatformsProvider: React.FC<{ children: React.ReactNode }> 
       });
     }
     
-    // Check Facebook access
-    const facebookAccessed = hasAccessedFacebook || 
-      localStorage.getItem(`facebook_accessed_${currentUser.uid}`) === 'true';
-    
-    console.log('[AcquiredPlatforms] Facebook check:', {
-      hasAccessedFacebook,
-      localStorage: localStorage.getItem(`facebook_accessed_${currentUser.uid}`),
-      final: facebookAccessed
-    });
+    // Facebook access - prioritize localStorage for persistence
+    const facebookAccessed = 
+      localStorage.getItem(`facebook_accessed_${currentUser.uid}`) === 'true' || 
+      sessionStorage.getItem(`facebook_accessed_${currentUser.uid}`) === 'true' ||
+      consolidatedList.includes('facebook') ||
+      hasAccessedFacebook;
     
     if (facebookAccessed) {
+      // Ensure the localStorage is set for future persistence
+      localStorage.setItem(`facebook_accessed_${currentUser.uid}`, 'true');
+      sessionStorage.setItem(`facebook_accessed_${currentUser.uid}`, 'true');
       platforms.push({
         id: 'facebook',
         name: 'Facebook',
@@ -102,16 +110,15 @@ export const AcquiredPlatformsProvider: React.FC<{ children: React.ReactNode }> 
       });
     }
     
-    // Check LinkedIn access
+    // LinkedIn access - only localStorage (no context available)
     const linkedinAccessed = 
-      localStorage.getItem(`linkedin_accessed_${currentUser.uid}`) === 'true';
-    
-    console.log('[AcquiredPlatforms] LinkedIn check:', {
-      localStorage: localStorage.getItem(`linkedin_accessed_${currentUser.uid}`),
-      final: linkedinAccessed
-    });
+      localStorage.getItem(`linkedin_accessed_${currentUser.uid}`) === 'true' ||
+      sessionStorage.getItem(`linkedin_accessed_${currentUser.uid}`) === 'true' ||
+      consolidatedList.includes('linkedin');
     
     if (linkedinAccessed) {
+      localStorage.setItem(`linkedin_accessed_${currentUser.uid}`, 'true');
+      sessionStorage.setItem(`linkedin_accessed_${currentUser.uid}`, 'true');
       platforms.push({
         id: 'linkedin',
         name: 'LinkedIn',
@@ -120,21 +127,87 @@ export const AcquiredPlatformsProvider: React.FC<{ children: React.ReactNode }> 
       });
     }
     
-    console.log('[AcquiredPlatforms] Final platforms:', platforms);
     setAcquiredPlatforms(platforms);
     setIsLoading(false);
   };
 
-  // Get acquired platforms on component mount and when auth/platform states change
+  // Initial load - check immediately when user is available
   useEffect(() => {
+    if (currentUser?.uid) {
+      refreshPlatforms();
+    } else {
+      setAcquiredPlatforms([]);
+      setIsLoading(false);
+    }
+  }, [currentUser?.uid]);
+
+  // Secondary check - when context hooks update (but don't overwrite if localStorage already has data)
+  useEffect(() => {
+    if (currentUser?.uid) {
+      refreshPlatforms();
+    }
+  }, [hasAccessedInstagram, hasAccessedTwitter, hasAccessedFacebook]);
+
+  // Listen for localStorage changes (cross-tab synchronization)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (currentUser?.uid && e.key && e.key.includes('_accessed_') && e.key.includes(currentUser.uid)) {
+        console.log('[AcquiredPlatforms] Storage change detected, refreshing platforms');
+        refreshPlatforms();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [currentUser?.uid]);
+
+  // Backup check every 30 seconds to ensure platforms are always visible
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+
+    const interval = setInterval(() => {
+      // Only refresh if we have no acquired platforms but should have some
+      if (acquiredPlatforms.length === 0) {
+        const hasAnyAccessed = ['instagram', 'twitter', 'facebook', 'linkedin'].some(
+          platform => localStorage.getItem(`${platform}_accessed_${currentUser.uid}`) === 'true'
+        );
+        
+        if (hasAnyAccessed) {
+          console.log('[AcquiredPlatforms] Backup check: refreshing platforms');
+          refreshPlatforms();
+        }
+      }
+    }, 30000); // Check every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [currentUser?.uid, acquiredPlatforms.length]);
+
+  // Utility function to mark a platform as acquired permanently
+  const markPlatformAsAcquired = (platformId: string) => {
+    if (!currentUser?.uid) return;
+    
+    // Set in both localStorage and sessionStorage for extra persistence
+    localStorage.setItem(`${platformId}_accessed_${currentUser.uid}`, 'true');
+    sessionStorage.setItem(`${platformId}_accessed_${currentUser.uid}`, 'true');
+    
+    // Also store a consolidated list for faster lookup
+    const currentAcquired = JSON.parse(localStorage.getItem(`acquired_platforms_${currentUser.uid}`) || '[]');
+    if (!currentAcquired.includes(platformId)) {
+      currentAcquired.push(platformId);
+      localStorage.setItem(`acquired_platforms_${currentUser.uid}`, JSON.stringify(currentAcquired));
+      sessionStorage.setItem(`acquired_platforms_${currentUser.uid}`, JSON.stringify(currentAcquired));
+    }
+    
+    // Immediately refresh the platforms list
     refreshPlatforms();
-  }, [currentUser, hasAccessedInstagram, hasAccessedTwitter, hasAccessedFacebook]);
+  };
 
   return (
     <AcquiredPlatformsContext.Provider value={{ 
       acquiredPlatforms, 
       isLoading,
-      refreshPlatforms
+      refreshPlatforms,
+      markPlatformAsAcquired
     }}>
       {children}
     </AcquiredPlatformsContext.Provider>

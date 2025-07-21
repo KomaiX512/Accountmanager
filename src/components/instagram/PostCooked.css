@@ -1,11 +1,15 @@
 .post-cooked-container {
-  max-width: 600px;
-  margin: 20px auto;
-  padding: 20px;
-  background: linear-gradient(135deg, #1a1a2e, #16213e);
-  border-radius: 16px;
-  box-shadow: 0 4px 20px rgba(0, 255, 204, 0.2);
+  max-width: 100%;
+  margin: 0;
+  padding: 12px;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
   overflow-x: hidden;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .post-cooked-container h2 {
@@ -21,8 +25,11 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
+  min-height: 30px;
+  padding: 0 4px;
+  margin-bottom: 4px;
 }
 
 .section-icon {
@@ -30,16 +37,19 @@
   height: 20px;
   color: #00ffcc;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .content-badge {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   background: linear-gradient(135deg, #ff6b6b, #ff8e53);
-  border-radius: 20px;
-  padding: 6px 12px;
-  font-size: 0.75rem;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 0.85rem;
   font-weight: 600;
   color: #fff;
   box-shadow: 0 2px 8px rgba(255, 107, 107, 0.4);
@@ -48,6 +58,7 @@
   transition: all 0.2s ease;
   margin-left: auto;
   min-width: auto;
+  height: 32px;
   white-space: nowrap;
 }
 

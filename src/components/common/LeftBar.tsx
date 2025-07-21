@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import ProfilePopup from './ProfilePopup';
 import CanvasEditor from './CanvasEditor';
 import ChatModal from './ChatModal';
+import RagService from '../../services/RagService';
 
 interface LeftBarProps {
   accountHolder: string;
@@ -40,12 +41,23 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
     const userMessage = { role: 'user' as const, content: message };
     setChatMessages(prev => [...prev, userMessage]);
     
-    // Here you would typically call your API to get the AI response
-    // For now, we'll just add a placeholder response
-    const botResponse = { role: 'assistant' as const, content: 'I am your AI assistant. How can I help you today?' };
-    setTimeout(() => {
-      setChatMessages(prev => [...prev, botResponse]);
-    }, 500);
+    // Call actual RAG API instead of placeholder response
+    try {
+      if (!accountHolder) {
+        console.error('[LeftBar] No account holder available for discussion');
+        const errorResponse = { role: 'assistant' as const, content: 'Please select an account to start a discussion.' };
+        setChatMessages(prev => [...prev, errorResponse]);
+        return;
+      }
+
+      const response = await RagService.sendDiscussionQuery(accountHolder, message, chatMessages, platform || 'instagram');
+      const assistantResponse = { role: 'assistant' as const, content: response.response };
+      setChatMessages(prev => [...prev, assistantResponse]);
+    } catch (error) {
+      console.error('[LeftBar] Error getting AI response:', error);
+      const errorResponse = { role: 'assistant' as const, content: 'Sorry, I encountered an error. Please try again.' };
+      setChatMessages(prev => [...prev, errorResponse]);
+    }
   };
 
   return (

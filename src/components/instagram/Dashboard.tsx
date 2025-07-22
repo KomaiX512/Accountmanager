@@ -19,6 +19,7 @@ import { useInstagram } from '../../context/InstagramContext';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
 import useUpgradeHandler from '../../hooks/useUpgradeHandler';
 import AccessControlPopup from '../common/AccessControlPopup';
+import useResetPlatformState from '../../hooks/useResetPlatformState';
 
 import ChatModal from './ChatModal';
 import RagService from '../../services/RagService';
@@ -47,6 +48,7 @@ interface DashboardProps {
 const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => {
   const { trackPost, trackDiscussion, trackAIReply, trackCampaign, isFeatureBlocked, trackRealDiscussion, trackRealAIReply, trackRealPostCreation, canUseFeature } = useFeatureTracking();
   const { showUpgradePopup, blockedFeature, handleFeatureAttempt, closeUpgradePopup, currentUsage } = useUpgradeHandler();
+  const { resetAndAllowReconnection } = useResetPlatformState();
   const [query, setQuery] = useState('');
   const [toast, setToast] = useState<string | null>(null);
   const [responses, setResponses] = useState<{ key: string; data: any }[]>([]);
@@ -60,7 +62,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const { userId: igBusinessId, isConnected: isInstagramConnected, connectInstagram, resetInstagramAccess } = useInstagram();
+  const { userId: igBusinessId, isConnected: isInstagramConnected, connectInstagram } = useInstagram();
   const [isSchedulerOpen, setIsSchedulerOpen] = useState(false);
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
@@ -1507,34 +1509,33 @@ Image Description: ${response.post.image_prompt}
     setIsResetConfirmOpen(false);
 
     try {
-      console.log(`[${new Date().toISOString()}] Resetting Instagram dashboard for user ${currentUser.uid}`);
+      console.log(`[${new Date().toISOString()}] 🔄 Starting bulletproof reset for Instagram dashboard (user: ${currentUser.uid})`);
 
-      // Call backend API to reset Instagram dashboard (same as other platforms)
-      const response = await axios.delete(`/api/platform-reset/${currentUser.uid}`, {
-        data: { platform: 'instagram' }
-      });
+      // Use the bulletproof reset hook - this handles everything:
+      // 1. Complete cache clearing (localStorage & sessionStorage)
+      // 2. Session manager cleanup
+      // 3. Backend API reset
+      // 4. Browser history manipulation
+      // 5. Navigation to main dashboard
+      const resetSuccess = await resetAndAllowReconnection('instagram', accountHolder);
 
-      if (response.data.success) {
-        console.log(`[${new Date().toISOString()}] Instagram dashboard reset successful`);
-
-        // Clear all frontend data for Instagram
-        clearInstagramFrontendData();
-
-        // Call Instagram context reset function
-        resetInstagramAccess();
-
-        setToast('Instagram dashboard reset successfully!');
+      if (resetSuccess) {
+        console.log(`[${new Date().toISOString()}] ✅ Bulletproof reset completed successfully for Instagram`);
+        setToast('Instagram dashboard reset successfully! Redirecting to main dashboard...');
         
-        // Optional: Navigate back to setup or refresh
-        setTimeout(() => {
-          window.location.reload();
-        }, 1500);
+        // The navigation is already handled by the reset hook
+        // No need for manual navigation or reload here
       } else {
-        throw new Error(response.data.error || 'Reset failed');
+        throw new Error('Reset operation failed');
       }
     } catch (error: any) {
-      console.error(`[${new Date().toISOString()}] Error resetting Instagram dashboard:`, error);
-      setToast(error.response?.data?.error || 'Failed to reset dashboard. Please try again.');
+      console.error(`[${new Date().toISOString()}] ❌ Bulletproof reset failed for Instagram:`, error);
+      setToast('Failed to reset dashboard. Please try again.');
+      
+      // Fallback navigation if reset completely fails
+      setTimeout(() => {
+        window.location.href = '/account';
+      }, 2000);
     } finally {
       setIsResetting(false);
     }

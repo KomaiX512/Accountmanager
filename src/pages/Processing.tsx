@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import ProcessingLoadingState from '../components/common/ProcessingLoadingState';
+import ProcessingErrorBoundary from '../components/common/ProcessingErrorBoundary';
 import { useProcessing } from '../context/ProcessingContext';
 import { useAuth } from '../context/AuthContext';
 import { safeNavigate, safeHistoryManipulation } from '../utils/navigationGuard';
@@ -267,12 +268,18 @@ const Processing: React.FC = () => {
   }
 
   return (
-    <ProcessingLoadingState 
-      platform={targetPlatform as 'instagram' | 'twitter' | 'facebook'}
-      username={username}
-      onComplete={handleComplete}
-      remainingMinutes={remainingMinutes}
-    />
+    <ProcessingErrorBoundary 
+      platform={targetPlatform}
+      onReset={() => window.location.reload()}
+      onNavigateHome={() => safeNavigate(navigate, '/account', {}, 1)}
+    >
+      <ProcessingLoadingState 
+        platform={targetPlatform as 'instagram' | 'twitter' | 'facebook'}
+        username={username}
+        onComplete={handleComplete}
+        remainingMinutes={remainingMinutes}
+      />
+    </ProcessingErrorBoundary>
   );
 };
 

@@ -43,6 +43,7 @@ import useProcessingGuard from '../../hooks/useProcessingGuard';
 import { useProcessing } from '../../context/ProcessingContext';
 import { safeFilter, safeMap, safeLength } from '../../utils/safeArrayUtils';
 import useDashboardRefresh from '../../hooks/useDashboardRefresh';
+import useResetPlatformState from '../../hooks/useResetPlatformState';
 
 // Define RagService compatible ChatMessage
 interface RagChatMessage {
@@ -76,11 +77,12 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
 
   // ALL CONTEXT HOOKS MUST BE CALLED FIRST - Rules of Hooks
   const { currentUser } = useAuth();
-  const { userId: igUserId, isConnected: isInstagramConnected, connectInstagram, resetInstagramAccess } = useInstagram();
-  const { userId: twitterId, isConnected: isTwitterConnected, connectTwitter, resetTwitterAccess } = useTwitter();
-  const { userId: facebookPageId, isConnected: isFacebookConnected, connectFacebook, resetFacebookAccess } = useFacebook();
+  const { userId: igUserId, isConnected: isInstagramConnected } = useInstagram();
+  const { userId: twitterId, isConnected: isTwitterConnected } = useTwitter();
+  const { userId: facebookPageId, isConnected: isFacebookConnected, connectFacebook } = useFacebook();
   const { trackRealDiscussion, trackRealAIReply, trackRealPostCreation, canUseFeature } = useFeatureTracking();
-  const { showUpgradePopup, blockedFeature, handleFeatureAttempt, closeUpgradePopup, currentUsage } = useUpgradeHandler();
+  const { showUpgradePopup, blockedFeature, closeUpgradePopup, currentUsage } = useUpgradeHandler();
+  const { resetAndAllowReconnection } = useResetPlatformState();
 
   // ALL STATE HOOKS
   const [query, setQuery] = useState('');
@@ -2221,62 +2223,42 @@ Image Description: ${response.post.image_prompt}
     setIsResetConfirmOpen(false);
 
     try {
-      console.log(`[${new Date().toISOString()}] Resetting ${platform} dashboard for user ${currentUser.uid}`);
+      console.log(`[${new Date().toISOString()}] 🔄 Starting bulletproof reset for ${platform} dashboard (user: ${currentUser.uid})`);
 
-      // Call backend API to reset platform dashboard
-      const response = await axios.delete(`/api/platform-reset/${currentUser.uid}`, {
-        data: { platform }
-      });
+      // Use the bulletproof reset hook - this handles everything:
+      // 1. Complete cache clearing (localStorage & sessionStorage)
+      // 2. Session manager cleanup
+      // 3. Backend API reset
+      // 4. Browser history manipulation
+      // 5. Navigation to main dashboard
+      const resetSuccess = await resetAndAllowReconnection(platform, accountHolder);
 
-      if (response.data.success) {
-        console.log(`[${new Date().toISOString()}] ${platform} dashboard reset successful`);
-
-        // Clear all frontend data for this platform
-        clearPlatformFrontendData();
-
-        // Navigate back to main dashboard
-        setToast(`${platform.charAt(0).toUpperCase() + platform.slice(1)} dashboard reset successfully!`);
+      if (resetSuccess) {
+        console.log(`[${new Date().toISOString()}] ✅ Bulletproof reset completed successfully for ${platform}`);
+        setToast(`${platform.charAt(0).toUpperCase() + platform.slice(1)} dashboard reset successfully! Redirecting to main dashboard...`);
         
-        setTimeout(() => {
-          navigate('/dashboard');
-        }, 1500);
+        // The navigation is already handled by the reset hook
+        // No need for manual navigation here
       } else {
-        throw new Error(response.data.error || 'Reset failed');
+        throw new Error('Reset operation failed');
       }
     } catch (error: any) {
-      console.error(`[${new Date().toISOString()}] Error resetting ${platform} dashboard:`, error);
-      setToast(error.response?.data?.error || 'Failed to reset dashboard. Please try again.');
+      console.error(`[${new Date().toISOString()}] ❌ Bulletproof reset failed for ${platform}:`, error);
+      setToast('Failed to reset dashboard. Please try again.');
+      
+      // Fallback navigation if reset completely fails
+      setTimeout(() => {
+        navigate('/account', { replace: true });
+      }, 2000);
     } finally {
       setIsResetting(false);
     }
   };
 
+  // Legacy function kept for backward compatibility but no longer used
   const clearPlatformFrontendData = () => {
-    const userId = currentUser?.uid;
-    if (!userId) return;
-
-    // Clear localStorage data for this platform
-    const keysToRemove = [
-      `${platform}_accessed_${userId}`,
-      `viewed_strategies_${platform}_${accountHolder}`,
-      `viewed_competitor_data_${platform}_${accountHolder}`,
-      `viewed_posts_${platform}_${accountHolder}`,
-    ];
-
-    keysToRemove.forEach(key => {
-      localStorage.removeItem(key);
-    });
-
-    // Reset platform access using the new reset methods
-    if (platform === 'instagram') {
-      resetInstagramAccess();
-    } else if (platform === 'twitter') {
-      resetTwitterAccess();
-    } else if (platform === 'facebook') {
-      resetFacebookAccess();
-    }
-
-    console.log(`[${new Date().toISOString()}] Cleared frontend data for ${platform} platform`);
+    // This function is now handled by the bulletproof reset hook
+    console.log(`[${new Date().toISOString()}] ⚠️ clearPlatformFrontendData called - replaced by bulletproof reset`);
   };
 
   return (
@@ -2729,7 +2711,6 @@ Image Description: ${response.post.image_prompt}
           onClose={() => setIsChatModalOpen(false)}
           username={`${accountHolder} (${config.name})`}
           platform={platform}
-          mode={chatMode}
           onSendMessage={(message: string) => {
             if (!message.trim() || !accountHolder) return;
             setIsProcessing(true);
@@ -2754,7 +2735,6 @@ Image Description: ${response.post.image_prompt}
               });
           }}
           isProcessing={isProcessing}
-          linkedAccounts={linkedAccounts}
         />
       )}
       {isTwitterSchedulerOpen && (

@@ -100,24 +100,46 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   const platformConfig = PLATFORM_CONFIGS[platform] || DEFAULT_PLATFORM_CONFIG;
 
   // ✅ BULLETPROOF TIMER SYSTEM - Real-time calculation based approach
+  
+  // ✅ FIX: Proper username initialization to prevent lexical declaration error
+  const getUsernameFromStorage = (platformId: string): string => {
+    try {
+      const processingInfo = localStorage.getItem(`${platformId}_processing_info`);
+      if (processingInfo) {
+        const info = JSON.parse(processingInfo);
+        return info.username || 'User';
+      }
+    } catch (error) {
+      console.error('Error reading username from localStorage:', error);
+    }
+    return 'User';
+  };
+
+  // Get username from props or localStorage (fixed lexical scoping)
+  const username = propUsername || getUsernameFromStorage(platform);
+
+  // State to trigger re-renders for real-time updates
+  const [currentTime, setCurrentTime] = useState(Date.now());
+  const [isTabVisible, setIsTabVisible] = useState(!document.hidden);
+  const [timerCompleted, setTimerCompleted] = useState(false);
 
   // Get timer data from localStorage with bulletproof error handling
   const getTimerData = () => {
     try {
       const endTimeRaw = localStorage.getItem(`${platform}_processing_countdown`);
       const processingInfoRaw = localStorage.getItem(`${platform}_processing_info`);
-
+      
       if (!endTimeRaw || !processingInfoRaw) {
         return null;
       }
-
+      
       const endTime = parseInt(endTimeRaw);
       const processingInfo = JSON.parse(processingInfoRaw);
-
+      
       if (Number.isNaN(endTime) || !processingInfo.startTime) {
         return null;
       }
-
+      
       return {
         endTime,
         startTime: processingInfo.startTime,
@@ -133,13 +155,13 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   // Initialize timer data if not exists (first time setup)
   useEffect(() => {
     const existingTimer = getTimerData();
-
+    
     if (!existingTimer) {
       // First time setup - create new timer
       const now = Date.now();
       const durationMs = (remainingMinutes || countdownMinutes) * 60 * 1000;
       const endTime = now + durationMs;
-
+      
       localStorage.setItem(`${platform}_processing_countdown`, endTime.toString());
       localStorage.setItem(`${platform}_processing_info`, JSON.stringify({
         platform,
@@ -148,7 +170,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
         endTime,
         totalDuration: durationMs
       }));
-
+      
       console.log(`🔥 BULLETPROOF TIMER: Initialized ${platform} timer for ${Math.ceil(durationMs / 1000 / 60)} minutes`);
     } else {
       console.log(`🔥 BULLETPROOF TIMER: Resumed existing ${platform} timer`);
@@ -159,7 +181,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   const getRemainingMs = (): number => {
     const timerData = getTimerData();
     if (!timerData) return 0;
-
+    
     const remaining = Math.max(0, timerData.endTime - currentTime);
     return remaining;
   };
@@ -171,7 +193,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   const getProgressPercentage = (): number => {
     const timerData = getTimerData();
     if (!timerData) return 100;
-
+    
     const elapsed = currentTime - timerData.startTime;
     const progress = Math.min(100, Math.max(0, (elapsed / timerData.totalDuration) * 100));
     return progress;
@@ -180,21 +202,21 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   // ✅ BULLETPROOF REAL-TIME TIMER - Updates based on actual time, not intervals
   useEffect(() => {
     if (timerCompleted) return;
-
+    
     const updateTimer = () => {
       const now = Date.now();
       setCurrentTime(now);
-
+      
       const remaining = getRemainingMs();
-
+      
       if (remaining <= 0 && !timerCompleted) {
         setTimerCompleted(true);
-
+        
         // Clean up localStorage
         try {
           localStorage.removeItem(`${platform}_processing_countdown`);
           localStorage.removeItem(`${platform}_processing_info`);
-
+          
           // Mark platform as completed
           const completedPlatforms = localStorage.getItem('completedPlatforms');
           const completed = completedPlatforms ? JSON.parse(completedPlatforms) : [];
@@ -202,20 +224,20 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
             completed.push(platform);
             localStorage.setItem('completedPlatforms', JSON.stringify(completed));
           }
-
+          
           console.log(`🔥 BULLETPROOF TIMER: Completed ${platform} processing`);
         } catch (error) {
           console.error('Error cleaning up timer:', error);
         }
       }
     };
-
+    
     // Update immediately
     updateTimer();
-
+    
     // Use different intervals based on tab visibility for optimal performance
     const interval = setInterval(updateTimer, isTabVisible ? 100 : 1000);
-
+    
     return () => clearInterval(interval);
   }, [platform, currentTime, isTabVisible, timerCompleted]);
 
@@ -224,7 +246,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     const handleVisibilityChange = () => {
       const isVisible = !document.hidden;
       setIsTabVisible(isVisible);
-
+      
       if (isVisible) {
         // Tab became visible - force immediate time sync
         const now = Date.now();
@@ -232,7 +254,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
         console.log(`🔥 BULLETPROOF TIMER: Tab visible - synced time for ${platform}`);
       }
     };
-
+    
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [platform]);
@@ -247,19 +269,18 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
         console.log(`🔥 BULLETPROOF TIMER: Cross-tab sync for ${platform}`);
       }
     };
-
+    
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [platform]);
 
   // Current values for display
   const countdown = getRemainingSeconds();
-  const progressPercentage = getProgressPercentage();
 
   const handleContinue = () => {
     // Call ProcessingContext completeProcessing
     completeProcessing();
-
+    
     if (onComplete) onComplete();
   };
 
@@ -297,7 +318,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
           (platform === 'facebook' && currentPath.includes('/facebook-dashboard')) ||
           (platform === 'linkedin' && currentPath.includes('/linkedin-dashboard'))
         );
-
+        
         if (isPlatformDashboard) {
           safeNavigate(navigate, `/processing/${platform}`, { 
             state: { 
@@ -315,40 +336,10 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     return () => window.removeEventListener('popstate', handleNavigation);
   }, [countdown, navigate, platform, username]);
 
-  // Calculate total duration from localStorage or props - BULLETPROOF calculation
-  const getTotalDuration = (): number => {
-    const timerData = getTimerData();
-    if (timerData) {
-      return Math.ceil(timerData.totalDuration / 1000);
-    }
-    return countdownMinutes * 60;
-  };
-
-  const totalDuration = getTotalDuration();
-
   const [currentStage, setCurrentStage] = useState(0);
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const [tipProgress, setTipProgress] = useState(0);
-
-  // Fix variable declaration order
-  const [currentTime, setCurrentTime] = useState(Date.now());
-  const [isTabVisible, setIsTabVisible] = useState(!document.hidden);
-  const [timerCompleted, setTimerCompleted] = useState(false);
-
-  // Fix username initialization order
-  const username = propUsername || (() => {
-    try {
-      const processingInfo = localStorage.getItem(`${platform}_processing_info`);
-      if (processingInfo) {
-        const info = JSON.parse(processingInfo);
-        return info.username || 'User';
-      }
-    } catch (error) {
-      console.error('Error reading username from localStorage:', error);
-    }
-    return 'User';
-  })();
 
   // Reusable stage system - automatically splits time into 5 equal stages
   const processingStages: ProcessingStage[] = [
@@ -833,4 +824,4 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   );
 };
 
-export default ProcessingLoadingState;
+export default ProcessingLoadingState; 

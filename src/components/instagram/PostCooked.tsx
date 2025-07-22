@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import ReactDOM from 'react-dom';
+import ReactDOM, { createPortal } from 'react-dom';
 import './PostCooked.css';
 import { motion } from 'framer-motion';
 import { saveFeedback } from '../../utils/FeedbackHandler';
@@ -1452,183 +1452,231 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     setIsPosting(true);
     console.log(`[PostNow] 🚀 Starting PostNow process for user ${userId}`);
     
-    try {
-      const post = selectedPostForPosting;
-      const caption = post.data.post?.caption || '';
-      
-      // ✅ PRE-VALIDATION: Check all requirements before starting
-      console.log(`[PostNow] 🔍 Validating post requirements...`);
-      
-      // Validate platform connection
-      if (!isConnected) {
-        throw new Error('Instagram account not connected. Please connect your Instagram account first.');
-      }
-      
-      // Validate post data
-      if (!post.key) {
-        throw new Error('Post key is missing. Cannot identify post.');
-      }
-      
-      // Validate caption length for Instagram
-      if (caption.length > 2200) {
-        throw new Error('Caption too long. Instagram captions must be under 2200 characters.');
-      }
-      
-      console.log(`[PostNow] ✅ Pre-validation passed. Post key: ${post.key}, Caption length: ${caption.length}`);
-      
-      // Enhanced image fetching using the new robust method
-      console.log(`[PostNow] 📷 Fetching image for posting...`);
-      const imageBlob = await fetchImageBlob(post, 'postNow');
-      
-      if (!imageBlob) {
-        throw new Error('Failed to fetch image for posting. Please try again or contact support.');
-      }
-      
-      // Additional image validation
-      if (imageBlob.size < 1000) {
-        throw new Error(`Image too small (${imageBlob.size} bytes). Please use a larger image.`);
-      }
-      
-      if (imageBlob.size > 8 * 1024 * 1024) {
-        throw new Error(`Image too large (${Math.round(imageBlob.size / 1024 / 1024)}MB). Please use an image under 8MB.`);
-      }
-      
-      console.log(`[PostNow] ✅ Image validated: ${imageBlob.size} bytes, type: ${imageBlob.type}`);
-      
-      // Prepare form data
-      const formData = new FormData();
-      formData.append('image', imageBlob, 'post_image.jpg');
-      formData.append('caption', caption);
-      formData.append('platform', platform);
-      formData.append('postKey', post.key);
-      
-      console.log(`[PostNow] 📤 Submitting to Instagram API for user ${userId}...`);
-      console.log(`[PostNow] 📝 Caption preview: "${caption.substring(0, 100)}${caption.length > 100 ? '...' : ''}"`);
-      
-      // Make the API call with enhanced error handling
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-      
-      const postNowUrl = getApiUrl('/api/post-instagram-now', `/${userId}`);
-      
-      const response = await fetch(postNowUrl, {
-        method: 'POST',
-        body: formData,
-        signal: controller.signal,
-        headers: {
-          // Don't set Content-Type header, let browser set it for FormData
-        }
-      });
-      
-      clearTimeout(timeoutId);
-      
-      console.log(`[PostNow] 📊 Instagram API Response: Status ${response.status}`);
-      
-      // Enhanced response handling
-      let responseData: any = {};
-      let responseText = '';
-      
+    // ✨ CUSTOMER NETWORK SUPPORT: Add retry mechanism for network issues
+    let retryCount = 0;
+    const maxRetries = 2; // Allow 2 retries for customer network issues
+    
+    while (retryCount <= maxRetries) {
       try {
-        responseText = await response.text();
-        console.log(`[PostNow] 📋 Raw response: ${responseText.substring(0, 500)}${responseText.length > 500 ? '...' : ''}`);
+        const post = selectedPostForPosting;
+        const caption = post.data.post?.caption || '';
         
-        if (responseText.trim()) {
-          responseData = JSON.parse(responseText);
-        }
-      } catch (parseError) {
-        console.warn(`[PostNow] ⚠️ Could not parse response as JSON: ${parseError}`);
-        responseData = { rawResponse: responseText };
-      }
-      
-      if (!response.ok) {
-        // Enhanced error handling with detailed diagnosis
-        let errorMessage = 'Unknown error occurred';
-        
-        if (response.status === 400) {
-          errorMessage = responseData.error || responseData.message || 'Bad request - check your post content and try again';
-        } else if (response.status === 401) {
-          errorMessage = 'Instagram authentication failed. Please reconnect your Instagram account.';
-        } else if (response.status === 403) {
-          errorMessage = 'Instagram API access denied. Your account may need verification.';
-        } else if (response.status === 429) {
-          errorMessage = 'Instagram rate limit exceeded. Please wait a few minutes and try again.';
-        } else if (response.status >= 500) {
-          errorMessage = 'Instagram server error. Please try again in a few minutes.';
-        } else {
-          errorMessage = responseData.error || responseData.message || `HTTP ${response.status}: ${response.statusText}`;
+        if (retryCount > 0) {
+          console.log(`[PostNow] 🔄 Retry attempt ${retryCount}/${maxRetries} for customer network reliability`);
+          setToastMessage(`🔄 Retrying post... (attempt ${retryCount + 1}/${maxRetries + 1})`);
         }
         
-        console.error(`[PostNow] ❌ Instagram API Error (${response.status}):`, {
-          status: response.status,
-          statusText: response.statusText,
-          responseData,
-          responseText: responseText.substring(0, 1000)
+        // ✅ PRE-VALIDATION: Check all requirements before starting
+        console.log(`[PostNow] 🔍 Validating post requirements...`);
+        
+        // Validate platform connection
+        if (!isConnected) {
+          throw new Error('Instagram account not connected. Please connect your Instagram account first.');
+        }
+        
+        // Validate post data
+        if (!post.key) {
+          throw new Error('Post key is missing. Cannot identify post.');
+        }
+        
+        // Validate caption length for Instagram
+        if (caption.length > 2200) {
+          throw new Error('Caption too long. Instagram captions must be under 2200 characters.');
+        }
+        
+        console.log(`[PostNow] ✅ Pre-validation passed. Post key: ${post.key}, Caption length: ${caption.length}`);
+        
+        // Enhanced image fetching using the new robust method
+        console.log(`[PostNow] 📷 Fetching image for posting...`);
+        const imageBlob = await fetchImageBlob(post, 'postNow');
+        
+        if (!imageBlob) {
+          throw new Error('Failed to fetch image for posting. Please try again or contact support.');
+        }
+        
+        // Additional image validation
+        if (imageBlob.size < 1000) {
+          throw new Error(`Image too small (${imageBlob.size} bytes). Please use a larger image.`);
+        }
+        
+        if (imageBlob.size > 8 * 1024 * 1024) {
+          throw new Error(`Image too large (${Math.round(imageBlob.size / 1024 / 1024)}MB). Please use an image under 8MB.`);
+        }
+        
+        console.log(`[PostNow] ✅ Image validated: ${imageBlob.size} bytes, type: ${imageBlob.type}`);
+        
+        // Prepare form data
+        const formData = new FormData();
+        formData.append('image', imageBlob, 'post_image.jpg');
+        formData.append('caption', caption);
+        formData.append('platform', platform);
+        formData.append('postKey', post.key);
+        
+        console.log(`[PostNow] 📤 Submitting to Instagram API for user ${userId}...`);
+        console.log(`[PostNow] 📝 Caption preview: "${caption.substring(0, 100)}${caption.length > 100 ? '...' : ''}"`);
+        
+        // Make the API call with enhanced error handling
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 90000); // 90 second timeout - accommodates slower customer connections
+        
+        const postNowUrl = getApiUrl('/api/post-instagram-now', `/${userId}`);
+        
+        const response = await fetch(postNowUrl, {
+          method: 'POST',
+          body: formData,
+          signal: controller.signal,
+          headers: {
+            // Don't set Content-Type header, let browser set it for FormData
+          }
         });
         
-        throw new Error(errorMessage);
+        clearTimeout(timeoutId);
+        
+        console.log(`[PostNow] 📊 Instagram API Response: Status ${response.status}`);
+        
+        // Enhanced response handling
+        let responseData: any = {};
+        let responseText = '';
+        
+        try {
+          responseText = await response.text();
+          console.log(`[PostNow] 📋 Raw response: ${responseText.substring(0, 500)}${responseText.length > 500 ? '...' : ''}`);
+          
+          if (responseText.trim()) {
+            responseData = JSON.parse(responseText);
+          }
+        } catch (parseError) {
+          console.warn(`[PostNow] ⚠️ Could not parse response as JSON: ${parseError}`);
+          responseData = { rawResponse: responseText };
+        }
+        
+        if (!response.ok) {
+          // Enhanced error handling with detailed diagnosis
+          let errorMessage = 'Unknown error occurred';
+          
+          if (response.status === 400) {
+            errorMessage = responseData.error || responseData.message || 'Bad request - check your post content and try again';
+          } else if (response.status === 401) {
+            errorMessage = 'Instagram authentication failed. Please reconnect your Instagram account.';
+          } else if (response.status === 403) {
+            errorMessage = 'Instagram API access denied. Your account may need verification.';
+          } else if (response.status === 429) {
+            errorMessage = 'Instagram rate limit exceeded. Please wait a few minutes and try again.';
+          } else if (response.status >= 500) {
+            errorMessage = 'Instagram server error. Please try again in a few minutes.';
+          } else {
+            errorMessage = responseData.error || responseData.message || `HTTP ${response.status}: ${response.statusText}`;
+          }
+          
+          console.error(`[PostNow] ❌ Instagram API Error (${response.status}):`, {
+            status: response.status,
+            statusText: response.statusText,
+            responseData,
+            responseText: responseText.substring(0, 1000)
+          });
+          
+          throw new Error(errorMessage);
+        }
+        
+        // Success handling
+        console.log(`[PostNow] ✅ Instagram posting successful:`, responseData);
+        
+        // ✅ REAL USAGE TRACKING: Track actual post publication
+        console.log(`[PostNow] 📊 Tracking usage...`);
+        const trackingSuccess = await trackRealPostCreation(platform, {
+          scheduled: false,
+          immediate: true,
+          type: 'instant_post_now'
+        });
+        
+        if (!trackingSuccess) {
+          console.warn(`[PostCooked] 🚫 Post publication blocked for ${platform} - limit reached`);
+          setToastMessage('⚠️ Post was successful but usage limit reached. Upgrade to continue posting.');
+          return;
+        }
+        
+        console.log(`[PostCooked] ✅ Usage tracking successful: ${platform} post tracked`);
+        
+        // Update UI to reflect successful post
+        setLocalPosts(prev => 
+          prev.map(p => 
+            p.key === selectedPostForPosting.key 
+              ? { ...p, data: { ...p.data, status: 'posted' } }
+              : p
+          )
+        );
+        
+        // Success message with post details
+        const postId = responseData.id || responseData.post_id || 'unknown';
+        setToastMessage(`🎉 Posted to Instagram successfully! Post ID: ${postId}`);
+        
+        // ✨ BULLETPROOF: Mark successfully posted post as permanently processed
+        console.log(`[PostNow] 🚫 Marking successfully posted post ${post.key} as permanently processed`);
+        markPostAsProcessed(post.key, 'posted-successfully');
+        
+        // Success - break retry loop
+        break;
+        
+      } catch (error: any) {
+        // ✨ CUSTOMER NETWORK SUPPORT: Implement smart retry logic
+        const isNetworkError = error.name === 'AbortError' || 
+                              error.message.includes('fetch') || 
+                              error.message.includes('network') ||
+                              error.message.includes('timeout');
+        
+        const isRetryableServerError = error.message.includes('Instagram server error') ||
+                                      error.message.includes('rate limit');
+        
+        if ((isNetworkError || isRetryableServerError) && retryCount < maxRetries) {
+          retryCount++;
+          console.warn(`[PostNow] 🔄 Network/server error, retrying (${retryCount}/${maxRetries}):`, error.message);
+          
+          // Progressive delay: 3s, 6s for network reliability
+          const delayMs = retryCount * 3000;
+          setToastMessage(`🔄 Network issue detected. Retrying in ${delayMs/1000} seconds... (${retryCount}/${maxRetries})`);
+          
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+          continue; // Retry the loop
+        }
+        
+        // Non-retryable error or max retries reached
+        console.error(`[PostNow] 💥 PostNow failed (attempt ${retryCount + 1}):`, {
+          error: error.message,
+          stack: error.stack,
+          userId,
+          postKey: selectedPostForPosting?.key,
+          platform,
+          retryCount
+        });
+        
+        // User-friendly error messages
+        let userMessage = error.message;
+        
+        if (error.name === 'AbortError') {
+          userMessage = 'Upload timed out. This usually happens with slower internet connections. Please try again or use a smaller image.';
+        } else if (error.message.includes('fetch')) {
+          userMessage = 'Network connection interrupted. Please check your internet stability and try again.';
+        } else if (error.message.includes('Failed to fetch image')) {
+          userMessage = 'Could not load image. Please refresh the page and try again.';
+        } else if (error.message.includes('rate limit')) {
+          userMessage = 'Instagram is temporarily limiting posts. Please wait 5 minutes and try again.';
+        } else if (error.message.includes('authentication') || error.message.includes('token')) {
+          userMessage = 'Instagram connection expired. Please reconnect your Instagram account.';
+        }
+        
+        const finalMessage = retryCount > 0 
+          ? `❌ PostNow failed after ${retryCount + 1} attempts: ${userMessage}`
+          : `❌ PostNow failed: ${userMessage}`;
+        
+        setToastMessage(finalMessage);
+        break; // Exit retry loop
       }
-      
-      // Success handling
-      console.log(`[PostNow] ✅ Instagram posting successful:`, responseData);
-      
-      // ✅ REAL USAGE TRACKING: Track actual post publication
-      console.log(`[PostNow] 📊 Tracking usage...`);
-      const trackingSuccess = await trackRealPostCreation(platform, {
-        scheduled: false,
-        immediate: true,
-        type: 'instant_post_now'
-      });
-      
-      if (!trackingSuccess) {
-        console.warn(`[PostCooked] 🚫 Post publication blocked for ${platform} - limit reached`);
-        setToastMessage('⚠️ Post was successful but usage limit reached. Upgrade to continue posting.');
-        return;
-      }
-      
-      console.log(`[PostCooked] ✅ Usage tracking successful: ${platform} post tracked`);
-      
-      // Update UI to reflect successful post
-      setLocalPosts(prev => 
-        prev.map(p => 
-          p.key === selectedPostForPosting.key 
-            ? { ...p, data: { ...p.data, status: 'posted' } }
-            : p
-        )
-      );
-      
-      // Success message with post details
-      const postId = responseData.id || responseData.post_id || 'unknown';
-      setToastMessage(`🎉 Posted to Instagram successfully! Post ID: ${postId}`);
-      
-    } catch (error: any) {
-      // Comprehensive error logging and user feedback
-      console.error(`[PostNow] 💥 PostNow failed:`, {
-        error: error.message,
-        stack: error.stack,
-        userId,
-        postKey: selectedPostForPosting?.key,
-        platform
-      });
-      
-      // User-friendly error messages
-      let userMessage = error.message;
-      
-      if (error.name === 'AbortError') {
-        userMessage = 'Request timed out. Please check your internet connection and try again.';
-      } else if (error.message.includes('fetch')) {
-        userMessage = 'Network error. Please check your internet connection and try again.';
-      } else if (error.message.includes('Failed to fetch image')) {
-        userMessage = 'Could not load image. Please refresh the page and try again.';
-      }
-      
-      setToastMessage(`❌ PostNow failed: ${userMessage}`);
-      
-    } finally {
-      setIsPosting(false);
-      setShowPostNowModal(false);
-      setSelectedPostForPosting(null);
-      console.log(`[PostNow] 🏁 PostNow process completed`);
     }
+    
+    setIsPosting(false);
+    setShowPostNowModal(false);
+    setSelectedPostForPosting(null);
+    console.log(`[PostNow] 🏁 PostNow process completed (attempts: ${retryCount + 1})`);
   };
 
   // Enhanced image key extraction with better fallbacks and validation
@@ -1800,8 +1848,9 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   const filteredPosts = getFilteredPosts();
 
   return (
-    <ErrorBoundary>
-      <div className="post-cooked-container">
+    <>
+      <ErrorBoundary>
+        <div className="post-cooked-container">
         <div className="post-cooked-header">
           <h2>
             <div className="section-header">
@@ -2533,94 +2582,96 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             {toastMessage}
           </motion.div>
         )}
-        
-        {/* Post Now Confirmation Modal */}
-        {showPostNowModal && selectedPostForPosting && (
+        </div>
+      </ErrorBoundary>
+
+      {/* Post Now Modal rendered as React Portal for absolute screen positioning */}
+      {showPostNowModal && selectedPostForPosting && createPortal(
+        <motion.div
+          className="modal-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          onClick={() => setShowPostNowModal(false)}
+        >
           <motion.div
-            className="modal-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            className="modal-content"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.8, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            onClick={() => setShowPostNowModal(false)}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+              border: '1px solid #00ffcc',
+              borderRadius: '16px',
+              padding: '24px',
+              maxWidth: '500px',
+              width: '90%',
+              position: 'relative'
+            }}
           >
-            <motion.div
-              className="modal-content"
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
-                border: '1px solid #00ffcc',
-                borderRadius: '16px',
-                padding: '24px',
-                maxWidth: '500px',
-                width: '90%',
-                position: 'relative'
-              }}
-            >
-              <h3 style={{ color: '#00ffcc', marginBottom: '16px', textAlign: 'center' }}>
-                🚀 Post to Instagram Now?
-              </h3>
-              
-              <div style={{ marginBottom: '16px', textAlign: 'center', color: '#e0e0ff' }}>
-                <p>This will immediately post to your connected Instagram account:</p>
-                <div style={{
-                  background: 'rgba(0, 255, 204, 0.1)',
-                  border: '1px solid rgba(0, 255, 204, 0.3)',
+            <h3 style={{ color: '#00ffcc', marginBottom: '16px', textAlign: 'center' }}>
+              🚀 Post to Instagram Now?
+            </h3>
+            
+            <div style={{ marginBottom: '16px', textAlign: 'center', color: '#e0e0ff' }}>
+              <p>This will immediately post to your connected Instagram account:</p>
+              <div style={{
+                background: 'rgba(0, 255, 204, 0.1)',
+                border: '1px solid rgba(0, 255, 204, 0.3)',
+                borderRadius: '8px',
+                padding: '12px',
+                margin: '12px 0',
+                maxHeight: '100px',
+                overflow: 'auto'
+              }}>
+                <strong>Caption:</strong> {selectedPostForPosting.data.post?.caption || 'No caption'}
+              </div>
+              <p style={{ fontSize: '14px', color: '#888' }}>
+                ⚠️ This action cannot be undone. The post will be live on Instagram.
+              </p>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button
+                onClick={() => setShowPostNowModal(false)}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid #666',
+                  color: '#e0e0ff',
+                  padding: '10px 20px',
                   borderRadius: '8px',
-                  padding: '12px',
-                  margin: '12px 0',
-                  maxHeight: '100px',
-                  overflow: 'auto'
-                }}>
-                  <strong>Caption:</strong> {selectedPostForPosting.data.post?.caption || 'No caption'}
-                </div>
-                <p style={{ fontSize: '14px', color: '#888' }}>
-                  ⚠️ This action cannot be undone. The post will be live on Instagram.
-                </p>
-              </div>
-              
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-                <button
-                  onClick={() => setShowPostNowModal(false)}
-                  style={{
-                    background: 'transparent',
-                    border: '1px solid #666',
-                    color: '#e0e0ff',
-                    padding: '10px 20px',
-                    borderRadius: '8px',
-                    cursor: 'pointer'
-                  }}
-                  disabled={isPosting}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleConfirmPostNow}
-                  disabled={isPosting}
-                  style={{
-                    background: isPosting 
-                      ? 'linear-gradient(45deg, #666, #777)' 
-                      : 'linear-gradient(45deg, #405DE6, #5851DB, #833AB4, #C13584, #E1306C, #FD1D1D)',
-                    color: 'white',
-                    border: 'none',
-                    padding: '10px 20px',
-                    borderRadius: '8px',
-                    cursor: isPosting ? 'not-allowed' : 'pointer',
-                    fontWeight: 'bold'
-                  }}
-                >
-                  {isPosting ? '🔄 Posting...' : '📤 Yes, Post Now!'}
-                </button>
-              </div>
-            </motion.div>
+                  cursor: 'pointer'
+                }}
+                disabled={isPosting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmPostNow}
+                disabled={isPosting}
+                style={{
+                  background: isPosting 
+                    ? 'linear-gradient(45deg, #666, #777)' 
+                    : 'linear-gradient(45deg, #405DE6, #5851DB, #833AB4, #C13584, #E1306C, #FD1D1D)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  cursor: isPosting ? 'not-allowed' : 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                {isPosting ? '🔄 Posting...' : '📤 Yes, Post Now!'}
+              </button>
+            </div>
           </motion.div>
-        )}
-      </div>
-    </ErrorBoundary>
+        </motion.div>,
+        document.body
+      )}
+    </>
   );
 };
 

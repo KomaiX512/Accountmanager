@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import './OurStrategies.css';
 import '../../utils/jsonDecoder.css';
 import useR2Fetch from '../../hooks/useR2Fetch';
@@ -109,104 +110,108 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
             </div>
           )}
         </motion.div>
-
-        {showPopup && (
-          <motion.div
-            className="popup-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <motion.div
-              className="popup-content"
-              initial={{ scale: 0.8, y: 50 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.8, y: 50 }}
-              transition={{ duration: 0.3, ease: 'easeOut' }}
-            >
-              <div className="profile-section">
-                <h3>{normalizedAccountHolder}</h3>
-                <div className="stats">
-                  <span>Followers: TBD</span>
-                  <span>Following: TBD</span>
-                </div>
-              </div>
-              <div className="strategy-section">
-                <h4>Strategy Report</h4>
-                {data?.length ? (
-                  <motion.div
-                    key={currentStrategyIndex}
-                    className="strategy-report"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <h5>Strategy {currentStrategyIndex + 1}</h5>
-                    {renderStrategyContent(data[currentStrategyIndex].data)}
-                    <div className="navigation-buttons">
-                      <motion.button
-                        className="nav-btn"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={handlePrevStrategy}
-                        disabled={currentStrategyIndex === 0}
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#e0e0ff"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M15 18l-6-6 6-6" />
-                        </svg>
-                        Previous
-                      </motion.button>
-                      <motion.button
-                        className="nav-btn"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={handleNextStrategy}
-                        disabled={currentStrategyIndex === data.length - 1}
-                      >
-                        Next
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#e0e0ff"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M9 18l6-6-6-6" />
-                        </svg>
-                      </motion.button>
-                    </div>
-                  </motion.div>
-                ) : (
-                  <p>No strategies available.</p>
-                )}
-              </div>
-              <motion.button
-                className="close-btn"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setShowPopup(false)}
-              >
-                Close
-              </motion.button>
-            </motion.div>
-          </motion.div>
-        )}
       </motion.div>
+      
+      {/* Render popup using React Portal for absolute screen positioning */}
+      {showPopup && createPortal(
+        <motion.div
+          className="popup-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          onClick={() => setShowPopup(false)}
+        >
+          <motion.div
+            className="popup-content"
+            initial={{ scale: 0.8, y: 50 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.8, y: 50 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="profile-section">
+              <h3>{normalizedAccountHolder}</h3>
+              <div className="stats">
+                <span>Followers: TBD</span>
+                <span>Following: TBD</span>
+              </div>
+            </div>
+            <div className="strategy-section">
+              <h4>Strategy Report</h4>
+              {data?.length ? (
+                <motion.div
+                  key={currentStrategyIndex}
+                  className="strategy-report"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <h5>Strategy {currentStrategyIndex + 1}</h5>
+                  {renderStrategyContent(data[currentStrategyIndex].data)}
+                  <div className="navigation-buttons">
+                    <motion.button
+                      className="nav-btn"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={handlePrevStrategy}
+                      disabled={currentStrategyIndex === 0}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#e0e0ff"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M15 18l-6-6 6-6" />
+                      </svg>
+                      Previous
+                    </motion.button>
+                    <motion.button
+                      className="nav-btn"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={handleNextStrategy}
+                      disabled={currentStrategyIndex === data.length - 1}
+                    >
+                      Next
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#e0e0ff"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M9 18l6-6-6-6" />
+                      </svg>
+                    </motion.button>
+                  </div>
+                </motion.div>
+              ) : (
+                <p>No strategies available.</p>
+              )}
+            </div>
+            <motion.button
+              className="close-btn"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setShowPopup(false)}
+            >
+              Close
+            </motion.button>
+          </motion.div>
+        </motion.div>,
+        document.body
+      )}
     </ErrorBoundary>
   );
 };

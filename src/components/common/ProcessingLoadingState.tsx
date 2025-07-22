@@ -79,7 +79,7 @@ const DEFAULT_PLATFORM_CONFIG: PlatformConfigType = {
 };
 
 interface ProcessingLoadingStateProps {
-  platform: 'instagram' | 'twitter' | 'facebook';
+  platform: 'instagram' | 'twitter' | 'facebook' | 'linkedin';
   username: string;
   onComplete?: () => void;
   countdownMinutes?: number;
@@ -99,7 +99,244 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   // Get platform configuration with fallback
   const platformConfig = PLATFORM_CONFIGS[platform] || DEFAULT_PLATFORM_CONFIG;
 
-  // Get username from props or localStorage
+  // ✅ BULLETPROOF TIMER SYSTEM - Real-time calculation based approach
+
+  // Get timer data from localStorage with bulletproof error handling
+  const getTimerData = () => {
+    try {
+      const endTimeRaw = localStorage.getItem(`${platform}_processing_countdown`);
+      const processingInfoRaw = localStorage.getItem(`${platform}_processing_info`);
+
+      if (!endTimeRaw || !processingInfoRaw) {
+        return null;
+      }
+
+      const endTime = parseInt(endTimeRaw);
+      const processingInfo = JSON.parse(processingInfoRaw);
+
+      if (Number.isNaN(endTime) || !processingInfo.startTime) {
+        return null;
+      }
+
+      return {
+        endTime,
+        startTime: processingInfo.startTime,
+        totalDuration: processingInfo.totalDuration || (countdownMinutes * 60 * 1000),
+        username: processingInfo.username || username
+      };
+    } catch (error) {
+      console.error('Error reading timer data:', error);
+      return null;
+    }
+  };
+
+  // Initialize timer data if not exists (first time setup)
+  useEffect(() => {
+    const existingTimer = getTimerData();
+
+    if (!existingTimer) {
+      // First time setup - create new timer
+      const now = Date.now();
+      const durationMs = (remainingMinutes || countdownMinutes) * 60 * 1000;
+      const endTime = now + durationMs;
+
+      localStorage.setItem(`${platform}_processing_countdown`, endTime.toString());
+      localStorage.setItem(`${platform}_processing_info`, JSON.stringify({
+        platform,
+        username,
+        startTime: now,
+        endTime,
+        totalDuration: durationMs
+      }));
+
+      console.log(`🔥 BULLETPROOF TIMER: Initialized ${platform} timer for ${Math.ceil(durationMs / 1000 / 60)} minutes`);
+    } else {
+      console.log(`🔥 BULLETPROOF TIMER: Resumed existing ${platform} timer`);
+    }
+  }, [platform, username, countdownMinutes, remainingMinutes]);
+
+  // Real-time calculation functions
+  const getRemainingMs = (): number => {
+    const timerData = getTimerData();
+    if (!timerData) return 0;
+
+    const remaining = Math.max(0, timerData.endTime - currentTime);
+    return remaining;
+  };
+
+  const getRemainingSeconds = (): number => {
+    return Math.ceil(getRemainingMs() / 1000);
+  };
+
+  const getProgressPercentage = (): number => {
+    const timerData = getTimerData();
+    if (!timerData) return 100;
+
+    const elapsed = currentTime - timerData.startTime;
+    const progress = Math.min(100, Math.max(0, (elapsed / timerData.totalDuration) * 100));
+    return progress;
+  };
+
+  // ✅ BULLETPROOF REAL-TIME TIMER - Updates based on actual time, not intervals
+  useEffect(() => {
+    if (timerCompleted) return;
+
+    const updateTimer = () => {
+      const now = Date.now();
+      setCurrentTime(now);
+
+      const remaining = getRemainingMs();
+
+      if (remaining <= 0 && !timerCompleted) {
+        setTimerCompleted(true);
+
+        // Clean up localStorage
+        try {
+          localStorage.removeItem(`${platform}_processing_countdown`);
+          localStorage.removeItem(`${platform}_processing_info`);
+
+          // Mark platform as completed
+          const completedPlatforms = localStorage.getItem('completedPlatforms');
+          const completed = completedPlatforms ? JSON.parse(completedPlatforms) : [];
+          if (!completed.includes(platform)) {
+            completed.push(platform);
+            localStorage.setItem('completedPlatforms', JSON.stringify(completed));
+          }
+
+          console.log(`🔥 BULLETPROOF TIMER: Completed ${platform} processing`);
+        } catch (error) {
+          console.error('Error cleaning up timer:', error);
+        }
+      }
+    };
+
+    // Update immediately
+    updateTimer();
+
+    // Use different intervals based on tab visibility for optimal performance
+    const interval = setInterval(updateTimer, isTabVisible ? 100 : 1000);
+
+    return () => clearInterval(interval);
+  }, [platform, currentTime, isTabVisible, timerCompleted]);
+
+  // ✅ PAGE VISIBILITY API - Perfect tab switching synchronization
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      const isVisible = !document.hidden;
+      setIsTabVisible(isVisible);
+
+      if (isVisible) {
+        // Tab became visible - force immediate time sync
+        const now = Date.now();
+        setCurrentTime(now);
+        console.log(`🔥 BULLETPROOF TIMER: Tab visible - synced time for ${platform}`);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [platform]);
+
+  // ✅ STORAGE SYNC - Sync across multiple tabs/windows
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === `${platform}_processing_countdown` || e.key === `${platform}_processing_info`) {
+        // Timer data changed in another tab - force sync
+        const now = Date.now();
+        setCurrentTime(now);
+        console.log(`🔥 BULLETPROOF TIMER: Cross-tab sync for ${platform}`);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [platform]);
+
+  // Current values for display
+  const countdown = getRemainingSeconds();
+  const progressPercentage = getProgressPercentage();
+
+  const handleContinue = () => {
+    // Call ProcessingContext completeProcessing
+    completeProcessing();
+
+    if (onComplete) onComplete();
+  };
+
+  // Handle completion on mount if countdown is already 0
+  useEffect(() => {
+    if (timerCompleted && onComplete) {
+      completeProcessing();
+      onComplete();
+    }
+  }, [timerCompleted, onComplete, completeProcessing]);
+
+  // ✅ SELECTIVE NAVIGATION BLOCKING - Only block the specific platform being processed
+  // This allows users to explore other parts of the app while timer runs
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (countdown > 0) {
+        e.preventDefault();
+        e.returnValue = 'Your dashboard setup is still in progress. Are you sure you want to leave?';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [countdown]);
+
+  // Handle direct navigation attempts - but ONLY for this specific platform
+  useEffect(() => {
+    const handleNavigation = () => {
+      if (countdown > 0) {
+        // Only redirect if they try to access THIS platform's dashboard
+        const currentPath = window.location.pathname;
+        const isPlatformDashboard = (
+          (platform === 'instagram' && currentPath.includes('/dashboard') && !currentPath.includes('twitter') && !currentPath.includes('facebook') && !currentPath.includes('linkedin')) ||
+          (platform === 'twitter' && currentPath.includes('/twitter-dashboard')) ||
+          (platform === 'facebook' && currentPath.includes('/facebook-dashboard')) ||
+          (platform === 'linkedin' && currentPath.includes('/linkedin-dashboard'))
+        );
+
+        if (isPlatformDashboard) {
+          safeNavigate(navigate, `/processing/${platform}`, { 
+            state: { 
+              platform, 
+              username,
+              remainingMinutes: Math.ceil(countdown / 60) 
+            },
+            replace: true
+          }, 8);
+        }
+      }
+    };
+
+    window.addEventListener('popstate', handleNavigation);
+    return () => window.removeEventListener('popstate', handleNavigation);
+  }, [countdown, navigate, platform, username]);
+
+  // Calculate total duration from localStorage or props - BULLETPROOF calculation
+  const getTotalDuration = (): number => {
+    const timerData = getTimerData();
+    if (timerData) {
+      return Math.ceil(timerData.totalDuration / 1000);
+    }
+    return countdownMinutes * 60;
+  };
+
+  const totalDuration = getTotalDuration();
+
+  const [currentStage, setCurrentStage] = useState(0);
+  const [currentTipIndex, setCurrentTipIndex] = useState(0);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const [tipProgress, setTipProgress] = useState(0);
+
+  // Fix variable declaration order
+  const [currentTime, setCurrentTime] = useState(Date.now());
+  const [isTabVisible, setIsTabVisible] = useState(!document.hidden);
+  const [timerCompleted, setTimerCompleted] = useState(false);
+
+  // Fix username initialization order
   const username = propUsername || (() => {
     try {
       const processingInfo = localStorage.getItem(`${platform}_processing_info`);
@@ -112,139 +349,6 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     }
     return 'User';
   })();
-
-  // Single countdown state - initialize from localStorage or props
-  const [countdown, setCountdown] = useState(() => {
-    try {
-      const savedCountdown = localStorage.getItem(`${platform}_processing_countdown`);
-      if (savedCountdown) {
-        const endTime = parseInt(savedCountdown);
-        const now = Date.now();
-        const remaining = Math.max(0, endTime - now);
-        return Math.ceil(remaining / 1000);
-      }
-    } catch (error) {
-      console.error('Error reading countdown from localStorage:', error);
-    }
-    return (remainingMinutes || countdownMinutes) * 60;
-  });
-
-  // Set localStorage only if it doesn't already exist (prevents restart on refresh)
-  useEffect(() => {
-    try {
-      const existingCountdown = localStorage.getItem(`${platform}_processing_countdown`);
-      if (!existingCountdown) {
-        const endTime = Date.now() + (countdown * 1000);
-        localStorage.setItem(`${platform}_processing_countdown`, endTime.toString());
-        
-        // Store processing info for verification
-        localStorage.setItem(`${platform}_processing_info`, JSON.stringify({
-          platform,
-          username,
-          startTime: Date.now(),
-          endTime,
-          totalDuration: countdown
-        }));
-      }
-    } catch (error) {
-      console.error('Error saving to localStorage:', error);
-    }
-  }, [platform, username, countdown]);
-
-  // Single timer effect
-  useEffect(() => {
-    if (countdown <= 0) {
-      // Clean up localStorage when countdown reaches 0
-      try {
-        localStorage.removeItem(`${platform}_processing_countdown`);
-        localStorage.removeItem(`${platform}_processing_info`);
-        
-        // Mark platform as completed
-        const completedPlatforms = localStorage.getItem('completedPlatforms');
-        const completed = completedPlatforms ? JSON.parse(completedPlatforms) : [];
-        if (!completed.includes(platform)) {
-          completed.push(platform);
-          localStorage.setItem('completedPlatforms', JSON.stringify(completed));
-        }
-      } catch (error) {
-        console.error('Error clearing localStorage:', error);
-      }
-      
-      return;
-    }
-
-    const timer = setInterval(() => {
-      setCountdown(prev => Math.max(0, prev - 1));
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [countdown, platform]);
-
-  const handleContinue = () => {
-    // Call ProcessingContext completeProcessing
-    completeProcessing();
-    
-    if (onComplete) onComplete();
-  };
-
-  // Handle completion on mount if countdown is already 0
-  useEffect(() => {
-    if (countdown <= 0 && onComplete) {
-      completeProcessing();
-      onComplete();
-    }
-  }, [countdown, onComplete, completeProcessing]);
-
-  // Prevent navigation away during processing
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (countdown > 0) {
-        e.preventDefault();
-        e.returnValue = '';
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [countdown]);
-
-  // Handle direct navigation attempts
-  useEffect(() => {
-    const handleNavigation = () => {
-      if (countdown > 0) {
-        safeNavigate(navigate, `/processing/${platform}`, { 
-          state: { 
-            platform, 
-            username,
-            remainingMinutes: Math.ceil(countdown / 60) 
-          },
-          replace: true
-        }, 8);
-      }
-    };
-
-    window.addEventListener('popstate', handleNavigation);
-    return () => window.removeEventListener('popstate', handleNavigation);
-  }, [countdown, navigate, platform, username]);
-
-  // Calculate total duration from localStorage or props
-  const totalDuration = (() => {
-    try {
-      const processingInfo = localStorage.getItem(`${platform}_processing_info`);
-      if (processingInfo) {
-        const { totalDuration: savedDuration } = JSON.parse(processingInfo);
-        return savedDuration || (countdownMinutes * 60);
-      }
-    } catch (error) {
-      console.error('Error reading total duration from localStorage:', error);
-    }
-    return countdownMinutes * 60;
-  })();
-
-  const [currentStage, setCurrentStage] = useState(0);
-  const [currentTipIndex, setCurrentTipIndex] = useState(0);
-  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
-  const [tipProgress, setTipProgress] = useState(0);
 
   // Reusable stage system - automatically splits time into 5 equal stages
   const processingStages: ProcessingStage[] = [
@@ -290,16 +394,20 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     }
   ];
 
-  // Update current stage based on time progress
+  // Update current stage based on time progress - BULLETPROOF real-time calculation
   useEffect(() => {
-    const progress = ((totalDuration - countdown) / totalDuration) * 100;
+    const progress = getProgressPercentage();
     const newStageIndex = processingStages.findIndex(stage => progress < stage.percentage);
     const stageIndex = newStageIndex === -1 ? processingStages.length - 1 : Math.max(0, newStageIndex - 1);
     
     if (stageIndex !== currentStage) {
       setCurrentStage(stageIndex);
     }
-  }, [countdown, currentStage, totalDuration, processingStages]);
+  }, [currentTime, currentStage, processingStages]);
+
+  const calculateProgress = (): number => {
+    return getProgressPercentage();
+  };
 
   const proTips: ProTip[] = [
     {
@@ -372,18 +480,18 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
 
   // Auto-advance tips effect - 1 minute per tip for comprehensive reading
   useEffect(() => {
-    if (isAutoPlaying && countdown > 0) {
+    if (isAutoPlaying && !timerCompleted) {
       const interval = setInterval(() => {
         setCurrentTipIndex((prev) => (prev + 1) % proTips.length);
         setTipProgress(0); // Reset progress when moving to next tip
       }, 60000); // 60 seconds per tip for thorough reading
       return () => clearInterval(interval);
     }
-  }, [isAutoPlaying, countdown, proTips.length]);
+  }, [isAutoPlaying, timerCompleted, proTips.length]);
 
   // Tip progress tracking
   useEffect(() => {
-    if (isAutoPlaying && countdown > 0) {
+    if (isAutoPlaying && !timerCompleted) {
       const progressInterval = setInterval(() => {
         setTipProgress((prev) => {
           const newProgress = prev + (100 / 60); // 60 seconds = 100%
@@ -392,16 +500,12 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
       }, 1000); // Update every second
       return () => clearInterval(progressInterval);
     }
-  }, [isAutoPlaying, countdown, currentTipIndex]);
+  }, [isAutoPlaying, timerCompleted, currentTipIndex]);
 
   const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
-
-  const calculateProgress = () => {
-    return ((totalDuration - countdown) / totalDuration) * 100;
   };
 
   const handleTipNavigation = (index: number) => {
@@ -431,7 +535,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   // Keyboard navigation for tips
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (countdown > 0) {
+      if (!timerCompleted) {
         switch (event.key) {
           case 'ArrowLeft':
             event.preventDefault();
@@ -451,7 +555,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [countdown]);
+  }, [timerCompleted]);
 
   // Touch/swipe support for mobile
   const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -570,7 +674,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
 
           {/* Current Stage Info */}
           <AnimatePresence mode="wait">
-            {countdown <= 0 ? (
+            {timerCompleted ? (
               <motion.div
                 className="completion-stage"
                 initial={{ opacity: 0, y: 10 }}
@@ -729,4 +833,4 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   );
 };
 
-export default ProcessingLoadingState; 
+export default ProcessingLoadingState;

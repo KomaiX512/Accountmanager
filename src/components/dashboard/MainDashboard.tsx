@@ -136,42 +136,64 @@ const MainDashboard: React.FC = () => {
     localStorage.setItem('completedPlatforms', JSON.stringify(Array.from(completedPlatforms)));
   }, [completedPlatforms]);
 
-  // -------- Bullet-proof timer check using shared countdown key --------
+  // ✅ BULLETPROOF TIMER SYSTEM - Synchronized with ProcessingLoadingState
   const getProcessingCountdownKey = (platformId: string) => `${platformId}_processing_countdown`;
 
   const getProcessingRemainingMs = (platformId: string): number => {
     // Never show timer for completed platforms
     if (completedPlatforms.has(platformId)) return 0;
 
-    const raw = localStorage.getItem(getProcessingCountdownKey(platformId));
-    if (!raw) return 0;
-    const endTime = parseInt(raw, 10);
-    if (Number.isNaN(endTime)) return 0;
-    return Math.max(0, endTime - Date.now());
+    try {
+      const raw = localStorage.getItem(getProcessingCountdownKey(platformId));
+      if (!raw) return 0;
+      
+      const endTime = parseInt(raw, 10);
+      if (Number.isNaN(endTime)) return 0;
+      
+      const remaining = Math.max(0, endTime - Date.now());
+      return remaining;
+    } catch (error) {
+      console.error(`Error reading timer for ${platformId}:`, error);
+      return 0;
+    }
   };
 
   const isPlatformLoading = (platformId: string): boolean => {
     // Never show loading for completed platforms
     if (completedPlatforms.has(platformId)) return false;
 
+    // Primary check: localStorage timer (bulletproof method)
     const remaining = getProcessingRemainingMs(platformId);
-    if (remaining > 0) return true;
+    if (remaining > 0) {
+      console.log(`🔥 TIMER SYNC: ${platformId} has ${Math.ceil(remaining / 1000 / 60)} minutes remaining`);
+      return true;
+    }
 
-    // fallback to in-memory state
+    // Fallback: in-memory state (backup method)
     const loadingState = platformLoadingStates[platformId];
-    if (!loadingState) return false;
-    return !loadingState.isComplete && Date.now() < loadingState.endTime;
+    if (loadingState && !loadingState.isComplete && Date.now() < loadingState.endTime) {
+      console.log(`🔥 TIMER FALLBACK: ${platformId} loading from memory state`);
+      return true;
+    }
+
+    return false;
   };
 
   // Function to start platform loading state
   const startPlatformLoading = (platformId: string, durationMinutes: number = 15) => {
     // Don't start loading for completed platforms
-    if (completedPlatforms.has(platformId)) return;
+    if (completedPlatforms.has(platformId)) {
+      console.log(`🔥 TIMER SKIP: ${platformId} already completed, skipping timer`);
+      return;
+    }
 
     const now = Date.now();
+    const durationMs = durationMinutes * 60 * 1000;
+    const endTime = now + durationMs;
+    
     const newLoadingState: PlatformLoadingState = {
       startTime: now,
-      endTime: now + (durationMinutes * 60 * 1000),
+      endTime: endTime,
       isComplete: false
     };
     
@@ -180,15 +202,23 @@ const MainDashboard: React.FC = () => {
       [platformId]: newLoadingState
     }));
 
-    // Persist countdown so all tabs/routes share it
-    const endTime = newLoadingState.endTime;
+    // ✅ BULLETPROOF PERSISTENCE: Store both countdown and processing info
     localStorage.setItem(getProcessingCountdownKey(platformId), endTime.toString());
-    // minimal info for ProcessingLoadingState UI
-    localStorage.setItem(`${platformId}_processing_info`, JSON.stringify({ platform: platformId, username: currentUser?.displayName || '', startTime: now, endTime }));
+    localStorage.setItem(`${platformId}_processing_info`, JSON.stringify({ 
+      platform: platformId, 
+      username: currentUser?.displayName || 'User', 
+      startTime: now, 
+      endTime: endTime,
+      totalDuration: durationMs
+    }));
+    
+    console.log(`🔥 TIMER START: ${platformId} timer set for ${durationMinutes} minutes (${endTime})`);
   };
 
   // Function to complete platform loading
   const completePlatformLoading = (platformId: string) => {
+    console.log(`🔥 TIMER COMPLETE: Completing ${platformId} processing`);
+    
     // Mark platform as completed
     setCompletedPlatforms(prev => new Set([...prev, platformId]));
 
@@ -204,6 +234,8 @@ const MainDashboard: React.FC = () => {
     // Clean up localStorage
     localStorage.removeItem(getProcessingCountdownKey(platformId));
     localStorage.removeItem(`${platformId}_processing_info`);
+    
+    console.log(`🔥 TIMER CLEANUP: ${platformId} processing completed and cleaned up`);
   };
 
   // ✅ PLATFORM STATUS SYNC FIX: Improved platform access tracking
@@ -292,6 +324,41 @@ const MainDashboard: React.FC = () => {
     
     return () => clearInterval(interval);
   }, [currentUser?.uid, getPlatformAccessStatus]);
+
+  // ✅ REAL-TIME TIMER SYNC: Update UI when processing timers complete
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+
+    const syncTimers = () => {
+      const platforms = ['instagram', 'twitter', 'facebook', 'linkedin'];
+      let hasExpiredTimer = false;
+
+      platforms.forEach(platformId => {
+        const remaining = getProcessingRemainingMs(platformId);
+        
+        // If timer expired, complete the processing
+        if (remaining === 0 && isPlatformLoading(platformId)) {
+          console.log(`🔥 TIMER EXPIRED: ${platformId} processing completed automatically`);
+          completePlatformLoading(platformId);
+          hasExpiredTimer = true;
+        }
+      });
+
+      // Force platform status refresh if any timer expired
+      if (hasExpiredTimer) {
+        // This will trigger platform status updates
+        setPlatforms(prev => [...prev]);
+      }
+    };
+
+    // Sync immediately
+    syncTimers();
+
+    // Check every 5 seconds for timer completion
+    const timerSyncInterval = setInterval(syncTimers, 5000);
+    
+    return () => clearInterval(timerSyncInterval);
+  }, [currentUser?.uid, getProcessingRemainingMs, isPlatformLoading, completePlatformLoading]);
 
   // Fetch user's name from authentication
   useEffect(() => {
@@ -542,8 +609,8 @@ const MainDashboard: React.FC = () => {
     }
   ]);
 
-  // Get only connected platforms
-  const connectedPlatforms = safeFilter(platforms, (p: PlatformData) => p.connected);
+  // Get only platforms that are both claimed and connected (ready for posting)
+  const connectedPlatforms = safeFilter(platforms, (p: PlatformData) => p.claimed && p.connected);
 
   // ✅ UNIFIED PLATFORM STATUS UPDATE: Single effect that handles both claimed and connected status
   useEffect(() => {
@@ -684,9 +751,11 @@ const MainDashboard: React.FC = () => {
   const navigateToPlatform = (platform: PlatformData) => {
     const remainingMs = getProcessingRemainingMs(platform.id);
     
-    // If platform is in loading state and time isn't complete
+    // ✅ SELECTIVE BLOCKING: Only block access to THIS specific platform if it's processing
     if (remainingMs > 0) {
       const remainingTime = Math.ceil(remainingMs / 1000 / 60);
+      console.log(`🔥 SELECTIVE BLOCK: Redirecting ${platform.id} to processing page (${remainingTime} min remaining)`);
+      
       safeNavigate(navigate, `/processing/${platform.id}`, {
         state: {
           platform: platform.id,
@@ -696,6 +765,9 @@ const MainDashboard: React.FC = () => {
       }, 7);
       return;
     }
+    
+    // ✅ NAVIGATION FLEXIBILITY: Allow access to all other areas normally
+    console.log(`🔥 NAVIGATION: Allowing access to ${platform.id} (no active processing)`);
     
     // If platform is claimed but not connected and has no active timer, navigate normally
     if (platform.claimed && !platform.connected && remainingMs === 0) {
@@ -716,6 +788,7 @@ const MainDashboard: React.FC = () => {
     
     // If this is first access and not claimed, start loading state
     if (!isPlatformLoading(platform.id) && !platform.claimed) {
+      console.log(`🔥 TIMER START: Starting 15-minute processing for ${platform.id}`);
       startPlatformLoading(platform.id);
       safeNavigate(navigate, `/processing/${platform.id}`, {
         state: {
@@ -876,9 +949,9 @@ const MainDashboard: React.FC = () => {
   
   // Open the instant post modal without checking for connected platforms
   const openInstantPostModal = () => {
-    // Pre-select connected platforms
+    // Pre-select platforms that are both claimed (acquired) AND connected
     const connectedPlatformIds = safeMap(
-      safeFilter(platforms, (p: PlatformData) => p.connected),
+      safeFilter(platforms, (p: PlatformData) => p.claimed && p.connected),
       (p: PlatformData) => p.id
     );
     
@@ -900,14 +973,14 @@ const MainDashboard: React.FC = () => {
       return;
     }
     
-    // Get selected platforms that are connected
+    // Get selected platforms that are both claimed and connected
     const selectedPlatforms = safeFilter(platforms, (p: PlatformData) => 
-      postContent.platformIds.includes(p.id) && p.connected
+      postContent.platformIds.includes(p.id) && p.claimed && p.connected
     );
     
-    // If no platforms are connected, save as draft
+    // If no platforms are claimed and connected, save as draft
     if (selectedPlatforms.length === 0) {
-      alert("Your post has been saved as a draft.");
+      alert("Your post has been saved as a draft. Please make sure platforms are both acquired and connected to post.");
       setShowInstantPostModal(false);
       return;
     }
@@ -1108,11 +1181,11 @@ const MainDashboard: React.FC = () => {
                 </div>
                 <div className="instant-post-text">
                   <h3>Instant Post</h3>
-                  <p>Create one post for all your connected platforms</p>
+                  <p>Create one post for all your acquired and connected platforms</p>
                 </div>
                 {connectedPlatforms.length > 0 && (
                   <div className="connected-platforms-count">
-                    <span>{connectedPlatforms.length} connected</span>
+                    <span>{connectedPlatforms.length} ready</span>
                   </div>
                 )}
               </button>
@@ -1241,7 +1314,7 @@ const MainDashboard: React.FC = () => {
                 </div>
                 <div className="stat-details">
                   <h4>Connected APIs</h4>
-                  <p className="stat-value">{safeLength(safeFilter(platforms, (p: PlatformData) => p.connected))}</p>
+                  <p className="stat-value">{safeLength(safeFilter(platforms, (p: PlatformData) => p.claimed && p.connected))}</p>
                 </div>
               </div>
               
@@ -1355,15 +1428,15 @@ const MainDashboard: React.FC = () => {
             <div className="platform-selection">
               <h4>Select platforms to post to:</h4>
               
-              {/* Connected Platforms */}
-              {safeLength(safeFilter(platforms, (platform: PlatformData) => platform.connected)) > 0 && (
+              {/* Connected & Claimed Platforms */}
+              {safeLength(safeFilter(platforms, (platform: PlatformData) => platform.claimed && platform.connected)) > 0 && (
                 <div className="connected-platforms-section">
                   <div className="section-title">
-                    <span className="status-indicator connected">✓ Connected Platforms</span>
+                    <span className="status-indicator connected">✓ Ready to Post (Acquired & Connected)</span>
                   </div>
                   <div className="platform-checkboxes">
                     {safeMap(
-                      safeFilter(platforms, (platform: PlatformData) => platform.connected),
+                      safeFilter(platforms, (platform: PlatformData) => platform.claimed && platform.connected),
                       (platform: PlatformData) => (
                         <div 
                           key={platform.id} 
@@ -1432,9 +1505,9 @@ const MainDashboard: React.FC = () => {
                 </div>
               )}
               
-              {safeLength(safeFilter(platforms, (p: PlatformData) => p.connected)) === 0 && (
+              {safeLength(safeFilter(platforms, (p: PlatformData) => p.claimed && p.connected)) === 0 && (
                 <div className="no-connected-platforms">
-                  <p>No connected platforms. Please connect your accounts from the platform dashboards to start posting.</p>
+                  <p>No platforms are ready for posting. Please acquire platforms and connect your accounts from the platform dashboards to start posting.</p>
                 </div>
               )}
             </div>

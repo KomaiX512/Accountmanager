@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import './Cs_Analysis.css';
 import '../../utils/jsonDecoder.css';
 import useR2Fetch from '../../hooks/useR2Fetch';
@@ -415,89 +416,90 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
   const { processingState } = useProcessing();
 
   return (
-    <ErrorBoundary>
-      <motion.div
-        className="cs-analysis-container"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        {error && (
-          <div className="error-message">
-            <div className="error-content">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff6b6b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="15" y1="9" x2="9" y2="15"/>
-                <line x1="9" y1="9" x2="15" y2="15"/>
-              </svg>
-              <span>{error}</span>
-            </div>
-            {needsRefresh && (
-              <motion.button
-                className="refresh-btn"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={handleManualRefresh}
-                disabled={loading}
-              >
-                {loading ? 'Refreshing...' : 'Refresh Now'}
-              </motion.button>
-            )}
-          </div>
-        )}
-
-        <div className="competitor-header">
-          <motion.button
-            className="add-competitor-btn"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => setShowAddModal(true)}
-            disabled={loading}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#00ffcc"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Add Competitor
-          </motion.button>
-        </div>
-
-        {/* Refactor competitor list container to be fixed-size and scrollable */}
-        <div className="competitor-list-scrollable">
-          {competitorData.map(({ competitor, fetch }, index) => (
-            // Show loading card if processingState.isProcessing && processingState.platform === platform && processingState.username === normalizedAccountHolder && (new/edited competitor)
-            (processingState.isProcessing && processingState.platform === platform && processingState.username === normalizedAccountHolder && (!fetch.data || fetch.data.length === 0)) ? (
-              <div className="competitor-loading-card" key={competitor}>
-                <div className="loading-spinner" />
-                <div className="loading-message">Analysis will be available in ~10 minutes.</div>
+    <>
+      <ErrorBoundary>
+        <motion.div
+          className="cs-analysis-container"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          {error && (
+            <div className="error-message">
+              <div className="error-content">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff6b6b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="15" y1="9" x2="9" y2="15"/>
+                  <line x1="9" y1="9" x2="15" y2="15"/>
+                </svg>
+                <span>{error}</span>
               </div>
-            ) : (
-              <motion.div
-                key={competitor}
-                className={`competitor-sub-container ${fetch.data && fetch.data.length > 0 ? 'loaded' : ''} ${(!fetch.data || fetch.data.length === 0) ? 'no-data' : ''}`}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: index * 0.1, duration: 0.2 }}
-                whileHover={{ scale: 1.02 }}
+              {needsRefresh && (
+                <motion.button
+                  className="refresh-btn"
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={handleManualRefresh}
+                  disabled={loading}
+                >
+                  {loading ? 'Refreshing...' : 'Refresh Now'}
+                </motion.button>
+              )}
+            </div>
+          )}
+
+          <div className="competitor-header">
+            <motion.button
+              className="add-competitor-btn"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setShowAddModal(true)}
+              disabled={loading}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#00ffcc"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               >
-                <div className="competitor-actions">
-                  <motion.button
-                    className="action-btn edit-btn"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => {
-                      setCurrentCompetitor(competitor);
-                      setEditCompetitor(competitor);
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Add Competitor
+            </motion.button>
+          </div>
+
+          {/* Refactor competitor list container to be fixed-size and scrollable */}
+          <div className="competitor-list-scrollable">
+            {competitorData.map(({ competitor, fetch }, index) => (
+              // Show loading card if processingState.isProcessing && processingState.platform === platform && processingState.username === normalizedAccountHolder && (new/edited competitor)
+              (processingState.isProcessing && processingState.platform === platform && processingState.username === normalizedAccountHolder && (!fetch.data || fetch.data.length === 0)) ? (
+                <div className="competitor-loading-card" key={competitor}>
+                  <div className="loading-spinner" />
+                  <div className="loading-message">Analysis will be available in ~10 minutes.</div>
+                </div>
+              ) : (
+                <motion.div
+                  key={competitor}
+                  className={`competitor-sub-container ${fetch.data && fetch.data.length > 0 ? 'loaded' : ''} ${(!fetch.data || fetch.data.length === 0) ? 'no-data' : ''}`}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: index * 0.1, duration: 0.2 }}
+                  whileHover={{ scale: 1.02 }}
+                >
+                  <div className="competitor-actions">
+                    <motion.button
+                      className="action-btn edit-btn"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => {
+                        setCurrentCompetitor(competitor);
+                        setEditCompetitor(competitor);
                       setShowEditModal(true);
                     }}
                     disabled={loading}
@@ -562,228 +564,6 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
           ))}
         </div>
 
-        {showAddModal && (
-          <motion.div
-            className="popup-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            onClick={() => {
-              setShowAddModal(false);
-              setNewCompetitor('');
-            }}
-          >
-            <motion.div
-              className="popup-content"
-              initial={{ scale: 0.8, y: 50 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.8, y: 50 }}
-              transition={{ duration: 0.3, ease: 'easeOut' }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3>Add Competitor</h3>
-              <input
-                type="text"
-                value={newCompetitor}
-                onChange={(e) => setNewCompetitor(e.target.value)}
-                placeholder="Enter competitor username"
-                className="competitor-input"
-                disabled={loading}
-              />
-              <div className="modal-actions">
-                <motion.button
-                  className="modal-btn save-btn"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={handleAddCompetitor}
-                  disabled={loading || !newCompetitor.trim()}
-                >
-                  {loading ? 'Saving...' : 'Save'}
-                </motion.button>
-                <motion.button
-                  className="modal-btn cancel-btn"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => {
-                    setShowAddModal(false);
-                    setNewCompetitor('');
-                  }}
-                  disabled={loading}
-                >
-                  Cancel
-                </motion.button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-
-        {showEditModal && (
-          <motion.div
-            className="popup-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            onClick={() => {
-              setShowEditModal(false);
-              setEditCompetitor('');
-              setCurrentCompetitor(null);
-            }}
-          >
-            <motion.div
-              className="popup-content"
-              initial={{ scale: 0.8, y: 50 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.8, y: 50 }}
-              transition={{ duration: 0.3, ease: 'easeOut' }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3>Edit Competitor</h3>
-              <input
-                type="text"
-                value={editCompetitor}
-                onChange={(e) => setEditCompetitor(e.target.value)}
-                placeholder="Edit competitor username"
-                className="competitor-input"
-                disabled={loading}
-              />
-              <div className="modal-actions">
-                <motion.button
-                  className="modal-btn save-btn"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={handleEditCompetitor}
-                  disabled={loading || !editCompetitor.trim()}
-                >
-                  {loading ? 'Saving...' : 'Save'}
-                </motion.button>
-                <motion.button
-                  className="modal-btn cancel-btn"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => {
-                    setShowEditModal(false);
-                    setEditCompetitor('');
-                    setCurrentCompetitor(null);
-                  }}
-                  disabled={loading}
-                >
-                  Cancel
-                </motion.button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-
-        {selectedCompetitor && (
-          <motion.div
-            className="popup-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            onClick={() => setSelectedCompetitor(null)}
-          >
-            <motion.div
-              className="popup-content"
-              initial={{ scale: 0.8, y: 50 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.8, y: 50 }}
-              transition={{ duration: 0.3, ease: 'easeOut' }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="profile-section">
-                <h3>{selectedCompetitor}</h3>
-                {profileErrors[selectedCompetitor] ? (
-                  <p className="error-text">{profileErrors[selectedCompetitor]}</p>
-                ) : competitorProfiles[selectedCompetitor] ? (
-                  <div className="stats">
-                    <span>Followers: {formatCount(competitorProfiles[selectedCompetitor].followersCount)}</span>
-                    <span>Following: {formatCount(competitorProfiles[selectedCompetitor].followsCount)}</span>
-                  </div>
-                ) : (
-                  <div className="stats">
-                    <span>Followers: Loading...</span>
-                    <span>Following: Loading...</span>
-                  </div>
-                )}
-              </div>
-              <div className="analysis-section">
-                <h4>Competitor Analysis Report</h4>
-                {selectedData?.length ? (
-                  <motion.div
-                    key={currentAnalysisIndex}
-                    className="analysis-report"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <h5>Analysis {currentAnalysisIndex + 1}</h5>
-                    {renderAnalysisContent(selectedData[currentAnalysisIndex]?.data || selectedData[currentAnalysisIndex])}
-                    <div className="navigation-buttons">
-                      <motion.button
-                        className="nav-btn"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={handlePrevAnalysis}
-                        disabled={currentAnalysisIndex === 0}
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#e0e0ff"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M15 18l-6-6 6-6" />
-                        </svg>
-                        Previous
-                      </motion.button>
-                      <motion.button
-                        className="nav-btn"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={handleNextAnalysis}
-                        disabled={currentAnalysisIndex === selectedData.length - 1}
-                      >
-                        Next
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#e0e0ff"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M9 18l6-6-6-6" />
-                        </svg>
-                      </motion.button>
-                    </div>
-                  </motion.div>
-                ) : (
-                  <p>No analysis available.</p>
-                )}
-              </div>
-              <motion.button
-                className="close-btn"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={() => setSelectedCompetitor(null)}
-              >
-                Close
-              </motion.button>
-            </motion.div>
-          </motion.div>
-        )}
-
         {toast && (
           <motion.div
             className="toast-notification"
@@ -810,8 +590,235 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
             {toast}
           </motion.div>
         )}
-      </motion.div>
-    </ErrorBoundary>
+        </motion.div>
+      </ErrorBoundary>
+
+      {/* All modals rendered as React Portals for absolute screen positioning */}
+      {showAddModal && createPortal(
+        <motion.div
+          className="popup-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          onClick={() => {
+            setShowAddModal(false);
+            setNewCompetitor('');
+          }}
+        >
+          <motion.div
+            className="popup-content"
+            initial={{ scale: 0.8, y: 50 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.8, y: 50 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>Add Competitor</h3>
+            <input
+              type="text"
+              value={newCompetitor}
+              onChange={(e) => setNewCompetitor(e.target.value)}
+              placeholder="Enter competitor username"
+              className="competitor-input"
+              disabled={loading}
+            />
+            <div className="modal-actions">
+              <motion.button
+                className="modal-btn save-btn"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleAddCompetitor}
+                disabled={loading || !newCompetitor.trim()}
+              >
+                {loading ? 'Saving...' : 'Save'}
+              </motion.button>
+              <motion.button
+                className="modal-btn cancel-btn"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => {
+                  setShowAddModal(false);
+                  setNewCompetitor('');
+                }}
+                disabled={loading}
+              >
+                Cancel
+              </motion.button>
+            </div>
+          </motion.div>
+        </motion.div>,
+        document.body
+      )}
+
+      {showEditModal && createPortal(
+        <motion.div
+          className="popup-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          onClick={() => {
+            setShowEditModal(false);
+            setEditCompetitor('');
+            setCurrentCompetitor(null);
+          }}
+        >
+          <motion.div
+            className="popup-content"
+            initial={{ scale: 0.8, y: 50 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.8, y: 50 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>Edit Competitor</h3>
+            <input
+              type="text"
+              value={editCompetitor}
+              onChange={(e) => setEditCompetitor(e.target.value)}
+              placeholder="Edit competitor username"
+              className="competitor-input"
+              disabled={loading}
+            />
+            <div className="modal-actions">
+              <motion.button
+                className="modal-btn save-btn"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleEditCompetitor}
+                disabled={loading || !editCompetitor.trim()}
+              >
+                {loading ? 'Saving...' : 'Save'}
+              </motion.button>
+              <motion.button
+                className="modal-btn cancel-btn"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditCompetitor('');
+                  setCurrentCompetitor(null);
+                }}
+                disabled={loading}
+              >
+                Cancel
+              </motion.button>
+            </div>
+          </motion.div>
+        </motion.div>,
+        document.body
+      )}
+
+      {selectedCompetitor && createPortal(
+        <motion.div
+          className="popup-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          onClick={() => setSelectedCompetitor(null)}
+        >
+          <motion.div
+            className="popup-content"
+            initial={{ scale: 0.8, y: 50 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.8, y: 50 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="profile-section">
+              <h3>{selectedCompetitor}</h3>
+              {profileErrors[selectedCompetitor] ? (
+                <p className="error-text">{profileErrors[selectedCompetitor]}</p>
+              ) : competitorProfiles[selectedCompetitor] ? (
+                <div className="stats">
+                  <span>Followers: {formatCount(competitorProfiles[selectedCompetitor].followersCount)}</span>
+                  <span>Following: {formatCount(competitorProfiles[selectedCompetitor].followsCount)}</span>
+                </div>
+              ) : (
+                <div className="stats">
+                  <span>Followers: Loading...</span>
+                  <span>Following: Loading...</span>
+                </div>
+              )}
+            </div>
+            <div className="analysis-section">
+              <h4>Competitor Analysis Report</h4>
+              {selectedData?.length ? (
+                <motion.div
+                  key={currentAnalysisIndex}
+                  className="analysis-report"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <h5>Analysis {currentAnalysisIndex + 1}</h5>
+                  {renderAnalysisContent(selectedData[currentAnalysisIndex]?.data || selectedData[currentAnalysisIndex])}
+                  <div className="navigation-buttons">
+                    <motion.button
+                      className="nav-btn"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={handlePrevAnalysis}
+                      disabled={currentAnalysisIndex === 0}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#e0e0ff"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M15 18l-6-6 6-6" />
+                      </svg>
+                      Previous
+                    </motion.button>
+                    <motion.button
+                      className="nav-btn"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={handleNextAnalysis}
+                      disabled={currentAnalysisIndex === selectedData.length - 1}
+                    >
+                      Next
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#e0e0ff"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M9 18l6-6-6-6" />
+                      </svg>
+                    </motion.button>
+                  </div>
+                </motion.div>
+              ) : (
+                <p>No analysis available.</p>
+              )}
+            </div>
+            <motion.button
+              className="close-btn"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setSelectedCompetitor(null)}
+            >
+              Close
+            </motion.button>
+          </motion.div>
+        </motion.div>,
+        document.body
+      )}
+    </>
   );
 };
 

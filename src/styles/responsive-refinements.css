@@ -183,8 +183,8 @@
   .canvas-editor-overlay,
   .modal-overlay,
   .popup-overlay {
-    transform: translateZ(0) !important;
-    will-change: transform !important;
+    transform: none !important; /* 🔧 CRITICAL FIX: Prevent transform issues with modal positioning */
+    will-change: auto !important; /* 🔧 CRITICAL FIX: Prevent performance optimization conflicts */
   }
   
   /* Ensure crisp borders and shadows */
@@ -251,8 +251,18 @@
     transform: none !important;
   }
   
-  .canvas-editor-overlay {
+  .canvas-editor-overlay,
+  .modal-overlay,
+  .popup-overlay {
     padding: 10px !important;
+    /* 🔧 CRITICAL FIX: Ensure modals are always viewport-relative */
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    transform: none !important;
+    z-index: 99999 !important;
   }
 }
 

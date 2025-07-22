@@ -292,82 +292,67 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     try {
       console.log(`[PlatformDashboard] ⚡ Fetching profile info for ${platform}`);
       
+      // 🎯 CRITICAL FIX: Try different endpoints for different platforms to handle R2 bucket structure
       let response;
       let profileData = null;
       
-      // 🎯 SIMPLE FIX: Use the same pattern for all platforms, just handle different data structures
-      if (platform === 'twitter') {
-        // For Twitter, try the cache extraction first since that has the actual profile data
-        try {
-          const cacheResponse = await axios.get(`/api/data/cache/twitter_${accountHolder}_profile.json`);
-          
-          if (cacheResponse?.data?.data && Array.isArray(cacheResponse.data.data) && cacheResponse.data.data.length > 0) {
-            const authorData = cacheResponse.data.data[0].author;
-            if (authorData && authorData.userName) {
-              console.log(`[TWITTER] Using cached profile data:`, authorData);
-              profileData = {
-                username: authorData.userName,
-                fullName: authorData.name || authorData.userName,
-                biography: authorData.description || '',
-                followersCount: authorData.followers || 0,
-                followsCount: authorData.following || 0,
-                postsCount: authorData.statusesCount || 0,
-                externalUrl: '',
-                profilePicUrl: authorData.profilePicture,
-                profilePicUrlHD: authorData.coverPicture || authorData.profilePicture,
-                private: authorData.protected || false,
-                verified: authorData.isVerified || false,
-                platform: 'twitter',
-                extractedAt: new Date().toISOString()
-              };
-            }
-          }
-        } catch (cacheErr) {
-          console.log(`[TWITTER] Cache extraction failed, will try API endpoint`);
-        }
-        
-        // If cache extraction failed, try the API endpoint
-        if (!profileData) {
-          try {
-            response = await axios.get(`/api/profile-info/${accountHolder}?platform=twitter`);
-            const rawData = response.data;
-            
-            // Check if this is account config data (has accountType, competitors, etc.)
-            if (rawData.accountType || rawData.competitors) {
-              console.log(`[TWITTER] Received account config instead of profile data, setting error`);
-              setProfileError(`Twitter profile data not scraped yet. Please ensure profile scraping is complete.`);
-              setProfileLoading(false);
-              return;
-            } else {
-              profileData = rawData;
-            }
-          } catch (apiErr) {
-            console.log(`[TWITTER] API endpoint also failed:`, apiErr);
-          }
-        }
+      if (platform === 'instagram') {
+        // Instagram works with the original endpoint (no platform param needed)
+        response = await axios.get(`/api/profile-info/${accountHolder}`);
+        profileData = response.data;
       } else {
-        // For Instagram and Facebook, use the standard approach
+        // Twitter and Facebook need platform-specific path handling
         try {
-          response = await axios.get(`/api/profile-info/${accountHolder}`);
+          const platformParam = `?platform=${platform}`;
+          response = await axios.get(`/api/profile-info/${accountHolder}${platformParam}`);
           profileData = response.data;
+          
+          // 🎯 ENHANCED VALIDATION: Check if response contains actual profile fields
+          const hasProfileFields = profileData.fullName || profileData.followersCount !== undefined || 
+                                   profileData.biography || profileData.profilePicUrl || profileData.profilePicUrlHD;
+          
+          if (!hasProfileFields && platform === 'twitter') {
+            // 🎯 FALLBACK: Try extracting from cached Twitter data
+            console.log(`[TWITTER] Profile data not found in R2, trying cache extraction...`);
+            const cacheResponse = await axios.get(`/api/data/cache/twitter_${accountHolder}_profile.json`).catch(() => null);
+            
+            if (cacheResponse?.data?.data && Array.isArray(cacheResponse.data.data) && cacheResponse.data.data.length > 0) {
+              const authorData = cacheResponse.data.data[0].author;
+              if (authorData) {
+                console.log(`[TWITTER] Extracting profile from cached author data:`, authorData);
+                profileData = {
+                  username: authorData.userName || accountHolder,
+                  fullName: authorData.name || authorData.userName,
+                  biography: authorData.description || '',
+                  followersCount: authorData.followers || 0,
+                  followsCount: authorData.following || 0,
+                  postsCount: authorData.statusesCount || 0,
+                  externalUrl: '',
+                  profilePicUrl: authorData.profilePicture,
+                  profilePicUrlHD: authorData.coverPicture || authorData.profilePicture,
+                  private: authorData.protected || false,
+                  verified: authorData.isVerified || false,
+                  platform: 'twitter',
+                  extractedAt: new Date().toISOString()
+                };
+                console.log(`[TWITTER] Successfully extracted profile data:`, profileData);
+              }
+            }
+          }
         } catch (err) {
-          console.warn(`[${platform.toUpperCase()}] Profile endpoint failed:`, err);
+          console.warn(`[${platform.toUpperCase()}] Primary profile endpoint failed, trying fallback...`);
+          profileData = null;
         }
       }
       
       console.log(`[PlatformDashboard] Raw response for ${platform}:`, profileData);
       
-      // Simple validation: Check if we have profile data
+      // 🎯 ENHANCED VALIDATION: Check if response contains actual profile fields
       if (profileData && typeof profileData === 'object' && !Array.isArray(profileData)) {
-        const hasProfileFields = profileData.fullName || 
-                               profileData.followersCount !== undefined || 
-                               profileData.followsCount !== undefined ||
-                               profileData.postsCount !== undefined ||
-                               profileData.biography !== undefined || 
-                               profileData.profilePicUrl || 
-                               profileData.profilePicUrlHD ||
-                               profileData.username;
-                               
+        // Validate that this is actually profile data, not account config
+        const hasProfileFields = profileData.fullName || profileData.followersCount !== undefined || 
+                                 profileData.biography || profileData.profilePicUrl || profileData.profilePicUrlHD;
+        
         if (hasProfileFields) {
           setProfileInfo(profileData);
           console.log(`[${platform.toUpperCase()}] Profile Info Successfully Fetched:`, {
@@ -376,19 +361,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
             biography: profileData.biography?.substring(0, 50) + '...',
             profilePicUrl: profileData.profilePicUrl ? 'Available' : 'N/A'
           });
-          
-          // 🎯 TWITTER DEBUG: Additional logging for Twitter profile data
-          if (platform === 'twitter') {
-            console.log(`[TWITTER-DEBUG] Setting profile info state with:`, {
-              raw_followersCount: profileData.followersCount,
-              type_followersCount: typeof profileData.followersCount,
-              raw_followsCount: profileData.followsCount,
-              type_followsCount: typeof profileData.followsCount,
-              raw_postsCount: profileData.postsCount,
-              type_postsCount: typeof profileData.postsCount,
-              fullProfileData: profileData
-            });
-          }
         } else {
           console.warn(`[${platform.toUpperCase()}] Response contains account config, not profile data:`, profileData);
           setProfileInfo(null);
@@ -400,7 +372,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       }
     } catch (err: any) {
       console.error(`[${platform.toUpperCase()}] Profile info fetch error:`, err);
-      
       if (err.response?.status === 404) {
         setProfileInfo(null);
         setProfileError(`Profile info not available for ${platform}.`);
@@ -2446,32 +2417,13 @@ Image Description: ${response.post.image_prompt}
                     <div className="stat">
                       <span className="label">Followers</span>
                       <span className="value">
-                        {(() => {
-                          const followerCount = profileInfo?.followersCount;
-                          console.log(`[UI-DEBUG] Rendering follower count:`, {
-                            platform: platform,
-                            followerCount: followerCount,
-                            type: typeof followerCount,
-                            profileInfo: profileInfo,
-                            formatResult: formatCount(followerCount)
-                          });
-                          return formatCount(followerCount);
-                        })()}
+                        {formatCount(profileInfo?.followersCount)}
                       </span>
                     </div>
                     <div className="stat">
                       <span className="label">Following</span>
                       <span className="value">
-                        {(() => {
-                          const followsCount = profileInfo?.followsCount;
-                          console.log(`[UI-DEBUG] Rendering follows count:`, {
-                            platform: platform,
-                            followsCount: followsCount,
-                            type: typeof followsCount,
-                            formatResult: formatCount(followsCount)
-                          });
-                          return formatCount(followsCount);
-                        })()}
+                        {formatCount(profileInfo?.followsCount)}
                       </span>
                     </div>
                   </div>

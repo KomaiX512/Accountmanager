@@ -27,7 +27,7 @@ import type { ChatMessage as ChatModalMessage } from './ChatModal';
 import type { Notification, ProfileInfo, LinkedAccount } from '../../types/notifications';
 import { safeFilter, safeMap, safeLength } from '../../utils/safeArrayUtils';
 // Import icons from react-icons
-import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaLock, FaBell, FaUndo, FaComments, FaPencilAlt, FaPaperPlane } from 'react-icons/fa';
+import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaLock, FaBell, FaUndo, FaComments, FaPencilAlt, FaPaperPlane, FaRocket } from 'react-icons/fa';
 import { MdAnalytics, MdOutlineSchedule, MdOutlineAutoGraph } from 'react-icons/md';
 import { BsLightningChargeFill, BsBinoculars, BsLightbulb } from 'react-icons/bs';
 import { IoMdAnalytics } from 'react-icons/io';
@@ -74,7 +74,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     type: 'dm' | 'comment';
     id: string;
   }[]>([]);
-  const [chatMode, setChatMode] = useState<'discussion' | 'post'>('discussion');
+  // ✅ FIX: Remove chat mode selector - dedicated to post creation only
   const [isProcessing, setIsProcessing] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatModalMessage[]>([]);
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
@@ -384,66 +384,65 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const handleSendQuery = async () => {
     if (!accountHolder || !query.trim()) return;
     
-    console.log(`[Dashboard] 🚀 Starting ${chatMode} query for ${accountHolder} on Instagram`);
+    console.log(`[Dashboard] 🚀 Starting post creation query for ${accountHolder} on Instagram`);
     console.log(`[Dashboard] 📝 Query: "${query}"`);
-    console.log(`[Dashboard] 📊 Previous messages: ${chatMessages.length}`);
     
     // Check feature access and show upgrade popup if blocked
-    if (chatMode === 'discussion') {
-      if (!handleFeatureAttempt('discussions')) {
-        return;
-      }
-    } else if (chatMode === 'post') {
-      if (!handleFeatureAttempt('posts')) {
-        return;
-      }
+    if (!handleFeatureAttempt('posts')) {
+      return;
     }
     
     setIsProcessing(true);
     setResult('');
     
     try {
-      if (chatMode === 'discussion') {
-        // ✅ REAL USAGE TRACKING: Check limits BEFORE engaging in discussion
-        const trackingSuccess = await trackRealDiscussion('instagram', {
-          messageCount: chatMessages.length + 1,
-          type: 'chat'
-        });
+      // ✅ REAL USAGE TRACKING: Check limits BEFORE creating post
+      const trackingSuccess = await trackRealPostCreation('instagram', {
+        scheduled: false,
+        immediate: false,
+        type: 'ai_generated_content'
+      });
+      
+      if (!trackingSuccess) {
+        console.warn(`[Dashboard] 🚫 Post creation blocked for Instagram - limit reached`);
+        setToast('Post creation limit reached - upgrade to continue');
+        setIsProcessing(false);
+        return;
+      }
+      
+      console.log(`[Dashboard] 🎨 Sending post generation query to RAG for ${accountHolder}: "${query}"`);
+      const response = await RagService.sendPostQuery(accountHolder, query, 'instagram');
+      
+      console.log(`[Dashboard] ✅ Received post generation response for ${accountHolder} on Instagram`);
+      console.log(`[Dashboard] 📝 Post generation details:`, {
+        success: response.success,
+        hasPost: !!response.post,
+        error: response.error
+      });
+      
+      if (response.success && response.post) {
+        const postContent = `
+Caption: ${response.post.caption}
+
+Hashtags: ${response.post.hashtags?.join(' ')}
+
+Call to Action: ${response.post.call_to_action}
+
+Image Description: ${response.post.image_prompt}
+        `;
         
-        if (!trackingSuccess) {
-          console.warn(`[Dashboard] 🚫 Discussion blocked for Instagram - limit reached`);
-          setToast('Discussion limit reached - upgrade to continue');
-          setIsProcessing(false);
-          return;
-        }
+        setResult(postContent);
+        console.log(`[Dashboard] ✨ Post content generated for ${accountHolder} on Instagram`);
         
-        console.log(`[Dashboard] 🔍 Sending discussion query to RAG for ${accountHolder}: "${query}"`);
-        const response = await RagService.sendDiscussionQuery(accountHolder, query, chatMessages, 'instagram');
-        
-        console.log(`[Dashboard] ✅ Received discussion response for ${accountHolder} on Instagram`);
-        console.log(`[Dashboard] 📝 Response details:`, {
-          responseLength: response.response?.length || 0,
-          usedFallback: response.usedFallback,
-          usingFallbackProfile: response.usingFallbackProfile,
-          enhancedContext: response.enhancedContext,
-          hasQuotaInfo: !!response.quotaInfo
-        });
-        
-        // Validate response
-        if (!response.response || response.response.trim().length === 0) {
-          console.error(`[Dashboard] ❌ Empty response received for ${accountHolder} on Instagram`);
-          throw new Error('Empty response from RAG service');
-        }
-        
-        // Add messages to history
+        // Add to history
         const userMessage: RagChatMessage = {
           role: 'user',
-          content: query
+          content: `Generate post: ${query}`
         };
         
         const assistantMessage: RagChatMessage = {
           role: 'assistant',
-          content: response.response
+          content: postContent
         };
         
         // Type assertion to ensure compatibility
@@ -452,125 +451,30 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
           assistantMessage as ChatModalMessage
         ];
         
-        console.log(`[Dashboard] 💬 Updated conversation with ${updatedMessages.length} messages for ${accountHolder}`);
-        
         setChatMessages(updatedMessages);
         
-        // Log response quality indicators
-        if (response.enhancedContext) {
-          console.log(`[Dashboard] 🧠 Enhanced ChromaDB context detected for ${accountHolder} on Instagram`);
-        } else if (response.usedFallback) {
-          console.log(`[Dashboard] ⚠️ Using fallback response for ${accountHolder} on Instagram`);
-        } else {
-          console.log(`[Dashboard] ✅ Standard response processed for ${accountHolder} on Instagram`);
-        }
-        
-        // Save to RAG server
-        try {
-          await RagService.saveConversation(accountHolder, [...chatMessages, userMessage, assistantMessage], 'instagram');
-          console.log(`[Dashboard] 💾 Conversation saved for ${accountHolder} on Instagram`);
-        } catch (saveErr) {
-          console.warn(`[Dashboard] ⚠️ Failed to save conversation for ${accountHolder}:`, saveErr);
-        }
-        
-        // Set the result
-        setResult(response.response);
-        
-        if (response.response.includes('https://instagram.com/')) {
-          const matches = response.response.match(/https:\/\/instagram\.com\/([A-Za-z0-9_.-]+)/g);
-          if (matches?.length) {
-            setLinkedAccounts(matches.map(url => ({
-              url,
-              username: url.replace('https://instagram.com/', '')
-            })));
-            console.log(`[Dashboard] 🔗 Found ${matches.length} linked accounts in response for ${accountHolder}`);
+        // TRIGGER POST REFRESH: Notify PostCooked component about new post
+        const newPostEvent = new CustomEvent('newPostCreated', {
+          detail: {
+            username: accountHolder,
+            platform: 'instagram',
+            timestamp: Date.now()
           }
-        }
-        
-        // Automatically open chat modal with the conversation
-        setIsChatModalOpen(true);
-        
-      } else if (chatMode === 'post') {
-        // ✅ REAL USAGE TRACKING: Check limits BEFORE creating post
-        const trackingSuccess = await trackRealPostCreation('instagram', {
-          scheduled: false,
-          immediate: false,
-          type: 'ai_generated_content'
         });
+        window.dispatchEvent(newPostEvent);
+        console.log(`[Dashboard] 🔄 NEW POST: Triggered PostCooked refresh event for Instagram`);
         
-        if (!trackingSuccess) {
-          console.warn(`[Dashboard] 🚫 Post creation blocked for Instagram - limit reached`);
-          setToast('Post creation limit reached - upgrade to continue');
-          setIsProcessing(false);
-          return;
-        }
-        
-        console.log(`[Dashboard] 🎨 Sending post generation query to RAG for ${accountHolder}: "${query}"`);
-        const response = await RagService.sendPostQuery(accountHolder, query, 'instagram');
-        
-        console.log(`[Dashboard] ✅ Received post generation response for ${accountHolder} on Instagram`);
-        console.log(`[Dashboard] 📝 Post generation details:`, {
-          success: response.success,
-          hasPost: !!response.post,
-          error: response.error
-        });
-        
-        if (response.success && response.post) {
-          const postContent = `
-Caption: ${response.post.caption}
-
-Hashtags: ${response.post.hashtags?.join(' ')}
-
-Call to Action: ${response.post.call_to_action}
-
-Image Description: ${response.post.image_prompt}
-          `;
-          
-          setResult(postContent);
-          console.log(`[Dashboard] ✨ Post content generated for ${accountHolder} on Instagram`);
-          
-          // Add to history
-          const userMessage: RagChatMessage = {
-            role: 'user',
-            content: `Generate post: ${query}`
-          };
-          
-          const assistantMessage: RagChatMessage = {
-            role: 'assistant',
-            content: postContent
-          };
-          
-          // Type assertion to ensure compatibility
-          const updatedMessages = [...chatMessages, 
-            userMessage as ChatModalMessage, 
-            assistantMessage as ChatModalMessage
-          ];
-          
-          setChatMessages(updatedMessages);
-          
-          // TRIGGER POST REFRESH: Notify PostCooked component about new post
-          const newPostEvent = new CustomEvent('newPostCreated', {
-            detail: {
-              username: accountHolder,
-              platform: 'instagram',
-              timestamp: Date.now()
-            }
-          });
-          window.dispatchEvent(newPostEvent);
-          console.log(`[Dashboard] 🔄 NEW POST: Triggered PostCooked refresh event for Instagram`);
-          
-          // DON'T OPEN POPUP FOR POST MODE: Just show success message via toast
-          setToast('Post generated successfully! Check the Cooked Posts section.');
-        } else {
-          // Handle error from post generation
-          console.error(`[Dashboard] ❌ Post generation failed for ${accountHolder} on Instagram:`, response.error);
-          setToast(response.error || 'Failed to generate post');
-        }
+        // Show success message via toast
+        setToast('Post generated successfully! Check the Cooked Posts section.');
+      } else {
+        // Handle error from post generation
+        console.error(`[Dashboard] ❌ Post generation failed for ${accountHolder} on Instagram:`, response.error);
+        setToast(response.error || 'Failed to generate post');
       }
       
       setQuery('');
     } catch (error: unknown) {
-      console.error(`[Dashboard] ❌ Error processing ${chatMode} query for ${accountHolder} on Instagram:`, error);
+      console.error(`[Dashboard] ❌ Error processing post creation query for ${accountHolder} on Instagram:`, error);
       setToast('Failed to process your request.');
       
       // Type guard for AxiosError or any error with response property
@@ -588,7 +492,7 @@ Image Description: ${response.post.image_prompt}
       }
     } finally {
       setIsProcessing(false);
-      console.log(`[Dashboard] ✅ Completed ${chatMode} query processing for ${accountHolder} on Instagram`);
+      console.log(`[Dashboard] ✅ Completed post creation processing for ${accountHolder} on Instagram`);
     }
   };
 
@@ -2015,50 +1919,39 @@ Image Description: ${response.post.image_prompt}
             <Cs_Analysis accountHolder={accountHolder} competitors={competitors} />
           </div>
 
-          <div className="chatbot">
-            <div className="chatbot-input-container">
-              <div className="chat-mode-selector">
-                <select 
-                  value={chatMode} 
-                  onChange={(e) => setChatMode(e.target.value as 'discussion' | 'post')}
-                  className="chat-mode-dropdown"
-                >
-                  <option value="discussion">Discussion Mode</option>
-                  <option value="post">Post Mode</option>
-                </select>
+          <div className="post-creation-bar">
+            <div className="post-creation-container">
+              <div className="post-creation-label">
+                <FaPencilAlt className="post-icon" />
+                <span>Create Post</span>
               </div>
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={chatMode === 'discussion' 
-                  ? "Ask me anything about your Instagram strategy..." 
-                  : "Describe the post you want to create..."}
-                className="chatbot-input"
-                disabled={isProcessing}
-              />
+              
+              <div className="post-input-section">
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="What would you like to post on Instagram?"
+                  className="post-input-field"
+                  disabled={isProcessing}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && !isProcessing && query.trim()) {
+                      handleSendQuery();
+                    }
+                  }}
+                />
+              </div>
+              
               <button 
-                className={`chatbot-send-btn ${isProcessing ? 'processing' : ''}`} 
+                className={`post-send-btn ${isProcessing ? 'processing' : ''}`} 
                 onClick={handleSendQuery} 
                 disabled={!query.trim() || isProcessing}
+                title="Send Post"
               >
                 {isProcessing ? (
-                  <div className="loading-spinner"></div>
+                  <div className="btn-spinner"></div>
                 ) : (
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#e0e0ff"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <line x1="22" y1="2" x2="11" y2="13" />
-                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                  </svg>
+                  <FaRocket />
                 )}
               </button>
             </div>

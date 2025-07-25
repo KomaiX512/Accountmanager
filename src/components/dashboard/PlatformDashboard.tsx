@@ -29,7 +29,7 @@ import RagService from '../../services/RagService';
 import type { ChatMessage as ChatModalMessage } from '../common/ChatModal';
 import { Notification, ProfileInfo, LinkedAccount } from '../../types/notifications';
 // Import icons from react-icons
-import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaTwitter, FaInstagram, FaPen, FaFacebook, FaBell, FaUndo, FaInfoCircle } from 'react-icons/fa';
+import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaTwitter, FaInstagram, FaPen, FaFacebook, FaBell, FaUndo, FaInfoCircle, FaPencilAlt, FaRocket } from 'react-icons/fa';
 import { MdAnalytics, MdOutlineSchedule, MdOutlineAutoGraph } from 'react-icons/md';
 import { BsLightningChargeFill, BsBinoculars, BsLightbulb } from 'react-icons/bs';
 import { IoMdAnalytics } from 'react-icons/io';
@@ -80,7 +80,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const { userId: igUserId, isConnected: isInstagramConnected } = useInstagram();
   const { userId: twitterId, isConnected: isTwitterConnected } = useTwitter();
   const { userId: facebookPageId, isConnected: isFacebookConnected, connectFacebook } = useFacebook();
-  const { trackRealDiscussion, trackRealAIReply, trackRealPostCreation, canUseFeature } = useFeatureTracking();
+  const { trackRealAIReply, trackRealPostCreation, canUseFeature } = useFeatureTracking();
   const { showUpgradePopup, blockedFeature, closeUpgradePopup, currentUsage } = useUpgradeHandler();
   const { resetAndAllowReconnection } = useResetPlatformState();
 
@@ -98,7 +98,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const [chatMode, setChatMode] = useState<'discussion' | 'post'>('discussion');
+  // ✅ FIX 2: Remove chat mode selector - chatbar is now dedicated to post creation only
   const [isProcessing, setIsProcessing] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatModalMessage[]>([]);
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
@@ -1287,8 +1287,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         onOpenChat(messageContent);
       }
     } else {
-      // Set chat mode to discussion
-      setChatMode('discussion');
+      // ✅ FIX 2: Chat bar is now dedicated to post creation, so open chat modal for discussions
       
       // Add the message content to chat messages as an assistant message
       const assistantMessage: ChatModalMessage = {
@@ -1957,134 +1956,34 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const handleSendQuery = async () => {
     if (!query.trim()) return;
     
-    console.log(`[PlatformDashboard] 🚀 Starting ${chatMode} query for ${accountHolder} on ${platform}`);
+    console.log(`[PlatformDashboard] 🚀 Starting post creation query for ${accountHolder} on ${platform}`);
     console.log(`[PlatformDashboard] 📝 Query: "${query}"`);
-    console.log(`[PlatformDashboard] 📊 Previous messages: ${chatMessages.length}`);
     
     setIsProcessing(true);
     
     try {
-      if (chatMode === 'discussion') {
-        // ✅ PRE-ACTION CHECK: Verify discussion limits BEFORE performing action
-        const discussionCheck = canUseFeature('discussions');
-        if (!discussionCheck.allowed) {
-          console.warn(`[PlatformDashboard] 🚫 Discussion blocked for ${platform} - ${discussionCheck.reason}`);
-          setToast(discussionCheck.reason || 'Discussion feature not available');
-          setIsProcessing(false);
-          return;
-        }
-        
-        console.log(`[PlatformDashboard] 🔍 Sending ${platform} discussion query to RAG for ${accountHolder}: "${query}"`);
-        const response = await RagService.sendDiscussionQuery(accountHolder, query, chatMessages, platform);
-        
-        console.log(`[PlatformDashboard] ✅ Received discussion response for ${accountHolder} on ${platform}`);
-        console.log(`[PlatformDashboard] 📝 Response details:`, {
-          responseLength: response.response?.length || 0,
-          usedFallback: response.usedFallback,
-          usingFallbackProfile: response.usingFallbackProfile,
-          enhancedContext: response.enhancedContext,
-          hasQuotaInfo: !!response.quotaInfo
-        });
-        
-        // Validate response
-        if (!response.response || response.response.trim().length === 0) {
-          console.error(`[PlatformDashboard] ❌ Empty response received for ${accountHolder} on ${platform}`);
-          throw new Error('Empty response from RAG service');
-        }
-        
-        const userMessage: RagChatMessage = {
-          role: 'user',
-          content: query
-        };
-        
-        const assistantMessage: RagChatMessage = {
-          role: 'assistant',
-          content: response.response
-        };
-        
-        const updatedMessages = [...chatMessages, 
-          userMessage as ChatModalMessage, 
-          assistantMessage as ChatModalMessage
-        ];
-        
-        console.log(`[PlatformDashboard] 💬 Updated conversation with ${updatedMessages.length} messages for ${accountHolder}`);
-        
-        // ✅ REAL USAGE TRACKING: Track actual discussion usage
-        const trackingSuccess = await trackRealDiscussion(platform, {
-          messageCount: updatedMessages.length,
-          type: 'chat'
-        });
-        
-        if (!trackingSuccess) {
-          console.warn(`[PlatformDashboard] 🚫 Discussion tracking failed for ${platform} - limit may have been reached`);
-          // Don't return here - discussion was already sent successfully
-        }
-        
-        setChatMessages(updatedMessages);
-        
-        // 🚀 AUTO-OPEN: Open chat modal when discussion response arrives
-        if (!isChatModalOpen) {
-          setIsChatModalOpen(true);
-        }
-        
-        console.log(`[PlatformDashboard] ✅ Discussion tracked: ${platform} chat engagement`);
-        
-        // Log response quality indicators
-        if (response.enhancedContext) {
-          console.log(`[PlatformDashboard] 🧠 Enhanced ChromaDB context detected for ${accountHolder} on ${platform}`);
-        } else if (response.usedFallback) {
-          console.log(`[PlatformDashboard] ⚠️ Using fallback response for ${accountHolder} on ${platform}`);
-        } else {
-          console.log(`[PlatformDashboard] ✅ Standard response processed for ${accountHolder} on ${platform}`);
-        }
-        
-        try {
-          await RagService.saveConversation(accountHolder, [...chatMessages, userMessage, assistantMessage], platform);
-          console.log(`[PlatformDashboard] 💾 Conversation saved for ${accountHolder} on ${platform}`);
-        } catch (saveErr) {
-          console.warn(`[PlatformDashboard] ⚠️ Failed to save conversation for ${accountHolder}:`, saveErr);
-        }
-        
-        setResult(response.response);
-        
-        // Handle platform-specific linked accounts
-        const urlPattern = platform === 'twitter' 
-          ? /https:\/\/twitter\.com\/([A-Za-z0-9_]+)/g
-          : /https:\/\/instagram\.com\/([A-Za-z0-9_.-]+)/g;
-        
-        const matches = [...response.response.matchAll(urlPattern)];
-        if (matches.length > 0) {
-          const newLinkedAccounts = matches.map(match => ({
-            username: match[1],
-            platform: platform as 'twitter' | 'instagram',
-            addedAt: new Date().toISOString()
-          }));
-          setLinkedAccounts(prev => [...prev, ...newLinkedAccounts]);
-          console.log(`[PlatformDashboard] 🔗 Found ${matches.length} linked accounts in response for ${accountHolder}`);
-        }
-        
-      } else if (chatMode === 'post') {
-        // ✅ PRE-ACTION CHECK: Verify post limits BEFORE performing action
-        const postCheck = canUseFeature('posts');
-        if (!postCheck.allowed) {
-          console.warn(`[PlatformDashboard] 🚫 Post creation blocked for ${platform} - ${postCheck.reason}`);
-          setToast(postCheck.reason || 'Post creation feature not available');
-          setIsProcessing(false);
-          return;
-        }
-        
-        console.log(`[PlatformDashboard] 🎨 Generating ${platform} post for ${accountHolder}: "${query}"`);
-        const response = await RagService.sendPostQuery(accountHolder, query, platform);
-        
-        console.log(`[PlatformDashboard] ✅ Received post generation response for ${accountHolder} on ${platform}`);
-        console.log(`[PlatformDashboard] 📝 Post generation details:`, {
-          success: response.success,
-          hasPost: !!response.post,
-          error: response.error
-        });
-        
-        if (response.success && response.post) {
-          const postContent = `
+      // ✅ FIX 2: Chat bar is now dedicated to post creation only
+      // ✅ PRE-ACTION CHECK: Verify post limits BEFORE performing action
+      const postCheck = canUseFeature('posts');
+      if (!postCheck.allowed) {
+        console.warn(`[PlatformDashboard] 🚫 Post creation blocked for ${platform} - ${postCheck.reason}`);
+        setToast(postCheck.reason || 'Post creation feature not available');
+        setIsProcessing(false);
+        return;
+      }
+      
+      console.log(`[PlatformDashboard] 🎨 Generating ${platform} post for ${accountHolder}: "${query}"`);
+      const response = await RagService.sendPostQuery(accountHolder, query, platform);
+      
+      console.log(`[PlatformDashboard] ✅ Received post generation response for ${accountHolder} on ${platform}`);
+      console.log(`[PlatformDashboard] 📝 Post generation details:`, {
+        success: response.success,
+        hasPost: !!response.post,
+        error: response.error
+      });
+      
+      if (response.success && response.post) {
+        const postContent = `
 Caption: ${response.post.caption}
 
 Hashtags: ${response.post.hashtags?.join(' ')}
@@ -2092,67 +1991,66 @@ Hashtags: ${response.post.hashtags?.join(' ')}
 Call to Action: ${response.post.call_to_action}
 
 Image Description: ${response.post.image_prompt}
-          `;
-          
-          setResult(postContent);
-          console.log(`[PlatformDashboard] ✨ Post content generated for ${accountHolder} on ${platform}`);
-          
-          const userMessage: RagChatMessage = {
-            role: 'user',
-            content: `Generate ${platform} post: ${query}`
-          };
-          
-          const assistantMessage: RagChatMessage = {
-            role: 'assistant',
-            content: postContent
-          };
-          
-          const updatedMessages = [...chatMessages, 
-            userMessage as ChatModalMessage, 
-            assistantMessage as ChatModalMessage
-          ];
-          
-          // ✅ REAL USAGE TRACKING: Track actual post creation
-          const trackingSuccess = await trackRealPostCreation(platform, {
-            scheduled: false,
-            immediate: false,
-            type: 'ai_generated_content'
-          });
-          
-          if (!trackingSuccess) {
-            console.warn(`[PlatformDashboard] 🚫 Post creation tracking failed for ${platform} - limit may have been reached`);
-            // Don't return here - post was already generated successfully
-          }
-          
-          setChatMessages(updatedMessages);
-          console.log(`[PlatformDashboard] ✅ Post generation tracked: ${platform} AI content`);
-          
-          // TRIGGER POST REFRESH: Notify PostCooked component about new post
-          const newPostEvent = new CustomEvent('newPostCreated', {
-            detail: {
-              username: accountHolder,
-              platform: platform,
-              timestamp: Date.now()
-            }
-          });
-          window.dispatchEvent(newPostEvent);
-          console.log(`[PlatformDashboard] 🔄 NEW POST: Triggered PostCooked refresh event for ${platform}`);
-          
-          // DON'T OPEN POPUP FOR POST MODE: Just show success message via toast
-          setToast('Post generated successfully! Check the Cooked Posts section.');
-          
-        } else {
-          console.error(`[PlatformDashboard] ❌ Post generation failed for ${accountHolder} on ${platform}:`, response.error);
-          setToast('Failed to generate post. Please try again.');
+        `;
+        
+        setResult(postContent);
+        console.log(`[PlatformDashboard] ✨ Post content generated for ${accountHolder} on ${platform}`);
+        
+        const userMessage: RagChatMessage = {
+          role: 'user',
+          content: `Generate ${platform} post: ${query}`
+        };
+        
+        const assistantMessage: RagChatMessage = {
+          role: 'assistant',
+          content: postContent
+        };
+        
+        const updatedMessages = [...chatMessages, 
+          userMessage as ChatModalMessage, 
+          assistantMessage as ChatModalMessage
+        ];
+        
+        // ✅ REAL USAGE TRACKING: Track actual post creation
+        const trackingSuccess = await trackRealPostCreation(platform, {
+          scheduled: false,
+          immediate: false,
+          type: 'ai_generated_content'
+        });
+        
+        if (!trackingSuccess) {
+          console.warn(`[PlatformDashboard] 🚫 Post creation tracking failed for ${platform} - limit may have been reached`);
+          // Don't return here - post was already generated successfully
         }
+        
+        setChatMessages(updatedMessages);
+        console.log(`[PlatformDashboard] ✅ Post generation tracked: ${platform} AI content`);
+        
+        // TRIGGER POST REFRESH: Notify PostCooked component about new post
+        const newPostEvent = new CustomEvent('newPostCreated', {
+          detail: {
+            username: accountHolder,
+            platform: platform,
+            timestamp: Date.now()
+          }
+        });
+        window.dispatchEvent(newPostEvent);
+        console.log(`[PlatformDashboard] 🔄 NEW POST: Triggered PostCooked refresh event for ${platform}`);
+        
+        // DON'T OPEN POPUP FOR POST MODE: Just show success message via toast
+        setToast('Post generated successfully! Check the Cooked Posts section.');
+        
+      } else {
+        console.error(`[PlatformDashboard] ❌ Post generation failed for ${accountHolder} on ${platform}:`, response.error);
+        setToast('Failed to generate post. Please try again.');
       }
     } catch (error: any) {
-      console.error(`[PlatformDashboard] ❌ Error processing ${chatMode} query for ${accountHolder} on ${platform}:`, error);
-      setToast(error.message || `Failed to process ${chatMode} query`);
+      console.error(`[PlatformDashboard] ❌ Error processing post creation query for ${accountHolder} on ${platform}:`, error);
+      setToast(error.message || 'Failed to process post creation query');
     } finally {
       setIsProcessing(false);
       setQuery('');
-      console.log(`[PlatformDashboard] ✅ Completed ${chatMode} query processing for ${accountHolder} on ${platform}`);
+      console.log(`[PlatformDashboard] ✅ Completed post creation query processing for ${accountHolder} on ${platform}`);
     }
   };
 
@@ -2677,50 +2575,39 @@ Image Description: ${response.post.image_prompt}
               <Cs_Analysis accountHolder={accountHolder} competitors={competitors} platform={platform} />
             </div>
 
-            <div className="chatbot">
-              <div className="chatbot-input-container">
-                <div className="chat-mode-selector">
-                  <select 
-                    value={chatMode} 
-                    onChange={(e) => setChatMode(e.target.value as 'discussion' | 'post')}
-                    className="chat-mode-dropdown"
-                  >
-                    <option value="discussion">Discussion Mode</option>
-                    <option value="post">Post Creation Mode</option>
-                  </select>
+            <div className="post-creation-bar">
+              <div className="post-creation-container">
+                <div className="post-creation-label">
+                  <FaPencilAlt className="post-icon" />
+                  <span>Create Post</span>
                 </div>
-                <input
-                  type="text"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={chatMode === 'discussion' 
-                    ? `Ask me anything about your ${config.name} strategy...` 
-                    : `Describe the ${config.name} post you want to create...`}
-                  className="chatbot-input"
-                  disabled={isProcessing}
-                />
+                
+                <div className="post-input-section">
+                  <input
+                    type="text"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder={`What would you like to post on ${config.name}?`}
+                    className="post-input-field"
+                    disabled={isProcessing}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && !isProcessing && query.trim()) {
+                        handleSendQuery();
+                      }
+                    }}
+                  />
+                </div>
+                
                 <button 
-                  className={`chatbot-send-btn ${isProcessing ? 'processing' : ''}`} 
+                  className={`post-send-btn ${isProcessing ? 'processing' : ''}`} 
                   onClick={handleSendQuery} 
                   disabled={!query.trim() || isProcessing}
+                  title="Send Post"
                 >
                   {isProcessing ? (
-                    <div className="loading-spinner"></div>
+                    <div className="btn-spinner"></div>
                   ) : (
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#e0e0ff"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <line x1="22" y1="2" x2="11" y2="13" />
-                      <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                    </svg>
+                    <FaRocket />
                   )}
                 </button>
               </div>

@@ -693,8 +693,8 @@ async function fetchImageWithFallbacks(key, fallbackImagePath = null, username =
     if (Date.now() - timestamp < IMAGE_CACHE_TTL) {
       console.log(`[${new Date().toISOString()}] [IMAGE] Using cached image for ${key}`);
       // Validate that cached data is a proper Buffer
-      if (Buffer.isBuffer(cacheEntry.data) && cacheEntry.data.length > 0) {
-        return { data: cacheEntry.data, source: 'memory-cache' };
+      if (Buffer.isBuffer(data) && data.length > 0) {
+        return { data, source: 'memory-cache' };
       } else {
         console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid cached data type for ${key}, removing from cache`);
         imageCache.delete(cacheKey);
@@ -1441,6 +1441,10 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
   
   // Generate unique cache key for this specific request
   const cacheKey = `r2_image_${platform}_${username}_${imageKey}_${forceRefresh || 'default'}`;
+  // Skip memory cache when a force refresh is requested
+  if (forceRefresh) {
+    imageCache.delete(cacheKey);
+  }
   
   try {
     // Construct the R2 key path

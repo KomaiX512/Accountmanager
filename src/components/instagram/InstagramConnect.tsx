@@ -87,9 +87,24 @@ const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected, classN
       }
     };
 
+    // ✅ FIX 1: Handle popup window closing without successful connection
+    const handlePopupClosed = () => {
+      // Check if we're in a connecting state but haven't received a connection message
+      setTimeout(() => {
+        if (isConnecting && !isConnected) {
+          console.log(`[${new Date().toISOString()}] Instagram popup closed without successful connection, resetting state`);
+          setIsConnecting(false);
+        }
+      }, 1000); // Small delay to allow for any pending messages
+    };
+
     window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [onConnected, currentUser, connectInstagram]);
+    window.addEventListener('focus', handlePopupClosed);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      window.removeEventListener('focus', handlePopupClosed);
+    };
+  }, [onConnected, currentUser, connectInstagram, isConnecting, isConnected]);
 
   const connectToInstagram = () => {
     if (!currentUser) {
@@ -97,11 +112,12 @@ const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected, classN
       return;
     }
     
+    // Use the platform OAuth endpoint with correct parameters from Meta dashboard
     const appId = '1089716559763623';
-    const redirectUri = 'https://0ca9a44ebc1f.ngrok-free.app/instagram/callback';
-    const scope = 'instagram_business_basic,instagram_business_manage_messages,instagram_business_content_publish';
-    
-    const authUrl = `https://api.instagram.com/oauth/authorize?app_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code`;
+    const redirectUri = 'https://c38b57a675c1.ngrok-free.app/instagram/callback';
+    // Include all required permissions and URL-encode the scope list
+    const scope = 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish,instagram_business_manage_insights';
+    const authUrl = `https://www.instagram.com/oauth/authorize?force_reauth=true&client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}`;
 
     setIsConnecting(true);
     
@@ -111,11 +127,27 @@ const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected, classN
     const left = window.screen.width / 2 - width / 2;
     const top = window.screen.height / 2 - height / 2;
 
-    window.open(
+    const popup = window.open(
       authUrl,
       'instagram-auth',
       `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no`
     );
+
+    // ✅ FIX 1: Monitor popup window to detect if it's closed without successful connection
+    if (popup) {
+      const checkClosed = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(checkClosed);
+          // Only reset connecting state if we haven't successfully connected
+          setTimeout(() => {
+            if (isConnecting && !isConnected) {
+              console.log(`[${new Date().toISOString()}] Instagram popup was closed without successful connection`);
+              setIsConnecting(false);
+            }
+          }, 500);
+        }
+      }, 1000);
+    }
   };
 
   const handleDisconnect = () => {

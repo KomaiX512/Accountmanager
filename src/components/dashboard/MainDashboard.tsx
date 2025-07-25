@@ -435,18 +435,18 @@ const MainDashboard: React.FC = () => {
             }
           }
           
-          // Get a real username for this platform instead of using dummy
-          const platformUsername = localStorage.getItem(`${platform}_username_${currentUser.uid}`);
-          if (platformUsername) {
-            // Fetch strategies count
+          // Get the dashboard username (accountHolder) for AI content fetching
+          const dashboardUsername = localStorage.getItem(`${platform}_username_${currentUser.uid}`);
+          if (dashboardUsername) {
+            // Fetch strategies count - using dashboard username for AI content
             try {
-              const strategiesResponse = await fetch(`/api/retrieve-strategies/${platformUsername}?platform=${platform}`);
+              const strategiesResponse = await fetch(`/api/retrieve-strategies/${dashboardUsername}?platform=${platform}`);
               if (strategiesResponse.ok) {
                 const strategies = await strategiesResponse.json();
                 // Defensive check: ensure strategies is an array before filtering
                 if (Array.isArray(strategies)) {
-                  // Count unseen strategies
-                  const viewedKey = `viewed_strategies_${platform}_${platformUsername}`;
+                  // Count unseen strategies - using dashboard username for consistency
+                  const viewedKey = `viewed_strategies_${platform}_${dashboardUsername}`;
                   const viewedStrategies = JSON.parse(localStorage.getItem(viewedKey) || '[]');
                   const unseenStrategies = safeFilter(strategies, (s: any) => !viewedStrategies.includes(s.key));
                   totalCount += unseenStrategies.length;
@@ -456,15 +456,15 @@ const MainDashboard: React.FC = () => {
               // Ignore strategy fetch errors - don't log to reduce console noise
             }
             
-            // Fetch posts count  
+            // Fetch posts count - using dashboard username for AI content
             try {
-              const postsResponse = await fetch(`/api/posts/${platformUsername}?platform=${platform}`);
+              const postsResponse = await fetch(`/api/posts/${dashboardUsername}?platform=${platform}`);
               if (postsResponse.ok) {
                 const posts = await postsResponse.json();
                 // Defensive check: ensure posts is an array before filtering
                 if (Array.isArray(posts)) {
-                  // Count unseen posts
-                  const viewedKey = `viewed_posts_${platform}_${platformUsername}`;
+                  // Count unseen posts - using dashboard username for consistency
+                  const viewedKey = `viewed_posts_${platform}_${dashboardUsername}`;
                   const viewedPosts = JSON.parse(localStorage.getItem(viewedKey) || '[]');
                   const unseenPosts = safeFilter(posts, (p: any) => !viewedPosts.includes(p.key));
                   totalCount += unseenPosts.length;
@@ -474,21 +474,21 @@ const MainDashboard: React.FC = () => {
               // Ignore posts fetch errors - don't log to reduce console noise
             }
             
-            // Fetch competitor analysis count
+            // Fetch competitor analysis count - using dashboard username for AI content
             try {
-              const accountInfoResponse = await fetch(`/api/profile-info/${platformUsername}?platform=${platform}`);
+              const accountInfoResponse = await fetch(`/api/profile-info/${dashboardUsername}?platform=${platform}`);
               if (accountInfoResponse.ok) {
                 const accountInfo = await accountInfoResponse.json();
                 const competitors = accountInfo.competitors || [];
                 
                 if (competitors.length > 0) {
-                  const competitorResponse = await fetch(`/api/retrieve-multiple/${platformUsername}?competitors=${competitors.join(',')}&platform=${platform}`);
+                  const competitorResponse = await fetch(`/api/retrieve-multiple/${dashboardUsername}?competitors=${competitors.join(',')}&platform=${platform}`);
                   if (competitorResponse.ok) {
                     const competitorData = await competitorResponse.json();
                     // Defensive check: ensure competitorData is an array before filtering
                     if (Array.isArray(competitorData)) {
-                      // Count unseen competitor analysis
-                      const viewedKey = `viewed_competitor_${platform}_${platformUsername}`;
+                      // Count unseen competitor analysis - using dashboard username for consistency
+                      const viewedKey = `viewed_competitor_${platform}_${dashboardUsername}`;
                       const viewedCompetitor = JSON.parse(localStorage.getItem(viewedKey) || '[]');
                       const unseenCompetitor = safeFilter(competitorData, (c: any) => !viewedCompetitor.includes(c.key || `${c.competitor}_${c.timestamp}`));
                       totalCount += unseenCompetitor.length;

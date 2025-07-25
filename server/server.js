@@ -2436,18 +2436,23 @@ async function streamToBuffer(stream) {
 }
 
 // Instagram App Credentials
-const APP_ID = '576296982152813';
-const APP_SECRET = 'd48ddc9eaf0e5c4969d4ddc4e293178c';
-const REDIRECT_URI = 'https://www.sentientm.com/instagram/callback';
+const APP_ID = '676612308718574';
+const APP_SECRET = '7a225c1e31ad1949ab9609d7224da6b5';
+const REDIRECT_URI = 'https://0ca9a44ebc1f.ngrok-free.app/instagram/callback';
 const VERIFY_TOKEN = 'myInstagramWebhook2025';
 
 // Facebook App Credentials  
-const FB_APP_ID = '581584257679639'; // Your ACTUAL Facebook App ID (NOT Configuration ID)
-const FB_APP_SECRET = 'cdd153955e347e194390333e48cb0480'; // Your actual App Secret
-const FB_REDIRECT_URI = 'https://www.sentientm.com/facebook/callback';
+const FB_APP_ID = '676612308718574'; // Your ACTUAL Facebook App ID (NOT Configuration ID)
+const FB_APP_SECRET = '0144a0685fd3182b29e2750dabe2fcda'; // Your actual App Secret
+const FB_REDIRECT_URI = 'https://0ca9a44ebc1f.ngrok-free.app/facebook/callback';
 const FB_VERIFY_TOKEN = 'myFacebookWebhook2025';
 
-app.get(['/instagram/callback', '/api/instagram/callback'], async (req, res) => {
+app.get([
+  '/instagram/callback',
+  '/api/instagram/callback',
+  '/webhook/instagram',
+  '/api/webhook/instagram'
+], async (req, res) => {
   // Check if this is a webhook verification request
   const hubMode = req.query['hub.mode'];
   const hubToken = req.query['hub.verify_token'];
@@ -2572,7 +2577,12 @@ app.get(['/instagram/callback', '/api/instagram/callback'], async (req, res) => 
 });
 
 // Instagram Webhook POST Handler (for webhook events sent to callback URL)
-app.post(['/instagram/callback', '/api/instagram/callback'], async (req, res) => {
+app.post([
+  '/instagram/callback',
+  '/api/instagram/callback',
+  '/webhook/instagram',
+  '/api/webhook/instagram'
+], async (req, res) => {
   const body = req.body;
 
   if (body.object !== 'instagram') {
@@ -8478,7 +8488,7 @@ class PlatformSchemaManager {
 // Twitter OAuth 2.0 credentials
 const TWITTER_CLIENT_ID = 'cVNYR3UxVm5jQ3d5UWw0UHFqUTI6MTpjaQ';
 const TWITTER_CLIENT_SECRET = 'Wr8Kewh92NVB-035hAvpQeQ1Azc7chre3PUTgDoEltjO57mxzO';
-const TWITTER_REDIRECT_URI = 'https://www.sentientm.com/twitter/callback';
+const TWITTER_REDIRECT_URI = 'https://0ca9a44ebc1f.ngrok-free.app/twitter/callback';
 
 // Debug logging for OAuth 2.0
 console.log(`[${new Date().toISOString()}] Twitter OAuth 2.0 Configuration:`);
@@ -9988,6 +9998,924 @@ async function postToInstagram(tokenData, imageBuffer, caption) {
   }
 }
 
+// ============= 🚀 AUTOPILOT BACKGROUND WATCHERS =============
+
+// Start autopilot background watchers
+function startAutopilotWatchers() {
+  console.log(`[${new Date().toISOString()}] [AUTOPILOT] 🚀 Starting background watchers...`);
+  
+  // 🔥 IMMEDIATE FIRST RUN: Run once immediately on startup
+  setTimeout(() => {
+    console.log(`[${new Date().toISOString()}] [AUTOPILOT] 🏃‍♂️ Running initial autopilot check...`);
+    processAutopilotScheduling();
+    processAutopilotReplies();
+  }, 5000); // Run after 5 seconds to allow server to fully start
+  
+  // Auto-schedule watcher - checks for new posts to schedule every 3 minutes
+  const scheduleInterval = setInterval(async () => {
+    try {
+      console.log(`[${new Date().toISOString()}] [AUTOPILOT] 🔄 Running scheduled auto-schedule check...`);
+      await processAutopilotScheduling();
+    } catch (error) {
+      console.error(`[${new Date().toISOString()}] [AUTOPILOT] Auto-schedule watcher error:`, error);
+    }
+  }, 180000); // Check every 3 minutes
+  
+  // Auto-reply watcher - checks for new DMs/comments to reply to every 5 minutes
+  const replyInterval = setInterval(async () => {
+    try {
+      console.log(`[${new Date().toISOString()}] [AUTOPILOT] 🔄 Running scheduled auto-reply check...`);
+      await processAutopilotReplies();
+    } catch (error) {
+      console.error(`[${new Date().toISOString()}] [AUTOPILOT] Auto-reply watcher error:`, error);
+    }
+  }, 300000); // Check every 5 minutes (300,000 ms)
+  
+  console.log(`[${new Date().toISOString()}] [AUTOPILOT] ✅ Background watchers started successfully`);
+  console.log(`[${new Date().toISOString()}] [AUTOPILOT] 📅 Auto-schedule: Every 3 minutes (180,000ms)`);
+  console.log(`[${new Date().toISOString()}] [AUTOPILOT] 💬 Auto-reply: Every 5 minutes (300,000ms)`);
+  
+  // Store interval references for potential cleanup
+  global.autopilotIntervals = {
+    schedule: scheduleInterval,
+    reply: replyInterval
+  };
+}
+
+// 🚀 AUTOPILOT: Process automatic scheduling for users with autopilot enabled
+async function processAutopilotScheduling() {
+  console.log(`[${new Date().toISOString()}] [AUTOPILOT] 📅 Checking for auto-schedule tasks...`);
+  
+  try {
+    // Get all autopilot settings
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: 'autopilot_settings/',
+      MaxKeys: 1000
+    });
+    
+    const response = await s3Client.send(listCommand);
+    
+    if (!response.Contents || response.Contents.length === 0) {
+      console.log(`[${new Date().toISOString()}] [AUTOPILOT] No autopilot settings found`);
+      return;
+    }
+    
+    for (const object of response.Contents) {
+      if (!object.Key?.endsWith('/settings.json')) continue;
+      
+      try {
+        // Get autopilot settings
+        const getCommand = new GetObjectCommand({
+          Bucket: 'tasks',
+          Key: object.Key
+        });
+        
+        const settingsResponse = await s3Client.send(getCommand);
+        const settings = JSON.parse(await settingsResponse.Body.transformToString());
+        
+        // Skip if autopilot or auto-schedule is disabled
+        if (!settings.enabled || !settings.autoSchedule) {
+          continue;
+        }
+        
+        const { username, platform } = settings;
+        console.log(`[${new Date().toISOString()}] [AUTOPILOT] 📅 Checking ${platform}/${username} for new posts to schedule...`);
+        
+        // Check for new ready posts
+        await checkAndScheduleNewPosts(username, platform, settings);
+        
+      } catch (error) {
+        console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error processing ${object.Key}:`, error);
+      }
+    }
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error in processAutopilotScheduling:`, error);
+  }
+}
+
+// 🚀 AUTOPILOT: Check for new posts and schedule them automatically
+async function checkAndScheduleNewPosts(username, platform, settings) {
+  try {
+    // Get ready posts for this user/platform
+    const postsPrefix = `generated_content/${platform}/${username}/ready/`;
+    
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: postsPrefix,
+      MaxKeys: 50
+    });
+    
+    const postsResponse = await s3Client.send(listCommand);
+    
+    if (!postsResponse.Contents || postsResponse.Contents.length === 0) {
+      console.log(`[${new Date().toISOString()}] [AUTOPILOT] No ready posts found for ${platform}/${username}`);
+      return;
+    }
+    
+    // Get existing scheduled posts to calculate next schedule time (checkpoint system)
+    const lastScheduledTime = await getLastScheduledPostTime(username, platform);
+    const intervalHours = await getSchedulingInterval(username, platform);
+    
+    let nextScheduleTime = lastScheduledTime ? 
+      new Date(lastScheduledTime.getTime() + (intervalHours * 60 * 60 * 1000)) :
+      new Date(Date.now() + 60 * 1000); // Start 1 minute from now if no posts exist
+    
+    // Make sure we don't schedule in the past
+    if (nextScheduleTime <= new Date()) {
+      nextScheduleTime = new Date(Date.now() + 60 * 1000);
+    }
+    
+    console.log(`[${new Date().toISOString()}] [AUTOPILOT] 📅 Next schedule time for ${platform}/${username}: ${nextScheduleTime.toISOString()}`);
+    
+    let scheduledCount = 0;
+    
+    for (const postObject of postsResponse.Contents) {
+      if (!postObject.Key?.endsWith('.json')) continue;
+      
+      try {
+        // Get post data
+        const getPostCommand = new GetObjectCommand({
+          Bucket: 'tasks',
+          Key: postObject.Key
+        });
+        
+        const postResponse = await s3Client.send(getPostCommand);
+        const postData = JSON.parse(await postResponse.Body.transformToString());
+        
+        // Check if post is already scheduled
+        const isAlreadyScheduled = await checkIfPostAlreadyScheduled(postObject.Key, username, platform);
+        if (isAlreadyScheduled) {
+          console.log(`[${new Date().toISOString()}] [AUTOPILOT] Post ${postObject.Key} already scheduled, skipping`);
+          continue;
+        }
+        
+        // Schedule this post
+        const scheduleResult = await schedulePostAutomatically(postData, postObject.Key, username, platform, nextScheduleTime);
+        
+        if (scheduleResult.success) {
+          scheduledCount++;
+          console.log(`[${new Date().toISOString()}] [AUTOPILOT] ✅ Auto-scheduled post ${postObject.Key} for ${nextScheduleTime.toISOString()}`);
+          
+          // Calculate next schedule time with interval
+          nextScheduleTime = new Date(nextScheduleTime.getTime() + (intervalHours * 60 * 60 * 1000));
+          
+          // Mark post as processed to avoid re-scheduling
+          await markPostAsAutoScheduled(postObject.Key, username, platform);
+        }
+        
+      } catch (error) {
+        console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error scheduling post ${postObject.Key}:`, error);
+      }
+    }
+    
+    if (scheduledCount > 0) {
+      console.log(`[${new Date().toISOString()}] [AUTOPILOT] 🎉 Auto-scheduled ${scheduledCount} posts for ${platform}/${username}`);
+    }
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error in checkAndScheduleNewPosts:`, error);
+  }
+}
+
+// 🚀 AUTOPILOT: Process automatic replies for users with autopilot enabled
+async function processAutopilotReplies() {
+  console.log(`[${new Date().toISOString()}] [AUTOPILOT] 💬 Checking for auto-reply tasks...`);
+  
+  try {
+    // Get all autopilot settings
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: 'autopilot_settings/',
+      MaxKeys: 1000
+    });
+    
+    const response = await s3Client.send(listCommand);
+    
+    if (!response.Contents || response.Contents.length === 0) {
+      return;
+    }
+    
+    for (const object of response.Contents) {
+      if (!object.Key?.endsWith('/settings.json')) continue;
+      
+      try {
+        // Get autopilot settings
+        const getCommand = new GetObjectCommand({
+          Bucket: 'tasks',
+          Key: object.Key
+        });
+        
+        const settingsResponse = await s3Client.send(getCommand);
+        const settings = JSON.parse(await settingsResponse.Body.transformToString());
+        
+        // Skip if autopilot or auto-reply is disabled
+        if (!settings.enabled || !settings.autoReply) {
+          continue;
+        }
+        
+        const { username, platform } = settings;
+        console.log(`[${new Date().toISOString()}] [AUTOPILOT] 💬 Checking ${platform}/${username} for new messages to reply to...`);
+        
+        // Check for new messages/comments to reply to
+        await checkAndReplyToNewMessages(username, platform, settings);
+        
+      } catch (error) {
+        console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error processing ${object.Key}:`, error);
+      }
+    }
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error in processAutopilotReplies:`, error);
+  }
+}
+
+// 🚀 AUTOPILOT: Check for new messages and reply automatically
+async function checkAndReplyToNewMessages(username, platform, settings) {
+  try {
+    // Get platform-specific events that need replies
+    const eventsPrefix = platform === 'instagram' ? `InstagramEvents/` :
+                        platform === 'twitter' ? `TwitterEvents/` :
+                        platform === 'facebook' ? `FacebookEvents/` : null;
+    
+    if (!eventsPrefix) {
+      console.warn(`[${new Date().toISOString()}] [AUTOPILOT] Unknown platform: ${platform}`);
+      return;
+    }
+    
+    // Find events for this user that are unhandled
+    const notifications = await getUnhandledNotifications(username, platform);
+    
+    if (notifications.length === 0) {
+      console.log(`[${new Date().toISOString()}] [AUTOPILOT] No unhandled notifications for ${platform}/${username}`);
+      return;
+    }
+    
+    console.log(`[${new Date().toISOString()}] [AUTOPILOT] 💬 Found ${notifications.length} unhandled notifications for ${platform}/${username}`);
+    
+    // Process auto-replies (limit to 5 at a time to avoid spam)
+    const limitedNotifications = notifications.slice(0, 5);
+    
+    for (const notification of limitedNotifications) {
+      try {
+        // Generate AI reply using the existing RAG system
+        const aiReplyResult = await generateAutopilotReply(notification, username, platform);
+        
+        if (aiReplyResult.success) {
+          // Send the reply automatically
+          const sendResult = await sendAutopilotReply(notification, aiReplyResult.reply, username, platform);
+          
+          if (sendResult.success) {
+            console.log(`[${new Date().toISOString()}] [AUTOPILOT] ✅ Auto-replied to ${notification.type} ${notification.message_id || notification.comment_id}`);
+          }
+        }
+        
+      } catch (error) {
+        console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error auto-replying to notification:`, error);
+      }
+    }
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error in checkAndReplyToNewMessages:`, error);
+  }
+}
+
+// Helper functions for autopilot (implementations simplified for core functionality)
+
+async function getLastScheduledPostTime(username, platform) {
+  // 🔥 ENHANCED: Get the most recent scheduled post time for intelligent interval calculation
+  try {
+    console.log(`[${new Date().toISOString()}] [AUTOPILOT] 🕐 Finding last scheduled post time for ${platform}/${username}`);
+    
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: `scheduled_posts/${platform}/`,
+      MaxKeys: 1000
+    });
+    
+    const response = await s3Client.send(listCommand);
+    let latestTime = null;
+    let scheduledPostsCount = 0;
+    
+    if (response.Contents) {
+      for (const object of response.Contents) {
+        if (!object.Key?.endsWith('.json')) continue;
+        
+        try {
+          const getCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: object.Key
+          });
+          
+          const scheduleResponse = await s3Client.send(getCommand);
+          const scheduleData = JSON.parse(await scheduleResponse.Body.transformToString());
+          
+          // Only consider posts for this user
+          if (scheduleData.username === username || scheduleData.userId === username) {
+            scheduledPostsCount++;
+            const scheduleTime = new Date(scheduleData.scheduleDate || scheduleData.scheduledDate);
+            
+            // Only consider future posts or very recent past posts (within 1 hour)
+            const now = new Date();
+            const hoursDiff = (scheduleTime - now) / (1000 * 60 * 60);
+            
+            if (hoursDiff > -1) { // Include posts scheduled within the last hour
+              if (!latestTime || scheduleTime > latestTime) {
+                latestTime = scheduleTime;
+              }
+            }
+          }
+        } catch (error) {
+          // Skip invalid files
+        }
+      }
+    }
+    
+    console.log(`[${new Date().toISOString()}] [AUTOPILOT] 📊 Found ${scheduledPostsCount} scheduled posts for ${platform}/${username}, latest time: ${latestTime?.toISOString() || 'none'}`);
+    return latestTime;
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error getting last scheduled time:`, error);
+    return null;
+  }
+}
+
+async function getSchedulingInterval(username, platform) {
+  // 🔥 INTELLIGENT INTERVAL: Get smart posting interval from user settings
+  try {
+    console.log(`[${new Date().toISOString()}] [AUTOPILOT] ⏱️ Determining posting interval for ${platform}/${username}`);
+    
+    // Method 1: Try to get interval from user's goal/campaign settings
+    const goalKey = `user_goals/${platform}/${username}/goal.json`;
+    
+    try {
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: goalKey
+      });
+      
+      const goalResponse = await s3Client.send(getCommand);
+      const goalData = JSON.parse(await goalResponse.Body.transformToString());
+      
+      if (goalData.Posting_Delay_Intervals) {
+        const interval = parseInt(goalData.Posting_Delay_Intervals);
+        if (!isNaN(interval) && interval > 0) {
+          console.log(`[${new Date().toISOString()}] [AUTOPILOT] 🎯 Using campaign interval: ${interval} hours`);
+          return interval;
+        }
+      }
+      
+      // Check for other interval fields
+      if (goalData.posting_interval || goalData.post_interval) {
+        const interval = parseInt(goalData.posting_interval || goalData.post_interval);
+        if (!isNaN(interval) && interval > 0) {
+          console.log(`[${new Date().toISOString()}] [AUTOPILOT] 🎯 Using alternative interval: ${interval} hours`);
+          return interval;
+        }
+      }
+      
+    } catch (error) {
+      console.log(`[${new Date().toISOString()}] [AUTOPILOT] No goal settings found for ${platform}/${username}, using default`);
+    }
+    
+    // Method 2: Try to get from autopilot settings
+    try {
+      const autopilotKey = `autopilot_settings/${platform}/${username}/settings.json`;
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: autopilotKey
+      });
+      
+      const autopilotResponse = await s3Client.send(getCommand);
+      const autopilotData = JSON.parse(await autopilotResponse.Body.transformToString());
+      
+      if (autopilotData.customInterval && autopilotData.customInterval > 0) {
+        console.log(`[${new Date().toISOString()}] [AUTOPILOT] 🤖 Using autopilot custom interval: ${autopilotData.customInterval} hours`);
+        return autopilotData.customInterval;
+      }
+    } catch (error) {
+      // No custom autopilot interval set
+    }
+    
+    // Method 3: Intelligent default based on platform
+    let defaultInterval;
+    switch (platform) {
+      case 'instagram':
+        defaultInterval = 6; // Instagram posts every 6 hours
+        break;
+      case 'twitter':
+        defaultInterval = 3; // Twitter posts every 3 hours (more frequent)
+        break;
+      case 'facebook':
+        defaultInterval = 8; // Facebook posts every 8 hours
+        break;
+      default:
+        defaultInterval = 4; // Default 4 hours as mentioned in requirements
+    }
+    
+    console.log(`[${new Date().toISOString()}] [AUTOPILOT] 📅 Using platform default interval: ${defaultInterval} hours for ${platform}`);
+    return defaultInterval;
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error getting scheduling interval:`, error);
+    return 4; // Safe fallback
+  }
+}
+
+async function checkIfPostAlreadyScheduled(postKey, username, platform) {
+  // 🔥 IMPROVED: Check both scheduled posts and autopilot markers
+  try {
+    // Method 1: Check autopilot processing markers
+    const markerPrefix = `autopilot_processed/${platform}/${username}/`;
+    const markerCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: markerPrefix,
+      MaxKeys: 1000
+    });
+    
+    const markerResponse = await s3Client.send(markerCommand);
+    if (markerResponse.Contents) {
+      for (const marker of markerResponse.Contents) {
+        if (marker.Key && marker.Key.includes(postKey.replace(/[^a-zA-Z0-9]/g, '_'))) {
+          console.log(`[${new Date().toISOString()}] [AUTOPILOT] Found autopilot marker for ${postKey}`);
+          return true;
+        }
+      }
+    }
+    
+    // Method 2: Check existing scheduled posts
+    const scheduledPrefix = `scheduled_posts/${platform}/`;
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: scheduledPrefix,
+      MaxKeys: 1000
+    });
+    
+    const response = await s3Client.send(listCommand);
+    
+    if (response.Contents) {
+      for (const object of response.Contents) {
+        if (!object.Key?.endsWith('.json')) continue;
+        
+        try {
+          const getCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: object.Key
+          });
+          
+          const scheduleResponse = await s3Client.send(getCommand);
+          const scheduleData = JSON.parse(await scheduleResponse.Body.transformToString());
+          
+          // Check if this post is already scheduled by looking at source keys or content
+          if (scheduleData.username === username && 
+              (scheduleData.postKey === postKey || 
+               scheduleData.originalPostKey === postKey ||
+               scheduleData.autopilot_source === postKey)) {
+            console.log(`[${new Date().toISOString()}] [AUTOPILOT] Found existing schedule for ${postKey}`);
+            return true;
+          }
+        } catch (error) {
+          // Skip invalid files
+        }
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error checking if post scheduled:`, error);
+    return false;
+  }
+}
+
+async function schedulePostAutomatically(postData, postKey, username, platform, scheduleTime) {
+  // 🔥 REAL IMPLEMENTATION: Use existing native scheduler to schedule posts
+  try {
+    console.log(`[${new Date().toISOString()}] [AUTOPILOT] 📅 Auto-scheduling post for ${platform}/${username} at ${scheduleTime.toISOString()}`);
+    
+    // Extract image key from post data
+    const imageKey = postData.image || postData.image_key || postData.imageKey;
+    if (!imageKey) {
+      throw new Error('No image key found in post data');
+    }
+    
+    // Get image from R2 storage
+    let imageBlob;
+    try {
+      // Try direct R2 access first
+      const imageResponse = await fetch(`${process.env.API_BASE_URL || 'http://localhost:3000'}/api/r2-image/${username}/${imageKey}`);
+      if (!imageResponse.ok) {
+        throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+      }
+      imageBlob = await imageResponse.blob();
+    } catch (error) {
+      console.warn(`[${new Date().toISOString()}] [AUTOPILOT] Direct image fetch failed, trying signed URL...`);
+      
+      // Fallback to signed URL
+      const signedUrlResponse = await fetch(`${process.env.API_BASE_URL || 'http://localhost:3000'}/api/signed-image-url/${username}/${imageKey}`);
+      if (!signedUrlResponse.ok) {
+        throw new Error('Failed to get signed image URL');
+      }
+      
+      const signedUrlData = await signedUrlResponse.json();
+      const imageFromSignedUrl = await fetch(signedUrlData.signedUrl);
+      imageBlob = await imageFromSignedUrl.blob();
+    }
+    
+    // Validate image
+    if (!imageBlob || imageBlob.size === 0) {
+      throw new Error('Empty or invalid image blob');
+    }
+    
+    // Prepare FormData for scheduling
+    const formData = new FormData();
+    formData.append('image', imageBlob, `autopilot_${platform}_post_${Date.now()}.jpg`);
+    formData.append('caption', postData.caption || postData.text || '');
+    formData.append('scheduleDate', scheduleTime.toISOString());
+    formData.append('platform', platform);
+    formData.append('autopilot', 'true'); // Mark as autopilot-scheduled
+    
+    // Use existing native scheduler endpoint
+    const scheduleResponse = await fetch(`${process.env.API_BASE_URL || 'http://localhost:3000'}/schedule-post/${username}`, {
+      method: 'POST',
+      body: formData
+    });
+    
+    if (!scheduleResponse.ok) {
+      const errorText = await scheduleResponse.text();
+      throw new Error(`Schedule API error: ${errorText}`);
+    }
+    
+    const scheduleResult = await scheduleResponse.json();
+    
+    console.log(`[${new Date().toISOString()}] [AUTOPILOT] ✅ Post auto-scheduled successfully: ${scheduleResult.schedule_id || 'no-id'}`);
+    
+    return { 
+      success: true, 
+      scheduleId: scheduleResult.schedule_id || `autopilot_${Date.now()}`,
+      scheduleTime: scheduleTime.toISOString(),
+      platform: platform,
+      username: username
+    };
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error in schedulePostAutomatically:`, error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function markPostAsAutoScheduled(postKey, username, platform) {
+  // Mark the post as processed by autopilot to avoid re-scheduling
+  try {
+    const markerKey = `autopilot_processed/${platform}/${username}/${Date.now()}_${postKey.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
+    
+    await s3Client.send(new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: markerKey,
+      Body: JSON.stringify({
+        postKey,
+        username,
+        platform,
+        processedAt: new Date().toISOString(),
+        type: 'auto_scheduled'
+      }),
+      ContentType: 'application/json'
+    }));
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error marking post as auto-scheduled:`, error);
+  }
+}
+
+async function getUnhandledNotifications(username, platform) {
+  // 🔥 REAL IMPLEMENTATION: Get actual unhandled DMs/comments from platform events
+  try {
+    console.log(`[${new Date().toISOString()}] [AUTOPILOT] 💬 Scanning for unhandled notifications for ${platform}/${username}`);
+    
+    const eventsPrefix = platform === 'instagram' ? `InstagramEvents/` :
+                        platform === 'twitter' ? `TwitterEvents/` :
+                        platform === 'facebook' ? `FacebookEvents/` : null;
+    
+    if (!eventsPrefix) {
+      console.warn(`[${new Date().toISOString()}] [AUTOPILOT] Unknown platform: ${platform}`);
+      return [];
+    }
+
+    // Get all event files for this platform
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: eventsPrefix,
+      MaxKeys: 1000
+    });
+    
+    const response = await s3Client.send(listCommand);
+    const unhandledNotifications = [];
+    
+    if (!response.Contents || response.Contents.length === 0) {
+      console.log(`[${new Date().toISOString()}] [AUTOPILOT] No events found for ${platform}`);
+      return [];
+    }
+
+    // Check each event file for unhandled notifications for this user
+    for (const object of response.Contents) {
+      if (!object.Key?.endsWith('.json')) continue;
+      
+      try {
+        const getCommand = new GetObjectCommand({
+          Bucket: 'tasks',
+          Key: object.Key
+        });
+        
+        const eventResponse = await s3Client.send(getCommand);
+        const eventData = JSON.parse(await eventResponse.Body.transformToString());
+        
+        // Check if this event belongs to our user and needs attention
+        if (Array.isArray(eventData)) {
+          for (const event of eventData) {
+            if (isUnhandledNotificationForUser(event, username, platform)) {
+              unhandledNotifications.push({
+                id: event.message_id || event.comment_id || event.id || `event_${Date.now()}`,
+                type: event.entry?.[0]?.messaging ? 'dm' : 'comment',
+                message: event.message?.text || event.text || '',
+                from_user: event.sender?.id || event.from?.id || event.user_id,
+                timestamp: event.timestamp || Date.now(),
+                platform: platform,
+                username: username,
+                original_event: event,
+                file_key: object.Key
+              });
+            }
+          }
+        } else if (isUnhandledNotificationForUser(eventData, username, platform)) {
+          unhandledNotifications.push({
+            id: eventData.message_id || eventData.comment_id || eventData.id || `event_${Date.now()}`,
+            type: eventData.entry?.[0]?.messaging ? 'dm' : 'comment',
+            message: eventData.message?.text || eventData.text || '',
+            from_user: eventData.sender?.id || eventData.from?.id || eventData.user_id,
+            timestamp: eventData.timestamp || Date.now(),
+            platform: platform,
+            username: username,
+            original_event: eventData,
+            file_key: object.Key
+          });
+        }
+        
+      } catch (error) {
+        console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error reading event file ${object.Key}:`, error);
+      }
+    }
+    
+    console.log(`[${new Date().toISOString()}] [AUTOPILOT] 📬 Found ${unhandledNotifications.length} unhandled notifications for ${platform}/${username}`);
+    return unhandledNotifications.slice(0, 5); // Limit to 5 per cycle to avoid spam
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error getting unhandled notifications:`, error);
+    return [];
+  }
+}
+
+function isUnhandledNotificationForUser(event, username, platform) {
+  // 🔥 INTELLIGENT NOTIFICATION DETECTION: Check if this event needs auto-reply
+  try {
+    // Skip if already auto-replied
+    if (event.autopilot_replied || event.auto_replied) {
+      return false;
+    }
+    
+    // Skip if too old (only handle recent messages within 24 hours)
+    const eventTime = new Date(event.timestamp || 0);
+    const now = new Date();
+    const hoursDiff = (now - eventTime) / (1000 * 60 * 60);
+    if (hoursDiff > 24) {
+      return false;
+    }
+    
+    // Platform-specific detection
+    if (platform === 'instagram') {
+      // Check for Instagram DMs (messaging webhook)
+      if (event.entry?.[0]?.messaging?.[0]) {
+        const message = event.entry[0].messaging[0];
+        // Only handle messages TO us (not from us)
+        const recipientId = message.recipient?.id;
+        const senderId = message.sender?.id;
+        
+        // Make sure this is a message TO our account (recipient should be our account)
+        if (recipientId && senderId && recipientId !== senderId) {
+          return true;
+        }
+      }
+      
+      // Check for Instagram comments
+      if (event.entry?.[0]?.changes?.[0]?.value?.text) {
+        // This is a comment on our post
+        return true;
+      }
+    }
+    
+    if (platform === 'twitter') {
+      // Check for Twitter DMs and mentions
+      if (event.direct_message_events || event.tweet_create_events) {
+        return true;
+      }
+    }
+    
+    if (platform === 'facebook') {
+      // Check for Facebook messages and comments
+      if (event.entry?.[0]?.messaging || event.entry?.[0]?.changes) {
+        return true;
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error checking if notification is unhandled:`, error);
+    return false;
+  }
+}
+
+async function generateAutopilotReply(notification, username, platform) {
+  // 🔥 REAL IMPLEMENTATION: Use existing RAG system for generating replies
+  try {
+    console.log(`[${new Date().toISOString()}] [AUTOPILOT] 🤖 Generating AI reply for ${notification.type} from ${notification.from_user}`);
+    
+    // Prepare the message for RAG system
+    const ragMessage = {
+      role: 'user',
+      content: notification.message || 'Hello'
+    };
+    
+    // Use the existing instant-reply endpoint internally
+    const ragResponse = await axios.post(`http://localhost:3001/instant-reply/${username}`, {
+      messages: [ragMessage],
+      platform: platform,
+      context: `Auto-reply to ${notification.type}`,
+      mode: 'smart_brief' // Use brief mode for auto-replies
+    }, {
+      timeout: 15000, // 15 second timeout
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    if (ragResponse.data && ragResponse.data.reply) {
+      console.log(`[${new Date().toISOString()}] [AUTOPILOT] ✅ AI reply generated successfully`);
+      return { 
+        success: true, 
+        reply: ragResponse.data.reply,
+        context: ragResponse.data.context || 'auto-generated'
+      };
+    } else {
+      throw new Error('No reply generated from RAG system');
+    }
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error generating AI reply:`, error);
+    
+    // Fallback to simple acknowledgment
+    const fallbackReplies = [
+      "Thank you for your message! I'll get back to you soon. 😊",
+      "Hi! Thanks for reaching out. I'll respond to you shortly! ✨",
+      "Hello! I appreciate your message and will reply soon. 👍",
+      "Thanks for contacting me! I'll get back to you as soon as possible. 🙂"
+    ];
+    
+    const randomReply = fallbackReplies[Math.floor(Math.random() * fallbackReplies.length)];
+    
+    return { 
+      success: true, 
+      reply: randomReply,
+      context: 'fallback_reply'
+    };
+  }
+}
+
+async function sendAutopilotReply(notification, reply, username, platform) {
+  // 🔥 REAL IMPLEMENTATION: Send actual replies using existing platform APIs
+  try {
+    console.log(`[${new Date().toISOString()}] [AUTOPILOT] 📤 Sending auto-reply via ${platform} for ${notification.type}`);
+    
+    let sendResult = { success: false };
+    
+    if (platform === 'instagram') {
+      sendResult = await sendInstagramAutopilotReply(notification, reply, username);
+    } else if (platform === 'twitter') {
+      sendResult = await sendTwitterAutopilotReply(notification, reply, username);
+    } else if (platform === 'facebook') {
+      sendResult = await sendFacebookAutopilotReply(notification, reply, username);
+    } else {
+      throw new Error(`Unsupported platform: ${platform}`);
+    }
+    
+    if (sendResult.success) {
+      // Mark the notification as auto-replied to avoid duplicate responses
+      await markNotificationAsAutoReplied(notification);
+      console.log(`[${new Date().toISOString()}] [AUTOPILOT] ✅ Auto-reply sent successfully via ${platform}`);
+    }
+    
+    return sendResult;
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error sending auto-reply:`, error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function sendInstagramAutopilotReply(notification, reply, username) {
+  try {
+    // Use existing Instagram reply functionality
+    if (notification.type === 'dm') {
+      // Send Instagram DM reply
+      const response = await axios.post(`/send-instagram-dm`, {
+        recipientId: notification.from_user,
+        message: reply,
+        username: username
+      });
+      return { success: true, messageId: response.data?.messageId };
+    } else {
+      // Send Instagram comment reply
+      const response = await axios.post(`/send-instagram-comment-reply`, {
+        commentId: notification.id,
+        message: reply,
+        username: username
+      });
+      return { success: true, commentId: response.data?.commentId };
+    }
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [AUTOPILOT] Instagram reply error:`, error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function sendTwitterAutopilotReply(notification, reply, username) {
+  try {
+    // Use existing Twitter reply functionality
+    const response = await axios.post(`/send-twitter-reply`, {
+      recipientId: notification.from_user,
+      message: reply,
+      username: username,
+      replyType: notification.type
+    });
+    return { success: true, tweetId: response.data?.tweetId };
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [AUTOPILOT] Twitter reply error:`, error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function sendFacebookAutopilotReply(notification, reply, username) {
+  try {
+    // Use existing Facebook reply functionality
+    const response = await axios.post(`/send-facebook-reply`, {
+      recipientId: notification.from_user,
+      message: reply,
+      username: username,
+      replyType: notification.type
+    });
+    return { success: true, messageId: response.data?.messageId };
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [AUTOPILOT] Facebook reply error:`, error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function markNotificationAsAutoReplied(notification) {
+  try {
+    // Update the original event file to mark as auto-replied
+    if (!notification.file_key) return;
+    
+    const getCommand = new GetObjectCommand({
+      Bucket: 'tasks',
+      Key: notification.file_key
+    });
+    
+    const response = await s3Client.send(getCommand);
+    const eventData = JSON.parse(await response.Body.transformToString());
+    
+    // Mark as auto-replied
+    if (Array.isArray(eventData)) {
+      for (let event of eventData) {
+        if ((event.message_id || event.comment_id || event.id) === notification.id) {
+          event.autopilot_replied = true;
+          event.autopilot_replied_at = new Date().toISOString();
+          break;
+        }
+      }
+    } else {
+      eventData.autopilot_replied = true;
+      eventData.autopilot_replied_at = new Date().toISOString();
+    }
+    
+    // Save back to R2
+    await s3Client.send(new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: notification.file_key,
+      Body: JSON.stringify(eventData),
+      ContentType: 'application/json'
+    }));
+    
+    console.log(`[${new Date().toISOString()}] [AUTOPILOT] 🏷️ Marked notification ${notification.id} as auto-replied`);
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error marking notification as auto-replied:`, error);
+  }
+}
+
 // ============= DEBUG/UTILITY ENDPOINTS =============
 
 // Get Facebook posting capabilities (utility endpoint)
@@ -10396,6 +11324,7 @@ app.post(['/api/scheduler-process-overdue', '/scheduler-process-overdue'], async
 startTwitterScheduler();
 startFacebookScheduler();
 startInstagramScheduler();
+startAutopilotWatchers(); // 🚀 AUTOPILOT: Start background automation watchers
 
 // Debug endpoint to check Instagram token mapping
 app.get('/debug/instagram-tokens', async (req, res) => {
@@ -11226,6 +12155,341 @@ app.get(['/engagement-metrics/:username', '/api/engagement-metrics/:username'], 
 app.options(['/engagement-metrics/:username', '/api/engagement-metrics/:username'], (req, res) => {
   setCorsHeaders(res);
   res.status(204).send();
+});
+
+// 🚀 AUTOPILOT: Get autopilot settings for a user/platform
+app.get(['/autopilot-settings/:username', '/api/autopilot-settings/:username'], async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  try {
+    const { username } = req.params;
+    const platform = (req.query.platform || 'instagram').toLowerCase();
+    
+    if (!['instagram', 'twitter', 'facebook'].includes(platform)) {
+      return res.status(400).json({ error: 'Invalid platform' });
+    }
+    
+    // Storage key for autopilot settings
+    const settingsKey = `autopilot_settings/${platform}/${username}/settings.json`;
+    
+    try {
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: settingsKey
+      });
+      
+      const response = await s3Client.send(getCommand);
+      const settingsData = JSON.parse(await response.Body.transformToString());
+      
+      console.log(`[${new Date().toISOString()}] [AUTOPILOT] Retrieved settings for ${platform}/${username}`);
+      res.json(settingsData);
+      
+    } catch (error) {
+      if (error.name === 'NoSuchKey') {
+        // Return default settings if none exist
+        const defaultSettings = {
+          enabled: false,
+          autoSchedule: false,
+          autoReply: false,
+          lastChecked: new Date().toISOString()
+        };
+        res.json(defaultSettings);
+      } else {
+        throw error;
+      }
+    }
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error fetching settings:`, error);
+    res.status(500).json({ error: 'Failed to fetch autopilot settings' });
+  }
+});
+
+// 🚀 AUTOPILOT: Update autopilot settings for a user/platform
+app.post(['/autopilot-settings/:username', '/api/autopilot-settings/:username'], async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  try {
+    const { username } = req.params;
+    const { platform, settings } = req.body;
+    
+    if (!platform || !['instagram', 'twitter', 'facebook'].includes(platform.toLowerCase())) {
+      return res.status(400).json({ error: 'Invalid platform' });
+    }
+    
+    if (!settings || typeof settings !== 'object') {
+      return res.status(400).json({ error: 'Invalid settings data' });
+    }
+    
+    // Storage key for autopilot settings
+    const settingsKey = `autopilot_settings/${platform.toLowerCase()}/${username}/settings.json`;
+    
+    // Add timestamp
+    const settingsWithTimestamp = {
+      ...settings,
+      lastUpdated: new Date().toISOString(),
+      username,
+      platform: platform.toLowerCase()
+    };
+    
+    // Store settings in R2
+    const putCommand = new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: settingsKey,
+      Body: JSON.stringify(settingsWithTimestamp, null, 2),
+      ContentType: 'application/json'
+    });
+    
+    await s3Client.send(putCommand);
+    
+    console.log(`[${new Date().toISOString()}] [AUTOPILOT] Updated settings for ${platform}/${username}:`, settingsWithTimestamp);
+    
+    // If autopilot was enabled, trigger the background watchers
+    if (settingsWithTimestamp.enabled) {
+      console.log(`[${new Date().toISOString()}] [AUTOPILOT] ✅ Autopilot enabled for ${platform}/${username} - watchers will activate`);
+      
+      // Dispatch event to start watchers (we'll implement this next)
+      process.nextTick(() => {
+        try {
+          // Emit event for autopilot activation (for future background processes)
+          console.log(`[${new Date().toISOString()}] [AUTOPILOT] 🚁 Background watchers activated for ${platform}/${username}`);
+        } catch (err) {
+          console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error activating watchers:`, err);
+        }
+      });
+    }
+    
+    res.json({ success: true, settings: settingsWithTimestamp });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error updating settings:`, error);
+    res.status(500).json({ error: 'Failed to update autopilot settings' });
+  }
+});
+
+// 🚀 AUTOPILOT: OPTIONS handlers
+app.options(['/autopilot-settings/:username', '/api/autopilot-settings/:username'], (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+
+// 🔥 DEBUG ENDPOINTS: Manual autopilot testing
+app.post(['/test-autopilot-schedule/:username', '/api/test-autopilot-schedule/:username'], async (req, res) => {
+  setCorsHeaders(res);
+  
+  const { username } = req.params;
+  const { platform = 'instagram' } = req.query;
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [AUTOPILOT] 🧪 Manual autopilot schedule test for ${platform}/${username}`);
+    
+    // Check if autopilot is enabled for this user
+    const settingsKey = `autopilot_settings/${platform}/${username}/settings.json`;
+    
+    try {
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: settingsKey
+      });
+      
+      const settingsResponse = await s3Client.send(getCommand);
+      const settings = JSON.parse(await settingsResponse.Body.transformToString());
+      
+      if (!settings.enabled || !settings.autoSchedule) {
+        return res.json({
+          success: false,
+          message: 'Autopilot or auto-schedule is disabled for this user',
+          settings: settings
+        });
+      }
+      
+      // Manually trigger auto-scheduling for this user
+      await checkAndScheduleNewPosts(username, platform, settings);
+      
+      res.json({
+        success: true,
+        message: `Autopilot schedule test completed for ${platform}/${username}`,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      if (error.name === 'NoSuchKey') {
+        return res.json({
+          success: false,
+          message: 'No autopilot settings found for this user'
+        });
+      }
+      throw error;
+    }
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [AUTOPILOT] Test schedule error:`, error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+app.post(['/test-autopilot-reply/:username', '/api/test-autopilot-reply/:username'], async (req, res) => {
+  setCorsHeaders(res);
+  
+  const { username } = req.params;
+  const { platform = 'instagram' } = req.query;
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [AUTOPILOT] 🧪 Manual autopilot reply test for ${platform}/${username}`);
+    
+    // Check if autopilot is enabled for this user
+    const settingsKey = `autopilot_settings/${platform}/${username}/settings.json`;
+    
+    try {
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: settingsKey
+      });
+      
+      const settingsResponse = await s3Client.send(getCommand);
+      const settings = JSON.parse(await settingsResponse.Body.transformToString());
+      
+      if (!settings.enabled || !settings.autoReply) {
+        return res.json({
+          success: false,
+          message: 'Autopilot or auto-reply is disabled for this user',
+          settings: settings
+        });
+      }
+      
+      // Manually trigger auto-replies for this user
+      await checkAndReplyToNewMessages(username, platform, settings);
+      
+      res.json({
+        success: true,
+        message: `Autopilot reply test completed for ${platform}/${username}`,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      if (error.name === 'NoSuchKey') {
+        return res.json({
+          success: false,
+          message: 'No autopilot settings found for this user'
+        });
+      }
+      throw error;
+    }
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [AUTOPILOT] Test reply error:`, error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get autopilot status and debug info
+app.get(['/autopilot-status/:username', '/api/autopilot-status/:username'], async (req, res) => {
+  setCorsHeaders(res);
+  
+  const { username } = req.params;
+  const { platform = 'instagram' } = req.query;
+  
+  try {
+    const settingsKey = `autopilot_settings/${platform}/${username}/settings.json`;
+    let settings = null;
+    
+    try {
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: settingsKey
+      });
+      
+      const settingsResponse = await s3Client.send(getCommand);
+      settings = JSON.parse(await settingsResponse.Body.transformToString());
+    } catch (error) {
+      // No settings found
+    }
+    
+    // Get ready posts count
+    const postsPrefix = `ready_post/${platform}/${username}/`;
+    const postsCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: postsPrefix,
+      MaxKeys: 100
+    });
+    
+    const postsResponse = await s3Client.send(postsCommand);
+    const readyPostsCount = postsResponse.Contents ? 
+      postsResponse.Contents.filter(obj => obj.Key && obj.Key.endsWith('.json')).length : 0;
+    
+    // Get scheduled posts count
+    const scheduledPrefix = `scheduled_posts/${platform}/`;
+    const scheduledCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: scheduledPrefix,
+      MaxKeys: 100
+    });
+    
+    const scheduledResponse = await s3Client.send(scheduledCommand);
+    let userScheduledCount = 0;
+    
+    if (scheduledResponse.Contents) {
+      for (const obj of scheduledResponse.Contents) {
+        if (!obj.Key?.endsWith('.json')) continue;
+        
+        try {
+          const getCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: obj.Key
+          });
+          
+          const scheduleData = JSON.parse(await (await s3Client.send(getCommand)).Body.transformToString());
+          if (scheduleData.username === username || scheduleData.userId === username) {
+            userScheduledCount++;
+          }
+        } catch (error) {
+          // Skip invalid files
+        }
+      }
+    }
+    
+    // Get last scheduled post time
+    const lastScheduledTime = await getLastScheduledPostTime(username, platform);
+    const schedulingInterval = await getSchedulingInterval(username, platform);
+    
+    res.json({
+      success: true,
+      autopilot: {
+        enabled: settings?.enabled || false,
+        autoSchedule: settings?.autoSchedule || false,
+        autoReply: settings?.autoReply || false,
+        lastChecked: settings?.lastChecked || null
+      },
+      stats: {
+        readyPosts: readyPostsCount,
+        scheduledPosts: userScheduledCount,
+        lastScheduledTime: lastScheduledTime?.toISOString() || null,
+        schedulingInterval: schedulingInterval,
+        nextScheduleTime: lastScheduledTime ? 
+          new Date(lastScheduledTime.getTime() + (schedulingInterval * 60 * 60 * 1000)).toISOString() :
+          new Date(Date.now() + 60 * 1000).toISOString()
+      },
+      watchers: {
+        running: !!global.autopilotIntervals,
+        scheduleInterval: '3 minutes',
+        replyInterval: '5 minutes'
+      },
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [AUTOPILOT] Status error:`, error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
 });
 
 // Generated content summary endpoint - Schema: tasks/generated_content/<platform>/<username>/posts.json

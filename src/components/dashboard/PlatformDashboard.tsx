@@ -29,7 +29,7 @@ import RagService from '../../services/RagService';
 import type { ChatMessage as ChatModalMessage } from '../common/ChatModal';
 import { Notification, ProfileInfo, LinkedAccount } from '../../types/notifications';
 // Import icons from react-icons
-import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaTwitter, FaInstagram, FaPen, FaFacebook, FaBell, FaUndo } from 'react-icons/fa';
+import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaTwitter, FaInstagram, FaPen, FaFacebook, FaBell, FaUndo, FaInfoCircle } from 'react-icons/fa';
 import { MdAnalytics, MdOutlineSchedule, MdOutlineAutoGraph } from 'react-icons/md';
 import { BsLightningChargeFill, BsBinoculars, BsLightbulb } from 'react-icons/bs';
 import { IoMdAnalytics } from 'react-icons/io';
@@ -87,6 +87,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   // ALL STATE HOOKS
   const [query, setQuery] = useState('');
   const [toast, setToast] = useState<string | null>(null);
+  const [toastType, setToastType] = useState<'info'|'success'|'error'|'warn'>('info');
   const [responses, setResponses] = useState<{ key: string; data: any }[]>([]);
   const [strategies, setStrategies] = useState<{ key: string; data: any }[]>([]);
   const [posts, setPosts] = useState<{ key: string; data: any }[]>([]);
@@ -176,66 +177,9 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     return stored ? new Set(JSON.parse(stored)) : new Set();
   });
 
-  // Simple refresh handler for regular data updates (defined first)
-  const handleDataRefresh = useCallback(() => {
-    if (!accountHolder || !platform) return;
-    
-    console.log(`[PlatformDashboard] 🔄 Refreshing data for ${platform}`);
-    refreshAllData();
-    fetchProfileInfo();
-  }, [platform, accountHolder]);
-
-  // ✅ BULLET-PROOF F5 INTEGRATION: Simple hook usage
-  useDashboardRefresh({
-    dashboardType: 'platform',
-    onRefresh: handleDataRefresh
-  });
-
-  // Initial load effect
-  useEffect(() => {
-    if (accountHolder && platform) {
-      console.log(`[PlatformDashboard] 🚀 Initial load for ${platform}`);
-      handleDataRefresh();
-    }
-  }, [platform, accountHolder, handleDataRefresh]);
-
-  // Helper function to get viewed storage key
-  const getViewedStorageKey = (section: string) => `viewed_${section}_${platform}_${accountHolder}`;
-
-  // Helper functions to get unseen counts for each section
-  const getUnseenStrategiesCount = () => {
-    return safeLength(safeFilter(strategies, (strategy: { key: string }) => !viewedStrategies.has(strategy.key)));
-  };
-
-  const getUnseenCompetitorCount = () => {
-    return safeLength(safeFilter(competitorData, (data: { key: string }) => !viewedCompetitorData.has(data.key)));
-  };
-
-  const getUnseenPostsCount = () => {
-    return safeLength(safeFilter(posts, (post: { key: string }) => !viewedPosts.has(post.key)));
-  };
-
-  // Function to mark content as viewed with localStorage persistence
-  const markStrategiesAsViewed = () => {
-    const newViewedStrategies = new Set(Array.isArray(strategies) ? strategies.map(s => s.key) : []);
-    setViewedStrategies(newViewedStrategies);
-    localStorage.setItem(`viewed_strategies_${platform}_${accountHolder}`, JSON.stringify(Array.from(newViewedStrategies)));
-  };
-
-  const markCompetitorDataAsViewed = () => {
-    const newViewedCompetitorData = new Set(Array.isArray(competitorData) ? competitorData.map(c => c.key) : []);
-    setViewedCompetitorData(newViewedCompetitorData);
-    localStorage.setItem(`viewed_competitor_data_${platform}_${accountHolder}`, JSON.stringify(Array.from(newViewedCompetitorData)));
-  };
-
-  const markPostsAsViewed = () => {
-    const newViewedPosts = new Set(Array.isArray(posts) ? posts.map(p => p.key) : []);
-    setViewedPosts(newViewedPosts);
-    localStorage.setItem(`viewed_posts_${platform}_${accountHolder}`, JSON.stringify(Array.from(newViewedPosts)));
-  };
-
-  // Define functions before useEffect hooks to avoid hoisting issues
-  async function refreshAllData() {
+  // Define functions FIRST to avoid dependency hoisting issues
+  // ✅ BULLETPROOF FIX: Convert to useCallback for proper dependency tracking
+  const refreshAllData = useCallback(async () => {
     if (!accountHolder) {
       return;
     }
@@ -284,9 +228,9 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       console.error(`Error refreshing ${platform} data:`, error);
       setToast(`Failed to load ${platform} dashboard data.`);
     }
-  }
+  }, [accountHolder, platform, accountType, competitors]);
 
-  async function fetchProfileInfo() {
+  const fetchProfileInfo = useCallback(async () => {
     if (!accountHolder) return;
     setProfileLoading(true);
     setProfileError(null);
@@ -341,8 +285,13 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
               }
             }
           }
-        } catch (err) {
-          console.warn(`[${platform.toUpperCase()}] Primary profile endpoint failed, trying fallback...`);
+        } catch (err: any) {
+          // For Twitter, don't log 404 as error since it's expected when profile data doesn't exist yet
+          if (platform === 'twitter' && err.response?.status === 404) {
+            console.log(`[TWITTER] Profile data not found in R2, this is expected for new Twitter accounts`);
+          } else {
+            console.warn(`[${platform.toUpperCase()}] Primary profile endpoint failed, trying fallback...`);
+          }
           profileData = null;
         }
       }
@@ -366,24 +315,135 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         } else {
           console.warn(`[${platform.toUpperCase()}] Response contains account config, not profile data:`, profileData);
           setProfileInfo(null);
-          setProfileError(`Profile data not found for ${platform}. Please ensure profile info is scraped.`);
+          if (platform === 'twitter') {
+            setProfileError(`Twitter profile data not found. Connect your Twitter account and scrape data to see profile information.`);
+          } else {
+            setProfileError(`Profile data not found for ${platform}. Please ensure profile info is scraped.`);
+          }
         }
       } else {
         setProfileInfo(null);
-        setProfileError(`Invalid profile data received for ${platform}.`);
+        if (platform === 'twitter') {
+          setProfileError(`Twitter profile data not available. Connect your Twitter account and scrape data to see profile information.`);
+        } else {
+          setProfileError(`Invalid profile data received for ${platform}.`);
+        }
       }
     } catch (err: any) {
-      console.error(`[${platform.toUpperCase()}] Profile info fetch error:`, err);
-      if (err.response?.status === 404) {
+      // Improved error handling for Twitter - don't log 404 as error
+      if (platform === 'twitter' && err.response?.status === 404) {
+        console.log(`[TWITTER] Profile info not available yet, this is expected for new Twitter accounts`);
         setProfileInfo(null);
-        setProfileError(`Profile info not available for ${platform}.`);
+        setProfileError(`Twitter profile info not available. Connect your Twitter account and scrape data to see profile information.`);
       } else {
-        setProfileError(`Failed to load ${platform} profile info.`);
+        console.error(`[${platform.toUpperCase()}] Profile info fetch error:`, err);
+        if (err.response?.status === 404) {
+          setProfileInfo(null);
+          setProfileError(`Profile info not available for ${platform}.`);
+        } else {
+          setProfileError(`Failed to load ${platform} profile info.`);
+        }
       }
     } finally {
       setProfileLoading(false);
     }
-  }
+  }, [accountHolder, platform]);
+
+  // Simple refresh handler for regular data updates (defined after functions)
+  const handleDataRefresh = useCallback(() => {
+    if (!accountHolder || !platform) return;
+    
+    console.log(`[PlatformDashboard] 🔄 Refreshing data for ${platform}`);
+    refreshAllData();
+    fetchProfileInfo();
+  }, [platform, accountHolder, refreshAllData, fetchProfileInfo]);
+
+  // ✅ BULLET-PROOF F5 INTEGRATION: Simple hook usage
+  useDashboardRefresh({
+    dashboardType: 'platform',
+    onRefresh: handleDataRefresh
+  });
+
+  // Initial load effect
+  useEffect(() => {
+    if (accountHolder && platform) {
+      console.log(`[PlatformDashboard] 🚀 Initial load for ${platform}`);
+      handleDataRefresh();
+    }
+  }, [platform, accountHolder, handleDataRefresh]);
+
+  // ✅ CRITICAL FIX: Force profile reset when switching platforms
+  useEffect(() => {
+    console.log(`[PlatformDashboard] 🔄 Platform or accountHolder changed, resetting profile state`);
+    
+    // Reset profile state immediately to prevent stale data display
+    setProfileInfo(null);
+    setProfileError(null);
+    setProfileLoading(false);
+    setImageError(false);
+    
+    // Reset notifications and other platform-specific data
+    setNotifications([]);
+    
+    // Force immediate profile fetch for new platform
+    if (accountHolder && platform) {
+      fetchProfileInfo();
+    }
+  }, [platform, accountHolder, fetchProfileInfo]);
+
+  // ✅ CLEANUP: Reset state when component unmounts
+  useEffect(() => {
+    return () => {
+      console.log(`[PlatformDashboard] 🧹 Component unmounting, cleaning up state for ${platform}`);
+      
+      // Close any open SSE connections
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+      
+      // Cancel any pending timeouts
+      if (autoReplyTimeoutRef.current) {
+        clearTimeout(autoReplyTimeoutRef.current);
+        autoReplyTimeoutRef.current = null;
+      }
+    };
+  }, [platform]);
+
+  // Helper function to get viewed storage key
+  const getViewedStorageKey = (section: string) => `viewed_${section}_${platform}_${accountHolder}`;
+
+  // Helper functions to get unseen counts for each section
+  const getUnseenStrategiesCount = () => {
+    return safeLength(safeFilter(strategies, (strategy: { key: string }) => !viewedStrategies.has(strategy.key)));
+  };
+
+  const getUnseenCompetitorCount = () => {
+    return safeLength(safeFilter(competitorData, (data: { key: string }) => !viewedCompetitorData.has(data.key)));
+  };
+
+  const getUnseenPostsCount = () => {
+    return safeLength(safeFilter(posts, (post: { key: string }) => !viewedPosts.has(post.key)));
+  };
+
+  // Function to mark content as viewed with localStorage persistence
+  const markStrategiesAsViewed = () => {
+    const newViewedStrategies = new Set(Array.isArray(strategies) ? strategies.map(s => s.key) : []);
+    setViewedStrategies(newViewedStrategies);
+    localStorage.setItem(`viewed_strategies_${platform}_${accountHolder}`, JSON.stringify(Array.from(newViewedStrategies)));
+  };
+
+  const markCompetitorDataAsViewed = () => {
+    const newViewedCompetitorData = new Set(Array.isArray(competitorData) ? competitorData.map(c => c.key) : []);
+    setViewedCompetitorData(newViewedCompetitorData);
+    localStorage.setItem(`viewed_competitor_data_${platform}_${accountHolder}`, JSON.stringify(Array.from(newViewedCompetitorData)));
+  };
+
+  const markPostsAsViewed = () => {
+    const newViewedPosts = new Set(Array.isArray(posts) ? posts.map(p => p.key) : []);
+    setViewedPosts(newViewedPosts);
+    localStorage.setItem(`viewed_posts_${platform}_${accountHolder}`, JSON.stringify(Array.from(newViewedPosts)));
+  };
 
   const fetchNotifications = async (attempt = 1, maxAttempts = 3) => {
     const currentUserId = platform === 'twitter' ? twitterId : 
@@ -752,12 +812,20 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     };
   }, [accountHolder]);
 
+  // Modern Toast auto-dismiss
   useEffect(() => {
     if (toast) {
-      const timer = setTimeout(() => setToast(null), 3000);
+      const timer = setTimeout(() => setToast(null), 3500);
       return () => clearTimeout(timer);
     }
   }, [toast]);
+
+  // Helper to show toast with type and filter out false notification
+  const showToast = (msg: string, type: 'info'|'success'|'error'|'warn' = 'info') => {
+    if (msg && /Failed to initialize .* after many retries/i.test(msg)) return;
+    setToast(msg);
+    setToastType(type);
+  };
 
   // Load previous conversations when the component mounts
   useEffect(() => {
@@ -2262,432 +2330,410 @@ Image Description: ${response.post.image_prompt}
   };
 
   return (
-    <motion.div
-      className="dashboard-wrapper"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      <div className="welcome-header">
-        <h1 className="welcome-text">
-          Welcome {profileInfo?.fullName || accountHolder}!
-        </h1>
-        <div className="welcome-subtext-container" style={{ position: 'relative', minHeight: '24px' }}>
-          <motion.p 
-            className="welcome-subtext"
-            animate={{ 
-              opacity: showInitialText ? 1 : 0,
-              y: showInitialText ? 0 : -10
-            }}
-            transition={{ duration: 0.5, ease: 'easeInOut' }}
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              margin: 0,
-              fontSize: '14px',
-              color: '#888',
-              textAlign: 'center'
-            }}
-          >
-            You are listed in Smart People on {config.name}!
-          </motion.p>
-          
-          {profileInfo?.biography && profileInfo.biography.trim() && (
-            <motion.div
-              className="bio-text"
+    <>
+      <motion.div
+        className="dashboard-wrapper"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+      >
+        <div className="welcome-header">
+          <h1 className="welcome-text">
+            Welcome {profileInfo?.fullName || accountHolder}!
+          </h1>
+          <div className="welcome-subtext-container" style={{ position: 'relative', minHeight: '24px' }}>
+            <motion.p 
+              className="welcome-subtext"
               animate={{ 
-                opacity: showBio ? 1 : 0,
-                y: showBio ? 0 : 10
+                opacity: showInitialText ? 1 : 0,
+                y: showInitialText ? 0 : -10
               }}
-              transition={{ duration: 0.5, ease: 'easeInOut', delay: showBio ? 0.2 : 0 }}
+              transition={{ duration: 0.5, ease: 'easeInOut' }}
               style={{
                 position: 'absolute',
                 top: 0,
                 left: 0,
                 right: 0,
                 margin: 0,
-                fontSize: '16px', // 🎯 ENHANCED: Increased font size for better visibility
-                fontWeight: '500', // 🎯 ENHANCED: Added font weight for prominence
-                color: '#2d2d2d', // 🎯 ENHANCED: Darker color for better readability
-                textAlign: 'center',
-                lineHeight: '1.5', // 🎯 ENHANCED: Better line height for readability
-                whiteSpace: 'pre-wrap',
-                fontStyle: 'italic',
-                padding: '8px 16px', // 🎯 ENHANCED: Added padding for better spacing
-                backgroundColor: 'rgba(255, 255, 255, 0.1)', // 🎯 ENHANCED: Subtle background
-                borderRadius: '8px', // 🎯 ENHANCED: Rounded corners
-                border: '1px solid rgba(0, 255, 204, 0.2)', // 🎯 ENHANCED: Subtle accent border
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)' // 🎯 ENHANCED: Subtle shadow
+                fontSize: '14px',
+                color: '#888',
+                textAlign: 'center'
               }}
             >
-              {typedBio}
-              {showBio && !bioAnimationComplete && (
-                <motion.span
-                  animate={{ opacity: [1, 0] }}
-                  transition={{ 
-                    duration: 0.5,
-                    repeat: Infinity,
-                    repeatType: 'reverse'
-                  }}
-                  style={{ 
-                    display: 'inline-block',
-                    width: '2px',
-                    height: '20px', // 🎯 ENHANCED: Increased cursor height
-                    backgroundColor: '#00ffcc',
-                    marginLeft: '2px',
-                    verticalAlign: 'text-bottom'
-                  }}
-                />
-              )}
-            </motion.div>
-          )}
-        </div>
-      </div>
-      <div className="modules-container">
-        <div className="dashboard-grid">
-          <div className="profile-metadata">
-            <div className="profile-header">
-              <div className="profile-bar">
-                {profileLoading ? (
-                  <div className="profile-loading">Loading...</div>
-                ) : (
-                  <>
-                    {(profileInfo?.profilePicUrlHD || profileInfo?.profilePicUrl) && !imageError ? (
-                      <img
-                        src={`/api/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD || profileInfo.profilePicUrl)}&t=${Date.now()}`}
-                        alt={`${accountHolder}'s profile picture`}
-                        className="profile-pic-bar"
-                        onError={(e) => {
-                          console.error(`Failed to load ${platform} profile picture for ${accountHolder} attempt ${imageRetryAttemptsRef.current + 1}`);
-                          if (imageRetryAttemptsRef.current < maxImageRetryAttempts) {
-                            imageRetryAttemptsRef.current++;
-                            const imgElement = e.target as HTMLImageElement;
-                            const imageUrl = profileInfo.profilePicUrlHD || profileInfo.profilePicUrl;
-                            
-                            if (imageRetryAttemptsRef.current === 1) {
-                              // First retry: try direct URL without proxy
-                              console.log(`Trying direct URL for ${platform} profile picture, attempt ${imageRetryAttemptsRef.current}`);
-                              setTimeout(() => {
-                                imgElement.src = imageUrl;
-                              }, 500);
-                            } else {
-                              // Final retry: try proxy again with timestamp
-                              console.log(`Final retry with proxy for ${platform}, attempt ${imageRetryAttemptsRef.current}/${maxImageRetryAttempts}`);
-                              setTimeout(() => {
-                                imgElement.src = `/api/proxy-image?url=${encodeURIComponent(imageUrl)}&t=${Date.now()}`;
-                              }, 1000);
-                            }
-                          } else {
-                            console.log(`Max retries reached for ${platform}, showing fallback for ${accountHolder}`);
-                            setImageError(true);
-                          }
-                        }}
-                      />
-                    ) : (
-                      <div className="profile-pic-bar">
-                        <div className="profile-pic-fallback">
-                          {profileInfo?.fullName ? profileInfo.fullName.charAt(0).toUpperCase() : accountHolder.charAt(0).toUpperCase()}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-                {platform !== 'facebook' && (
-                  <div className="stats">
-                    <div className="stat">
-                      <span className="label">Followers</span>
-                      <span className="value">
-                        {formatCount(profileInfo?.followersCount)}
-                      </span>
-                    </div>
-                    <div className="stat">
-                      <span className="label">Following</span>
-                      <span className="value">
-                        {formatCount(profileInfo?.followsCount)}
-                      </span>
-                    </div>
-                  </div>
-                )}
-                <div className="profile-actions">
-                  {/* Platform-specific Connect button */}
-                  {platform === 'instagram' ? (
-                    <>
-                      <InstagramConnect onConnected={handleInstagramConnected} />
-                      <InstagramRequiredButton
-                        isConnected={isConnected}
-                        onClick={handleOpenInsights}
-                        bypassConnectionRequirement={true}
-                        className="dashboard-btn insights-btn"
-                      >
-                        <FaChartLine className="btn-icon" />
-                        <span>Insights</span>
-                      </InstagramRequiredButton>
-                      
-                      <InstagramRequiredButton
-                        isConnected={isConnected}
-                        onClick={handleOpenScheduler}
-                        className="dashboard-btn schedule-btn"
-                      >
-                        <FaCalendarAlt className="btn-icon" />
-                        <span>Schedule</span>
-                      </InstagramRequiredButton>
-                    </>
-                  ) : platform === 'twitter' ? (
-                    <>
-                      <TwitterConnect onConnected={handleTwitterConnected} />
-                      <TwitterRequiredButton
-                        isConnected={isTwitterConnected}
-                        onClick={handleOpenTwitterCompose}
-                        className="dashboard-btn compose-btn twitter"
-                      >
-                        <FaPen className="btn-icon" />
-                        <span>Compose</span>
-                      </TwitterRequiredButton>
-                      <TwitterRequiredButton
-                        isConnected={isTwitterConnected}
-                        onClick={handleOpenTwitterInsights}
-                        bypassConnectionRequirement={true}
-                        className="dashboard-btn insights-btn twitter"
-                      >
-                        <FaChartLine className="btn-icon" />
-                        <span>Insights</span>
-                      </TwitterRequiredButton>
-                      
-                      <TwitterRequiredButton
-                        isConnected={isTwitterConnected}
-                        onClick={handleOpenTwitterScheduler}
-                        className="dashboard-btn schedule-btn twitter"
-                      >
-                        <FaCalendarAlt className="btn-icon" />
-                        <span>Schedule</span>
-                      </TwitterRequiredButton>
-                    </>
-                  ) : platform === 'facebook' ? (
-                    <>
-                      <FacebookConnect onConnected={handleFacebookConnected} />
-                      <FacebookRequiredButton
-                        isConnected={isConnected}
-                        onClick={handleOpenFacebookInsights}
-                        bypassConnectionRequirement={true}
-                        className="dashboard-btn insights-btn facebook"
-                      >
-                        <FaChartLine className="btn-icon" />
-                        <span>Insights</span>
-                      </FacebookRequiredButton>
-                      
-                      <FacebookRequiredButton
-                        isConnected={isConnected}
-                        onClick={handleOpenFacebookScheduler}
-                        className="dashboard-btn schedule-btn facebook"
-                      >
-                        <FaCalendarAlt className="btn-icon" />
-                        <span>Schedule</span>
-                      </FacebookRequiredButton>
-                    </>
-                  ) : null}
-                  
-                  <button
-                    onClick={handleOpenGoalModal}
-                    className={`dashboard-btn goal-btn ${platform === 'twitter' ? 'twitter' : platform === 'facebook' ? 'facebook' : platform === 'instagram' ? 'instagram' : ''}`}
-                  >
-                    <TbTargetArrow className="btn-icon" />
-                    <span>Goal</span>
-                  </button>
-                  
-                  <button
-                    onClick={handleOpenResetConfirm}
-                    className={`dashboard-btn reset-btn ${platform === 'twitter' ? 'twitter' : platform === 'facebook' ? 'facebook' : platform === 'instagram' ? 'instagram' : ''}`}
-                    disabled={isResetting}
-                  >
-                    <FaUndo className="btn-icon" />
-                    <span>{isResetting ? 'Resetting...' : 'Reset'}</span>
-                  </button>
-                  
-                  {showCampaignButton && (
-                    <button
-                      onClick={handleOpenCampaignModal}
-                      className={`dashboard-btn campaign-btn ${platform === 'twitter' ? 'twitter' : platform === 'facebook' ? 'facebook' : platform === 'instagram' ? 'instagram' : ''}`}
-                    >
-                      <FaBullhorn className="btn-icon" />
-                      <span>Campaign</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-              <div className="chart-placeholder"></div>
-            </div>
-          </div>
-
-          {config.supportsNotifications && (
-            <div className="notifications">
-              <h2>{config.name} Notifications <span className="badge">{notifications.length || 0} new!!!</span></h2>
-              <DmsComments 
-                notifications={notifications} 
-                onReply={handleReply} 
-                onIgnore={handleIgnore} 
-                onRefresh={() => {
-                  setRefreshKey(prev => prev + 1);
-                  fetchNotifications(1, 3);
-                }} 
-                onReplyWithAI={(notification: Notification) => {
-                  const notifId = notification.message_id || notification.comment_id || 'unknown';
-                  handleReplyWithAI(notification, notifId);
+              You are listed in Smart People on {config.name}!
+            </motion.p>
+            
+            {profileInfo?.biography && profileInfo.biography.trim() && (
+              <motion.div
+                className="bio-text"
+                animate={{ 
+                  opacity: showBio ? 1 : 0,
+                  y: showBio ? 0 : 10
                 }}
-                onAutoReplyAll={handleAutoReplyAll}
-                onStopAutoReply={handleStopAutoReply}
-                isAutoReplying={isAutoReplying}
+                transition={{ duration: 0.5, ease: 'easeInOut', delay: showBio ? 0.2 : 0 }}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  margin: 0,
+                  fontSize: '16px', // 🎯 ENHANCED: Increased font size for better visibility
+                  fontWeight: '500', // 🎯 ENHANCED: Added font weight for prominence
+                  color: '#2d2d2d', // 🎯 ENHANCED: Darker color for better readability
+                  textAlign: 'center',
+                  lineHeight: '1.5', // 🎯 ENHANCED: Better line height for readability
+                  whiteSpace: 'pre-wrap',
+                  fontStyle: 'italic',
+                  padding: '8px 16px', // 🎯 ENHANCED: Added padding for better spacing
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)', // 🎯 ENHANCED: Subtle background
+                  borderRadius: '8px', // 🎯 ENHANCED: Rounded corners
+                  border: '1px solid rgba(0, 255, 204, 0.2)', // 🎯 ENHANCED: Subtle accent border
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)' // 🎯 ENHANCED: Subtle shadow
+                }}
+              >
+                {typedBio}
+                {showBio && !bioAnimationComplete && (
+                  <motion.span
+                    animate={{ opacity: [1, 0] }}
+                    transition={{ 
+                      duration: 0.5,
+                      repeat: Infinity,
+                      repeatType: 'reverse'
+                    }}
+                    style={{ 
+                      display: 'inline-block',
+                      width: '2px',
+                      height: '20px', // 🎯 ENHANCED: Increased cursor height
+                      backgroundColor: '#00ffcc',
+                      marginLeft: '2px',
+                      verticalAlign: 'text-bottom'
+                    }}
+                  />
+                )}
+              </motion.div>
+            )}
+          </div>
+        </div>
+        <div className="modules-container">
+          <div className="dashboard-grid">
+            <div className="profile-metadata">
+              <div className="profile-header">
+                <div className="profile-bar">
+                  {profileLoading ? (
+                    <div className="profile-loading">Loading...</div>
+                  ) : (
+                    <>
+                      {(profileInfo?.profilePicUrlHD || profileInfo?.profilePicUrl) && !imageError ? (
+                        <img
+                          src={`/api/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD || profileInfo.profilePicUrl)}&t=${Date.now()}`}
+                          alt={`${accountHolder}'s profile picture`}
+                          className="profile-pic-bar"
+                          onError={(e) => {
+                            console.error(`Failed to load ${platform} profile picture for ${accountHolder} attempt ${imageRetryAttemptsRef.current + 1}`);
+                            if (imageRetryAttemptsRef.current < maxImageRetryAttempts) {
+                              imageRetryAttemptsRef.current++;
+                              const imgElement = e.target as HTMLImageElement;
+                              const imageUrl = profileInfo.profilePicUrlHD || profileInfo.profilePicUrl;
+                              
+                              if (imageRetryAttemptsRef.current === 1) {
+                                // First retry: try direct URL without proxy
+                                console.log(`Trying direct URL for ${platform} profile picture, attempt ${imageRetryAttemptsRef.current}`);
+                                setTimeout(() => {
+                                  imgElement.src = imageUrl;
+                                }, 500);
+                              } else {
+                                // Final retry: try proxy again with timestamp
+                                console.log(`Final retry with proxy for ${platform}, attempt ${imageRetryAttemptsRef.current}/${maxImageRetryAttempts}`);
+                                setTimeout(() => {
+                                  imgElement.src = `/api/proxy-image?url=${encodeURIComponent(imageUrl)}&t=${Date.now()}`;
+                                }, 1000);
+                              }
+                            } else {
+                              console.log(`Max retries reached for ${platform}, showing fallback for ${accountHolder}`);
+                              setImageError(true);
+                            }
+                          }}
+                        />
+                      ) : (
+                        <div className="profile-pic-bar">
+                          <div className="profile-pic-fallback">
+                            {profileInfo?.fullName ? profileInfo.fullName.charAt(0).toUpperCase() : accountHolder.charAt(0).toUpperCase()}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {platform !== 'facebook' && (
+                    <div className="stats">
+                      <div className="stat">
+                        <span className="label">Followers</span>
+                        <span className="value">
+                          {formatCount(profileInfo?.followersCount)}
+                        </span>
+                      </div>
+                      <div className="stat">
+                        <span className="label">Following</span>
+                        <span className="value">
+                          {formatCount(profileInfo?.followsCount)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  <div className="profile-actions">
+                    {/* Platform-specific Connect button */}
+                    {platform === 'instagram' ? (
+                      <>
+                        <InstagramConnect onConnected={handleInstagramConnected} />
+                        <InstagramRequiredButton
+                          isConnected={isConnected}
+                          onClick={handleOpenInsights}
+                          bypassConnectionRequirement={true}
+                          className="dashboard-btn insights-btn"
+                        >
+                          <FaChartLine className="btn-icon" />
+                          <span>Insights</span>
+                        </InstagramRequiredButton>
+                        
+                        <InstagramRequiredButton
+                          isConnected={isConnected}
+                          onClick={handleOpenScheduler}
+                          className="dashboard-btn schedule-btn"
+                        >
+                          <FaCalendarAlt className="btn-icon" />
+                          <span>Schedule</span>
+                        </InstagramRequiredButton>
+                      </>
+                    ) : platform === 'twitter' ? (
+                      <>
+                        <TwitterConnect onConnected={handleTwitterConnected} />
+                        <TwitterRequiredButton
+                          isConnected={isTwitterConnected}
+                          onClick={handleOpenTwitterCompose}
+                          className="dashboard-btn compose-btn twitter"
+                        >
+                          <FaPen className="btn-icon" />
+                          <span>Compose</span>
+                        </TwitterRequiredButton>
+                        <TwitterRequiredButton
+                          isConnected={isTwitterConnected}
+                          onClick={handleOpenTwitterInsights}
+                          bypassConnectionRequirement={true}
+                          className="dashboard-btn insights-btn twitter"
+                        >
+                          <FaChartLine className="btn-icon" />
+                          <span>Insights</span>
+                        </TwitterRequiredButton>
+                        
+                        <TwitterRequiredButton
+                          isConnected={isTwitterConnected}
+                          onClick={handleOpenTwitterScheduler}
+                          className="dashboard-btn schedule-btn twitter"
+                        >
+                          <FaCalendarAlt className="btn-icon" />
+                          <span>Schedule</span>
+                        </TwitterRequiredButton>
+                      </>
+                    ) : platform === 'facebook' ? (
+                      <>
+                        <FacebookConnect onConnected={handleFacebookConnected} />
+                        <FacebookRequiredButton
+                          isConnected={isConnected}
+                          onClick={handleOpenFacebookInsights}
+                          bypassConnectionRequirement={true}
+                          className="dashboard-btn insights-btn facebook"
+                        >
+                          <FaChartLine className="btn-icon" />
+                          <span>Insights</span>
+                        </FacebookRequiredButton>
+                        
+                        <FacebookRequiredButton
+                          isConnected={isConnected}
+                          onClick={handleOpenFacebookScheduler}
+                          className="dashboard-btn schedule-btn facebook"
+                        >
+                          <FaCalendarAlt className="btn-icon" />
+                          <span>Schedule</span>
+                        </FacebookRequiredButton>
+                      </>
+                    ) : null}
+                    
+                    <button
+                      onClick={handleOpenGoalModal}
+                      className={`dashboard-btn goal-btn ${platform === 'twitter' ? 'twitter' : platform === 'facebook' ? 'facebook' : platform === 'instagram' ? 'instagram' : ''}`}
+                    >
+                      <TbTargetArrow className="btn-icon" />
+                      <span>Goal</span>
+                    </button>
+                    
+                    <button
+                      onClick={handleOpenResetConfirm}
+                      className={`dashboard-btn reset-btn ${platform === 'twitter' ? 'twitter' : platform === 'facebook' ? 'facebook' : platform === 'instagram' ? 'instagram' : ''}`}
+                      disabled={isResetting}
+                    >
+                      <FaUndo className="btn-icon" />
+                      <span>{isResetting ? 'Resetting...' : 'Reset'}</span>
+                    </button>
+                    
+                    {showCampaignButton && (
+                      <button
+                        onClick={handleOpenCampaignModal}
+                        className={`dashboard-btn campaign-btn ${platform === 'twitter' ? 'twitter' : platform === 'facebook' ? 'facebook' : platform === 'instagram' ? 'instagram' : ''}`}
+                      >
+                        <FaBullhorn className="btn-icon" />
+                        <span>Campaign</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="chart-placeholder"></div>
+              </div>
+            </div>
+
+            {config.supportsNotifications && (
+              <div className="notifications">
+                <h2>{config.name} Notifications <span className="badge">{notifications.length || 0} new!!!</span></h2>
+                <DmsComments 
+                  notifications={notifications} 
+                  onReply={handleReply} 
+                  onIgnore={handleIgnore} 
+                  onRefresh={() => {
+                    setRefreshKey(prev => prev + 1);
+                    fetchNotifications(1, 3);
+                  }} 
+                  onReplyWithAI={(notification: Notification) => {
+                    const notifId = notification.message_id || notification.comment_id || 'unknown';
+                    handleReplyWithAI(notification, notifId);
+                  }}
+                  onAutoReplyAll={handleAutoReplyAll}
+                  onStopAutoReply={handleStopAutoReply}
+                  isAutoReplying={isAutoReplying}
+                  username={accountHolder}
+                  onIgnoreAIReply={handleIgnoreAIReply}
+                  refreshKey={refreshKey}
+                  igBusinessId={platform === 'instagram' ? igUserId : undefined}
+                  twitterId={platform === 'twitter' ? twitterId : undefined}
+                  facebookPageId={platform === 'facebook' ? facebookPageId : undefined}
+                  aiRepliesRefreshKey={refreshKey}
+                  onAIRefresh={() => setRefreshKey(prev => prev + 1)}
+                  aiProcessingNotifications={aiProcessingNotifications}
+                  onSendAIReply={handleSendAIReply}
+                  onEditAIReply={handleEditAIReply}
+                  autoReplyProgress={autoReplyProgress}
+                  platform={platform}
+                />
+              </div>
+            )}
+
+            <div className="post-cooked">
+              <PostCooked
                 username={accountHolder}
-                onIgnoreAIReply={handleIgnoreAIReply}
-                refreshKey={refreshKey}
-                igBusinessId={platform === 'instagram' ? igUserId : undefined}
-                twitterId={platform === 'twitter' ? twitterId : undefined}
-                facebookPageId={platform === 'facebook' ? facebookPageId : undefined}
-                aiRepliesRefreshKey={refreshKey}
-                onAIRefresh={() => setRefreshKey(prev => prev + 1)}
-                aiProcessingNotifications={aiProcessingNotifications}
-                onSendAIReply={handleSendAIReply}
-                onEditAIReply={handleEditAIReply}
-                autoReplyProgress={autoReplyProgress}
+                profilePicUrl=""
+                posts={posts}
+                userId={userId || undefined}
                 platform={platform}
               />
             </div>
-          )}
 
-          <div className="post-cooked">
-            <PostCooked
-              username={accountHolder}
-              profilePicUrl=""
-              posts={posts}
-              userId={userId || undefined}
-              platform={platform}
-            />
-          </div>
+            <div className="strategies">
+              <h2>
+                <div className="section-header">
+                  <BsLightbulb className="section-icon" />
+                  <span>{config.name} Strategies</span>
+                  {getUnseenStrategiesCount() > 0 ? (
+                    <div className="content-badge" onClick={markStrategiesAsViewed}>
+                      <FaBell className="badge-icon" />
+                      <span className="badge-count">{getUnseenStrategiesCount()}</span>
+                    </div>
+                  ) : (
+                    <div className="content-badge viewed">
+                      <FaBell className="badge-icon" />
+                      <span className="badge-text">Viewed</span>
+                    </div>
+                  )}
+                </div>
+              </h2>
+              <OurStrategies accountHolder={accountHolder} accountType={accountType} platform={platform} />
+            </div>
 
-          <div className="strategies">
-            <h2>
-              <div className="section-header">
-                <BsLightbulb className="section-icon" />
-                <span>{config.name} Strategies</span>
-                {getUnseenStrategiesCount() > 0 ? (
-                  <div className="content-badge" onClick={markStrategiesAsViewed}>
-                    <FaBell className="badge-icon" />
-                    <span className="badge-count">{getUnseenStrategiesCount()}</span>
-                  </div>
-                ) : (
-                  <div className="content-badge viewed">
-                    <FaBell className="badge-icon" />
-                    <span className="badge-text">Viewed</span>
-                  </div>
-                )}
-              </div>
-            </h2>
-            <OurStrategies accountHolder={accountHolder} accountType={accountType} platform={platform} />
-          </div>
+            <div className="competitor-analysis">
+              {/* Always show competitor analysis for both account types */}
+              <h2>
+                <div className="section-header">
+                  <GiSpy className="section-icon" />
+                  <span>{config.name} Competitor Analysis</span>
+                  {getUnseenCompetitorCount() > 0 ? (
+                    <div className="content-badge" onClick={markCompetitorDataAsViewed}>
+                      <FaBell className="badge-icon" />
+                      <span className="badge-count">{getUnseenCompetitorCount()}</span>
+                    </div>
+                  ) : (
+                    <div className="content-badge viewed">
+                      <FaBell className="badge-icon" />
+                      <span className="badge-text">Viewed</span>
+                    </div>
+                  )}
+                </div>
+              </h2>
+              <Cs_Analysis accountHolder={accountHolder} competitors={competitors} platform={platform} />
+            </div>
 
-          <div className="competitor-analysis">
-            {/* Always show competitor analysis for both account types */}
-            <h2>
-              <div className="section-header">
-                <GiSpy className="section-icon" />
-                <span>{config.name} Competitor Analysis</span>
-                {getUnseenCompetitorCount() > 0 ? (
-                  <div className="content-badge" onClick={markCompetitorDataAsViewed}>
-                    <FaBell className="badge-icon" />
-                    <span className="badge-count">{getUnseenCompetitorCount()}</span>
-                  </div>
-                ) : (
-                  <div className="content-badge viewed">
-                    <FaBell className="badge-icon" />
-                    <span className="badge-text">Viewed</span>
-                  </div>
-                )}
-              </div>
-            </h2>
-            <Cs_Analysis accountHolder={accountHolder} competitors={competitors} platform={platform} />
-          </div>
-
-          <div className="chatbot">
-            <div className="chatbot-input-container">
-              <div className="chat-mode-selector">
-                <select 
-                  value={chatMode} 
-                  onChange={(e) => setChatMode(e.target.value as 'discussion' | 'post')}
-                  className="chat-mode-dropdown"
-                >
-                  <option value="discussion">Discussion Mode</option>
-                  <option value="post">Post Creation Mode</option>
-                </select>
-              </div>
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={chatMode === 'discussion' 
-                  ? `Ask me anything about your ${config.name} strategy...` 
-                  : `Describe the ${config.name} post you want to create...`}
-                className="chatbot-input"
-                disabled={isProcessing}
-              />
-              <button 
-                className={`chatbot-send-btn ${isProcessing ? 'processing' : ''}`} 
-                onClick={handleSendQuery} 
-                disabled={!query.trim() || isProcessing}
-              >
-                {isProcessing ? (
-                  <div className="loading-spinner"></div>
-                ) : (
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#e0e0ff"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+            <div className="chatbot">
+              <div className="chatbot-input-container">
+                <div className="chat-mode-selector">
+                  <select 
+                    value={chatMode} 
+                    onChange={(e) => setChatMode(e.target.value as 'discussion' | 'post')}
+                    className="chat-mode-dropdown"
                   >
-                    <line x1="22" y1="2" x2="11" y2="13" />
-                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                  </svg>
-                )}
-              </button>
+                    <option value="discussion">Discussion Mode</option>
+                    <option value="post">Post Creation Mode</option>
+                  </select>
+                </div>
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={chatMode === 'discussion' 
+                    ? `Ask me anything about your ${config.name} strategy...` 
+                    : `Describe the ${config.name} post you want to create...`}
+                  className="chatbot-input"
+                  disabled={isProcessing}
+                />
+                <button 
+                  className={`chatbot-send-btn ${isProcessing ? 'processing' : ''}`} 
+                  onClick={handleSendQuery} 
+                  disabled={!query.trim() || isProcessing}
+                >
+                  {isProcessing ? (
+                    <div className="loading-spinner"></div>
+                  ) : (
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#e0e0ff"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <line x1="22" y1="2" x2="11" y2="13" />
+                      <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      {toast && (
-        <motion.div
-          className="toast-notification"
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: 20 }}
-          transition={{ duration: 0.3 }}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#00ffcc"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="toast-icon"
-          >
-            <line x1="22" y1="2" x2="11" y2="13" />
-            <polygon points="22 2 15 22 11 13 2 9 22 2" />
-          </svg>
-          {toast}
-        </motion.div>
-      )}
+        <ToastNotification toast={toast} type={toastType} />
+      </motion.div>
+      
       {isGoalModalOpen && (
         <GoalModal 
           username={accountHolder} 
-          platform={config.name}
+          platform={platform}
           onClose={() => setIsGoalModalOpen(false)}
           onSuccess={handleGoalSuccess}
         />
@@ -2803,7 +2849,7 @@ Image Description: ${response.post.image_prompt}
       {isCampaignModalOpen && (
         <CampaignModal 
           username={accountHolder}
-          platform={config.name}
+          platform={platform}
           isConnected={isConnected}
           onClose={() => setIsCampaignModalOpen(false)}
           onCampaignStopped={handleCampaignStopped}
@@ -2883,8 +2929,51 @@ Image Description: ${response.post.image_prompt}
           </motion.div>
         </div>
       )}
-    </motion.div>
+    </>
   );
 };
 
 export default PlatformDashboard;
+
+// Modern Toast Notification Component
+const ToastNotification: React.FC<{ toast: string | null; type?: 'info'|'success'|'error'|'warn' }> = ({ toast, type = 'info' }) => {
+  if (!toast) return null;
+  const colorMap = {
+    info: '#2196f3',
+    success: '#4caf50',
+    error: '#f44336',
+    warn: '#ff9800',
+  };
+  const iconMap = {
+    info: <FaInfoCircle style={{ marginRight: 8 }} />,
+    success: <FaBell style={{ marginRight: 8 }} />,
+    error: <FaBell style={{ marginRight: 8 }} />,
+    warn: <FaBell style={{ marginRight: 8 }} />,
+  };
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 24,
+      right: 24,
+      zIndex: 9999,
+      minWidth: 320,
+      maxWidth: 400,
+      background: '#fff',
+      boxShadow: '0 2px 16px rgba(0,0,0,0.12)',
+      borderRadius: 12,
+      padding: '16px 24px',
+      display: 'flex',
+      alignItems: 'center',
+      color: colorMap[type],
+      fontWeight: 500,
+      fontSize: 16,
+      gap: 8,
+      border: `2px solid ${colorMap[type]}`,
+      transition: 'opacity 0.3s',
+      pointerEvents: 'auto',
+    }}>
+      {iconMap[type]}
+      <span>{toast}</span>
+    </div>
+  );
+};

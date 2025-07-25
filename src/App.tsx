@@ -71,25 +71,29 @@ const AppContent: React.FC = () => {
   const [userId, setUserId] = useState<string | undefined>(undefined);
   const [isLoadingUserData, setIsLoadingUserData] = useState(false);
 
-  // ⚡ Ensure account info updates when switching between platform dashboards
+  // 🔄 Keep platform-specific user data in sync on route change
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser?.uid) return;
+
     const platformId = getCurrentPlatform();
     const uid = currentUser.uid;
 
     const username = localStorage.getItem(`${platformId}_username_${uid}`) || '';
-    const compsRaw = localStorage.getItem(`${platformId}_competitors_${uid}`) || '[]';
-    let comps: string[];
-    try {
-      comps = JSON.parse(compsRaw);
-    } catch {
-      comps = [];
-    }
-    const accT = (localStorage.getItem(`${platformId}_account_type_${uid}`) as 'branding' | 'non-branding') || 'branding';
 
-    setAccountHolder(username);
-    setCompetitors(comps);
-    setAccountType(accT);
+    const competitorsRaw = localStorage.getItem(`${platformId}_competitors_${uid}`) || '[]';
+    let parsedCompetitors: string[];
+    try {
+      parsedCompetitors = JSON.parse(competitorsRaw);
+    } catch {
+      parsedCompetitors = [];
+    }
+
+    const savedAccountType = (localStorage.getItem(`${platformId}_account_type_${uid}`) as 'branding' | 'non-branding') || 'branding';
+
+    // Update only if values actually differ to avoid extra renders
+    if (username !== accountHolder) setAccountHolder(username);
+    if (JSON.stringify(parsedCompetitors) !== JSON.stringify(competitors)) setCompetitors(parsedCompetitors);
+    if (savedAccountType !== accountType) setAccountType(savedAccountType);
   }, [location.pathname, currentUser]);
   
   // Chat modal state for MessagesPopup integration
@@ -345,90 +349,121 @@ const AppContent: React.FC = () => {
 
   // Note: Removed automatic redirect to allow users to stay on homepage
 
-  // Try to load user data if logged in but no account info
+  // ✅ BULLETPROOF: Load user data when switching platforms or missing account info
   useEffect(() => {
-    if (currentUser?.uid && !accountHolder && (location.pathname.includes('dashboard') || location.pathname.includes('twitter-dashboard'))) {
-      setIsLoadingUserData(true);
+    if (currentUser?.uid && (
+      location.pathname.includes('dashboard') || 
+      location.pathname.includes('-dashboard')  // Catches all platform dashboards
+    )) {
+      // ✅ CRITICAL FIX: Detect platform mismatch to trigger account reload
+      const currentUrlPlatform = location.pathname.includes('twitter') ? 'twitter' : 
+                                location.pathname.includes('facebook') ? 'facebook' : 'instagram';
       
-      const fetchUserStatus = async () => {
-        try {
-          // Determine which platform to check based on URL
-          const isTwitterDashboard = location.pathname.includes('twitter');
-          const isFacebookDashboard = location.pathname.includes('facebook');
-          const endpoint = isTwitterDashboard 
-            ? `/api/user-twitter-status/${currentUser.uid}`
-            : isFacebookDashboard
-            ? `/api/user-facebook-status/${currentUser.uid}`
-            : `/api/user-instagram-status/${currentUser.uid}`;
-          
-          const response = await axios.get(endpoint);
-          
-          // Defensive check for valid response data
-          if (!response.data || typeof response.data !== 'object') {
-            throw new Error('Invalid response data');
-          }
-          
-          const hasEnteredUsername = isTwitterDashboard 
-            ? response.data.hasEnteredTwitterUsername
-            : isFacebookDashboard
-            ? response.data.hasEnteredFacebookUsername
-            : response.data.hasEnteredInstagramUsername;
-          
-          if (hasEnteredUsername) {
-            const savedUsername = isTwitterDashboard 
-              ? response.data.twitter_username
-              : isFacebookDashboard
-              ? response.data.facebook_username
-              : response.data.instagram_username;
+      const accountPlatform = location.state?.platform || getCurrentPlatform();
+      
+      // ✅ FORCE RELOAD: If no account OR platform switched OR account doesn't match URL platform
+      const needsAccountReload = !accountHolder || 
+                                accountPlatform !== currentUrlPlatform ||
+                                !location.state?.accountHolder;
+      
+      if (needsAccountReload) {
+        console.log(`[App] 🔄 Triggering account reload: accountHolder=${accountHolder}, urlPlatform=${currentUrlPlatform}, accountPlatform=${accountPlatform}`);
+        setIsLoadingUserData(true);
+        
+        const fetchUserStatus = async () => {
+          try {
+            // ✅ ENHANCED: Determine which platform to check based on URL
+            const isTwitterDashboard = location.pathname.includes('twitter');
+            const isFacebookDashboard = location.pathname.includes('facebook');
             
-            // Get competitors from AccountInfo, not ProfileInfo
-            let savedCompetitors: string[] = [];
-            try {
-              const platform = isTwitterDashboard ? 'twitter' : isFacebookDashboard ? 'facebook' : 'instagram';
-              const accountInfoResponse = await axios.get(`/api/retrieve-account-info/${savedUsername}?platform=${platform}`);
-              savedCompetitors = accountInfoResponse.data.competitors || [];
-              console.log(`Retrieved competitors for ${savedUsername} on ${platform}:`, savedCompetitors);
-            } catch (error) {
-              console.error('Failed to fetch competitors from AccountInfo:', error);
-              savedCompetitors = [];
+            const endpoint = isTwitterDashboard 
+              ? `/api/user-twitter-status/${currentUser.uid}`
+              : isFacebookDashboard
+              ? `/api/user-facebook-status/${currentUser.uid}`
+              : `/api/user-instagram-status/${currentUser.uid}`;
+            
+            console.log(`[App] 🔄 Loading account info for platform: ${isTwitterDashboard ? 'Twitter' : isFacebookDashboard ? 'Facebook' : 'Instagram'}`);
+            
+            const response = await axios.get(endpoint);
+            
+            // Defensive check for valid response data
+            if (!response.data || typeof response.data !== 'object') {
+              throw new Error('Invalid response data');
             }
             
-            const savedAccountType = response.data.accountType || 'branding';
+            const hasEnteredUsername = isTwitterDashboard 
+              ? response.data.hasEnteredTwitterUsername
+              : isFacebookDashboard
+              ? response.data.hasEnteredFacebookUsername
+              : response.data.hasEnteredInstagramUsername;
             
-            console.log(`Retrieved saved ${isTwitterDashboard ? 'Twitter' : isFacebookDashboard ? 'Facebook' : 'Instagram'} data for ${currentUser.uid}:`, {
-              username: savedUsername,
-              accountType: savedAccountType,
-              competitors: savedCompetitors
-            });
-            
-            // Navigate to the correct dashboard with the saved data
-            safeNavigate(navigate, location.pathname, {
-              state: {
-                accountHolder: savedUsername,
-                competitors: savedCompetitors,
+            if (hasEnteredUsername) {
+              const savedUsername = isTwitterDashboard 
+                ? response.data.twitter_username
+                : isFacebookDashboard
+                ? response.data.facebook_username
+                : response.data.instagram_username;
+              
+              // ✅ ENHANCED: Get competitors from AccountInfo for all platforms
+              let savedCompetitors: string[] = [];
+              try {
+                const platform = isTwitterDashboard ? 'twitter' : isFacebookDashboard ? 'facebook' : 'instagram';
+                const accountInfoResponse = await axios.get(`/api/retrieve-account-info/${savedUsername}?platform=${platform}`);
+                savedCompetitors = accountInfoResponse.data.competitors || [];
+                console.log(`[App] ✅ Retrieved competitors for ${savedUsername} on ${platform}:`, savedCompetitors);
+              } catch (error) {
+                console.error(`[App] ⚠️ Failed to fetch competitors from AccountInfo:`, error);
+                savedCompetitors = [];
+              }
+              
+              const savedAccountType = response.data.accountType || 'branding';
+              
+              console.log(`[App] ✅ Retrieved saved ${isTwitterDashboard ? 'Twitter' : isFacebookDashboard ? 'Facebook' : 'Instagram'} data for ${currentUser.uid}:`, {
+                username: savedUsername,
                 accountType: savedAccountType,
-                platform: isTwitterDashboard ? 'twitter' : isFacebookDashboard ? 'facebook' : 'instagram'
-              },
-              replace: true
-            }, 5); // Medium priority for user data loading
-          } else {
-            // User hasn't set up the platform yet, redirect to setup page
-            safeNavigate(navigate, isTwitterDashboard ? '/twitter' : isFacebookDashboard ? '/facebook' : '/instagram', {}, 5);
+                competitors: savedCompetitors
+              });
+              
+              // ✅ BULLETPROOF: Navigate to the correct dashboard with the saved data
+              safeNavigate(navigate, location.pathname, {
+                state: {
+                  accountHolder: savedUsername,
+                  competitors: savedCompetitors,
+                  accountType: savedAccountType,
+                  platform: isTwitterDashboard ? 'twitter' : isFacebookDashboard ? 'facebook' : 'instagram'
+                },
+                replace: true
+              }, 5); // Medium priority for user data loading
+            } else {
+              // User hasn't set up the platform yet, redirect to setup page
+              console.log(`[App] ⚠️ User hasn't set up ${isTwitterDashboard ? 'Twitter' : isFacebookDashboard ? 'Facebook' : 'Instagram'} yet, redirecting to setup`);
+              safeNavigate(navigate, isTwitterDashboard ? '/twitter' : isFacebookDashboard ? '/facebook' : '/instagram', {}, 5);
+            }
+          } catch (error) {
+            console.error(`[App] ❌ Error fetching user status:`, error);
+            safeNavigate(navigate, location.pathname.includes('twitter') ? '/twitter' : location.pathname.includes('facebook') ? '/facebook' : '/instagram', {}, 5);
+          } finally {
+            setIsLoadingUserData(false);
           }
-        } catch (error) {
-          console.error('Error fetching user status:', error);
-          safeNavigate(navigate, location.pathname.includes('twitter') ? '/twitter' : location.pathname.includes('facebook') ? '/facebook' : '/instagram', {}, 5);
-        } finally {
-          setIsLoadingUserData(false);
-        }
-      };
-      
-      fetchUserStatus();
+        };
+        
+        fetchUserStatus();
+      }
     }
-  }, [currentUser?.uid, accountHolder, location.pathname, navigate]);
+  }, [currentUser?.uid, accountHolder, location.pathname, location.state, navigate, getCurrentPlatform]);
   
   if (isLoadingUserData) {
-    return <div className="loading-screen">Loading account information...</div>;
+    // ✅ ENHANCED: Show which platform is being loaded
+    const currentPlatformName = location.pathname.includes('twitter') ? 'Twitter' : 
+                               location.pathname.includes('facebook') ? 'Facebook' : 'Instagram';
+    return (
+      <div className="loading-screen">
+        <div>Loading {currentPlatformName} account information...</div>
+        <div style={{ fontSize: '0.9em', opacity: 0.7, marginTop: '10px' }}>
+          Please wait while we retrieve your account data
+        </div>
+      </div>
+    );
   }
 
   return (

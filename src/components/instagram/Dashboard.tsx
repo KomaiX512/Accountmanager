@@ -1505,23 +1505,39 @@ Image Description: ${response.post.image_prompt}
       return;
     }
 
+    if (!accountHolder) {
+      setToast('Instagram account holder not found. Cannot reset.');
+      return;
+    }
+
     setIsResetting(true);
     setIsResetConfirmOpen(false);
 
     try {
-      console.log(`[${new Date().toISOString()}] 🔄 Starting bulletproof reset for Instagram dashboard (user: ${currentUser.uid})`);
+      console.log(`[${new Date().toISOString()}] 🔄 Starting bulletproof reset for Instagram dashboard`);
+      console.log(`[${new Date().toISOString()}] 📋 Reset parameters:`, {
+        platform: 'instagram',
+        accountHolder: accountHolder,
+        userId: currentUser.uid,
+        hookAvailable: !!resetAndAllowReconnection
+      });
 
       // Use the bulletproof reset hook - this handles everything:
       // 1. Complete cache clearing (localStorage & sessionStorage)
       // 2. Session manager cleanup
-      // 3. Backend API reset
-      // 4. Browser history manipulation
-      // 5. Navigation to main dashboard
+      // 3. Context state reset (Instagram hasAccessed = false)
+      // 4. Backend API reset
+      // 5. Browser history manipulation
+      // 6. Navigation to main dashboard (/account)
+      // 7. Acquired platforms refresh
       const resetSuccess = await resetAndAllowReconnection('instagram', accountHolder);
 
       if (resetSuccess) {
         console.log(`[${new Date().toISOString()}] ✅ Bulletproof reset completed successfully for Instagram`);
         setToast('Instagram dashboard reset successfully! Redirecting to main dashboard...');
+        
+        // Clear local component state immediately for better UX
+        clearInstagramFrontendData();
         
         // The navigation is already handled by the reset hook
         // No need for manual navigation or reload here
@@ -1975,7 +1991,7 @@ Image Description: ${response.post.image_prompt}
                 )}
               </div>
             </h2>
-            <OurStrategies accountHolder={accountHolder} />
+            <OurStrategies accountHolder={accountHolder} accountType="branding" />
           </div>
 
           <div className="competitor-analysis">

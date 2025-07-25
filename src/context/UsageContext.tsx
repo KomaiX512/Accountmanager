@@ -189,7 +189,8 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
     }
 
     try {
-      console.log(`[UsageContext] 🚀 Incrementing ${feature} usage for ${platform || 'unknown'} platform`);
+      console.log(`[UsageContext] 🚀 INCREMENT STARTED: ${feature} usage for ${platform || 'unknown'} platform`);
+      console.log(`[UsageContext] 📊 Current usage before increment: ${feature} = ${usage[feature]}`);
       
       // Optimistically update local state first for immediate UI feedback
       const previousUsage = usage[feature];
@@ -212,14 +213,24 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
       });
 
       // Call backend to persist the change
+      console.log(`[UsageContext] 🌐 Calling backend UserService.incrementUsage...`);
       await UserService.incrementUsage(currentUser.uid, feature);
       console.log(`[UsageContext] ✅ Backend increment successful for ${feature}`);
       
       // Refresh from backend to ensure consistency
-      setTimeout(() => refreshUsage(), 1000);
+      setTimeout(() => {
+        console.log(`[UsageContext] 🔄 Refreshing usage from backend for consistency...`);
+        refreshUsage();
+      }, 1000);
       
     } catch (error) {
       console.error(`[UsageContext] ❌ Error incrementing ${feature} usage:`, error);
+      console.error(`[UsageContext] ❌ Error details:`, {
+        feature,
+        platform,
+        userId: currentUser.uid,
+        error: error instanceof Error ? error.message : String(error)
+      });
       
       // Revert optimistic update on error
       setUsage(prev => {
@@ -232,6 +243,9 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
         console.log(`[UsageContext] ↩️ Reverted optimistic update for ${feature}`);
         return revertedUsage;
       });
+      
+      // Re-throw the error so calling code knows it failed
+      throw error;
     }
   }, [currentUser?.uid, usage, refreshUsage]);
 
@@ -252,7 +266,7 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
       currentUsage: usage[feature]
     };
     
-    console.log(`[UsageContext] 📊 TRACKING:`, logEntry);
+    console.log(`[UsageContext] 📊 TRACKING STARTED:`, logEntry);
     
     // Store in usage history for analytics
     try {
@@ -266,12 +280,20 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
       }
       
       localStorage.setItem(historyKey, JSON.stringify(existingHistory));
+      console.log(`[UsageContext] 💾 Usage history stored successfully`);
     } catch (error) {
       console.warn(`[UsageContext] ⚠️ Error storing usage history:`, error);
     }
     
     // Increment the usage
-    await incrementUsage(feature, platform);
+    try {
+      console.log(`[UsageContext] 🔄 Calling incrementUsage for ${feature}...`);
+      await incrementUsage(feature, platform);
+      console.log(`[UsageContext] ✅ TRACKING COMPLETED: ${feature} -> ${action} for ${platform}`);
+    } catch (error) {
+      console.error(`[UsageContext] ❌ TRACKING FAILED for ${feature}:`, error);
+      throw error; // Re-throw to let calling code handle the error
+    }
   }, [currentUser?.uid, usage, incrementUsage]);
 
   const isFeatureBlocked = useCallback((feature: keyof UsageStats) => {

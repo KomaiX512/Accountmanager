@@ -237,6 +237,15 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
 
   useEffect(() => {
     console.log('Posts prop in PostCooked:', posts);
+    console.log('🔍 [DEBUG] Posts detailed structure:', posts.map(p => ({
+      key: p.key,
+      hasImageUrl: !!p.data?.image_url,
+      hasR2ImageUrl: !!p.data?.r2_image_url,
+      hasImagePath: !!p.data?.image_path,
+      imageUrl: p.data?.image_url,
+      r2ImageUrl: p.data?.r2_image_url,
+      imagePath: p.data?.image_path
+    })));
     setLocalPosts(posts);
     
     // Clear any existing image errors when new posts are loaded to prevent white images
@@ -480,9 +489,22 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       }
     }
     
-    // 🚨 SAFETY: If no pattern matched, return placeholder
+    // 🚨 SAFETY: If no pattern matched, try direct URLs as last resort
     if (!imageFilename) {
-      console.warn(`[PostCooked] Could not determine image filename for post ${postKey}`);
+      console.warn(`[PostCooked] Could not determine image filename for post ${postKey}, trying direct URLs...`);
+      
+      // Check if we have direct R2 URLs that we can use
+      if (post.data?.r2_image_url && post.data.r2_image_url.includes('r2.dev')) {
+        console.log(`[PostCooked] Using direct R2 URL: ${post.data.r2_image_url}`);
+        return post.data.r2_image_url + (forceRefresh ? `&t=${Date.now()}` : '');
+      }
+      
+      if (post.data?.image_url && post.data.image_url.includes('r2.dev')) {
+        console.log(`[PostCooked] Using direct image URL: ${post.data.image_url}`);
+        return post.data.image_url + (forceRefresh ? `&t=${Date.now()}` : '');
+      }
+      
+      console.error(`[PostCooked] No valid image URL found for post ${postKey}`);
       return `${API_BASE_URL}/placeholder.jpg?post=${encodeURIComponent(postKey)}&reason=no_pattern`;
     }
     
@@ -2131,32 +2153,38 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                     )}
                     <span className="username">{username}</span>
                   </div>
-                  {(post.key in imageErrors && imageErrors[post.key]?.failed && imageErrors[post.key]?.retryCount >= 3) || !post.data.image_url ? (
-                    <ImagePlaceholder postKey={post.key} />
-                  ) : (
-                    <img
-                      src={getReliableImageUrl(post)}
-                      alt="Post visual"
-                      className={`post-image ${loadingImages.has(post.key) ? 'loading' : 'loaded'}`}
-                      onLoadStart={() => {
-                        console.log(`[PostCooked] Image load started for ${post.key}: ${getReliableImageUrl(post)}`);
-                        handleImageLoadStart(post.key);
-                      }}
-                      onLoad={(e) => {
-                        console.log(`[PostCooked] Image loaded successfully for ${post.key}`);
-                        handleImageLoad(post.key, e.target as HTMLImageElement);
-                      }}
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        handleImageError(post.key, target);
-                      }}
-                      key={`${post.key}-${imageRefreshKey}`} // CACHED key for React
-                      style={{
-                        backgroundColor: '#2a2a4a', // Ensure background is visible during loading
-                        minHeight: '450px' // Ensure container has height even if image fails
-                      }}
-                    />
-                  )}
+                  {(() => {
+                    const imageUrl = getReliableImageUrl(post);
+                    const shouldShowPlaceholder = (post.key in imageErrors && imageErrors[post.key]?.failed && imageErrors[post.key]?.retryCount >= 3) || 
+                                                imageUrl.includes('placeholder.jpg');
+                    
+                    return shouldShowPlaceholder ? (
+                      <ImagePlaceholder postKey={post.key} />
+                    ) : (
+                      <img
+                        src={imageUrl}
+                        alt="Post visual"
+                        className={`post-image ${loadingImages.has(post.key) ? 'loading' : 'loaded'}`}
+                        onLoadStart={() => {
+                          console.log(`[PostCooked] Image load started for ${post.key}: ${imageUrl}`);
+                          handleImageLoadStart(post.key);
+                        }}
+                        onLoad={(e) => {
+                          console.log(`[PostCooked] Image loaded successfully for ${post.key}`);
+                          handleImageLoad(post.key, e.target as HTMLImageElement);
+                        }}
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          handleImageError(post.key, target);
+                        }}
+                        key={`${post.key}-${imageRefreshKey}`} // CACHED key for React
+                        style={{
+                          backgroundColor: '#2a2a4a', // Ensure background is visible during loading
+                          minHeight: '450px' // Ensure container has height even if image fails
+                        }}
+                      />
+                    );
+                  })()}
                   <div className="post-actions">
                     <motion.button
                       className="like-button"

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import axios from 'axios';
+import useFeatureTracking from '../../hooks/useFeatureTracking';
 
 interface CampaignModalProps {
   username: string;
@@ -32,7 +33,15 @@ interface EngagementMetrics {
   message: string;
 }
 
+interface AutopilotSettings {
+  enabled: boolean;
+  autoSchedule: boolean;
+  autoReply: boolean;
+  lastChecked?: string;
+}
+
 const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isConnected, onClose, onCampaignStopped }) => {
+  const { trackRealCampaign } = useFeatureTracking();
   const [summary, setSummary] = useState<CampaignSummary | null>(null);
   const [generatedSummary, setGeneratedSummary] = useState<GeneratedContentSummary | null>(null);
   // Removed postCooked metric state
@@ -40,21 +49,74 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isStopping, setIsStopping] = useState(false);
+  
+  // 🚀 AUTOPILOT: New state for automation features
+  const [autopilotSettings, setAutopilotSettings] = useState<AutopilotSettings>({
+    enabled: false,
+    autoSchedule: false,
+    autoReply: false
+  });
+  const [autopilotLoading, setAutopilotLoading] = useState(false);
 
   useEffect(() => {
     fetchCampaignData();
+    fetchAutopilotSettings(); // 🚀 AUTOPILOT: Fetch automation settings
     
     // Set up periodic refresh only if modal is open and not stopping
     const intervalId = setInterval(() => {
       if (!isStopping) {
         fetchCampaignData();
+        fetchAutopilotSettings(); // 🚀 AUTOPILOT: Also refresh automation settings
       }
-    }, 15000); // Check every 15 seconds
+    }, 300000); // Check every 5 minutes (300,000 ms)
     
     return () => {
       clearInterval(intervalId);
     };
   }, [username, platform, isStopping]);
+
+  // 🚀 AUTOPILOT: Fetch current automation settings
+  const fetchAutopilotSettings = async () => {
+    try {
+      const response = await axios.get(`/autopilot-settings/${username}?platform=${platform}`);
+      if (response.data) {
+        setAutopilotSettings(response.data);
+      }
+    } catch (err: any) {
+      // If autopilot settings don't exist yet, that's okay - use defaults
+      if (err.response?.status !== 404) {
+        console.warn('Error fetching autopilot settings:', err);
+      }
+    }
+  };
+
+  // 🚀 AUTOPILOT: Update automation settings
+  const updateAutopilotSettings = async (newSettings: Partial<AutopilotSettings>) => {
+    setAutopilotLoading(true);
+    try {
+      const updatedSettings = { ...autopilotSettings, ...newSettings };
+      
+      const response = await axios.post(`/autopilot-settings/${username}`, {
+        platform,
+        settings: updatedSettings
+      });
+      
+      if (response.data.success) {
+        setAutopilotSettings(updatedSettings);
+        setError(null);
+        
+        // Track automation usage
+        await trackRealCampaign(platform.toLowerCase(), {
+          action: 'campaign_started' // Using campaign_started for autopilot activation
+        });
+      }
+    } catch (err: any) {
+      console.error('Error updating autopilot settings:', err);
+      setError('Failed to update automation settings. Please try again.');
+    } finally {
+      setAutopilotLoading(false);
+    }
+  };
 
   const fetchCampaignData = async () => {
     if (isStopping) return; // Don't fetch if we're in the process of stopping
@@ -110,6 +172,44 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
 
   const handleRefresh = () => {
     fetchCampaignData();
+    fetchAutopilotSettings(); // 🚀 AUTOPILOT: Also refresh automation settings
+  };
+
+  // 🚀 AUTOPILOT: Toggle main autopilot switch
+  const handleAutopilotToggle = async () => {
+    // ✅ CONNECTION CHECK: Prevent activation if account not connected
+    if (!isConnected && !autopilotSettings.enabled) {
+      setError('Please connect your account first to enable autopilot features.');
+      return;
+    }
+    
+    const newEnabled = !autopilotSettings.enabled;
+    await updateAutopilotSettings({ 
+      enabled: newEnabled,
+      // If disabling autopilot, also disable both features
+      autoSchedule: newEnabled ? autopilotSettings.autoSchedule : false,
+      autoReply: newEnabled ? autopilotSettings.autoReply : false
+    });
+  };
+
+  // 🚀 AUTOPILOT: Toggle auto-schedule feature
+  const handleAutoScheduleToggle = async () => {
+    if (!autopilotSettings.enabled) return; // Can't toggle if autopilot is off
+    if (!isConnected) {
+      setError('Account connection required for auto-scheduling.');
+      return;
+    }
+    await updateAutopilotSettings({ autoSchedule: !autopilotSettings.autoSchedule });
+  };
+
+  // 🚀 AUTOPILOT: Toggle auto-reply feature  
+  const handleAutoReplyToggle = async () => {
+    if (!autopilotSettings.enabled) return; // Can't toggle if autopilot is off
+    if (!isConnected) {
+      setError('Account connection required for auto-replies.');
+      return;
+    }
+    await updateAutopilotSettings({ autoReply: !autopilotSettings.autoReply });
   };
 
   const handleStopCampaign = () => {
@@ -123,6 +223,16 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
 
     try {
       console.log(`[CampaignModal] Attempting to stop campaign for ${username} on ${platform.toLowerCase()}`);
+
+      // ✅ REAL USAGE TRACKING: Track campaign stop action
+      const trackingSuccess = await trackRealCampaign(platform.toLowerCase(), {
+        action: 'campaign_stopped'
+      });
+
+      if (trackingSuccess) {
+        console.log(`[CampaignModal] ✅ Campaign stop tracked: ${platform} campaign stopped`);
+      }
+
       const response = await axios.delete(`/stop-campaign/${username}?platform=${platform.toLowerCase()}`);
       
       if (response.data.success) {
@@ -315,6 +425,174 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
                     {postEstimated || (generatedSummary?.postCount ? generatedSummary.postCount : '-')}
                   </p>
                 </div>
+              </div>
+
+              {/* 🚀 AUTOPILOT: Automation Control Panel */}
+              <div style={{
+                border: '1px solid #333',
+                borderRadius: '8px',
+                padding: '16px',
+                background: 'rgba(138, 43, 226, 0.05)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <h3 style={{ color: '#8a2be2', margin: 0, fontSize: '16px' }}>🚁 Autopilot Mode</h3>
+                  <label style={{ display: 'flex', alignItems: 'center', cursor: isConnected ? 'pointer' : 'not-allowed' }}>
+                    <input
+                      type="checkbox"
+                      checked={autopilotSettings.enabled}
+                      onChange={handleAutopilotToggle}
+                      disabled={autopilotLoading || !isConnected}
+                      style={{
+                        marginRight: '8px',
+                        transform: 'scale(1.2)',
+                        accentColor: '#8a2be2',
+                        opacity: isConnected ? 1 : 0.5
+                      }}
+                    />
+                    <span style={{ color: '#e0e0ff', fontSize: '14px' }}>
+                      {autopilotSettings.enabled ? 'Active' : 'Inactive'}
+                    </span>
+                  </label>
+                </div>
+
+                {/* 🔗 CONNECTION STATUS CHECK */}
+                {!isConnected && (
+                  <div style={{
+                    padding: '12px',
+                    borderRadius: '6px',
+                    background: 'rgba(255, 193, 7, 0.1)',
+                    border: '1px solid rgba(255, 193, 7, 0.3)',
+                    marginBottom: '16px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ color: '#ffc107', marginRight: '8px' }}>⚠️</span>
+                      <h4 style={{ color: '#ffc107', margin: 0, fontSize: '14px' }}>
+                        Account Connection Required
+                      </h4>
+                    </div>
+                    <p style={{ color: '#e0e0ff', margin: '0 0 8px 0', fontSize: '13px' }}>
+                      Autopilot requires your {platform} account to be connected for auto-replies and scheduling.
+                    </p>
+                    <p style={{ color: '#a0a0cc', margin: 0, fontSize: '12px', fontStyle: 'italic' }}>
+                      Please connect your account from the main dashboard to enable automation features.
+                    </p>
+                  </div>
+                )}
+
+                {autopilotSettings.enabled && isConnected && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {/* Autopilot Status Indicator */}
+                    <div style={{
+                      padding: '10px',
+                      borderRadius: '6px',
+                      background: 'rgba(138, 43, 226, 0.1)',
+                      border: '1px solid rgba(138, 43, 226, 0.2)',
+                      marginBottom: '8px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
+                        <span style={{ color: '#8a2be2', marginRight: '6px' }}>🤖</span>
+                        <h4 style={{ color: '#8a2be2', margin: 0, fontSize: '13px' }}>
+                          Autopilot Status: Active
+                        </h4>
+                      </div>
+                      <p style={{ color: '#a0a0cc', margin: 0, fontSize: '11px' }}>
+                        • Auto-Reply: Checks every 5 minutes for new messages
+                      </p>
+                      <p style={{ color: '#a0a0cc', margin: 0, fontSize: '11px' }}>
+                        • Auto-Schedule: Maintains smart posting intervals
+                      </p>
+                    </div>
+
+                    {/* Auto-Schedule Option */}
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '12px',
+                      borderRadius: '6px',
+                      background: 'rgba(0, 255, 204, 0.1)',
+                      border: '1px solid rgba(0, 255, 204, 0.2)',
+                      opacity: !isConnected ? 0.6 : 1
+                    }}>
+                      <div>
+                        <h4 style={{ color: '#00ffcc', margin: '0 0 4px 0', fontSize: '14px' }}>
+                          📅 Auto-Schedule Posts
+                        </h4>
+                        <p style={{ color: '#a0a0cc', margin: 0, fontSize: '12px' }}>
+                          {isConnected 
+                            ? 'Automatically schedule new posts with smart intervals' 
+                            : 'Requires account connection for scheduling'
+                          }
+                        </p>
+                      </div>
+                      <label style={{ display: 'flex', alignItems: 'center', cursor: isConnected ? 'pointer' : 'not-allowed' }}>
+                        <input
+                          type="checkbox"
+                          checked={autopilotSettings.autoSchedule}
+                          onChange={handleAutoScheduleToggle}
+                          disabled={autopilotLoading || !autopilotSettings.enabled || !isConnected}
+                          style={{
+                            transform: 'scale(1.1)',
+                            accentColor: '#00ffcc',
+                            opacity: isConnected ? 1 : 0.5
+                          }}
+                        />
+                      </label>
+                    </div>
+
+                    {/* Auto-Reply Option */}
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '12px',
+                      borderRadius: '6px',
+                      background: 'rgba(255, 142, 83, 0.1)',
+                      border: '1px solid rgba(255, 142, 83, 0.2)',
+                      opacity: !isConnected ? 0.6 : 1
+                    }}>
+                      <div>
+                        <h4 style={{ color: '#ff8e53', margin: '0 0 4px 0', fontSize: '14px' }}>
+                          💬 Auto-Reply to DMs/Comments
+                        </h4>
+                        <p style={{ color: '#a0a0cc', margin: 0, fontSize: '12px' }}>
+                          {isConnected 
+                            ? 'AI responds to messages and comments automatically' 
+                            : 'Requires account connection for auto-replies'
+                          }
+                        </p>
+                      </div>
+                      <label style={{ display: 'flex', alignItems: 'center', cursor: isConnected ? 'pointer' : 'not-allowed' }}>
+                        <input
+                          type="checkbox"
+                          checked={autopilotSettings.autoReply}
+                          onChange={handleAutoReplyToggle}
+                          disabled={autopilotLoading || !autopilotSettings.enabled || !isConnected}
+                          style={{
+                            transform: 'scale(1.1)',
+                            accentColor: '#ff8e53',
+                            opacity: isConnected ? 1 : 0.5
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                {!autopilotSettings.enabled && (
+                  <p style={{ 
+                    color: '#a0a0cc', 
+                    margin: 0, 
+                    fontSize: '13px', 
+                    fontStyle: 'italic',
+                    textAlign: 'center'
+                  }}>
+                    {isConnected 
+                      ? 'Enable autopilot to access automation features'
+                      : 'Connect your account and enable autopilot for automation'
+                    }
+                  </p>
+                )}
               </div>
 
               {/* Engagement Results */}

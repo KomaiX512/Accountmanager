@@ -94,9 +94,21 @@
   background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
 }
 
+.competitor-sub-container.smart-loading {
+  background: linear-gradient(135deg, rgba(0, 255, 204, 0.1), rgba(0, 204, 153, 0.1));
+  border-color: rgba(0, 255, 204, 0.4);
+  animation: smart-loading-pulse 2s infinite ease-in-out;
+}
+
 .competitor-sub-container:hover {
   border-color: #00ffcc;
   transform: translateY(-2px);
+}
+
+.competitor-sub-container.smart-loading:hover {
+  border-color: #00ffcc;
+  transform: translateY(-3px);
+  box-shadow: 0 5px 25px rgba(0, 255, 204, 0.3);
 }
 
 .competitor-actions {
@@ -105,6 +117,7 @@
   right: 10px;
   display: flex;
   gap: 8px;
+  z-index: 10; /* ✅ FIXED: Ensure edit/delete buttons are always accessible above overlays */
 }
 
 .action-btn {
@@ -124,11 +137,20 @@
   font-size: 1.2rem;
   font-weight: 600;
   letter-spacing: 1px;
-  z-index: 2;
+  z-index: 5; /* ✅ INCREASED: Ensure this is above all overlays */
   text-shadow: 0 0 8px rgba(0, 255, 204, 0.4);
   text-align: center;
   display: block;
   cursor: pointer;
+  position: relative; /* ✅ ADDED: Ensure z-index takes effect */
+}
+
+/* ✅ NEW: Visual indicator for unclickable smart loading state */
+.competitor-sub-container.smart-loading .overlay-text {
+  opacity: 0.6;
+  color: #888;
+  text-shadow: none;
+  cursor: not-allowed;
 }
 
 .futuristic-loading {
@@ -141,6 +163,74 @@
   background: rgba(0, 0, 0, 0.6);
   z-index: 1;
   overflow: hidden;
+}
+
+.futuristic-loading.smart-loading-overlay {
+  background: rgba(0, 255, 204, 0.1);
+  backdrop-filter: blur(2px);
+}
+
+.smart-loading-tooltip {
+  position: absolute;
+  top: -120px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  pointer-events: none;
+  animation: tooltip-appear 0.3s ease-out;
+}
+
+.tooltip-content {
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  border: 2px solid #00ffcc;
+  border-radius: 12px;
+  padding: 16px;
+  width: 280px;
+  box-shadow: 0 8px 32px rgba(0, 255, 204, 0.3);
+  backdrop-filter: blur(8px);
+}
+
+.tooltip-title {
+  color: #00ffcc;
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
+.tooltip-message {
+  color: #e0e0ff;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.tooltip-message strong {
+  color: #00ffcc;
+  font-weight: 600;
+}
+
+.tooltip-note {
+  color: #b0b0ff;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  text-align: center;
+  opacity: 0.9;
+  font-style: italic;
+}
+
+.tooltip-arrow {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 10px solid #00ffcc;
 }
 
 .loading-text {
@@ -194,6 +284,28 @@
 @keyframes float-particle {
   0%, 100% { transform: translate(0, 0); }
   50% { transform: translate(10px, -10px); }
+}
+
+@keyframes smart-loading-pulse {
+  0%, 100% { 
+    border-color: rgba(0, 255, 204, 0.4);
+    box-shadow: 0 0 10px rgba(0, 255, 204, 0.2);
+  }
+  50% { 
+    border-color: rgba(0, 255, 204, 0.8);
+    box-shadow: 0 0 20px rgba(0, 255, 204, 0.4);
+  }
+}
+
+@keyframes tooltip-appear {
+  0% { 
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px) scale(0.9);
+  }
+  100% { 
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
 }
 
 @keyframes modalAppear {
@@ -586,6 +698,7 @@
   justify-content: center;
   background: rgba(0, 255, 204, 0.1);
   border-radius: 8px;
+  z-index: 2; /* ✅ FIXED: Keep below competitor-actions so buttons remain clickable */
 }
 
 .success-text {
@@ -614,4 +727,174 @@
   opacity: 0.8;
   background: rgba(255, 107, 107, 0.1);
   border-radius: 8px;
+  z-index: 1; /* ✅ FIXED: Keep below competitor-actions so buttons remain clickable */
+  pointer-events: none; /* ✅ FIXED: Don't block clicks - allow them to pass through to overlay-text */
+}
+
+/* ✅ NEW: Styles for detailed no-analysis explanation modal */
+.no-analysis-explanation {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.explanation-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.explanation-header h4 {
+  margin: 0;
+  color: #ffa500;
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.explanation-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.explanation-content p {
+  color: #e0e0ff;
+  font-size: 1rem;
+  line-height: 1.5;
+  margin: 0;
+  text-align: center;
+}
+
+.reason-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: rgba(45, 45, 75, 0.6);
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 255, 204, 0.2);
+}
+
+.reason-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  border-left: 3px solid rgba(255, 165, 0, 0.5);
+}
+
+.reason-icon {
+  font-size: 1.2rem;
+  min-width: 24px;
+  text-align: center;
+}
+
+.reason-text {
+  color: #e0e0ff;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.reason-text strong {
+  color: #ffa500;
+  font-weight: 600;
+}
+
+.suggested-actions {
+  background: rgba(0, 255, 204, 0.1);
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 255, 204, 0.3);
+}
+
+.suggested-actions h5 {
+  margin: 0 0 15px 0;
+  color: #00ffcc;
+  font-size: 1.1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.suggested-actions ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.suggested-actions li {
+  color: #e0e0ff;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  padding-left: 20px;
+  position: relative;
+}
+
+.suggested-actions li::before {
+  content: "→";
+  position: absolute;
+  left: 0;
+  color: #00ffcc;
+  font-weight: bold;
+}
+
+.suggested-actions li strong {
+  color: #00ffcc;
+  font-weight: 600;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0, 255, 204, 0.2);
+}
+
+.edit-btn-modal, .delete-btn-modal {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 140px;
+  justify-content: center;
+}
+
+.edit-btn-modal {
+  background: linear-gradient(90deg, #4a90e2, #357abd);
+  color: white;
+}
+
+.edit-btn-modal:hover {
+  background: linear-gradient(90deg, #5ba0f2, #4a8acd);
+  box-shadow: 0 0 15px rgba(74, 144, 226, 0.4);
+}
+
+.delete-btn-modal {
+  background: linear-gradient(90deg, #ff4444, #cc3333);
+  color: white;
+}
+
+.delete-btn-modal:hover {
+  background: linear-gradient(90deg, #ff5555, #dd4444);
+  box-shadow: 0 0 15px rgba(255, 68, 68, 0.4);
 }

@@ -344,6 +344,174 @@ router.post(['/instagram/callback', '/api/instagram/callback'], async (req, res)
   }
 });
 
+// Unified Instagram Webhook POST Handler for all webhook endpoints
+router.post([
+  '/webhook/instagram',
+  '/api/webhook/instagram',
+  '/instagram/callback',
+  '/api/instagram/callback'
+], async (req, res) => {
+  const body = req.body;
+
+  console.log(`[${new Date().toISOString()}] WEBHOOK ➜ Raw Instagram payload:`, JSON.stringify(body));
+
+  if (!body || (body.object !== 'instagram' && body.object !== 'page')) {
+    console.log(`[${new Date().toISOString()}] Invalid payload received at webhook:`, JSON.stringify(body));
+    return res.sendStatus(200); // Always return 200 to acknowledge receipt
+  }
+
+  console.log(`[${new Date().toISOString()}] WEBHOOK ➜ Valid Instagram payload received: ${JSON.stringify(body)}`);
+
+  try {
+    for (const entry of body.entry) {
+      const webhookGraphId = entry.id; // This is the Graph ID from the webhook
+      console.log(`[${new Date().toISOString()}] Processing entry for Webhook Graph ID: ${webhookGraphId}`);
+
+      // Find the user's actual token data based on webhook Graph ID
+      let matchedToken = null;
+      try {
+        const listCommand = new ListObjectsV2Command({
+          Bucket: 'tasks',
+          Prefix: 'InstagramTokens/',
+        });
+        const { Contents } = await s3Client.send(listCommand);
+        
+        if (Contents) {
+          console.log(`[${new Date().toISOString()}] Available tokens for webhook lookup:`);
+          for (const obj of Contents) {
+            if (obj.Key.endsWith('/token.json')) {
+              const getCommand = new GetObjectCommand({
+                Bucket: 'tasks',
+                Key: obj.Key,
+              });
+              const data = await s3Client.send(getCommand);
+              const token = JSON.parse(await data.Body.transformToString());
+              
+              // Match against both user_id and graph_id
+              if (token.instagram_user_id === webhookGraphId || token.instagram_graph_id === webhookGraphId) {
+                matchedToken = token;
+                console.log(`[${new Date().toISOString()}] Found matching token for webhook ID ${webhookGraphId}: username=${token.username}, userUserId=${token.instagram_user_id}`);
+                break;
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error(`[${new Date().toISOString()}] Error finding token for webhook ID ${webhookGraphId}:`, err.message);
+      }
+
+      // Handle Direct Messages
+      if (Array.isArray(entry.messaging)) {
+        for (const msg of entry.messaging) {
+          if (!msg.message?.text || msg.message.is_echo) {
+            console.log(`[${new Date().toISOString()}] Skipping non-text or echo message: ${JSON.stringify(msg.message)}`);
+            continue;
+          }
+
+          const eventData = {
+            type: 'message',
+            instagram_user_id: matchedToken ? matchedToken.instagram_user_id : webhookGraphId,
+            sender_id: msg.sender.id,
+            message_id: msg.message.mid,
+            text: msg.message.text,
+            timestamp: msg.timestamp,
+            received_at: new Date().toISOString(),
+            username: matchedToken ? matchedToken.username : 'unknown',
+            status: 'pending'
+          };
+
+          // ALWAYS store with USER ID
+          const storeUserId = matchedToken ? matchedToken.instagram_user_id : webhookGraphId;
+          if (!storeUserId) {
+            console.log(`[${new Date().toISOString()}] Skipping DM storage - no user ID found for webhook ID ${webhookGraphId}`);
+            continue;
+          }
+          
+          console.log(`[${new Date().toISOString()}] Storing DM event with USER ID: ${storeUserId}`);
+          
+          const userKey = `InstagramEvents/${storeUserId}/${eventData.message_id}.json`;
+          await s3Client.send(new PutObjectCommand({
+            Bucket: 'tasks',
+            Key: userKey,
+            Body: JSON.stringify(eventData, null, 2),
+            ContentType: 'application/json'
+          }));
+          
+          console.log(`[${new Date().toISOString()}] Stored DM at ${userKey}`);
+
+          // Broadcast update
+          const broadcastData = { event: 'message', data: eventData, timestamp: Date.now() };
+          broadcastUpdate(storeUserId, broadcastData);
+          
+          if (matchedToken && matchedToken.username && matchedToken.username !== 'unknown') {
+            broadcastUpdate(matchedToken.username, broadcastData);
+          }
+          
+          // Clear cache
+          cache.delete(`InstagramEvents/${storeUserId}`);
+        }
+      }
+
+      // Handle Comments
+      if (Array.isArray(entry.changes)) {
+        for (const change of entry.changes) {
+          if (change.value?.item !== 'comment' || !change.value.comment_id) {
+            continue;
+          }
+
+          const eventData = {
+            type: 'comment',
+            instagram_user_id: matchedToken ? matchedToken.instagram_user_id : webhookGraphId,
+            comment_id: change.value.comment_id,
+            post_id: change.value.post_id,
+            sender_id: change.value.from.id,
+            text: change.value.message,
+            timestamp: change.value.created_time || Date.now(),
+            received_at: new Date().toISOString(),
+            username: matchedToken ? matchedToken.username : 'unknown',
+            status: 'pending'
+          };
+
+          // ALWAYS store with USER ID
+          const storeUserId = matchedToken ? matchedToken.instagram_user_id : webhookGraphId;
+          if (!storeUserId) {
+            console.log(`[${new Date().toISOString()}] Skipping comment storage - no user ID found for webhook ID ${webhookGraphId}`);
+            continue;
+          }
+          
+          console.log(`[${new Date().toISOString()}] Storing comment event with USER ID: ${storeUserId}`);
+          
+          const userKey = `InstagramEvents/${storeUserId}/comment_${eventData.comment_id}.json`;
+          await s3Client.send(new PutObjectCommand({
+            Bucket: 'tasks',
+            Key: userKey,
+            Body: JSON.stringify(eventData, null, 2),
+            ContentType: 'application/json'
+          }));
+          
+          console.log(`[${new Date().toISOString()}] Stored comment at ${userKey}`);
+
+          // Broadcast update
+          const broadcastData = { event: 'comment', data: eventData, timestamp: Date.now() };
+          broadcastUpdate(storeUserId, broadcastData);
+          
+          if (matchedToken && matchedToken.username && matchedToken.username !== 'unknown') {
+            broadcastUpdate(matchedToken.username, broadcastData);
+          }
+          
+          // Clear cache
+          cache.delete(`InstagramEvents/${storeUserId}`);
+        }
+      }
+    }
+
+    return res.sendStatus(200); // Acknowledge receipt
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error processing webhook:`, error);
+    return res.sendStatus(200); // Still return 200 even on error to acknowledge receipt
+  }
+});
+
 // Facebook OAuth callback endpoint - ONLY for OAuth, NOT for webhooks
 router.post(['/facebook/callback', '/api/facebook/callback'], async (req, res) => {
   // This endpoint should only handle OAuth callbacks, not webhook events
@@ -910,7 +1078,8 @@ router.get(['/facebook/callback', '/api/facebook/callback'], async (req, res) =>
 
 
 // Webhook Verification
-router.get(['/webhook/instagram', '/api/webhook/instagram'], (req, res) => {
+// Instagram Webhook Verification (GET handler)
+router.get(['/webhook/instagram', '/api/webhook/instagram', '/instagram/callback', '/api/instagram/callback'], (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
@@ -923,15 +1092,6 @@ router.get(['/webhook/instagram', '/api/webhook/instagram'], (req, res) => {
     res.sendStatus(403);
   }
 });
-
-// Fixed Instagram Webhook POST Handler
-router.post(['/instagram/callback', '/api/instagram/callback'], async (req, res) => {
-  const body = req.body;
-
-  if (body.object !== 'instagram') {
-    console.log(`[${new Date().toISOString()}] Invalid payload received at callback, not Instagram object`);
-    return res.sendStatus(404);
-  }
 
   console.log(`[${new Date().toISOString()}] WEBHOOK ➜ Instagram payload received at callback: ${JSON.stringify(body)}`);
 

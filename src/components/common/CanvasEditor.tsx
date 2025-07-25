@@ -13,6 +13,7 @@ import { useTwitter } from '../../context/TwitterContext';
 import { useFacebook } from '../../context/FacebookContext';
 import { useLocation } from 'react-router-dom';
 import { schedulePost } from '../../utils/scheduleHelpers';
+import useFeatureTracking from '../../hooks/useFeatureTracking';
 
 interface CanvasEditorProps {
   onClose: () => void;
@@ -53,6 +54,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
   platform: propPlatform
 }) => {
   const location = useLocation();
+  const { trackRealPostCreation, canUseFeature } = useFeatureTracking();
   
   // Determine platform: use prop first, then detect from URL
   const detectedPlatform = propPlatform || (
@@ -1070,10 +1072,33 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
       setNotification('Missing date or user ID');
       return;
     }
+
+    // ✅ PRE-ACTION CHECK: Verify post limits before proceeding
+    const postAccessCheck = canUseFeature('posts');
+    if (!postAccessCheck.allowed) {
+      setNotification(postAccessCheck.reason || 'Posts feature is not available');
+      return;
+    }
     
     setIsScheduling(true);
     
     try {
+      // ✅ REAL USAGE TRACKING: Track before scheduling
+      const trackingSuccess = await trackRealPostCreation(detectedPlatform, {
+        scheduled: true,
+        immediate: false,
+        type: 'canvas_post'
+      });
+
+      if (!trackingSuccess) {
+        console.warn(`[CanvasEditor] 🚫 Post creation blocked for ${detectedPlatform} - limit reached`);
+        setNotification('Post limit reached - upgrade to continue');
+        setIsScheduling(false);
+        return;
+      }
+
+      console.log(`[CanvasEditor] ✅ Post tracked: ${detectedPlatform} scheduled canvas post`);
+
       // Get image from canvas if available
       let imageBlob: Blob | undefined = undefined;
       

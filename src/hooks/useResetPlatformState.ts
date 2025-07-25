@@ -12,6 +12,10 @@
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useInstagram } from '../context/InstagramContext';
+import { useTwitter } from '../context/TwitterContext';
+import { useFacebook } from '../context/FacebookContext';
+import { useAcquiredPlatforms } from '../context/AcquiredPlatformsContext';
 import { 
   clearInstagramConnection, 
   resetDisconnectedFlag as resetInstagramDisconnectedFlag 
@@ -38,6 +42,14 @@ export interface PlatformResetOptions {
 export const useResetPlatformState = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
+  
+  // Platform context hooks for accessing platform reset functions
+  const { resetInstagramAccess } = useInstagram();
+  const { resetTwitterAccess } = useTwitter();
+  const { resetFacebookAccess } = useFacebook();
+  
+  // Acquired platforms context for refreshing main dashboard status
+  const { refreshPlatforms } = useAcquiredPlatforms();
 
   /**
    * Clears all platform-specific localStorage entries
@@ -97,7 +109,7 @@ export const useResetPlatformState = () => {
   }, []);
 
   /**
-   * Clears platform-specific session manager data
+   * Clears platform-specific session manager data AND context state
    */
   const clearSessionManagerData = useCallback((platform: string, userId: string) => {
     console.log(`[ResetPlatformState] 🧹 Clearing session manager data for ${platform}`);
@@ -105,15 +117,18 @@ export const useResetPlatformState = () => {
     switch (platform) {
       case 'instagram':
         clearInstagramConnection(userId);
+        resetInstagramAccess(); // 🔥 Reset context state to update main dashboard
         break;
       case 'twitter':
         clearTwitterConnection(userId);
+        resetTwitterAccess(); // 🔥 Reset context state to update main dashboard
         break;
       case 'facebook':
         clearFacebookConnection(userId);
+        resetFacebookAccess(); // 🔥 Reset context state to update main dashboard
         break;
     }
-  }, []);
+  }, [resetInstagramAccess, resetTwitterAccess, resetFacebookAccess]);
 
   /**
    * Manipulates browser history to prevent back navigation to reset dashboard
@@ -218,6 +233,10 @@ export const useResetPlatformState = () => {
         });
       }
 
+      // Step 5: 🔥 BULLETPROOF FIX - Refresh acquired platforms to update main dashboard status
+      refreshPlatforms();
+      console.log(`[ResetPlatformState] 🔄 Refreshed acquired platforms - main dashboard will show "not acquired"`);
+
       console.log(`[ResetPlatformState] ✅ Platform reset completed successfully for ${platform}`);
       return true;
 
@@ -225,7 +244,7 @@ export const useResetPlatformState = () => {
       console.error(`[ResetPlatformState] ❌ Platform reset failed:`, error);
       return false;
     }
-  }, [currentUser, clearPlatformLocalStorage, clearPlatformSessionStorage, clearSessionManagerData, performBackendReset, preventBackNavigation, navigate]);
+  }, [currentUser, clearPlatformLocalStorage, clearPlatformSessionStorage, clearSessionManagerData, performBackendReset, preventBackNavigation, navigate, refreshPlatforms]);
 
   /**
    * Quick reset function for immediate use (with sensible defaults)
@@ -241,11 +260,14 @@ export const useResetPlatformState = () => {
 
   /**
    * Reset platform and clear disconnected flags (for allowing future reconnection)
+   * 🔥 BULLETPROOF: This ensures main dashboard status updates immediately
    */
   const resetAndAllowReconnection = useCallback(async (platform: 'instagram' | 'twitter' | 'facebook', username: string): Promise<boolean> => {
     if (!currentUser?.uid) return false;
 
-    // First perform the standard reset
+    console.log(`[ResetPlatformState] 🔄 Starting bulletproof reset for ${platform} with reconnection capability`);
+
+    // First perform the standard reset (which now includes context resets)
     const resetSuccess = await resetPlatformState({
       platform,
       username,
@@ -268,6 +290,8 @@ export const useResetPlatformState = () => {
           resetFacebookDisconnectedFlag(currentUser.uid);
           break;
       }
+      
+      console.log(`[ResetPlatformState] ✅ Platform ${platform} reset completed - ready for reconnection!`);
     }
 
     return resetSuccess;

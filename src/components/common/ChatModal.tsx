@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { MessageCircle, Send, X } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { MessageCircle, Send, X, Loader2 } from 'lucide-react';
 import './ChatModal.css';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
 
@@ -45,9 +45,12 @@ const ChatModal: React.FC<ChatModalProps> = ({
     e.preventDefault();
     if (!message.trim() || isProcessing) return;
 
+    console.log(`[ChatModal] 🚀 SUBMIT STARTED: platform=${platform}, message="${message.trim().substring(0, 50)}..."`);
+
     // Verify discussion limits before proceeding
     const discussionAccessCheck = canUseFeature('discussions');
     if (!discussionAccessCheck.allowed) {
+      console.warn(`[ChatModal] 🚫 DISCUSSION BLOCKED:`, discussionAccessCheck.reason);
       alert(discussionAccessCheck.reason || 'Discussions feature is not available');
       return;
     }
@@ -57,18 +60,26 @@ const ChatModal: React.FC<ChatModalProps> = ({
 
     // Track actual discussion engagement
     try {
+      console.log(`[ChatModal] 🎯 Calling trackRealDiscussion for ${platform}...`);
       const trackingSuccess = await trackRealDiscussion(platform, {
         messageCount: messages.length + 1,
         type: 'chat'
       });
       
+      console.log(`[ChatModal] 📊 Tracking result: ${trackingSuccess ? 'SUCCESS' : 'FAILED'}`);
+      
       if (!trackingSuccess) {
+        console.warn(`[ChatModal] 🚫 Tracking failed, aborting message send`);
         return;
       }
+      
+      console.log(`[ChatModal] ✅ Tracking successful, proceeding with message send`);
     } catch (trackingError) {
-      console.error(`[ChatModal] Discussion tracking error:`, trackingError);
+      console.error(`[ChatModal] ❌ Discussion tracking error:`, trackingError);
+      // Continue with sending message even if tracking fails
     }
 
+    console.log(`[ChatModal] 📤 Sending message to parent component...`);
     onSendMessage(messageToSend);
   };
 
@@ -130,114 +141,143 @@ const ChatModal: React.FC<ChatModalProps> = ({
 
   if (!open) return null;
 
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setMessage(e.target.value);
+    
+    // Auto-resize textarea
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 160)}px`;
+    }
+  }, []);
+
+  // Auto-focus input when modal opens
+  useEffect(() => {
+    if (open && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [open]);
+
   return (
-    <motion.div
-      className="chat-modal-overlay"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      onClick={onClose}
-    >
-      <motion.div
-        className="chat-modal-content"
-        initial={{ scale: 0.9, y: 50 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.9, y: 50 }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="chat-modal-header">
-          <div className="chat-header-info">
-            <div className="chat-mode-indicator">
-              <MessageCircle size={20} className="mode-icon discussion-icon" />
-              <h3>
-                AI Discussion with {username}
-              </h3>
-            </div>
-            <span className="platform-badge">{platform}</span>
-          </div>
-          <button className="chat-close-btn" onClick={onClose}>
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="chat-messages">
-          {messages.length === 0 ? (
-            <div className="welcome-message">
-              <div className="welcome-icon">
-                <MessageCircle size={32} className="mode-icon-large" />
-              </div>
-              <h4>
-                Start an AI Discussion
-              </h4>
-              <p>
-                Ask questions, get strategic insights, or discuss your {platform} growth strategy!
-              </p>
-            </div>
-          ) : (
-            messages.map((msg, index) => (
-              <motion.div
-                key={index}
-                className={`message ${msg.role}`}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-              >
-                <div 
-                  className="message-content"
-                  dangerouslySetInnerHTML={{ __html: formatMessageContent(msg.content) }}
-                />
-              </motion.div>
-            ))
-          )}
-          {isProcessing && (
-            <motion.div
-              className="message assistant processing"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <div className="message-content">
-                <div className="typing-indicator">
-                  <span></span>
-                  <span></span>
-                  <span></span>
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="chat-modal-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          onClick={onClose}
+        >
+          <motion.div
+            className="chat-modal-content"
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="chat-modal-header">
+              <div className="chat-header-info">
+                <div className="chat-mode-indicator">
+                  <MessageCircle size={20} className="mode-icon discussion-icon" />
+                  <h3>AI Discussion with {username}</h3>
                 </div>
-                AI is thinking...
+                <span className="platform-badge">{platform}</span>
               </div>
-            </motion.div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
+              <button 
+                className="chat-close-btn" 
+                onClick={onClose}
+                aria-label="Close chat"
+              >
+                <X size={18} strokeWidth={2.5} />
+              </button>
+            </div>
 
-        <form className="chat-input-form" onSubmit={handleSubmit}>
-          <div className="chat-input-wrapper">
-            <textarea
-              ref={textareaRef}
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder={`Ask about ${platform} strategy, content ideas, or growth tips...`}
-              className="chat-input"
-              rows={2}
-              disabled={isProcessing}
-            />
-            <button
-              type="submit"
-              className="chat-send-btn"
-              disabled={!message.trim() || isProcessing}
-            >
-              {isProcessing ? (
-                <div className="btn-spinner"></div>
+            <div className="chat-messages">
+              {messages.length === 0 ? (
+                <motion.div 
+                  className="welcome-message"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                >
+                  <div className="welcome-icon">
+                    <MessageCircle size={40} className="mode-icon-large" />
+                  </div>
+                  <h4>Start an AI Discussion</h4>
+                  <p>Ask questions, get strategic insights, or discuss your {platform} growth strategy!</p>
+                </motion.div>
               ) : (
-                <Send size={18} />
+                messages.map((msg, index) => (
+                  <motion.div
+                    key={index}
+                    className={`message ${msg.role}`}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ 
+                      duration: 0.3,
+                      ease: [0.4, 0, 0.2, 1],
+                      delay: index === 0 ? 0.1 : 0.05
+                    }}
+                  >
+                    <div 
+                      className="message-content"
+                      dangerouslySetInnerHTML={{ __html: formatMessageContent(msg.content) }}
+                    />
+                  </motion.div>
+                ))
               )}
-            </button>
-          </div>
-          <div className="chat-input-footer">
-            <small>Press Enter to send, Shift+Enter for new line</small>
-          </div>
-        </form>
-      </motion.div>
-    </motion.div>
+              {isProcessing && (
+                <motion.div
+                  className="message assistant processing"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div className="message-content">
+                    <div className="typing-indicator">
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            <div className="chat-input-container">
+              <form onSubmit={handleSubmit} className="chat-input-form">
+                <textarea
+                  ref={textareaRef}
+                  className="chat-input"
+                  value={message}
+                  onChange={handleInputChange}
+                  onKeyDown={handleKeyPress}
+                  placeholder={`Message ${username}...`}
+                  disabled={isProcessing}
+                  rows={1}
+                  aria-label="Type your message"
+                />
+                <button 
+                  type="submit" 
+                  className="send-button"
+                  disabled={!message.trim() || isProcessing}
+                  aria-label={isProcessing ? 'Sending...' : 'Send message'}
+                >
+                  {isProcessing ? (
+                    <Loader2 className="animate-spin" size={18} strokeWidth={2.5} />
+                  ) : (
+                    <Send size={18} strokeWidth={2.5} />
+                  )}
+                </button>
+              </form>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };
 

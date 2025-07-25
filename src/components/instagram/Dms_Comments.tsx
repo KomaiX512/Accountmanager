@@ -36,13 +36,10 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
   onIgnore, 
   onRefresh, 
   onReplyWithAI, 
-  username, 
-  refreshKey, 
-  igBusinessId: propIgBusinessId, 
-  twitterId: propTwitterId,
-  facebookPageId: propFacebookPageId,
-  aiRepliesRefreshKey = 0, 
-  onAIRefresh,
+  // username, // TODO: Use for display if needed
+  // refreshKey, // Handled by parent
+  // aiRepliesRefreshKey = 0, // Handled by parent 
+  // onAIRefresh, // Handled by parent
   aiProcessingNotifications = {},
   onSendAIReply,
   onIgnoreAIReply,
@@ -53,6 +50,12 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
   onEditAIReply, // NEW: Edit AI reply functionality
   autoReplyProgress: parentAutoReplyProgress // NEW: Auto-reply progress from parent
 }) => {
+  // Fix: Ensure all hooks are called in the same order every render
+  const { isConnected: isInstagramConnected } = useInstagram();
+  const { userId: twitterId } = useTwitter();
+  const { isConnected: isFacebookConnected } = useFacebook();
+
+  // State hooks in consistent order
   const [replyText, setReplyText] = useState<Record<string, string>>({});
   const [showReplyInput, setShowReplyInput] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -64,15 +67,34 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
   
   // 🛑 STOP OPERATION: Simple timeout reference for cancellation
   const autoReplyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // NEW: State for scroll position
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  
+  // NEW: Reference for scrollable container
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
+  // Handle scroll events to show/hide scroll-to-top button
+  const handleScroll = () => {
+    if (scrollContainerRef.current) {
+      const { scrollTop } = scrollContainerRef.current;
+      setShowScrollTop(scrollTop > 200);
+    }
+  };
+
+  // Scroll to top function
+  const scrollToTop = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  // Derived values after all hooks
   // 🛑 STOP OPERATION: Use parent's isAutoReplying state
   const isAutoReplying = parentIsAutoReplying;
-
-  const { userId: contextIgBusinessId, isConnected: isInstagramConnected } = useInstagram();
-  const igBusinessId = propIgBusinessId || contextIgBusinessId;
-  const { userId: twitterId } = useTwitter();
-  const { userId: facebookUserId, isConnected: isFacebookConnected } = useFacebook();
-  const facebookPageId = propFacebookPageId || facebookUserId;
 
   // CRITICAL FIX: Add validation for notifications array
   const validNotifications = React.useMemo(() => {
@@ -264,8 +286,12 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
       {error && <div className="error-message">{error}</div>}
       {/* Header Row with Notification Count and Tiny Refresh Icon */}
       <div className="notifications-header-row">
-        <span className="notifications-header-title">Notifications</span>
-        <span className="notifications-count-dot" />
+        <span className="notifications-header-title">
+          Notifications
+          {validNotifications.length > 0 && (
+            <span className="notifications-count-badge">{validNotifications.length}</span>
+          )}
+        </span>
         <button
           className="tiny-refresh-btn"
           onClick={onRefresh}
@@ -338,160 +364,179 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
       {validNotifications.length === 0 ? (
         <div className="no-notifications">No new notifications</div>
       ) : (
-        validNotifications.map((notif) => (
-          <div key={notif.message_id || notif.comment_id} className="notification-item">
-            <div className="notification-header">
-              <span className="notification-type">
-                {notif.type === 'message' 
-                  ? (platform === 'twitter' ? 'Tweet' : platform === 'facebook' ? 'Message' : 'DM')
-                  : 'Comment'} from {/* Enhanced Facebook sender display */}
-                {platform === 'facebook' && notif.page_name ? (
-                  <span className="facebook-sender-info">
-                    <strong className="sender-name">{notif.username || 'Unknown User'}</strong>
-                    <span className="page-tag">via {notif.page_name}</span>
-                  </span>
-                ) : (
-                  notif.username || 'Unknown'
-                )}
-              </span>
-              <span className="notification-time">{formatTimestamp(notif.timestamp)}</span>
-            </div>
-            <div className="notification-content">{notif.text}</div>
-            
-            {notif.status === 'ai_reply_ready' && notif.aiReply ? (
-              <div className="ai-reply-container">
-                {editingAIReply[notif.message_id || notif.comment_id || ''] ? (
-                  // Edit mode for AI reply
-                  <div className="ai-reply-edit-container">
-                    <div className="ai-reply-label">Edit AI Reply:</div>
-                    <textarea
-                      value={aiReplyEditText[notif.message_id || notif.comment_id || ''] || ''}
-                      onChange={(e) => setAiReplyEditText(prev => ({
-                        ...prev,
-                        [notif.message_id || notif.comment_id || '']: e.target.value
-                      }))}
-                      placeholder="Edit your AI reply..."
-                      className="ai-reply-edit-textarea"
-                      rows={3}
-                    />
-                    <div className="ai-reply-edit-actions">
-                      <button 
-                        onClick={() => handleSaveEditedAIReply(notif)}
-                        className="save-ai-reply-btn"
-                        disabled={!aiReplyEditText[notif.message_id || notif.comment_id || '']?.trim()}
-                      >
-                        Save Changes
-                      </button>
-                      <button 
-                        onClick={() => handleCancelEditAIReply(notif)}
-                        className="cancel-ai-reply-edit-btn"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  // Preview mode for AI reply
-                  <>
-                    <div className="ai-reply-label">AI Reply Preview:</div>
-                    <div className="ai-reply-content">{notif.aiReply.reply}</div>
-                    <div className="ai-reply-actions">
-                      <button 
-                        onClick={() => handleSendAIReply(notif)}
-                        disabled={isLoading || notif.aiReply.sendStatus === 'sending'}
-                        className={`send-ai-reply-btn ${notif.aiReply.sendStatus === 'sending' ? 'loading' : ''}`}
-                      >
-                        {notif.aiReply.sendStatus === 'sending' ? (
-                          <>
-                            <span className="loading-spinner"></span>
-                            Sending...
-                          </>
-                        ) : (
-                          'Send AI Reply'
-                        )}
-                      </button>
-                      <button 
-                        onClick={() => handleEditAIReply(notif)}
-                        className="edit-ai-reply-btn"
-                        title="Edit this AI reply"
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          <path d="m18.5 2.5 a 2.121 2.121 0 0 1 3 3 l -9.5 9.5 l -4 1 l 1 -4 l 9.5 -9.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                      <button 
-                        onClick={() => handleIgnoreAIReply(notif)}
-                        className="ignore-ai-reply-btn"
-                      >
-                        Ignore
-                      </button>
-                    </div>
-                  </>
-                )}
+        <div 
+          className="notifications-scroll-container" 
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+        >
+          {validNotifications.map((notif) => (
+            <div key={notif.message_id || notif.comment_id} className="notification-item">
+              <div className="notification-header">
+                <span className="notification-type">
+                  {notif.type === 'message' 
+                    ? (platform === 'twitter' ? 'Tweet' : platform === 'facebook' ? 'Message' : 'DM')
+                    : 'Comment'} from {/* Enhanced Facebook sender display */}
+                  {platform === 'facebook' && notif.page_name ? (
+                    <span className="facebook-sender-info">
+                      <strong className="sender-name">{notif.username || 'Unknown User'}</strong>
+                      <span className="page-tag">via {notif.page_name}</span>
+                    </span>
+                  ) : (
+                    notif.username || 'Unknown'
+                  )}
+                </span>
+                <span className="notification-time">{formatTimestamp(notif.timestamp)}</span>
               </div>
-            ) : (
-              <div className="notification-actions">
-                {showReplyInput[notif.message_id || notif.comment_id || ''] ? (
-                  <div className="reply-input-container">
-                    <textarea
-                      value={replyText[notif.message_id || notif.comment_id || ''] || ''}
-                      onChange={(e) => setReplyText(prev => ({
-                        ...prev,
-                        [notif.message_id || notif.comment_id || '']: e.target.value
-                      }))}
-                      placeholder="Type your reply..."
-                      className="reply-textarea"
-                    />
-                    <div className="reply-buttons">
-                      <button onClick={() => handleReply(notif)} className="send-reply-btn">
-                        Send
-                      </button>
-                      <button 
+              <div className="notification-content">{notif.text}</div>
+              
+              {notif.status === 'ai_reply_ready' && notif.aiReply ? (
+                <div className="ai-reply-container">
+                  {editingAIReply[notif.message_id || notif.comment_id || ''] ? (
+                    // Edit mode for AI reply
+                    <div className="ai-reply-edit-container">
+                      <div className="ai-reply-label">Edit AI Reply:</div>
+                      <textarea
+                        value={aiReplyEditText[notif.message_id || notif.comment_id || ''] || ''}
+                        onChange={(e) => setAiReplyEditText(prev => ({
+                          ...prev,
+                          [notif.message_id || notif.comment_id || '']: e.target.value
+                        }))}
+                        placeholder="Edit your AI reply..."
+                        className="ai-reply-edit-textarea"
+                        rows={3}
+                      />
+                      <div className="ai-reply-edit-actions">
+                        <button 
+                          onClick={() => handleSaveEditedAIReply(notif)}
+                          className="save-ai-reply-btn"
+                          disabled={!aiReplyEditText[notif.message_id || notif.comment_id || '']?.trim()}
+                        >
+                          Save Changes
+                        </button>
+                        <button 
+                          onClick={() => handleCancelEditAIReply(notif)}
+                          className="cancel-ai-reply-edit-btn"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    // Preview mode for AI reply
+                    <>
+                      <div className="ai-reply-label">AI Reply Preview:</div>
+                      <div className="ai-reply-content">{notif.aiReply.reply}</div>
+                      <div className="ai-reply-actions">
+                        <button 
+                          onClick={() => handleSendAIReply(notif)}
+                          disabled={isLoading || notif.aiReply.sendStatus === 'sending'}
+                          className={`send-ai-reply-btn ${notif.aiReply.sendStatus === 'sending' ? 'loading' : ''}`}
+                        >
+                          {notif.aiReply.sendStatus === 'sending' ? (
+                            <>
+                              <span className="loading-spinner"></span>
+                              Sending...
+                            </>
+                          ) : (
+                            'Send AI Reply'
+                          )}
+                        </button>
+                        <button 
+                          onClick={() => handleEditAIReply(notif)}
+                          className="edit-ai-reply-btn"
+                          title="Edit this AI reply"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="m18.5 2.5 a 2.121 2.121 0 0 1 3 3 l -9.5 9.5 l -4 1 l 1 -4 l 9.5 -9.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </button>
+                        <button 
+                          onClick={() => handleIgnoreAIReply(notif)}
+                          className="ignore-ai-reply-btn"
+                        >
+                          Ignore
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="notification-actions">
+                  {showReplyInput[notif.message_id || notif.comment_id || ''] ? (
+                    <div className="reply-input-container">
+                      <textarea
+                        value={replyText[notif.message_id || notif.comment_id || ''] || ''}
+                        onChange={(e) => setReplyText(prev => ({
+                          ...prev,
+                          [notif.message_id || notif.comment_id || '']: e.target.value
+                        }))}
+                        placeholder="Type your reply..."
+                        className="reply-textarea"
+                      />
+                      <div className="reply-buttons">
+                        <button onClick={() => handleReply(notif)} className="send-reply-btn">
+                          Send
+                        </button>
+                        <button 
+                          onClick={() => setShowReplyInput(prev => ({
+                            ...prev,
+                            [notif.message_id || notif.comment_id || '']: false
+                          }))}
+                          className="cancel-reply-btn"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <button
                         onClick={() => setShowReplyInput(prev => ({
                           ...prev,
-                          [notif.message_id || notif.comment_id || '']: false
+                          [notif.message_id || notif.comment_id || '']: true
                         }))}
-                        className="cancel-reply-btn"
+                        className="reply-btn"
                       >
-                        Cancel
+                        Reply
                       </button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => setShowReplyInput(prev => ({
-                        ...prev,
-                        [notif.message_id || notif.comment_id || '']: true
-                      }))}
-                      className="reply-btn"
-                    >
-                      Reply
-                    </button>
-                    <button
-                      onClick={() => onReplyWithAI(notif)}
-                      disabled={aiProcessingNotifications[notif.message_id || notif.comment_id || '']}
-                      className={`ai-reply-btn ${aiProcessingNotifications[notif.message_id || notif.comment_id || ''] ? 'loading' : ''}`}
-                    >
-                      {aiProcessingNotifications[notif.message_id || notif.comment_id || ''] 
-                        ? (
-                          <>
-                            <span className="loading-spinner"></span>
-                            Generating...
-                          </>
-                        ) 
-                        : 'AI Reply'}
-                    </button>
-                    <button onClick={() => handleIgnore(notif)} className="ignore-btn">
-                      Ignore
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        ))
+                      <button
+                        onClick={() => onReplyWithAI(notif)}
+                        disabled={aiProcessingNotifications[notif.message_id || notif.comment_id || '']}
+                        className={`ai-reply-btn ${aiProcessingNotifications[notif.message_id || notif.comment_id || ''] ? 'loading' : ''}`}
+                      >
+                        {aiProcessingNotifications[notif.message_id || notif.comment_id || ''] 
+                          ? (
+                            <>
+                              <span className="loading-spinner"></span>
+                              Generating...
+                            </>
+                          ) 
+                          : 'AI Reply'}
+                      </button>
+                      <button onClick={() => handleIgnore(notif)} className="ignore-btn">
+                        Ignore
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Scroll to top button */}
+      {showScrollTop && validNotifications.length > 5 && (
+        <button 
+          className="scroll-to-top-btn"
+          onClick={scrollToTop}
+          title="Scroll to top"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M7 14l5-5 5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
       )}
     </div>
   );

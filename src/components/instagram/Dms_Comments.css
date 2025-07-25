@@ -8,6 +8,137 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  overflow: hidden; /* Prevent container overflow */
+}
+
+/* Notifications Scroll Container - NEW: Scrollable notifications list */
+.notifications-scroll-container {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 8px;
+  margin-right: -8px;
+  max-height: calc(100vh - 300px); /* Adjust based on header and controls height */
+  min-height: 200px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  position: relative;
+}
+
+/* Scroll fade indicators */
+.notifications-scroll-container::before,
+.notifications-scroll-container::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 8px;
+  height: 20px;
+  pointer-events: none;
+  z-index: 1;
+  transition: opacity 0.3s ease;
+}
+
+.notifications-scroll-container::before {
+  top: 0;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.3), transparent);
+}
+
+.notifications-scroll-container::after {
+  bottom: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.3), transparent);
+}
+
+/* Custom Scrollbar for Webkit browsers */
+.notifications-scroll-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.notifications-scroll-container::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+
+.notifications-scroll-container::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, rgba(0, 122, 255, 0.6), rgba(88, 86, 214, 0.6));
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.notifications-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, rgba(0, 122, 255, 0.8), rgba(88, 86, 214, 0.8));
+}
+
+/* Smooth scrolling behavior */
+.notifications-scroll-container {
+  scroll-behavior: smooth;
+}
+
+/* Hide scrollbar on mobile for cleaner look */
+@media (max-width: 768px) {
+  .notifications-scroll-container {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding-right: 0;
+    margin-right: 0;
+  }
+  
+  .notifications-scroll-container::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Scroll to Top Button */
+.scroll-to-top-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, #007aff, #5856d6);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(0, 122, 255, 0.4);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1000;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.scroll-to-top-btn:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 6px 24px rgba(0, 122, 255, 0.5);
+  background: linear-gradient(135deg, #0056cc, #4c44d4);
+}
+
+.scroll-to-top-btn:active {
+  transform: translateY(-1px) scale(1);
+  box-shadow: 0 4px 16px rgba(0, 122, 255, 0.4);
+}
+
+.scroll-to-top-btn svg {
+  width: 20px;
+  height: 20px;
+  color: white;
+}
+
+/* Mobile scroll-to-top button adjustments */
+@media (max-width: 768px) {
+  .scroll-to-top-btn {
+    width: 44px;
+    height: 44px;
+    bottom: 80px;
+    right: 16px;
+  }
+  
+  .scroll-to-top-btn svg {
+    width: 18px;
+    height: 18px;
+  }
 }
 
 /* No notifications message */
@@ -144,7 +275,7 @@
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 16px;
   padding: 20px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -656,6 +787,29 @@
   font-weight: 600;
   color: #fff;
   letter-spacing: 0.2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Notification Count Badge */
+.notifications-count-badge {
+  background: linear-gradient(135deg, #ff3b30, #ff2d20);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 12px;
+  min-width: 20px;
+  text-align: center;
+  line-height: 1;
+  box-shadow: 0 2px 8px rgba(255, 59, 48, 0.3);
+  animation: pulse-badge 2s infinite;
+}
+
+@keyframes pulse-badge {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
 }
 
 .notifications-count-dot {

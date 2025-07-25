@@ -2,7 +2,6 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useAuth } from './AuthContext';
 import { 
   getInstagramConnection, 
-  isInstagramConnected, 
   isInstagramDisconnected,
   syncInstagramConnection
 } from '../utils/instagramSessionManager';
@@ -59,50 +58,54 @@ export const InstagramProvider: React.FC<InstagramProviderProps> = ({ children }
         return;
       }
 
-      // Sync with backend to ensure connection is available for API calls
+      // Fast local check first for immediate UI response
+      const localConnection = getInstagramConnection(currentUser.uid);
+      if (localConnection) {
+        setIsConnected(true);
+        setUserId(localConnection.instagram_user_id);
+        setGraphId(localConnection.instagram_graph_id);
+        console.log(`[${new Date().toISOString()}] Restored Instagram connection from cache:`, localConnection);
+      }
+
+      // Check platform access from localStorage first
+      const hasUserAccessed = localStorage.getItem(`instagram_accessed_${currentUser.uid}`) === 'true';
+      setHasAccessed(hasUserAccessed);
+
+      // Background sync without blocking UI
       try {
         await syncInstagramConnection(currentUser.uid);
-        console.log(`[${new Date().toISOString()}] Instagram connection sync completed for user ${currentUser.uid}`);
+        
+        // Re-check after sync in case anything changed
+        const updatedConnection = getInstagramConnection(currentUser.uid);
+        if (updatedConnection) {
+          setIsConnected(true);
+          setUserId(updatedConnection.instagram_user_id);
+          setGraphId(updatedConnection.instagram_graph_id);
+        }
+
+        // Background check API status if needed
+        if (!hasUserAccessed) {
+          try {
+            const response = await fetch(`/api/user-instagram-status/${currentUser.uid}`);
+            const data = await response.json();
+            const apiHasAccessed = data.hasEnteredInstagramUsername;
+            
+            if (apiHasAccessed) {
+              setHasAccessed(true);
+              localStorage.setItem(`instagram_accessed_${currentUser.uid}`, 'true');
+            }
+          } catch (error) {
+            console.error(`[${new Date().toISOString()}] Error checking Instagram status:`, error);
+          }
+        }
       } catch (error) {
         console.error(`[${new Date().toISOString()}] Error syncing Instagram connection:`, error);
-      }
-
-      // Check if Instagram is connected (after sync)
-      const connected = isInstagramConnected(currentUser.uid);
-      setIsConnected(connected);
-
-      // Check backend API status for platform access
-      try {
-        const response = await fetch(`/api/user-instagram-status/${currentUser.uid}`);
-        const data = await response.json();
-        const hasUserAccessed = data.hasEnteredInstagramUsername || localStorage.getItem(`instagram_accessed_${currentUser.uid}`) === 'true';
-        setHasAccessed(hasUserAccessed);
-        
-        if (hasUserAccessed) {
-          localStorage.setItem(`instagram_accessed_${currentUser.uid}`, 'true');
-        }
-      } catch (error) {
-        console.error(`[${new Date().toISOString()}] Error checking Instagram status:`, error);
-        // Fallback to localStorage
-        const hasUserAccessed = localStorage.getItem(`instagram_accessed_${currentUser.uid}`) === 'true';
-        setHasAccessed(hasUserAccessed);
-      }
-
-      if (connected) {
-        const connectionData = getInstagramConnection(currentUser.uid);
-        if (connectionData) {
-          setUserId(connectionData.instagram_user_id);
-          setGraphId(connectionData.instagram_graph_id);
-          console.log(`[${new Date().toISOString()}] Instagram connection loaded: userId=${connectionData.instagram_user_id}, graphId=${connectionData.instagram_graph_id}`);
-        }
-      } else {
-        setUserId(null);
-        setGraphId(null);
+        // Don't clear local connection on sync error
       }
     };
 
     checkInstagramConnection();
-  }, [currentUser]);
+  }, [currentUser?.uid]);
 
   const connectInstagram = (newUserId: string, newGraphId: string) => {
     console.log(`[${new Date().toISOString()}] Instagram connected: userId=${newUserId}, graphId=${newGraphId}`);

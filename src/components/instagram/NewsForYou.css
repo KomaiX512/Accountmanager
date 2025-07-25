@@ -132,44 +132,32 @@
 }
 
 .popup-overlay {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  background: rgba(0, 0, 0, 0.7) !important;
-  backdrop-filter: blur(8px) !important;
-  z-index: 99999 !important;
-  display: flex !important;
-  justify-content: center !important;
-  align-items: center !important;
-  padding: clamp(10px, 2vw, 20px) !important;
-  margin: 0 !important;
-  box-sizing: border-box !important;
-  overflow-y: auto !important;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .popup-content {
-  background: linear-gradient(135deg, #1a1a3a, #2e2e5e) !important;
-  border-radius: 16px !important;
-  padding: 24px !important;
-  width: 100% !important;
-  max-width: min(700px, 95vw) !important;
-  max-height: min(85vh, calc(100vh - 40px)) !important;
-  overflow-y: auto !important;
-  border: 1px solid rgba(0, 255, 204, 0.4) !important;
-  box-shadow: 0 10px 40px rgba(0, 255, 204, 0.3) !important;
-  color: #e0e0ff !important;
-  position: relative !important;
-  margin: auto !important;
-  animation: modalAppear 0.2s ease-out !important;
-  z-index: 100000 !important;
-  box-sizing: border-box !important;
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 15px !important;
+  background: #1a1a2e;
+  border-radius: 12px;
+  padding: 20px;
+  width: 600px;
+  max-height: 600px;
+  overflow-y: auto;
+  color: #e0e0ff;
+  box-shadow: 0 8px 30px rgba(0, 255, 204, 0.2);
+  border: 1px solid rgba(0, 255, 204, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
 }
 
 .news-section {
@@ -285,15 +273,4 @@
 
 .close-btn:hover {
   box-shadow: 0 0 15px rgba(255, 68, 68, 0.5);
-}
-
-@keyframes modalAppear {
-  from {
-    opacity: 0;
-    transform: scale(0.95) translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
 }

@@ -168,7 +168,7 @@ export const fetchImageFromR2 = async (
     console.log(`[ScheduleHelper] 📤 Fetching image: ${imageKey} for platform: ${platform}`);
     
     // SIMPLIFIED: Use the exact same approach as PostCooked - direct fetch
-    const endpoint = `/api/r2-image/${username}/${imageKey}?platform=${platform}`;
+    const endpoint = `/api/r2-image/${username}/${imageKey}?platform=${platform}&t=${Date.now()}`;
     
     console.log(`[ScheduleHelper] 🎯 Fetching from: ${endpoint}`);
     

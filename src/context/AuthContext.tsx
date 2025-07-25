@@ -42,8 +42,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Listen for auth state changes
+  // Listen for auth state changes with optimized initial load
   useEffect(() => {
+    // Check for persisted auth state first for faster initial load
+    const checkPersistedAuth = async () => {
+      try {
+        // Firebase might have cached auth state, check immediately
+        if (auth.currentUser) {
+          setCurrentUser(auth.currentUser);
+          setLoading(false);
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking persisted auth:', error);
+      }
+    };
+
+    checkPersistedAuth();
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       setLoading(false);

@@ -94,6 +94,8 @@ const useFeatureTracking = (): UseFeatureTrackingReturn => {
     postData: { scheduled?: boolean; immediate?: boolean; type?: string }
   ): Promise<boolean> => {
     try {
+      console.log(`[FeatureTracking] 🚀 POST TRACKING STARTED: ${platform}`, postData);
+      
       // ✅ PRE-ACTION CHECK: Always check before performing action
       const accessCheck = canUseFeature('posts');
       if (!accessCheck.allowed) {
@@ -115,11 +117,18 @@ const useFeatureTracking = (): UseFeatureTrackingReturn => {
       const action = postData.scheduled ? 'post_scheduled' : 
                      postData.immediate ? 'post_instant' : 'post_created';
       
+      console.log(`[FeatureTracking] 🎯 Tracking posts usage with action: ${action}`);
       await trackFeatureUsage('posts', platform, action);
       console.log(`[FeatureTracking] ✅ Real post tracked: ${platform} -> ${action} (${postData.type || 'standard'})`);
       return true;
     } catch (error) {
       console.error(`[FeatureTracking] ❌ Real post tracking failed:`, error);
+      console.error(`[FeatureTracking] ❌ Error details:`, {
+        platform,
+        postData,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
       return false;
     }
   }, [trackFeatureUsage, canUseFeature, getUsageForFeature, getUserLimits]);
@@ -129,6 +138,8 @@ const useFeatureTracking = (): UseFeatureTrackingReturn => {
     discussionData: { messageCount?: number; type?: 'chat' | 'dm_reply' | 'comment_reply' }
   ): Promise<boolean> => {
     try {
+      console.log(`[FeatureTracking] 🚀 DISCUSSION TRACKING STARTED: ${platform}`, discussionData);
+      
       // ✅ PRE-ACTION CHECK: Always check before performing action
       const accessCheck = canUseFeature('discussions');
       if (!accessCheck.allowed) {
@@ -150,11 +161,18 @@ const useFeatureTracking = (): UseFeatureTrackingReturn => {
       const action = discussionData.type ? `discussion_${discussionData.type}` : 'discussion_engaged';
       const messageInfo = discussionData.messageCount ? ` (${discussionData.messageCount} messages)` : '';
       
+      console.log(`[FeatureTracking] 🎯 Tracking discussions usage with action: ${action}`);
       await trackFeatureUsage('discussions', platform, action);
       console.log(`[FeatureTracking] ✅ Real discussion tracked: ${platform} -> ${action}${messageInfo}`);
       return true;
     } catch (error) {
       console.error(`[FeatureTracking] ❌ Real discussion tracking failed:`, error);
+      console.error(`[FeatureTracking] ❌ Error details:`, {
+        platform,
+        discussionData,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
       return false;
     }
   }, [trackFeatureUsage, canUseFeature, getUsageForFeature, getUserLimits]);
@@ -164,6 +182,8 @@ const useFeatureTracking = (): UseFeatureTrackingReturn => {
     replyData: { type?: 'dm' | 'comment' | 'auto'; mode?: 'instant' | 'scheduled' | 'auto' }
   ): Promise<boolean> => {
     try {
+      console.log(`[FeatureTracking] 🚀 AI REPLY TRACKING STARTED: ${platform}`, replyData);
+      
       // ✅ PRE-ACTION CHECK: Always check before performing action
       const accessCheck = canUseFeature('aiReplies');
       if (!accessCheck.allowed) {
@@ -184,11 +204,18 @@ const useFeatureTracking = (): UseFeatureTrackingReturn => {
       
       const action = `ai_reply_${replyData.type || 'sent'}_${replyData.mode || 'instant'}`;
       
+      console.log(`[FeatureTracking] 🎯 Tracking aiReplies usage with action: ${action}`);
       await trackFeatureUsage('aiReplies', platform, action);
       console.log(`[FeatureTracking] ✅ Real AI reply tracked: ${platform} -> ${action}`);
       return true;
     } catch (error) {
       console.error(`[FeatureTracking] ❌ Real AI reply tracking failed:`, error);
+      console.error(`[FeatureTracking] ❌ Error details:`, {
+        platform,
+        replyData,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
       return false;
     }
   }, [trackFeatureUsage, canUseFeature, getUsageForFeature, getUserLimits]);
@@ -198,6 +225,8 @@ const useFeatureTracking = (): UseFeatureTrackingReturn => {
     campaignData: { action?: 'goal_set' | 'campaign_started' | 'campaign_stopped' }
   ): Promise<boolean> => {
     try {
+      console.log(`[FeatureTracking] 🚀 CAMPAIGN TRACKING STARTED: ${platform}`, campaignData);
+      
       // ✅ PRE-ACTION CHECK: Always check before performing action
       const accessCheck = canUseFeature('campaigns');
       if (!accessCheck.allowed) {
@@ -218,11 +247,18 @@ const useFeatureTracking = (): UseFeatureTrackingReturn => {
       
       const action = campaignData.action || 'campaign_activity';
       
+      console.log(`[FeatureTracking] 🎯 Tracking campaigns usage with action: ${action}`);
       await trackFeatureUsage('campaigns', platform, action);
       console.log(`[FeatureTracking] ✅ Real campaign tracked: ${platform} -> ${action}`);
       return true;
     } catch (error) {
       console.error(`[FeatureTracking] ❌ Real campaign tracking failed:`, error);
+      console.error(`[FeatureTracking] ❌ Error details:`, {
+        platform,
+        campaignData,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
       return false;
     }
   }, [trackFeatureUsage, canUseFeature, getUsageForFeature, getUserLimits]);

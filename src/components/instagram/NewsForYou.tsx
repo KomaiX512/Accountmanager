@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import './NewsForYou.css';
 import useR2Fetch from '../../hooks/useR2Fetch';
 import { motion } from 'framer-motion';
@@ -10,8 +10,7 @@ interface NewsForYouProps {
 }
 
 const NewsForYou: React.FC<NewsForYouProps> = ({ accountHolder, platform = 'instagram' }) => {
-  // FIXED: Memoize endpoint to prevent infinite re-fetching
-  const endpoint = useMemo(() => `/api/news-for-you/${accountHolder}?platform=${platform}`, [accountHolder, platform]);
+  const endpoint = `/api/news-for-you/${accountHolder}?platform=${platform}`;
   const { data, loading } = useR2Fetch<any[]>(endpoint);
   const [selectedNewsIndex, setSelectedNewsIndex] = useState<number | null>(null);
 

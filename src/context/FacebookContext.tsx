@@ -40,24 +40,51 @@ export const FacebookProvider: React.FC<FacebookProviderProps> = ({ children }) 
     
     try {
       console.log(`[${new Date().toISOString()}] Checking for existing Facebook connection for user ${currentUser.uid}`);
+      
+      // Check localStorage first for immediate response
+      const cachedPageId = localStorage.getItem(`facebook_page_id_${currentUser.uid}`);
+      const cachedUsername = localStorage.getItem(`facebook_username_${currentUser.uid}`);
+      
+      if (cachedPageId) {
+        setUserId(cachedPageId);
+        setUsername(cachedUsername || null);
+        setIsConnected(true);
+        console.log(`[${new Date().toISOString()}] Restored Facebook connection from cache:`, {
+          userId: cachedPageId,
+          username: cachedUsername,
+          isConnected: true
+        });
+      }
+
+      // Background API sync without blocking UI
       const response = await axios.get(`/api/facebook-connection/${currentUser.uid}`);
       
       console.log(`[${new Date().toISOString()}] Facebook connection response:`, response.data);
       
       if (response.data.facebook_page_id) {
-        setUserId(response.data.facebook_page_id); // Use page ID for Facebook operations
-        setUsername(response.data.username || null);
+        const pageId = response.data.facebook_page_id;
+        const username = response.data.username || null;
+        
+        setUserId(pageId);
+        setUsername(username);
         setIsConnected(true);
-        console.log(`[${new Date().toISOString()}] Restored Facebook connection:`, {
-          userId: response.data.facebook_page_id, // Page ID is the correct userId for Facebook
-          username: response.data.username,
+        
+        // Cache the values
+        localStorage.setItem(`facebook_page_id_${currentUser.uid}`, pageId);
+        if (username) {
+          localStorage.setItem(`facebook_username_${currentUser.uid}`, username);
+        }
+        
+        console.log(`[${new Date().toISOString()}] Updated Facebook connection:`, {
+          userId: pageId,
+          username,
           isConnected: true
         });
         
         // CRITICAL FIX: Dispatch event when existing connection is restored
         const event = new CustomEvent('facebookConnected', { 
           detail: { 
-            facebookId: response.data.facebook_page_id, 
+            facebookId: pageId, 
             facebookUsername: response.data.username,
             timestamp: Date.now(),
             restored: true
@@ -83,29 +110,33 @@ export const FacebookProvider: React.FC<FacebookProviderProps> = ({ children }) 
     }
   }, [currentUser?.uid]);
 
-  // Check if user has accessed Facebook dashboard
+    // Optimized Facebook access checking
   useEffect(() => {
     if (currentUser?.uid) {
-      // Check backend API status for platform access
-      const checkFacebookStatus = async () => {
-        try {
-          const response = await fetch(`/api/user-facebook-status/${currentUser.uid}`);
-          const data = await response.json();
-          const hasUserAccessed = data.hasEnteredFacebookUsername || localStorage.getItem(`facebook_accessed_${currentUser.uid}`) === 'true';
-          setHasAccessed(hasUserAccessed);
-          
-          if (hasUserAccessed) {
-            localStorage.setItem(`facebook_accessed_${currentUser.uid}`, 'true');
+      // Fast localStorage check first
+      const hasUserAccessed = localStorage.getItem(`facebook_accessed_${currentUser.uid}`) === 'true';
+      setHasAccessed(hasUserAccessed);
+
+      // Background API status check if not cached
+      if (!hasUserAccessed) {
+        const checkFacebookStatus = async () => {
+          try {
+            const response = await fetch(`/api/user-facebook-status/${currentUser.uid}`);
+            const data = await response.json();
+            
+            const apiHasAccessed = data.hasEnteredFacebookUsername;
+            
+            if (apiHasAccessed) {
+              setHasAccessed(true);
+              localStorage.setItem(`facebook_accessed_${currentUser.uid}`, 'true');
+            }
+          } catch (error) {
+            console.error(`[${new Date().toISOString()}] Error checking Facebook status:`, error);
           }
-        } catch (error) {
-          console.error(`[${new Date().toISOString()}] Error checking Facebook status:`, error);
-          // Fallback to localStorage
-          const hasUserAccessed = localStorage.getItem(`facebook_accessed_${currentUser.uid}`) === 'true';
-          setHasAccessed(hasUserAccessed);
-        }
-      };
-      
-      checkFacebookStatus();
+        };
+        
+        checkFacebookStatus();
+      }
     } else {
       setHasAccessed(false);
     }

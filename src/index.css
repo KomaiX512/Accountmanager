@@ -1,7 +1,6 @@
 @import './styles/global-ui-refinements.css';
 @import './styles/global-scrollbar-styles.css';
 @import './styles/responsive-refinements.css';
-@import './styles/modal-positioning-fix.css'; /* 🎯 CRITICAL FIX: Global modal positioning enhancement */
 
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;

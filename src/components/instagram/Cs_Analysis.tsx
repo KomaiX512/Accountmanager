@@ -7,7 +7,6 @@ import { motion } from 'framer-motion';
 import ErrorBoundary from '../ErrorBoundary';
 import { decodeJSONToReactElements, formatCount } from '../../utils/jsonDecoder';
 import axios from 'axios';
-import { useProcessing } from '../../context/ProcessingContext';
 import { registerComponent, unregisterComponent } from '../../utils/componentRegistry';
 
 interface ProfileInfo {
@@ -31,6 +30,9 @@ interface Cs_AnalysisProps {
 
 const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, platform = 'instagram' }) => {
   const normalizedAccountHolder = accountHolder;
+  
+  // ✅ REMOVED: ProcessingContext not needed for competitor operations
+  // Individual container loading is managed via competitorLoadingStates
   
   // Component tracking
   const componentId = React.useRef(Math.random().toString(36).substr(2, 9));
@@ -62,6 +64,83 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
   // Add state for accountType and postingStyle
   const [accountType, setAccountType] = useState<string>('branding');
   const [postingStyle, setPostingStyle] = useState<string>('I post about NewYork lives');
+  
+  // ✅ NEW: Smart loading state for newly added/edited competitors
+  const [competitorLoadingStates, setCompetitorLoadingStates] = useState<Record<string, {
+    timestamp: number;
+    retryCount: number;
+    isLoading: boolean;
+  }>>({});
+  
+  // ✅ NEW: Tooltip state for smart loading hover
+  const [showLoadingTooltip, setShowLoadingTooltip] = useState<string | null>(null);
+  
+  // ✅ NEW: Check if competitor is in smart loading period (up to 15 minutes)
+  const isCompetitorInLoadingPeriod = (competitor: string): boolean => {
+    const state = competitorLoadingStates[competitor];
+    if (!state || !state.isLoading) return false;
+    
+    const currentTime = Date.now();
+    const elapsedTime = currentTime - state.timestamp;
+    const maxLoadingTime = 15 * 60 * 1000; // 15 minutes in milliseconds
+    
+    return elapsedTime < maxLoadingTime;
+  };
+
+  // ✅ NEW: Start smart loading for a competitor
+  const startCompetitorLoading = (competitor: string) => {
+    console.log(`[Cs_Analysis] 🔄 Starting smart loading for competitor: ${competitor}`);
+    setCompetitorLoadingStates(prev => ({
+      ...prev,
+      [competitor]: {
+        timestamp: Date.now(),
+        retryCount: 0,
+        isLoading: true
+      }
+    }));
+  };
+
+  // ✅ NEW: Stop smart loading for a competitor
+  const stopCompetitorLoading = (competitor: string) => {
+    console.log(`[Cs_Analysis] ✅ Stopping smart loading for competitor: ${competitor}`);
+    setCompetitorLoadingStates(prev => {
+      const newState = { ...prev };
+      delete newState[competitor];
+      return newState;
+    });
+  };
+
+  // ✅ NEW: Get remaining loading time for a competitor (in seconds)
+  const getRemainingLoadingTime = (competitor: string): number => {
+    const state = competitorLoadingStates[competitor];
+    if (!state || !state.isLoading) return 0;
+    
+    const currentTime = Date.now();
+    const elapsedTime = currentTime - state.timestamp;
+    const maxLoadingTime = 15 * 60 * 1000; // 15 minutes
+    const remainingTime = Math.max(0, maxLoadingTime - elapsedTime);
+    
+    return Math.ceil(remainingTime / 1000); // Return in seconds
+  };
+
+  // ✅ NEW: Handle tooltip for smart loading competitors
+  const handleLoadingTooltipShow = (competitor: string) => {
+    if (isCompetitorInLoadingPeriod(competitor)) {
+      setShowLoadingTooltip(competitor);
+    }
+  };
+
+  const handleLoadingTooltipHide = () => {
+    setShowLoadingTooltip(null);
+  };
+
+  // ✅ NEW: Get formatted remaining time for tooltip
+  const getFormattedRemainingTime = (competitor: string): string => {
+    const remainingTime = getRemainingLoadingTime(competitor);
+    const minutes = Math.floor(remainingTime / 60);
+    const seconds = remainingTime % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
   // Fetch account info on mount to get accountType and postingStyle
   useEffect(() => {
     const fetchAccountInfo = async () => {
@@ -112,7 +191,14 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     postingStyle
   });
 
-  const competitorData = localCompetitors.map(competitor => {
+  // ✅ NEW: Combine local competitors with any competitors in loading state
+  const allDisplayCompetitors = React.useMemo(() => {
+    const loadingCompetitors = Object.keys(competitorLoadingStates);
+    const allCompetitors = [...new Set([...localCompetitors, ...loadingCompetitors])];
+    return allCompetitors;
+  }, [localCompetitors, competitorLoadingStates]);
+
+  const competitorData = allDisplayCompetitors.map(competitor => {
     const dataForCompetitor = allCompetitorsFetch.data?.find(item => item.competitor === competitor) || null;
     
     // Enhanced debug logging
@@ -258,6 +344,49 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     }
   }, [toast]);
 
+  // ✅ NEW: Cleanup expired competitor loading states every minute
+  useEffect(() => {
+    const cleanupInterval = setInterval(() => {
+      setCompetitorLoadingStates(prev => {
+        const now = Date.now();
+        const maxLoadingTime = 15 * 60 * 1000; // 15 minutes
+        let hasExpired = false;
+        
+        const cleaned = Object.entries(prev).reduce((acc, [competitor, state]) => {
+          const elapsedTime = now - state.timestamp;
+          if (elapsedTime >= maxLoadingTime) {
+            console.log(`[Cs_Analysis] ⏰ Smart loading expired for competitor: ${competitor}`);
+            hasExpired = true;
+            // Don't include expired entries
+          } else {
+            acc[competitor] = state;
+          }
+          return acc;
+        }, {} as typeof prev);
+        
+        if (hasExpired) {
+          console.log(`[Cs_Analysis] 🧹 Cleaned up expired loading states`);
+        }
+        
+        return cleaned;
+      });
+    }, 60000); // Check every minute
+    
+    return () => clearInterval(cleanupInterval);
+  }, []);
+
+  // ✅ NEW: Update countdown timer every 10 seconds for better UX
+  useEffect(() => {
+    const updateInterval = setInterval(() => {
+      setCompetitorLoadingStates(prev => {
+        // Force re-render to update countdown timers
+        return { ...prev };
+      });
+    }, 10000); // Update every 10 seconds
+    
+    return () => clearInterval(updateInterval);
+  }, []);
+
   const handleAddCompetitor = async () => {
     if (!newCompetitor.trim()) {
       setToast('Competitor username cannot be empty.');
@@ -271,22 +400,54 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     setLoading(true);
     const originalCompetitors = [...localCompetitors];
     const updatedCompetitors = [...localCompetitors, newCompetitor];
-    setLocalCompetitors(updatedCompetitors);
+    // ✅ FIXED: Don't update localCompetitors immediately to prevent duplicate containers
+    // Only update after server confirmation
+
+    // ✅ NEW: Start smart loading for the new competitor
+    startCompetitorLoading(newCompetitor);
 
     const success = await updateCompetitors(updatedCompetitors);
     if (success) {
-      // ✅ FIXED: No processing wait for competitor updates - just refresh data
+      // ✅ FIXED: Only backend operations, NO global processing state trigger
+      try {
+        // Step 1: Reset/delete the existing account info
+        await axios.post('/api/reset-account-info', {
+          username: normalizedAccountHolder,
+          platform,
+        }, { headers: { 'Content-Type': 'application/json' } });
+        
+        // Step 2: Re-upload the account info with updated competitors
+        const accountInfoPayload = {
+          username: normalizedAccountHolder,
+          accountType,
+          postingStyle,
+          competitors: updatedCompetitors,
+          platform
+        };
+        
+        await axios.post(`/api/save-account-info?platform=${platform}`, accountInfoPayload, {
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        console.log('[Cs_Analysis] ✅ Successfully reset and re-uploaded account info with updated competitors');
+      } catch (err) {
+        console.error('[Cs_Analysis] ❌ Failed to reset and re-upload account info:', err);
+      }
+      
+      // ✅ FIXED: Stay in dashboard, show container-level loading only
       setRefreshKey(prev => prev + 1); // Force refresh of competitor data
       const serverCompetitors = await fetchAccountInfoWithRetry();
       if (serverCompetitors) {
         setLocalCompetitors(serverCompetitors);
-        setToast('Competitor added successfully!');
+        setToast('Competitor added successfully! Analysis will be ready within 15 minutes.');
       } else {
         setLocalCompetitors(updatedCompetitors);
-        setToast('Competitor added successfully!');
+        setToast('Competitor added successfully! Analysis will be ready within 15 minutes.');
       }
     } else {
       setLocalCompetitors(originalCompetitors);
+      // ✅ NEW: Stop loading if addition failed
+      stopCompetitorLoading(newCompetitor);
       setToast('Failed to add competitor.');
     }
 
@@ -314,22 +475,64 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     const updatedCompetitors = localCompetitors.map(comp =>
       comp === currentCompetitor ? editCompetitor : comp
     );
-    setLocalCompetitors(updatedCompetitors);
+    // ✅ FIXED: Don't update localCompetitors immediately to prevent duplicate containers
+    // Only update after server confirmation
+
+    // ✅ NEW: Start smart loading for the edited competitor (if name changed)
+    if (editCompetitor !== currentCompetitor) {
+      startCompetitorLoading(editCompetitor);
+      // Stop loading for the old name
+      stopCompetitorLoading(currentCompetitor);
+    }
 
     const success = await updateCompetitors(updatedCompetitors);
     if (success) {
-      // ✅ FIXED: No processing wait for competitor updates - just refresh data
+      // ✅ FIXED: Only backend operations, NO global processing state trigger
+      try {
+        // Step 1: Reset/delete the existing account info
+        await axios.post('/api/reset-account-info', {
+          username: normalizedAccountHolder,
+          platform,
+        }, { headers: { 'Content-Type': 'application/json' } });
+        
+        // Step 2: Re-upload the account info with updated competitors
+        const accountInfoPayload = {
+          username: normalizedAccountHolder,
+          accountType,
+          postingStyle,
+          competitors: updatedCompetitors,
+          platform
+        };
+        
+        await axios.post(`/api/save-account-info?platform=${platform}`, accountInfoPayload, {
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        console.log('[Cs_Analysis] ✅ Successfully reset and re-uploaded account info with updated competitors');
+      } catch (err) {
+        console.error('[Cs_Analysis] ❌ Failed to reset and re-upload account info:', err);
+      }
+      
+      // ✅ FIXED: Stay in dashboard, show container-level loading only
       setRefreshKey(prev => prev + 1); // Force refresh of competitor data
       const serverCompetitors = await fetchAccountInfoWithRetry();
       if (serverCompetitors) {
         setLocalCompetitors(serverCompetitors);
-        setToast('Competitor updated successfully!');
+        setToast(editCompetitor !== currentCompetitor 
+          ? 'Competitor updated successfully! Analysis will be ready within 15 minutes.' 
+          : 'Competitor updated successfully!');
       } else {
         setLocalCompetitors(updatedCompetitors);
-        setToast('Competitor updated successfully!');
+        setToast(editCompetitor !== currentCompetitor 
+          ? 'Competitor updated successfully! Analysis will be ready within 15 minutes.' 
+          : 'Competitor updated successfully!');
       }
     } else {
       setLocalCompetitors(originalCompetitors);
+      // ✅ NEW: Stop loading if edit failed
+      if (editCompetitor !== currentCompetitor) {
+        stopCompetitorLoading(editCompetitor);
+      }
       setToast('Failed to update competitor.');
     }
 
@@ -345,9 +548,38 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     const updatedCompetitors = localCompetitors.filter(comp => comp !== competitor);
     setLocalCompetitors(updatedCompetitors);
 
+    // ✅ NEW: Stop smart loading for deleted competitor
+    stopCompetitorLoading(competitor);
+
     const success = await updateCompetitors(updatedCompetitors);
     if (success) {
-      // ✅ FIXED: No processing wait for competitor deletion - just refresh data
+      // ✅ FIXED: Only backend operations, NO global processing state trigger
+      try {
+        // Step 1: Reset/delete the existing account info
+        await axios.post('/api/reset-account-info', {
+          username: normalizedAccountHolder,
+          platform,
+        }, { headers: { 'Content-Type': 'application/json' } });
+        
+        // Step 2: Re-upload the account info with updated competitors
+        const accountInfoPayload = {
+          username: normalizedAccountHolder,
+          accountType,
+          postingStyle,
+          competitors: updatedCompetitors,
+          platform
+        };
+        
+        await axios.post(`/api/save-account-info?platform=${platform}`, accountInfoPayload, {
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        console.log('[Cs_Analysis] ✅ Successfully reset and re-uploaded account info with updated competitors');
+      } catch (err) {
+        console.error('[Cs_Analysis] ❌ Failed to reset and re-upload account info:', err);
+      }
+      
+      // ✅ FIXED: Stay in dashboard, no navigation to loading state
       setRefreshKey(prev => prev + 1); // Force refresh of competitor data
       const serverCompetitors = await fetchAccountInfoWithRetry();
       if (serverCompetitors) {
@@ -413,8 +645,6 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     }
   };
 
-  const { processingState } = useProcessing();
-
   return (
     <>
       <ErrorBoundary>
@@ -476,22 +706,38 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
 
           {/* Refactor competitor list container to be fixed-size and scrollable */}
           <div className="competitor-list-scrollable">
-            {competitorData.map(({ competitor, fetch }, index) => (
-              // Show loading card if processingState.isProcessing && processingState.platform === platform && processingState.username === normalizedAccountHolder && (new/edited competitor)
-              (processingState.isProcessing && processingState.platform === platform && processingState.username === normalizedAccountHolder && (!fetch.data || fetch.data.length === 0)) ? (
-                <div className="competitor-loading-card" key={competitor}>
-                  <div className="loading-spinner" />
-                  <div className="loading-message">Analysis will be available in ~10 minutes.</div>
-                </div>
-              ) : (
+            {competitorData.map(({ competitor, fetch }, index) => {
+              // ✅ NEW: Check if competitor is in smart loading period
+              const isInSmartLoading = isCompetitorInLoadingPeriod(competitor);
+              const remainingTime = getRemainingLoadingTime(competitor);
+              
+              return (
                 <motion.div
                   key={competitor}
-                  className={`competitor-sub-container ${fetch.data && fetch.data.length > 0 ? 'loaded' : ''} ${(!fetch.data || fetch.data.length === 0) ? 'no-data' : ''}`}
+                  className={`competitor-sub-container ${fetch.data && fetch.data.length > 0 ? 'loaded' : ''} ${(!fetch.data || fetch.data.length === 0) && !isInSmartLoading ? 'no-data' : ''} ${isInSmartLoading ? 'smart-loading' : ''}`}
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: index * 0.1, duration: 0.2 }}
                   whileHover={{ scale: 1.02 }}
+                  onMouseEnter={() => handleLoadingTooltipShow(competitor)}
+                  onMouseLeave={handleLoadingTooltipHide}
                 >
+                  {/* ✅ NEW: Smart loading tooltip */}
+                  {showLoadingTooltip === competitor && isInSmartLoading && (
+                    <div className="smart-loading-tooltip">
+                      <div className="tooltip-content">
+                        <div className="tooltip-title">🔄 Analysis in Progress</div>
+                        <div className="tooltip-message">
+                          Competitor analysis will be ready in approximately <strong>{getFormattedRemainingTime(competitor)}</strong>
+                        </div>
+                        <div className="tooltip-note">
+                          Analysis typically completes within 15 minutes. The container will update automatically when ready.
+                        </div>
+                      </div>
+                      <div className="tooltip-arrow"></div>
+                    </div>
+                  )}
+                  
                   <div className="competitor-actions">
                     <motion.button
                       className="action-btn edit-btn"
@@ -515,7 +761,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     >
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2-2v-7" />
                       <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                     </svg>
                   </motion.button>
@@ -546,23 +792,51 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
                 </div>
                 <span
                   className="overlay-text"
-                  onClick={() => fetch.data && fetch.data.length > 0 && setSelectedCompetitor(competitor)}
+                  onClick={() => {
+                    // ✅ FIXED: Don't allow clicks during smart loading period
+                    if (isInSmartLoading) {
+                      console.log(`[Cs_Analysis] ⏸️ Competitor ${competitor} is in loading state - click disabled`);
+                      return;
+                    }
+                    
+                    console.log(`[Cs_Analysis] 🖱️ Clicked competitor: ${competitor}`, {
+                      hasData: fetch.data && fetch.data.length > 0,
+                      dataLength: fetch.data?.length || 0,
+                      isLoading: fetch.loading,
+                      isInSmartLoading
+                    });
+                    setSelectedCompetitor(competitor);
+                  }}
+                  style={{
+                    cursor: isInSmartLoading ? 'not-allowed' : 'pointer'
+                  }}
                 >
                   {competitor}
                 </span>
-                {fetch.loading && (
+                {/* ✅ NEW: Show smart loading state for newly added/edited competitors */}
+                {isInSmartLoading && !fetch.loading && (
+                  <div className="futuristic-loading smart-loading-overlay">
+                    <span className="loading-text">
+                      Analysis in progress... {Math.floor(remainingTime / 60)}:{(remainingTime % 60).toString().padStart(2, '0')} remaining
+                    </span>
+                    <div className="particle-effect" />
+                  </div>
+                )}
+                {/* ✅ UPDATED: Only show regular loading if not in smart loading */}
+                {fetch.loading && !isInSmartLoading && (
                   <div className="futuristic-loading">
                     <span className="loading-text">Analyzing {competitor}...</span>
                     <div className="particle-effect" />
                   </div>
                 )}
-                {fetch.data?.length === 0 && !fetch.loading && (
-                  <span className="no-data-text">No data available</span>
+                {/* ✅ FIXED: Always show "no data" overlay but make it non-blocking with pointer-events: none */}
+                {(!fetch.data || fetch.data.length === 0) && !fetch.loading && !isInSmartLoading && (
+                  <span className="no-data-text"></span>
                 )}
               </motion.div>
-            )
-          ))}
-        </div>
+              );
+            })}
+          </div>
 
         {toast && (
           <motion.div
@@ -803,7 +1077,131 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
                   </div>
                 </motion.div>
               ) : (
-                <p>No analysis available.</p>
+                <div className="no-analysis-explanation">
+                  <div className="explanation-header">
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      width="24" 
+                      height="24" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="#ffa500" 
+                      strokeWidth="2" 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round"
+                    >
+                      <circle cx="12" cy="12" r="10"/>
+                      <line x1="12" y1="8" x2="12" y2="12"/>
+                      <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                    <h4>Competitor Analysis Not Available</h4>
+                  </div>
+                  
+                  <div className="explanation-content">
+                    <p>We cannot access the analysis for <strong>{selectedCompetitor}</strong>. This could be due to several reasons:</p>
+                    
+                    <div className="reason-list">
+                      <div className="reason-item">
+                        <span className="reason-icon">❌</span>
+                        <div className="reason-text">
+                          <strong>Incorrect Username:</strong> The competitor username might be misspelled or doesn't exist on {platform}
+                        </div>
+                      </div>
+                      
+                      <div className="reason-item">
+                        <span className="reason-icon">🔒</span>
+                        <div className="reason-text">
+                          <strong>Private Account:</strong> The competitor's profile is private and cannot be analyzed
+                        </div>
+                      </div>
+                      
+                      <div className="reason-item">
+                        <span className="reason-icon">🆕</span>
+                        <div className="reason-text">
+                          <strong>New Competitor:</strong> Recently added competitor - analysis is still processing (can take up to 15 minutes)
+                        </div>
+                      </div>
+                      
+                      <div className="reason-item">
+                        <span className="reason-icon">⚠️</span>
+                        <div className="reason-text">
+                          <strong>Technical Issue:</strong> Temporary server issues or rate limiting from {platform}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="suggested-actions">
+                      <h5>🛠️ Suggested Actions:</h5>
+                      <ul>
+                        <li><strong>Verify Username:</strong> Double-check the competitor's {platform} username for typos</li>
+                        <li><strong>Check Profile:</strong> Ensure the competitor's profile is public and accessible</li>
+                        <li><strong>Wait for Processing:</strong> If recently added, wait 10-15 minutes for analysis to complete</li>
+                        <li><strong>Edit or Delete:</strong> Use the edit button to correct the username or delete if no longer needed</li>
+                        <li><strong>Try Again:</strong> Refresh the page and check if analysis becomes available</li>
+                      </ul>
+                    </div>
+                    
+                    <div className="action-buttons">
+                      <motion.button
+                        className="modal-btn edit-btn-modal"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          setCurrentCompetitor(selectedCompetitor);
+                          setEditCompetitor(selectedCompetitor || '');
+                          setSelectedCompetitor(null);
+                          setShowEditModal(true);
+                        }}
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#e0e0ff"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2-2v-7" />
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                        </svg>
+                        Edit Competitor
+                      </motion.button>
+                      
+                      <motion.button
+                        className="modal-btn delete-btn-modal"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          if (selectedCompetitor) {
+                            handleDeleteCompetitor(selectedCompetitor);
+                            setSelectedCompetitor(null);
+                          }
+                        }}
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#ff4444"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                          <line x1="10" y1="11" x2="10" y2="17" />
+                          <line x1="14" y1="11" x2="14" y2="17" />
+                        </svg>
+                        Delete Competitor
+                      </motion.button>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
             <motion.button

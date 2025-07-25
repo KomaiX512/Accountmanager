@@ -266,9 +266,9 @@ const s3Client = {
   }
 };
 
-// Setup a memory cache for images to reduce R2 load
+// CRITICAL FIX: Setup enhanced memory cache for images with proper TTL management
 const imageCache = new Map();
-const IMAGE_CACHE_TTL = 1000 * 60 * 60 * 6; // 6 hours (optimized from 1 hour)
+const IMAGE_CACHE_TTL = 1000 * 60 * 60; // 1 hour
 const IMAGE_CACHE_MAX_SIZE = 100; // Maximum number of images to cache
 
 // Set up CORS completely permissively (no restrictions)
@@ -686,181 +686,161 @@ function generatePlaceholderImage(text = 'Image Not Available', width = 512, hei
 
 // Enhanced image retrieval with multi-level fallbacks
 async function fetchImageWithFallbacks(key, fallbackImagePath = null, username = null, filename = null) {
-  // Check memory cache first
+  // CRITICAL FIX: Enhanced memory cache check with proper validation
   const cacheKey = `r2_${key}`;
   if (imageCache.has(cacheKey)) {
     const { data, timestamp } = imageCache.get(cacheKey);
     if (Date.now() - timestamp < IMAGE_CACHE_TTL) {
-      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE] Using cached image for ${key}`);
+      console.log(`[${new Date().toISOString()}] [IMAGE] Using cached image for ${key}`);
       // Validate that cached data is a proper Buffer
-      if (Buffer.isBuffer(data)) {
-        return { data, source: 'memory-cache' };
+      if (Buffer.isBuffer(cacheEntry.data) && cacheEntry.data.length > 0) {
+        return { data: cacheEntry.data, source: 'memory-cache' };
       } else {
-        if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid cached data type for ${key}, removing from cache`);
+        console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid cached data type for ${key}, removing from cache`);
         imageCache.delete(cacheKey);
       }
+    } else {
+      // Cache expired - remove it
+      console.log(`[${new Date().toISOString()}] [IMAGE] Cache expired for ${key}, removing`);
+      imageCache.delete(cacheKey);
     }
-    // Cache expired
-    imageCache.delete(cacheKey);
   }
   
   // Create path for local file cache
   const hashedKey = Buffer.from(key).toString('base64').replace(/[\/\+=]/g, '_');
   const localCacheFilePath = path.join(localCacheDir, hashedKey);
   
-  // --- BEGIN ROBUST ID-BASED FALLBACK LOGIC WITH MULTI-FORMAT SUPPORT ---
-  // If the key matches various patterns, try all possible formats for the same ID
-  let fallbackKeys = [key];
-  
-  // Handle campaign_ready_post_<ID>.(jpg|png|webp), ready_post_<ID>.(jpg|png|webp), image_<ID>.(jpg|png|webp)
-  const patterns = [
-    /\/(campaign_ready_post_)(\d+)\.(jpg|jpeg|png|webp)$/i,
-    /\/(ready_post_)(\d+)\.(jpg|jpeg|png|webp)$/i,
-    /\/(image_)(\d+)\.(jpg|jpeg|png|webp)$/i
-  ];
-  
-  let foundPattern = false;
-  for (const pattern of patterns) {
-    const match = key.match(pattern);
-    if (match) {
-      const prefix = match[1]; // e.g., 'campaign_ready_post_', 'ready_post_', 'image_'
-      const id = match[2]; // e.g., '1752914138472'
-      const basePath = key.substring(0, key.lastIndexOf('/') + 1);
-      const extensions = ['png', 'jpg', 'jpeg', 'webp']; // PNG first since it's more common for AI-generated images
+  try {
+    // Try local file cache first
+    if (fs.existsSync(localCacheFilePath)) {
+      console.log(`[${new Date().toISOString()}] [IMAGE] Using local cached image for ${key}`);
+      const data = fs.readFileSync(localCacheFilePath);
       
-      fallbackKeys = [];
-      
-      // Add the original key first
-      fallbackKeys.push(key);
-      
-      // Add all possible format variations
-      for (const ext of extensions) {
-        const fallbackKey = `${basePath}${prefix}${id}.${ext}`;
-        if (!fallbackKeys.includes(fallbackKey)) {
-          fallbackKeys.push(fallbackKey);
+      // Validate the cached file is a proper Buffer
+      if (!Buffer.isBuffer(data)) {
+        console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid cached file data type for ${key}, removing cache file`);
+        fs.unlinkSync(localCacheFilePath);
+      } else {
+        // Refresh memory cache with validated data
+        imageCache.set(cacheKey, { 
+          data, 
+          timestamp: Date.now() 
+        });
+        
+        // Limit cache size
+        if (imageCache.size > IMAGE_CACHE_MAX_SIZE) {
+          const oldestKey = Array.from(imageCache.keys())[0];
+          imageCache.delete(oldestKey);
         }
+        
+        return { data, source: 'file-cache' };
       }
-      
-      // Also try cross-pattern fallbacks (e.g., campaign -> ready_post -> image)
-      if (prefix === 'campaign_ready_post_') {
-        for (const ext of extensions) {
-          const readyPostKey = `${basePath}ready_post_${id}.${ext}`;
-          const imageKey = `${basePath}image_${id}.${ext}`;
-          if (!fallbackKeys.includes(readyPostKey)) fallbackKeys.push(readyPostKey);
-          if (!fallbackKeys.includes(imageKey)) fallbackKeys.push(imageKey);
-        }
-      } else if (prefix === 'ready_post_') {
-        for (const ext of extensions) {
-          const campaignKey = `${basePath}campaign_ready_post_${id}.${ext}`;
-          const imageKey = `${basePath}image_${id}.${ext}`;
-          if (!fallbackKeys.includes(campaignKey)) fallbackKeys.push(campaignKey);
-          if (!fallbackKeys.includes(imageKey)) fallbackKeys.push(imageKey);
-        }
-      } else if (prefix === 'image_') {
-        for (const ext of extensions) {
-          const campaignKey = `${basePath}campaign_ready_post_${id}.${ext}`;
-          const readyPostKey = `${basePath}ready_post_${id}.${ext}`;
-          if (!fallbackKeys.includes(campaignKey)) fallbackKeys.push(campaignKey);
-          if (!fallbackKeys.includes(readyPostKey)) fallbackKeys.push(readyPostKey);
-        }
-      }
-      
-      foundPattern = true;
-      break;
     }
-  }
-  
-  if (DEBUG_LOGS && foundPattern) {
-    console.log(`[${new Date().toISOString()}] [IMAGE] Generated ${fallbackKeys.length} fallback keys for ${key}: ${fallbackKeys.slice(0, 5).join(', ')}${fallbackKeys.length > 5 ? '...' : ''}`);
-  }
-  // --- END ROBUST ID-BASED FALLBACK LOGIC WITH MULTI-FORMAT SUPPORT ---
-
-  for (const tryKey of fallbackKeys) {
-    try {
-      // Try local file cache first
-      const tryHashedKey = Buffer.from(tryKey).toString('base64').replace(/[\/\+=]/g, '_');
-      const tryLocalCacheFilePath = path.join(localCacheDir, tryHashedKey);
-      if (fs.existsSync(tryLocalCacheFilePath)) {
-        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE] Using local cached image for ${tryKey}`);
-        const data = fs.readFileSync(tryLocalCacheFilePath);
-        if (Buffer.isBuffer(data)) {
-          imageCache.set(`r2_${tryKey}`, { data, timestamp: Date.now() });
-          if (imageCache.size > IMAGE_CACHE_MAX_SIZE) {
-            const oldestKey = Array.from(imageCache.keys())[0];
-            imageCache.delete(oldestKey);
+    
+    // If not in cache, fetch from R2 using the proper s3Client wrapper
+    console.log(`[${new Date().toISOString()}] [IMAGE] Fetching from R2: ${key}`);
+    
+    // Use the s3Client wrapper (not getS3Client) for proper Buffer handling
+    const data = await s3Client.getObject({
+      Bucket: 'tasks',
+      Key: key
+    }).promise();
+    
+    // Validate that we got a proper Buffer
+    if (!data || !data.Body || !Buffer.isBuffer(data.Body)) {
+      throw new Error(`Invalid response from S3: expected Buffer, got ${typeof data?.Body}`);
+    }
+    
+    // Validate image data integrity (check for valid image headers)
+    const isValidImage = validateImageBuffer(data.Body);
+    if (!isValidImage) {
+      console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid image data detected for ${key}, not caching`);
+      return { data: data.Body, source: 'r2-invalid' };
+    }
+    
+    // Save to local file cache
+    fs.writeFileSync(localCacheFilePath, data.Body);
+    
+    // Save to memory cache
+    imageCache.set(cacheKey, {
+      data: data.Body,
+      timestamp: Date.now()
+    });
+    
+    // Limit cache size
+    if (imageCache.size > IMAGE_CACHE_MAX_SIZE) {
+      const oldestKey = Array.from(imageCache.keys())[0];
+      imageCache.delete(oldestKey);
+    }
+    
+    return { data: data.Body, source: 'r2' };
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [IMAGE] Error fetching from R2: ${key}`, error.message);
+    
+    // Try fallback image path if provided
+    if (fallbackImagePath && fs.existsSync(fallbackImagePath)) {
+      console.log(`[${new Date().toISOString()}] [IMAGE] Using fallback image: ${fallbackImagePath}`);
+      const data = fs.readFileSync(fallbackImagePath);
+      
+      // Validate fallback image
+      if (Buffer.isBuffer(data) && validateImageBuffer(data)) {
+        return { data, source: 'fallback-file' };
+      } else {
+        console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid fallback image data: ${fallbackImagePath}`);
+      }
+    }
+    
+    // If username and filename are provided, check for alternate image names
+    if (username && filename) {
+      // Try different timestamp formats that might exist
+      const timestampMatch = filename.match(/_(\d+)\.jpg$/);
+      if (timestampMatch && timestampMatch[1]) {
+        const timestamp = parseInt(timestampMatch[1]);
+        const alternativeKeys = [
+          `ready_post/instagram/${username}/image_${timestamp}.jpg`,
+          `ready_post/instagram/${username}/image_${timestamp-1}.jpg`,
+          `ready_post/instagram/${username}/image_${timestamp+1}.jpg`
+        ];
+        
+        // Try alternative keys
+        for (const altKey of alternativeKeys) {
+          if (altKey === key) continue; // Skip the original key
+          
+          try {
+            console.log(`[${new Date().toISOString()}] [IMAGE] Trying alternative key: ${altKey}`);
+            const data = await s3Client.getObject({
+              Bucket: 'tasks',
+              Key: altKey
+            }).promise();
+            
+            // Validate alternative image data
+            if (!data || !data.Body || !Buffer.isBuffer(data.Body) || !validateImageBuffer(data.Body)) {
+              console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid alternative image data: ${altKey}`);
+              continue;
+            }
+            
+            // Cache the successful result
+            const hashedAltKey = Buffer.from(altKey).toString('base64').replace(/[\/\+\=]/g, '_');
+            const localCacheAltPath = path.join(localCacheDir, hashedAltKey);
+            fs.writeFileSync(localCacheAltPath, data.Body);
+            
+            // Also save a copy at the original path for future requests
+            fs.writeFileSync(localCacheFilePath, data.Body);
+            
+            return { data: data.Body, source: 'r2-alternative' };
+          } catch (altError) {
+            // Continue to next alternative
           }
-          return { data, source: 'file-cache' };
-        } else {
-          if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid cached file data type for ${tryKey}, removing cache file`);
-          fs.unlinkSync(tryLocalCacheFilePath);
         }
       }
-      // Try R2
-      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE] Fetching from R2: ${tryKey}`);
-      const data = await s3Client.getObject({ Bucket: 'tasks', Key: tryKey }).promise();
-      if (!data || !data.Body || !Buffer.isBuffer(data.Body)) {
-        throw new Error(`Invalid response from S3: expected Buffer, got ${typeof data?.Body}`);
-      }
-      let isValidImage = validateImageBuffer(data.Body);
-      if (!isValidImage) {
-        if (Buffer.isBuffer(data.Body) && data.Body.length > 100 && data.Body[0] === 0xFF && data.Body[1] === 0xD8) {
-          if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [IMAGE] Accepting fallback JPEG (SOI) for ${tryKey} despite failed strict validation`);
-          isValidImage = true;
-        } else {
-          if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid image data detected for ${tryKey}, not caching`);
-          continue;
-        }
-      }
-      fs.writeFileSync(tryLocalCacheFilePath, data.Body);
-      imageCache.set(`r2_${tryKey}`, { data: data.Body, timestamp: Date.now() });
-      if (imageCache.size > IMAGE_CACHE_MAX_SIZE) {
-        const oldestKey = Array.from(imageCache.keys())[0];
-        imageCache.delete(oldestKey);
-      }
-      return { data: data.Body, source: 'r2' };
-    } catch (error) {
-      if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [IMAGE] Error fetching from R2: ${tryKey}`, error.message);
-      // Try next fallbackKey
     }
+    
+    // Generate placeholder as last resort
+    console.log(`[${new Date().toISOString()}] [IMAGE] Generating placeholder image for ${key}`);
+    const placeholderText = `Image Not Available${username ? `\n${username}` : ''}`;
+    const placeholderImage = generatePlaceholderImage(placeholderText);
+    return { data: placeholderImage, source: 'placeholder' };
   }
-  
-  // If not in cache, fetch from R2 using the proper s3Client wrapper
-  if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE] Fetching from R2: ${key}`);
-  
-  // Use the s3Client wrapper (not getS3Client) for proper Buffer handling
-  const data = await s3Client.getObject({
-    Bucket: 'tasks',
-    Key: key
-  }).promise();
-  
-  // Validate that we got a proper Buffer
-  if (!data || !data.Body || !Buffer.isBuffer(data.Body)) {
-    throw new Error(`Invalid response from S3: expected Buffer, got ${typeof data?.Body}`);
-  }
-  
-  // Validate image data integrity (check for valid image headers)
-  const isValidImage = validateImageBuffer(data.Body);
-  if (!isValidImage) {
-    if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid image data detected for ${key}, not caching`);
-    return { data: data.Body, source: 'r2-invalid' };
-  }
-  
-  // Save to local file cache
-  fs.writeFileSync(localCacheFilePath, data.Body);
-  
-  // Save to memory cache
-  imageCache.set(cacheKey, {
-    data: data.Body,
-    timestamp: Date.now()
-  });
-  
-  // Limit cache size
-  if (imageCache.size > IMAGE_CACHE_MAX_SIZE) {
-    const oldestKey = Array.from(imageCache.keys())[0];
-    imageCache.delete(oldestKey);
-  }
-  
-  return { data: data.Body, source: 'r2' };
 }
 
 // Helper function to validate image buffer integrity
@@ -872,8 +852,8 @@ function validateImageBuffer(buffer) {
   // Check for valid image signatures
   const firstBytes = buffer.slice(0, 12);
   
-  // JPEG: FF D8 FF
-  if (firstBytes[0] === 0xFF && firstBytes[1] === 0xD8 && firstBytes[2] === 0xFF) {
+  // CRITICAL FIX: JPEG validation - only requires FF D8 (SOI marker), third byte can be various JPEG markers
+  if (firstBytes[0] === 0xFF && firstBytes[1] === 0xD8) {
     return true;
   }
   
@@ -1545,8 +1525,11 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
     
     // Minimum size check (prevent tiny corrupted files)
     if (data.length < 1024) { // Less than 1KB is suspicious for a real image
-      if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [R2-IMAGE] Suspiciously small image for ${imageKey}: ${data.length} bytes`);
+      console.warn(`[${new Date().toISOString()}] [R2-IMAGE] Suspiciously small image for ${imageKey}: ${data.length} bytes`);
       // Don't fail immediately, but log for monitoring
+    } else if (data.length < 1024) {
+      // Small but likely valid images - just log for monitoring without warning
+      console.log(`[${new Date().toISOString()}] [R2-IMAGE] Small but valid image for ${imageKey}: ${data.length} bytes`);
     }
     
     // Set comprehensive headers with validation info
@@ -1568,10 +1551,13 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
       res.setHeader('X-Cache-Mode', 'normal');
     }
     
-    // ETag with validation info
-    const etag = `"${imageKey}-${data.length}-${Date.now()}"`;
+    // CRITICAL FIX: Stable ETag for proper caching (don't use Date.now())
+    const etag = `"${imageKey}-${data.length}-v2"`;
     res.setHeader('ETag', etag);
-    res.setHeader('Last-Modified', new Date().toUTCString());
+    
+    // Set consistent Last-Modified to prevent unnecessary cache invalidation
+    const lastModified = new Date(Math.floor(Date.now() / (1000 * 60 * 60)) * 1000 * 60 * 60); // Round to hour
+    res.setHeader('Last-Modified', lastModified.toUTCString());
     
     // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -1591,8 +1577,8 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
           .jpeg({ quality: 90 })
           .toBuffer();
 
-        // Basic sanity-check: must start with JPEG SOI marker and be larger than 1 KB
-        if (jpegBuffer && jpegBuffer.length > 1024 && jpegBuffer[0] === 0xFF && jpegBuffer[1] === 0xD8) {
+        // CRITICAL FIX: Accept smaller valid JPEGs (don't require 1KB minimum)
+        if (jpegBuffer && jpegBuffer.length > 200 && jpegBuffer[0] === 0xFF && jpegBuffer[1] === 0xD8) {
           finalData = jpegBuffer;
           finalContentType = 'image/jpeg';
           if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] ✅ WebP→JPEG conversion succeeded for ${imageKey}`);
@@ -1767,7 +1753,7 @@ async function handlePostsEndpoint(req, res) {
   const isRealTime = req.query.realtime || req.query.nocache;
   
   try {
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [API-POSTS] Fetching posts for ${username} on ${platform} (forceRefresh: ${forceRefresh}, realTime: ${!!isRealTime})`);
+    console.log(`[${new Date().toISOString()}] [API-POSTS] Fetching posts for ${username} on ${platform} (forceRefresh: ${forceRefresh}, realTime: ${!!isRealTime})`);
     
     // Set real-time headers if requested
     if (isRealTime) {
@@ -1775,13 +1761,14 @@ async function handlePostsEndpoint(req, res) {
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
       res.setHeader('X-Real-Time', 'true');
-      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [API-POSTS] REAL-TIME mode activated for ${username}`);
+      console.log(`[${new Date().toISOString()}] [API-POSTS] REAL-TIME mode activated for ${username}`);
     }
     
-    // Clear cache if force refresh or real-time is requested
-    if (forceRefresh || isRealTime) {
+    // OPTIMIZATION: Only clear cache if force refresh is explicitly requested
+    // Don't clear cache for every real-time request to improve performance
+    if (forceRefresh) {
       const cacheKey = `ready_post/${platform}/${username}/`;
-      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [API-POSTS] Clearing ALL caches for: ${cacheKey}`);
+      console.log(`[${new Date().toISOString()}] [API-POSTS] Clearing ALL caches for: ${cacheKey}`);
       // Clear memory cache
       for (const key of imageCache.keys()) {
         if (key.startsWith(cacheKey)) {
@@ -1844,56 +1831,12 @@ async function handlePostsEndpoint(req, res) {
         let imageUrl = null;
         let r2ImageUrl = null;
         
-        // Extract image key from post data or file key with proper extension detection
+        // Extract image key from post data or file key
         let imageKey = null;
-        if (file.Key.includes('campaign_ready_post_') && file.Key.endsWith('.json')) {
-          // Campaign pattern: campaign_ready_post_1752000987874_9c14f1fd.json -> image_1752000987874_9c14f1fd.(jpg|png|webp)
-          const baseName = file.Key.replace(/^.*\/([^\/]+)\.json$/, '$1');
-          
-          // Check for multiple possible extensions
-          const possibleExtensions = ['jpg', 'jpeg', 'png', 'webp'];
-          for (const ext of possibleExtensions) {
-            const testKey = `${baseName}.${ext}`;
-            // We'll use this key and let the R2 endpoint handle fallbacks
-            imageKey = testKey;
-            break; // Use first extension as default, R2 endpoint will handle fallbacks
-          }
-        } else if (file.Key.includes('ready_post_') && file.Key.endsWith('.json')) {
-          // Traditional pattern: ready_post_1234567890.json -> image_1234567890.(jpg|png|webp)
+        if (file.Key.includes('ready_post_') && file.Key.endsWith('.json')) {
           const match = file.Key.match(/ready_post_(\d+)\.json$/);
           if (match) {
-            const imageId = match[1];
-            
-            // Try to determine actual extension by checking what exists in R2
-            const possibleExtensions = ['png', 'jpg', 'jpeg', 'webp'];
-            let actualExtension = 'jpg'; // Default fallback
-            
-            // Check if we can find the actual file extension
-            const imagePrefix = `ready_post/${platform}/${username}/image_${imageId}.`;
-            try {
-              const imageListParams = {
-                Bucket: 'tasks',
-                Prefix: imagePrefix,
-                MaxKeys: 10
-              };
-              const imageListResult = await client.listObjectsV2(imageListParams).promise();
-              
-              if (imageListResult.Contents && imageListResult.Contents.length > 0) {
-                // Find the actual image file
-                for (const imageFile of imageListResult.Contents) {
-                  const extMatch = imageFile.Key.match(/\.(png|jpg|jpeg|webp)$/i);
-                  if (extMatch) {
-                    actualExtension = extMatch[1].toLowerCase();
-                    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [API-POSTS] Detected actual image extension: ${actualExtension} for ${imageFile.Key}`);
-                    break;
-                  }
-                }
-              }
-            } catch (extError) {
-              if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [API-POSTS] Could not detect extension for ${imageId}, using default: ${extError.message}`);
-            }
-            
-            imageKey = `image_${imageId}.${actualExtension}`;
+            imageKey = `image_${match[1]}.jpg`;
           }
         }
         
@@ -2176,7 +2119,7 @@ app.use((req, res, next) => {
 
 // Health watchdog timer to detect freeze or deadlock conditions
 let watchdogLastCheckin = Date.now();
-const WATCHDOG_INTERVAL = 30000; // 30 seconds
+const WATCHDOG_INTERVAL = 600000; // 60 seconds (reduced frequency)
 const WATCHDOG_MAX_IDLE = 24 * 60 * 60 * 1000; // 24 hours max with no requests (enterprise-grade stability)
 
 const healthWatchdog = setInterval(() => {

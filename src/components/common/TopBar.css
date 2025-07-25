@@ -124,11 +124,16 @@
 }
 
 .nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 40px; /* Enforce a fixed height */
   color: #e0e0ff;
   text-decoration: none;
   font-size: clamp(0.9rem, 2.2vw, 1.1rem);
   font-weight: 700;
-  padding: clamp(10px, 2.5vw, 12px) clamp(16px, 4vw, 20px);
+  padding: 0 clamp(16px, 4vw, 20px); /* Adjust padding */
   border-radius: clamp(8px, 2vw, 10px);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
@@ -137,6 +142,7 @@
   backdrop-filter: blur(10px);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  white-space: nowrap;
 }
 
 .nav-link:hover {

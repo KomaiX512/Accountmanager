@@ -5,6 +5,7 @@ import 'react-datepicker/dist/react-datepicker.css';
 import axios from 'axios';
 import './TwitterCompose.css';
 import { useTwitter } from '../../context/TwitterContext';
+import useFeatureTracking from '../../hooks/useFeatureTracking';
 
 interface TwitterComposeProps {
   userId: string;
@@ -12,7 +13,8 @@ interface TwitterComposeProps {
 }
 
 const TwitterCompose: React.FC<TwitterComposeProps> = ({ userId, onClose }) => {
-  const { isConnected, userId: contextUserId } = useTwitter();
+  const { userId: contextUserId } = useTwitter();
+  const { trackRealPostCreation, canUseFeature } = useFeatureTracking();
   const userIdToUse = userId || contextUserId;
 
   const [tweetText, setTweetText] = useState('');
@@ -72,10 +74,34 @@ const TwitterCompose: React.FC<TwitterComposeProps> = ({ userId, onClose }) => {
       return;
     }
 
+    // ✅ PRE-ACTION CHECK: Verify post limits before proceeding
+    const postAccessCheck = canUseFeature('posts');
+    if (!postAccessCheck.allowed) {
+      setError(postAccessCheck.reason || 'Posts feature is not available');
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
     try {
+      // ✅ REAL USAGE TRACKING: Track before posting
+      const isScheduled = !!scheduleDate;
+      const trackingSuccess = await trackRealPostCreation('twitter', {
+        scheduled: isScheduled,
+        immediate: !isScheduled,
+        type: selectedImage ? 'image_post' : 'text_post'
+      });
+
+      if (!trackingSuccess) {
+        console.warn(`[TwitterCompose] 🚫 Post creation blocked for twitter - limit reached`);
+        setError('Post limit reached - upgrade to continue');
+        setIsSubmitting(false);
+        return;
+      }
+
+      console.log(`[TwitterCompose] ✅ Post tracked: twitter ${isScheduled ? 'scheduled' : 'immediate'} post`);
+
       if (scheduleDate) {
         // Schedule the tweet
         if (scheduleDate <= new Date()) {

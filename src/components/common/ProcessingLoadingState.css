@@ -283,7 +283,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgb(34, 197, 94);
+  color: rgb(0, 0, 0);
   animation: completionPulse 2s ease-in-out infinite;
 }
 

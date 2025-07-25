@@ -552,7 +552,7 @@ server {
     
     # RAG API endpoints with longer timeouts
     location ~ ^/api/(discussion|post-generator|instant-reply|auto-reply-all)/?$ {
-        proxy_pass http://localhost:3001/api/$1;
+        proxy_pass http://localhost:3001;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -562,7 +562,7 @@ server {
     }
     
     location ~ ^/api/conversations/([^/]+)/?$ {
-        proxy_pass http://localhost:3001/api/conversations/$1;
+        proxy_pass http://localhost:3001;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

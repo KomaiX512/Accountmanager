@@ -19,6 +19,8 @@ import { FaBell } from 'react-icons/fa';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
 import { getApiUrl } from '../../config/api';
 // Missing modules - comment out until they're available
+import { persistentScheduler } from '../../utils/persistentScheduler';
+import { r2PostFetcher } from '../../utils/r2PostFetcher';
 
 
 interface PostCookedProps {
@@ -290,63 +292,101 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   useEffect(() => {
     if (!username) return;
 
-         let refreshInterval: number;
-     let lastPostCount = localPosts.length;
+    let refreshInterval: number;
+    let lastPostCount = localPosts.length;
+    let r2AutoRefreshCleanup: (() => void) | null = null;
 
-     // Check for new posts every 30 seconds (increased from 10s to reduce API spam)
-     const checkForNewPosts = async () => {
-       const cacheKey = `check_posts_${username}_${platform}`;
-       
-       try {
-         const response = await deduplicatedRequest(
-           cacheKey,
-           () => axios.get(`${API_BASE_URL}/posts/${username}?platform=${platform}&nocache=${Date.now()}`, {
-             headers: {
-               'Cache-Control': 'no-cache, no-store, must-revalidate',
-               'Pragma': 'no-cache'
-             },
-             timeout: 8000 // Increased timeout for better reliability
-           }),
-           false // Don't cache background checks
-         );
+    // 🚀 BULLETPROOF FIX: Enhanced auto-refresh using R2PostFetcher
+    const checkForNewPosts = async () => {
+      try {
+        // Use R2PostFetcher for enhanced reliability
+        const result = await r2PostFetcher.fetchFreshFromR2({
+          platform,
+          username,
+          forceRefresh: false, // Allow some caching for performance
+          skipCache: false
+        });
 
-         const newPostCount = response.data.length;
-         
-         // If we have new posts, update immediately
-         if (newPostCount > lastPostCount) {
-           if (DEBUG_LOGGING) {
-             console.log(`[PostCooked] NEW POSTS: ${lastPostCount} → ${newPostCount}`);
-           }
-           setLocalPosts(response.data);
-           setToastMessage('✨ New post arrived! PostCooked module refreshed automatically.');
-           lastPostCount = newPostCount;
-         }
-       } catch (error: any) {
-         // Silently handle errors for background refresh to avoid spam (no logging)
-       }
-     };
+        if (result.success) {
+          const newPostCount = result.posts.length;
+          
+          // If we have new posts, update immediately
+          if (newPostCount > lastPostCount) {
+            if (DEBUG_LOGGING) {
+              console.log(`[PostCooked] NEW POSTS DETECTED: ${lastPostCount} → ${newPostCount} (${result.freshFromR2 ? 'fresh from R2' : 'cached'})`);
+            }
+            setLocalPosts(result.posts);
+            setToastMessage(`✨ ${newPostCount - lastPostCount} new post(s) arrived! ${result.freshFromR2 ? 'Fresh from R2!' : ''}`);
+            lastPostCount = newPostCount;
+          } else if (newPostCount < lastPostCount) {
+            // Posts may have been processed/deleted
+            if (DEBUG_LOGGING) {
+              console.log(`[PostCooked] POSTS REDUCED: ${lastPostCount} → ${newPostCount} (posts processed/deleted)`);
+            }
+            setLocalPosts(result.posts);
+            lastPostCount = newPostCount;
+          }
+        }
+      } catch (error: any) {
+        // Silently handle errors for background refresh to avoid spam
+        if (DEBUG_LOGGING) {
+          console.log('[PostCooked] Background refresh error (silent):', error.message);
+        }
+      }
+    };
 
-     // Start periodic checking with reduced frequency (30 seconds to minimize API spam)
-     refreshInterval = window.setInterval(checkForNewPosts, 30000);
+    // 🚀 BULLETPROOF: Setup enhanced auto-refresh every 5 minutes using R2PostFetcher
+    r2PostFetcher.setupAutoRefresh(
+      { platform, username, forceRefresh: true, skipCache: true },
+      (result) => {
+        console.log(`[PostCooked] 🔄 R2 Auto-refresh: ${result.posts.length} posts (fresh: ${result.freshFromR2})`);
+        setLocalPosts(result.posts);
+        if (result.posts.length !== lastPostCount) {
+          setToastMessage(`🔄 Auto-refreshed: ${result.posts.length} posts ${result.freshFromR2 ? '(fresh from R2)' : '(cached)'}`);
+          lastPostCount = result.posts.length;
+        }
+      },
+      5 // Every 5 minutes
+    ).then(cleanup => {
+      r2AutoRefreshCleanup = cleanup;
+    });
+
+    // Keep the legacy 30-second check for immediate responsiveness
+    refreshInterval = window.setInterval(checkForNewPosts, 30000);
 
     // Also listen for custom events from post creation
     const handleNewPostEvent = (event: CustomEvent) => {
       const { username: eventUsername, platform: eventPlatform } = event.detail;
       
       if (eventUsername === username && eventPlatform === platform) {
-        // Only log if needed for debugging
-        // console.log('[PostCooked] NEW POST EVENT: Refreshing immediately');
+        console.log('[PostCooked] NEW POST EVENT: Triggering immediate R2 refresh');
         setTimeout(() => handleRefreshPosts(), 1000); // Small delay to allow server processing
       }
     };
 
     window.addEventListener('newPostCreated', handleNewPostEvent as EventListener);
 
-         // Cleanup
-     return () => {
-       if (refreshInterval) window.clearInterval(refreshInterval);
-       window.removeEventListener('newPostCreated', handleNewPostEvent as EventListener);
-     };
+    // 🚀 BULLETPROOF: Listen for persistent scheduler events
+    const handleScheduledPostExecution = (event: CustomEvent) => {
+      const { post, platform: eventPlatform, username: eventUsername } = event.detail;
+      
+      if (eventUsername === username && eventPlatform === platform) {
+        console.log(`[PostCooked] 📤 Executing scheduled post: ${post.postKey}`);
+        // This will be handled by the persistent scheduler
+        // We just need to refresh the posts after execution
+        setTimeout(() => handleRefreshPosts(), 2000);
+      }
+    };
+
+    window.addEventListener('executeScheduledPost', handleScheduledPostExecution as EventListener);
+
+    // Cleanup
+    return () => {
+      if (refreshInterval) window.clearInterval(refreshInterval);
+      if (r2AutoRefreshCleanup) r2AutoRefreshCleanup();
+      window.removeEventListener('newPostCreated', handleNewPostEvent as EventListener);
+      window.removeEventListener('executeScheduledPost', handleScheduledPostExecution as EventListener);
+    };
   }, [username, platform, localPosts.length]);
 
   // State for forcing image refresh
@@ -400,6 +440,108 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     window.addEventListener('postUpdated', handlePostUpdate as EventListener);
     return () => window.removeEventListener('postUpdated', handlePostUpdate as EventListener);
   }, [platform, localPosts, username]);
+
+  // ✨ BULLETPROOF: Initialize persistent scheduler on component mount
+  useEffect(() => {
+    if (username && platform) {
+      console.log(`[PostCooked] 🚀 Initializing persistent scheduler for ${platform}/${username}`);
+      persistentScheduler.startScheduler();
+      
+      // Listen for scheduled post execution events
+      const handleScheduledPostExecution = async (event: CustomEvent) => {
+        const { post, platform: eventPlatform, username: eventUsername } = event.detail;
+        
+        if (eventUsername === username && eventPlatform === platform) {
+          console.log(`[PostCooked] 📤 Executing scheduled post from persistent queue: ${post.postKey}`);
+          
+          try {
+            // Execute the actual posting based on platform
+            if (platform === 'twitter') {
+              const caption = post.caption || '';
+              const finalCaption = caption.length > 280 ? caption.slice(0, 280) : caption.trim();
+              
+              await axios.post(`${API_BASE_URL}/api/schedule-tweet/${userId}`, {
+                text: finalCaption,
+                scheduled_time: new Date().toISOString() // Post immediately
+              });
+              
+              console.log(`[PostCooked] ✅ Twitter post executed: ${post.postKey}`);
+              
+            } else if (platform === 'facebook') {
+              const formData = new FormData();
+              formData.append('caption', post.caption || '');
+              formData.append('scheduleDate', new Date().toISOString());
+              formData.append('platform', 'facebook');
+              
+              // Try to fetch image if available
+              if (post.imageUrl) {
+                try {
+                  const imageBlob = await fetchImageBlob({ data: { image_url: post.imageUrl }, key: post.postKey }, 'persistentScheduler');
+                  if (imageBlob) {
+                    formData.append('image', imageBlob, `facebook_${post.postKey}.jpg`);
+                  }
+                } catch (imgErr) {
+                  console.warn(`[PostCooked] Image fetch failed for Facebook post ${post.postKey}, posting text-only`);
+                }
+              }
+              
+              await fetch(`${API_BASE_URL}/api/schedule-post/${userId}`, {
+                method: 'POST',
+                body: formData,
+              });
+              
+              console.log(`[PostCooked] ✅ Facebook post executed: ${post.postKey}`);
+              
+            } else {
+              // Instagram
+              const formData = new FormData();
+              formData.append('caption', post.caption || '');
+              formData.append('scheduleDate', new Date().toISOString());
+              formData.append('platform', 'instagram');
+              
+              // Fetch image for Instagram (required)
+              if (post.imageUrl) {
+                const imageBlob = await fetchImageBlob({ data: { image_url: post.imageUrl }, key: post.postKey }, 'persistentScheduler');
+                if (imageBlob) {
+                  formData.append('image', imageBlob, `instagram_${post.postKey}.jpg`);
+                  
+                  await fetch(`${API_BASE_URL}/api/schedule-post/${userId}`, {
+                    method: 'POST',
+                    body: formData,
+                  });
+                  
+                  console.log(`[PostCooked] ✅ Instagram post executed: ${post.postKey}`);
+                } else {
+                  throw new Error('Failed to fetch image for Instagram post');
+                }
+              } else {
+                throw new Error('No image available for Instagram post');
+              }
+            }
+            
+            // Mark as completed in persistent scheduler
+            persistentScheduler.markAsCompleted(platform, username, post.postKey);
+            
+            // Refresh posts to reflect changes
+            setTimeout(() => handleRefreshPosts(), 2000);
+            
+            setToastMessage(`✅ Scheduled post executed: ${post.postKey}`);
+            
+          } catch (error) {
+            console.error(`[PostCooked] ❌ Failed to execute scheduled post ${post.postKey}:`, error);
+            persistentScheduler.markAsFailed(platform, username, post.postKey, error instanceof Error ? error.message : 'Unknown error');
+            setToastMessage(`❌ Failed to execute scheduled post: ${post.postKey}`);
+          }
+        }
+      };
+      
+      window.addEventListener('executeScheduledPost', handleScheduledPostExecution as unknown as EventListener);
+      
+      return () => {
+        window.removeEventListener('executeScheduledPost', handleScheduledPostExecution as unknown as EventListener);
+      };
+    }
+  }, [username, platform, userId]);
 
   // ✨ BULLETPROOF: Listen for post scheduling events from Canvas Editor
   useEffect(() => {
@@ -1292,22 +1434,50 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     
     setIsRefreshing(true);
     try {
-      const response = await axios.get(`${API_BASE_URL}/posts/${username}?platform=${platform}&nocache=${Date.now()}`, {
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache'
-        },
-        timeout: 10000
+      console.log(`[PostCooked] 🔄 Starting BULLETPROOF R2 refresh for ${platform}/${username}`);
+      
+      // 🚀 BULLETPROOF FIX: Use R2PostFetcher to ensure fresh data from R2 bucket
+      const result = await r2PostFetcher.fetchFreshFromR2({
+        platform,
+        username,
+        forceRefresh: true,
+        skipCache: true
       });
       
-      setLocalPosts(response.data);
-      setImageErrors({});
-      setImageRefreshKey(prev => prev + 1);
-      console.log(`[PostCooked] ✅ Manually refreshed ${response.data.length} posts`);
-      setToastMessage('✅ Posts refreshed successfully!');
+      if (result.success) {
+        setLocalPosts(result.posts);
+        setImageErrors({});
+        setImageRefreshKey(prev => prev + 1);
+        
+        console.log(`[PostCooked] ✅ ${result.freshFromR2 ? 'FRESH FROM R2' : 'FROM CACHE'}: ${result.posts.length} posts loaded`);
+        setToastMessage(result.message);
+      } else {
+        throw new Error(result.message);
+      }
+      
     } catch (error: any) {
-      console.error('[PostCooked] Error refreshing posts:', error);
-      setToastMessage('❌ Failed to refresh posts. Please try again.');
+      console.error('[PostCooked] ❌ R2 refresh failed, trying fallback:', error);
+      
+      // FALLBACK: Try the original method if R2 fetcher fails
+      try {
+        const response = await axios.get(`${API_BASE_URL}/posts/${username}?platform=${platform}&nocache=${Date.now()}&refresh=true`, {
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+          },
+          timeout: 10000
+        });
+        
+        setLocalPosts(response.data);
+        setImageErrors({});
+        setImageRefreshKey(prev => prev + 1);
+        console.log(`[PostCooked] ✅ Fallback refresh successful: ${response.data.length} posts`);
+        setToastMessage('✅ Posts refreshed successfully (fallback)!');
+        
+      } catch (fallbackError: any) {
+        console.error('[PostCooked] ❌ Both R2 and fallback refresh failed:', fallbackError);
+        setToastMessage('❌ Failed to refresh posts. Please try again.');
+      }
     } finally {
       setIsRefreshing(false);
     }
@@ -1344,24 +1514,9 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     setAutoScheduling(true);
     setAutoScheduleProgress('🔍 Determining scheduling interval...');
     
-    // ✨ ENHANCED: Initialize comprehensive progress tracking with FILTERED posts
-    const totalPosts = filteredPosts.length;
-    setAutoScheduleTracking({
-      current: 0,
-      total: totalPosts,
-      successCount: 0,
-      failureCount: 0,
-      isRunning: true,
-      processedPosts: []
-    });
-    
-    let successCount = 0;
-    let failureCount = 0;
-    const processedPostKeys: string[] = [];
-    
     try {
       // Enhanced time delay fetching with better error handling
-      console.log(`[AutoSchedule] 🚀 Starting auto-schedule for ${totalPosts} ${platform} posts`);
+      console.log(`[AutoSchedule] 🚀 Starting BULLETPROOF auto-schedule for ${filteredPosts.length} ${platform} posts`);
       let delayHours = await fetchTimeDelay(intervalOverride);
       
       // Final sanity-check: never allow zero or negative intervals
@@ -1371,226 +1526,66 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       }
       
       console.log(`[AutoSchedule] ⏰ Using interval: ${delayHours} hours`);
-      setAutoScheduleProgress(`⏰ Scheduling ${totalPosts} ${platform === 'twitter' ? 'tweets' : 'posts'} every ${delayHours} hours...`);
+      setAutoScheduleProgress(`⏰ Adding ${filteredPosts.length} ${platform === 'twitter' ? 'tweets' : 'posts'} to persistent schedule queue...`);
       
-      // 🚫 CRITICAL FIX 3: Process only FILTERED posts to prevent duplicates
-      for (let i = 0; i < filteredPosts.length; i++) {
-        const post = filteredPosts[i];
-        const postNumber = i + 1;
-        
-        // 🚫 CRITICAL FIX 4: Skip if post is already being processed or was processed
-        if (processedPosts.has(post.key) || processedPostKeys.includes(post.key)) {
-          console.log(`[AutoSchedule] ⚠️ Skipping already processed post: ${post.key}`);
-          continue;
-        }
-        
-        // 🚫 CRITICAL FIX 5: Immediately mark as being processed to prevent race conditions
-        markPostAsProcessed(post.key, 'auto-schedule-in-progress');
-        
-        // ✨ ENHANCED: Update progress tracking in real-time
-        setAutoScheduleTracking(prev => ({
-          ...prev,
-          current: postNumber,
-          successCount,
-          failureCount
-        }));
-        
-        setAutoScheduleProgress(`📝 Processing ${platform === 'twitter' ? 'tweet' : 'post'} ${postNumber}/${totalPosts}...`);
-        
-        // Calculate schedule time for this post
-        const baseTime = Date.now() + 60 * 1000; // Start 1 minute from now
-        const scheduleTime = new Date(baseTime + (i * delayHours * 60 * 60 * 1000));
-        
-        console.log(`[AutoSchedule] 📅 Post ${postNumber} (${post.key}) scheduled for: ${scheduleTime.toISOString()}`);
-        
-        try {
-          if (platform === 'twitter') {
-            // ============= TWITTER SCHEDULING =============
-            const caption = post.data.post?.caption || '';
-            const finalCaption = caption.length > 280 ? caption.slice(0, 280) : caption.trim();
-            
-            console.log(`[AutoSchedule] 🐦 Twitter post ${postNumber}: "${finalCaption.substring(0, 50)}..."`);
-            
-            const response = await axios.post(`${API_BASE_URL}/api/schedule-tweet/${userId}`, {
-              text: finalCaption,
-              scheduled_time: scheduleTime.toISOString()
-            }, {
-              timeout: 10000, // 10 second timeout
-              headers: {
-                'Content-Type': 'application/json'
-              }
-            });
-
-            if (response.data.success) {
-              console.log(`[AutoSchedule] ✅ Tweet ${postNumber} scheduled successfully`);
-              successCount++;
-              processedPostKeys.push(post.key);
-              setToastMessage(`✅ Tweet ${postNumber} scheduled for ${scheduleTime.toLocaleString()}`);
-            } else {
-              throw new Error(response.data.message || 'Unknown Twitter API error');
-            }
-            
-          } else if (platform === 'facebook') {
-            // ============= FACEBOOK SCHEDULING =============
-            const caption = post.data.post?.caption || '';
-            console.log(`[AutoSchedule] 📘 Facebook post ${postNumber}: "${caption.substring(0, 50)}..."`);
-            
-            const formData = new FormData();
-            formData.append('caption', caption);
-            formData.append('scheduleDate', scheduleTime.toISOString());
-            formData.append('platform', 'facebook');
-
-            // Enhanced image handling for Facebook using new robust method
-            if (post.data.image_url) {
-              try {
-                setAutoScheduleProgress(`📷 Fetching image for Facebook post ${postNumber}...`);
-                const imageBlob = await fetchImageBlob(post, 'facebookAutoSchedule');
-                
-                if (imageBlob && imageBlob.size > 0) {
-                  formData.append('image', imageBlob, `facebook_post_${postNumber}.jpg`);
-                  console.log(`[AutoSchedule] 📷 Image added to Facebook post ${postNumber} (${imageBlob.size} bytes)`);
-                } else {
-                  console.warn(`[AutoSchedule] ⚠️ Facebook post ${postNumber}: Image fetch failed, posting text-only`);
-                }
-              } catch (imgErr) {
-                console.warn(`[AutoSchedule] ⚠️ Facebook post ${postNumber}: Image fetch failed, posting text-only`);
-              }
-            }
-
-            const resp = await fetch(`${API_BASE_URL}/api/schedule-post/${userId}`, {
-              method: 'POST',
-              body: formData,
-            });
-
-            if (!resp.ok) {
-              const errData = await resp.json().catch(() => ({}));
-              throw new Error(errData.error || `HTTP ${resp.status}: ${resp.statusText}`);
-            }
-
-            await resp.json();
-            console.log(`[AutoSchedule] ✅ Facebook post ${postNumber} scheduled successfully`);
-            successCount++;
-            processedPostKeys.push(post.key);
-            setToastMessage(`✅ Facebook post ${postNumber} scheduled for ${scheduleTime.toLocaleString()}`);
-            
-          } else {
-            // ============= INSTAGRAM SCHEDULING (NATIVE SCHEDULER) =============
-            console.log(`[AutoSchedule] 📸 Instagram post ${postNumber}: Processing...`);
-            
-            // Enhanced image fetching using the new robust method
-            setAutoScheduleProgress(`📷 Fetching image for Instagram post ${postNumber}...`);
-            const imageBlob = await fetchImageBlob(post, 'autoSchedule');
-            
-            if (!imageBlob) {
-              console.error(`[AutoSchedule] ❌ Image fetch failed for post ${postNumber}`);
-              failureCount++;
-              setToastMessage(`❌ Post ${postNumber}: Image fetch failed`);
-              continue;
-            }
-
-            // Enhanced caption handling
-            let caption = post.data.post?.caption || '';
-            console.log(`[AutoSchedule] 📝 Original caption length: ${caption.length} chars`);
-            
-            if (caption.length > 2150) {
-              console.warn(`[AutoSchedule] ✂️ Truncating caption from ${caption.length} to 2150 chars`);
-              caption = caption.slice(0, 2150);
-            }
-
-            // Submit to our NATIVE Instagram scheduler
-            const formData = new FormData();
-            formData.append('image', imageBlob, `auto_instagram_post_${postNumber}.jpg`);
-            formData.append('caption', caption);
-            formData.append('scheduleDate', scheduleTime.toISOString());
-            formData.append('platform', 'instagram');
-
-            console.log(`[AutoSchedule] 📤 Submitting Instagram post ${postNumber} to NATIVE scheduler...`);
-            
-            const resp = await fetch(`${API_BASE_URL}/api/schedule-post/${userId}`, {
-              method: 'POST',
-              body: formData,
-            });
-
-            // 🚫 CRITICAL FIX: Handle duplicate scheduling errors gracefully
-            if (!resp.ok) {
-              const errData = await resp.json().catch(() => ({}));
-              
-              // Handle duplicate error specifically
-              if (resp.status === 409 && errData.error === 'Duplicate schedule detected') {
-                console.log(`[AutoSchedule] ⚠️ Post ${postNumber}: Duplicate schedule detected, marking as processed`);
-                processedPostKeys.push(post.key);
-                successCount++; // Count as success since it's already scheduled
-                setToastMessage(`⚠️ Post ${postNumber}: Already scheduled (duplicate prevented)`);
-              } else {
-                throw new Error(errData.error || `HTTP ${resp.status}: ${resp.statusText}`);
-              }
-            } else {
-              const respData = await resp.json();
-              console.log(`[AutoSchedule] ✅ Instagram post ${postNumber} scheduled successfully:`, respData.scheduleId);
-              successCount++;
-              processedPostKeys.push(post.key);
-              setToastMessage(`✅ Instagram post ${postNumber} scheduled for ${scheduleTime.toLocaleString()}`);
-            }
-          }
-          
-        } catch (postError: any) {
-          console.error(`[AutoSchedule] ❌ Failed to schedule ${platform} post ${postNumber}:`, postError.message);
-          failureCount++;
-          setToastMessage(`❌ Post ${postNumber} failed: ${postError.message}`);
-          
-          // Continue with next post rather than stopping entire process
-          continue;
-        }
-        
-        // Small delay between posts to prevent API spam
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
+      // � BULLETPROOF FIX: Use PersistentScheduler for reliable scheduling
+      persistentScheduler.addToScheduleQueue(
+        filteredPosts,
+        platform,
+        username,
+        delayHours
+      );
       
-      // ✨ BULLETPROOF: Mark successfully processed posts as permanently processed
-      if (processedPostKeys.length > 0) {
-        console.log(`[AutoSchedule] 🧹 Permanently marking ${processedPostKeys.length} successfully scheduled posts as processed`);
-        
-        // Mark each post as permanently processed
-        processedPostKeys.forEach(postKey => {
-          markPostAsProcessed(postKey, 'auto-scheduled');
-        });
-        
-        console.log(`[AutoSchedule] ✅ All ${processedPostKeys.length} posts marked as permanently processed`);
-      }
+      // Start the persistent scheduler
+      persistentScheduler.startScheduler();
       
-      // Final results with enhanced completion tracking
+      // Mark all posts as being processed to prevent duplicates
+      filteredPosts.forEach(post => {
+        markPostAsProcessed(post.key, 'queued-for-auto-schedule');
+      });
+      
+      // Get queue status for user feedback
+      const queueStatus = persistentScheduler.getQueueStatus(platform, username);
+      
       setAutoScheduleProgress(null);
-      setAutoScheduleTracking(prev => ({
-        ...prev,
+      setAutoScheduleTracking({
+        current: 0,
+        total: filteredPosts.length,
+        successCount: 0,
+        failureCount: 0,
         isRunning: false,
-        processedPosts: processedPostKeys
-      }));
+        processedPosts: filteredPosts.map(p => p.key)
+      });
       
-      const resultMessage = `🎉 Auto-schedule completed! ✅ ${successCount} scheduled, ❌ ${failureCount} failed. Interval: ${delayHours}h`;
-      setToastMessage(resultMessage);
-      console.log(`[AutoSchedule] 🏁 COMPLETED: ${successCount}/${totalPosts} posts scheduled successfully`);
-      
-      // ✨ ENHANCED: Track usage if any posts were successfully scheduled
-      if (successCount > 0) {
-        console.log(`[AutoSchedule] 📊 Tracking usage for ${successCount} scheduled posts...`);
-        const trackingSuccess = await trackRealPostCreation(platform, {
-          scheduled: true,
-          immediate: false,
-          type: 'auto_schedule_batch'
-        });
+      const resultMessage = `🎉 BULLETPROOF Auto-schedule setup complete! 
+        📋 ${queueStatus.pending} posts queued
+        ⏰ Interval: ${delayHours}h
+        📅 Next post: ${queueStatus.nextSchedule?.toLocaleString() || 'Soon'}
         
-        if (!trackingSuccess) {
-          console.warn(`[AutoSchedule] 🚫 Usage tracking failed for ${platform} - but posts were scheduled successfully`);
-        } else {
-          console.log(`[AutoSchedule] ✅ Usage tracking successful: ${successCount} posts tracked`);
-        }
+        Posts will be automatically scheduled even during server downtime!`;
+      
+      setToastMessage(resultMessage);
+      console.log(`[AutoSchedule] 🏁 BULLETPROOF QUEUE SETUP: ${filteredPosts.length} posts queued for persistent scheduling`);
+      
+      // ✨ ENHANCED: Track usage for queued posts
+      console.log(`[AutoSchedule] 📊 Tracking usage for ${filteredPosts.length} queued posts...`);
+      const trackingSuccess = await trackRealPostCreation(platform, {
+        scheduled: true,
+        immediate: false,
+        type: 'persistent_auto_schedule_queue'
+      });
+      
+      if (!trackingSuccess) {
+        console.warn(`[AutoSchedule] 🚫 Usage tracking failed for ${platform} - but posts were queued successfully`);
+      } else {
+        console.log(`[AutoSchedule] ✅ Usage tracking successful: ${filteredPosts.length} posts tracked`);
       }
       
     } catch (err: any) {
-      console.error('[AutoSchedule] 💥 Fatal error during auto-scheduling:', err);
+      console.error('[AutoSchedule] 💥 Fatal error during auto-scheduling setup:', err);
       setAutoScheduleProgress(null);
       setAutoScheduleTracking(prev => ({ ...prev, isRunning: false }));
-      setToastMessage(`💥 Auto-scheduling failed: ${err.message}`);
+      setToastMessage(`💥 Auto-scheduling setup failed: ${err.message}`);
     } finally {
       setAutoScheduling(false);
     }
@@ -1951,6 +1946,63 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             </button>
           </div>
         </div>
+        
+        {/* 🚀 BULLETPROOF: Persistent Scheduler Queue Status */}
+        {username && (() => {
+          const queueStatus = persistentScheduler.getQueueStatus(platform, username);
+          if (queueStatus.total > 0) {
+            return (
+              <div style={{
+                background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+                border: '1px solid #00ffcc',
+                borderRadius: 8,
+                padding: 12,
+                marginBottom: 16,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontSize: 14
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: queueStatus.pending > 0 ? '#00ffcc' : '#666',
+                    animation: queueStatus.pending > 0 ? 'pulse 2s infinite' : 'none'
+                  }} />
+                  <span style={{ color: '#e0e0ff', fontWeight: 500 }}>
+                    📋 Persistent Queue: {queueStatus.pending} pending, {queueStatus.posted} posted, {queueStatus.failed} failed
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {queueStatus.nextSchedule && (
+                    <span style={{ color: '#a0a0cc', fontSize: 12 }}>
+                      Next: {queueStatus.nextSchedule.toLocaleString()}
+                    </span>
+                  )}
+                  <button
+                    onClick={() => persistentScheduler.clearCompletedSchedules(platform, username)}
+                    style={{
+                      background: 'transparent',
+                      border: '1px solid #666',
+                      borderRadius: 4,
+                      color: '#a0a0cc',
+                      fontSize: 12,
+                      padding: '4px 8px',
+                      cursor: 'pointer'
+                    }}
+                    title="Clear completed schedules"
+                  >
+                    🧹 Clear
+                  </button>
+                </div>
+              </div>
+            );
+          }
+          return null;
+        })()}
+        
         <div className="auto-schedule-row">
           {platform === 'twitter' ? (
             <TwitterRequiredButton

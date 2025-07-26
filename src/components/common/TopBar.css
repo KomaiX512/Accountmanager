@@ -1,23 +1,23 @@
 /* === Apple Glassmorphism Variables === */
 :root {
-  --glass-bg: rgba(20, 20, 30, 0.82);
-  --glass-border: rgba(255,255,255,0.10);
+  --glass-bg: rgba(255, 255, 255, 0.08);
+  --glass-border: rgba(255,255,255,0.15);
   --glass-text: #e0e0ff;
   --glass-accent: #00ffcc;
   --glass-reflection: linear-gradient(90deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.01) 100%);
   --glass-shadow: 0 8px 32px rgba(0,0,0,0.25);
-  --glass-blur: 18px;
+  --glass-blur: 20px;
   --glass-toggle-bg: rgba(255,255,255,0.08);
   --glass-toggle-icon: #fff;
 }
 [data-theme="light"] {
-  --glass-bg: rgba(255,255,255,0.85);
-  --glass-border: rgba(0,0,0,0.08);
+  --glass-bg: rgba(255,255,255,0.08);
+  --glass-border: rgba(0,0,0,0.15);
   --glass-text: #222;
   --glass-accent: #007bff;
-  --glass-reflection: linear-gradient(90deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.01) 100%);
+  --glass-reflection: linear-gradient(90deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.01) 100%);
   --glass-shadow: 0 8px 32px rgba(0,0,0,0.10);
-  --glass-blur: 18px;
+  --glass-blur: 20px;
   --glass-toggle-bg: rgba(0,0,0,0.08);
   --glass-toggle-icon: #222;
 }

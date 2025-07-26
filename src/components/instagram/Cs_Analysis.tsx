@@ -706,6 +706,8 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
 
           {/* Refactor competitor list container to be fixed-size and scrollable */}
           <div className="competitor-list-scrollable">
+            {/* Add heading for competitor list */}
+            <h2 className="competitor-list-heading">Competitors</h2>
             {competitorData.map(({ competitor, fetch }, index) => {
               // ✅ NEW: Check if competitor is in smart loading period
               const isInSmartLoading = isCompetitorInLoadingPeriod(competitor);
@@ -722,6 +724,13 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
                   onMouseEnter={() => handleLoadingTooltipShow(competitor)}
                   onMouseLeave={handleLoadingTooltipHide}
                 >
+                  {/* Add competitor heading and viewed badge */}
+                  <div className="competitor-header-row">
+                    <span className="competitor-name-heading">{competitor}</span>
+                    {selectedCompetitor === competitor && (
+                      <span className="viewed-badge">Viewed</span>
+                    )}
+                  </div>
                   {/* ✅ NEW: Smart loading tooltip */}
                   {showLoadingTooltip === competitor && isInSmartLoading && (
                     <div className="smart-loading-tooltip">

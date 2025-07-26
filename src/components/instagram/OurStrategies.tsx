@@ -97,7 +97,7 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
           whileHover={{ scale: 1.02 }}
           onClick={() => data && setShowPopup(true)}
         >
-          <span className="overlay-text">1. Strategies</span>
+          <span className="overlay-text">Our Strategies</span>
           {loading && (
             <div className="futuristic-loading">
               <span className="loading-text">Analyzing Strategies...</span>

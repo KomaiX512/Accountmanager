@@ -1,27 +1,90 @@
+/* === Apple Glassmorphism Variables === */
+:root {
+  --glass-bg: rgba(20, 20, 30, 0.82);
+  --glass-border: rgba(255,255,255,0.10);
+  --glass-text: #e0e0ff;
+  --glass-accent: #00ffcc;
+  --glass-reflection: linear-gradient(90deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.01) 100%);
+  --glass-shadow: 0 8px 32px rgba(0,0,0,0.25);
+  --glass-blur: 18px;
+  --glass-toggle-bg: rgba(255,255,255,0.08);
+  --glass-toggle-icon: #fff;
+}
+[data-theme="light"] {
+  --glass-bg: rgba(255,255,255,0.85);
+  --glass-border: rgba(0,0,0,0.08);
+  --glass-text: #222;
+  --glass-accent: #007bff;
+  --glass-reflection: linear-gradient(90deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.01) 100%);
+  --glass-shadow: 0 8px 32px rgba(0,0,0,0.10);
+  --glass-blur: 18px;
+  --glass-toggle-bg: rgba(0,0,0,0.08);
+  --glass-toggle-icon: #222;
+}
+
 .top-bar {
   position: fixed !important;
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
-  height: clamp(50px, 5vh, 70px) !important; /* Responsive height */
-  background: rgba(26, 26, 46, 0.95) !important; /* FIXED: More opaque */
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  height: 64px !important;
+  background: var(--glass-bg) !important;
+  border-bottom: 1.5px solid var(--glass-border) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
-  padding-left: clamp(60px, 8vw, 100px) !important; /* Responsive left padding */
-  padding-right: clamp(15px, 3vw, 30px) !important; /* Responsive right padding */
-  z-index: 999999 !important; /* FIXED: Maximum z-index for always visible */
-  transition: all 0.3s ease !important;
-  backdrop-filter: blur(10px) !important;
-  -webkit-backdrop-filter: blur(10px) !important;
+  padding-left: 90px !important;
+  padding-right: 36px !important;
+  z-index: 999999 !important;
+  transition: background 0.3s, border 0.3s, color 0.3s !important;
+  backdrop-filter: blur(var(--glass-blur)) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) !important;
   box-sizing: border-box !important;
-  /* BULLETPROOF STATIC POSITIONING */
-  transform: translateZ(0) !important;
-  will-change: transform !important;
-  /* Additional bulletproof properties */
-  min-height: clamp(50px, 5vh, 70px) !important;
-  max-height: clamp(50px, 5vh, 70px) !important;
+  min-height: 64px !important;
+  max-height: 64px !important;
+  box-shadow: var(--glass-shadow);
+  overflow: visible;
+}
+
+.top-bar::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 100%;
+  pointer-events: none;
+  background: var(--glass-reflection);
+  opacity: 0.7;
+  z-index: 1;
+}
+
+.top-bar * {
+  color: var(--glass-text) !important;
+  background: none;
+}
+
+.color-mode-toggle {
+  margin-left: 18px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--glass-toggle-bg);
+  border: 1.5px solid var(--glass-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s, border 0.2s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+  z-index: 2;
+}
+.color-mode-toggle:hover {
+  background: var(--glass-accent);
+  border-color: var(--glass-accent);
+}
+.color-mode-toggle svg {
+  width: 22px;
+  height: 22px;
+  color: var(--glass-toggle-icon);
+  transition: color 0.2s;
 }
 
 .social-icons {

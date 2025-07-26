@@ -1,47 +1,54 @@
 /* 🔒 BULLETPROOF VIEWPORT LOCK - Maximum CSS specificity and priority */
+/* === Apple Glassmorphism Variables (inherited from :root) === */
 .left-bar,
 div.left-bar,
 motion.div.left-bar,
 .main-content .left-bar,
 .App .left-bar {
   position: fixed !important;
-  top: clamp(50px, 5vh, 70px) !important; /* Responsive top to match TopBar */
+  top: 64px !important;
   left: 0 !important;
-  width: clamp(60px, 6vw, 80px) !important; /* Responsive width */
-  height: calc(100vh - clamp(50px, 5vh, 70px)) !important; /* Responsive height calculation */
-  background: rgba(26, 26, 46, 0.95) !important; /* FIXED: More opaque */
-  border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
-  z-index: 999998 !important; /* FIXED: Just below TopBar but above everything else */
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  backdrop-filter: blur(10px) !important;
-  -webkit-backdrop-filter: blur(10px) !important;
-  /* Ensure always visible when scrolling - professional solution */
+  width: 80px !important;
+  height: calc(100vh - 64px) !important;
+  background: var(--glass-bg) !important;
+  border-right: 1.5px solid var(--glass-border) !important;
+  z-index: 999998 !important;
+  transition: background 0.3s, border 0.3s !important;
+  backdrop-filter: blur(var(--glass-blur)) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) !important;
   transform: translateZ(0) !important;
   will-change: transform !important;
-  /* Lock to viewport - overrides any conflicting styles */
   bottom: 0 !important;
   overflow: visible !important;
-  /* Override any external styles that might interfere */
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
   margin: 0 !important;
   padding: 0 !important;
-  min-width: clamp(60px, 6vw, 80px) !important;
-  max-width: clamp(60px, 6vw, 80px) !important;
+  min-width: 80px !important;
+  max-width: 80px !important;
   box-sizing: border-box !important;
-  /* Additional bulletproof properties */
-  min-height: calc(100vh - clamp(50px, 5vh, 70px)) !important;
-  max-height: calc(100vh - clamp(50px, 5vh, 70px)) !important;
+  min-height: calc(100vh - 64px) !important;
+  max-height: calc(100vh - 64px) !important;
+  box-shadow: var(--glass-shadow);
+}
+.left-bar::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 100%;
+  pointer-events: none;
+  background: var(--glass-reflection);
+  opacity: 0.7;
+  z-index: 1;
 }
 
 .icon-container {
   display: flex;
   flex-direction: column;
-  gap: clamp(15px, 3vw, 20px);
+  gap: 20px;
   width: 100%;
   align-items: center;
-  padding-top: clamp(15px, 3vw, 20px);
+  padding-top: 20px;
   box-sizing: border-box;
 }
 
@@ -50,42 +57,43 @@ motion.div.left-bar,
   flex-direction: column;
   align-items: center;
   background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--glass-border);
   cursor: pointer;
   width: calc(100% - 16px);
-  padding: clamp(8px, 2vw, 10px) 0;
+  padding: 10px 0;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  border-radius: 8px;
+  border-radius: 12px;
   margin: 0 8px;
+  z-index: 2;
 }
-
 .icon-button:hover {
   background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: var(--glass-accent);
   transform: translateY(-1px);
 }
-
 .icon {
-  width: clamp(24px, 4vw, 28px);
-  height: clamp(24px, 4vw, 28px);
-  fill: rgba(255, 255, 255, 0.7);
+  width: 28px;
+  height: 28px;
+  fill: var(--glass-text);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
-
 .icon-button:hover .icon {
-  fill: #ffffff;
+  fill: var(--glass-accent);
 }
-
 .icon-button span {
-  font-size: clamp(10px, 2vw, 12px);
-  margin-top: clamp(4px, 1vw, 6px);
-  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  margin-top: 6px;
+  color: var(--glass-text);
   font-weight: 500;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
-
 .icon-button:hover span {
-  color: #ffffff;
+  color: var(--glass-accent);
+}
+
+.left-bar * {
+  color: var(--glass-text) !important;
+  background: none;
 }
 
 .icon-wrapper {

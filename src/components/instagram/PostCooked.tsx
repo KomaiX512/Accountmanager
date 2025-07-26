@@ -11,7 +11,7 @@ import FacebookRequiredButton from '../common/FacebookRequiredButton';
 import { useInstagram } from '../../context/InstagramContext';
 import { useTwitter } from '../../context/TwitterContext';
 import { useFacebook } from '../../context/FacebookContext';
-import { schedulePost, fetchImageFromR2 } from '../../utils/scheduleHelpers';
+import { schedulePost, fetchImageFromR2, extractImageKey } from '../../utils/scheduleHelpers';
 import axios from 'axios';
 import { safeFilter } from '../../utils/safeArrayUtils';
 import { BsLightbulb } from 'react-icons/bs';
@@ -84,10 +84,34 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   const [showPostNowModal, setShowPostNowModal] = useState(false);
   const [selectedPostForPosting, setSelectedPostForPosting] = useState<any>(null);
   const [isPosting, setIsPosting] = useState(false);
+  
+  // NEW: State for scroll position
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  
+  // NEW: Reference for scrollable container
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Request deduplication to prevent multiple simultaneous API calls
   const requestCache = useRef<Map<string, { promise: Promise<any>; timestamp: number }>>(new Map());
-  const CACHE_DURATION = 30000; // 30 seconds
+  const CACHE_DURATION = 30000;
+  
+  // Handle scroll events to show/hide scroll-to-top button
+  const handleScroll = () => {
+    if (scrollContainerRef.current) {
+      const { scrollTop } = scrollContainerRef.current;
+      setShowScrollTop(scrollTop > 200);
+    }
+  };
+
+  // Scroll to top function
+  const scrollToTop = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    }
+  }; // 30 seconds
   
   // Debounced request function to prevent duplicate API calls
   const deduplicatedRequest = useCallback(async (
@@ -390,7 +414,21 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     };
 
     window.addEventListener('postScheduled', handlePostScheduled as EventListener);
-    return () => window.removeEventListener('postScheduled', handlePostScheduled as EventListener);
+    
+    // 🚀 AUTOPILOT: Listen for auto-schedule trigger from Dashboard
+    const handleAutoScheduleTrigger = (event: CustomEvent) => {
+      if (event.detail?.username === username && event.detail?.platform === platform) {
+        console.log(`[AUTOPILOT] Received auto-schedule trigger for ${username} on ${platform}`);
+        handleAutoSchedule(); // Trigger the existing auto-schedule function
+      }
+    };
+    
+    window.addEventListener('triggerAutoSchedule', handleAutoScheduleTrigger as EventListener);
+    
+    return () => {
+      window.removeEventListener('postScheduled', handlePostScheduled as EventListener);
+      window.removeEventListener('triggerAutoSchedule', handleAutoScheduleTrigger as EventListener);
+    };
   }, [platform, markPostAsProcessed]);
 
   useEffect(() => {
@@ -1124,6 +1162,157 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     }
   };
 
+  // Helper function to extract image key from post data (moved before auto-schedule)
+  const extractImageKey = useCallback((post: any): string | null => {
+    try {
+      let imageKey = '';
+      
+      // Method 1: Extract from post key (most reliable)
+      if (post.key) {
+        // Campaign pattern: campaign_ready_post_1752000987874_9c14f1fd.json -> image_1752000987874_9c14f1fd.jpg
+        if (post.key.includes('campaign_ready_post_') && post.key.endsWith('.json')) {
+          const baseName = post.key.replace(/^.*\/([^\/]+)\.json$/, '$1');
+          imageKey = `${baseName}.jpg`;
+        }
+        // Regular pattern: ready_post_1234567890.json -> image_1234567890.jpg
+        else if (post.key.match(/ready_post_\d+\.json$/)) {
+          const postIdMatch = post.key.match(/ready_post_(\d+)\.json$/);
+          if (postIdMatch) {
+            imageKey = `image_${postIdMatch[1]}.jpg`;
+          }
+        }
+      }
+      
+      // Method 2: Extract from image URL if available
+      if (!imageKey && post.data?.image_url) {
+        const urlMatch = post.data.image_url.match(/(image_\d+\.jpg)/);
+        if (urlMatch) {
+          imageKey = urlMatch[1];
+        }
+      }
+      
+      console.log(`[PostCooked] 🔑 Extracted imageKey: ${imageKey} from post key: ${post.key}`);
+      return imageKey || null;
+    } catch (error) {
+      console.error(`[PostCooked] ❌ Error extracting imageKey:`, error);
+      return null;
+    }
+  }, []);
+
+  // Enhanced image fetching with comprehensive error handling and fallbacks (moved before auto-schedule)
+  const fetchImageBlob = useCallback(async (post: any, purpose: string = 'general'): Promise<Blob | null> => {
+    try {
+      const imageKey = extractImageKey(post);
+      if (!imageKey) {
+        throw new Error('Could not determine image key for post');
+      }
+      
+      console.log(`[PostCooked] 📤 Fetching image for ${purpose}: ${imageKey}`);
+      
+      // Try multiple endpoints with fallbacks
+      const endpoints = [
+        // Primary: Direct R2 endpoint with cache busting
+        `${API_BASE_URL}/api/r2-image/${username}/${imageKey}?platform=${platform}&t=${Date.now()}&purpose=${purpose}`,
+        // Fallback 1: Fix-image endpoint
+        `${API_BASE_URL}/fix-image/${username}/${imageKey}?platform=${platform}`,
+        // Fallback 2: Direct R2 without cache busting
+        `${API_BASE_URL}/api/r2-image/${username}/${imageKey}?platform=${platform}`
+      ];
+      
+      let lastError: Error | null = null;
+      
+      for (let i = 0; i < endpoints.length; i++) {
+        const endpoint = endpoints[i];
+        console.log(`[PostCooked] 🎯 Trying endpoint ${i + 1}/${endpoints.length}: ${endpoint}`);
+        
+        try {
+          const response = await fetch(endpoint, {
+            method: 'GET',
+            headers: {
+              'Accept': 'image/*,*/*',
+              'Cache-Control': purpose === 'postNow' ? 'no-cache' : 'default'
+            }
+          });
+          
+          console.log(`[PostCooked] 📊 Response ${i + 1}: Status ${response.status}, Content-Type: ${response.headers.get('content-type')}`);
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          
+          // Check content type
+          const contentType = response.headers.get('content-type') || '';
+          if (!contentType.startsWith('image/') && !contentType.includes('octet-stream')) {
+            if (contentType.includes('text/html')) {
+              const htmlContent = await response.text();
+              console.warn(`[PostCooked] ⚠️ Endpoint ${i + 1} returned HTML (probably error page): ${htmlContent.substring(0, 200)}...`);
+              throw new Error(`Invalid content type: ${contentType} (HTML error page)`);
+            }
+            throw new Error(`Invalid content type: ${contentType}. Expected image data.`);
+          }
+          
+          const imageBlob = await response.blob();
+          
+          // Validate image blob
+          if (!imageBlob || imageBlob.size === 0) {
+            throw new Error('Empty image blob received');
+          }
+          
+          if (imageBlob.size < 100) {
+            throw new Error(`Image too small: ${imageBlob.size} bytes (likely corrupted)`);
+          }
+          
+          // Check blob type
+          if (!['image/jpeg', 'image/png', 'image/webp', 'application/octet-stream'].includes(imageBlob.type)) {
+            console.warn(`[PostCooked] ⚠️ Unusual blob type: ${imageBlob.type}, but proceeding`);
+          }
+          
+          console.log(`[PostCooked] ✅ Image fetched successfully from endpoint ${i + 1}: ${imageBlob.size} bytes, type: ${imageBlob.type}`);
+          return imageBlob;
+          
+        } catch (endpointError: any) {
+          console.warn(`[PostCooked] ⚠️ Endpoint ${i + 1} failed: ${endpointError.message}`);
+          lastError = endpointError;
+          continue;
+        }
+      }
+      
+      // All endpoints failed
+      throw new Error(`All ${endpoints.length} endpoints failed. Last error: ${lastError?.message || 'Unknown error'}`);
+      
+    } catch (error: any) {
+      console.error(`[PostCooked] ❌ Image fetch failed for ${purpose}:`, error.message);
+      return null;
+    }
+  }, [username, platform, extractImageKey]);
+
+  // Helper function to refresh posts data
+  const handleRefreshPosts = useCallback(async () => {
+    if (!username || isRefreshing) return;
+    
+    setIsRefreshing(true);
+    try {
+      const response = await axios.get(`${API_BASE_URL}/posts/${username}?platform=${platform}&nocache=${Date.now()}`, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        },
+        timeout: 10000
+      });
+      
+      setLocalPosts(response.data);
+      setImageErrors({});
+      setImageRefreshKey(prev => prev + 1);
+      console.log(`[PostCooked] ✅ Manually refreshed ${response.data.length} posts`);
+      setToastMessage('✅ Posts refreshed successfully!');
+    } catch (error: any) {
+      console.error('[PostCooked] Error refreshing posts:', error);
+      setToastMessage('❌ Failed to refresh posts. Please try again.');
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [username, platform, isRefreshing]);
+
   const handleAutoSchedule = async (intervalOverride?: number) => {
     if (!userId || !localPosts.length) {
       setToastMessage('❌ No user ID or posts to schedule.');
@@ -1136,11 +1325,27 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       return;
     }
 
+    // 🚫 CRITICAL FIX 1: Prevent multiple simultaneous auto-schedule operations
+    if (autoScheduling) {
+      setToastMessage('⚠️ Auto-scheduling already in progress. Please wait...');
+      return;
+    }
+
+    // 🚫 CRITICAL FIX 2: Filter out already processed/scheduled posts BEFORE scheduling
+    const filteredPosts = getFilteredPosts();
+    
+    if (filteredPosts.length === 0) {
+      setToastMessage('✅ All posts are already processed. No posts available for scheduling.');
+      return;
+    }
+
+    console.log(`[AutoSchedule] 🔍 Filtered posts: ${filteredPosts.length} unprocessed out of ${localPosts.length} total posts`);
+
     setAutoScheduling(true);
     setAutoScheduleProgress('🔍 Determining scheduling interval...');
     
-    // ✨ ENHANCED: Initialize comprehensive progress tracking
-    const totalPosts = localPosts.length;
+    // ✨ ENHANCED: Initialize comprehensive progress tracking with FILTERED posts
+    const totalPosts = filteredPosts.length;
     setAutoScheduleTracking({
       current: 0,
       total: totalPosts,
@@ -1168,10 +1373,19 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       console.log(`[AutoSchedule] ⏰ Using interval: ${delayHours} hours`);
       setAutoScheduleProgress(`⏰ Scheduling ${totalPosts} ${platform === 'twitter' ? 'tweets' : 'posts'} every ${delayHours} hours...`);
       
-      // ENHANCED SCHEDULING LOOP with real-time progress tracking
-      for (let i = 0; i < localPosts.length; i++) {
-        const post = localPosts[i];
+      // 🚫 CRITICAL FIX 3: Process only FILTERED posts to prevent duplicates
+      for (let i = 0; i < filteredPosts.length; i++) {
+        const post = filteredPosts[i];
         const postNumber = i + 1;
+        
+        // 🚫 CRITICAL FIX 4: Skip if post is already being processed or was processed
+        if (processedPosts.has(post.key) || processedPostKeys.includes(post.key)) {
+          console.log(`[AutoSchedule] ⚠️ Skipping already processed post: ${post.key}`);
+          continue;
+        }
+        
+        // 🚫 CRITICAL FIX 5: Immediately mark as being processed to prevent race conditions
+        markPostAsProcessed(post.key, 'auto-schedule-in-progress');
         
         // ✨ ENHANCED: Update progress tracking in real-time
         setAutoScheduleTracking(prev => ({
@@ -1187,7 +1401,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         const baseTime = Date.now() + 60 * 1000; // Start 1 minute from now
         const scheduleTime = new Date(baseTime + (i * delayHours * 60 * 60 * 1000));
         
-        console.log(`[AutoSchedule] 📅 Post ${postNumber} scheduled for: ${scheduleTime.toISOString()}`);
+        console.log(`[AutoSchedule] 📅 Post ${postNumber} (${post.key}) scheduled for: ${scheduleTime.toISOString()}`);
         
         try {
           if (platform === 'twitter') {
@@ -1297,16 +1511,26 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
               body: formData,
             });
 
+            // 🚫 CRITICAL FIX: Handle duplicate scheduling errors gracefully
             if (!resp.ok) {
               const errData = await resp.json().catch(() => ({}));
-              throw new Error(errData.error || `HTTP ${resp.status}: ${resp.statusText}`);
+              
+              // Handle duplicate error specifically
+              if (resp.status === 409 && errData.error === 'Duplicate schedule detected') {
+                console.log(`[AutoSchedule] ⚠️ Post ${postNumber}: Duplicate schedule detected, marking as processed`);
+                processedPostKeys.push(post.key);
+                successCount++; // Count as success since it's already scheduled
+                setToastMessage(`⚠️ Post ${postNumber}: Already scheduled (duplicate prevented)`);
+              } else {
+                throw new Error(errData.error || `HTTP ${resp.status}: ${resp.statusText}`);
+              }
+            } else {
+              const respData = await resp.json();
+              console.log(`[AutoSchedule] ✅ Instagram post ${postNumber} scheduled successfully:`, respData.scheduleId);
+              successCount++;
+              processedPostKeys.push(post.key);
+              setToastMessage(`✅ Instagram post ${postNumber} scheduled for ${scheduleTime.toLocaleString()}`);
             }
-
-            const respData = await resp.json();
-            console.log(`[AutoSchedule] ✅ Instagram post ${postNumber} scheduled successfully:`, respData.scheduleId);
-            successCount++;
-            processedPostKeys.push(post.key);
-            setToastMessage(`✅ Instagram post ${postNumber} scheduled for ${scheduleTime.toLocaleString()}`);
           }
           
         } catch (postError: any) {
@@ -1414,40 +1638,6 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       key: key,
       caption: post.data.post?.caption || ''
     });
-  };
-
-  const handleRefreshPosts = async () => {
-    if (!username) return;
-    
-    setIsRefreshing(true);
-    setToastMessage('Refreshing posts...');
-    
-    try {
-      const platformParam = platform ? `&platform=${platform}` : '';
-      const realTimeTimestamp = Date.now();
-      const cacheKey = `refresh_posts_${username}_${platform}_${realTimeTimestamp}`;
-      
-      // REAL-TIME REQUEST: Always bypass cache with multiple parameters
-      const response = await deduplicatedRequest(
-        cacheKey,
-        () => axios.get(`${API_BASE_URL}/posts/${username}?forceRefresh=true${platformParam}&realtime=${realTimeTimestamp}&nocache=1&v=${Math.random()}`, {
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
-          }
-        }),
-        false // Don't cache forced refresh requests
-      );
-      
-      setLocalPosts(response.data);
-      setToastMessage('Posts refreshed successfully!');
-    } catch (error) {
-      console.error('Error refreshing posts:', error);
-      setToastMessage('Failed to refresh posts. Please try again.');
-    } finally {
-      setIsRefreshing(false);
-    }
   };
 
   const handlePostNow = async (post: any) => {
@@ -1701,160 +1891,6 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     console.log(`[PostNow] 🏁 PostNow process completed (attempts: ${retryCount + 1})`);
   };
 
-  // Enhanced image key extraction with better fallbacks and validation
-  const extractImageKey = useCallback((post: any): string | null => {
-    try {
-      // Method 1: Extract from post key (most reliable)
-      if (post.key && post.key.match(/ready_post_\d+\.json$/)) {
-        const postIdMatch = post.key.match(/ready_post_(\d+)\.json$/);
-        if (postIdMatch) {
-          const imageId = postIdMatch[1];
-          
-          // Determine the correct extension from post data
-          let extension = 'jpg'; // Default
-          if (post.data?.image_path) {
-            const pathMatch = post.data.image_path.match(/\.(jpg|jpeg|png|webp)$/i);
-            if (pathMatch) extension = pathMatch[1].toLowerCase();
-          } else if (post.data?.image_url) {
-            const urlMatch = post.data.image_url.match(/\.(jpg|jpeg|png|webp)(\?|$)/i);
-            if (urlMatch) extension = urlMatch[1].toLowerCase();
-          } else if (post.data?.r2_image_url) {
-            const urlMatch = post.data.r2_image_url.match(/\.(jpg|jpeg|png|webp)(\?|$)/i);
-            if (urlMatch) extension = urlMatch[1].toLowerCase();
-          }
-          
-          const imageKey = `image_${imageId}.${extension}`;
-          console.log(`[PostCooked] 🔑 Extracted imageKey from post key: ${imageKey}`);
-          return imageKey;
-        }
-      }
-      
-      // Method 2: Extract from existing image URLs
-      const imageUrl = post.data.image_url || post.data.r2_image_url || '';
-      if (imageUrl) {
-        // Handle both direct R2 URLs and our proxy URLs with multiple formats
-        const urlPatterns = [
-          /(image_\d+\.(jpg|jpeg|png|webp))/i,    // Direct filename match with extension
-          /\/([^\/]+\.(jpg|jpeg|png|webp))$/i,    // Last segment ending in image extension
-          /image_(\d+)/                           // Image ID pattern (fallback)
-        ];
-        
-        for (const pattern of urlPatterns) {
-          const match = imageUrl.match(pattern);
-          if (match) {
-            let imageKey = match[1];
-            // If we only got the ID, format it properly with detected extension
-            if (pattern.source.includes('image_(\\d+)') && !imageKey.includes('.')) {
-              // Try to detect extension from URL
-              let extension = 'jpg'; // Default
-              const extMatch = imageUrl.match(/\.(jpg|jpeg|png|webp)(\?|$)/i);
-              if (extMatch) extension = extMatch[1].toLowerCase();
-              imageKey = `image_${imageKey}.${extension}`;
-            }
-            console.log(`[PostCooked] 🔑 Extracted imageKey from URL: ${imageKey}`);
-            return imageKey;
-          }
-        }
-      }
-      
-      console.warn(`[PostCooked] ⚠️ Could not extract imageKey for post ${post.key}`);
-      return null;
-    } catch (error) {
-      console.error(`[PostCooked] ❌ Error extracting imageKey:`, error);
-      return null;
-    }
-  }, []);
-
-  // Enhanced image fetching with comprehensive error handling and fallbacks
-  const fetchImageBlob = useCallback(async (post: any, purpose: string = 'general'): Promise<Blob | null> => {
-    try {
-      const imageKey = extractImageKey(post);
-      if (!imageKey) {
-        throw new Error('Could not determine image key for post');
-      }
-      
-      console.log(`[PostCooked] 📤 Fetching image for ${purpose}: ${imageKey}`);
-      
-      // Try multiple endpoints with fallbacks
-      const endpoints = [
-        // Primary: Direct R2 endpoint with cache busting
-        `${API_BASE_URL}/api/r2-image/${username}/${imageKey}?platform=${platform}&t=${Date.now()}&purpose=${purpose}`,
-        // Fallback 1: Fix-image endpoint
-        `${API_BASE_URL}/fix-image/${username}/${imageKey}?platform=${platform}`,
-        // Fallback 2: Direct R2 without cache busting
-        `${API_BASE_URL}/api/r2-image/${username}/${imageKey}?platform=${platform}`
-      ];
-      
-      let lastError: Error | null = null;
-      
-      for (let i = 0; i < endpoints.length; i++) {
-        const endpoint = endpoints[i];
-        console.log(`[PostCooked] 🎯 Trying endpoint ${i + 1}/${endpoints.length}: ${endpoint}`);
-        
-        try {
-                     const response = await fetch(endpoint, {
-             method: 'GET',
-             headers: {
-               'Accept': 'image/*,*/*',
-               'Cache-Control': purpose === 'postNow' ? 'no-cache' : 'default'
-             }
-           });
-          
-          console.log(`[PostCooked] 📊 Response ${i + 1}: Status ${response.status}, Content-Type: ${response.headers.get('content-type')}`);
-          
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-          }
-          
-          // Check content type
-          const contentType = response.headers.get('content-type') || '';
-          if (!contentType.startsWith('image/') && !contentType.includes('octet-stream')) {
-            // If we get HTML or text, log it for debugging but try next endpoint
-            if (contentType.includes('text/html')) {
-              const htmlContent = await response.text();
-              console.warn(`[PostCooked] ⚠️ Endpoint ${i + 1} returned HTML (probably error page): ${htmlContent.substring(0, 200)}...`);
-              throw new Error(`Invalid content type: ${contentType} (HTML error page)`);
-            }
-            throw new Error(`Invalid content type: ${contentType}. Expected image data.`);
-          }
-          
-          const imageBlob = await response.blob();
-          
-          // Validate image blob
-          if (!imageBlob || imageBlob.size === 0) {
-            throw new Error('Empty image blob received');
-          }
-          
-          if (imageBlob.size < 100) {
-            throw new Error(`Image too small: ${imageBlob.size} bytes (likely corrupted)`);
-          }
-          
-          // Check blob type
-          if (!['image/jpeg', 'image/png', 'image/webp', 'application/octet-stream'].includes(imageBlob.type)) {
-            console.warn(`[PostCooked] ⚠️ Unusual blob type: ${imageBlob.type}, but proceeding`);
-          }
-          
-          console.log(`[PostCooked] ✅ Image fetched successfully from endpoint ${i + 1}: ${imageBlob.size} bytes, type: ${imageBlob.type}`);
-          return imageBlob;
-          
-        } catch (endpointError: any) {
-          console.warn(`[PostCooked] ⚠️ Endpoint ${i + 1} failed: ${endpointError.message}`);
-          lastError = endpointError;
-          
-          // Don't wait between endpoint attempts
-          continue;
-        }
-      }
-      
-      // All endpoints failed
-      throw new Error(`All ${endpoints.length} endpoints failed. Last error: ${lastError?.message || 'Unknown error'}`);
-      
-    } catch (error: any) {
-      console.error(`[PostCooked] ❌ Image fetch failed for ${purpose}:`, error.message);
-      return null;
-    }
-  }, [username, platform, extractImageKey]);
-
   if (!username) {
     return (
       <ErrorBoundary>
@@ -1874,64 +1910,54 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       <ErrorBoundary>
         <div className="post-cooked-container">
         <div className="post-cooked-header">
-          <h2>
-            <div className="section-header">
-              <BsLightbulb className="section-icon" />
-              <span>Cooked Posts</span>
-              {getUnseenPostsCount() > 0 ? (
-                <div className="content-badge" onClick={markPostsAsViewed}>
-                  <FaBell className="badge-icon" />
-                  <span className="badge-count">{getUnseenPostsCount()}</span>
-                </div>
-              ) : (
-                <div className="content-badge viewed">
-                  <FaBell className="badge-icon" />
-                  <span className="badge-text">Viewed</span>
-                </div>
-              )}
-            </div>
-          </h2>
-          <button 
-            className="refresh-button"
-            onClick={handleRefreshPosts}
-            disabled={isRefreshing}
-          >
-            {isRefreshing ? (
-              <div className="refresh-spinner"></div>
+          <div className="section-header">
+            <BsLightbulb className="section-icon" />
+            <span>Cooked Posts</span>
+            {getUnseenPostsCount() > 0 ? (
+              <div className="content-badge minimal-badge" onClick={markPostsAsViewed}>
+                <FaBell className="badge-icon" />
+                <span className="badge-count">{getUnseenPostsCount()}</span>
+              </div>
             ) : (
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
-              </svg>
+              <div className="content-badge minimal-badge viewed">
+                <FaBell className="badge-icon" />
+                <span className="badge-text">Viewed</span>
+              </div>
             )}
-            {isRefreshing ? 'Refreshing...' : 'Refresh'}
-          </button>
+            <button 
+              className="refresh-button minimal-refresh"
+              onClick={handleRefreshPosts}
+              disabled={isRefreshing}
+              aria-label="Refresh posts"
+            >
+              {isRefreshing ? (
+                <div className="refresh-spinner"></div>
+              ) : (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="refresh-icon"
+                >
+                  <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                </svg>
+              )}
+            </button>
+          </div>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+        <div className="auto-schedule-row">
           {platform === 'twitter' ? (
             <TwitterRequiredButton
               isConnected={isConnected}
               onClick={() => setShowIntervalModal(true)}
-              className="twitter-btn connect"
+              className="minimal-auto-schedule-btn twitter"
               disabled={!filteredPosts.length || autoScheduling}
-              style={{ 
-                background: 'linear-gradient(90deg, #1da1f2, #00acee)', 
-                color: '#ffffff', 
-                cursor: filteredPosts.length ? 'pointer' : 'not-allowed', 
-                borderRadius: 8, 
-                padding: '8px 16px', 
-                border: '1px solid #1da1f2',
-                opacity: filteredPosts.length ? 1 : 0.5
-              }}
             >
               {autoScheduling ? 'Auto-Scheduling...' : 'Auto-Schedule All'}
             </TwitterRequiredButton>
@@ -1939,17 +1965,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             <FacebookRequiredButton
               isConnected={isConnected}
               onClick={() => setShowIntervalModal(true)}
-              className="facebook-btn connect"
+              className="minimal-auto-schedule-btn facebook"
               disabled={!filteredPosts.length || autoScheduling}
-              style={{ 
-                background: 'linear-gradient(90deg, #3b5998, #4267b2)', 
-                color: '#ffffff', 
-                cursor: filteredPosts.length ? 'pointer' : 'not-allowed', 
-                borderRadius: 8, 
-                padding: '8px 16px', 
-                border: '1px solid #3b5998',
-                opacity: filteredPosts.length ? 1 : 0.5
-              }}
             >
               {autoScheduling ? 'Auto-Scheduling...' : 'Auto-Schedule All'}
             </FacebookRequiredButton>
@@ -1957,17 +1974,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             <InstagramRequiredButton
               isConnected={isConnected}
               onClick={() => setShowIntervalModal(true)}
-              className="insta-btn connect"
+              className="minimal-auto-schedule-btn instagram"
               disabled={!filteredPosts.length || autoScheduling}
-              style={{ 
-                background: 'linear-gradient(90deg, #007bff, #00ffcc)', 
-                color: '#e0e0ff', 
-                cursor: filteredPosts.length ? 'pointer' : 'not-allowed', 
-                borderRadius: 8, 
-                padding: '8px 16px', 
-                border: '1px solid #00ffcc',
-                opacity: filteredPosts.length ? 1 : 0.5
-              }}
             >
               {autoScheduling ? 'Auto-Scheduling...' : 'Auto-Schedule All'}
             </InstagramRequiredButton>
@@ -2127,8 +2135,13 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         {filteredPosts.length === 0 ? (
           <p className="no-posts">No posts ready yet. Stay tuned!</p>
         ) : (
-          <div className="post-list">
-            {filteredPosts.map((post) => (
+          <div 
+            className="posts-scroll-container" 
+            ref={scrollContainerRef}
+            onScroll={handleScroll}
+          >
+            <div className="post-list">
+              {filteredPosts.map((post) => (
               <motion.div
                 key={post.key}
                 className="post-card"
@@ -2185,20 +2198,20 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                       />
                     );
                   })()}
-                  <div className="post-actions">
+                  <div className="interaction-icons">
                     <motion.button
-                      className="like-button"
+                      className="interaction-icon like-button"
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={() => handleLike()}
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        width="24"
-                        height="24"
+                        width="16"
+                        height="16"
                         viewBox="0 0 24 24"
                         fill="none"
-                        stroke="#000000"
+                        stroke="currentColor"
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -2207,18 +2220,18 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                       </svg>
                     </motion.button>
                     <motion.button
-                      className="comment-button"
+                      className="interaction-icon comment-button"
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={() => handleComment()}
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        width="24"
-                        height="24"
+                        width="16"
+                        height="16"
                         viewBox="0 0 24 24"
                         fill="none"
-                        stroke="#000000"
+                        stroke="currentColor"
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -2227,18 +2240,18 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                       </svg>
                     </motion.button>
                     <motion.button
-                      className="share-button"
+                      className="interaction-icon share-button"
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={() => handleShare()}
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        width="24"
-                        height="24"
+                        width="16"
+                        height="16"
                         viewBox="0 0 24 24"
                         fill="none"
-                        stroke="#000000"
+                        stroke="currentColor"
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -2251,18 +2264,18 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                       </svg>
                     </motion.button>
                     <motion.button
-                      className="dislike-button"
+                      className="interaction-icon dislike-button"
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={() => handleDislike(post.key)}
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        width="24"
-                        height="24"
+                        width="16"
+                        height="16"
                         viewBox="0 0 24 24"
                         fill="none"
-                        stroke="#ff4444"
+                        stroke="currentColor"
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -2271,35 +2284,22 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                       </svg>
                     </motion.button>
                   </div>
-                  <div className="post-control-buttons">
+                  <div className="post-actions">
+                    <div className="post-control-buttons">
                     {platform === 'twitter' ? (
                       <TwitterRequiredButton
                         isConnected={isConnected}
                         onClick={() => handleScheduleClick(post.key)}
                         className="schedule-button"
-                        style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '5px', 
-                          backgroundColor: '#1da1f2', 
-                          color: '#ffffff',
-                          border: 'none',
-                          padding: '8px 12px',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          fontWeight: 'bold',
-                          transition: 'all 0.2s ease'
-                        }}
                         notificationPosition="bottom"
                       >
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
-                          width="16"
-                          height="16"
+                          width="12"
+                          height="12"
                           viewBox="0 0 24 24"
                           fill="none"
-                          stroke="#ffffff"
+                          stroke="currentColor"
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
@@ -2314,29 +2314,15 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                         isConnected={isConnected}
                         onClick={() => handleScheduleClick(post.key)}
                         className="schedule-button"
-                        style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '5px', 
-                          backgroundColor: '#3b5998', 
-                          color: '#ffffff',
-                          border: 'none',
-                          padding: '8px 12px',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          fontWeight: 'bold',
-                          transition: 'all 0.2s ease'
-                        }}
                         notificationPosition="bottom"
                       >
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
-                          width="16"
-                          height="16"
+                          width="12"
+                          height="12"
                           viewBox="0 0 24 24"
                           fill="none"
-                          stroke="#ffffff"
+                          stroke="currentColor"
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
@@ -2351,29 +2337,15 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                         isConnected={isConnected}
                         onClick={() => handleScheduleClick(post.key)}
                         className="schedule-button"
-                        style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '5px', 
-                          backgroundColor: '#007bff', 
-                          color: '#e0e0ff',
-                          border: 'none',
-                          padding: '8px 12px',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          fontWeight: 'bold',
-                          transition: 'all 0.2s ease'
-                        }}
                         notificationPosition="bottom"
                       >
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
-                          width="16"
-                          height="16"
+                          width="12"
+                          height="12"
                           viewBox="0 0 24 24"
                           fill="none"
-                          stroke="#e0e0ff"
+                          stroke="currentColor"
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
@@ -2392,11 +2364,11 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
+                        width="12"
+                        height="12"
                         viewBox="0 0 24 24"
                         fill="none"
-                        stroke="#e0e0ff"
+                        stroke="currentColor"
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -2412,20 +2384,6 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={() => handlePostNow(post)}
-                        style={{
-                          background: 'linear-gradient(45deg, #405DE6, #5851DB, #833AB4, #C13584, #E1306C, #FD1D1D)',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '8px',
-                          padding: '8px 16px',
-                          fontSize: '12px',
-                          fontWeight: 'bold',
-                          cursor: 'pointer',
-                          marginLeft: '8px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}
                       >
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
@@ -2452,11 +2410,11 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
+                        width="12"
+                        height="12"
                         viewBox="0 0 24 24"
                         fill="none"
-                        stroke="#ff4444"
+                        stroke="currentColor"
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -2466,6 +2424,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                       </svg>
                       Reject
                     </motion.button>
+                  </div>
                   </div>
                   <div className="post-caption">
                     <span className="username">{username}</span>{' '}
@@ -2505,11 +2464,11 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                         >
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
-                            width="14"
-                            height="14"
+                            width="12"
+                            height="12"
                             viewBox="0 0 24 24"
                             fill="none"
-                            stroke="#00ffcc"
+                            stroke="currentColor"
                             strokeWidth="2"
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -2547,6 +2506,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                 </div>
               </motion.div>
             ))}
+            </div>
           </div>
         )}
         {isFeedbackOpen && (
@@ -2609,6 +2569,19 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             </svg>
             {toastMessage}
           </motion.div>
+        )}
+        
+        {/* Scroll to top button */}
+        {showScrollTop && filteredPosts.length > 5 && (
+          <button 
+            className="scroll-to-top-btn"
+            onClick={scrollToTop}
+            title="Scroll to top"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M7 14l5-5 5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
         )}
         </div>
       </ErrorBoundary>

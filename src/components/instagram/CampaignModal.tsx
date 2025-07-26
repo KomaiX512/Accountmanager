@@ -38,6 +38,9 @@ interface AutopilotSettings {
   autoSchedule: boolean;
   autoReply: boolean;
   lastChecked?: string;
+  autoScheduleInterval?: number; // in minutes
+  scheduledPostsCount?: number;
+  autoRepliesCount?: number;
 }
 
 const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isConnected, onClose, onCampaignStopped }) => {
@@ -54,9 +57,14 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
   const [autopilotSettings, setAutopilotSettings] = useState<AutopilotSettings>({
     enabled: false,
     autoSchedule: false,
-    autoReply: false
+    autoReply: false,
+    autoScheduleInterval: 60, // default 1 hour
+    scheduledPostsCount: 0,
+    autoRepliesCount: 0
   });
   const [autopilotLoading, setAutopilotLoading] = useState(false);
+  const [autoScheduleActive, setAutoScheduleActive] = useState(false);
+  const [autoReplyActive, setAutoReplyActive] = useState(false);
 
   useEffect(() => {
     fetchCampaignData();
@@ -72,8 +80,12 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
     
     return () => {
       clearInterval(intervalId);
+      // Note: Autopilot interval cleanup now handled by Dashboard service
     };
   }, [username, platform, isStopping]);
+
+  // 🚀 AUTOPILOT: Note - Interval management moved to Dashboard for global operation
+  // Intervals now run independently of Campaign Modal being open
 
   // 🚀 AUTOPILOT: Fetch current automation settings
   const fetchAutopilotSettings = async () => {
@@ -83,8 +95,18 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
         setAutopilotSettings(response.data);
       }
     } catch (err: any) {
-      // If autopilot settings don't exist yet, that's okay - use defaults
-      if (err.response?.status !== 404) {
+      // If autopilot settings don't exist yet, that's okay - use fresh defaults for new campaign
+      if (err.response?.status === 404) {
+        console.log(`[CampaignModal] No existing autopilot settings found - using fresh defaults for new campaign`);
+        setAutopilotSettings({
+          enabled: false,
+          autoSchedule: false,
+          autoReply: false,
+          autoScheduleInterval: 60,
+          scheduledPostsCount: 0,  // ✅ FRESH START
+          autoRepliesCount: 0      // ✅ FRESH START
+        });
+      } else {
         console.warn('Error fetching autopilot settings:', err);
       }
     }
@@ -192,24 +214,82 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
     });
   };
 
-  // 🚀 AUTOPILOT: Toggle auto-schedule feature
-  const handleAutoScheduleToggle = async () => {
-    if (!autopilotSettings.enabled) return; // Can't toggle if autopilot is off
+  // 🚀 AUTOPILOT: Update auto-schedule interval
+  const handleIntervalChange = async (newInterval: number) => {
+    await updateAutopilotSettings({ autoScheduleInterval: newInterval });
+  };
+
+  // 🚀 AUTOPILOT: Button triggering functions
+  const triggerAutoScheduleButton = () => {
+    if (!autopilotSettings.autoSchedule || !isConnected) return;
+    
+    // Dispatch event to trigger the Auto Schedule button in PostCooked component
+    window.dispatchEvent(new CustomEvent('triggerAutoSchedule', {
+      detail: { 
+        username, 
+        platform: platform.toLowerCase(),
+        interval: autopilotSettings.autoScheduleInterval || 60
+      }
+    }));
+    
+    console.log(`[CampaignModal] Triggered auto-schedule for ${username} on ${platform}`);
+    
+    // Update counter
+    setAutopilotSettings(prev => ({
+      ...prev,
+      scheduledPostsCount: (prev.scheduledPostsCount || 0) + 1
+    }));
+  };
+
+  const triggerAutoReplyButton = () => {
+    if (!autopilotSettings.autoReply || !isConnected) return;
+    
+    // Dispatch event to trigger the Auto Reply All button in Dashboard component
+    window.dispatchEvent(new CustomEvent('triggerAutoReply', {
+      detail: { 
+        username, 
+        platform: platform.toLowerCase()
+      }
+    }));
+    
+    console.log(`[CampaignModal] Triggered auto-reply for ${username} on ${platform}`);
+    
+    // Update counter
+    setAutopilotSettings(prev => ({
+      ...prev,
+      autoRepliesCount: (prev.autoRepliesCount || 0) + 1
+    }));
+  };
+
+  // 🚀 AUTOPILOT: Note - Interval functions removed - now handled globally by Dashboard service
+
+  // 🚀 AUTOPILOT: Enhanced toggle functions - intervals managed globally by Dashboard
+  const handleAutoScheduleToggleWithInterval = async () => {
+    if (!autopilotSettings.enabled) return;
     if (!isConnected) {
       setError('Account connection required for auto-scheduling.');
       return;
     }
-    await updateAutopilotSettings({ autoSchedule: !autopilotSettings.autoSchedule });
+    
+    const newAutoSchedule = !autopilotSettings.autoSchedule;
+    await updateAutopilotSettings({ autoSchedule: newAutoSchedule });
+    
+    // Note: Interval management is now handled globally by Dashboard service
+    console.log(`[CampaignModal] Auto-schedule ${newAutoSchedule ? 'enabled' : 'disabled'} - Dashboard service will handle intervals`);
   };
 
-  // 🚀 AUTOPILOT: Toggle auto-reply feature  
-  const handleAutoReplyToggle = async () => {
-    if (!autopilotSettings.enabled) return; // Can't toggle if autopilot is off
+  const handleAutoReplyToggleWithInterval = async () => {
+    if (!autopilotSettings.enabled) return;
     if (!isConnected) {
       setError('Account connection required for auto-replies.');
       return;
     }
-    await updateAutopilotSettings({ autoReply: !autopilotSettings.autoReply });
+    
+    const newAutoReply = !autopilotSettings.autoReply;
+    await updateAutopilotSettings({ autoReply: newAutoReply });
+    
+    // Note: Interval management is now handled globally by Dashboard service
+    console.log(`[CampaignModal] Auto-reply ${newAutoReply ? 'enabled' : 'disabled'} - Dashboard service will handle intervals`);
   };
 
   const handleStopCampaign = () => {
@@ -237,6 +317,28 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
       
       if (response.data.success) {
         console.log('[CampaignModal] Campaign stopped successfully:', response.data);
+        
+        // 🚀 AUTOPILOT RESET: Reset autopilot settings and counters when campaign stops
+        setAutopilotSettings({
+          enabled: false,
+          autoSchedule: false,
+          autoReply: false,
+          autoScheduleInterval: 60, // Reset to default
+          scheduledPostsCount: 0,   // ✅ RESET COUNTERS
+          autoRepliesCount: 0       // ✅ RESET COUNTERS
+        });
+        
+        // Stop any running intervals
+        if ((window as any).autoScheduleInterval) {
+          clearInterval((window as any).autoScheduleInterval);
+          setAutoScheduleActive(false);
+        }
+        if ((window as any).autoReplyInterval) {
+          clearInterval((window as any).autoReplyInterval);
+          setAutoReplyActive(false);
+        }
+        
+        console.log(`[CampaignModal] ✅ Autopilot settings and counters reset for new campaign`);
         
         // Dispatch event to notify dashboard components first
         window.dispatchEvent(new CustomEvent('campaignStopped', { 
@@ -501,80 +603,213 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
                       <p style={{ color: '#a0a0cc', margin: 0, fontSize: '11px' }}>
                         • Auto-Schedule: Maintains smart posting intervals
                       </p>
+                      
+                      {/* Manual Trigger Buttons for Testing */}
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(138, 43, 226, 0.2)' }}>
+                        <button
+                          onClick={triggerAutoScheduleButton}
+                          disabled={!autopilotSettings.autoSchedule || !isConnected}
+                          style={{
+                            padding: '4px 8px',
+                            fontSize: '10px',
+                            background: 'rgba(0, 255, 204, 0.2)',
+                            border: '1px solid rgba(0, 255, 204, 0.3)',
+                            color: '#00ffcc',
+                            borderRadius: '4px',
+                            cursor: autopilotSettings.autoSchedule && isConnected ? 'pointer' : 'not-allowed',
+                            opacity: autopilotSettings.autoSchedule && isConnected ? 1 : 0.5
+                          }}
+                        >
+                          📅 Trigger Schedule
+                        </button>
+                        <button
+                          onClick={triggerAutoReplyButton}
+                          disabled={!autopilotSettings.autoReply || !isConnected}
+                          style={{
+                            padding: '4px 8px',
+                            fontSize: '10px',
+                            background: 'rgba(255, 142, 83, 0.2)',
+                            border: '1px solid rgba(255, 142, 83, 0.3)',
+                            color: '#ff8e53',
+                            borderRadius: '4px',
+                            cursor: autopilotSettings.autoReply && isConnected ? 'pointer' : 'not-allowed',
+                            opacity: autopilotSettings.autoReply && isConnected ? 1 : 0.5
+                          }}
+                        >
+                          💬 Trigger Reply
+                        </button>
+                      </div>
                     </div>
 
                     {/* Auto-Schedule Option */}
                     <div style={{
                       display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
+                      flexDirection: 'column',
                       padding: '12px',
                       borderRadius: '6px',
                       background: 'rgba(0, 255, 204, 0.1)',
                       border: '1px solid rgba(0, 255, 204, 0.2)',
                       opacity: !isConnected ? 0.6 : 1
                     }}>
-                      <div>
-                        <h4 style={{ color: '#00ffcc', margin: '0 0 4px 0', fontSize: '14px' }}>
-                          📅 Auto-Schedule Posts
-                        </h4>
-                        <p style={{ color: '#a0a0cc', margin: 0, fontSize: '12px' }}>
-                          {isConnected 
-                            ? 'Automatically schedule new posts with smart intervals' 
-                            : 'Requires account connection for scheduling'
-                          }
-                        </p>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <div>
+                          <h4 style={{ color: '#00ffcc', margin: '0 0 4px 0', fontSize: '14px' }}>
+                            📅 Auto-Schedule Posts
+                          </h4>
+                          <p style={{ color: '#a0a0cc', margin: 0, fontSize: '12px' }}>
+                            {isConnected 
+                              ? 'Automatically schedule new posts with smart intervals' 
+                              : 'Requires account connection for scheduling'
+                            }
+                          </p>
+                        </div>
+                        <label style={{ display: 'flex', alignItems: 'center', cursor: isConnected ? 'pointer' : 'not-allowed' }}>
+                          <input
+                            type="checkbox"
+                            checked={autopilotSettings.autoSchedule}
+                            onChange={handleAutoScheduleToggleWithInterval}
+                            disabled={autopilotLoading || !autopilotSettings.enabled || !isConnected}
+                            style={{
+                              transform: 'scale(1.1)',
+                              accentColor: '#00ffcc',
+                              opacity: isConnected ? 1 : 0.5
+                            }}
+                          />
+                        </label>
                       </div>
-                      <label style={{ display: 'flex', alignItems: 'center', cursor: isConnected ? 'pointer' : 'not-allowed' }}>
-                        <input
-                          type="checkbox"
-                          checked={autopilotSettings.autoSchedule}
-                          onChange={handleAutoScheduleToggle}
-                          disabled={autopilotLoading || !autopilotSettings.enabled || !isConnected}
-                          style={{
-                            transform: 'scale(1.1)',
-                            accentColor: '#00ffcc',
-                            opacity: isConnected ? 1 : 0.5
-                          }}
-                        />
-                      </label>
+                      
+                      {/* Interval Dropdown and Counter */}
+                      {autopilotSettings.autoSchedule && (
+                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid rgba(0, 255, 204, 0.2)' }}>
+                          <div style={{ flex: 1 }}>
+                            <label style={{ color: '#a0a0cc', fontSize: '11px', display: 'block', marginBottom: '4px' }}>
+                              Interval:
+                            </label>
+                            <select
+                              value={autopilotSettings.autoScheduleInterval || 60}
+                              onChange={(e) => handleIntervalChange(parseInt(e.target.value))}
+                              disabled={autopilotLoading || !isConnected}
+                              style={{
+                                background: 'rgba(0, 0, 0, 0.3)',
+                                border: '1px solid rgba(0, 255, 204, 0.3)',
+                                color: '#00ffcc',
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                width: '100%'
+                              }}
+                            >
+                              <option value={30}>30 minutes</option>
+                              <option value={60}>1 hour</option>
+                              <option value={120}>2 hours</option>
+                              <option value={180}>3 hours</option>
+                              <option value={240}>4 hours</option>
+                              <option value={360}>6 hours</option>
+                              <option value={480}>8 hours</option>
+                              <option value={720}>12 hours</option>
+                              <option value={1440}>24 hours</option>
+                            </select>
+                          </div>
+                          <div style={{ flex: 1, textAlign: 'center' }}>
+                            <div style={{ color: '#00ffcc', fontSize: '16px', fontWeight: 'bold' }}>
+                              {autopilotSettings.scheduledPostsCount || 0}
+                            </div>
+                            <div style={{ color: '#a0a0cc', fontSize: '10px' }}>
+                              Posts Scheduled
+                            </div>
+                          </div>
+                          <div style={{ flex: 1, textAlign: 'center' }}>
+                            <div style={{ 
+                              color: autoScheduleActive ? '#00ffcc' : '#666',
+                              fontSize: '12px',
+                              fontWeight: 'bold'
+                            }}>
+                              {autoScheduleActive ? '🟢 Active' : '⚪ Standby'}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Auto-Reply Option */}
                     <div style={{
                       display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
+                      flexDirection: 'column',
                       padding: '12px',
                       borderRadius: '6px',
                       background: 'rgba(255, 142, 83, 0.1)',
                       border: '1px solid rgba(255, 142, 83, 0.2)',
                       opacity: !isConnected ? 0.6 : 1
                     }}>
-                      <div>
-                        <h4 style={{ color: '#ff8e53', margin: '0 0 4px 0', fontSize: '14px' }}>
-                          💬 Auto-Reply to DMs/Comments
-                        </h4>
-                        <p style={{ color: '#a0a0cc', margin: 0, fontSize: '12px' }}>
-                          {isConnected 
-                            ? 'AI responds to messages and comments automatically' 
-                            : 'Requires account connection for auto-replies'
-                          }
-                        </p>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <div>
+                          <h4 style={{ color: '#ff8e53', margin: '0 0 4px 0', fontSize: '14px' }}>
+                            💬 Auto-Reply to DMs/Comments
+                          </h4>
+                          <p style={{ color: '#a0a0cc', margin: 0, fontSize: '12px' }}>
+                            {isConnected 
+                              ? 'AI responds to messages and comments automatically' 
+                              : 'Requires account connection for auto-replies'
+                            }
+                          </p>
+                        </div>
+                        <label style={{ display: 'flex', alignItems: 'center', cursor: isConnected ? 'pointer' : 'not-allowed' }}>
+                          <input
+                            type="checkbox"
+                            checked={autopilotSettings.autoReply}
+                            onChange={handleAutoReplyToggleWithInterval}
+                            disabled={autopilotLoading || !autopilotSettings.enabled || !isConnected}
+                            style={{
+                              transform: 'scale(1.1)',
+                              accentColor: '#ff8e53',
+                              opacity: isConnected ? 1 : 0.5
+                            }}
+                          />
+                        </label>
                       </div>
-                      <label style={{ display: 'flex', alignItems: 'center', cursor: isConnected ? 'pointer' : 'not-allowed' }}>
-                        <input
-                          type="checkbox"
-                          checked={autopilotSettings.autoReply}
-                          onChange={handleAutoReplyToggle}
-                          disabled={autopilotLoading || !autopilotSettings.enabled || !isConnected}
-                          style={{
-                            transform: 'scale(1.1)',
-                            accentColor: '#ff8e53',
-                            opacity: isConnected ? 1 : 0.5
-                          }}
-                        />
-                      </label>
+                      
+                      {/* Auto-Reply Counter and Status */}
+                      {autopilotSettings.autoReply && (
+                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid rgba(255, 142, 83, 0.2)' }}>
+                          <div style={{ flex: 1, textAlign: 'center' }}>
+                            <div style={{ color: '#ff8e53', fontSize: '16px', fontWeight: 'bold' }}>
+                              {autopilotSettings.autoRepliesCount || 0}
+                            </div>
+                            <div style={{ color: '#a0a0cc', fontSize: '10px' }}>
+                              Auto-Replies Sent
+                            </div>
+                          </div>
+                          <div style={{ flex: 1, textAlign: 'center' }}>
+                            <div style={{ 
+                              color: autoReplyActive ? '#ff8e53' : '#666',
+                              fontSize: '12px',
+                              fontWeight: 'bold'
+                            }}>
+                              {autoReplyActive ? '🟢 Active' : '⚪ Standby'}
+                            </div>
+                            <div style={{ color: '#a0a0cc', fontSize: '10px' }}>
+                              (Checks every 5min)
+                            </div>
+                          </div>
+                          
+                          {/* DM Rules Warning */}
+                          <div style={{ flex: 2 }}>
+                            <div style={{ 
+                              padding: '6px 8px',
+                              background: 'rgba(255, 193, 7, 0.1)',
+                              border: '1px solid rgba(255, 193, 7, 0.3)',
+                              borderRadius: '4px'
+                            }}>
+                              <div style={{ color: '#ffc107', fontSize: '10px', fontWeight: 'bold' }}>
+                                ⚠️ DM Rules Required
+                              </div>
+                              <div style={{ color: '#a0a0cc', fontSize: '9px' }}>
+                                Set up DM rules in conversation settings for best results
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

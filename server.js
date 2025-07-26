@@ -846,39 +846,50 @@ async function fetchImageWithFallbacks(key, fallbackImagePath = null, username =
 // Helper function to validate image buffer integrity
 function validateImageBuffer(buffer) {
   if (!Buffer.isBuffer(buffer) || buffer.length < 12) {
+    console.log(`[IMAGE-VALIDATION] Buffer validation failed: isBuffer=${Buffer.isBuffer(buffer)}, length=${buffer?.length || 'null'}`);
     return false;
   }
   
   // Check for valid image signatures
   const firstBytes = buffer.slice(0, 12);
   
+  // Log first few bytes for debugging
+  const byteStr = Array.from(firstBytes).map(b => `0x${b.toString(16).padStart(2, '0')}`).join(' ');
+  console.log(`[IMAGE-VALIDATION] First 12 bytes: ${byteStr}`);
+  
   // CRITICAL FIX: JPEG validation - only requires FF D8 (SOI marker), third byte can be various JPEG markers
   if (firstBytes[0] === 0xFF && firstBytes[1] === 0xD8) {
+    console.log(`[IMAGE-VALIDATION] Valid JPEG detected`);
     return true;
   }
   
   // PNG: 89 50 4E 47
   if (firstBytes[0] === 0x89 && firstBytes[1] === 0x50 && firstBytes[2] === 0x4E && firstBytes[3] === 0x47) {
+    console.log(`[IMAGE-VALIDATION] Valid PNG detected`);
     return true;
   }
   
   // GIF: 47 49 46
   if (firstBytes[0] === 0x47 && firstBytes[1] === 0x49 && firstBytes[2] === 0x46) {
+    console.log(`[IMAGE-VALIDATION] Valid GIF detected`);
     return true;
   }
   
   // WebP: RIFF...WEBP
   if (firstBytes[0] === 0x52 && firstBytes[1] === 0x49 && firstBytes[2] === 0x46 && firstBytes[3] === 0x46) {
     if (firstBytes.length > 12 && firstBytes[8] === 0x57 && firstBytes[9] === 0x45 && firstBytes[10] === 0x42 && firstBytes[11] === 0x50) {
+      console.log(`[IMAGE-VALIDATION] Valid WebP detected`);
       return true;
     }
   }
   
   // BMP: 42 4D
   if (firstBytes[0] === 0x42 && firstBytes[1] === 0x4D) {
+    console.log(`[IMAGE-VALIDATION] Valid BMP detected`);
     return true;
   }
   
+  console.log(`[IMAGE-VALIDATION] No valid image signature found`);
   return false;
 }
 
@@ -943,14 +954,18 @@ app.get('/fix-image/:username/:filename', async (req, res) => {
       return sendPlaceholder(res, 'Missing Filename');
     }
     
-    // Normalize the filename - ensure it has correct format
-    if (!filename.startsWith('image_') && filename.endsWith('.jpg')) {
-      // Try to extract timestamp and rebuild filename
+    // 🔥 CAMPAIGN POST FIX: Handle both traditional and campaign post patterns
+    // DON'T normalize campaign posts - they have their own naming scheme
+    if (!filename.startsWith('image_') && !filename.startsWith('campaign_ready_post_') && filename.endsWith('.jpg')) {
+      // Only normalize traditional posts that don't follow image_ pattern
       const timestampMatch = filename.match(/(\d+)\.jpg$/);
       if (timestampMatch) {
-        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Normalizing filename from ${filename} to image_${timestampMatch[1]}.jpg`);
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Normalizing traditional post filename from ${filename} to image_${timestampMatch[1]}.jpg`);
         filename = `image_${timestampMatch[1]}.jpg`;
       }
+    } else if (filename.startsWith('campaign_ready_post_')) {
+      // Campaign posts keep their original names - no normalization
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Campaign post detected: ${filename} - keeping original name`);
     }
     
     // Construct the key for R2 storage
@@ -1837,10 +1852,32 @@ async function handlePostsEndpoint(req, res) {
         
         // Extract image key from post data or file key
         let imageKey = null;
-        if (file.Key.includes('ready_post_') && file.Key.endsWith('.json')) {
-          const match = file.Key.match(/ready_post_(\d+)\.json$/);
-          if (match) {
-            imageKey = `image_${match[1]}.jpg`;
+        
+        // 🔥 ROBUST PATTERN MATCHING: Handle both traditional and campaign ready posts
+        if (file.Key.endsWith('.json')) {
+          // Pattern 1: Traditional format - ready_post_<ID>.json → image_<ID>.jpg
+          if (file.Key.includes('ready_post_') && !file.Key.includes('campaign_ready_post_')) {
+            const match = file.Key.match(/ready_post_(\d+)\.json$/);
+            if (match) {
+              imageKey = `image_${match[1]}.jpg`;
+            }
+          }
+          // Pattern 2: Campaign format - campaign_ready_post_<ID>_<hash>.json → campaign_ready_post_<ID>_<hash>.jpg  
+          else if (file.Key.includes('campaign_ready_post_')) {
+            const campaignMatch = file.Key.match(/campaign_ready_post_(\d+_[a-f0-9]+)\.json$/);
+            if (campaignMatch) {
+              // 🔥 ENHANCED: Try to find the actual image file extension by checking what exists in R2
+              const campaignId = campaignMatch[1];
+              const prefix = file.Key.replace(/[^\/]+$/, ''); // Get directory path
+              
+              // Try multiple extensions in priority order
+              const extensionPriority = ['jpg', 'jpeg', 'png', 'webp'];
+              let foundExtension = 'jpg'; // Default fallback
+              
+              // For performance, we'll use jpg as default since most images are JPEG
+              // The fix-image endpoint will handle extension detection dynamically
+              imageKey = `campaign_ready_post_${campaignId}.jpg`;
+            }
           }
         }
         

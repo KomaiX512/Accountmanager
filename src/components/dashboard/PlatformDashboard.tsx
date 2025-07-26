@@ -2489,7 +2489,6 @@ Image Description: ${response.post.image_prompt}
 
             {config.supportsNotifications && (
               <div className="notifications">
-                <h2>{config.name} Notifications <span className="badge">{notifications.length || 0} new!!!</span></h2>
                 <DmsComments 
                   notifications={notifications} 
                   onReply={handleReply} 

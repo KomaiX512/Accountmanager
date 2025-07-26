@@ -98,6 +98,21 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   // Content viewed tracking - track what has been seen vs unseen with localStorage persistence
   const getViewedStorageKey = (section: string) => `viewed_${section}_instagram_${accountHolder}`;
   
+  // 🚀 AUTOPILOT UI STATE: Track autopilot status for UI feedback
+  const [autopilotStatus, setAutopilotStatus] = useState<{
+    enabled: boolean;
+    autoSchedule: boolean;
+    autoReply: boolean;
+    scheduledCount: number;
+    repliedCount: number;
+  }>({
+    enabled: false,
+    autoSchedule: false,
+    autoReply: false,
+    scheduledCount: 0,
+    repliedCount: 0
+  });
+  
   // Initialize viewed sets from localStorage
   const [viewedStrategies, setViewedStrategies] = useState<Set<string>>(() => {
     const stored = localStorage.getItem(getViewedStorageKey('strategies'));
@@ -526,6 +541,20 @@ Image Description: ${response.post.image_prompt}
           message_id: notification.message_id,
         });
         
+        // 🔥 CRITICAL FIX: Mark notification as handled permanently to prevent reappearance
+        try {
+          await axios.post(`/mark-notification-handled/${igBusinessId}`, {
+            notification_id: notification.message_id,
+            type: 'message',
+            handled_by: 'manual_reply',
+            platform: 'instagram'
+          });
+          console.log(`[${new Date().toISOString()}] ✅ Instagram DM ${notification.message_id} marked as handled`);
+        } catch (markError) {
+          console.error(`[${new Date().toISOString()}] Error marking Instagram DM as handled:`, markError);
+          // Continue anyway - the reply was sent successfully
+        }
+        
         console.log(`[Dashboard] ✅ DM reply tracked: Instagram manual reply`);
         
         setReplySentTracker(prev => [
@@ -556,6 +585,20 @@ Image Description: ${response.post.image_prompt}
           comment_id: notification.comment_id,
           text: replyText,
         });
+        
+        // 🔥 CRITICAL FIX: Mark notification as handled permanently to prevent reappearance
+        try {
+          await axios.post(`/mark-notification-handled/${igBusinessId}`, {
+            notification_id: notification.comment_id,
+            type: 'comment',
+            handled_by: 'manual_reply',
+            platform: 'instagram'
+          });
+          console.log(`[${new Date().toISOString()}] ✅ Instagram comment ${notification.comment_id} marked as handled`);
+        } catch (markError) {
+          console.error(`[${new Date().toISOString()}] Error marking Instagram comment as handled:`, markError);
+          // Continue anyway - the reply was sent successfully
+        }
         
         console.log(`[Dashboard] ✅ Comment reply tracked: Instagram manual reply`);
         
@@ -589,6 +632,7 @@ Image Description: ${response.post.image_prompt}
       await axios.post(`/ignore-notification/${igBusinessId}`, {
         message_id: notification.message_id,
         comment_id: notification.comment_id,
+        platform: 'instagram' // 🔥 CRITICAL FIX: Include platform parameter
       });
       setNotifications(prev => safeFilter(prev, n =>
         !(
@@ -761,6 +805,8 @@ Image Description: ${response.post.image_prompt}
         message_id: notification.message_id || notification.comment_id,
         platform: 'instagram',
       };
+      
+      // Send the AI reply
       let sendResponse = await fetch(`/api/send-dm-reply/${igBusinessId}`, {
         method: 'POST',
         headers: {
@@ -770,22 +816,36 @@ Image Description: ${response.post.image_prompt}
         },
         body: JSON.stringify(dmPayload),
       });
+      
+      if (sendResponse.ok) {
+        // 🔥 CRITICAL FIX: Mark notification as handled permanently to prevent reappearance
+        try {
+          await axios.post(`/mark-notification-handled/${igBusinessId}`, {
+            notification_id: notification.message_id || notification.comment_id,
+            type: notification.type,
+            handled_by: 'ai_reply',
+            platform: 'instagram'
+          });
+          console.log(`[${new Date().toISOString()}] ✅ Instagram notification ${notifId} marked as ai_handled`);
+        } catch (markError) {
+          console.error(`[${new Date().toISOString()}] Error marking Instagram notification as handled:`, markError);
+          // Continue anyway - the reply was sent successfully
+        }
+        
+        setToast(`AI reply sent successfully!`);
+      } else {
+        console.warn(`[${new Date().toISOString()}] AI reply send failed with status ${sendResponse.status}`);
+        // The notification will be handled by the backend if appropriate
+      }
+      
       // Always remove the notification after attempting to send
       setNotifications(prev => prev.filter(n => !isSameNotification(n, notification)));
-      if (!sendResponse.ok) {
-        // Remove the toast for failed DM if it was actually sent
-        // Optionally, you can log the error for debugging but do not show to user
-        // const retryError = await sendResponse.json().catch(() => ({}));
-        // Optionally: setToast('There was a minor issue, but your DM was sent.');
-        return;
-      }
-      setToast(`AI reply sent successfully!`);
+      
     } catch (error: any) {
+      console.error(`[${new Date().toISOString()}] Network error sending Instagram AI reply:`, error);
       // Always remove the notification even if there is a network error
       setNotifications(prev => prev.filter(n => !isSameNotification(n, notification)));
-      // Optionally, you can log the error for debugging but do not show to user
-      // console.error(`[${new Date().toISOString()}] Network error sending AI reply:`, error);
-      // Do not show a toast to the user
+      // Do not show a toast to the user for network errors to avoid confusion
     }
   };
 
@@ -969,12 +1029,39 @@ Image Description: ${response.post.image_prompt}
                 message_id: notification.message_id,
                 platform: 'instagram',
               });
+              
+              // 🔥 CRITICAL FIX: Mark notification as handled permanently
+              try {
+                await axios.post(`/mark-notification-handled/${igBusinessId}`, {
+                  notification_id: notification.message_id,
+                  type: 'message',
+                  handled_by: 'ai_auto_reply',
+                  platform: 'instagram'
+                });
+                console.log(`[Instagram] ✅ Auto DM ${notification.message_id} marked as ai_handled`);
+              } catch (markError) {
+                console.error(`[Instagram] Error marking auto DM as handled:`, markError);
+              }
+              
             } else if (notification.type === 'comment' && notification.comment_id) {
               await axios.post(`/api/send-comment-reply/${igBusinessId}`, {
                 comment_id: notification.comment_id,
                 text: response.data.reply,
                 platform: 'instagram',
               });
+              
+              // 🔥 CRITICAL FIX: Mark notification as handled permanently
+              try {
+                await axios.post(`/mark-notification-handled/${igBusinessId}`, {
+                  notification_id: notification.comment_id,
+                  type: 'comment',
+                  handled_by: 'ai_auto_reply',
+                  platform: 'instagram'
+                });
+                console.log(`[Instagram] ✅ Auto comment ${notification.comment_id} marked as ai_handled`);
+              } catch (markError) {
+                console.error(`[Instagram] Error marking auto comment as handled:`, markError);
+              }
             }
 
             // ✅ REAL USAGE TRACKING: Track actual auto-reply generation and sending
@@ -1541,16 +1628,46 @@ Image Description: ${response.post.image_prompt}
       setToast(`${feature} limit reached - upgrade to continue`);
     };
 
+    // 🚀 AUTOPILOT: Listen for auto-reply trigger from CampaignModal
+    const handleAutoReplyTrigger = (event: CustomEvent) => {
+      if (event.detail?.username === accountHolder && event.detail?.platform === 'instagram') {
+        console.log(`[AUTOPILOT] Received auto-reply trigger for ${accountHolder} on instagram`);
+        
+        // First refresh notifications to get the latest data
+        if (igBusinessId) {
+          fetchNotifications(igBusinessId).then(() => {
+            // Use the current notifications state to trigger auto-reply
+            const currentNotifications = notifications.filter((notif: any) => 
+              !notif.status || notif.status === 'pending'
+            );
+            
+            if (currentNotifications.length > 0) {
+              console.log(`[AUTOPILOT] Triggering auto-reply for ${currentNotifications.length} notifications`);
+              handleAutoReplyAll(currentNotifications);
+            } else {
+              console.log(`[AUTOPILOT] No pending notifications found for auto-reply`);
+              setToast('No pending notifications to reply to');
+            }
+          });
+        } else {
+          console.warn(`[AUTOPILOT] No Instagram business ID available for auto-reply`);
+          setToast('Instagram account not properly connected');
+        }
+      }
+    };
+
     window.addEventListener('openCampaignModal', handleOpenCampaignEvent);
     window.addEventListener('campaignStopped', handleCampaignStoppedEvent);
     window.addEventListener('showUpgradePopup', handleShowUpgradePopup);
+    window.addEventListener('triggerAutoReply', handleAutoReplyTrigger as EventListener);
     
     return () => {
       window.removeEventListener('openCampaignModal', handleOpenCampaignEvent);
       window.removeEventListener('campaignStopped', handleCampaignStoppedEvent);
       window.removeEventListener('showUpgradePopup', handleShowUpgradePopup);
+      window.removeEventListener('triggerAutoReply', handleAutoReplyTrigger as EventListener);
     };
-  }, [accountHolder]);
+  }, [accountHolder, igBusinessId, notifications, handleAutoReplyAll]);
 
   // Clean old entries from reply tracker (older than 10 minutes)
   useEffect(() => {
@@ -1561,6 +1678,146 @@ Image Description: ${response.post.image_prompt}
     
     return () => clearInterval(cleanInterval);
   }, []);
+
+  // 🚀 AUTOPILOT SERVICE: Global autopilot management independent of Campaign Modal
+  useEffect(() => {
+    if (!accountHolder || !igBusinessId || !isInstagramConnected) return;
+
+    let autoScheduleInterval: NodeJS.Timeout | null = null;
+    let autoReplyInterval: NodeJS.Timeout | null = null;
+    let autopilotCheckInterval: NodeJS.Timeout | null = null;
+
+    // Function to check and start autopilot if enabled
+    const checkAndStartAutopilot = async () => {
+      try {
+        console.log(`[AutopilotService] 🔍 Checking autopilot settings for ${accountHolder}`);
+        
+        const response = await fetch(`/autopilot-settings/${accountHolder}?platform=instagram`);
+        
+        if (response.ok) {
+          const autopilotSettings = await response.json();
+          
+          if (autopilotSettings && autopilotSettings.enabled) {
+            console.log(`[AutopilotService] ✅ Autopilot enabled for ${accountHolder}:`, autopilotSettings);
+            
+            // 🚀 Update UI state for autopilot status
+            setAutopilotStatus({
+              enabled: true,
+              autoSchedule: autopilotSettings.autoSchedule || false,
+              autoReply: autopilotSettings.autoReply || false,
+              scheduledCount: 0, // Will be updated by event listeners
+              repliedCount: 0    // Will be updated by event listeners
+            });
+            
+            // Start auto-schedule interval if enabled and not already running
+            if (autopilotSettings.autoSchedule && !autoScheduleInterval) {
+              console.log(`[AutopilotService] 🚀 Starting auto-schedule interval (${autopilotSettings.autoScheduleInterval || 60} minutes)`);
+              
+              // Trigger immediately first
+              window.dispatchEvent(new CustomEvent('triggerAutoSchedule', {
+                detail: { 
+                  username: accountHolder, 
+                  platform: 'instagram',
+                  interval: autopilotSettings.autoScheduleInterval || 60
+                }
+              }));
+              
+              // Set up interval
+              autoScheduleInterval = setInterval(() => {
+                window.dispatchEvent(new CustomEvent('triggerAutoSchedule', {
+                  detail: { 
+                    username: accountHolder, 
+                    platform: 'instagram',
+                    interval: autopilotSettings.autoScheduleInterval || 60
+                  }
+                }));
+              }, (autopilotSettings.autoScheduleInterval || 60) * 60000);
+            }
+            
+            // Start auto-reply interval if enabled and not already running
+            if (autopilotSettings.autoReply && !autoReplyInterval) {
+              console.log(`[AutopilotService] 💬 Starting auto-reply interval (5 minutes)`);
+              
+              // Trigger immediately first
+              window.dispatchEvent(new CustomEvent('triggerAutoReply', {
+                detail: { 
+                  username: accountHolder, 
+                  platform: 'instagram'
+                }
+              }));
+              
+              // Set up 5-minute interval
+              autoReplyInterval = setInterval(() => {
+                window.dispatchEvent(new CustomEvent('triggerAutoReply', {
+                  detail: { 
+                    username: accountHolder, 
+                    platform: 'instagram'
+                  }
+                }));
+              }, 5 * 60000); // 5 minutes
+            }
+          } else {
+            console.log(`[AutopilotService] 🔒 Autopilot disabled for ${accountHolder}`);
+            
+            // 🚀 Update UI state to show autopilot is disabled
+            setAutopilotStatus({
+              enabled: false,
+              autoSchedule: false,
+              autoReply: false,
+              scheduledCount: 0,
+              repliedCount: 0
+            });
+            
+            // Clear intervals if autopilot is disabled
+            if (autoScheduleInterval) {
+              clearInterval(autoScheduleInterval);
+              autoScheduleInterval = null;
+            }
+            if (autoReplyInterval) {
+              clearInterval(autoReplyInterval);
+              autoReplyInterval = null;
+            }
+          }
+        } else if (response.status === 404) {
+          console.log(`[AutopilotService] 📝 No autopilot settings found for ${accountHolder} - autopilot disabled`);
+          
+          // 🚀 Update UI state - no settings means autopilot is disabled
+          setAutopilotStatus({
+            enabled: false,
+            autoSchedule: false,
+            autoReply: false,
+            scheduledCount: 0,
+            repliedCount: 0
+          });
+        }
+      } catch (error) {
+        console.error(`[AutopilotService] ❌ Error checking autopilot settings:`, error);
+      }
+    };
+
+    // Check autopilot settings immediately
+    checkAndStartAutopilot();
+
+    // Check autopilot settings every 2 minutes to detect changes
+    autopilotCheckInterval = setInterval(checkAndStartAutopilot, 2 * 60000);
+
+    console.log(`[AutopilotService] 🎯 Autopilot service initialized for ${accountHolder}`);
+
+    // Cleanup function
+    return () => {
+      console.log(`[AutopilotService] 🧹 Cleaning up autopilot service for ${accountHolder}`);
+      
+      if (autoScheduleInterval) {
+        clearInterval(autoScheduleInterval);
+      }
+      if (autoReplyInterval) {
+        clearInterval(autoReplyInterval);
+      }
+      if (autopilotCheckInterval) {
+        clearInterval(autopilotCheckInterval);
+      }
+    };
+  }, [accountHolder, igBusinessId, isInstagramConnected]);
 
   // Load previous conversations when the component mounts
   useEffect(() => {
@@ -1839,7 +2096,7 @@ Image Description: ${response.post.image_prompt}
           </div>
 
           <div className="notifications">
-            <h2>Notifications <span className="badge">{notifications.length || 0} new!!!</span></h2>
+
             <DmsComments 
               notifications={notifications} 
               onReply={handleReply} 

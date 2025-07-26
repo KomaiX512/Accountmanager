@@ -2291,8 +2291,24 @@ app.get(['/posts/:username', '/api/posts/:username'], async (req, res) => {
           }
           
           // Extract the timestamp/ID from the filename
-          const filenameMatch = file.Key.match(/(\d+)\.json$/);
-          const fileId = filenameMatch ? filenameMatch[1] : null;
+          // 🔥 ENHANCED: Handle both traditional and campaign filename patterns
+          let fileId = null;
+          
+          // Pattern 1: Traditional format - ready_post_<ID>.json
+          if (file.Key.includes('ready_post_') && !file.Key.includes('campaign_ready_post_')) {
+            const traditionalMatch = file.Key.match(/ready_post_(\d+)\.json$/);
+            fileId = traditionalMatch ? traditionalMatch[1] : null;
+          }
+          // Pattern 2: Campaign format - campaign_ready_post_<ID>_<hash>.json
+          else if (file.Key.includes('campaign_ready_post_')) {
+            const campaignMatch = file.Key.match(/campaign_ready_post_(\d+_[a-f0-9]+)\.json$/);
+            fileId = campaignMatch ? campaignMatch[1] : null; // This includes both timestamp and hash
+          }
+          // Fallback: Try generic number extraction for any other formats
+          else {
+            const fallbackMatch = file.Key.match(/(\d+)\.json$/);
+            fileId = fallbackMatch ? fallbackMatch[1] : null;
+          }
           
           if (!fileId) {
             console.warn(`Cannot extract ID from filename: ${file.Key}`);
@@ -2306,15 +2322,26 @@ app.get(['/posts/:username', '/api/posts/:username'], async (req, res) => {
           }
           
           // Look for matching image file
-          // Always check all possible image key patterns for the same ID (both jpg and png)
-          const potentialImageKeys = [
-            `${prefix}/image_${fileId}.jpg`,
-            `${prefix}/image_${fileId}.png`,
-            `${prefix}/ready_post_${fileId}.jpg`,
-            `${prefix}/ready_post_${fileId}.png`,
-            `${prefix}/campaign_ready_post_${fileId}.jpg`,
-            `${prefix}/campaign_ready_post_${fileId}.png`
-          ];
+          // 🔥 ENHANCED: Build image keys based on post type and extracted fileId
+          let potentialImageKeys = [];
+          
+          if (file.Key.includes('campaign_ready_post_')) {
+            // Campaign posts: fileId includes both timestamp and hash (e.g., "1753505284728_63e2f9e5")
+            potentialImageKeys = [
+              `${prefix}/campaign_ready_post_${fileId}.jpg`,
+              `${prefix}/campaign_ready_post_${fileId}.jpeg`,
+              `${prefix}/campaign_ready_post_${fileId}.png`,
+              `${prefix}/campaign_ready_post_${fileId}.webp`
+            ];
+          } else {
+            // Traditional posts: fileId is just timestamp (e.g., "1753505284728")
+            potentialImageKeys = [
+              `${prefix}/image_${fileId}.jpg`,
+              `${prefix}/image_${fileId}.png`,
+              `${prefix}/ready_post_${fileId}.jpg`,
+              `${prefix}/ready_post_${fileId}.png`
+            ];
+          }
           
           // Find the first matching image file
           const imageFile = imageFiles.find(img => 
@@ -2436,15 +2463,15 @@ async function streamToBuffer(stream) {
 }
 
 // Instagram App Credentials
-const APP_ID = '1089716559763623';
-const APP_SECRET = '0733abf780036963e9f57f33a4b2fa6e';
-const REDIRECT_URI = 'https://c38b57a675c1.ngrok-free.app/instagram/callback';
+const APP_ID = '676612308718574';
+const APP_SECRET = '7a225c1e31ad1949ab9609d7224da6b5';
+const REDIRECT_URI = 'https://0ca9a44ebc1f.ngrok-free.app/instagram/callback';
 const VERIFY_TOKEN = 'myInstagramWebhook2025';
 
 // Facebook App Credentials  
 const FB_APP_ID = '676612308718574'; // Your ACTUAL Facebook App ID (NOT Configuration ID)
 const FB_APP_SECRET = '0144a0685fd3182b29e2750dabe2fcda'; // Your actual App Secret
-const FB_REDIRECT_URI = 'https://c38b57a675c1.ngrok-free.app/facebook/callback';
+const FB_REDIRECT_URI = 'https://0ca9a44ebc1f.ngrok-free.app/facebook/callback';
 const FB_VERIFY_TOKEN = 'myFacebookWebhook2025';
 
 app.get([
@@ -2662,6 +2689,19 @@ app.post([
             continue;
           }
 
+          // 🔥 CRITICAL FIX: Additional filter to prevent account owner's own messages
+          if (msg.sender && matchedToken) {
+            const senderId = msg.sender.id;
+            const accountOwnerId = matchedToken.instagram_graph_id || webhookGraphId;
+            
+            if (senderId === accountOwnerId) {
+              console.log(`[${new Date().toISOString()}] ✅ Filtering out own DM: ${msg.message.mid} from account owner ${senderId}`);
+              continue; // Skip storing the account owner's own messages
+            }
+            
+            console.log(`[${new Date().toISOString()}] ✅ DM from external user: ${msg.message.mid} from ${senderId} (account: ${accountOwnerId})`);
+          }
+
           const eventData = {
             type: 'message',
             instagram_user_id: matchedToken ? matchedToken.instagram_user_id : webhookGraphId,
@@ -2723,15 +2763,30 @@ app.post([
             continue;
           }
 
+          // 🔥 CRITICAL FIX: Filter out comments made by the account owner
+          // Check if the comment was made by the account owner themselves
+          if (change.value.from && matchedToken) {
+            const commentAuthorId = change.value.from.id;
+            const accountOwnerId = matchedToken.instagram_graph_id || webhookGraphId;
+            
+            if (commentAuthorId === accountOwnerId) {
+              console.log(`[${new Date().toISOString()}] ✅ Filtering out own comment: ${change.value.id} from account owner ${commentAuthorId}`);
+              continue; // Skip storing the account owner's own comments
+            }
+            
+            console.log(`[${new Date().toISOString()}] ✅ Comment from external user: ${change.value.id} from ${commentAuthorId} (account: ${accountOwnerId})`);
+          }
+
           const eventData = {
             type: 'comment',
             instagram_user_id: matchedToken ? matchedToken.instagram_user_id : webhookGraphId,
             comment_id: change.value.id,
+            sender_id: change.value.from?.id || 'unknown', // 🔥 Add sender_id for consistency
             text: change.value.text,
             post_id: change.value.media.id,
             timestamp: change.value.timestamp || Date.now(),
             received_at: new Date().toISOString(),
-            username: matchedToken ? matchedToken.username : 'unknown',
+            username: change.value.from?.username || matchedToken?.username || 'unknown', // 🔥 Use comment author's username
             status: 'pending'
           };
 
@@ -4690,12 +4745,16 @@ async function filterHandledNotifications(notifications, userId, platform) {
       
       // PERMANENTLY FILTER OUT: Skip notifications that are already handled, replied, ignored, or ai_handled
       if (status && ['replied', 'ignored', 'ai_handled', 'handled', 'sent', 'scheduled', 'posted', 'published'].includes(status)) {
+        console.log(`[DEBUG] [FILTER] Filtering out ${platform} notification ${notificationId} with status: ${status}`);
         return false; // Skip this notification completely
       }
       
       // Update notification status if available
       if (status) {
         notification.status = status;
+        console.log(`[DEBUG] [FILTER] Keeping ${platform} notification ${notificationId} with status: ${status}`);
+      } else {
+        console.log(`[DEBUG] [FILTER] Keeping ${platform} notification ${notificationId} with no status file (pending)`);
       }
       
       return true; // Keep this notification
@@ -5946,6 +6005,62 @@ app.post(['/api/schedule-post/:userId', '/schedule-post/:userId'], upload.single
     // Validate image size (Instagram requirements)
     if (imageBuffer.length > 8 * 1024 * 1024) {
       return res.status(400).json({ error: 'Image too large. Maximum file size is 8MB for Instagram posts.' });
+    }
+
+    // 🚫 CRITICAL FIX: Prevent duplicate scheduling by checking existing schedules
+    try {
+      const existingSchedulesCommand = new ListObjectsV2Command({
+        Bucket: 'tasks',
+        Prefix: `scheduled_posts/${platform}/${userId}/`,
+        MaxKeys: 100
+      });
+      
+      const existingResponse = await s3Client.send(existingSchedulesCommand);
+      
+      if (existingResponse.Contents) {
+        // Check for potential duplicates based on caption and schedule time similarity
+        const captionTrimmed = caption.trim();
+        const scheduleTimeBuffer = 5 * 60 * 1000; // 5 minute buffer for duplicate detection
+        
+        for (const existingObj of existingResponse.Contents) {
+          if (!existingObj.Key?.endsWith('.json')) continue;
+          
+          try {
+            const getExistingCommand = new GetObjectCommand({
+              Bucket: 'tasks',
+              Key: existingObj.Key
+            });
+            
+            const existingData = await s3Client.send(getExistingCommand);
+            const existingSchedule = JSON.parse(await existingData.Body.transformToString());
+            
+            // Skip completed/failed schedules
+            if (existingSchedule.status !== 'scheduled') continue;
+            
+            const existingScheduleTime = new Date(existingSchedule.scheduleDate);
+            const timeDiff = Math.abs(existingScheduleTime.getTime() - scheduledTime.getTime());
+            
+            // Check for potential duplicate (same caption within 5 minutes)
+            if (existingSchedule.caption === captionTrimmed && timeDiff < scheduleTimeBuffer) {
+              console.log(`[${new Date().toISOString()}] 🚫 Potential duplicate detected: same caption within 5 minutes`);
+              return res.status(409).json({ 
+                error: 'Duplicate schedule detected',
+                message: 'A post with the same caption is already scheduled within 5 minutes of this time.',
+                existingScheduleId: existingSchedule.id,
+                existingScheduleTime: existingSchedule.scheduleDate
+              });
+            }
+            
+          } catch (checkError) {
+            // Continue checking other schedules if one fails to parse
+            console.warn(`[${new Date().toISOString()}] Error checking existing schedule ${existingObj.Key}:`, checkError.message);
+          }
+        }
+      }
+      
+    } catch (duplicateCheckError) {
+      console.warn(`[${new Date().toISOString()}] Warning: Could not check for duplicate schedules:`, duplicateCheckError.message);
+      // Continue with scheduling even if duplicate check fails (non-critical)
     }
 
     // Generate unique keys for storage
@@ -10080,6 +10195,15 @@ async function processAutopilotScheduling() {
         }
         
         const { username, platform } = settings;
+        
+        // 🔥 PLATFORM-SPECIFIC FIX: Only process autopilot for the specific platform where it was enabled
+        // Check if the settings file path matches the platform we're processing
+        const settingsKeyPlatform = object.Key.split('/')[1]; // Extract platform from path like autopilot_settings/instagram/username/settings.json
+        if (settingsKeyPlatform !== platform) {
+          console.log(`[${new Date().toISOString()}] [AUTOPILOT] ⚠️ Platform mismatch: settings key has ${settingsKeyPlatform} but settings data has ${platform}, skipping...`);
+          continue;
+        }
+        
         console.log(`[${new Date().toISOString()}] [AUTOPILOT] 📅 Checking ${platform}/${username} for new posts to schedule...`);
         
         // Check for new ready posts
@@ -10095,11 +10219,41 @@ async function processAutopilotScheduling() {
   }
 }
 
-// 🚀 AUTOPILOT: Check for new posts and schedule them automatically
+// � BULLETPROOF AUTOPILOT: Critical race condition protection
+const autopilotLocks = new Map(); // Prevent concurrent autopilot runs for same user/platform
+
+// Cleanup old locks periodically (every 10 minutes) to prevent memory leaks
+setInterval(() => {
+  const now = Date.now();
+  const lockTimeout = 10 * 60 * 1000; // 10 minutes
+  
+  for (const [lockKey, timestamp] of autopilotLocks.entries()) {
+    if (now - timestamp > lockTimeout) {
+      autopilotLocks.delete(lockKey);
+      console.log(`[${new Date().toISOString()}] [AUTOPILOT] 🧹 Cleaned up expired lock: ${lockKey}`);
+    }
+  }
+}, 10 * 60 * 1000);
+
+// �🚀 AUTOPILOT: Check for new posts and schedule them automatically
 async function checkAndScheduleNewPosts(username, platform, settings) {
+  // 🔒 RACE CONDITION PROTECTION: Implement user/platform locking
+  const lockKey = `${platform}/${username}`;
+  
+  if (autopilotLocks.has(lockKey)) {
+    console.log(`[${new Date().toISOString()}] [AUTOPILOT] 🔒 Lock active for ${lockKey}, skipping to prevent race condition`);
+    return;
+  }
+  
+  // Set lock
+  autopilotLocks.set(lockKey, Date.now());
+  
   try {
+    console.log(`[${new Date().toISOString()}] [AUTOPILOT] 🔓 Acquired lock for ${lockKey}, proceeding with scheduling`);
+    
     // Get ready posts for this user/platform
-    const postsPrefix = `generated_content/${platform}/${username}/ready/`;
+    // Use correct prefix for ready posts according to R2 schema
+    const postsPrefix = `ready_post/${platform}/${username}/`;
     
     const listCommand = new ListObjectsV2Command({
       Bucket: 'tasks',
@@ -10122,19 +10276,31 @@ async function checkAndScheduleNewPosts(username, platform, settings) {
       new Date(lastScheduledTime.getTime() + (intervalHours * 60 * 60 * 1000)) :
       new Date(Date.now() + 60 * 1000); // Start 1 minute from now if no posts exist
     
-    // Make sure we don't schedule in the past
-    if (nextScheduleTime <= new Date()) {
-      nextScheduleTime = new Date(Date.now() + 60 * 1000);
+    // 🚨 CRITICAL: Enforce minimum 30 minutes between any schedules for same user
+    const minimumInterval = 30 * 60 * 1000; // 30 minutes
+    const earliestAllowedTime = new Date(Date.now() + minimumInterval);
+    
+    if (nextScheduleTime < earliestAllowedTime) {
+      nextScheduleTime = earliestAllowedTime;
+      console.log(`[${new Date().toISOString()}] [AUTOPILOT] ⚠️ Enforcing minimum 30-minute interval, adjusted schedule time to: ${nextScheduleTime.toISOString()}`);
     }
     
     console.log(`[${new Date().toISOString()}] [AUTOPILOT] 📅 Next schedule time for ${platform}/${username}: ${nextScheduleTime.toISOString()}`);
     
     let scheduledCount = 0;
+    const maxPostsPerRun = 3; // Limit posts per autopilot run to prevent overwhelming
     
     for (const postObject of postsResponse.Contents) {
       if (!postObject.Key?.endsWith('.json')) continue;
+      if (scheduledCount >= maxPostsPerRun) {
+        console.log(`[${new Date().toISOString()}] [AUTOPILOT] Reached max posts per run (${maxPostsPerRun}), stopping`);
+        break;
+      }
       
       try {
+        // 🔒 PRE-SCHEDULE LOCK: Mark post as being processed immediately
+        await markPostAsAutoScheduled(postObject.Key, username, platform);
+        
         // Get post data
         const getPostCommand = new GetObjectCommand({
           Bucket: 'tasks',
@@ -10144,7 +10310,7 @@ async function checkAndScheduleNewPosts(username, platform, settings) {
         const postResponse = await s3Client.send(getPostCommand);
         const postData = JSON.parse(await postResponse.Body.transformToString());
         
-        // Check if post is already scheduled
+        // Check if post is already scheduled (double-check after marking)
         const isAlreadyScheduled = await checkIfPostAlreadyScheduled(postObject.Key, username, platform);
         if (isAlreadyScheduled) {
           console.log(`[${new Date().toISOString()}] [AUTOPILOT] Post ${postObject.Key} already scheduled, skipping`);
@@ -10158,11 +10324,11 @@ async function checkAndScheduleNewPosts(username, platform, settings) {
           scheduledCount++;
           console.log(`[${new Date().toISOString()}] [AUTOPILOT] ✅ Auto-scheduled post ${postObject.Key} for ${nextScheduleTime.toISOString()}`);
           
-          // Calculate next schedule time with interval
-          nextScheduleTime = new Date(nextScheduleTime.getTime() + (intervalHours * 60 * 60 * 1000));
-          
-          // Mark post as processed to avoid re-scheduling
-          await markPostAsAutoScheduled(postObject.Key, username, platform);
+          // Calculate next schedule time with proper interval (minimum 1 hour apart)
+          const scheduleInterval = Math.max(intervalHours, 1) * 60 * 60 * 1000; // Minimum 1 hour
+          nextScheduleTime = new Date(nextScheduleTime.getTime() + scheduleInterval);
+        } else {
+          console.error(`[${new Date().toISOString()}] [AUTOPILOT] Failed to schedule post ${postObject.Key}:`, scheduleResult.error);
         }
         
       } catch (error) {
@@ -10176,6 +10342,10 @@ async function checkAndScheduleNewPosts(username, platform, settings) {
     
   } catch (error) {
     console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error in checkAndScheduleNewPosts:`, error);
+  } finally {
+    // 🔓 ALWAYS RELEASE LOCK
+    autopilotLocks.delete(lockKey);
+    console.log(`[${new Date().toISOString()}] [AUTOPILOT] 🔓 Released lock for ${lockKey}`);
   }
 }
 
@@ -10216,6 +10386,15 @@ async function processAutopilotReplies() {
         }
         
         const { username, platform } = settings;
+        
+        // 🔥 PLATFORM-SPECIFIC FIX: Only process autopilot for the specific platform where it was enabled
+        // Check if the settings file path matches the platform we're processing
+        const settingsKeyPlatform = object.Key.split('/')[1]; // Extract platform from path like autopilot_settings/instagram/username/settings.json
+        if (settingsKeyPlatform !== platform) {
+          console.log(`[${new Date().toISOString()}] [AUTOPILOT] ⚠️ Platform mismatch: settings key has ${settingsKeyPlatform} but settings data has ${platform}, skipping...`);
+          continue;
+        }
+        
         console.log(`[${new Date().toISOString()}] [AUTOPILOT] 💬 Checking ${platform}/${username} for new messages to reply to...`);
         
         // Check for new messages/comments to reply to
@@ -10423,9 +10602,11 @@ async function getSchedulingInterval(username, platform) {
 }
 
 async function checkIfPostAlreadyScheduled(postKey, username, platform) {
-  // 🔥 IMPROVED: Check both scheduled posts and autopilot markers
+  // 🔥 BULLETPROOF: Comprehensive duplicate detection with robust pattern matching
   try {
-    // Method 1: Check autopilot processing markers
+    console.log(`[${new Date().toISOString()}] [AUTOPILOT] 🔍 Checking if post already scheduled: ${postKey}`);
+    
+    // STEP 1: Check autopilot processing markers with ROBUST key matching
     const markerPrefix = `autopilot_processed/${platform}/${username}/`;
     const markerCommand = new ListObjectsV2Command({
       Bucket: 'tasks',
@@ -10435,15 +10616,29 @@ async function checkIfPostAlreadyScheduled(postKey, username, platform) {
     
     const markerResponse = await s3Client.send(markerCommand);
     if (markerResponse.Contents) {
-      for (const marker of markerResponse.Contents) {
-        if (marker.Key && marker.Key.includes(postKey.replace(/[^a-zA-Z0-9]/g, '_'))) {
-          console.log(`[${new Date().toISOString()}] [AUTOPILOT] Found autopilot marker for ${postKey}`);
-          return true;
+      // Extract the core identifier from postKey for reliable matching
+      let postIdentifier = null;
+      
+      // Handle different post key formats
+      if (postKey.includes('campaign_ready_post_')) {
+        const campaignMatch = postKey.match(/campaign_ready_post_(\d+_[a-f0-9]+)\.json$/);
+        postIdentifier = campaignMatch ? campaignMatch[1] : null;
+      } else if (postKey.includes('ready_post_')) {
+        const traditionalMatch = postKey.match(/ready_post_(\d+)\.json$/);
+        postIdentifier = traditionalMatch ? traditionalMatch[1] : null;
+      }
+      
+      if (postIdentifier) {
+        for (const marker of markerResponse.Contents) {
+          if (marker.Key && marker.Key.includes(postIdentifier)) {
+            console.log(`[${new Date().toISOString()}] [AUTOPILOT] ✅ Found autopilot marker for ${postKey} with identifier ${postIdentifier}`);
+            return true;
+          }
         }
       }
     }
     
-    // Method 2: Check existing scheduled posts
+    // STEP 2: Check existing scheduled posts with ENHANCED matching
     const scheduledPrefix = `scheduled_posts/${platform}/`;
     const listCommand = new ListObjectsV2Command({
       Bucket: 'tasks',
@@ -10454,6 +10649,19 @@ async function checkIfPostAlreadyScheduled(postKey, username, platform) {
     const response = await s3Client.send(listCommand);
     
     if (response.Contents) {
+      // Get post data once for comparison
+      let sourcePostData = null;
+      try {
+        const getSourceCommand = new GetObjectCommand({
+          Bucket: 'tasks',
+          Key: postKey
+        });
+        const sourceResponse = await s3Client.send(getSourceCommand);
+        sourcePostData = JSON.parse(await sourceResponse.Body.transformToString());
+      } catch (sourceError) {
+        console.warn(`[${new Date().toISOString()}] [AUTOPILOT] Could not load source post data for ${postKey}`);
+      }
+      
       for (const object of response.Contents) {
         if (!object.Key?.endsWith('.json')) continue;
         
@@ -10466,24 +10674,62 @@ async function checkIfPostAlreadyScheduled(postKey, username, platform) {
           const scheduleResponse = await s3Client.send(getCommand);
           const scheduleData = JSON.parse(await scheduleResponse.Body.transformToString());
           
-          // Check if this post is already scheduled by looking at source keys or content
+          // ROBUST KEY MATCHING: Check multiple key fields
           if (scheduleData.username === username && 
               (scheduleData.postKey === postKey || 
                scheduleData.originalPostKey === postKey ||
-               scheduleData.autopilot_source === postKey)) {
-            console.log(`[${new Date().toISOString()}] [AUTOPILOT] Found existing schedule for ${postKey}`);
+               scheduleData.autopilot_source === postKey ||
+               scheduleData.sourceKey === postKey)) {
+            console.log(`[${new Date().toISOString()}] [AUTOPILOT] ✅ Found existing schedule by key match for ${postKey}`);
             return true;
           }
+          
+          // CAPTION-BASED DUPLICATE DETECTION: Enhanced with better validation
+          if (scheduleData.username === username && 
+              scheduleData.status === 'scheduled' &&
+              sourcePostData && sourcePostData.caption &&
+              scheduleData.caption) {
+            
+            // Normalize captions for comparison (remove extra whitespace, etc.)
+            const sourceCaption = sourcePostData.caption.trim().replace(/\s+/g, ' ');
+            const scheduleCaption = scheduleData.caption.trim().replace(/\s+/g, ' ');
+            
+            if (sourceCaption === scheduleCaption) {
+              console.log(`[${new Date().toISOString()}] [AUTOPILOT] ✅ Found existing schedule by caption match for ${postKey}`);
+              return true;
+            }
+          }
+          
+          // TIME-BASED PROTECTION: Prevent scheduling within 10 minutes of existing schedules
+          if (scheduleData.username === username && 
+              scheduleData.status === 'scheduled' &&
+              scheduleData.scheduledTime) {
+            
+            const existingTime = new Date(scheduleData.scheduledTime);
+            const now = new Date();
+            const timeDiff = Math.abs(existingTime.getTime() - now.getTime());
+            const tenMinutes = 10 * 60 * 1000;
+            
+            if (timeDiff < tenMinutes) {
+              console.log(`[${new Date().toISOString()}] [AUTOPILOT] ⚠️ Found recent schedule within 10 minutes for ${username}, blocking duplicate`);
+              return true;
+            }
+          }
+          
         } catch (error) {
           // Skip invalid files
+          console.warn(`[${new Date().toISOString()}] [AUTOPILOT] Error checking scheduled post ${object.Key}:`, error.message);
         }
       }
     }
     
+    console.log(`[${new Date().toISOString()}] [AUTOPILOT] ✅ Post ${postKey} is clear for scheduling`);
     return false;
+    
   } catch (error) {
     console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error checking if post scheduled:`, error);
-    return false;
+    // FAIL SAFE: Return true to prevent scheduling on error
+    return true;
   }
 }
 
@@ -10492,33 +10738,104 @@ async function schedulePostAutomatically(postData, postKey, username, platform, 
   try {
     console.log(`[${new Date().toISOString()}] [AUTOPILOT] 📅 Auto-scheduling post for ${platform}/${username} at ${scheduleTime.toISOString()}`);
     
-    // Extract image key from post data
-    const imageKey = postData.image || postData.image_key || postData.imageKey;
-    if (!imageKey) {
-      throw new Error('No image key found in post data');
+    // 🔥 BULLETPROOF IMAGE KEY EXTRACTION: Handle both traditional and campaign posts
+    // Post key formats: 
+    // - Traditional: ready_post/platform/username/ready_post_123456.json
+    // - Campaign: ready_post/platform/username/campaign_ready_post_123456_hash.json
+    
+    let fileId = null;
+    let isTraditionalPost = false;
+    let isCampaignPost = false;
+    
+    // Pattern 1: Traditional posts
+    const traditionalMatch = postKey.match(/ready_post_(\d+)\.json$/);
+    if (traditionalMatch) {
+      fileId = traditionalMatch[1];
+      isTraditionalPost = true;
+      console.log(`[${new Date().toISOString()}] [AUTOPILOT] Traditional post detected, fileId: ${fileId}`);
     }
     
-    // Get image from R2 storage
+    // Pattern 2: Campaign posts  
+    const campaignMatch = postKey.match(/campaign_ready_post_(\d+_[a-f0-9]+)\.json$/);
+    if (campaignMatch) {
+      fileId = campaignMatch[1]; // Includes both timestamp and hash
+      isCampaignPost = true;
+      console.log(`[${new Date().toISOString()}] [AUTOPILOT] Campaign post detected, fileId: ${fileId}`);
+    }
+    
+    if (!fileId) {
+      throw new Error(`Cannot extract file ID from post key: ${postKey}. Expected format: ready_post_123456.json or campaign_ready_post_123456_hash.json`);
+    }
+    
+    const prefix = postKey.replace(/[^\/]+$/, ''); // Get directory path
+    
+    // Build potential image keys based on post type
+    let potentialImageKeys = [];
+    
+    if (isCampaignPost) {
+      // Campaign posts: image has same name as JSON but with image extension
+      potentialImageKeys = [
+        `${prefix}campaign_ready_post_${fileId}.jpg`,
+        `${prefix}campaign_ready_post_${fileId}.jpeg`,
+        `${prefix}campaign_ready_post_${fileId}.png`,
+        `${prefix}campaign_ready_post_${fileId}.webp`
+      ];
+    } else if (isTraditionalPost) {
+      // Traditional posts: multiple naming patterns
+      potentialImageKeys = [
+        `${prefix}image_${fileId}.jpg`,
+        `${prefix}image_${fileId}.jpeg`,
+        `${prefix}image_${fileId}.png`,
+        `${prefix}ready_post_${fileId}.jpg`,
+        `${prefix}ready_post_${fileId}.png`,
+        `${prefix}ready_post_${fileId}.jpeg`
+      ];
+    }
+    
+    // Find which image exists in R2 - Use direct R2 access instead of API endpoint
+    let imageKey = null;
+    for (const testKey of potentialImageKeys) {
+      try {
+        // Use direct R2 command to check if image exists
+        const getCommand = new GetObjectCommand({
+          Bucket: 'tasks',
+          Key: testKey
+        });
+        await s3Client.send(getCommand);
+        imageKey = testKey; // Keep the full path, not just filename
+        console.log(`[${new Date().toISOString()}] [AUTOPILOT] Found image: ${imageKey}`);
+        break;
+      } catch (e) {
+        // Continue trying other keys - this is expected for non-existent keys
+      }
+    }
+    
+    if (!imageKey) {
+      console.log(`[${new Date().toISOString()}] [AUTOPILOT] Tried image keys: ${potentialImageKeys.map(k => k.split('/').pop()).join(', ')}`);
+      throw new Error(`No image found for post ${postKey}. Expected keys: ${potentialImageKeys.map(k => k.split('/').pop()).join(', ')}`);
+    }
+    
+    console.log(`[${new Date().toISOString()}] [AUTOPILOT] Found image: ${imageKey}`);
+    
+    // Get image from R2 storage using direct R2 access
     let imageBlob;
     try {
-      // Try direct R2 access first
-      const imageResponse = await fetch(`${process.env.API_BASE_URL || 'http://localhost:3000'}/api/r2-image/${username}/${imageKey}`);
-      if (!imageResponse.ok) {
-        throw new Error(`Failed to fetch image: ${imageResponse.status}`);
-      }
-      imageBlob = await imageResponse.blob();
+      console.log(`[${new Date().toISOString()}] [AUTOPILOT] Fetching image from R2: ${imageKey}`);
+      
+      // Use direct R2 command to get the image
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: imageKey
+      });
+      
+      const response = await s3Client.send(getCommand);
+      const imageBuffer = await streamToBuffer(response.Body);
+      imageBlob = new Blob([imageBuffer], { type: response.ContentType || 'image/png' });
+      
+      console.log(`[${new Date().toISOString()}] [AUTOPILOT] Successfully fetched image: ${imageKey}, size: ${imageBlob.size} bytes`);
     } catch (error) {
-      console.warn(`[${new Date().toISOString()}] [AUTOPILOT] Direct image fetch failed, trying signed URL...`);
-      
-      // Fallback to signed URL
-      const signedUrlResponse = await fetch(`${process.env.API_BASE_URL || 'http://localhost:3000'}/api/signed-image-url/${username}/${imageKey}`);
-      if (!signedUrlResponse.ok) {
-        throw new Error('Failed to get signed image URL');
-      }
-      
-      const signedUrlData = await signedUrlResponse.json();
-      const imageFromSignedUrl = await fetch(signedUrlData.signedUrl);
-      imageBlob = await imageFromSignedUrl.blob();
+      console.error(`[${new Date().toISOString()}] [AUTOPILOT] Failed to fetch image from R2:`, error);
+      throw new Error(`Failed to fetch image from R2: ${error.message}`);
     }
     
     // Validate image
@@ -10564,25 +10881,45 @@ async function schedulePostAutomatically(postData, postKey, username, platform, 
 }
 
 async function markPostAsAutoScheduled(postKey, username, platform) {
-  // Mark the post as processed by autopilot to avoid re-scheduling
+  // 🔒 BULLETPROOF MARKING: Create robust marker to prevent re-scheduling
   try {
-    const markerKey = `autopilot_processed/${platform}/${username}/${Date.now()}_${postKey.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
+    // Extract identifier from postKey for robust naming
+    let postIdentifier = 'unknown';
+    
+    if (postKey.includes('campaign_ready_post_')) {
+      const campaignMatch = postKey.match(/campaign_ready_post_(\d+_[a-f0-9]+)\.json$/);
+      postIdentifier = campaignMatch ? campaignMatch[1] : `campaign_${Date.now()}`;
+    } else if (postKey.includes('ready_post_')) {
+      const traditionalMatch = postKey.match(/ready_post_(\d+)\.json$/);
+      postIdentifier = traditionalMatch ? traditionalMatch[1] : `traditional_${Date.now()}`;
+    }
+    
+    const timestamp = Date.now();
+    const markerKey = `autopilot_processed/${platform}/${username}/${timestamp}_${postIdentifier}.json`;
+    
+    const markerData = {
+      postKey: postKey,
+      postIdentifier: postIdentifier,
+      username: username,
+      platform: platform,
+      processedAt: new Date().toISOString(),
+      timestamp: timestamp,
+      type: 'auto_scheduled',
+      version: '2.0' // Version tracking for future compatibility
+    };
     
     await s3Client.send(new PutObjectCommand({
       Bucket: 'tasks',
       Key: markerKey,
-      Body: JSON.stringify({
-        postKey,
-        username,
-        platform,
-        processedAt: new Date().toISOString(),
-        type: 'auto_scheduled'
-      }),
+      Body: JSON.stringify(markerData, null, 2),
       ContentType: 'application/json'
     }));
     
+    console.log(`[${new Date().toISOString()}] [AUTOPILOT] ✅ Created autopilot marker: ${markerKey}`);
+    
   } catch (error) {
     console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error marking post as auto-scheduled:`, error);
+    // Don't throw - this shouldn't block the main process
   }
 }
 
@@ -11324,7 +11661,7 @@ app.post(['/api/scheduler-process-overdue', '/scheduler-process-overdue'], async
 startTwitterScheduler();
 startFacebookScheduler();
 startInstagramScheduler();
-startAutopilotWatchers(); // 🚀 AUTOPILOT: Start background automation watchers
+// startAutopilotWatchers(); // 🚀 AUTOPILOT: Disabled - will use frontend button triggers instead
 
 // Debug endpoint to check Instagram token mapping
 app.get('/debug/instagram-tokens', async (req, res) => {
@@ -12243,20 +12580,19 @@ app.post(['/autopilot-settings/:username', '/api/autopilot-settings/:username'],
     await s3Client.send(putCommand);
     
     console.log(`[${new Date().toISOString()}] [AUTOPILOT] Updated settings for ${platform}/${username}:`, settingsWithTimestamp);
-    
-    // If autopilot was enabled, trigger the background watchers
+
+    // If autopilot was enabled, trigger immediate actions based on settings
     if (settingsWithTimestamp.enabled) {
-      console.log(`[${new Date().toISOString()}] [AUTOPILOT] ✅ Autopilot enabled for ${platform}/${username} - watchers will activate`);
-      
-      // Dispatch event to start watchers (we'll implement this next)
-      process.nextTick(() => {
-        try {
-          // Emit event for autopilot activation (for future background processes)
-          console.log(`[${new Date().toISOString()}] [AUTOPILOT] 🚁 Background watchers activated for ${platform}/${username}`);
-        } catch (err) {
-          console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error activating watchers:`, err);
-        }
-      });
+      if (settingsWithTimestamp.autoSchedule) {
+        console.log(`[${new Date().toISOString()}] [AUTOPILOT] 🔥 Immediate auto-schedule trigger for ${platform}/${username}`);
+        checkAndScheduleNewPosts(username, platform, settingsWithTimestamp)
+          .catch(err => console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error in immediate auto-schedule trigger:`, err));
+      }
+      if (settingsWithTimestamp.autoReply) {
+        console.log(`[${new Date().toISOString()}] [AUTOPILOT] 🔥 Immediate auto-reply trigger for ${platform}/${username}`);
+        checkAndReplyToNewMessages(username, platform, settingsWithTimestamp)
+          .catch(err => console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error in immediate auto-reply trigger:`, err));
+      }
     }
     
     res.json({ success: true, settings: settingsWithTimestamp });
@@ -12411,7 +12747,7 @@ app.get(['/autopilot-status/:username', '/api/autopilot-status/:username'], asyn
       // No settings found
     }
     
-    // Get ready posts count
+    // Get ready posts count using correct prefix
     const postsPrefix = `ready_post/${platform}/${username}/`;
     const postsCommand = new ListObjectsV2Command({
       Bucket: 'tasks',
@@ -12785,6 +13121,37 @@ app.delete(['/stop-campaign/:username', '/api/stop-campaign/:username'], async (
     }
 
     console.log(`[${new Date().toISOString()}] Campaign deletion completed for ${username} on ${platform}. Deleted ${deletedFiles.length} files, ${deletionErrors.length} errors.`);
+
+    // 🚀 AUTOPILOT RESET: Clear autopilot settings when campaign stops
+    try {
+      const autopilotKey = `autopilot_settings/${username}_${platform}.json`;
+      
+      // Check if autopilot settings exist
+      try {
+        const getAutopilotCommand = new GetObjectCommand({
+          Bucket: 'tasks',
+          Key: autopilotKey
+        });
+        await s3Client.send(getAutopilotCommand);
+        
+        // If exists, delete it to reset autopilot for new campaigns
+        const deleteAutopilotCommand = new DeleteObjectCommand({
+          Bucket: 'tasks',
+          Key: autopilotKey
+        });
+        await s3Client.send(deleteAutopilotCommand);
+        
+        console.log(`[${new Date().toISOString()}] ✅ Autopilot settings reset for ${username} on ${platform}`);
+        deletedFiles.push(autopilotKey);
+      } catch (autopilotError) {
+        // Autopilot settings didn't exist, which is fine
+        if (autopilotError.name !== 'NoSuchKey') {
+          console.warn(`[${new Date().toISOString()}] Warning: Could not reset autopilot settings: ${autopilotError.message}`);
+        }
+      }
+    } catch (resetError) {
+      console.warn(`[${new Date().toISOString()}] Warning: Autopilot reset failed: ${resetError.message}`);
+    }
 
     // Clear any cached status data - skip cache operations if memoryCache is not defined
     try {

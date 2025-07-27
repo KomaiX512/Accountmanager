@@ -3,10 +3,9 @@
     background: transparent;
     display: flex;
     flex-direction: column;
-    align-items: center;      /* Center horizontally */
-    justify-content: flex-start; /* Start from top but centered horizontally */
-    padding-top: 100px;       /* Space for top bar */
-    padding-bottom: 40px;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
     width: 100vw;
     box-sizing: border-box;
 }
@@ -14,9 +13,9 @@
 .dashboard-container {
     display: flex;
     justify-content: center;
-    align-items: flex-start;
+    align-items: center;
     width: 100%;
-    max-width: 800px;         /* Prevents stretching on large screens */
+    max-width: 600px;
     margin: 0 auto;
     background: transparent;
     padding: 0;
@@ -24,13 +23,19 @@
 
 .card {
     width: 100%;
-    max-width: 1200px; /* doubled from 600px */
-    background: linear-gradient(135deg, #1a1a3a 0%, #2e2e5e 100%);
-    border-radius: 20px;
-    box-shadow: 0 10px 40px rgba(0, 255, 204, 0.5), 0 0 20px rgba(0, 255, 204, 0.3);
-    padding: 2.5rem;
-    backdrop-filter: blur(15px);
-    border: 2px solid rgba(0, 255, 204, 0.4);
+    max-width: 480px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1.5px solid rgba(255, 255, 255, 0.15);
+    border-radius: 24px;
+    padding: 48px 40px;
+    backdrop-filter: blur(20px);
+    box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.25),
+        0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+    position: relative;
+    overflow: hidden;
+    backdrop-filter: blur(20px);
+    border: 1.5px solid rgba(255, 255, 255, 0.15);
     position: relative;
     overflow: hidden;
 }
@@ -44,10 +49,10 @@
     height: 200%;
     background: radial-gradient(circle, rgba(0, 255, 204, 0.2) 0%, transparent 70%);
     animation: pulse 8s infinite;
-    pointer-events: none; /* <-- Add this line */
-  }
-  
-  .title {
+    pointer-events: none; 
+}
+
+.title {
     font-size: 2rem;
     color: #00ffcc;
     text-align: center;
@@ -254,19 +259,12 @@
   border-radius: 8px;
   font-size: 0.9rem;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  margin-left: 15px;
-  backdrop-filter: blur(5px);
-  border: 1px solid rgba(255, 223, 126, 0.3);
 }
 
-.username-notification::before {
-  content: '';
-  position: absolute;
-  left: -8px;
-  top: 50%;
-  transform: translateY(-50%);
-  border-style: solid;
-  border-width: 8px 8px 8px 0;
+.form-note {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.5);
+    line-height: 1.4;
   border-color: transparent rgba(255, 223, 126, 0.95) transparent transparent;
 }
 

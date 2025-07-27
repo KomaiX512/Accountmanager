@@ -2258,7 +2258,7 @@ Image Description: ${response.post.image_prompt}
                 textAlign: 'center'
               }}
             >
-              You are listed in Smart People on {config.name}!
+              Congrats! You are listed on top initial users of Sentient Marketing AI-powered Management!
             </motion.p>
             
             {profileInfo?.biography && profileInfo.biography.trim() && (
@@ -2420,15 +2420,6 @@ Image Description: ${response.post.image_prompt}
                         >
                           <FaChartLine className="btn-icon" />
                           <span>Insights</span>
-                        </TwitterRequiredButton>
-                        
-                        <TwitterRequiredButton
-                          isConnected={isTwitterConnected}
-                          onClick={handleOpenTwitterScheduler}
-                          className="dashboard-btn schedule-btn twitter"
-                        >
-                          <FaCalendarAlt className="btn-icon" />
-                          <span>Schedule</span>
                         </TwitterRequiredButton>
                       </>
                     ) : platform === 'facebook' ? (

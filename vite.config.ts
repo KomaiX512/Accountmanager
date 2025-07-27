@@ -283,6 +283,13 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      // Fresh R2 posts endpoint for R2PostFetcher
+      '/api/posts-fresh-r2': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path, // Keep the full path including /api
+      },
       '/images': {
         target: 'http://localhost:3002',
         changeOrigin: true,

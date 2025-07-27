@@ -362,7 +362,7 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
       )}
 
       {validNotifications.length === 0 ? (
-        <div className="no-notifications">No new notifications</div>
+        <div className="no-notifications">You will receive new DMs and Comments here from now here</div>
       ) : (
         <div 
           className="notifications-scroll-container" 

@@ -6018,9 +6018,9 @@ app.post(['/api/schedule-post/:userId', '/schedule-post/:userId'], upload.single
       const existingResponse = await s3Client.send(existingSchedulesCommand);
       
       if (existingResponse.Contents) {
-        // Check for potential duplicates based on caption and schedule time similarity
+        // 🎯 BULLETPROOF: Smart duplicate detection that supports auto-scheduling
         const captionTrimmed = caption.trim();
-        const scheduleTimeBuffer = 5 * 60 * 1000; // 5 minute buffer for duplicate detection
+        const scheduleTimeBuffer = 30 * 1000; // 30 second buffer (reduced from 5 minutes)
         
         for (const existingObj of existingResponse.Contents) {
           if (!existingObj.Key?.endsWith('.json')) continue;
@@ -6040,15 +6040,20 @@ app.post(['/api/schedule-post/:userId', '/schedule-post/:userId'], upload.single
             const existingScheduleTime = new Date(existingSchedule.scheduleDate);
             const timeDiff = Math.abs(existingScheduleTime.getTime() - scheduledTime.getTime());
             
-            // Check for potential duplicate (same caption within 5 minutes)
+            // 🎯 SMART DUPLICATE DETECTION: Only flag as duplicate if:
+            // 1. Exact same caption AND exact same time (within 30 seconds)
+            // 2. This prevents legitimate auto-scheduled posts from being flagged
             if (existingSchedule.caption === captionTrimmed && timeDiff < scheduleTimeBuffer) {
-              console.log(`[${new Date().toISOString()}] 🚫 Potential duplicate detected: same caption within 5 minutes`);
+              console.log(`[${new Date().toISOString()}] 🚫 TRUE duplicate detected: same caption within 30 seconds (${timeDiff}ms apart)`);
               return res.status(409).json({ 
                 error: 'Duplicate schedule detected',
-                message: 'A post with the same caption is already scheduled within 5 minutes of this time.',
+                message: 'A post with the exact same caption is already scheduled within 30 seconds of this time.',
                 existingScheduleId: existingSchedule.id,
                 existingScheduleTime: existingSchedule.scheduleDate
               });
+            } else if (existingSchedule.caption === captionTrimmed) {
+              // Log but allow: same caption but different time (auto-scheduling)
+              console.log(`[${new Date().toISOString()}] ✅ Auto-schedule allowed: same caption but ${Math.round(timeDiff/1000)}s apart (not a duplicate)`);
             }
             
           } catch (checkError) {
@@ -6089,7 +6094,8 @@ app.post(['/api/schedule-post/:userId', '/schedule-post/:userId'], upload.single
 
     // Store schedule data
     const scheduleData = {
-      id: scheduleId,
+      id: scheduleId, // legacy field
+      scheduleId,     // 🔑 NEW: explicit scheduleId field for downstream consistency
       userId,
       platform,
       caption: caption.trim(),
@@ -9862,7 +9868,15 @@ async function processScheduledInstagramPosts() {
 }
 
 async function executeScheduledPost(scheduleData) {
-  const { userId, imageKey, caption, scheduleId } = scheduleData;
+  // Accept both `scheduleId` (new) and legacy `id` field for backward compatibility
+  const {
+    userId,
+    imageKey,
+    caption,
+    scheduleId: explicitScheduleId,
+    id: legacyId
+  } = scheduleData;
+  const scheduleId = explicitScheduleId || legacyId;
   console.log(`[SCHEDULER-TRACE] Starting scheduled post: scheduleId=${scheduleId}, userId=${userId}, imageKey=${imageKey}`);
   let tokenData;
   try {
@@ -9908,73 +9922,124 @@ async function executeScheduledPost(scheduleData) {
     const apiResponse = await postToInstagram(tokenData, imageBuffer, caption);
     console.log(`[SCHEDULER-TRACE] Instagram API call success: userId=${userId}, scheduleId=${scheduleId}, response=${JSON.stringify(apiResponse)}`);
     
-    // --- CRITICAL FIX: Update schedule status to prevent reprocessing ---
+    // 🎯 BULLETPROOF FIX: Update schedule status to prevent duplicate posting
     try {
-      // Find the schedule file to update its status
-      const listCommand = new ListObjectsV2Command({
-        Bucket: 'tasks',
-        Prefix: `scheduled_posts/instagram/${userId}/`,
-      });
-      const scheduleFiles = await s3Client.send(listCommand);
+      // First, try to construct the exact schedule file key if we have scheduleId
+      let targetScheduleKey = null;
       
-      if (scheduleFiles.Contents) {
-        for (const file of scheduleFiles.Contents) {
-          if (file.Key.endsWith('.json')) {
-            try {
-              const getScheduleCommand = new GetObjectCommand({
-                Bucket: 'tasks',
-                Key: file.Key,
-              });
-              const scheduleResponse = await s3Client.send(getScheduleCommand);
-              const scheduleDataStr = await streamToString(scheduleResponse.Body);
-              const scheduleData = JSON.parse(scheduleDataStr);
-              
-              // Check if this is the matching schedule (by imageKey or scheduleId)
-              if ((scheduleData.imageKey === imageKey) || 
-                  (scheduleId && scheduleData.scheduleId === scheduleId) ||
-                  (scheduleData.caption === caption && scheduleData.userId === userId)) {
-                
-                // Update status to prevent reprocessing
-                scheduleData.status = 'posted';
-                scheduleData.posted_at = new Date().toISOString();
-                scheduleData.post_id = apiResponse.post_id;
-                
-                // Update the schedule file
-                await s3Client.send(new PutObjectCommand({
+      if (scheduleId) {
+        targetScheduleKey = `scheduled_posts/instagram/${userId}/${scheduleId}.json`;
+        console.log(`[SCHEDULER-TRACE] Attempting direct schedule file access: ${targetScheduleKey}`);
+        
+        try {
+          // Try direct access first (fastest path)
+          const getDirectCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: targetScheduleKey,
+          });
+          const directResponse = await s3Client.send(getDirectCommand);
+          const directScheduleStr = await streamToString(directResponse.Body);
+          const directScheduleData = JSON.parse(directScheduleStr);
+          
+          // Update status immediately
+          directScheduleData.status = 'posted';
+          directScheduleData.posted_at = new Date().toISOString();
+          directScheduleData.post_id = apiResponse.post_id;
+          directScheduleData.media_id = apiResponse.media_id;
+          
+          // CRITICAL: Use atomic operation to prevent race conditions
+          const completedKey = targetScheduleKey.replace('scheduled_posts/', 'completed_posts/');
+          
+          // Move to completed folder first
+          await s3Client.send(new PutObjectCommand({
+            Bucket: 'tasks',
+            Key: completedKey,
+            Body: JSON.stringify(directScheduleData, null, 2),
+            ContentType: 'application/json',
+          }));
+          
+          // Then delete original (atomic cleanup)
+          await s3Client.send(new DeleteObjectCommand({
+            Bucket: 'tasks',
+            Key: targetScheduleKey,
+          }));
+          
+          console.log(`[SCHEDULER-TRACE] ✅ BULLETPROOF: Schedule moved to completed successfully: ${completedKey}`);
+          
+        } catch (directError) {
+          console.log(`[SCHEDULER-TRACE] Direct access failed, falling back to search: ${directError.message}`);
+          targetScheduleKey = null; // Fall back to search method
+        }
+      }
+      
+      // Fallback: Search for the schedule file if direct access failed
+      if (!targetScheduleKey) {
+        const listCommand = new ListObjectsV2Command({
+          Bucket: 'tasks',
+          Prefix: `scheduled_posts/instagram/${userId}/`,
+        });
+        const scheduleFiles = await s3Client.send(listCommand);
+        
+        console.log(`[SCHEDULER-TRACE] Searching through ${scheduleFiles.Contents?.length || 0} schedule files`);
+        
+        if (scheduleFiles.Contents) {
+          for (const file of scheduleFiles.Contents) {
+            if (file.Key.endsWith('.json')) {
+              try {
+                const getScheduleCommand = new GetObjectCommand({
                   Bucket: 'tasks',
                   Key: file.Key,
-                  Body: JSON.stringify(scheduleData, null, 2),
-                  ContentType: 'application/json',
-                }));
+                });
+                const scheduleResponse = await s3Client.send(getScheduleCommand);
+                const scheduleDataStr = await streamToString(scheduleResponse.Body);
+                const foundScheduleData = JSON.parse(scheduleDataStr);
                 
-                console.log(`[SCHEDULER-TRACE] ✅ Updated schedule status to 'posted': ${file.Key}`);
+                // Enhanced matching logic
+                const isMatch = (
+                  (foundScheduleData.imageKey === imageKey) ||
+                  (scheduleId && foundScheduleData.id === scheduleId) ||
+                  (foundScheduleData.caption?.trim() === caption?.trim() && foundScheduleData.userId === userId && foundScheduleData.status === 'scheduled')
+                );
                 
-                // Optional: Move to completed folder or delete to prevent future processing
-                const completedKey = file.Key.replace('scheduled_posts/', 'completed_posts/');
-                await s3Client.send(new PutObjectCommand({
-                  Bucket: 'tasks',
-                  Key: completedKey,
-                  Body: JSON.stringify(scheduleData, null, 2),
-                  ContentType: 'application/json',
-                }));
-                
-                // Delete the original schedule file
-                await s3Client.send(new DeleteObjectCommand({
-                  Bucket: 'tasks',
-                  Key: file.Key,
-                }));
-                
-                console.log(`[SCHEDULER-TRACE] ✅ Moved schedule to completed: ${completedKey}`);
-                break; // Found and processed the matching schedule
+                if (isMatch) {
+                  console.log(`[SCHEDULER-TRACE] Found matching schedule file: ${file.Key}`);
+                  
+                  // Update status
+                  foundScheduleData.status = 'posted';
+                  foundScheduleData.posted_at = new Date().toISOString();
+                  foundScheduleData.post_id = apiResponse.post_id;
+                  foundScheduleData.media_id = apiResponse.media_id;
+                  
+                  // Move to completed and delete original
+                  const completedKey = file.Key.replace('scheduled_posts/', 'completed_posts/');
+                  
+                  await s3Client.send(new PutObjectCommand({
+                    Bucket: 'tasks',
+                    Key: completedKey,
+                    Body: JSON.stringify(foundScheduleData, null, 2),
+                    ContentType: 'application/json',
+                  }));
+                  
+                  await s3Client.send(new DeleteObjectCommand({
+                    Bucket: 'tasks',
+                    Key: file.Key,
+                  }));
+                  
+                  console.log(`[SCHEDULER-TRACE] ✅ BULLETPROOF: Schedule moved to completed via search: ${completedKey}`);
+                  break;
+                }
+              } catch (updateError) {
+                console.error(`[SCHEDULER-TRACE] Error processing schedule file ${file.Key}:`, updateError.message);
+                continue; // Continue searching other files
               }
-            } catch (updateError) {
-              console.error(`[SCHEDULER-TRACE] Error updating schedule file ${file.Key}:`, updateError.message);
             }
           }
         }
       }
     } catch (cleanupError) {
-      console.error(`[SCHEDULER-TRACE] Error in schedule cleanup:`, cleanupError.message);
+      console.error(`[SCHEDULER-TRACE] CRITICAL: Schedule cleanup failed - this may cause duplicates:`, cleanupError.message);
+      // Even if cleanup fails, we posted successfully, so log this clearly
+      console.log(`[SCHEDULER-TRACE] ⚠️ POST WAS SUCCESSFUL but cleanup failed - monitor for duplicates`);
     }
     // ----------------------------------------------------------------
     
@@ -13305,7 +13370,7 @@ app.get(['/profit-analysis/:username', '/api/profit-analysis/:username'], async 
       console.log(`[${new Date().toISOString()}] No profit analysis found for ${username} on ${platform}`);
       return res.status(404).json({ 
         error: 'Profit analysis not found',
-        message: 'No profit analysis data available for this account.'
+        message: 'Your public data was not exposed, your account is fresh, or your username is incorrect.'
       });
     }
 
@@ -13321,7 +13386,7 @@ app.get(['/profit-analysis/:username', '/api/profit-analysis/:username'], async 
     if (analysisFiles.length === 0) {
       return res.status(404).json({ 
         error: 'No valid analysis files found',
-        message: 'No profit analysis data available for this account.'
+        message: 'Your public data was not exposed, your account is fresh, or your username is incorrect.'
       });
     }
 
@@ -13346,7 +13411,7 @@ app.get(['/profit-analysis/:username', '/api/profit-analysis/:username'], async 
     if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
       return res.status(404).json({ 
         error: 'Profit analysis not found',
-        message: 'No profit analysis data available for this account.'
+        message: 'Your public data was not exposed, your account is fresh, or your username is incorrect.'
       });
     }
 

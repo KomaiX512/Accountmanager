@@ -318,6 +318,16 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
       if (response.data.success) {
         console.log('[CampaignModal] Campaign stopped successfully:', response.data);
         
+        // ✅ BULLETPROOF: Log generated content cleanup confirmation
+        if (response.data.generatedContentCleared) {
+          console.log(`[CampaignModal] ✅ BULLETPROOF: Generated content cleared from R2 - fresh start for next campaign`);
+        }
+        
+        // ✅ BULLETPROOF CLEANUP: Clear all campaign data to prevent UI reuse
+        setSummary(null);
+        setGeneratedSummary(null);
+        setEngagement(null);
+        
         // 🚀 AUTOPILOT RESET: Reset autopilot settings and counters when campaign stops
         setAutopilotSettings({
           enabled: false,
@@ -408,19 +418,17 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
 
   return (
     <motion.div
-      className="popup-overlay"
+      className="post-scheduler-modal"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.2 }}
-      onClick={onClose}
     >
       <motion.div
-        className="popup-content"
-        initial={{ scale: 0.8, y: 50 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.8, y: 50 }}
-        transition={{ duration: 0.3, ease: 'easeOut' }}
+        className="post-scheduler-content"
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        transition={{ type: "spring", damping: 25, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
         style={{ maxWidth: 600, width: '100%', maxHeight: '80vh', overflowY: 'auto' }}
       >

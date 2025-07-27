@@ -219,19 +219,17 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
   if (isCheckingStatus) {
     return (
       <motion.div
-        className="popup-overlay"
+        className="post-scheduler-modal"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.2 }}
-        onClick={onClose}
       >
         <motion.div
-          className="popup-content"
-          initial={{ scale: 0.8, y: 50 }}
-          animate={{ scale: 1, y: 0 }}
-          exit={{ scale: 0.8, y: 50 }}
-          transition={{ duration: 0.3, ease: 'easeOut' }}
+          className="post-scheduler-content"
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.9, opacity: 0 }}
+          transition={{ type: "spring", damping: 25, stiffness: 300 }}
           onClick={(e) => e.stopPropagation()}
           style={{ maxWidth: 500, width: '100%' }}
         >

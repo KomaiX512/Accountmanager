@@ -1933,7 +1933,7 @@ Image Description: ${response.post.image_prompt}
               textAlign: 'center'
             }}
           >
-            You are listed in Smart People on Instagram!
+            Congrats! You are listed as a top initial user of AI powered Account Management!
           </motion.p>
           
           {profileInfo?.biography && profileInfo.biography.trim() && (
@@ -2273,8 +2273,19 @@ Image Description: ${response.post.image_prompt}
         />
       )}
       {isResetConfirmOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content">
+        <motion.div
+          className="post-scheduler-modal"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.div
+            className="post-scheduler-content"
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+          >
             <h3>Reset Instagram Dashboard</h3>
             <p>This will clear all your Instagram dashboard data including:</p>
             <ul>
@@ -2300,8 +2311,8 @@ Image Description: ${response.post.image_prompt}
                 {isResetting ? 'Resetting...' : 'Reset Dashboard'}
               </button>
             </div>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       )}
       {isChatModalOpen && (
         <ChatModal 

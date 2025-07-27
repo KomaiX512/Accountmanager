@@ -85,7 +85,7 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
   const [activeTab, setActiveTab] = useState<'analysis' | 'reach' | 'other'>('analysis');
   const [accountUsername, setAccountUsername] = useState<string | null>(null);
 
-  // Fetch account username for profit analysis
+  // Fetch account username for statistical analysis
   useEffect(() => {
     const fetchAccountUsername = async () => {
       if (!currentUser?.uid) return;
@@ -116,7 +116,7 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
     fetchAccountUsername();
   }, [currentUser?.uid, platform]);
 
-  // Fetch profit analysis data (works without connection)
+  // Fetch statistical analysis data (works without connection)
   useEffect(() => {
     const fetchProfitAnalysis = async () => {
       if (!accountUsername) {
@@ -125,13 +125,13 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
       }
 
       try {
-        console.log(`[${new Date().toISOString()}] Fetching profit analysis for ${platform} user: ${accountUsername}`);
+        console.log(`[${new Date().toISOString()}] Fetching statistical analysis for ${platform} user: ${accountUsername}`);
         const response = await axios.get(`/api/profit-analysis/${accountUsername}?platform=${platform}`);
         setProfitAnalysis(response.data);
-        console.log(`[${new Date().toISOString()}] Profit analysis fetched:`, response.data);
+        console.log(`[${new Date().toISOString()}] Statistical analysis fetched:`, response.data);
       } catch (err: any) {
-        console.error(`[${new Date().toISOString()}] Error fetching profit analysis:`, err);
-        setAnalysisError(err.response?.data?.message || 'No profit analysis data available for this account.');
+        console.error(`[${new Date().toISOString()}] Error fetching statistical analysis:`, err);
+        setAnalysisError(err.response?.data?.message || 'Your public data was not exposed, your account is fresh, or your username is incorrect. Please ensure your profile has public content and try again.');
       } finally {
         setAnalysisLoading(false);
       }
@@ -363,7 +363,7 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
 
   const renderProfitAnalysis = () => {
     if (analysisLoading) {
-      return <div className="insights-loading">Loading profit analysis...</div>;
+      return <div className="insights-loading">Loading statistical analysis...</div>;
     }
 
     if (analysisError) {
@@ -374,8 +374,8 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
       return (
         <div className="insights-error">
           {!accountUsername 
-            ? `Please set up your ${platform === 'instagram' ? 'Instagram' : platform === 'twitter' ? 'Twitter' : 'Facebook'} account to view prophet analysis.`
-            : 'No Prophet analysis data available for this account.'
+            ? `Please set up your ${platform === 'instagram' ? 'Instagram' : platform === 'twitter' ? 'Twitter' : 'Facebook'} account to view statistical analysis.`
+            : 'No statistical analysis data available for this account.'
           }
         </div>
       );
@@ -449,7 +449,7 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
             className={activeTab === 'analysis' ? 'active' : ''}
             onClick={() => setActiveTab('analysis')}
           >
-            Profit Analysis
+            Statistical Analysis
           </button>
           <button
             className={activeTab === 'reach' ? 'active' : ''}

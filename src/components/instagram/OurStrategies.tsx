@@ -95,18 +95,13 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.2 }}
           whileHover={{ scale: 1.02 }}
-          onClick={() => data && setShowPopup(true)}
+          onClick={() => setShowPopup(true)}
         >
           <span className="overlay-text">Our Strategies</span>
           {loading && (
             <div className="futuristic-loading">
               <span className="loading-text">Analyzing Strategies...</span>
               <div className="particle-effect" />
-            </div>
-          )}
-          {error && (
-            <div className="error-text">
-              Failed to load strategies: {error}
             </div>
           )}
         </motion.div>
@@ -197,7 +192,140 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
                   </div>
                 </motion.div>
               ) : (
-                <p>No strategies available.</p>
+                <div className="no-analysis-explanation">
+                  <div className="explanation-header">
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      width="24" 
+                      height="24" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="#ffa500" 
+                      strokeWidth="2" 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round"
+                    >
+                      <circle cx="12" cy="12" r="10"/>
+                      <line x1="12" y1="8" x2="12" y2="12"/>
+                      <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                    <h4>Strategy Analysis Not Available</h4>
+                  </div>
+                  
+                  <div className="explanation-content">
+                    <p>We cannot access the strategy analysis for <strong>{normalizedAccountHolder}</strong>. This could be due to several reasons:</p>
+                    
+                    <div className="reason-list">
+                      <div className="reason-item">
+                        <span className="reason-icon">❌</span>
+                        <div className="reason-text">
+                          <strong>Incorrect Username:</strong> The account username might be misspelled or doesn't exist on {platform}
+                        </div>
+                      </div>
+                      
+                      <div className="reason-item">
+                        <span className="reason-icon">🔒</span>
+                        <div className="reason-text">
+                          <strong>Private Account:</strong> The account profile is private and cannot be analyzed for strategies
+                        </div>
+                      </div>
+                      
+                      <div className="reason-item">
+                        <span className="reason-icon">🆕</span>
+                        <div className="reason-text">
+                          <strong>New Account:</strong> Recently added account - strategy analysis is still processing (can take up to 15 minutes)
+                        </div>
+                      </div>
+                      
+                      <div className="reason-item">
+                        <span className="reason-icon">📊</span>
+                        <div className="reason-text">
+                          <strong>Insufficient Data:</strong> The account doesn't have enough public content to generate meaningful strategies
+                        </div>
+                      </div>
+                      
+                      <div className="reason-item">
+                        <span className="reason-icon">⚠️</span>
+                        <div className="reason-text">
+                          <strong>Technical Issue:</strong> Temporary server issues or rate limiting from {platform}
+                        </div>
+                      </div>
+                      
+                      <div className="reason-item">
+                        <span className="reason-icon">🚫</span>
+                        <div className="reason-text">
+                          <strong>Data Scraping Blocker:</strong> Anti-bot protection or rate limiting prevented data collection from {platform}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="suggested-actions">
+                      <h5>🛠️ Suggested Actions:</h5>
+                      <ul>
+                        <li><strong>Verify Username:</strong> Double-check the {platform} username for typos</li>
+                        <li><strong>Check Profile:</strong> Ensure the account profile is public and accessible</li>
+                        <li><strong>Wait for Processing:</strong> If recently added, wait 10-15 minutes for analysis to complete</li>
+                        <li><strong>Add More Content:</strong> Ensure the account has sufficient public posts for strategy generation</li>
+                        <li><strong>Try Again:</strong> Refresh the page and check if strategies become available</li>
+                        <li><strong>Check Account Type:</strong> Verify the account type (branding/non-branding) is correctly set</li>
+                        <li><strong>Wait for Rate Limit:</strong> If blocked by anti-bot protection, wait 15-30 minutes before retrying</li>
+                      </ul>
+                    </div>
+                    
+                    <div className="action-buttons">
+                      <motion.button
+                        className="modal-btn refresh-btn-modal"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          setShowPopup(false);
+                          // Force a refresh by triggering a re-render
+                          window.location.reload();
+                        }}
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#00ffcc"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M23 4v6h-6"/>
+                          <path d="M1 20v-6h6"/>
+                          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                        </svg>
+                        Refresh Page
+                      </motion.button>
+                      
+                      <motion.button
+                        className="modal-btn close-btn-modal"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => setShowPopup(false)}
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#e0e0ff"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <line x1="18" y1="6" x2="6" y2="18"/>
+                          <line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                        Close
+                      </motion.button>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
             <motion.button

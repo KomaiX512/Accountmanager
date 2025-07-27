@@ -1981,37 +1981,43 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             </InstagramRequiredButton>
           )}
         </div>
-        {showIntervalModal && (
-          <div style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0,0,0,0.4)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}>
-            <div style={{ background: '#23234a', borderRadius: 12, padding: 24, minWidth: 380, boxShadow: '0 4px 24px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <h3 style={{ color: '#e0e0ff', marginBottom: 8 }}>Set Auto-Schedule Interval</h3>
+        {showIntervalModal && ReactDOM.createPortal(
+          <div className="auto-schedule-interval-modal">
+            <div className="auto-schedule-interval-content">
+              <h3 className="auto-schedule-interval-title">Set Auto-Schedule Interval</h3>
               <input
                 type="number"
                 min={1}
-                
                 step={1}
                 value={intervalInput}
                 onChange={e => setIntervalInput(e.target.value)}
                 placeholder="Interval in hours (e.g. 4)"
-                style={{ padding: 8, borderRadius: 6, border: '1px solid #00ffcc', fontSize: 16, marginBottom: 8 }}
+                className="auto-schedule-interval-input"
                 autoFocus
               />
-              <div style={{ color: '#a0a0cc', fontSize: 14, marginBottom: 8, lineHeight: '1.4' }}>
+              <div className="auto-schedule-interval-description">
                 <strong>Priority System:</strong><br />
                 1. Your custom interval (if provided)<br />
                 2. Campaign timeline from goal settings<br />
-                3. Default interval (6 hours)
+                3. Default interval (6 hours)<br /><br />
+                <strong>🧪 Testing Mode:</strong> Use the "Quick Test (5 min)" button for immediate testing without waiting for long intervals
               </div>
-              <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+              <div className="auto-schedule-interval-actions">
                 <button
-                  className="insta-btn disconnect"
+                  className="auto-schedule-quick-btn"
+                  onClick={() => {
+                    setShowIntervalModal(false);
+                    setIntervalInput('');
+                    handleAutoSchedule(0.083); // 5 minutes (5/60 = 0.083 hours)
+                  }}
+                  disabled={autoScheduling}
+                >🚀 Quick Test (5 min)</button>
+                <button
+                  className="auto-schedule-cancel-btn"
                   onClick={() => { setShowIntervalModal(false); setIntervalInput(''); }}
                 >Cancel</button>
                 <button
-                  className="insta-btn connect"
+                  className="auto-schedule-start-btn"
                   onClick={() => {
                     setShowIntervalModal(false);
                     const interval = intervalInput.trim() ? parseInt(intervalInput, 10) : undefined;
@@ -2022,25 +2028,23 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                 >Start Auto-Schedule</button>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
-        {showScheduleModal && (
-          <div style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0,0,0,0.4)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}>
-            <div className="schedule-modal">
-              <h3>Schedule Post</h3>
-              <label style={{ color: '#e0e0ff', fontSize: '1rem', marginBottom: '8px' }}>
+        {showScheduleModal && ReactDOM.createPortal(
+          <div className="schedule-modal-overlay">
+            <div className="schedule-modal-content">
+              <h3 className="schedule-modal-title">Schedule Post</h3>
+              <label className="schedule-modal-label">
                 Select Date and Time
               </label>
               <input
                 type="datetime-local"
                 value={scheduleDateTime}
                 onChange={e => setScheduleDateTime(e.target.value)}
-                style={{ padding: 8, borderRadius: 6, border: '1px solid #00ffcc', fontSize: 16, width: '100%', background: 'rgba(255, 255, 255, 0.05)', color: '#e0e0ff' }}
+                className="schedule-modal-input"
               />
-              <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 16 }}>
+              <div className="schedule-modal-actions">
                 <button
                   className="schedule-cancel-button"
                   onClick={handleScheduleCancel}
@@ -2052,7 +2056,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                 >Schedule</button>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
         {showCanvasEditor && editingPost && ReactDOM.createPortal(
           <CanvasEditor
@@ -2079,7 +2084,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.3 }}
             style={{
-              background: 'linear-gradient(135deg, rgba(0, 255, 204, 0.1), rgba(0, 123, 255, 0.1))',
+              background: 'rgba(0, 255, 204, 0.08)',
               border: '1px solid rgba(0, 255, 204, 0.3)',
               borderRadius: '12px',
               padding: '16px',
@@ -2110,7 +2115,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
               <motion.div
                 style={{
                   height: '100%',
-                  background: 'linear-gradient(90deg, #00ffcc, #007bff)',
+                  background: 'rgba(0, 255, 204, 0.6)',
                   borderRadius: '4px',
                   width: `${autoScheduleTracking.total > 0 ? (autoScheduleTracking.current / autoScheduleTracking.total) * 100 : 0}%`
                 }}
@@ -2133,8 +2138,9 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
           </motion.div>
         )}
         {filteredPosts.length === 0 ? (
-          <p className="no-posts">No posts ready yet. Stay tuned!</p>
+          <p className="no-posts">Start by creating your first post with your Account Manager with one prompt!</p>
         ) : (
+          
           <div 
             className="posts-scroll-container" 
             ref={scrollContainerRef}
@@ -2167,7 +2173,12 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                     <span className="username">{username}</span>
                   </div>
                   {(() => {
-                    const imageUrl = getReliableImageUrl(post);
+                    // Ensure imageUrl is cache-busting after refresh
+                    let imageUrl = getReliableImageUrl(post);
+                    if (imageUrl && typeof imageUrl === 'string') {
+                      const hasQuery = imageUrl.includes('?');
+                      imageUrl += (hasQuery ? '&' : '?') + 'refreshKey=' + imageRefreshKey;
+                    }
                     const shouldShowPlaceholder = (post.key in imageErrors && imageErrors[post.key]?.failed && imageErrors[post.key]?.retryCount >= 3) || 
                                                 imageUrl.includes('placeholder.jpg');
                     
@@ -2604,13 +2615,15 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             transition={{ duration: 0.2 }}
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
-              border: '1px solid #00ffcc',
-              borderRadius: '16px',
-              padding: '24px',
+              background: 'rgba(255, 255, 255, 0.08)',
+              border: '1.5px solid rgba(255, 255, 255, 0.15)',
+              borderRadius: '24px',
+              padding: '28px',
               maxWidth: '500px',
               width: '90%',
-              position: 'relative'
+              position: 'relative',
+              backdropFilter: 'blur(20px)',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.05) inset'
             }}
           >
             <h3 style={{ color: '#00ffcc', marginBottom: '16px', textAlign: 'center' }}>
@@ -2639,12 +2652,13 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
               <button
                 onClick={() => setShowPostNowModal(false)}
                 style={{
-                  background: 'transparent',
-                  border: '1px solid #666',
-                  color: '#e0e0ff',
+                  background: 'rgba(255, 68, 68, 0.15)',
+                  border: '1px solid rgba(255, 68, 68, 0.3)',
+                  color: '#ff6b6b',
                   padding: '10px 20px',
-                  borderRadius: '8px',
-                  cursor: 'pointer'
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease'
                 }}
                 disabled={isPosting}
               >
@@ -2655,14 +2669,15 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                 disabled={isPosting}
                 style={{
                   background: isPosting 
-                    ? 'linear-gradient(45deg, #666, #777)' 
-                    : 'linear-gradient(45deg, #405DE6, #5851DB, #833AB4, #C13584, #E1306C, #FD1D1D)',
-                  color: 'white',
-                  border: 'none',
+                    ? 'rgba(255, 255, 255, 0.05)' 
+                    : 'rgba(0, 255, 204, 0.15)',
+                  color: isPosting ? '#666' : '#00ffcc',
+                  border: `1px solid ${isPosting ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 255, 204, 0.3)'}`,
                   padding: '10px 20px',
-                  borderRadius: '8px',
+                  borderRadius: '12px',
                   cursor: isPosting ? 'not-allowed' : 'pointer',
-                  fontWeight: 'bold'
+                  fontWeight: 'bold',
+                  transition: 'all 0.3s ease'
                 }}
               >
                 {isPosting ? '🔄 Posting...' : '📤 Yes, Post Now!'}

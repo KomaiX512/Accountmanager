@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { safeNavigate } from '../utils/navigationGuard';
 
@@ -40,7 +40,6 @@ export const useProcessing = () => {
 export const ProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
 
   const [isLoading, setIsLoading] = useState(true);
   const [processingState, setProcessingState] = useState<ProcessingState>(initialProcessingState);
@@ -118,20 +117,7 @@ export const ProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   }, [processingState, isLoading]);
 
-  // Navigation guard – ensure user stays on the correct processing route
-  useEffect(() => {
-    if (isLoading) return;
 
-    // Only run when processing is active
-    if (!processingState.isProcessing) return;
-
-    const expectedPath = `/processing/${processingState.platform}`;
-
-    // Redirect if user is not already on the correct processing route
-    if (!location.pathname.startsWith('/processing') || location.pathname !== expectedPath) {
-      safeNavigate(navigate, expectedPath, { replace: true }, 9); // High priority for processing context
-    }
-  }, [processingState, location.pathname, navigate, isLoading]);
   
   const startProcessing = useCallback((
     platform: 'instagram' | 'twitter' | 'facebook',

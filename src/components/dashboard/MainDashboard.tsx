@@ -81,6 +81,11 @@ const MainDashboard: React.FC = () => {
   const [isWishlisted, setIsWishlisted] = useState<boolean>(false);
   const [showWishlistConfirmation, setShowWishlistConfirmation] = useState<boolean>(false);
   
+  // Meta Ads coming soon state
+  const [showMetaAdsModal, setShowMetaAdsModal] = useState<boolean>(false);
+  const [isMetaAdsWishlisted, setIsMetaAdsWishlisted] = useState<boolean>(false);
+  const [showMetaAdsWishlistConfirmation, setShowMetaAdsWishlistConfirmation] = useState<boolean>(false);
+  
 
   
   // Platform time tracking state
@@ -370,6 +375,10 @@ const MainDashboard: React.FC = () => {
       // Load wishlist status from localStorage
       const wishlistStatus = localStorage.getItem(`agent_wishlisted_${currentUser.uid}`) === 'true';
       setIsWishlisted(wishlistStatus);
+      
+      // Load Meta Ads wishlist status from localStorage
+      const metaAdsWishlistStatus = localStorage.getItem(`meta_ads_wishlisted_${currentUser.uid}`) === 'true';
+      setIsMetaAdsWishlisted(metaAdsWishlistStatus);
     }
   }, [currentUser]);
 
@@ -1121,11 +1130,7 @@ const MainDashboard: React.FC = () => {
     return usage.posts + usage.aiReplies + usage.discussions;
   };
 
-  useEffect(() => {
-    if (processingState.isProcessing && processingState.platform === 'instagram') {
-      navigate('/processing/instagram', { replace: true });
-    }
-  }, [processingState, navigate]);
+
 
   return (
     <div className="dashboard-page">
@@ -1167,6 +1172,28 @@ const MainDashboard: React.FC = () => {
 
                 {activeTab === 'overview' && (
           <div className="dashboard-content-grid">
+            {/* Meta Ads Coming Soon Section */}
+            <div className="meta-ads-section">
+              <button 
+                className="meta-ads-button"
+                onClick={() => setShowMetaAdsModal(true)}
+                title="Run Meta Ads campaigns with AI"
+              >
+                <div className="meta-ads-icon">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4M12,6A6,6 0 0,1 18,12A6,6 0 0,1 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6M12,8A4,4 0 0,0 8,12A4,4 0 0,0 12,16A4,4 0 0,0 16,12A4,4 0 0,0 12,8Z" />
+                  </svg>
+                </div>
+                <div className="meta-ads-text">
+                  <h3>Run Meta Ads</h3>
+                  <p>Launch AI-powered ad campaigns with just a few clicks</p>
+                </div>
+                <div className="meta-ads-status">
+                  <span>Coming Soon</span>
+                </div>
+              </button>
+            </div>
+            
             {/* Action Buttons Section - Premium Layout */}
             <div className="instant-post-section">
               <button 
@@ -1282,7 +1309,92 @@ const MainDashboard: React.FC = () => {
                 userId={twitterUserId}
                 onClose={() => setShowTwitterComposer(false)}
               />
-        )}
+            )}
+            
+            {/* Meta Ads Coming Soon Modal */}
+            {showMetaAdsModal && (
+              <div className="meta-ads-modal">
+                <div className="meta-ads-content">
+                  <div className="meta-ads-header">
+                    <h3>Meta Ads Campaign Manager</h3>
+                    <button 
+                      className="meta-ads-close-btn"
+                      onClick={() => setShowMetaAdsModal(false)}
+                    >
+                      <svg viewBox="0 0 24 24">
+                        <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" />
+                      </svg>
+                    </button>
+                  </div>
+                  
+                  <div className="meta-ads-body">
+                    <div className="meta-ads-icon-large">
+                      <svg viewBox="0 0 24 24">
+                        <path d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4M12,6A6,6 0 0,1 18,12A6,6 0 0,1 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6M12,8A4,4 0 0,0 8,12A4,4 0 0,0 12,16A4,4 0 0,0 16,12A4,4 0 0,0 12,8Z" />
+                      </svg>
+                    </div>
+                    
+                    <h4>Coming Soon</h4>
+                    <p>
+                      The Meta Ads Campaign Manager will revolutionize your advertising strategy. 
+                      Our AI-powered system will create, optimize, and manage your Facebook and Instagram ad campaigns 
+                      with just a few clicks. Get ready for intelligent targeting, automated optimization, 
+                      and real-time performance tracking.
+                    </p>
+                    
+                    <div className="meta-ads-features">
+                      <div className="feature-item">
+                        <svg viewBox="0 0 24 24">
+                          <path d="M9,20.42L2.79,14.21L5.62,11.38L9,14.77L18.88,4.88L21.71,7.71L9,20.42Z" />
+                        </svg>
+                        <span>AI-Powered Campaign Creation</span>
+                      </div>
+                      <div className="feature-item">
+                        <svg viewBox="0 0 24 24">
+                          <path d="M9,20.42L2.79,14.21L5.62,11.38L9,14.77L18.88,4.88L21.71,7.71L9,20.42Z" />
+                        </svg>
+                        <span>Intelligent Audience Targeting</span>
+                      </div>
+                      <div className="feature-item">
+                        <svg viewBox="0 0 24 24">
+                          <path d="M9,20.42L2.79,14.21L5.62,11.38L9,14.77L18.88,4.88L21.71,7.71L9,20.42Z" />
+                        </svg>
+                        <span>Real-Time Performance Analytics</span>
+                      </div>
+                      <div className="feature-item">
+                        <svg viewBox="0 0 24 24">
+                          <path d="M9,20.42L2.79,14.21L5.62,11.38L9,14.77L18.88,4.88L21.71,7.71L9,20.42Z" />
+                        </svg>
+                        <span>Automated Budget Optimization</span>
+                      </div>
+                    </div>
+                    
+                    <button 
+                      className={`meta-ads-wishlist-btn ${isMetaAdsWishlisted ? 'wishlisted' : ''}`}
+                      onClick={() => {
+                        if (!isMetaAdsWishlisted) {
+                          setIsMetaAdsWishlisted(true);
+                          setShowMetaAdsWishlistConfirmation(true);
+                          if (currentUser?.uid) {
+                            localStorage.setItem(`meta_ads_wishlisted_${currentUser.uid}`, 'true');
+                          }
+                          setTimeout(() => setShowMetaAdsWishlistConfirmation(false), 3000);
+                        }
+                      }}
+                      disabled={isMetaAdsWishlisted}
+                    >
+                      {isMetaAdsWishlisted ? 'Added to Wishlist' : 'Add to Wishlist'}
+                    </button>
+                    
+                    {showMetaAdsWishlistConfirmation && (
+                      <div className="meta-ads-wishlist-confirmation">
+                        <p>Thank you for your interest! You'll be notified when Meta Ads Campaign Manager launches.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
         
         {activeTab === 'usage' && (
           <div className="usage-container">

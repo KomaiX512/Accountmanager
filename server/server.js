@@ -9847,6 +9847,16 @@ async function processScheduledInstagramPosts() {
           const scheduleResponse = await s3Client.send(getCommand);
           const scheduleDataStr = await streamToString(scheduleResponse.Body);
           const scheduleData = JSON.parse(scheduleDataStr);
+          // 🔑 Ensure scheduleId consistency for older schedule files
+          if (!scheduleData.scheduleId && !scheduleData.id) {
+            const fileName = object.Key ? object.Key.split('/').pop().replace('.json', '') : `schedule_${Date.now()}`;
+            scheduleData.scheduleId = fileName;
+            scheduleData.id = fileName;
+          } else if (!scheduleData.scheduleId && scheduleData.id) {
+            scheduleData.scheduleId = scheduleData.id;
+          } else if (!scheduleData.id && scheduleData.scheduleId) {
+            scheduleData.id = scheduleData.scheduleId;
+          }
 
           // Check if it's time to post
           const scheduleTime = new Date(scheduleData.scheduleDate);
@@ -10066,6 +10076,16 @@ async function executeScheduledPost(scheduleData) {
               const scheduleResponse = await s3Client.send(getScheduleCommand);
               const scheduleDataStr = await streamToString(scheduleResponse.Body);
               const scheduleData = JSON.parse(scheduleDataStr);
+          // 🔑 Ensure scheduleId consistency for older schedule files
+          if (!scheduleData.scheduleId && !scheduleData.id) {
+            const fileName = object.Key ? object.Key.split('/').pop().replace('.json', '') : `schedule_${Date.now()}`;
+            scheduleData.scheduleId = fileName;
+            scheduleData.id = fileName;
+          } else if (!scheduleData.scheduleId && scheduleData.id) {
+            scheduleData.scheduleId = scheduleData.id;
+          } else if (!scheduleData.id && scheduleData.scheduleId) {
+            scheduleData.id = scheduleData.scheduleId;
+          }
               
               if ((scheduleData.imageKey === imageKey) || 
                   (scheduleId && scheduleData.scheduleId === scheduleId) ||
@@ -11559,6 +11579,16 @@ app.get(['/api/scheduler-health/instagram', '/scheduler-health/instagram'], asyn
           const scheduleResponse = await s3Client.send(getCommand);
           const scheduleDataStr = await streamToString(scheduleResponse.Body);
           const scheduleData = JSON.parse(scheduleDataStr);
+          // 🔑 Ensure scheduleId consistency for older schedule files
+          if (!scheduleData.scheduleId && !scheduleData.id) {
+            const fileName = object.Key ? object.Key.split('/').pop().replace('.json', '') : `schedule_${Date.now()}`;
+            scheduleData.scheduleId = fileName;
+            scheduleData.id = fileName;
+          } else if (!scheduleData.scheduleId && scheduleData.id) {
+            scheduleData.scheduleId = scheduleData.id;
+          } else if (!scheduleData.id && scheduleData.scheduleId) {
+            scheduleData.id = scheduleData.scheduleId;
+          }
           
           const scheduleTime = new Date(scheduleData.scheduleDate);
           const isOverdue = scheduleTime <= now && scheduleData.status === 'scheduled';
@@ -11643,6 +11673,16 @@ app.post(['/api/scheduler-retry/:postId', '/scheduler-retry/:postId'], async (re
           const scheduleResponse = await s3Client.send(getCommand);
           const scheduleDataStr = await streamToString(scheduleResponse.Body);
           const scheduleData = JSON.parse(scheduleDataStr);
+          // 🔑 Ensure scheduleId consistency for older schedule files
+          if (!scheduleData.scheduleId && !scheduleData.id) {
+            const fileName = object.Key ? object.Key.split('/').pop().replace('.json', '') : `schedule_${Date.now()}`;
+            scheduleData.scheduleId = fileName;
+            scheduleData.id = fileName;
+          } else if (!scheduleData.scheduleId && scheduleData.id) {
+            scheduleData.scheduleId = scheduleData.id;
+          } else if (!scheduleData.id && scheduleData.scheduleId) {
+            scheduleData.id = scheduleData.scheduleId;
+          }
           
           if (scheduleData.id === postId) {
             foundPost = scheduleData;

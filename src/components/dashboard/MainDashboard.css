@@ -822,7 +822,10 @@
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 12px;
   padding: clamp(1rem, 2vw, 1.4rem);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* COMPLETELY STATIC - NO TRANSITIONS OR ANIMATIONS */
+  transition: none !important;
+  animation: none !important;
+  transform: none !important;
   position: relative;
   overflow: hidden;
   aspect-ratio: 1.2;
@@ -835,6 +838,15 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.15),
     inset 0 -1px 0 rgba(255, 255, 255, 0.08);
   justify-content: space-between;
+  /* STATIC CONTAINER - No hover effects to avoid confusion */
+  cursor: default;
+  /* OVERRIDE ANY GLOBAL TRANSITIONS */
+  will-change: auto !important;
+  /* OVERRIDE GLOBAL CSS TRANSITIONS */
+  transition-property: none !important;
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+  transition-timing-function: none !important;
 }
 
 /* Ensure platform icons never rotate or animate */
@@ -845,31 +857,28 @@
   transition: none !important;
 }
 
-.platform-row::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(45deg, transparent, rgba(0, 255, 204, 0.08), transparent);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
+/* Remove hover effects from platform row container */
 .platform-row:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(0, 255, 204, 0.2);
-  /* VIEWPORT LOCK FIX: Removed translateZ that interferes with position: fixed */
-  transform: translateY(-10px) scale(1.02);
+  /* No hover effects - static container */
+  transform: none !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
   box-shadow: 
-    0 25px 80px rgba(0, 0, 0, 0.3),
-    0 0 60px rgba(0, 255, 204, 0.15),
-    inset 0 2px 0 rgba(255, 255, 255, 0.3);
+    0 6px 24px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.08) !important;
+  transition: none !important;
+  animation: none !important;
+  /* OVERRIDE GLOBAL CSS TRANSITIONS */
+  transition-property: none !important;
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+  transition-timing-function: none !important;
 }
 
-.platform-row:hover::before {
-  opacity: 1;
+/* Remove the shimmer effect */
+.platform-row::before {
+  display: none;
 }
 
 .platform-row.claimed {
@@ -891,10 +900,21 @@
   gap: clamp(0.8rem, 2vw, 1rem);
   text-align: center;
   width: 100%;
+  /* ENHANCED CLICKABLE AREA - Clear button indication */
+  position: relative;
+  border-radius: 8px;
+  padding: 4px;
 }
 
 .clickable-area:hover {
   transform: translateY(-3px);
+  background: rgba(0, 255, 204, 0.08);
+  border: 1px solid rgba(0, 255, 204, 0.2);
+}
+
+.clickable-area:active {
+  transform: translateY(-1px);
+  transition: transform 0.05s ease;
 }
 
 .platform-icon {
@@ -909,6 +929,21 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   animation: none !important;
   transform: none !important;
+  /* ENHANCED BUTTON INDICATION */
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.platform-icon:hover {
+  background: rgba(0, 255, 204, 0.15);
+  border: 1px solid rgba(0, 255, 204, 0.3);
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 255, 204, 0.2);
+}
+
+.platform-icon:active {
+  transform: scale(0.95);
+  transition: transform 0.05s ease;
 }
 
 .platform-icon img {
@@ -947,57 +982,83 @@
 }
 
 .status-indicator {
-  padding: 0.3rem 0.7rem;
-  border-radius: 12px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  cursor: default;
-  transition: all 0.3s ease;
-  user-select: none;
-}
-
-.status-indicator.claimed {
-  background: rgba(0, 255, 204, 0.15);
-  color: #00ffcc;
-  border: 1px solid rgba(0, 255, 204, 0.3);
-}
-
-.status-indicator.unclaimed {
-  background: rgba(255, 64, 129, 0.15);
-  color: #FF4081;
-  border: 1px solid rgba(255, 64, 129, 0.3);
-  cursor: pointer;
-}
-
-.status-indicator.unclaimed:hover {
-  background: rgba(255, 64, 129, 0.25);
-}
-
-.connection-indicator {
-  font-size: 0.7rem;
-  padding: 0.3rem 0.7rem;
-  border-radius: 12px;
+  padding: 0.2rem 0.5rem;
+  border-radius: 8px;
+  font-size: 0.65rem;
   font-weight: 500;
   cursor: default;
   transition: all 0.3s ease;
   user-select: none;
+  /* DIM STATUS INDICATOR - Clear non-interactive styling */
+  opacity: 0.7;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+  /* Smallest possible size to indicate status only */
+  min-width: auto;
+  text-align: center;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.status-indicator.claimed {
+  background: rgba(0, 255, 204, 0.08);
+  color: rgba(0, 255, 204, 0.7);
+  border: 1px solid rgba(0, 255, 204, 0.2);
+  opacity: 0.8;
+}
+
+.status-indicator.unclaimed {
+  background: rgba(255, 64, 129, 0.08);
+  color: rgba(255, 64, 129, 0.7);
+  border: 1px solid rgba(255, 64, 129, 0.2);
+  opacity: 0.8;
+  cursor: default; /* Remove cursor pointer - not clickable */
+}
+
+.status-indicator.unclaimed:hover {
+  background: rgba(255, 64, 129, 0.08); /* No hover effect */
+  opacity: 0.8;
+}
+
+.connection-indicator {
+  font-size: 0.65rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: default;
+  transition: all 0.3s ease;
+  user-select: none;
+  /* DIM CONNECTION INDICATOR - Clear non-interactive styling */
+  opacity: 0.7;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+  /* Smallest possible size to indicate status only */
+  min-width: auto;
+  text-align: center;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
 }
 
 .connection-indicator.connected {
-  background: rgba(76, 175, 80, 0.15);
-  color: #4CAF50;
-  border: 1px solid rgba(76, 175, 80, 0.3);
+  background: rgba(76, 175, 80, 0.08);
+  color: rgba(76, 175, 80, 0.7);
+  border: 1px solid rgba(76, 175, 80, 0.2);
+  opacity: 0.8;
 }
 
 .connection-indicator.disconnected {
-  background: rgba(255, 152, 0, 0.15);
-  color: #FF9800;
-  border: 1px solid rgba(255, 152, 0, 0.3);
+  background: rgba(255, 152, 0, 0.08);
+  color: rgba(255, 152, 0, 0.7);
+  border: 1px solid rgba(255, 152, 0, 0.2);
+  opacity: 0.8;
   cursor: default;
 }
 
 .connection-indicator.disconnected:hover {
-  background: rgba(255, 152, 0, 0.25);
+  background: rgba(255, 152, 0, 0.08); /* No hover effect */
+  opacity: 0.8;
 }
 
 /* Enhanced notification badge styling with consistent theme */
@@ -1449,6 +1510,16 @@
   .platform-row {
     aspect-ratio: 1.3;
     padding: clamp(0.8rem, 2vw, 1.1rem);
+    /* COMPLETELY STATIC - NO TRANSITIONS OR ANIMATIONS */
+    transition: none !important;
+    animation: none !important;
+    transform: none !important;
+    will-change: auto !important;
+    /* OVERRIDE GLOBAL CSS TRANSITIONS */
+    transition-property: none !important;
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+    transition-timing-function: none !important;
   }
 
   .platform-info {
@@ -1810,65 +1881,79 @@
 /* Harmonized Status Indicators */
 .status-indicators.aligned {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
-  min-width: 200px;
+  min-width: 160px;
   justify-content: flex-end;
 }
 
 .status-indicator,
 .connection-indicator {
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 0.75rem;
-  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.6rem;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  min-width: 80px;
+  letter-spacing: 0.3px;
+  min-width: 60px;
   text-align: center;
   transition: all 0.2s ease;
+  /* DIM STATUS INDICATORS - Clear non-interactive styling */
+  opacity: 0.6;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.5);
+  cursor: default;
 }
 
 .status-indicator.claimed {
-  background: rgba(40, 167, 69, 0.2);
-  color: #28a745;
-  border: 1px solid rgba(40, 167, 69, 0.3);
+  background: rgba(40, 167, 69, 0.06);
+  color: rgba(40, 167, 69, 0.6);
+  border: 1px solid rgba(40, 167, 69, 0.15);
+  opacity: 0.7;
 }
 
 .status-indicator.unclaimed {
-  background: rgba(108, 117, 125, 0.2);
-  color: #6c757d;
-  border: 1px solid rgba(108, 117, 125, 0.3);
+  background: rgba(108, 117, 125, 0.06);
+  color: rgba(108, 117, 125, 0.6);
+  border: 1px solid rgba(108, 117, 125, 0.15);
+  opacity: 0.7;
+  cursor: default; /* Remove cursor pointer - not clickable */
 }
 
 .connection-indicator.connected {
-  background: rgba(0, 123, 255, 0.2);
-  color: #007bff;
-  border: 1px solid rgba(0, 123, 255, 0.3);
+  background: rgba(0, 123, 255, 0.06);
+  color: rgba(0, 123, 255, 0.6);
+  border: 1px solid rgba(0, 123, 255, 0.15);
+  opacity: 0.7;
 }
 
 .connection-indicator.disconnected {
-  background: rgba(220, 53, 69, 0.2);
-  color: #dc3545;
-  border: 1px solid rgba(220, 53, 69, 0.3);
-  cursor: pointer;
+  background: rgba(220, 53, 69, 0.06);
+  color: rgba(220, 53, 69, 0.6);
+  border: 1px solid rgba(220, 53, 69, 0.15);
+  opacity: 0.7;
+  cursor: default; /* Remove cursor pointer - not clickable */
 }
 
 .connection-indicator.disconnected:hover {
-  background: rgba(220, 53, 69, 0.3);
-  transform: translateY(-1px);
+  background: rgba(220, 53, 69, 0.06); /* No hover effect */
+  opacity: 0.7;
+  transform: none;
 }
 
 .connection-indicator.coming-soon {
-  background: rgba(255, 193, 7, 0.2);
-  color: #ffc107;
-  border: 1px solid rgba(255, 193, 7, 0.3);
+  background: rgba(255, 193, 7, 0.06);
+  color: rgba(255, 193, 7, 0.6);
+  border: 1px solid rgba(255, 193, 7, 0.15);
+  opacity: 0.7;
   cursor: default !important;
   position: relative;
 }
 
 .connection-indicator.coming-soon:hover {
-  background: rgba(255, 193, 7, 0.2);
+  background: rgba(255, 193, 7, 0.06); /* No hover effect */
+  opacity: 0.7;
   transform: none;
 }
 
@@ -2250,5 +2335,427 @@
   
   .wishlist-confirmation {
     padding: clamp(0.75rem, 2vw, 0.875rem) clamp(1rem, 2.5vw, 1.25rem);
+  }
+} 
+
+/* Meta Ads Coming Soon Section */
+.meta-ads-section {
+  margin-bottom: 24px;
+}
+
+.meta-ads-button {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+  box-shadow: 
+    0 4px 16px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+  position: relative;
+  overflow: hidden;
+}
+
+.meta-ads-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent
+  );
+  transition: left 0.5s ease;
+}
+
+.meta-ads-button:hover::before {
+  left: 100%;
+}
+
+.meta-ads-button:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 24px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+}
+
+.meta-ads-button:active {
+  transform: translateY(0);
+  transition: transform 0.1s ease;
+}
+
+.meta-ads-icon {
+  width: 48px;
+  height: 48px;
+  background: rgba(0, 255, 204, 0.15);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.meta-ads-icon svg {
+  width: 24px;
+  height: 24px;
+  fill: #00ffcc;
+}
+
+.meta-ads-text {
+  flex: 1;
+  text-align: left;
+}
+
+.meta-ads-text h3 {
+  color: #e0e0ff;
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+}
+
+.meta-ads-text p {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.9rem;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.meta-ads-status {
+  background: rgba(255, 193, 7, 0.15);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  border-radius: 8px;
+  padding: 6px 12px;
+  flex-shrink: 0;
+}
+
+.meta-ads-status span {
+  color: #ffc107;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Meta Ads Modal - Glossy Design */
+.meta-ads-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2147483647;
+}
+
+.meta-ads-content {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 24px;
+  padding: 28px;
+  width: 100%;
+  max-width: 500px;
+  backdrop-filter: blur(20px);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+}
+
+.meta-ads-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.meta-ads-header h3 {
+  font-size: 1.5rem;
+  color: #e0e0ff;
+  margin: 0;
+  font-weight: 600;
+}
+
+.meta-ads-close-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.meta-ads-close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.meta-ads-close-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.meta-ads-body {
+  text-align: center;
+}
+
+.meta-ads-icon-large {
+  width: 80px;
+  height: 80px;
+  background: rgba(0, 255, 204, 0.15);
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+}
+
+.meta-ads-icon-large svg {
+  width: 40px;
+  height: 40px;
+  fill: #00ffcc;
+}
+
+.meta-ads-body h4 {
+  color: #00ffcc;
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin: 0 0 16px 0;
+}
+
+.meta-ads-body p {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin: 0 0 24px 0;
+}
+
+.meta-ads-features {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.feature-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.feature-item svg {
+  width: 18px;
+  height: 18px;
+  fill: #00ffcc;
+  flex-shrink: 0;
+}
+
+.feature-item span {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.meta-ads-wishlist-btn {
+  background: rgba(0, 255, 204, 0.15);
+  color: #00ffcc;
+  border: 1px solid rgba(0, 255, 204, 0.3);
+  border-radius: 12px;
+  padding: 12px 24px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 16px;
+}
+
+.meta-ads-wishlist-btn:hover:not(:disabled) {
+  background: rgba(0, 255, 204, 0.2);
+  border-color: rgba(0, 255, 204, 0.4);
+  transform: translateY(-1px);
+}
+
+.meta-ads-wishlist-btn:disabled {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.5);
+  border-color: rgba(255, 255, 255, 0.1);
+  cursor: not-allowed;
+  transform: none;
+}
+
+.meta-ads-wishlist-btn.wishlisted {
+  background: rgba(76, 175, 80, 0.15);
+  color: #4caf50;
+  border-color: rgba(76, 175, 80, 0.3);
+}
+
+.meta-ads-wishlist-confirmation {
+  background: rgba(76, 175, 80, 0.1);
+  border: 1px solid rgba(76, 175, 80, 0.2);
+  border-radius: 12px;
+  padding: 12px 16px;
+  animation: confirmationSlideIn 0.3s ease;
+}
+
+.meta-ads-wishlist-confirmation p {
+  color: #4caf50;
+  font-size: 0.85rem;
+  margin: 0;
+  text-align: center;
+}
+
+/* Responsive Design for Meta Ads */
+@media (max-width: 768px) {
+  .meta-ads-button {
+    padding: 16px;
+    gap: 12px;
+  }
+  
+  .meta-ads-icon {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .meta-ads-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+  
+  .meta-ads-text h3 {
+    font-size: 1rem;
+  }
+  
+  .meta-ads-text p {
+    font-size: 0.8rem;
+  }
+  
+  .meta-ads-status {
+    padding: 4px 8px;
+  }
+  
+  .meta-ads-status span {
+    font-size: 0.7rem;
+  }
+  
+  .meta-ads-content {
+    margin: 20px;
+    padding: 24px;
+  }
+  
+  .meta-ads-header h3 {
+    font-size: 1.3rem;
+  }
+  
+  .meta-ads-icon-large {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .meta-ads-icon-large svg {
+    width: 30px;
+    height: 30px;
+  }
+  
+  .meta-ads-body h4 {
+    font-size: 1.1rem;
+  }
+  
+  .meta-ads-body p {
+    font-size: 0.9rem;
+  }
+  
+  .feature-item {
+    padding: 10px 12px;
+  }
+  
+  .feature-item span {
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .meta-ads-button {
+    padding: 14px;
+    gap: 10px;
+  }
+  
+  .meta-ads-icon {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .meta-ads-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .meta-ads-text h3 {
+    font-size: 0.95rem;
+  }
+  
+  .meta-ads-text p {
+    font-size: 0.75rem;
+  }
+  
+  .meta-ads-content {
+    padding: 20px;
+  }
+  
+  .meta-ads-header h3 {
+    font-size: 1.2rem;
+  }
+  
+  .meta-ads-icon-large {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .meta-ads-icon-large svg {
+    width: 25px;
+    height: 25px;
+  }
+  
+  .meta-ads-body h4 {
+    font-size: 1rem;
+  }
+  
+  .meta-ads-body p {
+    font-size: 0.85rem;
+  }
+  
+  .feature-item {
+    padding: 8px 10px;
+  }
+  
+  .feature-item span {
+    font-size: 0.8rem;
+  }
+  
+  .meta-ads-wishlist-btn {
+    padding: 10px 20px;
+    font-size: 0.85rem;
   }
 } 

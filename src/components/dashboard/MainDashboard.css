@@ -304,7 +304,7 @@
   margin-left: auto;
 }
 
-/* Enhanced Responsive Modal Styling */
+/* Enhanced Responsive Modal Styling - Glassy Design */
 .modal-overlay {
   position: fixed !important;
   top: 0 !important;
@@ -313,9 +313,9 @@
   bottom: 0 !important;
   width: 100vw !important;
   height: 100vh !important;
-  background-color: rgba(0, 0, 0, 0.8) !important;
-  backdrop-filter: blur(8px) !important;
-  z-index: 99999 !important;
+  background-color: rgba(0, 0, 0, 0.3) !important;
+  backdrop-filter: blur(5px) !important;
+  z-index: 2147483647 !important;
   display: flex !important;
   justify-content: center !important;
   align-items: center !important;
@@ -326,19 +326,23 @@
 }
 
 .modal-content {
-  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%) !important;
-  padding: 0 !important;
-  border-radius: clamp(6px, 1.5vw, 12px) !important;
-  border: 1px solid rgba(0, 255, 204, 0.3) !important;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8) !important;
-  color: #ffffff !important;
-  width: min(92vw, 600px) !important;
-  max-height: min(85vh, calc(100vh - 40px)) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 24px !important;
+  padding: 28px !important;
+  width: 100% !important;
+  max-width: 600px !important;
+  max-height: 90vh !important;
   overflow-y: auto !important;
   position: relative !important;
+  backdrop-filter: blur(20px) !important;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset !important;
+  color: #ffffff !important;
   margin: auto !important;
   box-sizing: border-box !important;
-  z-index: 100000 !important;
+  z-index: 2147483647 !important;
   animation: modalAppear 0.2s ease-out !important;
   scrollbar-width: thin !important;
 }
@@ -365,27 +369,28 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: clamp(0.8rem, 2.5vw, 1.5rem) clamp(0.8rem, 3vw, 2rem) clamp(0.4rem, 1.5vw, 1rem) clamp(0.8rem, 3vw, 2rem);
-  border-bottom: 1px solid rgba(0, 255, 204, 0.2);
-  margin-bottom: clamp(0.4rem, 1.5vw, 1rem);
+  padding: 0 0 24px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 24px;
 }
 
 .modal-header h3 {
   margin: 0;
-  color: #00ffcc;
-  font-size: clamp(1rem, 2.5vw, 1.5rem);
+  color: #e0e0ff;
+  font-size: 1.5rem;
+  font-weight: 600;
 }
 
 .modal-close-btn {
   background: none;
   border: none;
-  color: #ffffff;
-  font-size: clamp(1rem, 2.5vw, 1.5rem);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 1.2rem;
   cursor: pointer;
-  padding: clamp(0.25rem, 0.8vw, 0.5rem);
-  border-radius: 50%;
-  width: clamp(1.8rem, 4vw, 2.5rem);
-  height: clamp(1.8rem, 4vw, 2.5rem);
+  padding: 8px;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -394,14 +399,14 @@
 
 .modal-close-btn:hover {
   background-color: rgba(255, 255, 255, 0.1);
-  color: #ff6b6b;
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .modal-content h4 {
   color: #e0e0ff;
-  margin: 0 0 12px 0;
-  font-size: 1rem;
-  font-weight: 500;
+  margin: 0 0 16px 0;
+  font-size: 1.1rem;
+  font-weight: 600;
 }
 
 /* Enhanced Platform selection */
@@ -453,12 +458,13 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: clamp(0.6rem, 1.5vw, 1rem);
-  border-radius: clamp(6px, 1.5vw, 12px);
-  border: 2px solid rgba(0, 255, 204, 0.3);
-  background: rgba(0, 255, 204, 0.05);
+  padding: clamp(0.8rem, 1.5vw, 1.2rem);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.3s ease;
   position: relative;
   min-width: clamp(100px, 18vw, 140px);
   text-align: center;
@@ -466,8 +472,9 @@
 
 .platform-checkbox:hover {
   transform: translateY(-2px);
-  border-color: rgba(0, 255, 204, 0.6);
-  background: rgba(0, 255, 204, 0.1);
+  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
 .platform-checkbox:active {
@@ -475,9 +482,9 @@
 }
 
 .platform-checkbox.selected {
-  border-color: #00ffcc;
-  background: rgba(0, 255, 204, 0.15);
-  box-shadow: 0 0 15px rgba(0, 255, 204, 0.3);
+  border-color: rgba(0, 255, 204, 0.5);
+  background: rgba(0, 255, 204, 0.1);
+  box-shadow: 0 0 20px rgba(0, 255, 204, 0.2);
 }
 
 .platform-checkbox.disabled {
@@ -612,19 +619,22 @@
 .instant-post-textarea {
   width: 100%;
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(0, 255, 204, 0.3);
-  border-radius: 8px;
-  padding: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  padding: 16px;
   color: #e0e0ff;
   font-size: 1rem;
   resize: none;
   margin-bottom: 0.5rem;
   font-family: inherit;
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
 }
 
 .instant-post-textarea:focus {
   outline: none;
-  border-color: rgba(0, 255, 204, 0.6);
+  border-color: rgba(0, 255, 204, 0.5);
+  background: rgba(255, 255, 255, 0.08);
   box-shadow: 0 0 0 2px rgba(0, 255, 204, 0.2);
 }
 
@@ -649,14 +659,15 @@
   align-items: center;
   gap: 8px;
   background: rgba(255, 255, 255, 0.05);
-  border: 1px dashed rgba(0, 255, 204, 0.4);
-  border-radius: 8px;
-  padding: 0.8rem 1rem;
+  border: 1px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  padding: 12px 16px;
   color: #00ffcc;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.3s ease;
   justify-content: center;
   margin-bottom: 1rem;
+  backdrop-filter: blur(10px);
 }
 
 .upload-button:hover {
@@ -736,11 +747,11 @@
 
 .cancel-button, .post-button {
   padding: 12px 24px;
-  border-radius: 8px;
+  border-radius: 12px;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.3s ease;
   border: none;
 }
 
@@ -1018,6 +1029,19 @@
 
 .status-indicator.unclaimed:hover {
   background: rgba(255, 64, 129, 0.08); /* No hover effect */
+  opacity: 0.8;
+}
+
+.status-indicator.acquiring {
+  background: rgba(255, 152, 0, 0.08);
+  color: rgba(255, 152, 0, 0.7);
+  border: 1px solid rgba(255, 152, 0, 0.2);
+  opacity: 0.8;
+  cursor: default;
+}
+
+.status-indicator.acquiring:hover {
+  background: rgba(255, 152, 0, 0.08); /* No hover effect */
   opacity: 0.8;
 }
 
@@ -1919,6 +1943,14 @@
   border: 1px solid rgba(108, 117, 125, 0.15);
   opacity: 0.7;
   cursor: default; /* Remove cursor pointer - not clickable */
+}
+
+.status-indicator.acquiring {
+  background: rgba(255, 152, 0, 0.06);
+  color: rgba(255, 152, 0, 0.6);
+  border: 1px solid rgba(255, 152, 0, 0.15);
+  opacity: 0.7;
+  cursor: default;
 }
 
 .connection-indicator.connected {

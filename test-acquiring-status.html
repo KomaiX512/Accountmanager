@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Acquiring Status</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .test-section {
+            background: #2a2a2a;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+        .status-indicator {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin: 5px;
+        }
+        .status-indicator.unclaimed {
+            background: rgba(108, 117, 125, 0.06);
+            color: rgba(108, 117, 125, 0.6);
+            border: 1px solid rgba(108, 117, 125, 0.15);
+        }
+        .status-indicator.acquiring {
+            background: rgba(255, 152, 0, 0.06);
+            color: rgba(255, 152, 0, 0.6);
+            border: 1px solid rgba(255, 152, 0, 0.15);
+        }
+        .status-indicator.claimed {
+            background: rgba(40, 167, 69, 0.06);
+            color: rgba(40, 167, 69, 0.6);
+            border: 1px solid rgba(40, 167, 69, 0.15);
+        }
+        .platform-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+            padding: 10px;
+            background: #333;
+            border-radius: 4px;
+        }
+        .platform-name {
+            min-width: 100px;
+            font-weight: bold;
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .test-button.danger {
+            background: #dc3545;
+        }
+        .test-button.danger:hover {
+            background: #c82333;
+        }
+        .log {
+            background: #000;
+            color: #0f0;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test "Acquiring" Status Implementation</h1>
+    
+    <div class="test-section">
+        <h2>📋 Test Controls</h2>
+        <button class="test-button" onclick="simulateProcessing('instagram')">Simulate Instagram Processing</button>
+        <button class="test-button" onclick="simulateProcessing('twitter')">Simulate Twitter Processing</button>
+        <button class="test-button" onclick="simulateProcessing('facebook')">Simulate Facebook Processing</button>
+        <button class="test-button danger" onclick="clearProcessing('instagram')">Clear Instagram</button>
+        <button class="test-button danger" onclick="clearProcessing('twitter')">Clear Twitter</button>
+        <button class="test-button danger" onclick="clearProcessing('facebook')">Clear Facebook</button>
+        <button class="test-button" onclick="markAsAcquired('instagram')">Mark Instagram as Acquired</button>
+        <button class="test-button" onclick="refreshStatus()">Refresh Status</button>
+    </div>
+
+    <div class="test-section">
+        <h2>📊 Current Status</h2>
+        <div id="status-display"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>📝 Test Log</h2>
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        // Test utilities
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        // Simulate processing state for testing
+        function simulateProcessing(platform) {
+            const now = Date.now();
+            const durationMs = 15 * 60 * 1000; // 15 minutes
+            const endTime = now + durationMs;
+            
+            // Set up the processing state in localStorage
+            localStorage.setItem(`${platform}_processing_countdown`, endTime.toString());
+            localStorage.setItem(`${platform}_processing_info`, JSON.stringify({
+                platform,
+                username: 'testuser',
+                startTime: now,
+                endTime: endTime,
+                totalDuration: durationMs
+            }));
+            
+            log(`✅ Simulated processing state for ${platform}`);
+            log(`⏰ End time: ${new Date(endTime).toLocaleString()}`);
+            log(`⏱️ Remaining: ${Math.ceil((endTime - now) / 1000 / 60)} minutes`);
+            
+            refreshStatus();
+        }
+
+        // Clear processing state
+        function clearProcessing(platform) {
+            localStorage.removeItem(`${platform}_processing_countdown`);
+            localStorage.removeItem(`${platform}_processing_info`);
+            localStorage.removeItem(`${platform}_accessed_testuser`);
+            log(`🗑️ Cleared processing state for ${platform}`);
+            refreshStatus();
+        }
+
+        // Mark platform as acquired
+        function markAsAcquired(platform) {
+            localStorage.setItem(`${platform}_accessed_testuser`, 'true');
+            log(`✅ Marked ${platform} as acquired`);
+            refreshStatus();
+        }
+
+        // Test the isPlatformLoading function logic (same as MainDashboard)
+        function isPlatformLoading(platformId) {
+            try {
+                const raw = localStorage.getItem(`${platformId}_processing_countdown`);
+                if (!raw) return false;
+                
+                const endTime = parseInt(raw, 10);
+                if (Number.isNaN(endTime)) return false;
+                
+                const remaining = Math.max(0, endTime - Date.now());
+                return remaining > 0;
+            } catch (error) {
+                log(`❌ Error testing ${platformId}: ${error.message}`);
+                return false;
+            }
+        }
+
+        // Test the status display logic (same as MainDashboard)
+        function getPlatformStatus(platformId) {
+            const isCurrentlyLoading = isPlatformLoading(platformId);
+            const claimed = localStorage.getItem(`${platformId}_accessed_testuser`) === 'true';
+            
+            let status = 'Not Acquired';
+            let statusClass = 'unclaimed';
+            
+            if (isCurrentlyLoading) {
+                status = 'Acquiring';
+                statusClass = 'acquiring';
+            } else if (claimed) {
+                status = 'Acquired';
+                statusClass = 'claimed';
+            }
+            
+            return { status, statusClass, isCurrentlyLoading, claimed };
+        }
+
+        // Refresh status display
+        function refreshStatus() {
+            const statusDiv = document.getElementById('status-display');
+            const platforms = ['instagram', 'twitter', 'facebook', 'linkedin'];
+            
+            let html = '';
+            platforms.forEach(platform => {
+                const { status, statusClass, isCurrentlyLoading, claimed } = getPlatformStatus(platform);
+                
+                html += `
+                    <div class="platform-row">
+                        <div class="platform-name">${platform.charAt(0).toUpperCase() + platform.slice(1)}</div>
+                        <div class="status-indicator ${statusClass}">${status}</div>
+                        <div style="font-size: 12px; color: #888;">
+                            Loading: ${isCurrentlyLoading ? 'Yes' : 'No'} | 
+                            Claimed: ${claimed ? 'Yes' : 'No'}
+                        </div>
+                    </div>
+                `;
+                
+                log(`📊 ${platform}: ${status} (${statusClass}) - Loading: ${isCurrentlyLoading}, Claimed: ${claimed}`);
+            });
+            
+            statusDiv.innerHTML = html;
+        }
+
+        // Initialize
+        log('🚀 Starting "Acquiring" Status Tests...');
+        refreshStatus();
+        
+        // Auto-refresh every 5 seconds to show countdown
+        setInterval(() => {
+            refreshStatus();
+        }, 5000);
+    </script>
+</body>
+</html> 

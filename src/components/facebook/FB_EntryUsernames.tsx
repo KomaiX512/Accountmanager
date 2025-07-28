@@ -36,6 +36,10 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
   const [usernameValid, setUsernameValid] = useState<boolean>(true);
   const [usernameTouched, setUsernameTouched] = useState<boolean>(false);
   
+  // New state for pre-submission confirmation
+  const [showConfirmation, setShowConfirmation] = useState<boolean>(false);
+  const [confirmationData, setConfirmationData] = useState<any>(null);
+  
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const { startProcessing, processingState } = useProcessing();
@@ -323,24 +327,32 @@ const usernameCheckUrl = '/api/check-username-availability';
       return;
     }
 
+    // Show confirmation dialog before proceeding
+    const finalCompetitors = competitors.filter(comp => comp.trim() !== '');
+    const dataToConfirm = {
+      username: username.trim(),
+      accountType,
+      competitors: finalCompetitors,
+      postingStyle: postingStyle.trim() || 'General posting style',
+      platform: 'facebook'
+    };
+    
+    setConfirmationData(dataToConfirm);
+    setShowConfirmation(true);
+  };
+
+  const handleConfirmedSubmission = async () => {
+    if (!confirmationData || !currentUser?.uid) return;
+    
     setIsLoading(true);
+    setShowConfirmation(false);
 
     try {
       const apiUrl = `/api/save-account-info`;
       const statusApiUrl = `/api/user-status`;
 
-      const finalCompetitors = competitors.filter(comp => comp.trim() !== '');
-
-      const payload = {
-        username: username.trim(),
-        accountType,
-        competitors: finalCompetitors,
-        postingStyle: postingStyle.trim() || 'General posting style',
-        platform: 'facebook'
-      };
-
       // Save to account info API
-      const response = await axios.post(apiUrl, payload, {
+      const response = await axios.post(apiUrl, confirmationData, {
         headers: { 'Content-Type': 'application/json' },
         timeout: 30000,
       });
@@ -348,21 +360,21 @@ const usernameCheckUrl = '/api/check-username-availability';
       if (response.status === 200) {
         // Now save the user's Facebook username entry state
         await axios.post(`/api/user-facebook-status/${currentUser.uid}`, {
-          facebook_username: username.trim(),
-          accountType,
-          competitors: competitors.map(comp => comp.trim())
+          facebook_username: confirmationData.username,
+          accountType: confirmationData.accountType,
+          competitors: confirmationData.competitors
         });
         
         // Save to localStorage immediately for future use
         localStorage.setItem(`facebook_accessed_${currentUser.uid}`, 'true');
-        localStorage.setItem(`facebook_username_${currentUser.uid}`, username.trim());
-        localStorage.setItem(`facebook_account_type_${currentUser.uid}`, accountType);
-        localStorage.setItem(`facebook_competitors_${currentUser.uid}`, JSON.stringify(competitors.map(comp => comp.trim())));
+        localStorage.setItem(`facebook_username_${currentUser.uid}`, confirmationData.username);
+        localStorage.setItem(`facebook_account_type_${currentUser.uid}`, confirmationData.accountType);
+        localStorage.setItem(`facebook_competitors_${currentUser.uid}`, JSON.stringify(confirmationData.competitors));
         
         showMessage('Submission successful', 'success');
         
         // Start the processing phase using unified ProcessingContext
-        startProcessing('facebook', username.trim(), 15); // 15 minutes duration
+        startProcessing('facebook', confirmationData.username, 15); // 15 minutes duration
       }
     } catch (error: any) {
       console.error('Error submitting Facebook data:', error);
@@ -439,7 +451,10 @@ const usernameCheckUrl = '/api/check-username-availability';
       <div className="fb-entry-wrapper">
         <div className="fb-entry-header">
           <h1>Setup Your Facebook Account</h1>
-          <p>Enter your Facebook username and competitors to get started with AI-powered social media management</p>
+          <div className="importance-notice">
+            <div className="importance-icon">⚠️</div>
+            <p><strong>Critical Setup:</strong> This information initiates a 15-minute AI analysis process. Please ensure all details are accurate before submission.</p>
+          </div>
         </div>
 
         <form className="fb-entry-form" onSubmit={(e) => { e.preventDefault(); submitData(); }}>
@@ -447,7 +462,10 @@ const usernameCheckUrl = '/api/check-username-availability';
             <h2>Account Information</h2>
             
             <div className="form-group">
-              <label htmlFor="facebook-username">Your Facebook Username *</label>
+              <label htmlFor="facebook-username">
+                Your Facebook Username * 
+                <span className="critical-field">CRITICAL</span>
+              </label>
               <input
                 type="text"
                 id="facebook-username"
@@ -463,7 +481,15 @@ const usernameCheckUrl = '/api/check-username-availability';
                   {usernameMessage}
                 </div>
               )}
-              <small>Enter your Facebook page name or profile username</small>
+              <div className="field-description">
+                <p><strong>Why this matters:</strong> Your username is the foundation for all AI-generated content, competitor analysis, and strategic recommendations.</p>
+                <ul>
+                  <li>✓ Must be your exact Facebook page name or profile username</li>
+                  <li>✓ Only letters, numbers, and periods allowed</li>
+                  <li>✓ No spaces or special characters</li>
+                  <li>✓ This will be used for 15 minutes of AI processing</li>
+                </ul>
+              </div>
             </div>
 
             <div className="form-group">
@@ -478,9 +504,13 @@ const usernameCheckUrl = '/api/check-username-availability';
                 <option value="branding">Branding Account</option>
                 <option value="non-branding">Non-Branding Account</option>
               </select>
-              <small>
-                Branding: Business/brand promotion | Non-Branding: Personal content focus
-              </small>
+              <div className="field-description">
+                <p><strong>Account Type Impact:</strong></p>
+                <ul>
+                  <li><strong>Branding:</strong> Business promotion, product marketing, brand awareness</li>
+                  <li><strong>Non-Branding:</strong> Personal content, lifestyle, entertainment focus</li>
+                </ul>
+              </div>
             </div>
 
             <div className="form-group">
@@ -494,45 +524,62 @@ const usernameCheckUrl = '/api/check-username-availability';
                 rows={4}
                 disabled={isLoading}
               />
-              <small>Help our AI understand your voice and content style</small>
+              <div className="field-description">
+                <p><strong>AI Training Data:</strong> This helps our AI understand your voice and create content that matches your style.</p>
+                <p><em>Examples:</em> "Professional and informative with occasional humor" or "Casual and relatable lifestyle content"</p>
+              </div>
             </div>
           </div>
 
           <div className="form-section">
             <h2>Competitor Analysis</h2>
-            <p>Add Facebook pages/profiles you want to analyze and compete with</p>
+            <div className="section-description">
+              <p><strong>Strategic Intelligence:</strong> These competitors will be analyzed to understand market trends, content strategies, and engagement patterns.</p>
+            </div>
             
-            {competitors.map((competitor, index) => (
-              <div key={index} className="form-group competitor-group">
-                <div className="competitor-input-wrapper">
-                  <label htmlFor={`competitor-${index}`}>
-                    Competitor {index + 1} {index < 3 ? '*' : ''}
-                  </label>
-                  <input
-                    type="text"
-                    id={`competitor-${index}`}
-                    value={competitor}
-                    onChange={(e) => handleCompetitorChange(index, e.target.value)}
-                    placeholder="e.g., competitor.page"
-                    className={`form-input ${competitor.trim() && !validateCompetitorUsername(competitor) ? 'error' : ''}`}
-                    disabled={isLoading}
-                  />
-                  {index >= 3 && (
-                    <button
-                      type="button"
-                      onClick={() => removeCompetitor(index)}
-                      className="remove-competitor"
+            <div className="competitors-container">
+              {competitors.map((competitor, index) => (
+                <div key={index} className="competitor-input-group">
+                  <div className="competitor-header">
+                    <label htmlFor={`competitor-${index}`} className="competitor-label">
+                      Competitor {index + 1} {index < 3 ? '*' : ''}
+                      {index < 3 && <span className="required-badge">Required</span>}
+                    </label>
+                    {index < 3 && (
+                      <div className="competitor-hint">
+                        Choose a Facebook page that represents your target market or content niche
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="competitor-input-wrapper">
+                    <input
+                      type="text"
+                      id={`competitor-${index}`}
+                      value={competitor}
+                      onChange={(e) => handleCompetitorChange(index, e.target.value)}
+                      placeholder="e.g., competitor.page"
+                      className={`competitor-input ${competitor.trim() && !validateCompetitorUsername(competitor) ? 'error' : ''}`}
                       disabled={isLoading}
-                    >
-                      Remove
-                    </button>
+                    />
+                    {index >= 3 && (
+                      <button
+                        type="button"
+                        onClick={() => removeCompetitor(index)}
+                        className="remove-competitor"
+                        disabled={isLoading}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  
+                  {competitor.trim() && !validateCompetitorUsername(competitor) && (
+                    <div className="error-message">Invalid Facebook username format</div>
                   )}
                 </div>
-                {competitor.trim() && !validateCompetitorUsername(competitor) && (
-                  <div className="error-message">Invalid Facebook username format</div>
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
             
             {competitors.length < 10 && (
               <button
@@ -577,12 +624,81 @@ const usernameCheckUrl = '/api/check-username-availability';
                   Setting up...
                 </>
               ) : (
-                'Setup Facebook Account'
+                'Review & Submit Setup'
               )}
             </button>
           </div>
         </form>
       </div>
+
+      {/* Pre-submission Confirmation Modal */}
+      {showConfirmation && confirmationData && (
+        <motion.div
+          className="confirmation-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.div
+            className="confirmation-modal"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.8, opacity: 0 }}
+          >
+            <div className="confirmation-header">
+              <h3>🔍 Final Review Required</h3>
+              <p><strong>Please verify your information before starting the 15-minute AI analysis:</strong></p>
+            </div>
+            
+            <div className="confirmation-content">
+              <div className="confirmation-section">
+                <h4>📝 Your Information</h4>
+                <div className="confirmation-item">
+                  <strong>Username:</strong> {confirmationData.username}
+                  <div className="critical-warning">⚠️ This is critical - check spelling carefully!</div>
+                </div>
+                <div className="confirmation-item">
+                  <strong>Account Type:</strong> {confirmationData.accountType}
+                </div>
+                <div className="confirmation-item">
+                  <strong>Posting Style:</strong> {confirmationData.postingStyle}
+                </div>
+              </div>
+              
+              <div className="confirmation-section">
+                <h4>🎯 Competitors ({confirmationData.competitors.length})</h4>
+                {confirmationData.competitors.map((comp: string, index: number) => (
+                  <div key={index} className="confirmation-item">
+                    <strong>Competitor {index + 1}:</strong> {comp}
+                  </div>
+                ))}
+              </div>
+              
+              <div className="confirmation-warning">
+                <p><strong>⚠️ Important:</strong> Once submitted, this will initiate a 15-minute AI analysis process. Make sure all information is correct!</p>
+              </div>
+            </div>
+            
+            <div className="confirmation-actions">
+              <button
+                type="button"
+                onClick={() => setShowConfirmation(false)}
+                className="cancel-button"
+              >
+                Go Back & Edit
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmedSubmission}
+                className="confirm-button"
+                disabled={isLoading}
+              >
+                {isLoading ? 'Processing...' : '✅ Confirm & Start Analysis'}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
     </motion.div>
   );
 };

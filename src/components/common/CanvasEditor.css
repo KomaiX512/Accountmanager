@@ -6,8 +6,8 @@
   bottom: 0 !important;
   width: 100vw !important;
   height: 100vh !important;
-  background-color: rgba(0, 0, 0, 0.8) !important;
-  backdrop-filter: blur(8px) !important;
+  background-color: rgba(0, 0, 0, 0.3) !important;
+  backdrop-filter: blur(5px) !important;
   z-index: 999999 !important;
   display: flex !important;
   justify-content: center !important;
@@ -116,7 +116,7 @@ body:has(.canvas-editor-overlay) {
 }
 
 .canvas-editor-container {
-  background-color: #151521 !important;
+  background: rgba(255, 255, 255, 0.08) !important;
   border-radius: 12px !important;
   width: min(95vw, 1000px) !important;
   height: min(85vh, 700px) !important;
@@ -125,7 +125,11 @@ body:has(.canvas-editor-overlay) {
   padding: 0 !important;
   display: flex !important;
   flex-direction: column !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.15) !important;
+  backdrop-filter: blur(20px) !important;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset !important;
   position: relative !important;
   z-index: 1000000 !important;
   animation: modalAppear 0.3s ease-out !important;
@@ -156,8 +160,9 @@ body:has(.canvas-editor-overlay) {
   justify-content: space-between;
   align-items: center;
   padding: 0 24px !important;
-  border-bottom: 1px solid #2d2d42;
-  background-color: #1a1a2e !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05) !important;
+  backdrop-filter: blur(8px) !important;
   border-radius: 12px 12px 0 0 !important;
 }
 
@@ -211,7 +216,8 @@ body:has(.canvas-editor-overlay) {
   position: relative !important;
   overflow: hidden !important;
   border-radius: 8px !important;
-  background-color: #1a1a1a !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  backdrop-filter: blur(8px) !important;
 }
 
 .canvas-editor-footer {
@@ -221,9 +227,10 @@ body:has(.canvas-editor-overlay) {
   justify-content: flex-end;
   align-items: center;
   padding: 0 24px !important;
-  border-top: 1px solid #2d2d42;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   gap: 16px !important;
-  background-color: #1a1a2e !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  backdrop-filter: blur(8px) !important;
   border-radius: 0 0 12px 12px !important;
 }
 
@@ -265,7 +272,8 @@ body:has(.canvas-editor-overlay) {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.8);
+  background-color: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(5px);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -275,12 +283,16 @@ body:has(.canvas-editor-overlay) {
 }
 
 .scheduler-container {
-  background-color: #1e1e2d;
+  background: rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   padding: 24px;
   width: 90%;
   max-width: 400px;
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(20px);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
 }
 
 .scheduler-container h3 {
@@ -357,7 +369,8 @@ body:has(.canvas-editor-overlay) {
 
 /* Update for left sidebar menu positioning */
 .tui-image-editor-container .tui-image-editor-menu {
-  background-color: #151521 !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  backdrop-filter: blur(8px) !important;
   position: absolute !important;
   left: 70px !important; /* Increased gap for better visibility */
   width: 60px !important;
@@ -406,8 +419,11 @@ body:has(.canvas-editor-overlay) {
 
 /* Adjust submenu position */
 .tui-image-editor-container .tui-image-editor-submenu {
-  background-color: #1e1e2d !important;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(12px) !important;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset !important;
   left: 60px !important;
   bottom: auto !important;
   right: auto !important;
@@ -420,7 +436,7 @@ body:has(.canvas-editor-overlay) {
   scrollbar-width: thin !important;
   scrollbar-color: rgba(0, 123, 255, 0.6) rgba(45, 45, 66, 0.3) !important;
   border-radius: 8px !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
   min-width: 200px !important;
   max-width: 300px !important;
   /* FIXED: Ensure submenu sliders are contained within submenu */
@@ -526,7 +542,8 @@ body:has(.canvas-editor-overlay) {
 .tui-image-editor-container .tui-image-editor-right-menu,
 .tui-image-editor-container .tui-image-editor-toolbar,
 .tui-image-editor-container .tui-image-editor-controls {
-  background-color: #151521 !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  backdrop-filter: blur(8px) !important;
   overflow-y: auto !important;
   overflow-x: hidden !important;
   /* Custom scrollbar for right tools */
@@ -541,7 +558,8 @@ body:has(.canvas-editor-overlay) {
   top: 0 !important;
   width: 60px !important;
   height: 100% !important;
-  background-color: #151521 !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  backdrop-filter: blur(8px) !important;
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
@@ -642,10 +660,13 @@ body:has(.canvas-editor-overlay) {
 
 /* Enhanced color picker container */
 .tui-colorpicker-container {
-  background-color: #1e1e2d !important;
-  border: 1px solid #3c3c57 !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
   border-radius: 8px !important;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4) !important;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset !important;
   padding: 15px !important;
   width: 280px !important;
   max-width: 100% !important;
@@ -917,7 +938,8 @@ body:has(.canvas-editor-overlay) {
   display: flex;
   width: 100%;
   height: 500px;
-  background-color: #1a1a1a;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(8px);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -927,7 +949,8 @@ body:has(.canvas-editor-overlay) {
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: #111;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(4px);
   padding: 10px;
   border-radius: 4px;
 }
@@ -955,9 +978,10 @@ body:has(.canvas-editor-overlay) {
 .brand-kit-sidebar {
   width: 280px;
   padding: 15px;
-  background-color: #1e1e2d;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(8px);
   color: #e0e0ff;
-  border-left: 1px solid #2a2a3a;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
   overflow-y: auto;
   /* Enhanced scrollbar for brand kit sidebar */
   scrollbar-width: thin !important;
@@ -989,7 +1013,7 @@ body:has(.canvas-editor-overlay) {
   margin-bottom: 15px;
   color: #0a9a6c;
   font-size: 18px;
-  border-bottom: 1px solid #2a2a3a;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   padding-bottom: 8px;
 }
 
@@ -1031,8 +1055,9 @@ body:has(.canvas-editor-overlay) {
 .brand-element-type-select {
   padding: 8px;
   border-radius: 4px;
-  border: 1px solid #2a2a3a;
-  background-color: #252535;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(4px);
   color: #e0e0ff;
 }
 
@@ -1053,14 +1078,15 @@ body:has(.canvas-editor-overlay) {
   align-items: center;
   padding: 8px 10px;
   margin-bottom: 4px;
-  background-color: #252535;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(4px);
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .brand-element-item:hover {
-  background-color: #2a2a42;
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .brand-element-item.selected {
@@ -1090,7 +1116,8 @@ body:has(.canvas-editor-overlay) {
 
 /* Element Properties */
 .element-properties {
-  background-color: #252535;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(4px);
   padding: 10px;
   border-radius: 4px;
 }
@@ -1117,7 +1144,7 @@ body:has(.canvas-editor-overlay) {
   appearance: none;
   -webkit-appearance: none;
   height: 4px;
-  background: #0a9a6c;
+  background: linear-gradient(to right, #0a9a6c, #00ffcc);
   border-radius: 2px;
 }
 
@@ -1228,8 +1255,9 @@ body:has(.canvas-editor-overlay) {
 
 /* Multi-Image Panel */
 .multi-image-panel {
-  background: rgba(30, 30, 45, 0.95);
-  border: 1px solid #3c3c57;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
   margin: 10px 0;
   padding: 12px;
@@ -1546,7 +1574,8 @@ body:has(.canvas-editor-overlay) {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(21, 21, 33, 0.8);
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(5px);
   display: flex;
   align-items: center;
   justify-content: center;

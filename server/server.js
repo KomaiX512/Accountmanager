@@ -9847,6 +9847,8 @@ async function processScheduledInstagramPosts() {
           const scheduleResponse = await s3Client.send(getCommand);
           const scheduleDataStr = await streamToString(scheduleResponse.Body);
           const scheduleData = JSON.parse(scheduleDataStr);
+          // Preserve original R2 JSON path for precise cleanup later
+          scheduleData.fileKey = object.Key;
           // 🔑 Ensure scheduleId consistency for older schedule files
           if (!scheduleData.scheduleId && !scheduleData.id) {
             const fileName = object.Key ? object.Key.split('/').pop().replace('.json', '') : `schedule_${Date.now()}`;
@@ -10076,6 +10078,8 @@ async function executeScheduledPost(scheduleData) {
               const scheduleResponse = await s3Client.send(getScheduleCommand);
               const scheduleDataStr = await streamToString(scheduleResponse.Body);
               const scheduleData = JSON.parse(scheduleDataStr);
+          // Preserve original R2 JSON path for precise cleanup later
+          scheduleData.fileKey = object.Key;
           // 🔑 Ensure scheduleId consistency for older schedule files
           if (!scheduleData.scheduleId && !scheduleData.id) {
             const fileName = object.Key ? object.Key.split('/').pop().replace('.json', '') : `schedule_${Date.now()}`;
@@ -11579,6 +11583,8 @@ app.get(['/api/scheduler-health/instagram', '/scheduler-health/instagram'], asyn
           const scheduleResponse = await s3Client.send(getCommand);
           const scheduleDataStr = await streamToString(scheduleResponse.Body);
           const scheduleData = JSON.parse(scheduleDataStr);
+          // Preserve original R2 JSON path for precise cleanup later
+          scheduleData.fileKey = object.Key;
           // 🔑 Ensure scheduleId consistency for older schedule files
           if (!scheduleData.scheduleId && !scheduleData.id) {
             const fileName = object.Key ? object.Key.split('/').pop().replace('.json', '') : `schedule_${Date.now()}`;
@@ -11673,6 +11679,8 @@ app.post(['/api/scheduler-retry/:postId', '/scheduler-retry/:postId'], async (re
           const scheduleResponse = await s3Client.send(getCommand);
           const scheduleDataStr = await streamToString(scheduleResponse.Body);
           const scheduleData = JSON.parse(scheduleDataStr);
+          // Preserve original R2 JSON path for precise cleanup later
+          scheduleData.fileKey = object.Key;
           // 🔑 Ensure scheduleId consistency for older schedule files
           if (!scheduleData.scheduleId && !scheduleData.id) {
             const fileName = object.Key ? object.Key.split('/').pop().replace('.json', '') : `schedule_${Date.now()}`;

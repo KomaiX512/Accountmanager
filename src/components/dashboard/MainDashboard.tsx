@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -144,7 +144,7 @@ const MainDashboard: React.FC = () => {
   // ✅ BULLETPROOF TIMER SYSTEM - Synchronized with ProcessingLoadingState
   const getProcessingCountdownKey = (platformId: string) => `${platformId}_processing_countdown`;
 
-  const getProcessingRemainingMs = (platformId: string): number => {
+  const getProcessingRemainingMs = useCallback((platformId: string): number => {
     // Never show timer for completed platforms
     if (completedPlatforms.has(platformId)) return 0;
 
@@ -161,9 +161,9 @@ const MainDashboard: React.FC = () => {
       console.error(`Error reading timer for ${platformId}:`, error);
       return 0;
     }
-  };
+  }, [completedPlatforms]);
 
-  const isPlatformLoading = (platformId: string): boolean => {
+  const isPlatformLoading = useCallback((platformId: string): boolean => {
     // Never show loading for completed platforms
     if (completedPlatforms.has(platformId)) return false;
 
@@ -182,7 +182,7 @@ const MainDashboard: React.FC = () => {
     }
 
     return false;
-  };
+  }, [completedPlatforms, platformLoadingStates, getProcessingRemainingMs]);
 
   // Function to start platform loading state
   const startPlatformLoading = (platformId: string, durationMinutes: number = 15) => {
@@ -221,7 +221,7 @@ const MainDashboard: React.FC = () => {
   };
 
   // Function to complete platform loading
-  const completePlatformLoading = (platformId: string) => {
+  const completePlatformLoading = useCallback((platformId: string) => {
     console.log(`🔥 TIMER COMPLETE: Completing ${platformId} processing`);
     
     // Mark platform as completed
@@ -241,7 +241,7 @@ const MainDashboard: React.FC = () => {
     localStorage.removeItem(`${platformId}_processing_info`);
     
     console.log(`🔥 TIMER CLEANUP: ${platformId} processing completed and cleaned up`);
-  };
+  }, [completedPlatforms]);
 
   // ✅ PLATFORM STATUS SYNC FIX: Improved platform access tracking
   const getPlatformAccessStatus = useCallback((platformId: string): boolean => {
@@ -364,6 +364,13 @@ const MainDashboard: React.FC = () => {
     
     return () => clearInterval(timerSyncInterval);
   }, [currentUser?.uid, getProcessingRemainingMs, isPlatformLoading, completePlatformLoading]);
+
+  // ✅ PROCESSING STATE UI SYNC: Force re-render when processing state changes
+  useEffect(() => {
+    // Force platform status refresh when processing state changes
+    // This ensures the "Acquiring" status is displayed immediately
+    setPlatforms(prev => [...prev]);
+  }, [processingState]);
 
   // Fetch user's name from authentication
   useEffect(() => {
@@ -524,7 +531,7 @@ const MainDashboard: React.FC = () => {
 
   // ✅ CLEAN MAIN DASHBOARD: No auto-refresh, just basic data loading
   useEffect(() => {
-    console.log(`[MainDashboard] � Main dashboard mounted - basic data load`);
+    console.log(`[MainDashboard] 🔄 Main dashboard mounted - basic data load`);
     
     // Only fetch initial data on mount, no auto-refresh
     if (currentUser?.uid) {
@@ -627,10 +634,11 @@ const MainDashboard: React.FC = () => {
       prev.map(platform => {
         const newClaimed = getPlatformAccessStatus(platform.id);
         const newConnected = getPlatformConnectionStatus(platform.id);
+        const isCurrentlyLoading = isPlatformLoading(platform.id);
         
         // Only update if status actually changed
         if (platform.claimed !== newClaimed || platform.connected !== newConnected) {
-          console.log(`[MainDashboard] 🔄 Platform ${platform.id} status update: claimed=${newClaimed}, connected=${newConnected}`);
+          console.log(`[MainDashboard] 🔄 Platform ${platform.id} status update: claimed=${newClaimed}, connected=${newConnected}, loading=${isCurrentlyLoading}`);
           return { 
             ...platform, 
             claimed: newClaimed,
@@ -641,7 +649,7 @@ const MainDashboard: React.FC = () => {
         return platform;
       })
     );
-  }, [getPlatformAccessStatus, getPlatformConnectionStatus]);
+  }, [getPlatformAccessStatus, getPlatformConnectionStatus, isPlatformLoading]);
 
   // ✅ AUTO-COMPLETE CLAIMED PLATFORMS: Mark claimed platforms as completed to prevent timer
   useEffect(() => {
@@ -841,7 +849,6 @@ const MainDashboard: React.FC = () => {
     }
   };
 
-  // Add a function to navigate to the entry setup
   const navigateToSetup = (platformId: string) => {
     // Set a flag in localStorage to indicate that this platform should be marked as acquired upon successful submission
     if (currentUser?.uid) {
@@ -891,11 +898,19 @@ const MainDashboard: React.FC = () => {
     }
 
     if (!platform.connected) {
-      // Navigate to platform dashboard using the platform's route
+      // Navigate to entry form for unconnected platforms
+      if (platform.id === 'instagram') {
+        safeNavigate(navigate, '/dashboard', {}, 6); // Instagram special case
+      } else {
+        safeNavigate(navigate, `/${platform.id}`, {}, 6); // Entry form path e.g. /facebook
+      }
+      return;
+    }
+    // If platform is connected, go to its dashboard route
+    if (platform.connected) {
       if (platform.id === 'instagram') {
         safeNavigate(navigate, '/dashboard', {}, 6);
       } else {
-        // Use the platform's route for consistent navigation
         safeNavigate(navigate, `/${platform.route}`, {}, 6);
       }
     }
@@ -1250,9 +1265,19 @@ const MainDashboard: React.FC = () => {
                   <div className="platform-info">
                     <div className="status-indicators">
                       <div 
-                        className={`status-indicator ${platform.claimed ? 'claimed' : 'unclaimed'}`}
+                        className={`status-indicator ${
+                          isPlatformLoading(platform.id) 
+                            ? 'acquiring' 
+                            : platform.claimed 
+                              ? 'claimed' 
+                              : 'unclaimed'
+                        }`}
                       >
-                        {platform.claimed ? 'Acquired' : 'Not Acquired'}
+                        {isPlatformLoading(platform.id) 
+                          ? 'Acquiring' 
+                          : platform.claimed 
+                            ? 'Acquired' 
+                            : 'Not Acquired'}
                       </div>
                       
                       <div 

@@ -37,6 +37,10 @@ const IG_EntryUsernames: React.FC<IG_EntryUsernamesProps> = ({
   const [usernameValid, setUsernameValid] = useState<boolean>(true);
   const [usernameTouched, setUsernameTouched] = useState<boolean>(false);
   
+  // New state for pre-submission confirmation
+  const [showConfirmation, setShowConfirmation] = useState<boolean>(false);
+  const [confirmationData, setConfirmationData] = useState<any>(null);
+  
   const navigate = useNavigate();
   const { currentUser } = useAuth(); // Get the current user from auth context
   const { processingState, startProcessing } = useProcessing();
@@ -243,24 +247,32 @@ const usernameCheckUrl = '/api/check-username-availability';
       return;
     }
 
+    // Show confirmation dialog before proceeding
+    const finalCompetitors = competitors.filter(comp => comp.trim() !== '');
+    const dataToConfirm = {
+      username: username.trim(),
+      accountType,
+      competitors: finalCompetitors,
+      postingStyle: postingStyle.trim() || 'General posting style',
+      platform: 'instagram'
+    };
+    
+    setConfirmationData(dataToConfirm);
+    setShowConfirmation(true);
+  };
+
+  const handleConfirmedSubmission = async () => {
+    if (!confirmationData || !currentUser?.uid) return;
+    
     setIsLoading(true);
+    setShowConfirmation(false);
 
     try {
       const apiUrl = `/api/save-account-info`;
       const statusApiUrl = `/api/user-status`;
 
-      const finalCompetitors = competitors.filter(comp => comp.trim() !== '');
-
-      const payload = {
-        username: username.trim(),
-        accountType,
-        competitors: finalCompetitors,
-        postingStyle: postingStyle.trim() || 'General posting style',
-        platform: 'instagram'
-      };
-
       // Save to account info API
-      const response = await axios.post(apiUrl, payload, {
+      const response = await axios.post(apiUrl, confirmationData, {
         headers: { 'Content-Type': 'application/json' },
         timeout: 30000,
       });
@@ -268,21 +280,21 @@ const usernameCheckUrl = '/api/check-username-availability';
       if (response.status === 200) {
         // Now save the user's Instagram username entry state
         await axios.post(`/api/user-instagram-status/${currentUser.uid}`, {
-          instagram_username: username.trim(),
-          accountType,
-          competitors: competitors.map(comp => comp.trim()) // Always save competitors
+          instagram_username: confirmationData.username,
+          accountType: confirmationData.accountType,
+          competitors: confirmationData.competitors // Always save competitors
         });
         
         // Save to localStorage immediately for future use
         localStorage.setItem(`instagram_accessed_${currentUser.uid}`, 'true');
-        localStorage.setItem(`instagram_username_${currentUser.uid}`, username.trim());
-        localStorage.setItem(`instagram_account_type_${currentUser.uid}`, accountType);
-        localStorage.setItem(`instagram_competitors_${currentUser.uid}`, JSON.stringify(competitors.map(comp => comp.trim())));
+        localStorage.setItem(`instagram_username_${currentUser.uid}`, confirmationData.username);
+        localStorage.setItem(`instagram_account_type_${currentUser.uid}`, confirmationData.accountType);
+        localStorage.setItem(`instagram_competitors_${currentUser.uid}`, JSON.stringify(confirmationData.competitors));
         
         showMessage('Submission successful', 'success');
         
         // Start the processing phase using unified ProcessingContext
-        startProcessing('instagram', username.trim(), 15); // 15 minutes duration
+        startProcessing('instagram', confirmationData.username, 15); // 15 minutes duration
       }
     } catch (error: any) {
       console.error('Error submitting data:', error);
@@ -328,9 +340,17 @@ const usernameCheckUrl = '/api/check-username-availability';
         transition={{ duration: 0.3 }}
       >
         <h1 className="title">Instagram Setup</h1>
+        
+        <div className="importance-notice">
+          <div className="importance-icon">⚠️</div>
+          <p><strong>Critical Setup:</strong> This information initiates a 15-minute AI analysis process. Please ensure all details are accurate before submission.</p>
+        </div>
 
         <div className="section">
-          <h2 className="subtitle">Username</h2>
+          <h2 className="subtitle">
+            Username 
+            <span className="critical-field">CRITICAL</span>
+          </h2>
           <motion.div className="input-group" whileHover={{ x: 5 }}>
             <input
               value={username}
@@ -363,6 +383,15 @@ const usernameCheckUrl = '/api/check-username-availability';
                 : 'You can go ahead but this is already taken'}
             </motion.div>
           )}
+          <div className="field-description">
+            <p><strong>Why this matters:</strong> Your username is the foundation for all AI-generated content, competitor analysis, and strategic recommendations.</p>
+            <ul>
+              <li>✓ Must be your exact Instagram username (lowercase only)</li>
+              <li>✓ Only lowercase letters, numbers, periods, and underscores</li>
+              <li>✓ No spaces or special characters</li>
+              <li>✓ This will be used for 15 minutes of AI processing</li>
+            </ul>
+          </div>
         </div>
 
         <div className="section">
@@ -387,6 +416,13 @@ const usernameCheckUrl = '/api/check-username-availability';
               Non-Branding
             </label>
           </div>
+          <div className="field-description">
+            <p><strong>Account Type Impact:</strong></p>
+            <ul>
+              <li><strong>Branding:</strong> Business promotion, product marketing, brand awareness</li>
+              <li><strong>Non-Branding:</strong> Personal content, lifestyle, entertainment focus</li>
+            </ul>
+          </div>
         </div>
 
         <div className="section">
@@ -399,42 +435,68 @@ const usernameCheckUrl = '/api/check-username-availability';
               placeholder="Describe your posting style (e.g., casual, professional, lifestyle)"
             />
           </motion.div>
+          <div className="field-description">
+            <p><strong>AI Training Data:</strong> This helps our AI understand your voice and create content that matches your style.</p>
+            <p><em>Examples:</em> "Professional and informative with occasional humor" or "Casual and relatable lifestyle content"</p>
+          </div>
         </div>
 
         <div className="section">
           <h2 className="subtitle">Competitors (at least 3 required)</h2>
-          {competitors.map((competitor, index) => (
-            <motion.div
-              key={index}
-              className="input-group competitor-input"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <input
-                value={competitor}
-                onChange={(e) => handleCompetitorChange(index, e.target.value)}
-                type="text"
-                placeholder={`Enter competitor ${index + 1}`}
-                className={competitor && !validateCompetitorUsername(competitor) ? 'invalid-input' : ''}
-              />
-              {competitors.length > 3 && (
-                <motion.button
-                  className="remove-btn"
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => removeCompetitor(index)}
-                >
-                  ×
-                </motion.button>
-              )}
-              {competitor && !validateCompetitorUsername(competitor) && (
-                <div className="validation-error">
-                  Invalid competitor username format
+          <div className="section-description">
+            <p><strong>Strategic Intelligence:</strong> These competitors will be analyzed to understand market trends, content strategies, and engagement patterns.</p>
+          </div>
+          
+          <div className="competitors-container">
+            {competitors.map((competitor, index) => (
+              <motion.div
+                key={index}
+                className="competitor-input-group"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                <div className="competitor-header">
+                  <label className="competitor-label">
+                    Competitor {index + 1} {index < 3 ? '*' : ''}
+                    {index < 3 && <span className="required-badge">Required</span>}
+                  </label>
+                  {index < 3 && (
+                    <div className="competitor-hint">
+                      Choose an Instagram account that represents your target market or content niche
+                    </div>
+                  )}
                 </div>
-              )}
-            </motion.div>
-          ))}
+                
+                <div className="competitor-input-wrapper">
+                  <input
+                    value={competitor}
+                    onChange={(e) => handleCompetitorChange(index, e.target.value)}
+                    type="text"
+                    placeholder={`Enter competitor ${index + 1}`}
+                    className={`competitor-input ${competitor && !validateCompetitorUsername(competitor) ? 'invalid-input' : ''}`}
+                  />
+                  {competitors.length > 3 && (
+                    <motion.button
+                      className="remove-btn"
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => removeCompetitor(index)}
+                    >
+                      ×
+                    </motion.button>
+                  )}
+                </div>
+                
+                {competitor && !validateCompetitorUsername(competitor) && (
+                  <div className="validation-error">
+                    Invalid competitor username format
+                  </div>
+                )}
+              </motion.div>
+            ))}
+          </div>
+          
           <motion.button
             className="add-btn"
             whileHover={{ scale: 1.05 }}
@@ -471,7 +533,7 @@ const usernameCheckUrl = '/api/check-username-availability';
             {isLoading ? (
               <div className="spinner"></div>
             ) : (
-              <span>Submit</span>
+              <span>Review & Submit Setup</span>
             )}
           </motion.button>
         </div>
@@ -487,6 +549,75 @@ const usernameCheckUrl = '/api/check-username-availability';
           </motion.div>
         )}
       </motion.div>
+
+      {/* Pre-submission Confirmation Modal */}
+      {showConfirmation && confirmationData && (
+        <motion.div
+          className="confirmation-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.div
+            className="confirmation-modal"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.8, opacity: 0 }}
+          >
+            <div className="confirmation-header">
+              <h3>🔍 Final Review Required</h3>
+              <p><strong>Please verify your information before starting the 15-minute AI analysis:</strong></p>
+            </div>
+            
+            <div className="confirmation-content">
+              <div className="confirmation-section">
+                <h4>📝 Your Information</h4>
+                <div className="confirmation-item">
+                  <strong>Username:</strong> {confirmationData.username}
+                  <div className="critical-warning">⚠️ This is critical - check spelling carefully!</div>
+                </div>
+                <div className="confirmation-item">
+                  <strong>Account Type:</strong> {confirmationData.accountType}
+                </div>
+                <div className="confirmation-item">
+                  <strong>Posting Style:</strong> {confirmationData.postingStyle}
+                </div>
+              </div>
+              
+              <div className="confirmation-section">
+                <h4>🎯 Competitors ({confirmationData.competitors.length})</h4>
+                {confirmationData.competitors.map((comp: string, index: number) => (
+                  <div key={index} className="confirmation-item">
+                    <strong>Competitor {index + 1}:</strong> {comp}
+                  </div>
+                ))}
+              </div>
+              
+              <div className="confirmation-warning">
+                <p><strong>⚠️ Important:</strong> Once submitted, this will initiate a 15-minute AI analysis process. Make sure all information is correct!</p>
+              </div>
+            </div>
+            
+            <div className="confirmation-actions">
+              <button
+                type="button"
+                onClick={() => setShowConfirmation(false)}
+                className="cancel-button"
+              >
+                Go Back & Edit
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmedSubmission}
+                className="confirm-button"
+                disabled={isLoading}
+              >
+                {isLoading ? 'Processing...' : '✅ Confirm & Start Analysis'}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
     </motion.div>
   );
 };

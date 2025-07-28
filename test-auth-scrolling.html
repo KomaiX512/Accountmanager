@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth Scrolling Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #0a0a1a, #252554);
+            color: #e0e0ff;
+            min-height: 100vh;
+        }
+        
+        .test-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            z-index: 10;
+            overflow: auto;
+        }
+        
+        .test-card {
+            width: 100%;
+            max-width: 480px;
+            padding: 40px 30px;
+            overflow: visible;
+            position: relative;
+            z-index: 2;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(30px) saturate(180%) brightness(1.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 24px;
+            box-shadow: 
+                0 25px 80px rgba(0, 0, 0, 0.4),
+                0 0 120px rgba(0, 255, 204, 0.2),
+                inset 0 2px 0 rgba(255, 255, 255, 0.3),
+                inset 0 -2px 0 rgba(255, 255, 255, 0.15);
+        }
+        
+        .test-header {
+            text-align: center;
+            margin-bottom: 30px;
+            flex-shrink: 0;
+        }
+        
+        .test-header h1 {
+            color: #e0e0ff;
+            font-size: 2.2rem;
+            margin-bottom: 8px;
+            font-weight: 600;
+            background: linear-gradient(135deg, #00ffcc 0%, #007bff 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .test-form {
+            margin-bottom: 20px;
+            overflow-y: auto;
+            flex: 1;
+            padding-right: 5px;
+        }
+        
+        .test-form::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .test-form::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 3px;
+        }
+        
+        .test-form::-webkit-scrollbar-thumb {
+            background: rgba(0, 255, 204, 0.3);
+            border-radius: 3px;
+            transition: background 0.2s;
+        }
+        
+        .test-form::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 255, 204, 0.5);
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #e0e0ff;
+            font-size: 0.9rem;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(24, 24, 40, 0.8);
+            color: #e0e0ff;
+            border: 1px solid rgba(224, 224, 255, 0.2);
+            border-radius: 6px;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+        }
+        
+        .test-footer {
+            margin-top: 30px;
+            text-align: center;
+            color: #a0a0cc;
+            font-size: 0.8rem;
+            flex-shrink: 0;
+        }
+        
+        .test-button {
+            width: 100%;
+            padding: 14px 20px;
+            background: linear-gradient(90deg, #00c9a7, #00b4e6);
+            color: #0a0a1a;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            margin-bottom: 16px;
+            flex-shrink: 0;
+        }
+        
+        @media (max-width: 576px) {
+            .test-card {
+                padding: 30px 20px;
+                max-height: 95vh;
+            }
+            
+            .test-container {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-card">
+            <div class="test-header">
+                <h1>Test Scrolling</h1>
+                <p>This simulates the sign-up form with many fields</p>
+            </div>
+            
+            <form class="test-form">
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" class="form-input" placeholder="Your Name" />
+                </div>
+                
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" class="form-input" placeholder="your@email.com" />
+                </div>
+                
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" class="form-input" placeholder="••••••••" />
+                </div>
+                
+                <div class="form-group">
+                    <label>Confirm Password</label>
+                    <input type="password" class="form-input" placeholder="••••••••" />
+                </div>
+                
+                <div class="form-group">
+                    <label>Phone Number</label>
+                    <input type="tel" class="form-input" placeholder="+1 (555) 123-4567" />
+                </div>
+                
+                <div class="form-group">
+                    <label>Date of Birth</label>
+                    <input type="date" class="form-input" />
+                </div>
+                
+                <div class="form-group">
+                    <label>Address</label>
+                    <input type="text" class="form-input" placeholder="123 Main St" />
+                </div>
+                
+                <div class="form-group">
+                    <label>City</label>
+                    <input type="text" class="form-input" placeholder="New York" />
+                </div>
+                
+                <div class="form-group">
+                    <label>State</label>
+                    <input type="text" class="form-input" placeholder="NY" />
+                </div>
+                
+                <div class="form-group">
+                    <label>ZIP Code</label>
+                    <input type="text" class="form-input" placeholder="10001" />
+                </div>
+                
+                <div class="form-group">
+                    <label>Company</label>
+                    <input type="text" class="form-input" placeholder="Your Company" />
+                </div>
+                
+                <div class="form-group">
+                    <label>Job Title</label>
+                    <input type="text" class="form-input" placeholder="Software Engineer" />
+                </div>
+                
+                <div class="form-group">
+                    <label>Website</label>
+                    <input type="url" class="form-input" placeholder="https://example.com" />
+                </div>
+                
+                <div class="form-group">
+                    <label>Bio</label>
+                    <textarea class="form-input" rows="3" placeholder="Tell us about yourself..."></textarea>
+                </div>
+            </form>
+            
+            <button class="test-button">Create Account</button>
+            
+            <div class="test-footer">
+                <p>This test shows the scrolling functionality when content exceeds the viewport height.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html> 

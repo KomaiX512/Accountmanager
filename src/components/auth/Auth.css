@@ -9,7 +9,7 @@
   align-items: center;
   padding: 20px;
   z-index: 10;
-  overflow: hidden;
+  overflow: auto;
 }
 
 /* GLASSY AUTH CARD */
@@ -38,14 +38,18 @@
   width: 100%;
   max-width: 480px;
   padding: 40px 30px;
-  overflow: hidden;
+  overflow: visible;
   position: relative;
   z-index: 2;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .auth-header {
   text-align: center;
   margin-bottom: 30px;
+  flex-shrink: 0;
 }
 
 .auth-header h1 {
@@ -75,6 +79,7 @@
   border-radius: 6px;
   position: relative;
   font-size: 0.9rem;
+  flex-shrink: 0;
 }
 
 .auth-lockout {
@@ -113,6 +118,7 @@
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .google-signin-btn:hover {
@@ -160,6 +166,7 @@
   text-align: center;
   color: #a0a0cc;
   font-size: 0.8rem;
+  flex-shrink: 0;
 }
 
 .auth-footer a {
@@ -279,6 +286,28 @@
 /* Email/Password Authentication Styles */
 .auth-form {
   margin-bottom: 20px;
+  overflow-y: auto;
+  flex: 1;
+  padding-right: 5px;
+}
+
+.auth-form::-webkit-scrollbar {
+  width: 6px;
+}
+
+.auth-form::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+
+.auth-form::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 204, 0.3);
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+
+.auth-form::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 204, 0.5);
 }
 
 .form-group {
@@ -350,6 +379,7 @@
   margin: 24px 0;
   color: #a0a0cc;
   font-size: 0.9rem;
+  flex-shrink: 0;
 }
 
 .auth-divider::before,
@@ -369,6 +399,7 @@
   text-align: center;
   color: #a0a0cc;
   font-size: 0.9rem;
+  flex-shrink: 0;
 }
 
 .auth-switch a {
@@ -407,15 +438,21 @@
   margin-bottom: 25px;
   border-radius: 6px;
   font-size: 0.9rem;
+  flex-shrink: 0;
 }
 
 /* Responsive styles */
 @media (max-width: 576px) {
   .auth-card {
     padding: 30px 20px;
+    max-height: 95vh;
   }
   
   .auth-header h1 {
     font-size: 1.8rem;
+  }
+  
+  .auth-container {
+    padding: 10px;
   }
 } 

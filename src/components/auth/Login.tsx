@@ -442,10 +442,22 @@ const Login: React.FC = () => {
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.9 }}
         transition={{ duration: 0.3 }}
+        /* FIX: Ensure motion doesn't interfere with rendering in production */
+        style={{ 
+          transform: 'translateZ(0)',
+          willChange: 'transform',
+          backfaceVisibility: 'hidden'
+        }}
       >
         <motion.div
           className="auth-card glassy-auth-card"
           whileHover={{ boxShadow: '0 10px 30px rgba(0, 0, 0, 0.15)' }}
+          /* FIX: Prevent motion from causing rendering issues */
+          style={{
+            transform: 'translateZ(0)',
+            willChange: 'transform',
+            backfaceVisibility: 'hidden'
+          }}
         >
           <div className="auth-header">
             <h1>
@@ -514,6 +526,12 @@ const Login: React.FC = () => {
             whileTap={{ scale: 0.98 }}
             onClick={handleGoogleLogin}
             disabled={loading || lockout}
+            /* FIX: Ensure button motion doesn't cause rendering issues */
+            style={{
+              transform: 'translateZ(0)',
+              willChange: 'transform',
+              backfaceVisibility: 'hidden'
+            }}
           >
             {loading && mode === 'login' ? (
               <span className="loading-spinner"></span>

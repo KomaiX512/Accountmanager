@@ -10,6 +10,10 @@
   padding: 20px;
   z-index: 10;
   overflow: hidden;
+  /* FIX: Ensure proper stacking context */
+  transform: translateZ(0);
+  will-change: transform;
+  contain: layout style;
 }
 
 /* GLASSY AUTH CARD */
@@ -29,9 +33,15 @@
     inset 0 2px 0 rgba(255, 255, 255, 0.3),
     inset 0 -2px 0 rgba(255, 255, 255, 0.15);
   
-  transform: translateZ(50px);
+  /* FIX: Remove translateZ that causes rendering issues in production */
+  /* transform: translateZ(50px); */
+  transform: translateZ(0);
   will-change: transform;
   transition: all 0.3s ease;
+  /* FIX: Ensure proper rendering in production */
+  backface-visibility: hidden;
+  perspective: 1000px;
+  transform-style: preserve-3d;
 }
 
 .auth-card {
@@ -41,6 +51,9 @@
   overflow: hidden;
   position: relative;
   z-index: 2;
+  /* FIX: Ensure proper stacking */
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 .auth-header {
@@ -113,12 +126,18 @@
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
+  /* FIX: Ensure button is always visible */
+  z-index: 1;
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 .google-signin-btn:hover {
   background: linear-gradient(90deg, #1a1a32, #2a2a60);
   border-color: rgba(224, 224, 255, 0.3);
   transform: translateY(-2px);
+  /* FIX: Ensure hover state doesn't cause rendering issues */
+  z-index: 2;
 }
 
 .google-signin-btn:active {
@@ -128,6 +147,8 @@
 .google-signin-btn:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+  /* FIX: Ensure disabled state is visible */
+  transform: translateZ(0);
 }
 
 .google-icon {
@@ -301,12 +322,19 @@
   border-radius: 6px;
   font-size: 0.95rem;
   transition: all 0.3s ease;
+  /* FIX: Ensure inputs are always visible */
+  transform: translateZ(0);
+  will-change: transform;
+  position: relative;
+  z-index: 1;
 }
 
 .form-input:focus {
   outline: none;
   border-color: #00ffcc;
   box-shadow: 0 0 0 2px rgba(0, 255, 204, 0.2);
+  /* FIX: Ensure focus state doesn't cause rendering issues */
+  z-index: 2;
 }
 
 .form-input::placeholder {
@@ -328,11 +356,18 @@
   justify-content: center;
   transition: all 0.3s ease;
   margin-bottom: 16px;
+  /* FIX: Ensure submit button is always visible */
+  z-index: 1;
+  transform: translateZ(0);
+  will-change: transform;
+  position: relative;
 }
 
 .submit-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 12px rgba(0, 255, 204, 0.15);
+  /* FIX: Ensure hover state doesn't cause rendering issues */
+  z-index: 2;
 }
 
 .submit-btn:active {
@@ -342,6 +377,8 @@
 .submit-btn:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+  /* FIX: Ensure disabled state is visible */
+  transform: translateZ(0);
 }
 
 .auth-divider {
@@ -418,4 +455,73 @@
   .auth-header h1 {
     font-size: 1.8rem;
   }
+} 
+
+/* FIX: Add production-specific fixes for VPS rendering issues */
+@media (min-resolution: 1.5dppx) {
+  .glassy-auth-card {
+    /* High DPI displays may have different rendering behavior */
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+}
+
+/* FIX: Ensure proper rendering on different browsers in production */
+@supports (backdrop-filter: blur(1px)) {
+  .glassy-auth-card {
+    backdrop-filter: blur(30px) saturate(180%) brightness(1.1);
+    -webkit-backdrop-filter: blur(30px) saturate(180%) brightness(1.1);
+  }
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .glassy-auth-card {
+    /* Fallback for browsers that don't support backdrop-filter */
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* FIX: Ensure buttons are always clickable and visible */
+.auth-form button,
+.google-signin-btn,
+.submit-btn {
+  /* Force hardware acceleration */
+  transform: translateZ(0);
+  will-change: transform;
+  /* Ensure proper stacking */
+  position: relative;
+  z-index: 1;
+  /* Prevent any potential clipping */
+  overflow: visible;
+}
+
+/* FIX: Ensure form elements are properly rendered */
+.form-input {
+  width: 100%;
+  padding: 12px 16px;
+  background: rgba(24, 24, 40, 0.8);
+  color: #e0e0ff;
+  border: 1px solid rgba(224, 224, 255, 0.2);
+  border-radius: 6px;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+  /* FIX: Ensure inputs are always visible */
+  transform: translateZ(0);
+  will-change: transform;
+  position: relative;
+  z-index: 1;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #00ffcc;
+  box-shadow: 0 0 0 2px rgba(0, 255, 204, 0.2);
+  /* FIX: Ensure focus state doesn't cause rendering issues */
+  z-index: 2;
+}
+
+.form-input::placeholder {
+  color: rgba(160, 160, 204, 0.6);
 } 

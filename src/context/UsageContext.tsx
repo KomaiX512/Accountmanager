@@ -7,16 +7,18 @@ interface UsageStats {
   discussions: number;
   aiReplies: number;
   campaigns: number;
+  resets: number;
 }
 
 interface UsageContextType {
   usage: UsageStats;
   incrementUsage: (feature: keyof UsageStats, platform?: string) => Promise<void>;
   resetUsage: () => void;
+  resetDashboard: () => void;
   getUsageForFeature: (feature: keyof UsageStats) => number;
   trackFeatureUsage: (feature: keyof UsageStats, platform: string, action: string) => Promise<void>;
   isFeatureBlocked: (feature: keyof UsageStats) => boolean;
-  getUserLimits: () => { posts: number; discussions: number; aiReplies: number; campaigns: number };
+  getUserLimits: () => { posts: number; discussions: number; aiReplies: number; campaigns: number; resets: number };
   refreshUsage: () => Promise<void>;
   isLoading: boolean;
 }
@@ -26,6 +28,8 @@ const UsageContext = createContext<UsageContextType | undefined>(undefined);
 export const useUsage = () => {
   const context = useContext(UsageContext);
   if (!context) {
+    console.error('[UsageContext] useUsage hook called outside of UsageProvider!');
+    console.error('[UsageContext] Make sure the component is wrapped with <UsageProvider>');
     throw new Error('useUsage must be used within a UsageProvider');
   }
   return context;
@@ -41,7 +45,8 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
     posts: 0,
     discussions: 0,
     aiReplies: 0,
-    campaigns: 0
+    campaigns: 0,
+    resets: 0
   });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -62,7 +67,8 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
           posts: backendUsage.postsUsed || 0,
           discussions: backendUsage.discussionsUsed || 0,
           aiReplies: backendUsage.aiRepliesUsed || 0,
-          campaigns: backendUsage.campaignsUsed || 0
+          campaigns: backendUsage.campaignsUsed || 0,
+          resets: backendUsage.resetsUsed || 0
         };
         
         setUsage(normalizedUsage);
@@ -155,29 +161,33 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
         return {
           posts: 160,
           discussions: 200,
-          aiReplies: -1, // unlimited
-          campaigns: 10
+          aiReplies: -1,
+          campaigns: 10,
+          resets: -1
         };
       case 'admin':
         return {
-          posts: -1, // unlimited
-          discussions: -1, // unlimited
-          aiReplies: -1, // unlimited
-          campaigns: -1 // unlimited
+          posts: -1,
+          discussions: -1,
+          aiReplies: -1,
+          campaigns: -1,
+          resets: -1
         };
       case 'freemium':
         return {
           posts: 20,
           discussions: 50,
           aiReplies: 50,
-          campaigns: 3
+          campaigns: 3,
+          resets: 3
         };
       default: // free
         return {
           posts: 5,
           discussions: 10,
           aiReplies: 2,
-          campaigns: 0
+          campaigns: 0,
+          resets: 3
         };
     }
   }, [currentUser?.uid]);
@@ -321,7 +331,8 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
       posts: 0,
       discussions: 0,
       aiReplies: 0,
-      campaigns: 0
+      campaigns: 0,
+      resets: 0
     };
     
     setUsage(resetUsage);
@@ -330,6 +341,25 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
       localStorage.setItem(`usage_${currentUser.uid}`, JSON.stringify(resetUsage));
       console.log(`[UsageContext] 🔄 Usage reset for user ${currentUser.uid}`);
     }
+  }, [currentUser?.uid]);
+
+  // Reset only dashboard usage counts (keep resets count)
+  const resetDashboard = useCallback(() => {
+    setUsage(prev => {
+      const newUsage = {
+        ...prev,
+        posts: 0,
+        discussions: 0,
+        aiReplies: 0,
+        campaigns: 0
+      };
+      if (currentUser?.uid) {
+        localStorage.setItem(`usage_${currentUser.uid}`, JSON.stringify(newUsage));
+        window.dispatchEvent(new CustomEvent('usageUpdated', { detail: { userId: currentUser.uid, usage: newUsage } }));
+        console.log(`[UsageContext] 🔄 Dashboard reset for user ${currentUser.uid}`);
+      }
+      return newUsage;
+    });
   }, [currentUser?.uid]);
 
   const value: UsageContextType = {
@@ -341,6 +371,7 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
     isFeatureBlocked,
     getUserLimits,
     refreshUsage,
+    resetDashboard,
     isLoading
   };
 

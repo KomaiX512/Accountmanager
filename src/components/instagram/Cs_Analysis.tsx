@@ -614,13 +614,27 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
       return <p className="analysis-detail">No details available.</p>;
     }
 
-    // Use the new comprehensive JSON decoder
+    // Use the new comprehensive JSON decoder with advanced options
     const decodedSections = decodeJSONToReactElements(analysisData, {
       customClassPrefix: 'analysis',
       enableBoldFormatting: true,
       enableItalicFormatting: true,
       enableHighlighting: true,
-      maxNestingLevel: 4
+      enableQuotes: true,
+      enableEmphasis: true,
+      preserveJSONStructure: true,
+      smartParagraphDetection: true,
+      maxNestingLevel: 6, // ✅ Increased to handle deeper nesting
+      enableDebugLogging: false, // ✅ Debug logging for troubleshooting (disable in production)
+      skipDecodingForElements: [
+        'Module Type',
+        'Platform', 
+        'Primary Username',
+        'Competitor',
+        'Timestamp',
+        'Intelligence Source'
+        // ✅ REMOVED 'Data' - we want to decode the Data content, just skip the metadata
+      ]
     });
 
     return decodedSections.map((section, idx) => (
@@ -644,6 +658,8 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
       setCurrentAnalysisIndex(currentAnalysisIndex - 1);
     }
   };
+
+  const [showDataInfo, setShowDataInfo] = useState(false);
 
   return (
     <>
@@ -1026,6 +1042,55 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
                 </div>
               )}
             </div>
+            
+            {/* ✅ NEW: Compact data limitation notice */}
+            <div className="compact-data-notice" onClick={() => setShowDataInfo(!showDataInfo)}>
+              <div className="notice-icon-tiny">
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  width="12" 
+                  height="12" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="8" x2="12" y2="12"/>
+                  <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+              </div>
+              <span className="notice-text-compact">
+                Limited analysis? Click for details
+              </span>
+              <div className="expand-icon">
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  width="10" 
+                  height="10" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round"
+                >
+                  <polyline points="6,9 12,15 18,9"/>
+                </svg>
+              </div>
+            </div>
+            
+            {/* ✅ NEW: Expandable detailed information */}
+            {showDataInfo && (
+              <div className="expanded-data-info">
+                <div className="info-content">
+                  <p>For exact competitive analysis, ensure the competitor has sufficient public content. Limited insights may indicate the competitor needs 2-3 more posts for comprehensive analysis.</p>
+                </div>
+              </div>
+            )}
+            
             <div className="analysis-section">
               <h4>Competitor Analysis Report</h4>
               {selectedData?.length ? (

@@ -32,7 +32,7 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
 
   const menuItems = [
     { icon: 'chat', label: 'AI Chat', action: () => setShowChatModal(true) },
-    { icon: 'content', label: 'Content Hub', action: () => setShowCanvasEditor(true) },
+    { icon: 'content', label: 'Image Editor', action: () => setShowCanvasEditor(true) },
     { icon: 'profile', label: 'Profile', action: () => setShowProfilePopup(true) }
   ];
 

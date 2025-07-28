@@ -2463,15 +2463,15 @@ async function streamToBuffer(stream) {
 }
 
 // Instagram App Credentials
-const APP_ID = '676612308718574';
-const APP_SECRET = '7a225c1e31ad1949ab9609d7224da6b5';
-const REDIRECT_URI = 'https://0ca9a44ebc1f.ngrok-free.app/instagram/callback';
+const APP_ID = '576296982152813';
+const APP_SECRET = 'd48ddc9eaf0e5c4969d4ddc4e293178c';
+const REDIRECT_URI = 'https://sentientm.com/instagram/callback';
 const VERIFY_TOKEN = 'myInstagramWebhook2025';
 
 // Facebook App Credentials  
-const FB_APP_ID = '676612308718574'; // Your ACTUAL Facebook App ID (NOT Configuration ID)
-const FB_APP_SECRET = '0144a0685fd3182b29e2750dabe2fcda'; // Your actual App Secret
-const FB_REDIRECT_URI = 'https://0ca9a44ebc1f.ngrok-free.app/facebook/callback';
+const FB_APP_ID = '581584257679639'; // Your ACTUAL Facebook App ID (NOT Configuration ID)
+const FB_APP_SECRET = 'cdd153955e347e194390333e48cb0480'; // Your actual App Secret
+const FB_REDIRECT_URI = 'https://sentientm.com/facebook/callback';
 const FB_VERIFY_TOKEN = 'myFacebookWebhook2025';
 
 app.get([
@@ -6094,8 +6094,7 @@ app.post(['/api/schedule-post/:userId', '/schedule-post/:userId'], upload.single
 
     // Store schedule data
     const scheduleData = {
-      id: scheduleId, // legacy field
-      scheduleId,     // 🔑 NEW: explicit scheduleId field for downstream consistency
+      id: scheduleId,
       userId,
       platform,
       caption: caption.trim(),
@@ -8609,7 +8608,7 @@ class PlatformSchemaManager {
 // Twitter OAuth 2.0 credentials
 const TWITTER_CLIENT_ID = 'cVNYR3UxVm5jQ3d5UWw0UHFqUTI6MTpjaQ';
 const TWITTER_CLIENT_SECRET = 'Wr8Kewh92NVB-035hAvpQeQ1Azc7chre3PUTgDoEltjO57mxzO';
-const TWITTER_REDIRECT_URI = 'https://c38b57a675c1.ngrok-free.app/twitter/callback';
+const TWITTER_REDIRECT_URI = 'https://sentientm.com/twitter/callback';
 
 // Debug logging for OAuth 2.0
 console.log(`[${new Date().toISOString()}] Twitter OAuth 2.0 Configuration:`);
@@ -9847,18 +9846,6 @@ async function processScheduledInstagramPosts() {
           const scheduleResponse = await s3Client.send(getCommand);
           const scheduleDataStr = await streamToString(scheduleResponse.Body);
           const scheduleData = JSON.parse(scheduleDataStr);
-          // Preserve original R2 JSON path for precise cleanup later
-          scheduleData.fileKey = object.Key;
-          // 🔑 Ensure scheduleId consistency for older schedule files
-          if (!scheduleData.scheduleId && !scheduleData.id) {
-            const fileName = object.Key ? object.Key.split('/').pop().replace('.json', '') : `schedule_${Date.now()}`;
-            scheduleData.scheduleId = fileName;
-            scheduleData.id = fileName;
-          } else if (!scheduleData.scheduleId && scheduleData.id) {
-            scheduleData.scheduleId = scheduleData.id;
-          } else if (!scheduleData.id && scheduleData.scheduleId) {
-            scheduleData.id = scheduleData.scheduleId;
-          }
 
           // Check if it's time to post
           const scheduleTime = new Date(scheduleData.scheduleDate);
@@ -9880,15 +9867,7 @@ async function processScheduledInstagramPosts() {
 }
 
 async function executeScheduledPost(scheduleData) {
-  // Accept both `scheduleId` (new) and legacy `id` field for backward compatibility
-  const {
-    userId,
-    imageKey,
-    caption,
-    scheduleId: explicitScheduleId,
-    id: legacyId
-  } = scheduleData;
-  const scheduleId = explicitScheduleId || legacyId;
+  const { userId, imageKey, caption, scheduleId } = scheduleData;
   console.log(`[SCHEDULER-TRACE] Starting scheduled post: scheduleId=${scheduleId}, userId=${userId}, imageKey=${imageKey}`);
   let tokenData;
   try {
@@ -10078,18 +10057,6 @@ async function executeScheduledPost(scheduleData) {
               const scheduleResponse = await s3Client.send(getScheduleCommand);
               const scheduleDataStr = await streamToString(scheduleResponse.Body);
               const scheduleData = JSON.parse(scheduleDataStr);
-          // Preserve original R2 JSON path for precise cleanup later
-          scheduleData.fileKey = object.Key;
-          // 🔑 Ensure scheduleId consistency for older schedule files
-          if (!scheduleData.scheduleId && !scheduleData.id) {
-            const fileName = object.Key ? object.Key.split('/').pop().replace('.json', '') : `schedule_${Date.now()}`;
-            scheduleData.scheduleId = fileName;
-            scheduleData.id = fileName;
-          } else if (!scheduleData.scheduleId && scheduleData.id) {
-            scheduleData.scheduleId = scheduleData.id;
-          } else if (!scheduleData.id && scheduleData.scheduleId) {
-            scheduleData.id = scheduleData.scheduleId;
-          }
               
               if ((scheduleData.imageKey === imageKey) || 
                   (scheduleId && scheduleData.scheduleId === scheduleId) ||
@@ -10225,7 +10192,7 @@ function startAutopilotWatchers() {
     }
   }, 180000); // Check every 3 minutes
   
-  // Auto-reply watcher - checks for new DMs/comments to reply to every 5 minutes
+  // Auto-reply watcher - checks for new DMs/comments to reply to every 30 seconds
   const replyInterval = setInterval(async () => {
     try {
       console.log(`[${new Date().toISOString()}] [AUTOPILOT] 🔄 Running scheduled auto-reply check...`);
@@ -10233,11 +10200,11 @@ function startAutopilotWatchers() {
     } catch (error) {
       console.error(`[${new Date().toISOString()}] [AUTOPILOT] Auto-reply watcher error:`, error);
     }
-  }, 300000); // Check every 5 minutes (300,000 ms)
+  }, 30000); // Check every 30 seconds (30,000 ms)
   
   console.log(`[${new Date().toISOString()}] [AUTOPILOT] ✅ Background watchers started successfully`);
   console.log(`[${new Date().toISOString()}] [AUTOPILOT] 📅 Auto-schedule: Every 3 minutes (180,000ms)`);
-  console.log(`[${new Date().toISOString()}] [AUTOPILOT] 💬 Auto-reply: Every 5 minutes (300,000ms)`);
+  console.log(`[${new Date().toISOString()}] [AUTOPILOT] 💬 Auto-reply: Every 30 seconds (30,000ms)`);
   
   // Store interval references for potential cleanup
   global.autopilotIntervals = {
@@ -11583,18 +11550,6 @@ app.get(['/api/scheduler-health/instagram', '/scheduler-health/instagram'], asyn
           const scheduleResponse = await s3Client.send(getCommand);
           const scheduleDataStr = await streamToString(scheduleResponse.Body);
           const scheduleData = JSON.parse(scheduleDataStr);
-          // Preserve original R2 JSON path for precise cleanup later
-          scheduleData.fileKey = object.Key;
-          // 🔑 Ensure scheduleId consistency for older schedule files
-          if (!scheduleData.scheduleId && !scheduleData.id) {
-            const fileName = object.Key ? object.Key.split('/').pop().replace('.json', '') : `schedule_${Date.now()}`;
-            scheduleData.scheduleId = fileName;
-            scheduleData.id = fileName;
-          } else if (!scheduleData.scheduleId && scheduleData.id) {
-            scheduleData.scheduleId = scheduleData.id;
-          } else if (!scheduleData.id && scheduleData.scheduleId) {
-            scheduleData.id = scheduleData.scheduleId;
-          }
           
           const scheduleTime = new Date(scheduleData.scheduleDate);
           const isOverdue = scheduleTime <= now && scheduleData.status === 'scheduled';
@@ -11679,18 +11634,6 @@ app.post(['/api/scheduler-retry/:postId', '/scheduler-retry/:postId'], async (re
           const scheduleResponse = await s3Client.send(getCommand);
           const scheduleDataStr = await streamToString(scheduleResponse.Body);
           const scheduleData = JSON.parse(scheduleDataStr);
-          // Preserve original R2 JSON path for precise cleanup later
-          scheduleData.fileKey = object.Key;
-          // 🔑 Ensure scheduleId consistency for older schedule files
-          if (!scheduleData.scheduleId && !scheduleData.id) {
-            const fileName = object.Key ? object.Key.split('/').pop().replace('.json', '') : `schedule_${Date.now()}`;
-            scheduleData.scheduleId = fileName;
-            scheduleData.id = fileName;
-          } else if (!scheduleData.scheduleId && scheduleData.id) {
-            scheduleData.scheduleId = scheduleData.id;
-          } else if (!scheduleData.id && scheduleData.scheduleId) {
-            scheduleData.id = scheduleData.scheduleId;
-          }
           
           if (scheduleData.id === postId) {
             foundPost = scheduleData;
@@ -12927,7 +12870,7 @@ app.get(['/autopilot-status/:username', '/api/autopilot-status/:username'], asyn
       watchers: {
         running: !!global.autopilotIntervals,
         scheduleInterval: '3 minutes',
-        replyInterval: '5 minutes'
+        replyInterval: '30 seconds'
       },
       timestamp: new Date().toISOString()
     });
@@ -13157,11 +13100,12 @@ app.delete(['/stop-campaign/:username', '/api/stop-campaign/:username'], async (
     let deletedFiles = [];
     let deletionErrors = [];
 
-    // Define file prefixes to delete
+    // Define file prefixes to delete - including generated content for bulletproof cleanup
     const prefixesToDelete = [
       `goal/${platform}/${username}`,
       `goal_summary/${platform}/${username}`,
-      `ready_post/${platform}/${username}`
+      `ready_post/${platform}/${username}`,
+      `generated_content/${platform}/${username}` // ✅ BULLETPROOF: Delete generated content to prevent reuse
     ];
 
     // Delete files from each prefix
@@ -13187,7 +13131,13 @@ app.delete(['/stop-campaign/:username', '/api/stop-campaign/:username'], async (
                 
                 await s3Client.send(deleteCommand);
                 deletedFiles.push(object.Key);
-                console.log(`[${new Date().toISOString()}] Deleted: ${object.Key}`);
+                
+                // ✅ BULLETPROOF: Log generated content deletion specifically
+                if (object.Key.includes('generated_content')) {
+                  console.log(`[${new Date().toISOString()}] ✅ BULLETPROOF: Deleted generated content: ${object.Key} - Campaign data cleared completely`);
+                } else {
+                  console.log(`[${new Date().toISOString()}] Deleted: ${object.Key}`);
+                }
               } catch (deleteError) {
                 console.error(`[${new Date().toISOString()}] Error deleting ${object.Key}:`, deleteError);
                 deletionErrors.push({ key: object.Key, error: deleteError.message });
@@ -13213,10 +13163,27 @@ app.delete(['/stop-campaign/:username', '/api/stop-campaign/:username'], async (
     const verifyData = await s3Client.send(verifyCommand);
     const stillHasGoalFiles = verifyData.Contents && verifyData.Contents.length > 0;
     
-    if (stillHasGoalFiles) {
+    // ✅ BULLETPROOF: Also verify generated content was completely deleted
+    const generatedContentPrefix = `generated_content/${platform}/${username}`;
+    const verifyGeneratedCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: `${generatedContentPrefix}/`
+    });
+    
+    const verifyGeneratedData = await s3Client.send(verifyGeneratedCommand);
+    const stillHasGeneratedContent = verifyGeneratedData.Contents && verifyGeneratedData.Contents.length > 0;
+    
+    if (stillHasGoalFiles || stillHasGeneratedContent) {
       console.error(`[${new Date().toISOString()}] Warning: Campaign files still exist after deletion attempt for ${username} on ${platform}`);
+      
+      // Combine both sets of remaining files for cleanup
+      const remainingFiles = [
+        ...(verifyData.Contents || []),
+        ...(verifyGeneratedData.Contents || [])
+      ];
+      
       // Try one more time to delete any remaining files
-      for (const object of verifyData.Contents) {
+      for (const object of remainingFiles) {
         if (object.Key) {
           try {
             const deleteCommand = new DeleteObjectCommand({
@@ -13225,7 +13192,12 @@ app.delete(['/stop-campaign/:username', '/api/stop-campaign/:username'], async (
             });
             await s3Client.send(deleteCommand);
             deletedFiles.push(object.Key);
-            console.log(`[${new Date().toISOString()}] Retry deleted: ${object.Key}`);
+            
+            if (object.Key.includes('generated_content')) {
+              console.log(`[${new Date().toISOString()}] ✅ BULLETPROOF: Retry deleted generated content: ${object.Key}`);
+            } else {
+              console.log(`[${new Date().toISOString()}] Retry deleted: ${object.Key}`);
+            }
           } catch (retryError) {
             console.error(`[${new Date().toISOString()}] Error in retry deletion of ${object.Key}:`, retryError);
           }
@@ -13275,6 +13247,16 @@ app.delete(['/stop-campaign/:username', '/api/stop-campaign/:username'], async (
           memoryCache.del(cacheKey);
         }
       }
+      
+      // ✅ BULLETPROOF: Clear generated content from memory cache
+      const generatedContentCacheKey = `generated_content/${platform}/${username}/posts.json`;
+      if (cache && cache.has(generatedContentCacheKey)) {
+        cache.delete(generatedContentCacheKey);
+        console.log(`[${new Date().toISOString()}] ✅ BULLETPROOF: Cleared generated content cache for ${username} on ${platform}`);
+      }
+      if (cacheTimestamps && cacheTimestamps.has(generatedContentCacheKey)) {
+        cacheTimestamps.delete(generatedContentCacheKey);
+      }
     } catch (cacheError) {
       console.log(`[${new Date().toISOString()}] Cache operation skipped: ${cacheError.message}`);
     }
@@ -13287,7 +13269,8 @@ app.delete(['/stop-campaign/:username', '/api/stop-campaign/:username'], async (
       errors: deletionErrors,
       platform: platform,
       username: username,
-      hasActiveCampaign: false
+      hasActiveCampaign: false,
+      generatedContentCleared: deletedFiles.some(file => file.includes('generated_content')) // ✅ BULLETPROOF: Confirm generated content cleanup
     });
 
   } catch (error) {
@@ -13418,7 +13401,7 @@ app.get(['/profit-analysis/:username', '/api/profit-analysis/:username'], async 
       console.log(`[${new Date().toISOString()}] No profit analysis found for ${username} on ${platform}`);
       return res.status(404).json({ 
         error: 'Profit analysis not found',
-        message: 'Your public data was not exposed, your account is fresh, or your username is incorrect.'
+        message: 'No profit analysis data available for this account.'
       });
     }
 
@@ -13434,7 +13417,7 @@ app.get(['/profit-analysis/:username', '/api/profit-analysis/:username'], async 
     if (analysisFiles.length === 0) {
       return res.status(404).json({ 
         error: 'No valid analysis files found',
-        message: 'Your public data was not exposed, your account is fresh, or your username is incorrect.'
+        message: 'No profit analysis data available for this account.'
       });
     }
 
@@ -13459,7 +13442,7 @@ app.get(['/profit-analysis/:username', '/api/profit-analysis/:username'], async 
     if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
       return res.status(404).json({ 
         error: 'Profit analysis not found',
-        message: 'Your public data was not exposed, your account is fresh, or your username is incorrect.'
+        message: 'No profit analysis data available for this account.'
       });
     }
 
@@ -13806,6 +13789,70 @@ app.delete(['/platform-reset/:userId', '/api/platform-reset/:userId'], async (re
   console.log(`[${new Date().toISOString()}] Platform reset requested for user ${userId} on ${platform}`);
   
   try {
+    // 🚨 ENHANCED RESET: First check and stop any active campaigns
+    console.log(`[${new Date().toISOString()}] Checking for active campaigns before reset for ${userId} on ${platform}`);
+    
+    // Check for existing goal files (active campaign indicator)
+    const goalPrefix = `goal/${platform}/${userId}`;
+    const listGoalsCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: `${goalPrefix}/`
+    });
+
+    try {
+      const goalData = await s3Client.send(listGoalsCommand);
+      const hasActiveGoal = goalData.Contents && goalData.Contents.length > 0;
+
+      if (hasActiveGoal) {
+        console.log(`[${new Date().toISOString()}] 🛑 Active campaign found during reset - cleaning up goal files for ${userId} on ${platform}`);
+        
+        // Delete all goal files to stop the campaign
+        const deletePromises = goalData.Contents.map(async (obj) => {
+          const deleteCommand = new DeleteObjectCommand({
+            Bucket: 'tasks',
+            Key: obj.Key,
+          });
+          return s3Client.send(deleteCommand);
+        });
+        
+        await Promise.all(deletePromises);
+        console.log(`[${new Date().toISOString()}] ✅ Deleted goal files - campaign stopped as part of reset`);
+        
+        // Also clear goal summaries
+        const goalSummaryKey = `goal-summary/${platform}/${userId}.json`;
+        try {
+          const deleteSummaryCommand = new DeleteObjectCommand({
+            Bucket: 'tasks',
+            Key: goalSummaryKey,
+          });
+          await s3Client.send(deleteSummaryCommand);
+          console.log(`[${new Date().toISOString()}] ✅ Deleted goal summary for ${userId} on ${platform}`);
+        } catch (summaryError) {
+          if (summaryError.name !== 'NoSuchKey') {
+            console.warn(`[${new Date().toISOString()}] Warning deleting goal summary:`, summaryError);
+          }
+        }
+        
+        // Clear generated content from R2
+        const generatedContentKey = `generated-content/${platform}/${userId}/posts.json`;
+        try {
+          const deleteContentCommand = new DeleteObjectCommand({
+            Bucket: 'tasks',
+            Key: generatedContentKey,
+          });
+          await s3Client.send(deleteContentCommand);
+          console.log(`[${new Date().toISOString()}] ✅ Deleted generated content for ${userId} on ${platform}`);
+        } catch (contentError) {
+          if (contentError.name !== 'NoSuchKey') {
+            console.warn(`[${new Date().toISOString()}] Warning deleting generated content:`, contentError);
+          }
+        }
+      } else {
+        console.log(`[${new Date().toISOString()}] ✅ No active campaigns found for ${userId} on ${platform}`);
+      }
+    } catch (goalCheckError) {
+      console.warn(`[${new Date().toISOString()}] Warning checking for active campaigns:`, goalCheckError);
+    }
     // Clear platform-specific user status
     const statusKey = `User${platform.charAt(0).toUpperCase() + platform.slice(1)}Status/${userId}/status.json`;
     
@@ -13815,7 +13862,7 @@ app.delete(['/platform-reset/:userId', '/api/platform-reset/:userId'], async (re
         Key: statusKey,
       });
       await s3Client.send(deleteStatusCommand);
-      console.log(`[${new Date().toISOString()}] Deleted ${platform} status for user ${userId}`);
+      console.log(`[${new Date().toISOString()}] ✅ Deleted ${platform} status for user ${userId}`);
     } catch (error) {
       if (error.name !== 'NoSuchKey') {
         console.error(`[${new Date().toISOString()}] Error deleting ${platform} status:`, error);
@@ -13831,7 +13878,7 @@ app.delete(['/platform-reset/:userId', '/api/platform-reset/:userId'], async (re
         Key: connectionKey,
       });
       await s3Client.send(deleteConnectionCommand);
-      console.log(`[${new Date().toISOString()}] Deleted ${platform} connection for user ${userId}`);
+      console.log(`[${new Date().toISOString()}] ✅ Deleted ${platform} connection for user ${userId}`);
     } catch (error) {
       if (error.name !== 'NoSuchKey') {
         console.error(`[${new Date().toISOString()}] Error deleting ${platform} connection:`, error);
@@ -13859,7 +13906,9 @@ app.delete(['/platform-reset/:userId', '/api/platform-reset/:userId'], async (re
         });
         
         await Promise.all(deletePromises);
-        console.log(`[${new Date().toISOString()}] Deleted ${listResponse.Contents.length} scheduled posts for ${platform}/${userId}`);
+        console.log(`[${new Date().toISOString()}] ✅ Deleted ${listResponse.Contents.length} scheduled posts for ${platform}/${userId}`);
+      } else {
+        console.log(`[${new Date().toISOString()}] ✅ No scheduled posts found for ${platform}/${userId}`);
       }
     } catch (error) {
       console.error(`[${new Date().toISOString()}] Error deleting scheduled posts for ${platform}/${userId}:`, error);
@@ -13877,15 +13926,17 @@ app.delete(['/platform-reset/:userId', '/api/platform-reset/:userId'], async (re
         cache.delete(key);
       });
       
-      console.log(`[${new Date().toISOString()}] Cleared cache for ${platform}/${userId}`);
+      console.log(`[${new Date().toISOString()}] ✅ Cleared cache for ${platform}/${userId}`);
     }
     
-    console.log(`[${new Date().toISOString()}] Successfully reset ${platform} dashboard for user ${userId}`);
+    console.log(`[${new Date().toISOString()}] ✅ Successfully reset ${platform} dashboard for user ${userId} - campaigns stopped and data cleared`);
     
     res.json({ 
       success: true, 
       message: `${platform.charAt(0).toUpperCase() + platform.slice(1)} dashboard reset successfully`,
-      platform: platform
+      platform: platform,
+      campaignsStopped: true,
+      resetTimestamp: new Date().toISOString()
     });
     
   } catch (error) {

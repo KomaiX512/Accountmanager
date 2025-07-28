@@ -160,6 +160,52 @@ export const useResetPlatformState = () => {
   }, [navigate]);
 
   /**
+   * Checks if user has an active campaign for the platform
+   */
+  const checkActiveCampaign = useCallback(async (platform: string, username: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`/api/campaign-status/${username}?platform=${platform}&bypass_cache=true`);
+      if (!response.ok) {
+        console.warn(`[ResetPlatformState] Failed to check campaign status: ${response.statusText}`);
+        return false;
+      }
+      
+      const data = await response.json();
+      return data.hasActiveCampaign || false;
+    } catch (error) {
+      console.error(`[ResetPlatformState] Error checking active campaign:`, error);
+      return false;
+    }
+  }, []);
+
+  /**
+   * Stops an active campaign for the platform
+   */
+  const stopActiveCampaign = useCallback(async (platform: string, username: string): Promise<boolean> => {
+    console.log(`[ResetPlatformState] 🛑 Stopping active campaign for ${username} on ${platform}`);
+    
+    try {
+      const response = await fetch(`/api/stop-campaign/${username}?platform=${platform}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Stop campaign failed: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log(`[ResetPlatformState] ✅ Campaign stopped successfully:`, result);
+      return result.success || true;
+    } catch (error) {
+      console.error(`[ResetPlatformState] ❌ Failed to stop campaign:`, error);
+      return false;
+    }
+  }, []);
+
+  /**
    * Performs backend platform reset API call
    */
   const performBackendReset = useCallback(async (platform: string, userId: string): Promise<boolean> => {
@@ -191,7 +237,7 @@ export const useResetPlatformState = () => {
    * Main reset function that orchestrates all reset operations
    */
   const resetPlatformState = useCallback(async (options: PlatformResetOptions): Promise<boolean> => {
-    const { platform, navigateToMain = true, clearBrowserHistory = true } = options;
+    const { platform, username, navigateToMain = true, clearBrowserHistory = true } = options;
     
     if (!currentUser?.uid) {
       console.error('[ResetPlatformState] ❌ No authenticated user found');
@@ -203,6 +249,26 @@ export const useResetPlatformState = () => {
     console.log(`[ResetPlatformState] 🔄 Starting platform reset for ${platform} (user: ${userId})`);
 
     try {
+      // Step 0: 🚨 ENHANCED - Check for and stop any active campaigns first
+      console.log(`[ResetPlatformState] 🔍 Checking for active campaigns before reset`);
+      const hasActiveCampaign = await checkActiveCampaign(platform, username);
+      
+      if (hasActiveCampaign) {
+        console.log(`[ResetPlatformState] 🛑 Active campaign detected - stopping before reset`);
+        const campaignStopped = await stopActiveCampaign(platform, username);
+        
+        if (!campaignStopped) {
+          console.warn(`[ResetPlatformState] ⚠️ Failed to stop active campaign - continuing with reset anyway`);
+        } else {
+          console.log(`[ResetPlatformState] ✅ Active campaign stopped successfully`);
+        }
+        
+        // Wait a moment for campaign cleanup to complete
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } else {
+        console.log(`[ResetPlatformState] ✅ No active campaigns found`);
+      }
+
       // Step 1: Clear frontend caches first (immediate feedback)
       clearPlatformLocalStorage(platform, userId);
       clearPlatformSessionStorage(platform, userId);
@@ -244,7 +310,7 @@ export const useResetPlatformState = () => {
       console.error(`[ResetPlatformState] ❌ Platform reset failed:`, error);
       return false;
     }
-  }, [currentUser, clearPlatformLocalStorage, clearPlatformSessionStorage, clearSessionManagerData, performBackendReset, preventBackNavigation, navigate, refreshPlatforms]);
+  }, [currentUser, checkActiveCampaign, stopActiveCampaign, clearPlatformLocalStorage, clearPlatformSessionStorage, clearSessionManagerData, performBackendReset, preventBackNavigation, navigate, refreshPlatforms]);
 
   /**
    * Quick reset function for immediate use (with sensible defaults)
@@ -303,7 +369,9 @@ export const useResetPlatformState = () => {
     resetAndAllowReconnection,
     clearPlatformLocalStorage,
     clearPlatformSessionStorage,
-    clearSessionManagerData
+    clearSessionManagerData,
+    checkActiveCampaign,
+    stopActiveCampaign
   };
 };
 

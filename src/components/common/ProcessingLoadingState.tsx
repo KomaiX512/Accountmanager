@@ -154,6 +154,11 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
 
   // Initialize timer data if not exists (first time setup)
   useEffect(() => {
+    // If the timer has already completed, do NOT create a new one
+    if (timerCompleted) {
+      return;
+    }
+
     const existingTimer = getTimerData();
     
     if (!existingTimer) {
@@ -175,7 +180,8 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     } else {
       console.log(`🔥 BULLETPROOF TIMER: Resumed existing ${platform} timer`);
     }
-  }, [platform, username, countdownMinutes, remainingMinutes]);
+  // Added timerCompleted to dependencies to ensure effect re-runs correctly only when necessary
+  }, [platform, username, countdownMinutes, remainingMinutes, timerCompleted]);
 
   // Real-time calculation functions
   const getRemainingMs = (): number => {

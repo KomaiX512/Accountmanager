@@ -37,7 +37,7 @@ body:has(.dashboard-wrapper) {
 /* ✨ MINIMALIST WELCOME HEADER */
 .welcome-header {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 20px;
 }
 
 .welcome-text {
@@ -82,7 +82,7 @@ body:has(.dashboard-wrapper) {
   background: rgba(255, 255, 255, 0.08);
   border: 1.5px solid rgba(255, 255, 255, 0.15);
   border-radius: 24px;
-  padding: 28px;
+  padding: 20px;
   width: 100%;
   max-width: 1400px;
   margin: 0 auto;
@@ -116,9 +116,9 @@ body:has(.dashboard-wrapper) {
     "notifications post-cooked competitor-analysis"
     "post-creation post-creation post-creation";
   grid-template-columns: 1fr 1.5fr 1fr;
-  /* Adjusted to remove unused extra row and let post-creation size to content */
-  grid-template-rows: auto 1.2fr 0.8fr auto;
-  gap: 28px;
+  /* Reduced row heights for more compact layout */
+  grid-template-rows: auto 0.9fr 0.6fr auto;
+  gap: 20px;
   min-height: fit-content; /* Remove extra height */
   height: auto; /* Let content determine height */
   box-sizing: border-box;
@@ -131,7 +131,7 @@ body:has(.dashboard-wrapper) {
   background: rgba(255, 255, 255, 0.12);
   border: 1.5px solid rgba(255, 255, 255, 0.18);
   border-radius: 20px;
-  padding: 28px;
+  padding: 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -379,7 +379,7 @@ body:has(.dashboard-wrapper) {
   background: rgba(255, 255, 255, 0.1);
   border: 1.5px solid rgba(255, 255, 255, 0.18);
   border-radius: 20px;
-  padding: 28px;
+  padding: 20px;
   height: 100%;
   overflow-y: auto;
   backdrop-filter: blur(15px);
@@ -395,7 +395,7 @@ body:has(.dashboard-wrapper) {
   background: rgba(255, 255, 255, 0.1);
   border: 1.5px solid rgba(255, 255, 255, 0.18);
   border-radius: 20px;
-  padding: 28px;
+  padding: 20px;
   height: 100%;
   overflow: hidden; /* No scrolling for strategies */
   backdrop-filter: blur(15px);
@@ -411,7 +411,7 @@ body:has(.dashboard-wrapper) {
   background: rgba(255, 255, 255, 0.1);
   border: 1.5px solid rgba(255, 255, 255, 0.18);
   border-radius: 20px;
-  padding: 28px;
+  padding: 20px;
   height: 100%;
   overflow-y: auto; /* Keep scrolling for competitor analysis */
   backdrop-filter: blur(15px);
@@ -559,11 +559,11 @@ h2 {
   background: rgba(255, 255, 255, 0.1);
   border: 1.5px solid rgba(255, 255, 255, 0.18);
   border-radius: 20px;
-  padding: 20px 24px;
+  padding: 16px 20px;
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
-  min-height: 64px;
+  min-height: 56px;
   box-shadow: 
     0 4px 20px rgba(0, 0, 0, 0.2),
     0 0 0 1px rgba(255, 255, 255, 0.08) inset;

@@ -41,16 +41,16 @@ const router = express.Router();
 // Configure multer for file uploads
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Instagram App Credentials (set your Instagram App Secret in env INSTAGRAM_APP_SECRET)
-const APP_ID = '1089716559763623';
-const APP_SECRET = process.env.INSTAGRAM_APP_SECRET || 'd48ddc9eaf0e5c4969d4ddc4e293178c';
+// Instagram App Credentials
+const APP_ID = '576296982152813';
+const APP_SECRET = 'd48ddc9eaf0e5c4969d4ddc4e293178c';
 const REDIRECT_URI = 'https://c38b57a675c1.ngrok-free.app/instagram/callback';
 const VERIFY_TOKEN = 'myInstagramWebhook2025';
 
 // Facebook App Credentials  
 const FB_APP_ID = '581584257679639'; // Your ACTUAL Facebook App ID (NOT Configuration ID)
 const FB_APP_SECRET = 'cdd153955e347e194390333e48cb0480'; // Your actual App Secret
-const FB_REDIRECT_URI = 'https://www.sentientm.com/facebook/callback';
+const FB_REDIRECT_URI = 'https://c38b57a675c1.ngrok-free.app/facebook/callback';
 const FB_VERIFY_TOKEN = 'myFacebookWebhook2025';
 
 router.get(['/instagram/callback', '/api/instagram/callback'], async (req, res) => {

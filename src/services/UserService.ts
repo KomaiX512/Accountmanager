@@ -91,11 +91,6 @@ class UserService {
     }
   ];
 
-  // Admin credentials
-  private readonly ADMIN_CREDENTIALS = {
-    username: 'sentientai',
-    password: 'Sentiant123@'
-  };
 
   // Get user data from R2 with caching
   async getUserData(userId: string): Promise<User | null> {
@@ -403,7 +398,7 @@ class UserService {
   }
 
   // Increment usage counter
-  async incrementUsage(userId: string, feature: 'posts' | 'discussions' | 'aiReplies' | 'campaigns'): Promise<void> {
+  async incrementUsage(userId: string, feature: 'posts' | 'discussions' | 'aiReplies' | 'campaigns' | 'resets'): Promise<void> {
     try {
       // Use new backend endpoint for usage increment
       const response = await fetch(`${this.API_BASE_URL}/usage/increment/${userId}`, {

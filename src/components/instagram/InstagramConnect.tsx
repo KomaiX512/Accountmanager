@@ -113,8 +113,8 @@ const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected, classN
     }
     
     // Use the platform OAuth endpoint with correct parameters from Meta dashboard
-    const appId = '1089716559763623';
-    const redirectUri = 'https://c38b57a675c1.ngrok-free.app/instagram/callback';
+    const appId = '576296982152813';
+    const redirectUri = 'https://sentientm.com/instagram/callback';
     // Include all required permissions and URL-encode the scope list
     const scope = 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish,instagram_business_manage_insights';
     const authUrl = `https://www.instagram.com/oauth/authorize?force_reauth=true&client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}`;

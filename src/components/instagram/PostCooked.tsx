@@ -1304,10 +1304,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       setImageErrors({});
       setImageRefreshKey(prev => prev + 1);
       console.log(`[PostCooked] ✅ Manually refreshed ${response.data.length} posts`);
-      setToastMessage('✅ Posts refreshed successfully!');
     } catch (error: any) {
       console.error('[PostCooked] Error refreshing posts:', error);
-      setToastMessage('❌ Failed to refresh posts. Please try again.');
     } finally {
       setIsRefreshing(false);
     }

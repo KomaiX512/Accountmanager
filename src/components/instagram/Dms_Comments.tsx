@@ -222,7 +222,6 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
     );
     
     if (pendingNotifications.length === 0) {
-      setError('No pending notifications to reply to');
       return;
     }
 

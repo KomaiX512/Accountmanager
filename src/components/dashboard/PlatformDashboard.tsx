@@ -246,44 +246,31 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         // Instagram works with the original endpoint (no platform param needed)
         response = await axios.get(`/api/profile-info/${accountHolder}`);
         profileData = response.data;
-      } else {
+        } else {
         // Twitter and Facebook need platform-specific path handling
         try {
           const platformParam = `?platform=${platform}`;
           response = await axios.get(`/api/profile-info/${accountHolder}${platformParam}`);
-          profileData = response.data;
-          
-          // 🎯 ENHANCED VALIDATION: Check if response contains actual profile fields
-          const hasProfileFields = profileData.fullName || profileData.followersCount !== undefined || 
-                                   profileData.biography || profileData.profilePicUrl || profileData.profilePicUrlHD;
-          
-          if (!hasProfileFields && platform === 'twitter') {
-            // 🎯 FALLBACK: Try extracting from cached Twitter data
-            console.log(`[TWITTER] Profile data not found in R2, trying cache extraction...`);
-            const cacheResponse = await axios.get(`/api/data/cache/twitter_${accountHolder}_profile.json`).catch(() => null);
-            
-            if (cacheResponse?.data?.data && Array.isArray(cacheResponse.data.data) && cacheResponse.data.data.length > 0) {
-              const authorData = cacheResponse.data.data[0].author;
-              if (authorData) {
-                console.log(`[TWITTER] Extracting profile from cached author data:`, authorData);
-                profileData = {
-                  username: authorData.userName || accountHolder,
-                  fullName: authorData.name || authorData.userName,
-                  biography: authorData.description || '',
-                  followersCount: authorData.followers || 0,
-                  followsCount: authorData.following || 0,
-                  postsCount: authorData.statusesCount || 0,
-                  externalUrl: '',
-                  profilePicUrl: authorData.profilePicture,
-                  profilePicUrlHD: authorData.coverPicture || authorData.profilePicture,
-                  private: authorData.protected || false,
-                  verified: authorData.isVerified || false,
-                  platform: 'twitter',
-                  extractedAt: new Date().toISOString()
-                };
-                console.log(`[TWITTER] Successfully extracted profile data:`, profileData);
-              }
-            }
+          const rawData = response.data;
+          // Map Twitter raw fields to unified profileData format
+          if (platform === 'twitter' && rawData && rawData.username) {
+            profileData = {
+              username: rawData.username,
+              fullName: rawData.name || rawData.username,
+              biography: rawData.bio || rawData.description || '',
+              followersCount: rawData.follower_count ?? rawData.followersCount ?? 0,
+              followsCount: rawData.following_count ?? rawData.followsCount ?? 0,
+              postsCount: rawData.tweet_count ?? rawData.postsCount ?? 0,
+              externalUrl: rawData.website || rawData.externalUrl || '',
+              profilePicUrl: rawData.profile_image_url || rawData.profilePicUrl || '',
+              profilePicUrlHD: rawData.profile_image_url || rawData.profilePicUrlHD || rawData.profilePicUrl || '',
+              private: rawData.protected ?? false,
+              verified: rawData.verified ?? false,
+              platform: 'twitter',
+              extractedAt: new Date().toISOString()
+            };
+          } else {
+            profileData = rawData;
           }
         } catch (err: any) {
           // For Twitter, don't log 404 as error since it's expected when profile data doesn't exist yet
@@ -1753,7 +1740,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     );
     
     if (pendingNotifications.length === 0) {
-      setToast('No pending notifications to reply to');
       return;
     }
     

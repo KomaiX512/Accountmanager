@@ -49,6 +49,7 @@ export interface UsageStats {
   discussionsUsed: number;
   aiRepliesUsed: number;
   campaignsUsed: number;
+  resetsUsed?: number;
   lastUpdated: string;
 }
 

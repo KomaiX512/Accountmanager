@@ -323,7 +323,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
           console.log(`[${new Date().toISOString()}] Retrying fetchIgBusinessId, attempt ${attempt + 1}/${maxAttempts}`);
           setTimeout(() => fetchIgBusinessId(attempt + 1, maxAttempts), 2000);
         } else {
-          setToast('Failed to initialize Instagram account after retries.');
+          // Failed to initialize Instagram account after retries
         }
       }
     } catch (err) {
@@ -332,7 +332,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
         console.log(`[${new Date().toISOString()}] Retrying fetchIgBusinessId in 2s...`);
         setTimeout(() => fetchIgBusinessId(attempt + 1, maxAttempts), 2000);
       } else {
-        setToast('Failed to initialize Instagram account after retries.');
+        // Failed to initialize Instagram account after retries
       }
     }
   };
@@ -957,7 +957,6 @@ Image Description: ${response.post.image_prompt}
     );
     
     if (pendingNotifications.length === 0) {
-      setToast('No pending notifications to reply to');
       return;
     }
     
@@ -1646,7 +1645,6 @@ Image Description: ${response.post.image_prompt}
               handleAutoReplyAll(currentNotifications);
             } else {
               console.log(`[AUTOPILOT] No pending notifications found for auto-reply`);
-              setToast('No pending notifications to reply to');
             }
           });
         } else {
@@ -1736,7 +1734,7 @@ Image Description: ${response.post.image_prompt}
             
             // Start auto-reply interval if enabled and not already running
             if (autopilotSettings.autoReply && !autoReplyInterval) {
-              console.log(`[AutopilotService] 💬 Starting auto-reply interval (5 minutes)`);
+              console.log(`[AutopilotService] 💬 Starting auto-reply interval (30 seconds)`);
               
               // Trigger immediately first
               window.dispatchEvent(new CustomEvent('triggerAutoReply', {
@@ -1746,7 +1744,7 @@ Image Description: ${response.post.image_prompt}
                 }
               }));
               
-              // Set up 5-minute interval
+              // Set up 30-second interval
               autoReplyInterval = setInterval(() => {
                 window.dispatchEvent(new CustomEvent('triggerAutoReply', {
                   detail: { 
@@ -1754,7 +1752,7 @@ Image Description: ${response.post.image_prompt}
                     platform: 'instagram'
                   }
                 }));
-              }, 5 * 60000); // 5 minutes
+              }, 30000); // 30 seconds
             }
           } else {
             console.log(`[AutopilotService] 🔒 Autopilot disabled for ${accountHolder}`);

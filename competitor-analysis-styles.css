@@ -1,0 +1,405 @@
+/* Competitor Analysis - Beautiful Frontend Styling */
+
+/* Main container for competitor analysis */
+.competitor-analysis-container {
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.8), rgba(20, 20, 40, 0.9));
+  border-radius: 12px;
+  padding: 2rem;
+  margin: 1rem 0;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(0, 255, 204, 0.2);
+}
+
+/* Competitor header styling */
+.competitor-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid rgba(0, 255, 204, 0.3);
+}
+
+.competitor-name {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #00ffcc;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-shadow: 0 0 15px rgba(0, 255, 204, 0.4);
+  margin-right: 1rem;
+}
+
+.competitor-icon {
+  font-size: 2rem;
+  margin-right: 1rem;
+  color: #00ffcc;
+}
+
+/* Section styling */
+.analysis-section {
+  margin: 1.5rem 0;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  border-left: 4px solid rgba(0, 255, 204, 0.4);
+  transition: all 0.3s ease;
+}
+
+.analysis-section:hover {
+  transform: translateX(5px);
+  border-left-color: rgba(0, 255, 204, 0.8);
+  box-shadow: 0 4px 20px rgba(0, 255, 204, 0.1);
+}
+
+.section-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #ffcc00;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  letter-spacing: 0.03em;
+}
+
+.section-title::before {
+  margin-right: 0.5rem;
+  font-size: 1.1em;
+}
+
+/* Overview section */
+.overview-section .section-title::before {
+  content: "📋";
+}
+
+.overview-content {
+  font-size: 1.1rem;
+  line-height: 1.7;
+  color: #e0e0ff;
+  text-align: justify;
+  word-spacing: 0.05em;
+  letter-spacing: 0.02em;
+}
+
+/* Strengths section */
+.strengths-section .section-title::before {
+  content: "✅";
+}
+
+.strengths-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.strengths-list li {
+  padding: 0.8rem 1rem;
+  margin: 0.5rem 0;
+  background: linear-gradient(135deg, rgba(0, 255, 0, 0.1), rgba(0, 255, 0, 0.05));
+  border-radius: 6px;
+  border-left: 3px solid rgba(0, 255, 0, 0.4);
+  color: #e0e0ff;
+  font-size: 1rem;
+  line-height: 1.6;
+  transition: all 0.3s ease;
+}
+
+.strengths-list li:hover {
+  transform: translateX(3px);
+  background: linear-gradient(135deg, rgba(0, 255, 0, 0.15), rgba(0, 255, 0, 0.08));
+  border-left-color: rgba(0, 255, 0, 0.6);
+}
+
+.strengths-list li::before {
+  content: "•";
+  color: #00ff00;
+  font-weight: bold;
+  margin-right: 0.5rem;
+  font-size: 1.2em;
+}
+
+/* Vulnerabilities section */
+.vulnerabilities-section .section-title::before {
+  content: "⚠️";
+}
+
+.vulnerabilities-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.vulnerabilities-list li {
+  padding: 0.8rem 1rem;
+  margin: 0.5rem 0;
+  background: linear-gradient(135deg, rgba(255, 165, 0, 0.1), rgba(255, 165, 0, 0.05));
+  border-radius: 6px;
+  border-left: 3px solid rgba(255, 165, 0, 0.4);
+  color: #e0e0ff;
+  font-size: 1rem;
+  line-height: 1.6;
+  transition: all 0.3s ease;
+}
+
+.vulnerabilities-list li:hover {
+  transform: translateX(3px);
+  background: linear-gradient(135deg, rgba(255, 165, 0, 0.15), rgba(255, 165, 0, 0.08));
+  border-left-color: rgba(255, 165, 0, 0.6);
+}
+
+.vulnerabilities-list li::before {
+  content: "•";
+  color: #ffa500;
+  font-weight: bold;
+  margin-right: 0.5rem;
+  font-size: 1.2em;
+}
+
+/* Counter strategies section */
+.strategies-section .section-title::before {
+  content: "🎯";
+}
+
+.strategies-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.strategies-list li {
+  padding: 1rem 1.2rem;
+  margin: 0.8rem 0;
+  background: linear-gradient(135deg, rgba(0, 255, 204, 0.1), rgba(0, 255, 204, 0.05));
+  border-radius: 8px;
+  border-left: 4px solid rgba(0, 255, 204, 0.4);
+  color: #e0e0ff;
+  font-size: 1rem;
+  line-height: 1.7;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.strategies-list li:hover {
+  transform: translateX(5px);
+  background: linear-gradient(135deg, rgba(0, 255, 204, 0.15), rgba(0, 255, 204, 0.08));
+  border-left-color: rgba(0, 255, 204, 0.6);
+  box-shadow: 0 4px 15px rgba(0, 255, 204, 0.1);
+}
+
+.strategies-list li::before {
+  content: counter(strategy-counter);
+  counter-increment: strategy-counter;
+  position: absolute;
+  left: -0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #00ffcc;
+  color: #000;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 0.9rem;
+  box-shadow: 0 2px 8px rgba(0, 255, 204, 0.3);
+}
+
+.strategies-list {
+  counter-reset: strategy-counter;
+}
+
+/* Market intelligence section */
+.market-intelligence-section .section-title::before {
+  content: "📈";
+}
+
+.intelligence-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.intelligence-item {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 1rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+}
+
+.intelligence-item:hover {
+  background: rgba(0, 0, 0, 0.3);
+  border-color: rgba(0, 255, 204, 0.3);
+  transform: translateY(-2px);
+}
+
+.intelligence-label {
+  font-size: 0.9rem;
+  color: #8888aa;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.3rem;
+}
+
+.intelligence-value {
+  font-size: 1.1rem;
+  color: #00ffcc;
+  font-weight: 600;
+}
+
+/* Content intelligence section */
+.content-intelligence-section .section-title::before {
+  content: "📱";
+}
+
+.content-formats-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.content-formats-list li {
+  padding: 0.6rem 1rem;
+  margin: 0.3rem 0;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  color: #e0e0ff;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+}
+
+.content-formats-list li:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateX(3px);
+}
+
+.content-formats-list li::before {
+  content: "📹";
+  margin-right: 0.5rem;
+}
+
+/* Text formatting enhancements */
+.analysis-content strong {
+  color: #00ffcc;
+  font-weight: 700;
+  text-shadow: 0 0 8px rgba(0, 255, 204, 0.3);
+  letter-spacing: 0.02em;
+}
+
+.analysis-content em {
+  color: #ffcc00;
+  font-style: italic;
+  font-weight: 500;
+  text-shadow: 0 0 6px rgba(255, 204, 0, 0.3);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .competitor-analysis-container {
+    padding: 1.5rem;
+    margin: 0.5rem 0;
+  }
+  
+  .competitor-name {
+    font-size: 1.5rem;
+  }
+  
+  .analysis-section {
+    padding: 1rem;
+    margin: 1rem 0;
+  }
+  
+  .intelligence-grid {
+    grid-template-columns: 1fr;
+    gap: 0.8rem;
+  }
+  
+  .strategies-list li {
+    padding: 0.8rem 1rem;
+    font-size: 0.95rem;
+  }
+  
+  .overview-content {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .competitor-analysis-container {
+    padding: 1rem;
+  }
+  
+  .competitor-name {
+    font-size: 1.3rem;
+  }
+  
+  .section-title {
+    font-size: 1.1rem;
+  }
+  
+  .analysis-section {
+    padding: 0.8rem;
+  }
+  
+  .strengths-list li,
+  .vulnerabilities-list li,
+  .strategies-list li {
+    padding: 0.6rem 0.8rem;
+    font-size: 0.9rem;
+  }
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.analysis-section {
+  animation: fadeInUp 0.5s ease-out;
+}
+
+.analysis-section:nth-child(1) { animation-delay: 0.1s; }
+.analysis-section:nth-child(2) { animation-delay: 0.2s; }
+.analysis-section:nth-child(3) { animation-delay: 0.3s; }
+.analysis-section:nth-child(4) { animation-delay: 0.4s; }
+.analysis-section:nth-child(5) { animation-delay: 0.5s; }
+
+/* Print styles */
+@media print {
+  .competitor-analysis-container {
+    background: white;
+    color: black;
+    box-shadow: none;
+    border: 1px solid #ccc;
+  }
+  
+  .competitor-name {
+    color: #000;
+    text-shadow: none;
+  }
+  
+  .section-title {
+    color: #333;
+  }
+  
+  .analysis-section {
+    background: #f8f8f8;
+    border-left-color: #ccc;
+  }
+  
+  .strengths-list li,
+  .vulnerabilities-list li,
+  .strategies-list li {
+    background: #f0f0f0;
+    border-left-color: #999;
+  }
+} 

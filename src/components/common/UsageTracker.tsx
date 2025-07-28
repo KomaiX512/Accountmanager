@@ -26,7 +26,7 @@ import {
 import './UsageTracker.css';
 
 const UsageTracker: React.FC = () => {
-  const { usage, getUserLimits, isFeatureBlocked, trackFeatureUsage, refreshUsage, isLoading } = useUsage();
+  const { usage, getUserLimits, isFeatureBlocked, trackFeatureUsage, resetUsage, refreshUsage, isLoading } = useUsage();
   const { currentUser } = useAuth();
   const [showDetails, setShowDetails] = useState(false);
   const [showTestSection, setShowTestSection] = useState(false);
@@ -37,7 +37,7 @@ const UsageTracker: React.FC = () => {
   
   // Upgrade popup state
   const [showUpgradePopup, setShowUpgradePopup] = useState(false);
-  const [blockedFeature, setBlockedFeature] = useState<'posts' | 'discussions' | 'aiReplies' | 'campaigns' | null>(null);
+  const [blockedFeature, setBlockedFeature] = useState<'posts' | 'discussions' | 'aiReplies' | 'campaigns' | 'resets' | null>(null);
 
   const limits = getUserLimits();
 
@@ -68,6 +68,23 @@ const UsageTracker: React.FC = () => {
       // Show upgrade popup instead of alert
       setBlockedFeature(feature as any);
       setShowUpgradePopup(true);
+    }
+  };
+  
+  // Reset dashboard button handler
+  const handleResetClick = async () => {
+    if (isFeatureBlocked('resets')) {
+      setBlockedFeature('resets');
+      setShowUpgradePopup(true);
+      return;
+    }
+    addDebugLog('User initiated dashboard reset');
+    try {
+      await trackFeatureUsage('resets', 'ui', 'reset_dashboard');
+      resetUsage();
+      addDebugLog('Dashboard reset completed');
+    } catch (error) {
+      addDebugLog(`Dashboard reset failed: ${error}`);
     }
   };
 
@@ -228,6 +245,13 @@ const UsageTracker: React.FC = () => {
       icon: <FiTarget size={20} />,
       description: 'Advanced marketing campaigns',
       realTimeInfo: 'Tracked when you: Set campaign goals, start campaigns, manage campaign activities'
+    },
+    {
+      key: 'resets',
+      name: 'Resets',
+      icon: <FiRefreshCw size={20} />,
+      description: 'Reset your dashboard',
+      realTimeInfo: 'Tracked when you: press the reset button'
     }
   ];
 
@@ -268,7 +292,7 @@ const UsageTracker: React.FC = () => {
                 className={`usage-card ${isBlocked ? 'blocked' : 'available'}`}
                 whileHover={{ scale: isBlocked ? 1.0 : 1.02 }}
                 whileTap={{ scale: isBlocked ? 1.0 : 0.98 }}
-                onClick={() => handleFeatureClick(feature.key)}
+                onClick={() => feature.key === 'resets' ? handleResetClick() : handleFeatureClick(feature.key)}
                 style={{ cursor: isBlocked ? 'not-allowed' : 'pointer' }}
               >
                 <div className="usage-card-header">

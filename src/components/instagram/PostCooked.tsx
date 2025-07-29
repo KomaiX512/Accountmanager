@@ -85,6 +85,11 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   const [selectedPostForPosting, setSelectedPostForPosting] = useState<any>(null);
   const [isPosting, setIsPosting] = useState(false);
   
+  // ✨ NEW: Schedule loading state and timer mechanism
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [scheduleButtonTimers, setScheduleButtonTimers] = useState<{ [key: string]: number }>({});
+  const SCHEDULE_COOLDOWN_MS = 3 * 60 * 1000; // 3 minutes cooldown
+  
   // NEW: State for scroll position
   const [showScrollTop, setShowScrollTop] = useState(false);
   
@@ -824,9 +829,20 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   };
 
   const handleScheduleClick = (key: string) => {
+    // ✨ BULLETPROOF: Check if button is in cooldown
+    const nowMs = Date.now();
+    const lastClickTime = scheduleButtonTimers[key] || 0;
+    const timeSinceLastClick = nowMs - lastClickTime;
+    
+    if (timeSinceLastClick < SCHEDULE_COOLDOWN_MS) {
+      const remainingTime = Math.ceil((SCHEDULE_COOLDOWN_MS - timeSinceLastClick) / 1000 / 60);
+      setToastMessage(`Please wait ${remainingTime} minute(s) before scheduling this post again.`);
+      return;
+    }
+    
     const now = new Date();
-    // Add 2 minutes so that, after seconds are stripped, we are guaranteed to be > 1-minute ahead
-    const defaultTime = new Date(now.getTime() + 2 * 60 * 1000);
+    // Add 3 minutes so that, after seconds are stripped, we are guaranteed to be > 3-minute ahead
+    const defaultTime = new Date(now.getTime() + 3 * 60 * 1000);
     setScheduleDateTime(toLocalDateTimeString(defaultTime));
     setSelectedPostKey(key);
     setShowScheduleModal(true);
@@ -887,9 +903,12 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
           setToastMessage('Failed to fetch image for post.');
           return;
         }
-      } else if (platform === 'instagram') {
-        setToastMessage('Could not determine image for Instagram post.');
-        return;
+      } else {
+        // ✨ BULLETPROOF: Handle missing image key for ALL image-required platforms
+        if (platform === 'instagram' || platform === 'facebook') {
+          setToastMessage(`Could not determine image for ${platform} post.`);
+          return;
+        }
       }
     }
     
@@ -1167,37 +1186,73 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     try {
       let imageKey = '';
       
+      console.log(`[extractImageKey] 🔍 Processing post:`, {
+        key: post.key,
+        platform: platform,
+        hasImageUrl: !!post.data?.image_url,
+        hasR2ImageUrl: !!post.data?.r2_image_url,
+        imageUrl: post.data?.image_url,
+        r2ImageUrl: post.data?.r2_image_url
+      });
+      
       // Method 1: Extract from post key (most reliable)
       if (post.key) {
-        // Campaign pattern: campaign_ready_post_1752000987874_9c14f1fd.json -> image_1752000987874_9c14f1fd.jpg
+        // Campaign pattern: campaign_ready_post_1752000987874_9c14f1fd.json -> campaign_ready_post_1752000987874_9c14f1fd.jpg
         if (post.key.includes('campaign_ready_post_') && post.key.endsWith('.json')) {
           const baseName = post.key.replace(/^.*\/([^\/]+)\.json$/, '$1');
           imageKey = `${baseName}.jpg`;
+          console.log(`[extractImageKey] ✅ Campaign pattern match: ${imageKey}`);
         }
         // Regular pattern: ready_post_1234567890.json -> image_1234567890.jpg
         else if (post.key.match(/ready_post_\d+\.json$/)) {
           const postIdMatch = post.key.match(/ready_post_(\d+)\.json$/);
           if (postIdMatch) {
             imageKey = `image_${postIdMatch[1]}.jpg`;
+            console.log(`[extractImageKey] ✅ Standard pattern match: ${imageKey}`);
           }
         }
       }
       
-      // Method 2: Extract from image URL if available
-      if (!imageKey && post.data?.image_url) {
-        const urlMatch = post.data.image_url.match(/(image_\d+\.jpg)/);
-        if (urlMatch) {
-          imageKey = urlMatch[1];
+      // Method 2: Extract from image URL if available (for both direct R2 URLs and API URLs)
+      if (!imageKey && (post.data?.image_url || post.data?.r2_image_url)) {
+        const imageUrl = post.data.image_url || post.data.r2_image_url;
+        
+        // Try to extract image filename from URL
+        const urlPatterns = [
+          /(image_\d+\.(?:jpg|jpeg|png|webp))/i,
+          /(campaign_ready_post_\d+_[a-f0-9]+\.(?:jpg|jpeg|png|webp))/i,
+          /\/([^\/]+\.(?:jpg|jpeg|png|webp))(?:\?|$)/i
+        ];
+        
+        for (const pattern of urlPatterns) {
+          const urlMatch = imageUrl.match(pattern);
+          if (urlMatch) {
+            imageKey = urlMatch[1];
+            console.log(`[extractImageKey] ✅ URL pattern match: ${imageKey} from ${imageUrl}`);
+            break;
+          }
         }
       }
       
-      console.log(`[PostCooked] 🔑 Extracted imageKey: ${imageKey} from post key: ${post.key}`);
+      // Method 3: Fallback for Facebook/platform-specific patterns if still no key
+      if (!imageKey && post.key) {
+        console.log(`[extractImageKey] ⚠️ No standard pattern found, trying fallbacks for ${platform}`);
+        
+        // Try extracting any numeric ID and create a standard image key
+        const idMatch = post.key.match(/(\d+)/);
+        if (idMatch) {
+          imageKey = `image_${idMatch[1]}.jpg`;
+          console.log(`[extractImageKey] 🔄 Fallback pattern created: ${imageKey}`);
+        }
+      }
+      
+      console.log(`[extractImageKey] 🎯 Final result: imageKey="${imageKey}" for post key="${post.key}"`);
       return imageKey || null;
     } catch (error) {
-      console.error(`[PostCooked] ❌ Error extracting imageKey:`, error);
+      console.error(`[extractImageKey] ❌ Error extracting imageKey:`, error);
       return null;
     }
-  }, []);
+  }, [platform]);
 
   // Enhanced image fetching with comprehensive error handling and fallbacks (moved before auto-schedule)
   const fetchImageBlob = useCallback(async (post: any, purpose: string = 'general'): Promise<Blob | null> => {

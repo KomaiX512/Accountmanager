@@ -3,6 +3,13 @@ import './FacebookConnect.css';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 
+// Facebook OAuth configuration from environment or defaults
+const FB_APP_ID = process.env.REACT_APP_FACEBOOK_APP_ID || '581584257679639';
+const FB_REDIRECT_URI = process.env.REACT_APP_FACEBOOK_REDIRECT_URI || 'https://www.sentientm.com/facebook/callback';
+const FB_API_VERSION = process.env.REACT_APP_FACEBOOK_API_VERSION || 'v17.0';
+// Define default scope; override via REACT_APP_FACEBOOK_SCOPE in .env (comma-separated)
+const FB_DEFAULT_SCOPE = process.env.REACT_APP_FACEBOOK_SCOPE || 'public_profile,pages_show_list,pages_messaging';
+
 interface FacebookConnectProps {
   onConnected?: (facebookId: string, username: string) => void;
   className?: string;
@@ -114,12 +121,9 @@ const FacebookConnect: React.FC<FacebookConnectProps> = ({ onConnected, classNam
       return;
     }
     
-    // Facebook OAuth configuration
-    const appId = '581584257679639';
-    const redirectUri = 'https://www.sentientm.com/facebook/callback';
-    const scope = 'pages_messaging,pages_show_list,pages_manage_posts,pages_manage_metadata,pages_manage_engagement,pages_read_engagement,pages_read_user_content,pages_manage_metadata,instagram_manage_messages,instagram_content_publish,instagram_manage_comments,instagram_manage_insights,read_insights,publish_video,instagram_basic,instagram_manage_comments,instagram_manage_insights,instagram_content_publish,instagram_manage_messages,pages_read_engagement,pages_manage_metadata,whatsapp_business_messaging,public_profile';
-    
-    const authUrl = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code&state=${currentUser.uid}`;
+    // Build OAuth URL
+    const scopeParam = encodeURIComponent(FB_DEFAULT_SCOPE);
+    const authUrl = `https://www.facebook.com/${FB_API_VERSION}/dialog/oauth?client_id=${FB_APP_ID}&redirect_uri=${encodeURIComponent(FB_REDIRECT_URI)}&scope=${scopeParam}&response_type=code&state=${currentUser.uid}`;
 
     setIsConnecting(true);
     
@@ -170,14 +174,19 @@ const FacebookConnect: React.FC<FacebookConnectProps> = ({ onConnected, classNam
   };
 
   return (
-    <div className={`facebook-connect ${className}`}>
+    <div className={`facebook-connect ${className}`}>      
       {isConnected ? (
-        <button 
-          className="facebook-disconnect-button" 
-          onClick={handleDisconnect}
-        >
-          Disconnect Facebook
-        </button>
+        <>
+          <div className="facebook-connected-info">
+            Connected to Facebook as <strong>{username || facebookId}</strong>
+          </div>
+          <button 
+            className="facebook-disconnect-button" 
+            onClick={handleDisconnect}
+          >
+            Disconnect Facebook
+          </button>
+        </>
       ) : (
         <button 
           className="facebook-connect-button" 
@@ -191,4 +200,4 @@ const FacebookConnect: React.FC<FacebookConnectProps> = ({ onConnected, classNam
   );
 };
 
-export default FacebookConnect; 
+export default FacebookConnect;

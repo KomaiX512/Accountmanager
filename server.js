@@ -954,18 +954,14 @@ app.get('/fix-image/:username/:filename', async (req, res) => {
       return sendPlaceholder(res, 'Missing Filename');
     }
     
-    // 🔥 CAMPAIGN POST FIX: Handle both traditional and campaign post patterns
-    // DON'T normalize campaign posts - they have their own naming scheme
-    if (!filename.startsWith('image_') && !filename.startsWith('campaign_ready_post_') && filename.endsWith('.jpg')) {
-      // Only normalize traditional posts that don't follow image_ pattern
+    // Normalize the filename - ensure it has correct format
+    if (!filename.startsWith('image_') && filename.endsWith('.jpg')) {
+      // Try to extract timestamp and rebuild filename
       const timestampMatch = filename.match(/(\d+)\.jpg$/);
       if (timestampMatch) {
-        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Normalizing traditional post filename from ${filename} to image_${timestampMatch[1]}.jpg`);
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Normalizing filename from ${filename} to image_${timestampMatch[1]}.jpg`);
         filename = `image_${timestampMatch[1]}.jpg`;
       }
-    } else if (filename.startsWith('campaign_ready_post_')) {
-      // Campaign posts keep their original names - no normalization
-      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [FIX-IMAGE:${requestId}] Campaign post detected: ${filename} - keeping original name`);
     }
     
     // Construct the key for R2 storage
@@ -1850,11 +1846,14 @@ async function handlePostsEndpoint(req, res) {
         let imageUrl = null;
         let r2ImageUrl = null;
         
-        // Extract image key from post data or file key
+        // Extract image key, prefer actual image_path from post data (handles png, webp, etc)
         let imageKey = null;
+        if (postData.image_path) {
+          imageKey = path.basename(postData.image_path);
+        }
         
-        // 🔥 ROBUST PATTERN MATCHING: Handle both traditional and campaign ready posts
-        if (file.Key.endsWith('.json')) {
+        // 🔥 ROBUST PATTERN MATCHING: Handle both traditional and campaign ready posts if no explicit image_path
+        if (!imageKey && file.Key.endsWith('.json')) {
           // Pattern 1: Traditional format - ready_post_<ID>.json → image_<ID>.jpg
           if (file.Key.includes('ready_post_') && !file.Key.includes('campaign_ready_post_')) {
             const match = file.Key.match(/ready_post_(\d+)\.json$/);

@@ -79,6 +79,43 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const [chatMessages, setChatMessages] = useState<ChatModalMessage[]>([]);
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   
+  // 🍎 Mobile expandable modules state
+  const [expandedModules, setExpandedModules] = useState<{
+    notifications: boolean;
+    postCooked: boolean;
+    strategies: boolean;
+    competitorAnalysis: boolean;
+  }>({
+    notifications: false,
+    postCooked: false,
+    strategies: false,
+    competitorAnalysis: false
+  });
+
+  // 🍎 Toggle mobile module expansion
+  const toggleMobileModule = (module: keyof typeof expandedModules) => {
+    setExpandedModules(prev => ({
+      ...prev,
+      [module]: !prev[module]
+    }));
+  };
+
+  // 🍎 Handle mobile module header clicks
+  const handleMobileModuleClick = (module: keyof typeof expandedModules, e: React.MouseEvent) => {
+    // Only handle clicks on mobile and in the header area (top 60px)
+    if (window.innerWidth <= 767) {
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const clickY = e.clientY - rect.top;
+      
+      // Only toggle if clicked in the header area (first 60px)
+      if (clickY <= 60) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleMobileModule(module);
+      }
+    }
+  };
+  
   // 🛑 STOP OPERATION: Auto-reply state management for Instagram
   const [isAutoReplying, setIsAutoReplying] = useState(false);
   const [shouldStopAutoReply, setShouldStopAutoReply] = useState(false);
@@ -94,6 +131,16 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   // Reset functionality state
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  
+  // ✨ MOBILE STATE MANAGEMENT
+  const [isMobileProfileMenuOpen, setIsMobileProfileMenuOpen] = useState(false);
+  const [isMobileChatOpen, setIsMobileChatOpen] = useState(false);
+  const [isMobileImageEditorOpen, setIsMobileImageEditorOpen] = useState(false);
+  const [isMobileProfilePopupOpen, setIsMobileProfilePopupOpen] = useState(false);
+  
+  // ✨ MOBILE DROPDOWN POSITIONING
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
+  const profileActionsRef = useRef<HTMLDivElement>(null);
   
   // Content viewed tracking - track what has been seen vs unseen with localStorage persistence
   const getViewedStorageKey = (section: string) => `viewed_${section}_instagram_${accountHolder}`;
@@ -1888,6 +1935,72 @@ Image Description: ${response.post.image_prompt}
     }
   }, [accountHolder]);
 
+  // ✨ MOBILE PROFILE DROPDOWN CLICK OUTSIDE HANDLER
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      // ✨ FIX: Check if click is outside both profile-actions and dropdown
+      if (!target.closest('.profile-actions') && !target.closest('.mobile-profile-dropdown') && isMobileProfileMenuOpen) {
+        setIsMobileProfileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isMobileProfileMenuOpen]);
+
+  // ✨ RECALCULATE POSITION WHEN DROPDOWN OPENS
+  useEffect(() => {
+    if (isMobileProfileMenuOpen) {
+      console.log('Mobile dropdown opening, calculating position...');
+      calculateDropdownPosition();
+    }
+  }, [isMobileProfileMenuOpen]);
+
+  // ✨ CALCULATE DROPDOWN POSITION
+  const calculateDropdownPosition = () => {
+    if (profileActionsRef.current) {
+      const rect = profileActionsRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const viewportWidth = window.innerWidth;
+      const dropdownHeight = 350; // Approximate dropdown height
+      const dropdownWidth = 240; // Dropdown width
+      
+      // ✨ FIX: Position dropdown near the profile bar, not center
+      let top = rect.bottom + 8;
+      let right = viewportWidth - rect.right;
+      
+      console.log('Profile bar position:', rect);
+      console.log('Calculated dropdown position:', { top, right });
+      
+      // If dropdown would go below viewport, position it above the profile bar
+      if (top + dropdownHeight > viewportHeight - 20) {
+        top = rect.top - dropdownHeight - 8;
+      }
+      
+      // Ensure minimum top position
+      if (top < 20) {
+        top = 20;
+      }
+      
+      // Ensure dropdown doesn't go off the right edge
+      if (right + dropdownWidth > viewportWidth - 20) {
+        right = 20;
+      }
+      
+      setDropdownPosition({
+        top,
+        right
+      });
+      
+      console.log('Final dropdown position:', { top, right });
+    } else {
+      console.log('Profile actions ref not found');
+    }
+  };
+
   if (!accountHolder) {
     return null;
   }
@@ -2038,7 +2151,7 @@ Image Description: ${response.post.image_prompt}
                       </span>
                     </div>
                   </div>
-                  <div className="profile-actions">
+                  <div className="profile-actions" ref={profileActionsRef}>
                     <InstagramConnect onConnected={handleInstagramConnected} />
                     
                     <InstagramRequiredButton
@@ -2086,6 +2199,17 @@ Image Description: ${response.post.image_prompt}
                         <span>Campaign</span>
                       </button>
                     )}
+
+                    {/* ✨ MOBILE PROFILE MENU BUTTON */}
+                    <button
+                      className="mobile-profile-menu"
+                      onClick={() => {
+                        console.log('Hamburger button clicked, current state:', isMobileProfileMenuOpen);
+                        setIsMobileProfileMenuOpen(!isMobileProfileMenuOpen);
+                      }}
+                    >
+                      ☰
+                    </button>
                   </div>
                 </div>
               )}
@@ -2093,7 +2217,86 @@ Image Description: ${response.post.image_prompt}
             </div>
           </div>
 
-          <div className="notifications">
+          {/* ✨ MOBILE PROFILE DROPDOWN - RENDERED OUTSIDE CONTAINER */}
+          {isMobileProfileMenuOpen && (
+            <div className="mobile-profile-dropdown" style={{ position: 'fixed', top: dropdownPosition.top, right: dropdownPosition.right }}>
+              {/* ✨ CONNECT BUTTON INSIDE DROPDOWN */}
+              <div className="mobile-connect-wrapper">
+                <InstagramConnect onConnected={handleInstagramConnected} />
+              </div>
+              
+              <InstagramRequiredButton
+                isConnected={!!igBusinessId}
+                onClick={() => {
+                  console.log('Mobile Insights clicked');
+                  handleOpenInsights();
+                  setIsMobileProfileMenuOpen(false);
+                }}
+                bypassConnectionRequirement={true}
+                className="dashboard-btn insights-btn"
+              >
+                <FaChartLine className="btn-icon" />
+                <span>Insights</span>
+              </InstagramRequiredButton>
+              
+              <InstagramRequiredButton
+                isConnected={!!igBusinessId}
+                onClick={() => {
+                  console.log('Mobile Schedule clicked');
+                  handleOpenScheduler();
+                  setIsMobileProfileMenuOpen(false);
+                }}
+                className="dashboard-btn schedule-btn"
+              >
+                <FaCalendarAlt className="btn-icon" />
+                <span>Schedule</span>
+              </InstagramRequiredButton>
+              
+              <button
+                onClick={() => {
+                  console.log('Mobile Goal clicked');
+                  handleOpenGoalModal();
+                  setIsMobileProfileMenuOpen(false);
+                }}
+                className="dashboard-btn goal-btn"
+              >
+                <TbTargetArrow className="btn-icon" />
+                <span>Goal</span>
+              </button>
+              
+              <button
+                onClick={() => {
+                  console.log('Mobile Reset clicked');
+                  handleOpenResetConfirm();
+                  setIsMobileProfileMenuOpen(false);
+                }}
+                className="dashboard-btn reset-btn instagram"
+                disabled={isResetting}
+              >
+                <FaUndo className="btn-icon" />
+                <span>{isResetting ? 'Resetting...' : 'Reset'}</span>
+              </button>
+              
+              {showCampaignButton && (
+                <button
+                  onClick={() => {
+                    console.log('Mobile Campaign clicked');
+                    handleOpenCampaignModal();
+                    setIsMobileProfileMenuOpen(false);
+                  }}
+                  className="dashboard-btn campaign-btn"
+                >
+                  <FaBullhorn className="btn-icon" />
+                  <span>Campaign</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          <div 
+            className={`notifications ${expandedModules.notifications ? 'mobile-expanded' : ''}`}
+            onClick={(e) => handleMobileModuleClick('notifications', e)}
+          >
 
             <DmsComments 
               notifications={notifications} 
@@ -2123,7 +2326,7 @@ Image Description: ${response.post.image_prompt}
             />
           </div>
 
-          <div className="post-cooked">
+          <div className="post-cooked post-cooked-always-expanded">
             <PostCooked
               username={accountHolder}
               profilePicUrl={profileInfo?.profilePicUrlHD ? `/api/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}` : ''}
@@ -2132,7 +2335,10 @@ Image Description: ${response.post.image_prompt}
             />
           </div>
 
-          <div className="strategies">
+          <div 
+            className={`strategies ${expandedModules.strategies ? 'mobile-expanded' : ''}`}
+            onClick={(e) => handleMobileModuleClick('strategies', e)}
+          >
             <h2>
               <div className="section-header">
                 <BsLightbulb className="section-icon" />
@@ -2153,7 +2359,10 @@ Image Description: ${response.post.image_prompt}
             <OurStrategies accountHolder={accountHolder} accountType="branding" />
           </div>
 
-          <div className="competitor-analysis">
+          <div 
+            className={`competitor-analysis ${expandedModules.competitorAnalysis ? 'mobile-expanded' : ''}`}
+            onClick={(e) => handleMobileModuleClick('competitorAnalysis', e)}
+          >
             <h2>
               <div className="section-header">
                 <GiSpy className="section-icon" />
@@ -2360,6 +2569,107 @@ Image Description: ${response.post.image_prompt}
         redirectToPricing={true}
         currentUsage={currentUsage}
       />
+
+      {/* ✨ MOBILE FLOATING ACTION BUTTONS */}
+      <div className="mobile-floating-actions">
+        <button
+          className="mobile-floating-btn chat-btn"
+          onClick={() => setIsMobileChatOpen(true)}
+          title="AI Chat"
+        >
+          💬
+        </button>
+        <button
+          className="mobile-floating-btn image-btn"
+          onClick={() => setIsMobileImageEditorOpen(true)}
+          title="Image Editor"
+        >
+          🎨
+        </button>
+        <button
+          className="mobile-floating-btn profile-btn"
+          onClick={() => setIsMobileProfilePopupOpen(true)}
+          title="Profile"
+        >
+          👤
+        </button>
+      </div>
+
+      {/* ✨ MOBILE CHAT MODAL */}
+      {isMobileChatOpen && (
+        <ChatModal 
+          open={isMobileChatOpen}
+          messages={chatMessages}
+          onClose={() => setIsMobileChatOpen(false)}
+          username={accountHolder}
+          onSendMessage={(message: string) => {
+            if (!message.trim() || !accountHolder) return;
+            setIsProcessing(true);
+            RagService.sendDiscussionQuery(accountHolder, message, chatMessages as RagChatMessage[], 'instagram')
+              .then(response => {
+                const updatedMessages = [
+                  ...chatMessages,
+                  { role: 'user' as const, content: message },
+                  { role: 'assistant' as const, content: response.response }
+                ];
+                setChatMessages(updatedMessages);
+                
+                RagService.saveConversation(accountHolder, updatedMessages, 'instagram')
+                  .catch(err => console.error('Error saving conversation:', err));
+              })
+              .catch(error => {
+                console.error('Error with chat message:', error);
+                setToast('Failed to send message.');
+              })
+              .finally(() => {
+                setIsProcessing(false);
+              });
+          }}
+          isProcessing={isProcessing}
+          linkedAccounts={linkedAccounts}
+          platform="instagram"
+        />
+      )}
+
+      {/* ✨ MOBILE IMAGE EDITOR MODAL */}
+      {isMobileImageEditorOpen && (
+        <div className="mobile-image-editor-overlay">
+          <div className="mobile-image-editor-content">
+            <div className="mobile-image-editor-header">
+              <h3>Image Editor</h3>
+              <button 
+                className="close-mobile-image-editor"
+                onClick={() => setIsMobileImageEditorOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="mobile-image-editor-body">
+              <p>Image editor functionality coming soon...</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✨ MOBILE PROFILE POPUP */}
+      {isMobileProfilePopupOpen && (
+        <div className="mobile-profile-popup-overlay">
+          <div className="mobile-profile-popup-content">
+            <div className="mobile-profile-popup-header">
+              <h3>Profile</h3>
+              <button 
+                className="close-mobile-profile-popup"
+                onClick={() => setIsMobileProfilePopupOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="mobile-profile-popup-body">
+              <p>Profile management functionality coming soon...</p>
+            </div>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 };

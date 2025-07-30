@@ -1,113 +1,85 @@
-export default {
+module.exports = {
   apps: [
     {
-      name: 'sentientm-main-server',
+      name: 'sentientm-main-server-dev',
       script: './server/server.js',
       cwd: '/home/komail/Accountmanager',
       instances: 1,
       exec_mode: 'fork',
       env: {
-        NODE_ENV: 'production',
+        NODE_ENV: 'development',
         MAIN_SERVER_PORT: 3000,
-        HOST: '0.0.0.0'
-      },
-      env_production: {
-        NODE_ENV: 'production',
-        MAIN_SERVER_PORT: 3000,
-        HOST: '0.0.0.0'
+        HOST: 'localhost'
       },
       autorestart: true,
       watch: false,
-      max_memory_restart: '2G',
-      min_uptime: '10s',
+      max_memory_restart: '1G',
+      min_uptime: '5s',
       max_restarts: 10,
-      restart_delay: 5000,
-      log_file: './logs/main-server-combined.log',
-      out_file: './logs/main-server-out.log',
-      error_file: './logs/main-server-error.log',
+      restart_delay: 2000,
+      log_file: './logs/dev-main-server-combined.log',
+      out_file: './logs/dev-main-server-out.log',
+      error_file: './logs/dev-main-server-error.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      kill_timeout: 5000,
-      listen_timeout: 10000,
+      kill_timeout: 3000,
+      listen_timeout: 8000,
       shutdown_with_message: true,
-      env_file: '.env.production'
+      env_file: '.env'
     },
     {
-      name: 'sentientm-rag-server',
+      name: 'sentientm-rag-server-dev',
       script: './rag-server.js',
       cwd: '/home/komail/Accountmanager',
       instances: 1,
       exec_mode: 'fork',
       node_args: '--experimental-specifier-resolution=node',
       env: {
-        NODE_ENV: 'production',
+        NODE_ENV: 'development',
         RAG_SERVER_PORT: 3001,
-        HOST: '0.0.0.0',
-        PATH: '/home/komail/.local/bin:/usr/local/bin:/usr/bin:/bin',
-        PYTHONPATH: '/usr/lib/python3/dist-packages'
-      },
-      env_production: {
-        NODE_ENV: 'production',
-        RAG_SERVER_PORT: 3001,
-        HOST: '0.0.0.0',
+        HOST: 'localhost',
         PATH: '/home/komail/.local/bin:/usr/local/bin:/usr/bin:/bin',
         PYTHONPATH: '/usr/lib/python3/dist-packages'
       },
       autorestart: true,
       watch: false,
-      max_memory_restart: '2G',
-      min_uptime: '10s',
+      max_memory_restart: '1G',
+      min_uptime: '5s',
       max_restarts: 10,
-      restart_delay: 5000,
-      log_file: './logs/rag-server-combined.log',
-      out_file: './logs/rag-server-out.log',
-      error_file: './logs/rag-server-error.log',
+      restart_delay: 2000,
+      log_file: './logs/dev-rag-server-combined.log',
+      out_file: './logs/dev-rag-server-out.log',
+      error_file: './logs/dev-rag-server-error.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      kill_timeout: 5000,
-      listen_timeout: 10000,
+      kill_timeout: 3000,
+      listen_timeout: 8000,
       shutdown_with_message: true,
-      env_file: '.env.production'
+      env_file: '.env'
     },
     {
-      name: 'sentientm-proxy-server',
+      name: 'sentientm-proxy-server-dev',
       script: './server.js',
       cwd: '/home/komail/Accountmanager',
       instances: 1,
       exec_mode: 'fork',
       env: {
-        NODE_ENV: 'production',
+        NODE_ENV: 'development',
         PROXY_SERVER_PORT: 3002,
-        HOST: '0.0.0.0'
-      },
-      env_production: {
-        NODE_ENV: 'production',
-        PROXY_SERVER_PORT: 3002,
-        HOST: '0.0.0.0'
+        HOST: 'localhost'
       },
       autorestart: true,
       watch: false,
-      max_memory_restart: '1G',
-      min_uptime: '10s',
+      max_memory_restart: '512M',
+      min_uptime: '5s',
       max_restarts: 10,
-      restart_delay: 5000,
-      log_file: './logs/proxy-server-combined.log',
-      out_file: './logs/proxy-server-out.log',
-      error_file: './logs/proxy-server-error.log',
+      restart_delay: 2000,
+      log_file: './logs/dev-proxy-server-combined.log',
+      out_file: './logs/dev-proxy-server-out.log',
+      error_file: './logs/dev-proxy-server-error.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      kill_timeout: 5000,
-      listen_timeout: 10000,
+      kill_timeout: 3000,
+      listen_timeout: 8000,
       shutdown_with_message: true,
-      env_file: '.env.production'
+      env_file: '.env'
     }
-  ],
-  deploy: {
-    production: {
-      user: 'sentuhgk',
-      host: '66.29.141.183',
-      ref: 'origin/master',
-      repo: 'https://github.com/komaix512/accountmanager.git',
-      path: '/var/www/sentientm/Accountmanager',
-      'post-deploy': 'npm install --production && npm run build && pm2 reload ecosystem.config.js --env production && pm2 save',
-      'pre-setup': 'mkdir -p /var/www/sentientm/Accountmanager/logs'
-    }
-  }
+  ]
 };

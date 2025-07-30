@@ -1208,6 +1208,9 @@
     0 12px 40px rgba(0, 0, 0, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.2),
     inset 0 -1px 0 rgba(255, 255, 255, 0.1);
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .usage-header {
@@ -1234,8 +1237,93 @@
   margin-bottom: 2rem;
 }
 
-/* Premium Glassy Usage Stats */
-.usage-stat {
+/* Platform Usage Stats - Horizontal Layout */
+.platform-usage-stats {
+  margin-top: 2rem;
+  width: 100%;
+}
+
+.platform-usage-stats .usage-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.platform-usage-stats .usage-stat {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(15px) saturate(160%);
+  -webkit-backdrop-filter: blur(15px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateZ(20px);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.platform-usage-stats .usage-stat:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(0, 255, 204, 0.2);
+  transform: translateZ(30px) translateY(-5px) scale(1.05);
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.25),
+    0 0 40px rgba(0, 255, 204, 0.15),
+    inset 0 2px 0 rgba(255, 255, 255, 0.25);
+}
+
+.platform-usage-stats .stat-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  margin-right: 0.8rem;
+  flex-shrink: 0;
+}
+
+.platform-usage-stats .stat-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.platform-usage-stats .stat-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.platform-usage-stats .stat-details h4 {
+  margin: 0 0 0.2rem 0;
+  font-weight: 500;
+  color: #e0e0ff;
+  font-size: 0.8rem;
+  line-height: 1.2;
+}
+
+.platform-usage-stats .stat-value {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #00ffcc;
+  margin: 0;
+  line-height: 1.2;
+}
+
+/* Usage Overview - 2x2 Grid Layout */
+.usage-container .usage-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.usage-container .usage-stat {
   background: rgba(255, 255, 255, 0.06);
   backdrop-filter: blur(15px) saturate(160%);
   -webkit-backdrop-filter: blur(15px) saturate(160%);
@@ -1252,7 +1340,7 @@
     inset 0 -1px 0 rgba(255, 255, 255, 0.1);
 }
 
-.usage-stat:hover {
+.usage-container .usage-stat:hover {
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(0, 255, 204, 0.2);
   transform: translateZ(30px) translateY(-5px) scale(1.05);
@@ -1262,7 +1350,7 @@
     inset 0 2px 0 rgba(255, 255, 255, 0.25);
 }
 
-.stat-icon {
+.usage-container .stat-icon {
   width: 50px;
   height: 50px;
   display: flex;
@@ -1270,42 +1358,68 @@
   justify-content: center;
   border-radius: 50%;
   margin-right: 1rem;
+  flex-shrink: 0;
 }
 
-.stat-icon svg {
+.usage-container .stat-icon svg {
   width: 28px;
   height: 28px;
   fill: currentColor;
 }
 
-.stat-icon.claimed {
+.usage-container .stat-icon.claimed {
   background: rgba(0, 255, 204, 0.15);
   color: #00ffcc;
 }
 
-.stat-icon.connected {
+.usage-container .stat-icon.connected {
   background: rgba(76, 175, 80, 0.15);
   color: #4CAF50;
 }
 
-.stat-icon.posts {
+.usage-container .stat-icon.posts {
   background: rgba(255, 193, 7, 0.15);
   color: #FFC107;
 }
 
-.stat-icon.ai {
+.usage-container .stat-icon.ai {
   background: rgba(33, 150, 243, 0.15);
   color: #2196F3;
 }
 
-.stat-details h4 {
+.platform-usage-stats .stat-icon.claimed {
+  background: rgba(0, 255, 204, 0.15);
+  color: #00ffcc;
+}
+
+.platform-usage-stats .stat-icon.connected {
+  background: rgba(76, 175, 80, 0.15);
+  color: #4CAF50;
+}
+
+.platform-usage-stats .stat-icon.api {
+  background: rgba(156, 39, 176, 0.15);
+  color: #9C27B0;
+}
+
+.platform-usage-stats .stat-icon.ai.inactive {
+  background: rgba(158, 158, 158, 0.15);
+  color: #9E9E9E;
+}
+
+.usage-container .stat-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.usage-container .stat-details h4 {
   margin: 0 0 0.3rem 0;
   font-weight: 500;
   color: #e0e0ff;
   font-size: 0.9rem;
 }
 
-.stat-value {
+.usage-container .stat-value {
   font-size: 1.5rem;
   font-weight: 600;
   color: #00ffcc;
@@ -1349,23 +1463,54 @@
   color: #a0a0cc;
 }
 
-/* RESPONSIVE BREAKPOINTS FOR SMALLER LAPTOP SCREENS */
+/* RESPONSIVE BREAKPOINTS FOR LARGER SCREENS */
 
 /* Large laptops and small desktops (1440px and down) */
 @media (max-width: 1440px) {
   .dashboard-page {
-    padding: clamp(65px, 6.5vh, 75px) clamp(8px, 1.8vw, 18px) clamp(8px, 1.8vw, 18px);
+    padding: clamp(70px, 6vh, 80px) clamp(12px, 2vw, 20px) clamp(12px, 2vw, 20px);
   }
   
   .main-dashboard-wrapper {
-    max-width: min(calc(100vw - clamp(65px, 6.5vw, 85px)), clamp(750px, 78vw, 1100px));
-    padding: clamp(1.2rem, 2.8vw, 3.5rem);
-    border-radius: clamp(14px, 2.2vw, 22px);
+    max-width: min(calc(100vw - 40px), 1200px);
+    padding: clamp(2rem, 3vw, 3rem);
+    border-radius: clamp(16px, 2.5vw, 24px);
   }
   
   .welcome-banner {
-    max-width: min(92vw, 1100px);
-    padding: clamp(0.4rem, 1.2vw, 1.8rem);
+    max-width: min(calc(100vw - 40px), 1200px);
+    padding: clamp(1rem, 2vw, 2rem);
+  }
+  
+  .welcome-banner h2 {
+    font-size: clamp(1.6rem, 3vw, 2.2rem);
+  }
+  
+  .main-dashboard-header h1 {
+    font-size: clamp(1.8rem, 3.5vw, 2.5rem);
+  }
+  
+  .tab {
+    font-size: clamp(0.9rem, 1.8vw, 1.1rem);
+    padding: clamp(0.8rem, 1.8vw, 1rem) clamp(1.5rem, 2.8vw, 2rem);
+  }
+}
+
+/* Standard laptops (1366px and down) */
+@media (max-width: 1366px) {
+  .dashboard-page {
+    padding: clamp(65px, 5.5vh, 75px) clamp(10px, 1.8vw, 18px) clamp(10px, 1.8vw, 18px);
+  }
+  
+  .main-dashboard-wrapper {
+    max-width: min(calc(100vw - 32px), 1100px);
+    padding: clamp(1.5rem, 2.5vw, 2.5rem);
+    border-radius: clamp(14px, 2.2vw, 20px);
+  }
+  
+  .welcome-banner {
+    max-width: min(calc(100vw - 32px), 1100px);
+    padding: clamp(0.8rem, 1.8vw, 1.6rem);
   }
   
   .welcome-banner h2 {
@@ -1373,30 +1518,30 @@
   }
   
   .main-dashboard-header h1 {
-    font-size: clamp(1.6rem, 3.5vw, 2.2rem);
+    font-size: clamp(1.6rem, 3.2vw, 2.2rem);
   }
   
   .tab {
-    font-size: clamp(0.85rem, 1.8vw, 1rem);
-    padding: clamp(0.7rem, 1.8vw, 0.9rem) clamp(1.2rem, 2.8vw, 1.8rem);
+    font-size: clamp(0.85rem, 1.6vw, 1rem);
+    padding: clamp(0.7rem, 1.6vw, 0.9rem) clamp(1.2rem, 2.5vw, 1.8rem);
   }
 }
 
-/* Standard laptops (1366px and down) */
-@media (max-width: 1366px) {
+/* Smaller laptops (1280px and down) */
+@media (max-width: 1280px) {
   .dashboard-page {
-    padding: clamp(60px, 6vh, 70px) clamp(6px, 1.5vw, 16px) clamp(6px, 1.5vw, 16px);
+    padding: clamp(60px, 5vh, 70px) clamp(8px, 1.5vw, 16px) clamp(8px, 1.5vw, 16px);
   }
   
   .main-dashboard-wrapper {
-    max-width: min(calc(100vw - clamp(60px, 6vw, 80px)), clamp(700px, 76vw, 1000px));
-    padding: clamp(1rem, 2.5vw, 3rem);
-    border-radius: clamp(12px, 2vw, 20px);
+    max-width: min(calc(100vw - 24px), 1000px);
+    padding: clamp(1.2rem, 2.2vw, 2rem);
+    border-radius: clamp(12px, 2vw, 18px);
   }
   
   .welcome-banner {
-    max-width: min(90vw, 1000px);
-    padding: clamp(0.3rem, 1vw, 1.6rem);
+    max-width: min(calc(100vw - 24px), 1000px);
+    padding: clamp(0.6rem, 1.5vw, 1.4rem);
   }
   
   .welcome-banner h2 {
@@ -1404,64 +1549,33 @@
   }
   
   .main-dashboard-header h1 {
-    font-size: clamp(1.4rem, 3.2vw, 2rem);
+    font-size: clamp(1.4rem, 3vw, 2rem);
   }
   
   .tab {
-    font-size: clamp(0.8rem, 1.6vw, 0.95rem);
-    padding: clamp(0.6rem, 1.6vw, 0.8rem) clamp(1rem, 2.5vw, 1.6rem);
-  }
-}
-
-/* Smaller laptops (1280px and down) */
-@media (max-width: 1280px) {
-  .dashboard-page {
-    padding: clamp(58px, 5.8vh, 68px) clamp(5px, 1.2vw, 14px) clamp(5px, 1.2vw, 14px);
-  }
-  
-  .main-dashboard-wrapper {
-    max-width: min(calc(100vw - clamp(55px, 5.5vw, 75px)), clamp(650px, 74vw, 900px));
-    padding: clamp(0.8rem, 2.2vw, 2.5rem);
-    border-radius: clamp(10px, 1.8vw, 18px);
-  }
-  
-  .welcome-banner {
-    max-width: min(88vw, 900px);
-    padding: clamp(0.2rem, 0.8vw, 1.4rem);
-  }
-  
-  .welcome-banner h2 {
-    font-size: clamp(1rem, 2.2vw, 1.6rem);
-  }
-  
-  .main-dashboard-header h1 {
-    font-size: clamp(1.2rem, 3vw, 1.8rem);
-  }
-  
-  .tab {
-    font-size: clamp(0.75rem, 1.4vw, 0.9rem);
-    padding: clamp(0.5rem, 1.4vw, 0.7rem) clamp(0.8rem, 2.2vw, 1.4rem);
+    font-size: clamp(0.8rem, 1.5vw, 0.95rem);
+    padding: clamp(0.6rem, 1.5vw, 0.8rem) clamp(1rem, 2.2vw, 1.6rem);
   }
 }
 
 /* Mobile Responsive - Maintaining Premium $1B Glassy Theme */
 @media (max-width: 768px) {
   .dashboard-page {
-    padding: 70px 5px 5px;
+    padding: 70px 8px 8px;
     margin-left: 0;
     perspective: none; /* Disable 3D on mobile for performance */
   }
 
   .welcome-banner {
-    padding: clamp(0.4rem, 1vw, 1rem);
-    margin: 0 auto 10px;
-    max-width: min(calc(100vw - 70px), 1200px); /* Account for left bar */
+    padding: clamp(0.8rem, 2vw, 1.2rem);
+    margin: 0 auto 12px;
+    max-width: calc(100vw - 16px); /* Perfect mobile width */
   }
 
   .main-dashboard-wrapper {
-    padding: clamp(1.5rem, 3vw, 2rem);
-    border-radius: clamp(16px, 4vw, 20px);
-    max-width: min(calc(100vw - 70px), 1200px);
+    padding: clamp(1.2rem, 3vw, 1.8rem);
+    border-radius: clamp(12px, 3vw, 16px);
+    max-width: calc(100vw - 16px); /* Perfect mobile width */
     margin: 0 auto;
     width: 100%;
     box-sizing: border-box;
@@ -1473,67 +1587,68 @@
   .main-dashboard-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: clamp(0.5rem, 2vw, 1rem);
-    margin-bottom: clamp(0.5rem, 1.5vw, 1.5rem);
-    padding-bottom: clamp(0.3rem, 1vw, 0.8rem);
+    gap: clamp(0.6rem, 2vw, 1rem);
+    margin-bottom: clamp(0.8rem, 2vw, 1.2rem);
+    padding-bottom: clamp(0.5rem, 1.5vw, 0.8rem);
   }
 
   .main-dashboard-header h1 {
-    font-size: clamp(0.9rem, 2.2vw, 1.8rem);
+    font-size: clamp(1.2rem, 3vw, 1.6rem);
   }
 
   .tabs {
-    gap: clamp(0.5rem, 1.5vw, 1.5rem);
+    gap: clamp(0.4rem, 1.5vw, 1rem);
+    flex-wrap: wrap;
   }
 
   .tab {
-    font-size: clamp(0.8rem, 1.8vw, 1rem);
-    padding: clamp(0.6rem, 1.5vw, 0.8rem) clamp(1rem, 2.5vw, 1.5rem);
-    border-radius: 10px;
+    font-size: clamp(0.75rem, 2vw, 0.9rem);
+    padding: clamp(0.5rem, 1.5vw, 0.7rem) clamp(0.8rem, 2vw, 1.2rem);
+    border-radius: 8px;
   }
 
   .instant-post-button {
-    padding: clamp(0.5rem, 1.2vw, 1rem);
-    flex-direction: column;
-    text-align: center;
-    gap: clamp(0.3rem, 1vw, 8px);
+    padding: clamp(0.8rem, 2vw, 1rem);
+    flex-direction: row;
+    text-align: left;
+    gap: clamp(0.4rem, 1vw, 0.6rem);
   }
   
   .instant-post-icon {
-    width: clamp(28px, 6vw, 36px);
-    height: clamp(28px, 6vw, 36px);
-    margin-right: 0;
+    width: clamp(32px, 6vw, 40px);
+    height: clamp(32px, 6vw, 40px);
+    margin-right: clamp(0.6rem, 1.5vw, 0.8rem);
   }
 
   .instant-post-text h3 {
-    font-size: clamp(0.75rem, 1.6vw, 1.1rem);
+    font-size: clamp(0.85rem, 2vw, 1rem);
   }
 
   .instant-post-text p {
-    font-size: clamp(0.6rem, 1.2vw, 0.8rem);
+    font-size: clamp(0.7rem, 1.5vw, 0.8rem);
   }
 
   .connected-platforms-count {
-    font-size: clamp(0.5rem, 1.1vw, 0.7rem);
-    padding: clamp(0.1rem, 0.6vw, 0.25rem) clamp(0.25rem, 1vw, 0.6rem);
+    font-size: clamp(0.6rem, 1.5vw, 0.7rem);
+    padding: clamp(0.2rem, 0.8vw, 0.3rem) clamp(0.4rem, 1.2vw, 0.6rem);
   }
 
+  /* Platform Grid - 2x2 Layout for Mobile */
   .platforms-container {
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: clamp(0.6rem, 1.5vw, 1rem);
+    grid-template-columns: repeat(2, 1fr);
+    gap: clamp(0.6rem, 1.5vw, 0.8rem);
+    margin-bottom: clamp(1rem, 2.5vw, 1.5rem);
   }
-  
-
   
   .instant-post-section {
-    aspect-ratio: 2.8 / 1;
-    min-height: 70px;
-    max-height: 110px;
+    aspect-ratio: 2.5 / 1;
+    min-height: 80px;
+    max-height: 120px;
   }
   
   .platform-row {
-    aspect-ratio: 1.3;
-    padding: clamp(0.8rem, 2vw, 1.1rem);
+    aspect-ratio: 1.1;
+    padding: clamp(0.6rem, 1.5vw, 0.8rem);
     /* COMPLETELY STATIC - NO TRANSITIONS OR ANIMATIONS */
     transition: none !important;
     animation: none !important;
@@ -1552,117 +1667,406 @@
 
   .status-indicators {
     flex-wrap: wrap;
-    gap: clamp(0.3rem, 1vw, 0.8rem);
+    gap: clamp(0.3rem, 1vw, 0.5rem);
   }
 
-  .usage-stats {
-    grid-template-columns: 1fr;
+  /* Fix platform usage container for mobile */
+  .usage-container {
+    padding: clamp(1rem, 2.5vw, 1.5rem);
+    border-radius: clamp(12px, 3vw, 16px);
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+    transform: none; /* Remove 3D transform on mobile */
+  }
+
+  .usage-header h2 {
+    font-size: clamp(1.4rem, 3.5vw, 1.8rem);
+  }
+
+  /* Usage Overview - 2x2 Grid for Mobile */
+  .usage-container .usage-stats {
+    grid-template-columns: repeat(2, 1fr);
     gap: clamp(0.8rem, 2vw, 1.2rem);
+  }
+
+  .usage-container .usage-stat {
+    padding: clamp(1rem, 2.5vw, 1.5rem);
+    transform: none; /* Remove 3D transform on mobile */
+  }
+
+  .usage-container .usage-stat:hover {
+    transform: none; /* Remove hover transform on mobile */
+  }
+
+  .usage-container .stat-icon {
+    width: clamp(40px, 6vw, 50px);
+    height: clamp(40px, 6vw, 50px);
+    margin-right: clamp(0.8rem, 2vw, 1rem);
+  }
+
+  .usage-container .stat-icon svg {
+    width: clamp(20px, 4vw, 28px);
+    height: clamp(20px, 4vw, 28px);
+  }
+
+  .usage-container .stat-details h4 {
+    font-size: clamp(0.8rem, 2vw, 0.9rem);
+  }
+
+  .usage-container .stat-value {
+    font-size: clamp(1.2rem, 3vw, 1.5rem);
+  }
+
+  /* Platform Usage Stats - Horizontal Layout for Mobile */
+  .platform-usage-stats .usage-stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: clamp(0.8rem, 2vw, 1rem);
+  }
+
+  .platform-usage-stats .usage-stat {
+    padding: clamp(0.8rem, 2vw, 1rem);
+    transform: none; /* Remove 3D transform on mobile */
+  }
+
+  .platform-usage-stats .usage-stat:hover {
+    transform: none; /* Remove hover transform on mobile */
+  }
+
+  .platform-usage-stats .stat-icon {
+    width: clamp(32px, 5vw, 40px);
+    height: clamp(32px, 5vw, 40px);
+    margin-right: clamp(0.6rem, 1.5vw, 0.8rem);
+  }
+
+  .platform-usage-stats .stat-icon svg {
+    width: clamp(16px, 3vw, 20px);
+    height: clamp(16px, 3vw, 20px);
+  }
+
+  .platform-usage-stats .stat-details h4 {
+    font-size: clamp(0.7rem, 1.8vw, 0.8rem);
+  }
+
+  .platform-usage-stats .stat-value {
+    font-size: clamp(1rem, 2.5vw, 1.2rem);
+  }
+
+  /* Fix platform icon size for mobile - MUCH SMALLER */
+  .platform-icon {
+    width: clamp(24px, 4vw, 32px);
+    height: clamp(24px, 4vw, 32px);
+  }
+
+  .platform-icon img {
+    width: clamp(18px, 3vw, 24px);
+    height: clamp(18px, 3vw, 24px);
+  }
+
+  .platform-name {
+    font-size: clamp(0.7rem, 1.8vw, 0.85rem);
   }
   
   /* Notification positioning for mobile - keep absolute positioning */
   .notification-badge-container {
-    top: 6px;
-    right: 6px;
+    top: 8px;
+    right: 8px;
   }
 
   .modal-overlay {
-    padding: clamp(3px, 1vw, 10px);
+    padding: clamp(8px, 2vw, 12px);
   }
   
   .modal-content {
-    width: min(96vw, 600px);
-    max-height: min(98vh, 800px);
-    border-radius: clamp(4px, 1.2vw, 12px);
+    width: calc(100vw - 16px);
+    max-width: 500px;
+    max-height: calc(100vh - 32px);
+    border-radius: clamp(12px, 3vw, 16px);
   }
 
   .modal-header {
-    padding: clamp(0.6rem, 2vw, 1.2rem) clamp(0.6rem, 2.5vw, 1.5rem) clamp(0.3rem, 1.2vw, 0.8rem) clamp(0.6rem, 2.5vw, 1.5rem);
+    padding: clamp(0.8rem, 2vw, 1rem) clamp(0.8rem, 2.5vw, 1.2rem) clamp(0.4rem, 1.5vw, 0.6rem) clamp(0.8rem, 2.5vw, 1.2rem);
   }
   
   .modal-header h3 {
-    font-size: clamp(0.9rem, 2.2vw, 1.2rem);
+    font-size: clamp(1rem, 2.5vw, 1.3rem);
   }
 
   .platform-selection {
-    padding: 0 clamp(0.6rem, 2.5vw, 1.5rem);
+    padding: 0 clamp(0.8rem, 2.5vw, 1.2rem);
   }
   
   .platform-checkboxes {
     flex-direction: column;
-    gap: clamp(0.3rem, 1.2vw, 8px);
+    gap: clamp(0.4rem, 1.5vw, 0.8rem);
   }
 
   .platform-checkbox {
     min-width: auto;
     width: 100%;
-    padding: clamp(0.5rem, 1.2vw, 0.8rem);
+    padding: clamp(0.6rem, 1.5vw, 0.8rem);
   }
 
   .platform-checkbox img {
-    width: clamp(20px, 3.5vw, 28px);
-    height: clamp(20px, 3.5vw, 28px);
+    width: clamp(24px, 4vw, 32px);
+    height: clamp(24px, 4vw, 32px);
   }
 
   .platform-checkbox span {
-    font-size: clamp(0.65rem, 1.6vw, 0.9rem);
+    font-size: clamp(0.7rem, 1.8vw, 0.9rem);
   }
   
   .notification-badge {
-    font-size: clamp(0.55rem, 1.3vw, 0.65rem);
-    padding: clamp(2px, 0.8vw, 3px) clamp(4px, 1.2vw, 6px);
-    max-width: clamp(80px, 20vw, 100px);
+    font-size: clamp(0.6rem, 1.5vw, 0.7rem);
+    padding: clamp(0.3rem, 1vw, 0.4rem) clamp(0.5rem, 1.5vw, 0.7rem);
+    max-width: clamp(90px, 22vw, 110px);
   }
   
   .notification-bell-icon {
-    width: clamp(8px, 2vw, 10px);
-    height: clamp(8px, 2vw, 10px);
+    width: clamp(10px, 2.5vw, 12px);
+    height: clamp(10px, 2.5vw, 12px);
   }
   
   .modal-buttons {
     flex-direction: column;
-    gap: clamp(0.6rem, 2vw, 12px);
-    padding: clamp(0.8rem, 2vw, 1rem) clamp(0.6rem, 2.5vw, 1.5rem) clamp(1.2rem, 3vw, 2rem) clamp(0.6rem, 2.5vw, 1.5rem);
+    gap: clamp(0.6rem, 2vw, 0.8rem);
+    padding: clamp(0.8rem, 2vw, 1rem) clamp(0.8rem, 2.5vw, 1.2rem) clamp(1rem, 2.5vw, 1.5rem) clamp(0.8rem, 2.5vw, 1.2rem);
   }
   
   .cancel-button, .post-button {
     width: 100%;
-    padding: clamp(10px, 3vw, 14px) clamp(16px, 4vw, 20px);
-    font-size: clamp(0.8rem, 1.8vw, 1rem);
+    padding: clamp(10px, 3vw, 12px) clamp(16px, 4vw, 20px);
+    font-size: clamp(0.8rem, 2vw, 0.9rem);
   }
 }
 
 /* Ultra-small screens (phones in portrait mode) */
 @media (max-width: 480px) {
   .dashboard-page {
-    padding: 70px 2px 2px;
+    padding: 70px 4px 4px;
     margin-left: 0; /* Remove any left margin that might cause overlap */
   }
 
   .welcome-banner {
-    padding: clamp(0.3rem, 0.8vw, 0.8rem);
-    max-width: min(calc(100vw - 60px), 1200px); /* Account for smaller left bar */
+    padding: clamp(0.6rem, 1.5vw, 1rem);
+    max-width: calc(100vw - 8px); /* Perfect mobile width */
   }
 
   .main-dashboard-wrapper {
-    padding: clamp(0.4rem, 1.2vw, 1rem);
-    max-width: min(calc(100vw - 60px), 1200px); /* Account for smaller left bar */
+    padding: clamp(0.8rem, 2vw, 1.2rem);
+    max-width: calc(100vw - 8px); /* Perfect mobile width */
     margin: 0 auto;
     width: 100%;
     box-sizing: border-box;
   }
 
   .main-dashboard-header h1 {
-    font-size: clamp(0.8rem, 2vw, 1.5rem);
+    font-size: clamp(1rem, 2.5vw, 1.4rem);
     letter-spacing: clamp(0.3px, 0.15vw, 2px);
   }
 
   .tabs {
-    gap: clamp(0.4rem, 1.2vw, 1rem);
+    gap: clamp(0.3rem, 1vw, 0.6rem);
   }
 
   .tab {
-    font-size: clamp(0.6rem, 1.4vw, 0.8rem);
+    font-size: clamp(0.65rem, 1.8vw, 0.8rem);
+    padding: clamp(0.4rem, 1.2vw, 0.6rem) clamp(0.6rem, 1.8vw, 1rem);
+  }
+
+  .instant-post-icon {
+    width: clamp(28px, 5.5vw, 36px);
+    height: clamp(28px, 5.5vw, 36px);
+  }
+
+  .instant-post-text h3 {
+    font-size: clamp(0.75rem, 2vw, 0.9rem);
+  }
+
+  .instant-post-text p {
+    font-size: clamp(0.6rem, 1.5vw, 0.75rem);
+  }
+
+  .connected-platforms-count {
+    font-size: clamp(0.5rem, 1.3vw, 0.6rem);
+    padding: clamp(0.15rem, 0.6vw, 0.25rem) clamp(0.3rem, 1vw, 0.5rem);
+  }
+
+  /* Platform Grid - 2x2 Layout for Ultra-small screens */
+  .platforms-container {
+    grid-template-columns: repeat(2, 1fr);
+    gap: clamp(0.4rem, 1vw, 0.6rem);
+  }
+
+  .platform-row {
+    aspect-ratio: 1.05;
+    padding: clamp(0.4rem, 1vw, 0.6rem);
+  }
+
+  /* Fix platform usage container for ultra-small screens */
+  .usage-container {
+    padding: clamp(0.8rem, 2vw, 1.2rem);
+    border-radius: clamp(8px, 2vw, 12px);
+  }
+
+  .usage-header h2 {
+    font-size: clamp(1.2rem, 3vw, 1.4rem);
+  }
+
+  /* Usage Overview - 2x2 Grid for Ultra-small screens */
+  .usage-container .usage-stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: clamp(0.6rem, 1.5vw, 1rem);
+  }
+
+  .usage-container .usage-stat {
+    padding: clamp(0.8rem, 2vw, 1.2rem);
+  }
+
+  .usage-container .stat-icon {
+    width: clamp(32px, 5vw, 40px);
+    height: clamp(32px, 5vw, 40px);
+    margin-right: clamp(0.6rem, 1.5vw, 0.8rem);
+  }
+
+  .usage-container .stat-icon svg {
+    width: clamp(18px, 3.5vw, 24px);
+    height: clamp(18px, 3.5vw, 24px);
+  }
+
+  .usage-container .stat-details h4 {
+    font-size: clamp(0.7rem, 1.8vw, 0.8rem);
+  }
+
+  .usage-container .stat-value {
+    font-size: clamp(1rem, 2.5vw, 1.2rem);
+  }
+
+  /* Platform Usage Stats - Horizontal Layout for Ultra-small screens */
+  .platform-usage-stats .usage-stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: clamp(0.6rem, 1.5vw, 1rem);
+  }
+
+  .platform-usage-stats .usage-stat {
+    padding: clamp(0.6rem, 1.5vw, 1rem);
+  }
+
+  .platform-usage-stats .stat-icon {
+    width: clamp(28px, 4.5vw, 36px);
+    height: clamp(28px, 4.5vw, 36px);
+    margin-right: clamp(0.5rem, 1.2vw, 0.7rem);
+  }
+
+  .platform-usage-stats .stat-icon svg {
+    width: clamp(14px, 2.5vw, 18px);
+    height: clamp(14px, 2.5vw, 18px);
+  }
+
+  .platform-usage-stats .stat-details h4 {
+    font-size: clamp(0.65rem, 1.6vw, 0.75rem);
+  }
+
+  .platform-usage-stats .stat-value {
+    font-size: clamp(0.9rem, 2.2vw, 1.1rem);
+  }
+
+  /* Fix platform icon size for ultra-small screens - MUCH SMALLER */
+  .platform-icon {
+    width: clamp(20px, 3.5vw, 28px);
+    height: clamp(20px, 3.5vw, 28px);
+  }
+
+  .platform-icon img {
+    width: clamp(14px, 2.5vw, 20px);
+    height: clamp(14px, 2.5vw, 20px);
+  }
+
+  .platform-name {
+    font-size: clamp(0.6rem, 1.5vw, 0.75rem);
+  }
+
+  .modal-content {
+    width: calc(100vw - 8px);
+    border-radius: clamp(8px, 2vw, 12px);
+  }
+
+  .modal-header {
+    padding: clamp(0.6rem, 1.8vw, 0.8rem) clamp(0.6rem, 2vw, 1rem) clamp(0.3rem, 1vw, 0.5rem) clamp(0.6rem, 2vw, 1rem);
+  }
+
+  .modal-header h3 {
+    font-size: clamp(0.9rem, 2.2vw, 1.1rem);
+  }
+
+  .modal-close-btn {
+    width: clamp(24px, 5vw, 28px);
+    height: clamp(24px, 5vw, 28px);
+    font-size: clamp(0.8rem, 2vw, 1rem);
+  }
+
+  .platform-selection {
+    padding: 0 clamp(0.6rem, 2vw, 1rem);
+  }
+
+  .platform-checkbox {
+    padding: clamp(0.5rem, 1.2vw, 0.7rem);
+  }
+
+  .platform-checkbox img {
+    width: clamp(20px, 4vw, 28px);
+    height: clamp(20px, 4vw, 28px);
+  }
+
+  .platform-checkbox span {
+    font-size: clamp(0.65rem, 1.6vw, 0.8rem);
+  }
+
+  .platform-requirements .requirement,
+  .platform-requirements .char-limit {
+    font-size: clamp(0.55rem, 1.4vw, 0.7rem);
+    padding: clamp(0.1rem, 0.4vw, 0.2rem) clamp(0.2rem, 0.8vw, 0.4rem);
+  }
+
+  .notification-badge {
+    font-size: clamp(0.55rem, 1.4vw, 0.65rem);
+    padding: clamp(0.2rem, 0.8vw, 0.3rem) clamp(0.4rem, 1.2vw, 0.6rem);
+    max-width: clamp(80px, 20vw, 100px);
+  }
+
+  .modal-buttons {
+    padding: clamp(0.6rem, 1.8vw, 0.8rem) clamp(0.6rem, 2vw, 1rem) clamp(0.8rem, 2.2vw, 1.2rem) clamp(0.6rem, 2vw, 1rem);
+  }
+
+  .cancel-button, .post-button {
+    padding: clamp(8px, 2.5vw, 10px) clamp(12px, 3.5vw, 16px);
+    font-size: clamp(0.7rem, 1.8vw, 0.85rem);
+  }
+}
+
+/* Extra small screens (very small phones) */
+@media (max-width: 360px) {
+  .dashboard-page {
+    padding: 70px 2px 2px;
+  }
+
+  .welcome-banner {
+    padding: clamp(0.4rem, 1.2vw, 0.8rem);
+    max-width: calc(100vw - 4px);
+  }
+
+  .main-dashboard-wrapper {
+    padding: clamp(0.6rem, 1.8vw, 1rem);
+    max-width: calc(100vw - 4px);
+  }
+
+  .main-dashboard-header h1 {
+    font-size: clamp(0.9rem, 2.2vw, 1.2rem);
+  }
+
+  .tab {
+    font-size: clamp(0.6rem, 1.6vw, 0.75rem);
+    padding: clamp(0.3rem, 1vw, 0.5rem) clamp(0.5rem, 1.5vw, 0.8rem);
   }
 
   .instant-post-icon {
@@ -1671,73 +2075,142 @@
   }
 
   .instant-post-text h3 {
-    font-size: clamp(0.7rem, 1.4vw, 1rem);
+    font-size: clamp(0.7rem, 1.8vw, 0.85rem);
   }
 
   .instant-post-text p {
-    font-size: clamp(0.55rem, 1.1vw, 0.75rem);
+    font-size: clamp(0.55rem, 1.4vw, 0.7rem);
   }
 
   .connected-platforms-count {
-    font-size: clamp(0.45rem, 1vw, 0.65rem);
-    padding: clamp(0.08rem, 0.5vw, 0.2rem) clamp(0.2rem, 0.8vw, 0.5rem);
+    font-size: clamp(0.45rem, 1.2vw, 0.55rem);
+    padding: clamp(0.1rem, 0.5vw, 0.2rem) clamp(0.25rem, 0.8vw, 0.4rem);
   }
 
-  .modal-content {
-    width: min(98vw, 600px);
-    border-radius: clamp(3px, 1vw, 8px);
+  /* Platform Grid - 2x2 Layout for Extra-small screens */
+  .platforms-container {
+    grid-template-columns: repeat(2, 1fr);
+    gap: clamp(0.3rem, 0.8vw, 0.5rem);
   }
 
-  .modal-header {
-    padding: clamp(0.5rem, 1.5vw, 1rem) clamp(0.5rem, 2vw, 1.2rem) clamp(0.25rem, 1vw, 0.6rem) clamp(0.5rem, 2vw, 1.2rem);
+  .platform-row {
+    aspect-ratio: 1;
+    padding: clamp(0.3rem, 0.8vw, 0.5rem);
   }
 
-  .modal-header h3 {
-    font-size: clamp(0.8rem, 2vw, 1.1rem);
+  /* Fix platform usage container for extra-small screens */
+  .usage-container {
+    padding: clamp(0.6rem, 1.5vw, 1rem);
+    border-radius: clamp(6px, 1.5vw, 10px);
   }
 
-  .modal-close-btn {
-    width: clamp(1.6rem, 3.5vw, 2rem);
-    height: clamp(1.6rem, 3.5vw, 2rem);
-    font-size: clamp(0.9rem, 2.2vw, 1.3rem);
+  .usage-header h2 {
+    font-size: clamp(1rem, 2.5vw, 1.2rem);
   }
 
-  .platform-selection {
-    padding: 0 clamp(0.5rem, 2vw, 1.2rem);
+  /* Usage Overview - 2x2 Grid for Extra-small screens */
+  .usage-container .usage-stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: clamp(0.5rem, 1.2vw, 0.8rem);
   }
 
-  .platform-checkbox {
-    padding: clamp(0.4rem, 1vw, 0.7rem);
+  .usage-container .usage-stat {
+    padding: clamp(0.6rem, 1.5vw, 1rem);
   }
 
-  .platform-checkbox img {
+  .usage-container .stat-icon {
+    width: clamp(28px, 4.5vw, 36px);
+    height: clamp(28px, 4.5vw, 36px);
+    margin-right: clamp(0.5rem, 1.2vw, 0.7rem);
+  }
+
+  .usage-container .stat-icon svg {
+    width: clamp(16px, 3vw, 20px);
+    height: clamp(16px, 3vw, 20px);
+  }
+
+  .usage-container .stat-details h4 {
+    font-size: clamp(0.65rem, 1.6vw, 0.75rem);
+  }
+
+  .usage-container .stat-value {
+    font-size: clamp(0.9rem, 2.2vw, 1.1rem);
+  }
+
+  /* Platform Usage Stats - Horizontal Layout for Extra-small screens */
+  .platform-usage-stats .usage-stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: clamp(0.4rem, 1vw, 0.6rem);
+  }
+
+  .platform-usage-stats .usage-stat {
+    padding: clamp(0.5rem, 1.2vw, 0.8rem);
+  }
+
+  .platform-usage-stats .stat-icon {
+    width: clamp(24px, 4vw, 32px);
+    height: clamp(24px, 4vw, 32px);
+    margin-right: clamp(0.4rem, 1vw, 0.6rem);
+  }
+
+  .platform-usage-stats .stat-icon svg {
+    width: clamp(12px, 2.2vw, 16px);
+    height: clamp(12px, 2.2vw, 16px);
+  }
+
+  .platform-usage-stats .stat-details h4 {
+    font-size: clamp(0.6rem, 1.4vw, 0.7rem);
+  }
+
+  .platform-usage-stats .stat-value {
+    font-size: clamp(0.8rem, 2vw, 1rem);
+  }
+
+  /* Fix platform icon size for extra-small screens - MUCH SMALLER */
+  .platform-icon {
     width: clamp(18px, 3vw, 24px);
     height: clamp(18px, 3vw, 24px);
   }
 
-  .platform-checkbox span {
-    font-size: clamp(0.6rem, 1.4vw, 0.8rem);
+  .platform-icon img {
+    width: clamp(12px, 2vw, 16px);
+    height: clamp(12px, 2vw, 16px);
   }
 
-  .platform-requirements .requirement,
-  .platform-requirements .char-limit {
-    font-size: clamp(0.55rem, 1.2vw, 0.7rem);
-    padding: clamp(0.1rem, 0.3vw, 0.15rem) clamp(0.2rem, 0.6vw, 0.3rem);
+  .platform-name {
+    font-size: clamp(0.55rem, 1.3vw, 0.65rem);
+  }
+
+  .modal-content {
+    width: calc(100vw - 4px);
+  }
+
+  .modal-header h3 {
+    font-size: clamp(0.8rem, 2vw, 1rem);
+  }
+
+  .platform-checkbox {
+    padding: clamp(0.4rem, 1vw, 0.6rem);
+  }
+
+  .platform-checkbox img {
+    width: clamp(18px, 3.5vw, 24px);
+    height: clamp(18px, 3.5vw, 24px);
+  }
+
+  .platform-checkbox span {
+    font-size: clamp(0.6rem, 1.5vw, 0.75rem);
   }
 
   .notification-badge {
-    font-size: clamp(0.5rem, 1.2vw, 0.6rem);
-    padding: clamp(1px, 0.6vw, 2px) clamp(3px, 1vw, 4px);
+    font-size: clamp(0.5rem, 1.3vw, 0.6rem);
+    padding: clamp(0.15rem, 0.6vw, 0.25rem) clamp(0.3rem, 1vw, 0.5rem);
     max-width: clamp(70px, 18vw, 90px);
   }
 
-  .modal-buttons {
-    padding: clamp(0.6rem, 1.5vw, 0.8rem) clamp(0.5rem, 2vw, 1.2rem) clamp(1rem, 2.5vw, 1.5rem) clamp(0.5rem, 2vw, 1.2rem);
-  }
-
   .cancel-button, .post-button {
-    padding: clamp(8px, 2.5vw, 12px) clamp(12px, 3.5vw, 16px);
-    font-size: clamp(0.75rem, 1.6vw, 0.9rem);
+    padding: clamp(6px, 2vw, 8px) clamp(10px, 3vw, 14px);
+    font-size: clamp(0.65rem, 1.6vw, 0.8rem);
   }
 }
 
@@ -2097,80 +2570,7 @@
 
 /* Removed shimmer animations for premium minimalism */
 
-/* PROPORTIONAL SCALING SYSTEM - NO LAYOUT REARRANGEMENT */
-/* Base scaling container */
-.dashboard-scaling-container {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  min-height: 100vh;
-  box-sizing: border-box;
-}
-
-/* Proportional scaling based on viewport width */
-@media (max-width: 1400px) {
-  .main-dashboard-wrapper {
-    transform: scale(0.95);
-  }
-  .welcome-banner {
-    transform: scale(0.95);
-  }
-}
-
-@media (max-width: 1200px) {
-  .main-dashboard-wrapper {
-    transform: scale(0.85);
-  }
-  .welcome-banner {
-    transform: scale(0.85);
-  }
-}
-
-@media (max-width: 1000px) {
-  .main-dashboard-wrapper {
-    transform: scale(0.75);
-  }
-  .welcome-banner {
-    transform: scale(0.75);
-  }
-}
-
-@media (max-width: 800px) {
-  .main-dashboard-wrapper {
-    transform: scale(0.65);
-  }
-  .welcome-banner {
-    transform: scale(0.65);
-  }
-}
-
-@media (max-width: 600px) {
-  .main-dashboard-wrapper {
-    transform: scale(0.55);
-  }
-  .welcome-banner {
-    transform: scale(0.55);
-  }
-}
-
-@media (max-width: 480px) {
-  .main-dashboard-wrapper {
-    transform: scale(0.45);
-  }
-  .welcome-banner {
-    transform: scale(0.45);
-  }
-}
-
-@media (max-width: 360px) {
-  .main-dashboard-wrapper {
-    transform: scale(0.35);
-  }
-  .welcome-banner {
-    transform: scale(0.35);
-  }
-}
+/* REMOVED PROBLEMATIC SCALING SYSTEM - Now using proper responsive design */
 
 /* ============================
    ACCOUNT AGENT TAB STYLES - PREMIUM GLASSY DESIGN

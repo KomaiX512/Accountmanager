@@ -294,3 +294,42 @@ motion.div.left-bar,
     font-size: clamp(7px, 1.4vw, 9px);
   }
 }
+
+/* ✨ MOBILE RESPONSIVE - COMPLETELY HIDE LEFT BAR */
+@media (max-width: 767px) and (orientation: portrait) {
+  .left-bar {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    width: 0 !important;
+    height: 0 !important;
+    position: absolute !important;
+    left: -9999px !important;
+    top: -9999px !important;
+    z-index: -9999 !important;
+    pointer-events: none !important;
+  }
+
+  .icon-container {
+    display: none !important;
+  }
+
+  .icon-button {
+    display: none !important;
+  }
+}
+
+@media (max-width: 480px) and (orientation: portrait) {
+  .left-bar {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    width: 0 !important;
+    height: 0 !important;
+    position: absolute !important;
+    left: -9999px !important;
+    top: -9999px !important;
+    z-index: -9999 !important;
+    pointer-events: none !important;
+  }
+}

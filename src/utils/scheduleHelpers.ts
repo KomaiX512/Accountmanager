@@ -166,35 +166,50 @@ export const fetchImageFromR2 = async (
 ): Promise<Blob | null> => {
   try {
     console.log(`[ScheduleHelper] 📤 Fetching image: ${imageKey} for platform: ${platform}`);
-    
-    // SIMPLIFIED: Use the exact same approach as PostCooked - direct fetch
-    const endpoint = `/api/r2-image/${username}/${imageKey}?platform=${platform}&t=${Date.now()}`;
-    
-    console.log(`[ScheduleHelper] 🎯 Fetching from: ${endpoint}`);
-    
-    const response = await fetch(endpoint, {
-      method: 'GET',
-      headers: {
-        'Accept': 'image/*,*/*',
-        'Cache-Control': 'no-cache'
+    // Try multiple endpoints with fallbacks similar to PostCooked.fetchImageBlob
+    const endpoints = [
+      // Primary: R2 image with cache busting
+      getApiUrl(API_CONFIG.ENDPOINTS.R2_IMAGE, `/${username}/${imageKey}?platform=${platform}&t=${Date.now()}`),
+      // Fallback: proxy image endpoint
+      getApiUrl(API_CONFIG.ENDPOINTS.PROXY_IMAGE, `/${username}/${imageKey}?platform=${platform}`),
+      // Fallback: R2 image without cache busting
+      getApiUrl(API_CONFIG.ENDPOINTS.R2_IMAGE, `/${username}/${imageKey}?platform=${platform}`)
+    ];
+    let lastError: Error | null = null;
+    for (let i = 0; i < endpoints.length; i++) {
+      const url = endpoints[i];
+      console.log(`[ScheduleHelper] 🎯 Trying endpoint ${i + 1}/${endpoints.length}: ${url}`);
+      try {
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            Accept: 'image/*,*/*',
+            'Cache-Control': 'no-cache'
+          }
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.startsWith('image/') && !contentType.includes('octet-stream')) {
+          throw new Error(`Invalid content type: ${contentType}`);
+        }
+        const blob = await response.blob();
+        if (!blob || blob.size === 0) {
+          throw new Error('Empty image blob received');
+        }
+        return blob;
+      } catch (err: any) {
+        console.warn(`[ScheduleHelper] ⚠️ Endpoint ${i + 1} failed: ${err.message}`);
+        lastError = err;
+        continue;
       }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-    
-    const imageBlob = await response.blob();
-    
-    if (!imageBlob || imageBlob.size === 0) {
-      throw new Error('Empty image blob received');
-    }
-    
-    console.log(`[ScheduleHelper] ✅ Image fetched successfully: ${imageBlob.size} bytes, type: ${imageBlob.type}`);
-    return imageBlob;
-    
+    // All endpoints failed
+    console.error(`[ScheduleHelper] ❌ All ${endpoints.length} endpoints failed. Last error: ${lastError?.message || 'Unknown error'}`);
+    return null;
   } catch (error) {
-    console.error(`[ScheduleHelper] ❌ Error fetching image ${imageKey}:`, error);
+    console.error(`[ScheduleHelper] ❌ Unexpected error fetching image ${imageKey}:`, error);
     return null;
   }
 };

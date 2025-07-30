@@ -1,4 +1,37 @@
 /* 🚀 GLOBAL INTELLIGENT RESPONSIVENESS OVERRIDE
  * This file ensures ALL components follow the intelligent responsiveness rules
  * Import this LAST to override any conflicting responsive styles
+ */
+
+/* ====================================================================
+   📱 MOBILE VIEW HOTFIX – Flush-left alignment (portrait ≤767px)
+   --------------------------------------------------------------------
+   Problem: Due to global centering (margin: 0 auto) and scale() based
+   proportional-scaling, pages render with a blank strip on the left side
+   of small mobile screens. The wrapper remains horizontally centered
+   even after scaling, so the visual content looks right-shifted.
+
+   Solution: Force all primary wrappers to align flush-left and change
+   transform-origin to `left top` on portrait mobile breakpoints.
+   ==================================================================== */
+@media (max-width: 767px) and (orientation: portrait) {
+  /* Primary layout containers that must start at x=0 */
+  .main-dashboard-wrapper,
+  .dashboard-wrapper,
+  .content-area,
+  .page-container,
+  .modules-container {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    max-width: 100% !important;
+    transform-origin: left top !important;
+  }
+
+  /* Ensure body root is not re-centered by flex rules */
+  body {
+    justify-content: flex-start !important;
+  }
+}
+
+/* -------------------------------------------------------------------- */
  

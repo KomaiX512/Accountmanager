@@ -118,11 +118,6 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
               <div className="particle-effect" />
             </div>
           )}
-          {error && (
-            <div className="error-text">
-              Failed to load strategies: {error}
-            </div>
-          )}
         </motion.div>
       </motion.div>
       

@@ -4,7 +4,19 @@ import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 const UserDropdown: React.FC = () => {
-  const { currentUser, signOut } = useAuth();
+  // ✨ SAFETY CHECK: Handle AuthContext initialization
+  let currentUser = null;
+  let signOut = async () => {};
+  
+  try {
+    const authContext = useAuth();
+    currentUser = authContext.currentUser;
+    signOut = authContext.signOut;
+  } catch (error) {
+    console.log('AuthContext not ready in UserDropdown');
+    return null; // Don't render if auth context is not ready
+  }
+
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();

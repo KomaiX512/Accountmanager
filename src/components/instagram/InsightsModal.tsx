@@ -449,7 +449,7 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
             className={activeTab === 'analysis' ? 'active' : ''}
             onClick={() => setActiveTab('analysis')}
           >
-            Profit Analysis
+            Statistical Analysis
           </button>
           <button
             className={activeTab === 'reach' ? 'active' : ''}

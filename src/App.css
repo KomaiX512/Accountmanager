@@ -3,6 +3,8 @@
   width: 100%;
   min-height: 100vh;
   background: linear-gradient(135deg, #2a2a4a, #3e3e6e);
+  margin: 0 auto;
+  box-sizing: border-box;
 }
 
 /* DEPRECATED: Left bar styles moved to LeftBar.css for professional implementation */
@@ -24,36 +26,47 @@
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  margin: 0;
+  margin: 0 auto;
   padding: 0;
-  width: calc(100% - 60px);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .App {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
 }
 
 .main-content {
   display: flex;
   flex: 1;
   padding-top: 80px; /* Space for TopBar */
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
 }
 
 .content-area {
   flex: 1;
   position: relative;
   transition: all 0.3s ease;
-  margin-left: 80px; /* Account for LeftBar width */
-  width: calc(100% - 80px);
+  margin: 0 auto;
+  width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
   min-width: 0; /* Prevent overflow */
+  padding: 0;
 }
 
 .content-area.full-width {
-  margin-left: 0;
+  margin: 0 auto;
   width: 100%;
+  max-width: 100%;
 }
 
 .loading-screen {
@@ -71,6 +84,7 @@
   position: fixed;
   top: 0;
   left: 0;
+  margin: 0 auto;
 }
 
 /* Add a spinning animation to indicate loading */
@@ -100,45 +114,71 @@
 /* Large laptops and desktops */
 @media (max-width: 1440px) {
   .content-area {
-    margin-left: clamp(65px, 6.5vw, 75px);
-    width: calc(100% - clamp(65px, 6.5vw, 75px));
+    margin: 0 auto;
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
   }
 }
 
 /* Standard laptops */
 @media (max-width: 1366px) {
   .content-area {
-    margin-left: clamp(60px, 6vw, 70px);
-    width: calc(100% - clamp(60px, 6vw, 70px));
+    margin: 0 auto;
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
   }
 }
 
 /* Smaller laptops */
 @media (max-width: 1280px) {
   .content-area {
-    margin-left: clamp(55px, 5.5vw, 65px);
-    width: calc(100% - clamp(55px, 5.5vw, 65px));
+    margin: 0 auto;
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
   }
 }
 
 /* Previous breakpoints maintained for compatibility */
 @media (max-width: 1200px) {
   .content-area {
-    margin-left: clamp(50px, 5vw, 70px);
-    width: calc(100% - clamp(50px, 5vw, 70px));
+    margin: 0 auto;
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
   }
 }
 
 @media (max-width: 768px) {
   .content-area {
-    margin-left: clamp(45px, 4.5vw, 60px);
-    width: calc(100% - clamp(45px, 4.5vw, 60px));
+    margin: 0 auto;
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+  }
+  
+  .main-content {
+    margin: 0 auto;
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
   }
 }
 
 @media (max-width: 480px) {
   .content-area {
-    margin-left: clamp(40px, 4vw, 50px);
-    width: calc(100% - clamp(40px, 4vw, 50px));
+    margin: 0 auto;
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+  }
+  
+  .main-content {
+    margin: 0 auto;
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
   }
 }

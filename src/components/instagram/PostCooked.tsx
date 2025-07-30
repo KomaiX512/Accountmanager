@@ -2105,8 +2105,9 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                 <button
                   className="schedule-submit-button"
                   onClick={handleScheduleSubmit}
-                  disabled={!scheduleDateTime}
-                >Schedule</button>
+                  disabled={!scheduleDateTime || isScheduling}
+                  style={isScheduling ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
+                >{isScheduling ? 'Scheduling...' : 'Schedule'}</button>
               </div>
             </div>
           </div>,

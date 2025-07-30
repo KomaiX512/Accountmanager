@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
-import { useResetPlatformState } from '../../hooks/useResetPlatformState';
 
 interface CampaignModalProps {
   username: string;
@@ -46,7 +45,6 @@ interface AutopilotSettings {
 
 const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isConnected, onClose, onCampaignStopped }) => {
   const { trackRealCampaign } = useFeatureTracking();
-  const { resetAndAllowReconnection } = useResetPlatformState();
   const [summary, setSummary] = useState<CampaignSummary | null>(null);
   const [generatedSummary, setGeneratedSummary] = useState<GeneratedContentSummary | null>(null);
   // Removed postCooked metric state
@@ -54,7 +52,6 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isStopping, setIsStopping] = useState(false);
-  const [isResetting, setIsResetting] = useState(false); // 🔄 RESET: New state for reset operation
   
   // 🚀 AUTOPILOT: New state for automation features
   const [autopilotSettings, setAutopilotSettings] = useState<AutopilotSettings>({
@@ -295,45 +292,6 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
     console.log(`[CampaignModal] Auto-reply ${newAutoReply ? 'enabled' : 'disabled'} - Dashboard service will handle intervals`);
   };
 
-  // 🔄 RESET: Force reset function for convenient re-reset
-  const handleForceReset = async () => {
-    if (isResetting || isStopping) return;
-    
-    setIsResetting(true);
-    setError(null);
-
-    try {
-      console.log(`[CampaignModal] 🔄 Starting force reset for ${username} on ${platform}`);
-      
-      // Track the reset action
-      await trackRealCampaign(platform.toLowerCase(), {
-        action: 'campaign_stopped' // Using campaign_stopped for reset action
-      });
-      
-      // Use the bulletproof reset functionality
-      const resetSuccess = await resetAndAllowReconnection(platform.toLowerCase() as 'instagram' | 'twitter' | 'facebook', username);
-      
-      if (resetSuccess) {
-        console.log(`[CampaignModal] ✅ Force reset completed successfully for ${platform}`);
-        
-        // Wait a moment for the reset to propagate
-        setTimeout(() => {
-          // The reset hook will handle navigation, but we should also close the modal
-          if (onCampaignStopped) {
-            onCampaignStopped();
-          }
-          onClose();
-        }, 1500);
-      } else {
-        throw new Error('Force reset operation failed');
-      }
-    } catch (error: any) {
-      console.error(`[CampaignModal] ❌ Force reset failed:`, error);
-      setError('Failed to reset dashboard. Please try the reset button on the dashboard.');
-    } finally {
-      setIsResetting(false);
-    }
-  };
 
   const handleStopCampaign = () => {
     // Remove confirmation and directly stop the campaign
@@ -494,21 +452,6 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
                 {loading ? 'Loading...' : 'Refresh'}
               </button>
               <button
-                onClick={handleForceReset}
-                className="insta-btn reset"
-                style={{
-                  padding: '6px 12px',
-                  fontSize: '12px',
-                  background: 'linear-gradient(90deg, #8a2be2, #6a1bb2)',
-                  color: '#fff',
-                  border: '1px solid #8a2be2'
-                }}
-                disabled={loading || isStopping || isResetting}
-                title="Reset dashboard and stop any running campaigns"
-              >
-                {isResetting ? 'Resetting...' : '🔄 Force Reset'}
-              </button>
-              <button
                 onClick={handleStopCampaign}
                 className="insta-btn disconnect"
                 style={{
@@ -518,7 +461,7 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
                   color: '#fff',
                   border: '1px solid #ff4444'
                 }}
-                disabled={loading || isStopping || isResetting}
+                disabled={loading || isStopping}
               >
                 {isStopping ? 'Stopping...' : 'Stop Campaign'}
               </button>
@@ -539,29 +482,6 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
             </div>
           )}
 
-          {/* 🔄 RESET INFO: Show helpful banner for convenient reset */}
-          {!loading && (summary || generatedSummary) && (
-            <div style={{
-              margin: '20px 0',
-              padding: '12px',
-              border: '1px solid rgba(138, 43, 226, 0.3)',
-              borderRadius: '6px',
-              background: 'rgba(138, 43, 226, 0.05)'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                <span style={{ color: '#8a2be2', marginRight: '8px' }}>💡</span>
-                <h4 style={{ color: '#8a2be2', margin: 0, fontSize: '14px' }}>
-                  Force Reset Tip
-                </h4>
-              </div>
-              <p style={{ color: '#a0a0cc', margin: '0 0 8px 0', fontSize: '13px' }}>
-                If you recently reset your dashboard but still see this campaign, use the <strong style={{ color: '#8a2be2' }}>🔄 Force Reset</strong> button above.
-              </p>
-              <p style={{ color: '#a0a0cc', margin: 0, fontSize: '12px', fontStyle: 'italic' }}>
-                This will ensure both the campaign and dashboard are completely reset for a fresh start.
-              </p>
-            </div>
-          )}
 
           {loading ? (
             <div style={{ textAlign: 'center', padding: '40px 0' }}>

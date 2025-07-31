@@ -1237,6 +1237,28 @@
   margin-bottom: 2rem;
 }
 
+/* Mobile-first grid override for usage stats */
+@media (max-width: 768px) {
+  .usage-stats {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: clamp(0.6rem, 1.5vw, 1rem);
+  }
+}
+
+@media (max-width: 480px) {
+  .usage-stats {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: clamp(0.5rem, 1.2vw, 0.8rem);
+  }
+}
+
+@media (max-width: 360px) {
+  .usage-stats {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: clamp(0.4rem, 1vw, 0.6rem);
+  }
+}
+
 /* Platform Usage Stats - Horizontal Layout */
 .platform-usage-stats {
   margin-top: 2rem;
@@ -1321,6 +1343,31 @@
   grid-template-columns: repeat(2, 1fr);
   gap: 1.5rem;
   margin-bottom: 2rem;
+}
+
+/* Force 2x2 grid for all usage stats on mobile */
+@media (max-width: 768px) {
+  .usage-container .usage-stats,
+  .usage-stats {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: clamp(0.6rem, 1.5vw, 1rem) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .usage-container .usage-stats,
+  .usage-stats {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: clamp(0.5rem, 1.2vw, 0.8rem) !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .usage-container .usage-stats,
+  .usage-stats {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: clamp(0.4rem, 1vw, 0.6rem) !important;
+  }
 }
 
 .usage-container .usage-stat {
@@ -1684,15 +1731,16 @@
     font-size: clamp(1.4rem, 3.5vw, 1.8rem);
   }
 
-  /* Usage Overview - 2x2 Grid for Mobile */
+  /* Usage Overview - 2x2 Grid for Mobile - COMPACT CARDS */
   .usage-container .usage-stats {
     grid-template-columns: repeat(2, 1fr);
-    gap: clamp(0.8rem, 2vw, 1.2rem);
+    gap: clamp(0.6rem, 1.5vw, 1rem);
   }
 
   .usage-container .usage-stat {
-    padding: clamp(1rem, 2.5vw, 1.5rem);
+    padding: clamp(0.8rem, 2vw, 1.2rem);
     transform: none; /* Remove 3D transform on mobile */
+    min-height: auto; /* Remove fixed height for better mobile fit */
   }
 
   .usage-container .usage-stat:hover {
@@ -1700,22 +1748,24 @@
   }
 
   .usage-container .stat-icon {
-    width: clamp(40px, 6vw, 50px);
-    height: clamp(40px, 6vw, 50px);
-    margin-right: clamp(0.8rem, 2vw, 1rem);
+    width: clamp(32px, 5vw, 40px);
+    height: clamp(32px, 5vw, 40px);
+    margin-right: clamp(0.6rem, 1.5vw, 0.8rem);
   }
 
   .usage-container .stat-icon svg {
-    width: clamp(20px, 4vw, 28px);
-    height: clamp(20px, 4vw, 28px);
+    width: clamp(16px, 3vw, 20px);
+    height: clamp(16px, 3vw, 20px);
   }
 
   .usage-container .stat-details h4 {
-    font-size: clamp(0.8rem, 2vw, 0.9rem);
+    font-size: clamp(0.7rem, 1.8vw, 0.8rem);
+    margin: 0 0 clamp(0.2rem, 0.5vw, 0.3rem) 0;
   }
 
   .usage-container .stat-value {
-    font-size: clamp(1.2rem, 3vw, 1.5rem);
+    font-size: clamp(1rem, 2.5vw, 1.3rem);
+    font-weight: 600;
   }
 
   /* Platform Usage Stats - Horizontal Layout for Mobile */
@@ -1752,15 +1802,15 @@
     font-size: clamp(1rem, 2.5vw, 1.2rem);
   }
 
-  /* Fix platform icon size for mobile - MUCH SMALLER */
+  /* LARGE platform icon size for mobile - MUCH MORE PROMINENT */
   .platform-icon {
-    width: clamp(24px, 4vw, 32px);
-    height: clamp(24px, 4vw, 32px);
+    width: clamp(48px, 7vw, 60px);
+    height: clamp(48px, 7vw, 60px);
   }
 
   .platform-icon img {
-    width: clamp(18px, 3vw, 24px);
-    height: clamp(18px, 3vw, 24px);
+    width: clamp(36px, 5.5vw, 48px);
+    height: clamp(36px, 5.5vw, 48px);
   }
 
   .platform-name {
@@ -1913,33 +1963,36 @@
     font-size: clamp(1.2rem, 3vw, 1.4rem);
   }
 
-  /* Usage Overview - 2x2 Grid for Ultra-small screens */
+  /* Usage Overview - 2x2 Grid for Ultra-small screens - COMPACT */
   .usage-container .usage-stats {
     grid-template-columns: repeat(2, 1fr);
-    gap: clamp(0.6rem, 1.5vw, 1rem);
+    gap: clamp(0.5rem, 1.2vw, 0.8rem);
   }
 
   .usage-container .usage-stat {
-    padding: clamp(0.8rem, 2vw, 1.2rem);
+    padding: clamp(0.6rem, 1.5vw, 1rem);
+    min-height: auto;
   }
 
   .usage-container .stat-icon {
-    width: clamp(32px, 5vw, 40px);
-    height: clamp(32px, 5vw, 40px);
-    margin-right: clamp(0.6rem, 1.5vw, 0.8rem);
+    width: clamp(28px, 4.5vw, 36px);
+    height: clamp(28px, 4.5vw, 36px);
+    margin-right: clamp(0.5rem, 1.2vw, 0.7rem);
   }
 
   .usage-container .stat-icon svg {
-    width: clamp(18px, 3.5vw, 24px);
-    height: clamp(18px, 3.5vw, 24px);
+    width: clamp(14px, 2.8vw, 18px);
+    height: clamp(14px, 2.8vw, 18px);
   }
 
   .usage-container .stat-details h4 {
-    font-size: clamp(0.7rem, 1.8vw, 0.8rem);
+    font-size: clamp(0.65rem, 1.6vw, 0.75rem);
+    margin: 0 0 clamp(0.15rem, 0.4vw, 0.25rem) 0;
   }
 
   .usage-container .stat-value {
-    font-size: clamp(1rem, 2.5vw, 1.2rem);
+    font-size: clamp(0.9rem, 2.2vw, 1.1rem);
+    font-weight: 600;
   }
 
   /* Platform Usage Stats - Horizontal Layout for Ultra-small screens */
@@ -1973,13 +2026,13 @@
 
   /* Fix platform icon size for ultra-small screens - MUCH SMALLER */
   .platform-icon {
-    width: clamp(20px, 3.5vw, 28px);
-    height: clamp(20px, 3.5vw, 28px);
+    width: clamp(40px, 6vw, 52px);
+    height: clamp(40px, 6vw, 52px);
   }
 
   .platform-icon img {
-    width: clamp(14px, 2.5vw, 20px);
-    height: clamp(14px, 2.5vw, 20px);
+    width: clamp(30px, 4.5vw, 40px);
+    height: clamp(30px, 4.5vw, 40px);
   }
 
   .platform-name {
@@ -2108,33 +2161,36 @@
     font-size: clamp(1rem, 2.5vw, 1.2rem);
   }
 
-  /* Usage Overview - 2x2 Grid for Extra-small screens */
+  /* Usage Overview - 2x2 Grid for Extra-small screens - COMPACT */
   .usage-container .usage-stats {
     grid-template-columns: repeat(2, 1fr);
-    gap: clamp(0.5rem, 1.2vw, 0.8rem);
+    gap: clamp(0.4rem, 1vw, 0.6rem);
   }
 
   .usage-container .usage-stat {
-    padding: clamp(0.6rem, 1.5vw, 1rem);
+    padding: clamp(0.5rem, 1.2vw, 0.8rem);
+    min-height: auto;
   }
 
   .usage-container .stat-icon {
-    width: clamp(28px, 4.5vw, 36px);
-    height: clamp(28px, 4.5vw, 36px);
-    margin-right: clamp(0.5rem, 1.2vw, 0.7rem);
+    width: clamp(24px, 4vw, 32px);
+    height: clamp(24px, 4vw, 32px);
+    margin-right: clamp(0.4rem, 1vw, 0.6rem);
   }
 
   .usage-container .stat-icon svg {
-    width: clamp(16px, 3vw, 20px);
-    height: clamp(16px, 3vw, 20px);
+    width: clamp(12px, 2.5vw, 16px);
+    height: clamp(12px, 2.5vw, 16px);
   }
 
   .usage-container .stat-details h4 {
-    font-size: clamp(0.65rem, 1.6vw, 0.75rem);
+    font-size: clamp(0.6rem, 1.4vw, 0.7rem);
+    margin: 0 0 clamp(0.1rem, 0.3vw, 0.2rem) 0;
   }
 
   .usage-container .stat-value {
-    font-size: clamp(0.9rem, 2.2vw, 1.1rem);
+    font-size: clamp(0.8rem, 2vw, 1rem);
+    font-weight: 600;
   }
 
   /* Platform Usage Stats - Horizontal Layout for Extra-small screens */
@@ -2168,13 +2224,13 @@
 
   /* Fix platform icon size for extra-small screens - MUCH SMALLER */
   .platform-icon {
-    width: clamp(18px, 3vw, 24px);
-    height: clamp(18px, 3vw, 24px);
+    width: clamp(36px, 5.5vw, 48px);
+    height: clamp(36px, 5.5vw, 48px);
   }
 
   .platform-icon img {
-    width: clamp(12px, 2vw, 16px);
-    height: clamp(12px, 2vw, 16px);
+    width: clamp(28px, 4vw, 36px);
+    height: clamp(28px, 4vw, 36px);
   }
 
   .platform-name {

@@ -18,6 +18,8 @@ export interface ScheduleResult {
 
 export const schedulePost = async (options: ScheduleOptions): Promise<ScheduleResult> => {
   const { platform, userId, imageBlob, caption, scheduleTime, postKey } = options;
+  // Since backend currently expects JPG references, keep this constant. No effect on actual uploaded file.
+  const preferredExt = 'jpg';
   
   // Validate inputs
   if (!userId) {
@@ -115,11 +117,11 @@ export const schedulePost = async (options: ScheduleOptions): Promise<ScheduleRe
         let imageKey = '';
         if (postKey.includes('campaign_ready_post_') && postKey.endsWith('.json')) {
           const baseName = postKey.replace(/^.*\/(.+)\.json$/, '$1');
-          imageKey = `${baseName}.jpg`;
+          imageKey = `${baseName}.${preferredExt}`;
         } else if (postKey.match(/ready_post_\d+\.json$/)) {
           const postIdMatch = postKey.match(/ready_post_(\d+)\.json$/);
           if (postIdMatch) {
-            imageKey = `image_${postIdMatch[1]}.jpg`;
+            imageKey = `image_${postIdMatch[1]}.${preferredExt}`;
           }
         }
         if (imageKey) {
@@ -128,7 +130,10 @@ export const schedulePost = async (options: ScheduleOptions): Promise<ScheduleRe
       }
       // --- CRITICAL FIX: Always send image as file if present ---
       if (imageBlob) {
-        const filename = postKey ? `${platform}_post_${postKey}.jpg` : `${platform}_${Date.now()}.jpg`;
+        // Determine extension to preserve original format. Prefer MIME from blob, else fallback to jpg
+      const mimeExt = imageBlob && (imageBlob as any).type ? ((imageBlob as any).type as string).split('/')[1] : null;
+      const uploadExt = (mimeExt && ['jpeg','jpg','png','webp'].includes(mimeExt)) ? mimeExt.replace('jpeg','jpg') : (preferredExt || 'jpg');
+      const filename = postKey ? `${platform}_post_${postKey}.${uploadExt}` : `${platform}_${Date.now()}.${uploadExt}`;
         formData.append('image', imageBlob, filename);
       }
       // ---------------------------------------------------------
@@ -225,19 +230,50 @@ export const extractImageKey = (post: any): string => {
     r2ImageUrl: post.data?.r2_image_url
   });
   
+  // Utility: Detect real extension from any URL/path to avoid hard-coding JPG
+  const detectExtension = (): string => {
+    // Look into known URL fields first
+    const sources = [post.data?.image_path, post.data?.image_url, post.data?.r2_image_url].filter(Boolean) as string[];
+    for (const src of sources) {
+      const m = src.match(/\.(jpg|jpeg|png|webp)(?:\?|$)/i);
+      if (m) {
+        return m[1].toLowerCase();
+      }
+    }
+
+    // Fallback #2: inspect the post.key itself for an embedded image filename
+    if (typeof post.key === 'string') {
+      const m = post.key.match(/image_\d+\.(jpg|jpeg|png|webp)/i);
+      if (m) {
+        return m[1].toLowerCase();
+      }
+    }
+
+    // Fallback #3: if key path suggests facebook or platform suggests facebook/instagram, prefer png
+    if ((post.platform as string) === 'facebook' || (post.platform as string) === 'instagram' || (typeof post.key === 'string' && post.key.includes('/facebook/'))) {
+      return 'png';
+    }
+
+    // Default
+    return 'jpg';
+  };
+
+  // Detect most likely extension early so pattern builders can use it
+  const preferredExt = detectExtension();
+
   // Method 1: Extract from post key (most reliable)
   if (post.key) {
     // Campaign pattern: campaign_ready_post_1752000987874_9c14f1fd.json -> campaign_ready_post_1752000987874_9c14f1fd.jpg
     if (post.key.includes('campaign_ready_post_') && post.key.endsWith('.json')) {
       const baseName = post.key.replace(/^.*\/([^\/]+)\.json$/, '$1');
-      imageKey = `${baseName}.jpg`;
+      imageKey = `${baseName}.${preferredExt}`;
       console.log(`[ScheduleHelper-extractImageKey] ✅ Campaign pattern match: ${imageKey}`);
     }
     // Regular pattern: ready_post_1234567890.json -> image_1234567890.jpg
     else if (post.key.match(/ready_post_\d+\.json$/)) {
       const postIdMatch = post.key.match(/ready_post_(\d+)\.json$/);
       if (postIdMatch) {
-        imageKey = `image_${postIdMatch[1]}.jpg`;
+        imageKey = `image_${postIdMatch[1]}.${preferredExt}`;
         console.log(`[ScheduleHelper-extractImageKey] ✅ Standard pattern match: ${imageKey}`);
       }
     }
@@ -271,7 +307,7 @@ export const extractImageKey = (post: any): string => {
     // Try extracting any numeric ID and create a standard image key
     const idMatch = post.key.match(/(\d+)/);
     if (idMatch) {
-      imageKey = `image_${idMatch[1]}.jpg`;
+      imageKey = `image_${idMatch[1]}.${preferredExt}`;
       console.log(`[ScheduleHelper-extractImageKey] 🔄 Fallback pattern created: ${imageKey}`);
     }
   }

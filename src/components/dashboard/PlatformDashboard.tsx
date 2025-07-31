@@ -29,7 +29,7 @@ import RagService from '../../services/RagService';
 import type { ChatMessage as ChatModalMessage } from '../common/ChatModal';
 import { Notification, ProfileInfo, LinkedAccount } from '../../types/notifications';
 // Import icons from react-icons
-import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaTwitter, FaInstagram, FaPen, FaFacebook, FaBell, FaUndo, FaInfoCircle, FaPencilAlt, FaRocket } from 'react-icons/fa';
+import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaTwitter, FaInstagram, FaPen, FaFacebook, FaBell, FaUndo, FaInfoCircle, FaPencilAlt, FaRocket, FaRobot } from 'react-icons/fa';
 import { MdAnalytics, MdOutlineSchedule, MdOutlineAutoGraph } from 'react-icons/md';
 import { BsLightningChargeFill, BsBinoculars, BsLightbulb } from 'react-icons/bs';
 import { IoMdAnalytics } from 'react-icons/io';
@@ -44,6 +44,7 @@ import { useProcessing } from '../../context/ProcessingContext';
 import { safeFilter, safeMap, safeLength } from '../../utils/safeArrayUtils';
 import useDashboardRefresh from '../../hooks/useDashboardRefresh';
 import useResetPlatformState from '../../hooks/useResetPlatformState';
+import AutopilotPopup from '../common/AutopilotPopup';
 
 // Define RagService compatible ChatMessage
 interface RagChatMessage {
@@ -143,6 +144,11 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const [isFacebookComposeOpen, setIsFacebookComposeOpen] = useState(false);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  // 🚀 AUTOPILOT: Autopilot popup state
+  const [isAutopilotPopupOpen, setIsAutopilotPopupOpen] = useState(false);
+  
+  // DEBUG: Log when component renders
+  console.log(`[DEBUG] PlatformDashboard rendering - Platform: ${platform}, User: ${accountHolder}, Autopilot Popup Open: ${isAutopilotPopupOpen}`);
   // ✅ ADDED: Track auto-replied notifications to prevent redundancy
   const [autoRepliedNotifications, setAutoRepliedNotifications] = useState<Set<string>>(new Set());
 
@@ -2125,6 +2131,17 @@ Image Description: ${response.post.image_prompt}
     setIsCampaignModalOpen(false);
   };
 
+  // 🚀 AUTOPILOT: Handlers for autopilot popup
+  const handleOpenAutopilotPopup = () => {
+    console.log(`[DEBUG] Opening autopilot popup for ${platform} - ${accountHolder}`);
+    setIsAutopilotPopupOpen(true);
+  };
+
+  const handleCloseAutopilotPopup = () => {
+    console.log(`[DEBUG] Closing autopilot popup for ${platform} - ${accountHolder}`);
+    setIsAutopilotPopupOpen(false);
+  };
+
   const handleOpenTwitterScheduler = () => {
     console.log(`[${new Date().toISOString()}] Opening Twitter PostScheduler for user ${twitterId}`);
     setIsTwitterSchedulerOpen(true);
@@ -2431,6 +2448,16 @@ Image Description: ${response.post.image_prompt}
                         </FacebookRequiredButton>
                       </>
                     ) : null}
+                    
+                    {/* 🚀 AUTOPILOT: Autopilot button with glassmorphism style */}
+                    <button
+                      onClick={handleOpenAutopilotPopup}
+                      className={`dashboard-btn autopilot-btn ${platform === 'twitter' ? 'twitter' : platform === 'facebook' ? 'facebook' : platform === 'instagram' ? 'instagram' : ''}`}
+                      title="Autopilot Mode - Automate your dashboard"
+                    >
+                      <FaRobot className="btn-icon" />
+                      <span>Autopilot</span>
+                    </button>
                     
                     <button
                       onClick={handleOpenGoalModal}
@@ -2791,6 +2818,16 @@ Image Description: ${response.post.image_prompt}
             </div>
           </motion.div>
         </div>
+      )}
+
+      {/* 🚀 AUTOPILOT: Autopilot Popup - Exact same functionality as CampaignModal */}
+      {isAutopilotPopupOpen && (
+        <AutopilotPopup
+          username={accountHolder}
+          platform={platform}
+          isConnected={isConnected}
+          onClose={handleCloseAutopilotPopup}
+        />
       )}
     </>
   );

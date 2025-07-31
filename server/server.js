@@ -2463,15 +2463,15 @@ async function streamToBuffer(stream) {
 }
 
 // Instagram App Credentials
-const APP_ID = '1089716559763623';
-const APP_SECRET = '0733abf780036963e9f57f33a4b2fa6e';
-const REDIRECT_URI = 'https://c38b57a675c1.ngrok-free.app/instagram/callback';
+const APP_ID = '576296982152813';
+const APP_SECRET = 'd48ddc9eaf0e5c4969d4ddc4e293178c';
+const REDIRECT_URI = 'https://www.sentientm.com/instagram/callback';
 const VERIFY_TOKEN = 'myInstagramWebhook2025';
 
 // Facebook App Credentials  
-const FB_APP_ID = '676612308718574'; // Your ACTUAL Facebook App ID (NOT Configuration ID)
-const FB_APP_SECRET = '0144a0685fd3182b29e2750dabe2fcda'; // Your actual App Secret
-const FB_REDIRECT_URI = 'https://c38b57a675c1.ngrok-free.app/facebook/callback';
+const FB_APP_ID = '581584257679639'; // Your ACTUAL Facebook App ID (NOT Configuration ID)
+const FB_APP_SECRET = 'cdd153955e347e194390333e48cb0480'; // Your actual App Secret
+const FB_REDIRECT_URI = 'https://www.sentientm.com/facebook/callback';
 const FB_VERIFY_TOKEN = 'myFacebookWebhook2025';
 
 app.get([
@@ -8608,7 +8608,7 @@ class PlatformSchemaManager {
 // Twitter OAuth 2.0 credentials
 const TWITTER_CLIENT_ID = 'cVNYR3UxVm5jQ3d5UWw0UHFqUTI6MTpjaQ';
 const TWITTER_CLIENT_SECRET = 'Wr8Kewh92NVB-035hAvpQeQ1Azc7chre3PUTgDoEltjO57mxzO';
-const TWITTER_REDIRECT_URI = 'https://c38b57a675c1.ngrok-free.app/twitter/callback';
+const TWITTER_REDIRECT_URI = 'https://www.sentientm.com/twitter/callback';
 
 // Debug logging for OAuth 2.0
 console.log(`[${new Date().toISOString()}] Twitter OAuth 2.0 Configuration:`);
@@ -9350,6 +9350,31 @@ function startFacebookScheduler() {
           // Check if post is due (within 1 minute tolerance)
           if (scheduledTime <= now && (scheduledPost.status === 'pending' || scheduledPost.status === 'scheduled')) {
             console.log(`[${new Date().toISOString()}] Processing due Facebook post: ${scheduledPost.id}`);
+
+              // ---- BULLETPROOF DEDUPLICATION ----
+              // Immediately mark the schedule as processing so no other worker can pick it up.
+              const scheduleKey = file.Key;
+              if (scheduledPost.status !== 'scheduled' && scheduledPost.status !== 'pending') {
+                // Another worker already grabbed it after our first check
+                console.log(`[${new Date().toISOString()}] Skipping ${scheduledPost.id} – status changed to ${scheduledPost.status}`);
+                continue;
+              }
+              scheduledPost.status = 'processing';
+              scheduledPost.processing_started_at = new Date().toISOString();
+              try {
+                await s3Client.putObject({
+                  Bucket: 'tasks',
+                  Key: scheduleKey,
+                  Body: JSON.stringify(scheduledPost, null, 2),
+                  ContentType: 'application/json',
+                  CacheControl: 'no-cache'
+                }).promise();
+                console.log(`[${new Date().toISOString()}] Locked ${scheduledPost.id} with status=processing`);
+              } catch (lockErr) {
+                console.error(`[${new Date().toISOString()}] Failed to lock schedule ${scheduledPost.id}:`, lockErr.message);
+                continue; // Skip processing to avoid duplicates
+              }
+              // ---- END DEDUPLICATION ----
             
             try {
               // Get Facebook access token
@@ -13789,70 +13814,6 @@ app.delete(['/platform-reset/:userId', '/api/platform-reset/:userId'], async (re
   console.log(`[${new Date().toISOString()}] Platform reset requested for user ${userId} on ${platform}`);
   
   try {
-    // 🚨 ENHANCED RESET: First check and stop any active campaigns
-    console.log(`[${new Date().toISOString()}] Checking for active campaigns before reset for ${userId} on ${platform}`);
-    
-    // Check for existing goal files (active campaign indicator)
-    const goalPrefix = `goal/${platform}/${userId}`;
-    const listGoalsCommand = new ListObjectsV2Command({
-      Bucket: 'tasks',
-      Prefix: `${goalPrefix}/`
-    });
-
-    try {
-      const goalData = await s3Client.send(listGoalsCommand);
-      const hasActiveGoal = goalData.Contents && goalData.Contents.length > 0;
-
-      if (hasActiveGoal) {
-        console.log(`[${new Date().toISOString()}] 🛑 Active campaign found during reset - cleaning up goal files for ${userId} on ${platform}`);
-        
-        // Delete all goal files to stop the campaign
-        const deletePromises = goalData.Contents.map(async (obj) => {
-          const deleteCommand = new DeleteObjectCommand({
-            Bucket: 'tasks',
-            Key: obj.Key,
-          });
-          return s3Client.send(deleteCommand);
-        });
-        
-        await Promise.all(deletePromises);
-        console.log(`[${new Date().toISOString()}] ✅ Deleted goal files - campaign stopped as part of reset`);
-        
-        // Also clear goal summaries
-        const goalSummaryKey = `goal-summary/${platform}/${userId}.json`;
-        try {
-          const deleteSummaryCommand = new DeleteObjectCommand({
-            Bucket: 'tasks',
-            Key: goalSummaryKey,
-          });
-          await s3Client.send(deleteSummaryCommand);
-          console.log(`[${new Date().toISOString()}] ✅ Deleted goal summary for ${userId} on ${platform}`);
-        } catch (summaryError) {
-          if (summaryError.name !== 'NoSuchKey') {
-            console.warn(`[${new Date().toISOString()}] Warning deleting goal summary:`, summaryError);
-          }
-        }
-        
-        // Clear generated content from R2
-        const generatedContentKey = `generated-content/${platform}/${userId}/posts.json`;
-        try {
-          const deleteContentCommand = new DeleteObjectCommand({
-            Bucket: 'tasks',
-            Key: generatedContentKey,
-          });
-          await s3Client.send(deleteContentCommand);
-          console.log(`[${new Date().toISOString()}] ✅ Deleted generated content for ${userId} on ${platform}`);
-        } catch (contentError) {
-          if (contentError.name !== 'NoSuchKey') {
-            console.warn(`[${new Date().toISOString()}] Warning deleting generated content:`, contentError);
-          }
-        }
-      } else {
-        console.log(`[${new Date().toISOString()}] ✅ No active campaigns found for ${userId} on ${platform}`);
-      }
-    } catch (goalCheckError) {
-      console.warn(`[${new Date().toISOString()}] Warning checking for active campaigns:`, goalCheckError);
-    }
     // Clear platform-specific user status
     const statusKey = `User${platform.charAt(0).toUpperCase() + platform.slice(1)}Status/${userId}/status.json`;
     
@@ -13862,7 +13823,7 @@ app.delete(['/platform-reset/:userId', '/api/platform-reset/:userId'], async (re
         Key: statusKey,
       });
       await s3Client.send(deleteStatusCommand);
-      console.log(`[${new Date().toISOString()}] ✅ Deleted ${platform} status for user ${userId}`);
+      console.log(`[${new Date().toISOString()}] Deleted ${platform} status for user ${userId}`);
     } catch (error) {
       if (error.name !== 'NoSuchKey') {
         console.error(`[${new Date().toISOString()}] Error deleting ${platform} status:`, error);
@@ -13878,7 +13839,7 @@ app.delete(['/platform-reset/:userId', '/api/platform-reset/:userId'], async (re
         Key: connectionKey,
       });
       await s3Client.send(deleteConnectionCommand);
-      console.log(`[${new Date().toISOString()}] ✅ Deleted ${platform} connection for user ${userId}`);
+      console.log(`[${new Date().toISOString()}] Deleted ${platform} connection for user ${userId}`);
     } catch (error) {
       if (error.name !== 'NoSuchKey') {
         console.error(`[${new Date().toISOString()}] Error deleting ${platform} connection:`, error);
@@ -13906,9 +13867,7 @@ app.delete(['/platform-reset/:userId', '/api/platform-reset/:userId'], async (re
         });
         
         await Promise.all(deletePromises);
-        console.log(`[${new Date().toISOString()}] ✅ Deleted ${listResponse.Contents.length} scheduled posts for ${platform}/${userId}`);
-      } else {
-        console.log(`[${new Date().toISOString()}] ✅ No scheduled posts found for ${platform}/${userId}`);
+        console.log(`[${new Date().toISOString()}] Deleted ${listResponse.Contents.length} scheduled posts for ${platform}/${userId}`);
       }
     } catch (error) {
       console.error(`[${new Date().toISOString()}] Error deleting scheduled posts for ${platform}/${userId}:`, error);
@@ -13926,17 +13885,15 @@ app.delete(['/platform-reset/:userId', '/api/platform-reset/:userId'], async (re
         cache.delete(key);
       });
       
-      console.log(`[${new Date().toISOString()}] ✅ Cleared cache for ${platform}/${userId}`);
+      console.log(`[${new Date().toISOString()}] Cleared cache for ${platform}/${userId}`);
     }
     
-    console.log(`[${new Date().toISOString()}] ✅ Successfully reset ${platform} dashboard for user ${userId} - campaigns stopped and data cleared`);
+    console.log(`[${new Date().toISOString()}] Successfully reset ${platform} dashboard for user ${userId}`);
     
     res.json({ 
       success: true, 
       message: `${platform.charAt(0).toUpperCase() + platform.slice(1)} dashboard reset successfully`,
-      platform: platform,
-      campaignsStopped: true,
-      resetTimestamp: new Date().toISOString()
+      platform: platform
     });
     
   } catch (error) {

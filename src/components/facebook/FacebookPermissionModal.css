@@ -1,0 +1,133 @@
+.fb-permission-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.fb-permission-modal {
+  background: #2c2c2c;
+  color: #f0f0f0;
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.fb-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.fb-modal-close::before,
+.fb-modal-close::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 2px;
+  height: 20px;
+  background: #aaa;
+  top: 0;
+  left: calc(50% - 1px);
+}
+.fb-modal-close::before { transform: rotate(45deg); }
+.fb-modal-close::after { transform: rotate(-45deg); }
+
+.fb-modal-title {
+  margin: 20px 20px 12px;
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #f0f0f0;
+}
+
+.fb-permission-list {
+  padding: 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fb-permission-option {
+  display: flex;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.fb-permission-option input {
+  margin-right: 8px;
+  accent-color: #4267b2;
+}
+
+.fb-policy-container {
+  flex: 0 0 150px;
+  overflow-y: auto;
+  margin: 12px 20px;
+  padding: 12px;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: #1e1e1e;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.fb-accept-option {
+  margin: 10px 20px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.fb-permission-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px 20px;
+}
+
+.fb-cancel-button,
+.fb-continue-button {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 4px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.fb-cancel-button {
+  background: #555;
+  color: #f0f0f0;
+}
+
+.fb-cancel-button:hover {
+  background: #666;
+}
+
+.fb-continue-button {
+  background: linear-gradient(90deg, #1877f2, #4267b2);
+  color: #fff;
+}
+
+.fb-continue-button:hover {
+  background: linear-gradient(90deg, #166fe5, #365899);
+}
+
+.fb-continue-button:disabled {
+  background: #444;
+  cursor: not-allowed;
+}

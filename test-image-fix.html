@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Fetching Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-image {
+            max-width: 100%;
+            height: auto;
+            border: 2px solid #ccc;
+            margin: 10px 0;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <h1>Image Fetching Test</h1>
+    
+    <div id="status"></div>
+    
+    <h2>Test 1: Direct R2 Image Endpoint</h2>
+    <img id="test1" class="test-image" alt="Test 1" />
+    
+    <h2>Test 2: Posts API</h2>
+    <div id="posts-data"></div>
+    
+    <script>
+        const API_BASE_URL = 'http://localhost:3002';
+        
+        function updateStatus(message, isError = false) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = `<div class="status ${isError ? 'error' : 'success'}">${message}</div>`;
+        }
+        
+        async function testImageFetching() {
+            try {
+                // Test 1: Direct image fetch
+                const img1 = document.getElementById('test1');
+                const imageUrl = `${API_BASE_URL}/api/r2-image/elonmusk/image_1754219173644.png?platform=twitter`;
+                
+                img1.onload = () => {
+                    updateStatus(`✅ Image loaded successfully! Size: ${img1.naturalWidth}x${img1.naturalHeight}`);
+                };
+                
+                img1.onerror = () => {
+                    updateStatus(`❌ Failed to load image from: ${imageUrl}`, true);
+                };
+                
+                img1.src = imageUrl;
+                
+                // Test 2: Posts API
+                const postsResponse = await fetch(`${API_BASE_URL}/api/posts/elonmusk?platform=twitter`);
+                const postsData = await postsResponse.json();
+                
+                document.getElementById('posts-data').innerHTML = `
+                    <p>✅ Posts API working! Found ${postsData.length} posts</p>
+                    <pre>${JSON.stringify(postsData[0], null, 2)}</pre>
+                `;
+                
+            } catch (error) {
+                updateStatus(`❌ Error: ${error.message}`, true);
+            }
+        }
+        
+        // Run the test
+        testImageFetching();
+    </script>
+</body>
+</html> 

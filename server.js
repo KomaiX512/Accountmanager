@@ -2548,6 +2548,66 @@ const startServer = async () => {
 // Start the server with enterprise-grade reliability
 startServer();
 
+// Enhanced R2 Image Renderer with white image prevention
+app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
+  const { username, imageKey } = req.params;
+  const platform = req.query.platform || 'instagram';
+  const forceRefresh = req.query.t || req.query.v || req.query.refresh;
+  
+  try {
+    // Construct the R2 key path
+    const r2Key = `ready_post/${platform}/${username}/${imageKey}`;
+    
+    console.log(`[${new Date().toISOString()}] [R2-IMAGE] Fetching: ${r2Key}`);
+    
+    // Get the image from R2
+    const getCommand = new GetObjectCommand({
+      Bucket: 'tasks',
+      Key: r2Key,
+    });
+    
+    const response = await s3Client.send(getCommand);
+    const imageBuffer = await streamToString(response.Body);
+    
+    // Validate that we actually have image data
+    if (!imageBuffer || imageBuffer.length === 0) {
+      console.error(`[${new Date().toISOString()}] [R2-IMAGE] No image data returned for ${r2Key}`);
+      throw new Error('Empty image data');
+    }
+    
+    // Detect content type from file extension
+    let contentType = 'image/jpeg'; // Default
+    if (imageKey.endsWith('.png')) {
+      contentType = 'image/png';
+    } else if (imageKey.endsWith('.webp')) {
+      contentType = 'image/webp';
+    } else if (imageKey.endsWith('.gif')) {
+      contentType = 'image/gif';
+    }
+    
+    // Set appropriate headers
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', '*');
+    
+    // Send the image
+    res.send(Buffer.from(imageBuffer, 'binary'));
+    
+    console.log(`[${new Date().toISOString()}] [R2-IMAGE] ✅ Served ${r2Key} successfully`);
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [R2-IMAGE] Error serving ${imageKey}:`, error);
+    
+    // Send a placeholder image
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Cache-Control', 'no-cache, no-store');
+    res.status(404).send('Image not found');
+  }
+});
+
 // Test endpoint to directly serve local image file
 app.get('/test-direct-image/:username/:filename', (req, res) => {
   const { username, filename } = req.params;

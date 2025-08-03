@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './InstagramConnect.css';
+import InstagramPermissionModal from './InstagramPermissionModal';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import { useInstagram } from '../../context/InstagramContext';
@@ -17,6 +18,13 @@ interface InstagramConnectProps {
 
 const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected, className = '' }) => {
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedPermissions, setSelectedPermissions] = useState<string[]>(['instagram_business_basic']);
+  const togglePermission = (perm: string) => {
+    setSelectedPermissions(prev =>
+      prev.includes(perm) ? prev.filter(p => p !== perm) : [...prev, perm]
+    );
+  };
   const { currentUser } = useAuth();
   const { isConnected, connectInstagram, disconnectInstagram } = useInstagram();
   const isStoringConnectionRef = useRef(false);
@@ -106,17 +114,16 @@ const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected, classN
     };
   }, [onConnected, currentUser, connectInstagram, isConnecting, isConnected]);
 
-  const connectToInstagram = () => {
-    if (!currentUser) {
-      console.error(`[${new Date().toISOString()}] Cannot connect Instagram: No authenticated user`);
-      return;
-    }
-    
-    // Use the platform OAuth endpoint with correct parameters from Meta dashboard
+  // Open permission modal first
+  const openPermissionModal = () => {
+    setIsModalOpen(true);
+  }
+
+  const handleModalContinue = () => {
+    setIsModalOpen(false);
     const appId = '1089716559763623';
     const redirectUri = 'https://c38b57a675c1.ngrok-free.app/instagram/callback';
-    // Include all required permissions and URL-encode the scope list
-    const scope = 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish,instagram_business_manage_insights';
+    const scope = selectedPermissions.length > 0 ? selectedPermissions.join(',') : 'instagram_business_basic';
     const authUrl = `https://www.instagram.com/oauth/authorize?force_reauth=true&client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}`;
 
     setIsConnecting(true);
@@ -149,6 +156,12 @@ const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected, classN
       }, 1000);
     }
   };
+
+
+
+  
+
+  const connectToInstagram = openPermissionModal;
 
   const handleDisconnect = () => {
     if (!currentUser) {
@@ -202,6 +215,13 @@ const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected, classN
           {isConnecting ? 'Connecting...' : 'Connect Instagram'}
         </button>
       )}
+      <InstagramPermissionModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onContinue={handleModalContinue}
+        selectedPermissions={selectedPermissions}
+        togglePermission={togglePermission}
+      />
     </div>
   );
 };

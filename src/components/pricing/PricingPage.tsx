@@ -20,7 +20,11 @@ import {
   FiTag,
   FiShield,
   FiGift,
-  FiCheck
+  FiCheck,
+  FiArrowRight,
+  FiUsers,
+  FiTrendingUp,
+  FiAward
 } from 'react-icons/fi';
 import './PricingPage.css';
 
@@ -92,19 +96,19 @@ const PricingPage: React.FC = () => {
   };
 
   const getFeatureIcon = (feature: string) => {
-    if (feature.includes('Unlimited')) return <FiRepeat size={24} />;
-    if (feature.includes('Auto')) return <FiZap size={24} />;
-    if (feature.includes('AI')) return <FiCpu size={24} />;
-    if (feature.includes('Analytics')) return <FiBarChart size={24} />;
-    if (feature.includes('Support')) return <FiLifeBuoy size={24} />;
-    if (feature.includes('Posts')) return <FiEdit3 size={24} />;
-    if (feature.includes('Discussions')) return <FiMessageCircle size={24} />;
-    if (feature.includes('Campaigns')) return <FiTarget size={24} />;
-    if (feature.includes('Custom')) return <FiSettings size={24} />;
-    if (feature.includes('Priority')) return <FiZap size={24} />;
-    if (feature.includes('White-label')) return <FiTag size={24} />;
-    if (feature.includes('SLA')) return <FiShield size={24} />;
-    return <FiCheck size={24} />;
+    if (feature.includes('Unlimited')) return <FiRepeat size={16} />;
+    if (feature.includes('Auto')) return <FiZap size={16} />;
+    if (feature.includes('AI')) return <FiCpu size={16} />;
+    if (feature.includes('Analytics')) return <FiBarChart size={16} />;
+    if (feature.includes('Support')) return <FiLifeBuoy size={16} />;
+    if (feature.includes('Posts')) return <FiEdit3 size={16} />;
+    if (feature.includes('Discussions')) return <FiMessageCircle size={16} />;
+    if (feature.includes('Campaigns')) return <FiTarget size={16} />;
+    if (feature.includes('Custom')) return <FiSettings size={16} />;
+    if (feature.includes('Priority')) return <FiZap size={16} />;
+    if (feature.includes('White-label')) return <FiTag size={16} />;
+    if (feature.includes('SLA')) return <FiShield size={16} />;
+    return <FiCheck size={16} />;
   };
 
   const currentPlan = userData?.subscription?.planId;
@@ -114,15 +118,9 @@ const PricingPage: React.FC = () => {
   if (loading) {
     return (
       <div className="pricing-page">
-        <div className="pricing-banner">
-          <h2>Loading Pricing Plans</h2>
-        </div>
-        
-        <div className="pricing-wrapper">
-          <div className="pricing-loading">
-            <div className="loading-spinner"></div>
-            <p>Loading pricing information...</p>
-          </div>
+        <div className="pricing-loading">
+          <div className="loading-spinner"></div>
+          <p>Loading pricing information...</p>
         </div>
       </div>
     );
@@ -130,14 +128,12 @@ const PricingPage: React.FC = () => {
 
   return (
     <div className="pricing-page">
-      <div className="pricing-banner">
-        <h2>Welcome to Our Pricing Plans</h2>
-      </div>
-      
-      <div className="pricing-wrapper">
-        <div className="pricing-header">
-          <h1>Choose Your Plan</h1>
-          <p>Unlock the full potential of AI-powered social media management</p>
+      {/* Hero Section */}
+      <div className="pricing-hero">
+        <div className="hero-content">
+          <h1>Start for free.</h1>
+          <h2>Start the savings.</h2>
+          <p>Whether you're a startup, global enterprise, or somewhere in between, our AI-powered social media management is designed to save you time and money.</p>
           
           {isTrialActive && trialDaysRemaining && (
             <div className="trial-badge">
@@ -146,15 +142,27 @@ const PricingPage: React.FC = () => {
             </div>
           )}
         </div>
+      </div>
 
+      {/* Pricing Cards */}
       <div className="pricing-container">
         {UserService.PRICING_PLANS.map((plan: PricingPlan) => (
           <div 
             key={plan.id}
             className={`pricing-card ${plan.popular ? 'popular' : ''} ${currentPlan === plan.id ? 'current' : ''}`}
           >
-            {plan.popular && <div className="popular-badge">Most Popular</div>}
-            {currentPlan === plan.id && <div className="current-badge">Current Plan</div>}
+            {plan.popular && (
+              <div className="popular-badge">
+                <FiAward size={14} />
+                <span>Most Popular</span>
+              </div>
+            )}
+            {currentPlan === plan.id && (
+              <div className="current-badge">
+                <FiCheck size={14} />
+                <span>Current Plan</span>
+              </div>
+            )}
             
             <div className="plan-header">
               <div className="plan-icon">{getPlanIcon(plan.id)}</div>
@@ -167,7 +175,7 @@ const PricingPage: React.FC = () => {
             </div>
 
             <div className="plan-features">
-              <h4>What's included:</h4>
+              <h4>Key features:</h4>
               <ul>
                 {plan.features.map((feature, index) => (
                   <li key={index}>
@@ -185,9 +193,11 @@ const PricingPage: React.FC = () => {
                   onClick={() => handlePlanSelect(plan.id)}
                 >
                   Contact Sales
+                  <FiArrowRight size={16} />
                 </button>
               ) : currentPlan === plan.id ? (
                 <button className="btn-current" disabled>
+                  <FiCheck size={16} />
                   Current Plan
                 </button>
               ) : (
@@ -202,9 +212,15 @@ const PricingPage: React.FC = () => {
                       Processing...
                     </>
                   ) : plan.id === 'basic' ? (
-                    'Start Free Trial'
+                    <>
+                      Get started for free
+                      <FiArrowRight size={16} />
+                    </>
                   ) : (
-                    'Upgrade Now'
+                    <>
+                      Get started for free
+                      <FiArrowRight size={16} />
+                    </>
                   )}
                 </button>
               )}
@@ -219,6 +235,7 @@ const PricingPage: React.FC = () => {
         ))}
       </div>
 
+      {/* FAQ Section */}
       <div className="pricing-faq">
         <h2>Frequently Asked Questions</h2>
         <div className="faq-grid">
@@ -241,8 +258,15 @@ const PricingPage: React.FC = () => {
         </div>
       </div>
 
-        <div className="pricing-footer">
-          <p>Need help choosing? <a href="mailto:support@accountmanager.com">Contact our team</a></p>
+      {/* CTA Section */}
+      <div className="pricing-cta">
+        <div className="cta-content">
+          <h2>Time is money. Save both.</h2>
+          <p>Join thousands of businesses simplifying their social media management with AI.</p>
+          <button className="btn-cta">
+            Get started for free
+            <FiArrowRight size={18} />
+          </button>
         </div>
       </div>
     </div>

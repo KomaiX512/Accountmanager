@@ -26,8 +26,10 @@ import RagService from '../../services/RagService';
 import type { ChatMessage as ChatModalMessage } from './ChatModal';
 import type { Notification, ProfileInfo, LinkedAccount } from '../../types/notifications';
 import { safeFilter, safeMap, safeLength } from '../../utils/safeArrayUtils';
+import AutopilotPopup from '../common/AutopilotPopup';
+import News4U from '../common/News4U';
 // Import icons from react-icons
-import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaLock, FaBell, FaUndo, FaComments, FaPencilAlt, FaPaperPlane, FaRocket } from 'react-icons/fa';
+import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaLock, FaBell, FaUndo, FaComments, FaPencilAlt, FaPaperPlane, FaRocket, FaNewspaper } from 'react-icons/fa';
 import { MdAnalytics, MdOutlineSchedule, MdOutlineAutoGraph } from 'react-icons/md';
 import { BsLightningChargeFill, BsBinoculars, BsLightbulb } from 'react-icons/bs';
 import { IoMdAnalytics } from 'react-icons/io';
@@ -67,6 +69,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
   const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
+  const [isAutopilotPopupOpen, setIsAutopilotPopupOpen] = useState(false);
   const [showCampaignButton, setShowCampaignButton] = useState(false);
   const [replySentTracker, setReplySentTracker] = useState<{
     text: string;
@@ -85,11 +88,13 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     postCooked: boolean;
     strategies: boolean;
     competitorAnalysis: boolean;
+    news4u: boolean;
   }>({
     notifications: false,
     postCooked: false,
     strategies: false,
-    competitorAnalysis: false
+    competitorAnalysis: false,
+    news4u: false
   });
 
   // 🍎 Toggle mobile module expansion
@@ -1527,6 +1532,16 @@ Image Description: ${response.post.image_prompt}
     checkCampaignStatus();
   };
 
+  // 🚀 AUTOPILOT: Autopilot popup handlers
+  const handleOpenAutopilotPopup = () => {
+    console.log('[DEBUG] Autopilot button clicked in Instagram Dashboard!');
+    setIsAutopilotPopupOpen(true);
+  };
+
+  const handleCloseAutopilotPopup = () => {
+    setIsAutopilotPopupOpen(false);
+  };
+
   // Reset functionality handlers
   const handleOpenResetConfirm = () => {
     setIsResetConfirmOpen(true);
@@ -2174,6 +2189,15 @@ Image Description: ${response.post.image_prompt}
                     </InstagramRequiredButton>
                     
                     <button
+                      onClick={handleOpenAutopilotPopup}
+                      className="dashboard-btn autopilot-btn instagram"
+                      onMouseEnter={() => console.log('[DEBUG] Autopilot button hovered!')}
+                    >
+                      <FaRocket className="btn-icon" />
+                      <span>Autopilot</span>
+                    </button>
+                    
+                    <button
                       onClick={handleOpenGoalModal}
                       className="dashboard-btn goal-btn"
                     >
@@ -2292,6 +2316,17 @@ Image Description: ${response.post.image_prompt}
               )}
             </div>
           )}
+
+          <div 
+            className={`news4u ${expandedModules.news4u ? 'mobile-expanded' : ''}`}
+            onClick={(e) => handleMobileModuleClick('news4u', e)}
+          >
+
+            <News4U 
+              accountHolder={accountHolder}
+              platform="instagram"
+            />
+          </div>
 
           <div 
             className={`notifications ${expandedModules.notifications ? 'mobile-expanded' : ''}`}
@@ -2479,6 +2514,16 @@ Image Description: ${response.post.image_prompt}
           onCampaignStopped={handleCampaignStopped}
         />
       )}
+
+      {/* 🚀 AUTOPILOT: Autopilot Popup Component */}
+      <AutopilotPopup
+        username={accountHolder}
+        platform="instagram"
+        isConnected={!!igBusinessId}
+        isOpen={isAutopilotPopupOpen}
+        onClose={handleCloseAutopilotPopup}
+      />
+
       {isResetConfirmOpen && (
         <motion.div
           className="post-scheduler-modal"

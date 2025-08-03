@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
+import { FaRocket, FaCalendarAlt, FaReply, FaTimes, FaCheck, FaExclamationTriangle } from 'react-icons/fa';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
+import './AutopilotPopup.css';
 
 interface AutopilotSettings {
   enabled: boolean;
@@ -9,6 +11,7 @@ interface AutopilotSettings {
   autoReply: boolean;
   lastChecked?: string;
   autoScheduleInterval?: number; // in minutes
+  autoReplyInterval?: number; // in minutes
   scheduledPostsCount?: number;
   autoRepliesCount?: number;
 }
@@ -17,36 +20,33 @@ interface AutopilotPopupProps {
   username: string;
   platform: string;
   isConnected: boolean;
+  isOpen: boolean;
   onClose: () => void;
 }
 
-const AutopilotPopup: React.FC<AutopilotPopupProps> = ({ 
-  username, 
-  platform, 
-  isConnected, 
-  onClose 
+const AutopilotPopup: React.FC<AutopilotPopupProps> = ({
+  username,
+  platform,
+  isConnected,
+  isOpen,
+  onClose
 }) => {
   const { trackRealCampaign } = useFeatureTracking();
   
-  // 🚀 AUTOPILOT: Exact same state structure as CampaignModal
+  // 🚀 AUTOPILOT: Exact same state as CampaignModal
   const [autopilotSettings, setAutopilotSettings] = useState<AutopilotSettings>({
     enabled: false,
     autoSchedule: false,
     autoReply: false,
     autoScheduleInterval: 60, // default 1 hour
+    autoReplyInterval: 5, // default 5 minutes
     scheduledPostsCount: 0,
     autoRepliesCount: 0
   });
   const [autopilotLoading, setAutopilotLoading] = useState(false);
-  const [autoScheduleActive] = useState(false);
-  const [autoReplyActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchAutopilotSettings();
-  }, [username, platform]);
-
-  // 🚀 AUTOPILOT: Exact same logic as CampaignModal - Fetch current automation settings
+  // 🚀 AUTOPILOT: Fetch current automation settings (same as CampaignModal)
   const fetchAutopilotSettings = async () => {
     try {
       const response = await axios.get(`/autopilot-settings/${username}?platform=${platform}`);
@@ -62,8 +62,9 @@ const AutopilotPopup: React.FC<AutopilotPopupProps> = ({
           autoSchedule: false,
           autoReply: false,
           autoScheduleInterval: 60,
-          scheduledPostsCount: 0,  // ✅ FRESH START
-          autoRepliesCount: 0      // ✅ FRESH START
+          autoReplyInterval: 5,
+          scheduledPostsCount: 0,
+          autoRepliesCount: 0
         });
       } else {
         console.warn('Error fetching autopilot settings:', err);
@@ -71,7 +72,7 @@ const AutopilotPopup: React.FC<AutopilotPopupProps> = ({
     }
   };
 
-  // 🚀 AUTOPILOT: Exact same logic as CampaignModal - Update automation settings
+  // 🚀 AUTOPILOT: Update automation settings (same as CampaignModal)
   const updateAutopilotSettings = async (newSettings: Partial<AutopilotSettings>) => {
     setAutopilotLoading(true);
     try {
@@ -88,7 +89,7 @@ const AutopilotPopup: React.FC<AutopilotPopupProps> = ({
         
         // Track automation usage
         await trackRealCampaign(platform.toLowerCase(), {
-          action: 'campaign_started' // Using campaign_started for autopilot activation
+          action: 'campaign_started'
         });
       }
     } catch (err: any) {
@@ -99,7 +100,7 @@ const AutopilotPopup: React.FC<AutopilotPopupProps> = ({
     }
   };
 
-  // 🚀 AUTOPILOT: Exact same logic as CampaignModal - Toggle main autopilot switch
+  // 🚀 AUTOPILOT: Toggle main autopilot switch (same as CampaignModal)
   const handleAutopilotToggle = async () => {
     // ✅ CONNECTION CHECK: Prevent activation if account not connected
     if (!isConnected && !autopilotSettings.enabled) {
@@ -116,54 +117,7 @@ const AutopilotPopup: React.FC<AutopilotPopupProps> = ({
     });
   };
 
-  // 🚀 AUTOPILOT: Exact same logic as CampaignModal - Update auto-schedule interval
-  const handleIntervalChange = async (newInterval: number) => {
-    await updateAutopilotSettings({ autoScheduleInterval: newInterval });
-  };
-
-  // 🚀 AUTOPILOT: Exact same logic as CampaignModal - Button triggering functions
-  const triggerAutoScheduleButton = () => {
-    if (!autopilotSettings.autoSchedule || !isConnected) return;
-    
-    // Dispatch event to trigger the Auto Schedule button in PostCooked component
-    window.dispatchEvent(new CustomEvent('triggerAutoSchedule', {
-      detail: { 
-        username, 
-        platform: platform.toLowerCase(),
-        interval: autopilotSettings.autoScheduleInterval || 60
-      }
-    }));
-    
-    console.log(`[AutopilotPopup] Triggered auto-schedule for ${username} on ${platform}`);
-    
-    // Update counter
-    setAutopilotSettings(prev => ({
-      ...prev,
-      scheduledPostsCount: (prev.scheduledPostsCount || 0) + 1
-    }));
-  };
-
-  const triggerAutoReplyButton = () => {
-    if (!autopilotSettings.autoReply || !isConnected) return;
-    
-    // Dispatch event to trigger the Auto Reply All button in Dashboard component
-    window.dispatchEvent(new CustomEvent('triggerAutoReply', {
-      detail: { 
-        username, 
-        platform: platform.toLowerCase()
-      }
-    }));
-    
-    console.log(`[AutopilotPopup] Triggered auto-reply for ${username} on ${platform}`);
-    
-    // Update counter
-    setAutopilotSettings(prev => ({
-      ...prev,
-      autoRepliesCount: (prev.autoRepliesCount || 0) + 1
-    }));
-  };
-
-  // 🚀 AUTOPILOT: Exact same logic as CampaignModal - Enhanced toggle functions
+  // 🚀 AUTOPILOT: Enhanced toggle functions - intervals managed globally by Dashboard
   const handleAutoScheduleToggleWithInterval = async () => {
     if (!autopilotSettings.enabled) return;
     if (!isConnected) {
@@ -174,7 +128,6 @@ const AutopilotPopup: React.FC<AutopilotPopupProps> = ({
     const newAutoSchedule = !autopilotSettings.autoSchedule;
     await updateAutopilotSettings({ autoSchedule: newAutoSchedule });
     
-    // Note: Interval management is now handled globally by Dashboard service
     console.log(`[AutopilotPopup] Auto-schedule ${newAutoSchedule ? 'enabled' : 'disabled'} - Dashboard service will handle intervals`);
   };
 
@@ -188,417 +141,250 @@ const AutopilotPopup: React.FC<AutopilotPopupProps> = ({
     const newAutoReply = !autopilotSettings.autoReply;
     await updateAutopilotSettings({ autoReply: newAutoReply });
     
-    // Note: Interval management is now handled globally by Dashboard service
     console.log(`[AutopilotPopup] Auto-reply ${newAutoReply ? 'enabled' : 'disabled'} - Dashboard service will handle intervals`);
   };
 
+  // 🚀 AUTOPILOT: Update auto-schedule interval (same as CampaignModal)
+  const handleIntervalChange = async (newInterval: number) => {
+    await updateAutopilotSettings({ autoScheduleInterval: newInterval });
+  };
+
+  // 🚀 AUTOPILOT: Update auto-reply interval
+  const handleAutoReplyIntervalChange = async (newInterval: number) => {
+    await updateAutopilotSettings({ autoReplyInterval: newInterval });
+  };
+
+  // Fetch settings when popup opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchAutopilotSettings();
+    }
+  }, [isOpen, username, platform]);
+
+  // Auto-dismiss error after 5 seconds
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
+  const platformConfig = {
+    instagram: { color: '#e4405f', name: 'Instagram' },
+    twitter: { color: '#000000', name: 'X (Twitter)' },
+    facebook: { color: '#1877f2', name: 'Facebook' }
+  }[platform] || { color: '#6366f1', name: platform };
+
   return (
-    <motion.div
-      className="autopilot-popup-overlay"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      onClick={onClose}
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-        zIndex: 1000,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px'
-      }}
-    >
-      <motion.div
-        className="autopilot-popup-content"
-        initial={{ scale: 0.9, opacity: 0, y: 20 }}
-        animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 0.9, opacity: 0, y: 20 }}
-        transition={{ type: "spring", damping: 25, stiffness: 300 }}
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.95) 0%, rgba(20, 20, 40, 0.95) 100%)',
-          backdropFilter: 'blur(20px)',
-          borderRadius: '16px',
-          border: '1px solid rgba(138, 43, 226, 0.3)',
-          boxShadow: '0 20px 40px rgba(138, 43, 226, 0.2), 0 0 30px rgba(138, 43, 226, 0.1)',
-          padding: '24px',
-          maxWidth: '500px',
-          width: '100%',
-          maxHeight: '80vh',
-          overflowY: 'auto'
-        }}
-      >
-        {/* Header */}
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          marginBottom: '20px',
-          paddingBottom: '12px',
-          borderBottom: '1px solid rgba(138, 43, 226, 0.2)'
-        }}>
-          <h2 style={{ 
-            color: '#8a2be2', 
-            margin: 0, 
-            fontSize: '20px',
-            fontWeight: 'bold',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            🚁 Autopilot Mode
-          </h2>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#a0a0cc',
-              fontSize: '24px',
-              cursor: 'pointer',
-              padding: '4px',
-              borderRadius: '4px',
-              transition: 'color 0.2s'
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.color = '#ff4444'}
-            onMouseLeave={(e) => e.currentTarget.style.color = '#a0a0cc'}
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          className="autopilot-popup-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+        >
+          <motion.div
+            className="autopilot-popup"
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            onClick={(e) => e.stopPropagation()}
           >
-            ×
-          </button>
-        </div>
-
-        {/* Platform Info */}
-        <div style={{
-          textAlign: 'center',
-          marginBottom: '20px',
-          padding: '12px',
-          borderRadius: '8px',
-          background: 'rgba(138, 43, 226, 0.1)',
-          border: '1px solid rgba(138, 43, 226, 0.2)'
-        }}>
-          <p style={{ color: '#e0e0ff', margin: 0, fontSize: '14px' }}>
-            <strong>{platform.charAt(0).toUpperCase() + platform.slice(1)}</strong> Dashboard Automation for <strong>{username}</strong>
-          </p>
-        </div>
-
-        {error && (
-          <div style={{ 
-            color: '#ff4444', 
-            textAlign: 'center', 
-            margin: '0 0 20px 0',
-            padding: '10px',
-            border: '1px solid #ff4444',
-            borderRadius: '6px',
-            background: 'rgba(255, 68, 68, 0.1)'
-          }}>
-            {error}
-          </div>
-        )}
-
-        {/* Main Autopilot Toggle */}
-        <div style={{
-          marginBottom: '20px',
-          padding: '16px',
-          borderRadius: '8px',
-          background: 'rgba(138, 43, 226, 0.05)',
-          border: '1px solid rgba(138, 43, 226, 0.2)'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <div>
-              <h3 style={{ color: '#8a2be2', margin: '0 0 4px 0', fontSize: '16px' }}>
-                Enable Autopilot
-              </h3>
-              <p style={{ color: '#a0a0cc', margin: 0, fontSize: '12px' }}>
-                Automate your entire {platform} dashboard activities
-              </p>
-            </div>
-            <label style={{ display: 'flex', alignItems: 'center', cursor: isConnected ? 'pointer' : 'not-allowed' }}>
-              <input
-                type="checkbox"
-                checked={autopilotSettings.enabled}
-                onChange={handleAutopilotToggle}
-                disabled={autopilotLoading || !isConnected}
-                style={{
-                  marginRight: '8px',
-                  transform: 'scale(1.3)',
-                  accentColor: '#8a2be2',
-                  opacity: isConnected ? 1 : 0.5
-                }}
-              />
-              <span style={{ color: '#e0e0ff', fontSize: '14px', fontWeight: 'bold' }}>
-                {autopilotSettings.enabled ? 'Active' : 'Inactive'}
-              </span>
-            </label>
-          </div>
-        </div>
-
-        {/* 🔗 CONNECTION STATUS CHECK - Exact same as CampaignModal */}
-        {!isConnected && (
-          <div style={{
-            padding: '12px',
-            borderRadius: '6px',
-            background: 'rgba(255, 193, 7, 0.1)',
-            border: '1px solid rgba(255, 193, 7, 0.3)',
-            marginBottom: '20px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ color: '#ffc107', marginRight: '8px' }}>⚠️</span>
-              <h4 style={{ color: '#ffc107', margin: 0, fontSize: '14px' }}>
-                Account Connection Required
-              </h4>
-            </div>
-            <p style={{ color: '#e0e0ff', margin: '0 0 8px 0', fontSize: '13px' }}>
-              Autopilot requires your {platform} account to be connected for auto-replies and scheduling.
-            </p>
-            <p style={{ color: '#a0a0cc', margin: 0, fontSize: '12px', fontStyle: 'italic' }}>
-              Please connect your account from the main dashboard to enable automation features.
-            </p>
-          </div>
-        )}
-
-        {/* Automation Features - Only show when autopilot is enabled and connected */}
-        {autopilotSettings.enabled && isConnected && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {/* Autopilot Status Indicator - Exact same as CampaignModal */}
-            <div style={{
-              padding: '12px',
-              borderRadius: '6px',
-              background: 'rgba(138, 43, 226, 0.1)',
-              border: '1px solid rgba(138, 43, 226, 0.2)'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '6px' }}>
-                <span style={{ color: '#8a2be2', marginRight: '6px' }}>🤖</span>
-                <h4 style={{ color: '#8a2be2', margin: 0, fontSize: '14px' }}>
-                  Autopilot Status: Active
-                </h4>
+            {/* Header */}
+            <div className="autopilot-popup-header">
+              <div className="autopilot-popup-title">
+                <FaRocket className="title-icon" style={{ color: platformConfig.color }} />
+                <h3>Autopilot Dashboard</h3>
+                <span className="platform-badge" style={{ backgroundColor: platformConfig.color }}>
+                  {platformConfig.name}
+                </span>
               </div>
-              <p style={{ color: '#a0a0cc', margin: '0 0 4px 0', fontSize: '11px' }}>
-                • Auto-Reply: Checks every 30 seconds for new messages
-              </p>
-              <p style={{ color: '#a0a0cc', margin: 0, fontSize: '11px' }}>
-                • Auto-Schedule: Maintains smart posting intervals
-              </p>
-              
-              {/* Manual Trigger Buttons for Testing - Exact same as CampaignModal */}
-              <div style={{ display: 'flex', gap: '8px', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(138, 43, 226, 0.2)' }}>
+              <button className="autopilot-popup-close" onClick={onClose}>
+                <FaTimes />
+              </button>
+            </div>
+
+            {/* Error Message */}
+            {error && (
+              <motion.div
+                className="autopilot-error"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+              >
+                <FaExclamationTriangle />
+                <span>{error}</span>
+              </motion.div>
+            )}
+
+            {/* Connection Status */}
+            {!isConnected && (
+              <div className="autopilot-connection-warning">
+                <FaExclamationTriangle />
+                <span>Connect your {platformConfig.name} account to enable autopilot features</span>
+              </div>
+            )}
+
+            {/* Main Autopilot Toggle */}
+            <div className="autopilot-main-control">
+              <div className="autopilot-main-toggle">
+                <div className="toggle-info">
+                  <h4>Enable Autopilot Mode</h4>
+                  <p>Automate your entire {platformConfig.name} dashboard</p>
+                </div>
                 <button
-                  onClick={triggerAutoScheduleButton}
-                  disabled={!autopilotSettings.autoSchedule || !isConnected}
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '11px',
-                    background: 'rgba(0, 255, 204, 0.2)',
-                    border: '1px solid rgba(0, 255, 204, 0.3)',
-                    color: '#00ffcc',
-                    borderRadius: '4px',
-                    cursor: autopilotSettings.autoSchedule && isConnected ? 'pointer' : 'not-allowed',
-                    opacity: autopilotSettings.autoSchedule && isConnected ? 1 : 0.5
-                  }}
+                  className={`autopilot-toggle-btn ${autopilotSettings.enabled ? 'active' : ''}`}
+                  onClick={handleAutopilotToggle}
+                  disabled={autopilotLoading || (!isConnected && !autopilotSettings.enabled)}
                 >
-                  📅 Trigger Schedule
-                </button>
-                <button
-                  onClick={triggerAutoReplyButton}
-                  disabled={!autopilotSettings.autoReply || !isConnected}
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '11px',
-                    background: 'rgba(255, 142, 83, 0.2)',
-                    border: '1px solid rgba(255, 142, 83, 0.3)',
-                    color: '#ff8e53',
-                    borderRadius: '4px',
-                    cursor: autopilotSettings.autoReply && isConnected ? 'pointer' : 'not-allowed',
-                    opacity: autopilotSettings.autoReply && isConnected ? 1 : 0.5
-                  }}
-                >
-                  💬 Trigger Reply
+                  <div className="toggle-slider">
+                    <div className="toggle-knob">
+                      {autopilotLoading ? (
+                        <div className="loading-spinner" />
+                      ) : autopilotSettings.enabled ? (
+                        <FaCheck />
+                      ) : null}
+                    </div>
+                  </div>
+                  <span>{autopilotSettings.enabled ? 'Active' : 'Inactive'}</span>
                 </button>
               </div>
             </div>
 
-            {/* Auto-Schedule Option - Exact same as CampaignModal */}
-            <div style={{
-              padding: '14px',
-              borderRadius: '8px',
-              background: 'rgba(0, 255, 204, 0.1)',
-              border: '1px solid rgba(0, 255, 204, 0.2)'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <div>
-                  <h4 style={{ color: '#00ffcc', margin: '0 0 4px 0', fontSize: '14px' }}>
-                    📅 Auto-Schedule Posts
-                  </h4>
-                  <p style={{ color: '#a0a0cc', margin: 0, fontSize: '12px' }}>
-                    Automatically schedule new posts with smart intervals
-                  </p>
+            {/* Feature Controls */}
+            <div className={`autopilot-features ${!autopilotSettings.enabled ? 'disabled' : ''}`}>
+              {/* Auto-Schedule Feature */}
+              <div className="autopilot-feature">
+                <div className="feature-header">
+                  <div className="feature-icon">
+                    <FaCalendarAlt style={{ color: platformConfig.color }} />
+                  </div>
+                  <div className="feature-info">
+                    <h5>Auto-Schedule Posts</h5>
+                    <p>Automatically schedule your ready posts with smart intervals</p>
+                  </div>
+                  <button
+                    className={`feature-toggle ${autopilotSettings.autoSchedule ? 'active' : ''}`}
+                    onClick={handleAutoScheduleToggleWithInterval}
+                    disabled={!autopilotSettings.enabled || autopilotLoading}
+                  >
+                    <div className="toggle-slider">
+                      <div className="toggle-knob">
+                        {autopilotSettings.autoSchedule && <FaCheck />}
+                      </div>
+                    </div>
+                  </button>
                 </div>
-                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={autopilotSettings.autoSchedule}
-                    onChange={handleAutoScheduleToggleWithInterval}
-                    disabled={autopilotLoading || !autopilotSettings.enabled}
-                    style={{
-                      transform: 'scale(1.2)',
-                      accentColor: '#00ffcc'
-                    }}
-                  />
-                </label>
+
+                {autopilotSettings.autoSchedule && (
+                  <motion.div
+                    className="feature-details"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                  >
+                    <div className="interval-selector">
+                      <label>Posting Interval:</label>
+                      <select
+                        value={autopilotSettings.autoScheduleInterval || 60}
+                        onChange={(e) => handleIntervalChange(Number(e.target.value))}
+                        disabled={autopilotLoading}
+                      >
+                        <option value={0.33}>20 Seconds (Testing)</option>
+                        <option value={1}>1 Minute (Testing)</option>
+                        <option value={5}>5 Minutes (Testing)</option>
+                        <option value={60}>1 Hour</option>
+                        <option value={120}>2 Hours</option>
+                        <option value={240}>4 Hours</option>
+                        <option value={480}>8 Hours</option>
+                        <option value={720}>12 Hours</option>
+                        <option value={1440}>24 Hours</option>
+                      </select>
+                    </div>
+                    <div className="feature-stats">
+                      <span>Scheduled: {autopilotSettings.scheduledPostsCount || 0}</span>
+                    </div>
+                  </motion.div>
+                )}
               </div>
-              
-              {/* Interval Dropdown and Counter - Exact same as CampaignModal */}
-              {autopilotSettings.autoSchedule && (
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid rgba(0, 255, 204, 0.2)' }}>
-                  <div style={{ flex: 1 }}>
-                    <label style={{ color: '#a0a0cc', fontSize: '11px', display: 'block', marginBottom: '4px' }}>
-                      Interval:
-                    </label>
-                    <select
-                      value={autopilotSettings.autoScheduleInterval || 60}
-                      onChange={(e) => handleIntervalChange(parseInt(e.target.value))}
-                      disabled={autopilotLoading}
-                      style={{
-                        background: 'rgba(0, 0, 0, 0.3)',
-                        border: '1px solid rgba(0, 255, 204, 0.3)',
-                        color: '#00ffcc',
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        fontSize: '11px',
-                        width: '100%'
-                      }}
-                    >
-                      <option value={30}>30 minutes</option>
-                      <option value={60}>1 hour</option>
-                      <option value={120}>2 hours</option>
-                      <option value={180}>3 hours</option>
-                      <option value={240}>4 hours</option>
-                      <option value={360}>6 hours</option>
-                      <option value={480}>8 hours</option>
-                      <option value={720}>12 hours</option>
-                      <option value={1440}>24 hours</option>
-                    </select>
+
+              {/* Auto-Reply Feature */}
+              <div className="autopilot-feature">
+                <div className="feature-header">
+                  <div className="feature-icon">
+                    <FaReply style={{ color: platformConfig.color }} />
                   </div>
-                  <div style={{ flex: 1, textAlign: 'center' }}>
-                    <div style={{ color: '#00ffcc', fontSize: '16px', fontWeight: 'bold' }}>
-                      {autopilotSettings.scheduledPostsCount || 0}
-                    </div>
-                    <div style={{ color: '#a0a0cc', fontSize: '10px' }}>
-                      Posts Scheduled
-                    </div>
+                  <div className="feature-info">
+                    <h5>Auto-Reply Messages</h5>
+                    <p>AI responses to DMs and comments automatically</p>
                   </div>
-                  <div style={{ flex: 1, textAlign: 'center' }}>
-                    <div style={{ 
-                      color: autoScheduleActive ? '#00ffcc' : '#666',
-                      fontSize: '12px',
-                      fontWeight: 'bold'
-                    }}>
-                      {autoScheduleActive ? '🟢 Active' : '⚪ Standby'}
+                  <button
+                    className={`feature-toggle ${autopilotSettings.autoReply ? 'active' : ''}`}
+                    onClick={handleAutoReplyToggleWithInterval}
+                    disabled={!autopilotSettings.enabled || autopilotLoading}
+                  >
+                    <div className="toggle-slider">
+                      <div className="toggle-knob">
+                        {autopilotSettings.autoReply && <FaCheck />}
+                      </div>
                     </div>
-                  </div>
+                  </button>
                 </div>
-              )}
+
+                {autopilotSettings.autoReply && (
+                  <motion.div
+                    className="feature-details"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                  >
+                    <div className="interval-selector">
+                      <label>Reply Check Interval:</label>
+                      <select
+                        value={autopilotSettings.autoReplyInterval || 5}
+                        onChange={(e) => handleAutoReplyIntervalChange(Number(e.target.value))}
+                        disabled={autopilotLoading}
+                      >
+                        <option value={0.33}>20 Seconds (Testing)</option>
+                        <option value={1}>1 Minute (Testing)</option>
+                        <option value={5}>5 Minutes</option>
+                        <option value={10}>10 Minutes</option>
+                        <option value={30}>30 Minutes</option>
+                        <option value={60}>1 Hour</option>
+                      </select>
+                    </div>
+                    <div className="feature-stats">
+                      <span>Replies Sent: {autopilotSettings.autoRepliesCount || 0}</span>
+                    </div>
+                    <div className="feature-note">
+                      <small>AI automatically replies to new messages and comments</small>
+                    </div>
+                  </motion.div>
+                )}
+              </div>
             </div>
 
-            {/* Auto-Reply Option - Exact same as CampaignModal */}
-            <div style={{
-              padding: '14px',
-              borderRadius: '8px',
-              background: 'rgba(255, 142, 83, 0.1)',
-              border: '1px solid rgba(255, 142, 83, 0.2)'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <div>
-                  <h4 style={{ color: '#ff8e53', margin: '0 0 4px 0', fontSize: '14px' }}>
-                    💬 Auto-Reply to DMs/Comments
-                  </h4>
-                  <p style={{ color: '#a0a0cc', margin: 0, fontSize: '12px' }}>
-                    AI responds to messages and comments automatically
-                  </p>
+            {/* Status Summary */}
+            {autopilotSettings.enabled && (
+              <motion.div
+                className="autopilot-status"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <div className="status-indicator">
+                  <div className="status-dot active" />
+                  <span>Autopilot Active</span>
                 </div>
-                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={autopilotSettings.autoReply}
-                    onChange={handleAutoReplyToggleWithInterval}
-                    disabled={autopilotLoading || !autopilotSettings.enabled}
-                    style={{
-                      transform: 'scale(1.2)',
-                      accentColor: '#ff8e53'
-                    }}
-                  />
-                </label>
-              </div>
-              
-              {/* Auto-Reply Counter and Status - Exact same as CampaignModal */}
-              {autopilotSettings.autoReply && (
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid rgba(255, 142, 83, 0.2)' }}>
-                  <div style={{ flex: 1, textAlign: 'center' }}>
-                    <div style={{ color: '#ff8e53', fontSize: '16px', fontWeight: 'bold' }}>
-                      {autopilotSettings.autoRepliesCount || 0}
-                    </div>
-                    <div style={{ color: '#a0a0cc', fontSize: '10px' }}>
-                      Auto-Replies Sent
-                    </div>
-                  </div>
-                  <div style={{ flex: 1, textAlign: 'center' }}>
-                    <div style={{ 
-                      color: autoReplyActive ? '#ff8e53' : '#666',
-                      fontSize: '12px',
-                      fontWeight: 'bold'
-                    }}>
-                      {autoReplyActive ? '🟢 Active' : '⚪ Standby'}
-                    </div>
-                    <div style={{ color: '#a0a0cc', fontSize: '10px' }}>
-                      Status
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Inactive State Message - Exact same as CampaignModal */}
-        {!autopilotSettings.enabled && (
-          <div style={{
-            textAlign: 'center',
-            padding: '20px',
-            borderRadius: '8px',
-            background: 'rgba(160, 160, 204, 0.05)',
-            border: '1px solid rgba(160, 160, 204, 0.2)'
-          }}>
-            <p style={{ 
-              color: '#a0a0cc', 
-              margin: 0, 
-              fontSize: '14px', 
-              fontStyle: 'italic'
-            }}>
-              {isConnected 
-                ? 'Enable autopilot to access automation features'
-                : 'Connect your account and enable autopilot for automation'
-              }
-            </p>
-          </div>
-        )}
-
-        {/* Footer with Platform Info */}
-        <div style={{ 
-          textAlign: 'center', 
-          padding: '12px 0 0 0',
-          marginTop: '20px',
-          color: '#666',
-          fontSize: '12px',
-          borderTop: '1px solid rgba(138, 43, 226, 0.2)'
-        }}>
-          Platform: {platform} | User: {username}
-        </div>
-      </motion.div>
-    </motion.div>
+                <p>Your {platformConfig.name} dashboard is now automated!</p>
+              </motion.div>
+            )}
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };
 

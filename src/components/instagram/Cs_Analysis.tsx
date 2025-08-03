@@ -661,6 +661,153 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
 
   const [showDataInfo, setShowDataInfo] = useState(false);
 
+  // Extract counter strategies preview from competitor data
+  const getCounterStrategiesPreview = (competitorData: any) => {
+    if (!competitorData || !competitorData.data || competitorData.data.length === 0) {
+      console.log('[Cs_Analysis] No competitor data available');
+      return null;
+    }
+    
+    console.log('[Cs_Analysis] Competitor data structure:', JSON.stringify(competitorData.data[0], null, 2));
+    
+    // Find the best analysis with counter strategies
+    let bestAnalysis = null;
+    let bestStrategies = null;
+    
+    for (let i = 0; i < competitorData.data.length; i++) {
+      const analysis = competitorData.data[i];
+      if (!analysis) continue;
+      
+      // Check for recommended_counter_strategies in the nested data structure
+      if (analysis.data && analysis.data.data && analysis.data.data.recommended_counter_strategies && Array.isArray(analysis.data.data.recommended_counter_strategies)) {
+        const strategies = analysis.data.data.recommended_counter_strategies;
+        if (strategies.length > 0 && strategies[0] && strategies[0].length > 50) { // Check if first strategy has meaningful content
+          console.log(`[Cs_Analysis] Found good counter strategies in analysis ${i}:`, strategies);
+          bestAnalysis = analysis;
+          bestStrategies = strategies;
+          break;
+        }
+      }
+      
+      // Also check the direct data structure
+      if (analysis.data && analysis.data.recommended_counter_strategies && Array.isArray(analysis.data.recommended_counter_strategies)) {
+        const strategies = analysis.data.recommended_counter_strategies;
+        if (strategies.length > 0 && strategies[0] && strategies[0].length > 50) { // Check if first strategy has meaningful content
+          console.log(`[Cs_Analysis] Found good counter strategies (direct) in analysis ${i}:`, strategies);
+          bestAnalysis = analysis;
+          bestStrategies = strategies;
+          break;
+        }
+      }
+    }
+    
+    if (bestStrategies && bestStrategies.length > 0) {
+      // Join the first few strategies with periods
+      const combinedText = bestStrategies.slice(0, 3).join('. ');
+      console.log('[Cs_Analysis] Combined counter strategies text:', combinedText);
+      return combinedText;
+    }
+
+    // Fallback: if no good counter strategies found, try to extract from any analysis
+    const firstAnalysis = competitorData.data[0];
+    if (!firstAnalysis) {
+      console.log('[Cs_Analysis] No first analysis found');
+      return null;
+    }
+
+    // Check different possible data structures for text content
+    let response = null;
+    
+    // Try different possible data structures
+    if (firstAnalysis.data && typeof firstAnalysis.data === 'string') {
+      response = firstAnalysis.data;
+    } else if (firstAnalysis.data && firstAnalysis.data.response && typeof firstAnalysis.data.response === 'string') {
+      response = firstAnalysis.data.response;
+    } else if (firstAnalysis.response && typeof firstAnalysis.response === 'string') {
+      response = firstAnalysis.response;
+    } else if (typeof firstAnalysis === 'string') {
+      response = firstAnalysis;
+    }
+
+    if (!response) {
+      console.log('[Cs_Analysis] No response text found in data structure');
+      return null;
+    }
+
+    console.log('[Cs_Analysis] Found response text:', response.substring(0, 200) + '...');
+
+    // Find counter strategies section with more flexible patterns
+    const patterns = [
+      /\*\*.*[Cc]ounter.*[Ss]trategies.*\*\*.*?\n(.*?)(?=\n\*\*|\n\n|$)/s,
+      /\*\*.*[Rr]ecommended.*[Cc]ounter.*[Ss]trategies.*\*\*.*?\n(.*?)(?=\n\*\*|\n\n|$)/s,
+      /[Cc]ounter.*[Ss]trategies.*?\n(.*?)(?=\n\*\*|\n\n|$)/s,
+      /[Rr]ecommended.*[Cc]ounter.*[Ss]trategies.*?\n(.*?)(?=\n\*\*|\n\n|$)/s,
+      /[Ss]trategies.*?\n(.*?)(?=\n\*\*|\n\n|$)/s
+    ];
+
+    for (let i = 0; i < patterns.length; i++) {
+      const match = response.match(patterns[i]);
+      if (match) {
+        console.log(`[Cs_Analysis] Found counter strategies with pattern ${i + 1}:`, match[1].substring(0, 100) + '...');
+        return match[1];
+      }
+    }
+
+    // Fallback: extract any meaningful content from the response
+    console.log('[Cs_Analysis] No specific counter strategies found, trying fallback extraction');
+    
+    // Try to find any content after "Analysis" or "Assessment" sections
+    const fallbackPatterns = [
+      /\*\*.*[Aa]nalysis.*\*\*.*?\n(.*?)(?=\n\*\*|\n\n|$)/s,
+      /\*\*.*[Aa]ssessment.*\*\*.*?\n(.*?)(?=\n\*\*|\n\n|$)/s,
+      /\*\*.*[Ii]nsights.*\*\*.*?\n(.*?)(?=\n\*\*|\n\n|$)/s,
+      /[Aa]nalysis.*?\n(.*?)(?=\n\*\*|\n\n|$)/s,
+      /[Aa]ssessment.*?\n(.*?)(?=\n\*\*|\n\n|$)/s
+    ];
+
+    for (let i = 0; i < fallbackPatterns.length; i++) {
+      const match = response.match(fallbackPatterns[i]);
+      if (match) {
+        console.log(`[Cs_Analysis] Found fallback content with pattern ${i + 1}:`, match[1].substring(0, 100) + '...');
+        return match[1];
+      }
+    }
+
+    // Last resort: take first 200 characters of the response
+    console.log('[Cs_Analysis] Using last resort: first 200 characters');
+    return response.substring(0, 200);
+  };
+
+  // Get preview text (first 2-3 sentences)
+  const getPreviewText = (fullText: string) => {
+    if (!fullText) {
+      console.log('[Cs_Analysis] No full text provided for preview');
+      return '';
+    }
+    
+    console.log('[Cs_Analysis] Processing preview text:', fullText.substring(0, 100) + '...');
+    
+    // Clean the text and get first few sentences
+    const cleanedText = fullText
+      .replace(/\*\*/g, '') // Remove bold markers
+      .replace(/\*/g, '') // Remove italic markers
+      .replace(/\n/g, ' ') // Replace newlines with spaces
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .trim();
+    
+    console.log('[Cs_Analysis] Cleaned text:', cleanedText.substring(0, 100) + '...');
+    
+    // Split into sentences and take first 2-3
+    const sentences = cleanedText.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    console.log('[Cs_Analysis] Found sentences:', sentences.length);
+    
+    const previewSentences = sentences.slice(0, 2); // Take only 2 sentences to fit in 3 lines
+    const result = previewSentences.join('. ') + (sentences.length > 2 ? '...' : '');
+    
+    console.log('[Cs_Analysis] Preview result:', result);
+    return result;
+  };
+
   return (
     <>
       <ErrorBoundary>
@@ -729,6 +876,10 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
               const isInSmartLoading = isCompetitorInLoadingPeriod(competitor);
               const remainingTime = getRemainingLoadingTime(competitor);
               
+              // Get counter strategies preview
+              const counterStrategiesPreview = getCounterStrategiesPreview(fetch);
+              const previewText = counterStrategiesPreview ? getPreviewText(counterStrategiesPreview) : '';
+              
               return (
                 <motion.div
                   key={competitor}
@@ -771,94 +922,115 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
                       onClick={() => {
                         setCurrentCompetitor(competitor);
                         setEditCompetitor(competitor);
-                      setShowEditModal(true);
-                    }}
-                    disabled={loading}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#e0e0ff"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+                        setShowEditModal(true);
+                      }}
+                      disabled={loading}
                     >
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2-2v-7" />
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                    </svg>
-                  </motion.button>
-                  <motion.button
-                    className="action-btn delete-btn"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => handleDeleteCompetitor(competitor)}
-                    disabled={loading}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#ff4444"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#e0e0ff"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2-2v-7" />
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                      </svg>
+                    </motion.button>
+                    <motion.button
+                      className="action-btn delete-btn"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => handleDeleteCompetitor(competitor)}
+                      disabled={loading}
                     >
-                      <polyline points="3 6 5 6 21 6" />
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                      <line x1="10" y1="11" x2="10" y2="17" />
-                      <line x1="14" y1="11" x2="14" y2="17" />
-                    </svg>
-                  </motion.button>
-                </div>
-                <span
-                  className="overlay-text"
-                  onClick={() => {
-                    // ✅ FIXED: Don't allow clicks during smart loading period
-                    if (isInSmartLoading) {
-                      console.log(`[Cs_Analysis] ⏸️ Competitor ${competitor} is in loading state - click disabled`);
-                      return;
-                    }
-                    
-                    console.log(`[Cs_Analysis] 🖱️ Clicked competitor: ${competitor}`, {
-                      hasData: fetch.data && fetch.data.length > 0,
-                      dataLength: fetch.data?.length || 0,
-                      isLoading: fetch.loading,
-                      isInSmartLoading
-                    });
-                    setSelectedCompetitor(competitor);
-                  }}
-                  style={{
-                    cursor: isInSmartLoading ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  {competitor}
-                </span>
-                {/* ✅ NEW: Show smart loading state for newly added/edited competitors */}
-                {isInSmartLoading && !fetch.loading && (
-                  <div className="futuristic-loading smart-loading-overlay">
-                    <span className="loading-text">
-                      Analysis in progress... {Math.floor(remainingTime / 60)}:{(remainingTime % 60).toString().padStart(2, '0')} remaining
-                    </span>
-                    <div className="particle-effect" />
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#ff4444"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        <line x1="10" y1="11" x2="10" y2="17" />
+                        <line x1="14" y1="11" x2="14" y2="17" />
+                      </svg>
+                    </motion.button>
                   </div>
-                )}
-                {/* ✅ UPDATED: Only show regular loading if not in smart loading */}
-                {fetch.loading && !isInSmartLoading && (
-                  <div className="futuristic-loading">
-                    <span className="loading-text">Analyzing {competitor}...</span>
-                    <div className="particle-effect" />
-                  </div>
-                )}
-                {/* ✅ FIXED: Always show "no data" overlay but make it non-blocking with pointer-events: none */}
-                {(!fetch.data || fetch.data.length === 0) && !fetch.loading && !isInSmartLoading && (
-                  <span className="no-data-text"></span>
-                )}
-              </motion.div>
+                  
+                  {/* ✅ NEW: Preview content instead of button */}
+                  {!isInSmartLoading && (fetch.data && previewText ? (
+                    <>
+                      <div className="preview-text">
+                        {previewText}
+                      </div>
+                      <button 
+                        className="see-more-btn"
+                        onClick={() => {
+                          console.log(`[Cs_Analysis] 🖱️ Clicked competitor: ${competitor}`, {
+                            hasData: fetch.data && fetch.data.length > 0,
+                            dataLength: fetch.data?.length || 0,
+                            isLoading: fetch.loading,
+                            isInSmartLoading
+                          });
+                          setSelectedCompetitor(competitor);
+                        }}
+                      >
+                        see more
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="preview-text">
+                        Loading latest competitor analysis for {competitor}. Analyzing competitive strategies and generating counter recommendations. Preparing detailed insights based on competitor performance patterns...
+                      </div>
+                      <button 
+                        className="see-more-btn"
+                        onClick={() => {
+                          console.log(`[Cs_Analysis] 🖱️ Clicked competitor: ${competitor}`, {
+                            hasData: fetch.data && fetch.data.length > 0,
+                            dataLength: fetch.data?.length || 0,
+                            isLoading: fetch.loading,
+                            isInSmartLoading
+                          });
+                          setSelectedCompetitor(competitor);
+                        }}
+                      >
+                        see more
+                      </button>
+                    </>
+                  ))}
+                  
+                  {/* ✅ NEW: Show smart loading state for newly added/edited competitors */}
+                  {isInSmartLoading && !fetch.loading && (
+                    <div className="futuristic-loading smart-loading-overlay">
+                      <span className="loading-text">
+                        Analysis in progress... {Math.floor(remainingTime / 60)}:{(remainingTime % 60).toString().padStart(2, '0')} remaining
+                      </span>
+                      <div className="particle-effect" />
+                    </div>
+                  )}
+                  {/* ✅ UPDATED: Only show regular loading if not in smart loading */}
+                  {fetch.loading && !isInSmartLoading && (
+                    <div className="futuristic-loading">
+                      <span className="loading-text">Analyzing {competitor}...</span>
+                      <div className="particle-effect" />
+                    </div>
+                  )}
+                  {/* ✅ FIXED: Always show "no data" overlay but make it non-blocking with pointer-events: none */}
+                  {(!fetch.data || fetch.data.length === 0) && !fetch.loading && !isInSmartLoading && (
+                    <span className="no-data-text"></span>
+                  )}
+                </motion.div>
               );
             })}
           </div>

@@ -13,10 +13,10 @@
     "logs": "pm2 logs",
     "monitor": "pm2 monit",
     "build": "vite build",
-    "dev": "concurrently \"npm run dev:main\" \"npm run dev:rag\" \"npm run dev:proxy\" \"npm run dev:frontend\"",
-    "dev:main": "node server/server.js",
-    "dev:rag": "node rag-server.js",
-    "dev:proxy": "node server.js",
+    "dev": "concurrently \"npm run dev:main\" \"npm run dev:rag\" \"npm run dev:proxy\" \"npm run dev:frontend\" --kill-others --success first",
+    "dev:main": "MAIN_SERVER_PORT=3000 node server/server.js",
+    "dev:rag": "RAG_SERVER_PORT=3001 node rag-server.js",
+    "dev:proxy": "PROXY_SERVER_PORT=3002 node server.js",
     "dev:frontend": "vite",
     "production:setup": "npm install --production && npm run build && mkdir -p logs && pm2 start ecosystem.config.js --env production",
     "production:status": "pm2 status",
@@ -95,7 +95,7 @@
     "terser": "^5.43.1",
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.24.1",
-    "vite": "^6.2.0"
+    "vite": "^5.4.19"
   },
   "keywords": [
     "social-media",

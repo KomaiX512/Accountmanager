@@ -36,7 +36,7 @@ interface ImageErrorState {
 }
 
 // Base URL for all API requests (using relative URLs with Vite proxy)
-const API_BASE_URL = ''; // Deprecated: prefer getApiUrl for new API calls
+const API_BASE_URL = 'http://localhost:3002'; // Use the correct server port
 
 // Debug flag - set to true to enable verbose logging
 const DEBUG_LOGGING = false;
@@ -542,12 +542,12 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       console.warn(`[PostCooked] Could not determine image filename for post ${postKey}, trying direct URLs...`);
       
       // Check if we have direct R2 URLs that we can use
-      if (post.data?.r2_image_url && post.data.r2_image_url.includes('r2.dev')) {
+      if (post.data?.r2_image_url && (post.data.r2_image_url.includes('r2.dev') || post.data.r2_image_url.includes('cloudflarestorage.com'))) {
         console.log(`[PostCooked] Using direct R2 URL: ${post.data.r2_image_url}`);
         return post.data.r2_image_url + (forceRefresh ? `&t=${Date.now()}` : '');
       }
       
-      if (post.data?.image_url && post.data.image_url.includes('r2.dev')) {
+      if (post.data?.image_url && (post.data.image_url.includes('r2.dev') || post.data.image_url.includes('cloudflarestorage.com'))) {
         console.log(`[PostCooked] Using direct image URL: ${post.data.image_url}`);
         return post.data.image_url + (forceRefresh ? `&t=${Date.now()}` : '');
       }
@@ -559,9 +559,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     // Create timestamp for cache busting
     const timestamp = forceRefresh ? Date.now() : Math.floor(Date.now() / 60000); // 1-minute cache
     
-    // 🎯 GENIUS: Use the exact matched filename instead of assuming image_ prefix
-    const reliableUrl = `${API_BASE_URL}/api/r2-image/${username}/${imageFilename}` +
-      `?platform=${platform}&t=${timestamp}&v=${imageRefreshKey}&post=${encodeURIComponent(postKey)}`;
+    // 🎯 FIXED: Use the R2 image endpoint to avoid CORS issues
+    const reliableUrl = `${API_BASE_URL}/api/r2-image/${username}/${imageFilename}?platform=${platform}&t=${timestamp}&v=${imageRefreshKey}&post=${encodeURIComponent(postKey)}`;
     
     console.log(`[ImageURL] Final URL: ${reliableUrl}`);
     return reliableUrl;
@@ -1276,15 +1275,15 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       
       console.log(`[PostCooked] 📤 Fetching image for ${purpose}: ${imageKey}`);
       
-      // Try multiple endpoints with fallbacks
-      const endpoints = [
-        // Primary: Direct R2 endpoint with cache busting
-        `${API_BASE_URL}/api/r2-image/${username}/${imageKey}?platform=${platform}&t=${Date.now()}&purpose=${purpose}`,
-        // Fallback 1: Fix-image endpoint
-        `${API_BASE_URL}/fix-image/${username}/${imageKey}?platform=${platform}`,
-        // Fallback 2: Direct R2 without cache busting
-        `${API_BASE_URL}/api/r2-image/${username}/${imageKey}?platform=${platform}`
-      ];
+             // Try multiple endpoints with fallbacks
+       const endpoints = [
+         // Primary: Use direct R2 URLs from post data
+         post.data?.r2_image_url || post.data?.image_url,
+         // Fallback 1: Proxy-image endpoint for local files
+         `${API_BASE_URL}/proxy-image?url=${encodeURIComponent(`${API_BASE_URL}/ready_post/${platform}/${username}/${imageKey}`)}`,
+         // Fallback 2: Fix-image endpoint if it exists
+         `${API_BASE_URL}/fix-image/${username}/${imageKey}?platform=${platform}`
+       ].filter(Boolean); // Remove undefined URLs
       
       let lastError: Error | null = null;
       

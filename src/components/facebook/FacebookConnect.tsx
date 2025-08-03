@@ -1,14 +1,28 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './FacebookConnect.css';
+import FacebookPermissionModal from './FacebookPermissionModal';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 
 // Facebook OAuth configuration from environment or defaults
-const FB_APP_ID = process.env.REACT_APP_FACEBOOK_APP_ID || '581584257679639';
-const FB_REDIRECT_URI = process.env.REACT_APP_FACEBOOK_REDIRECT_URI || 'https://www.sentientm.com/facebook/callback';
+const FB_APP_ID = process.env.REACT_APP_FACEBOOK_APP_ID || '676612308718574';
+const FB_REDIRECT_URI = process.env.REACT_APP_FACEBOOK_REDIRECT_URI || 'https://c38b57a675c1.ngrok-free.app/facebook/callback';
 const FB_API_VERSION = process.env.REACT_APP_FACEBOOK_API_VERSION || 'v17.0';
-// Define default scope; override via REACT_APP_FACEBOOK_SCOPE in .env (comma-separated)
-const FB_DEFAULT_SCOPE = process.env.REACT_APP_FACEBOOK_SCOPE || 'public_profile,pages_show_list,pages_messaging';
+
+/**
+ * List of Facebook Page permissions that can be optionally requested.
+ * Only permissions selected by the user will be included in the `scope` param
+ * passed to Facebook OAuth. NEVER add additional permissions without explicit
+ * approval – doing so will break GDPR / Meta policy compliance.
+ * See https://developers.facebook.com/docs/graph-api/reference/permission
+ */
+const FB_PERMISSION_OPTIONS: { key: string; label: string; default?: boolean }[] = [
+  { key: 'public_profile',       label: 'Basic profile (required)',                              default: true },
+  { key: 'pages_show_list',      label: 'Show list of Pages you manage',                         default: true },
+  { key: 'pages_messaging',      label: 'Manage and access Page conversations on Messenger' },
+  { key: 'pages_manage_posts',   label: 'Create and manage content on your Page' },
+  { key: 'pages_read_engagement',label: 'Read content posted on the Page' }
+];
 
 interface FacebookConnectProps {
   onConnected?: (facebookId: string, username: string) => void;
@@ -16,11 +30,30 @@ interface FacebookConnectProps {
 }
 
 const FacebookConnect: React.FC<FacebookConnectProps> = ({ onConnected, className = '' }) => {
-  const [isConnecting, setIsConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
   const [facebookId, setFacebookId] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
   const { currentUser } = useAuth();
+
+  // Modal visibility
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Track permissions selected by the user. Defaults are those flagged `default: true` above.
+  const [selectedPermissions, setSelectedPermissions] = useState<string[]>(
+    FB_PERMISSION_OPTIONS.filter(p => p.default).map(p => p.key)
+  );
+
+  /**
+   * Toggles a permission in the `selectedPermissions` state array.
+   */
+  const togglePermission = (permission: string) => {
+    setSelectedPermissions(prev =>
+      prev.includes(permission)
+        ? prev.filter(p => p !== permission)
+        : [...prev, permission]
+    );
+  };
   const isStoringConnectionRef = useRef(false);
   const connectionDataRef = useRef<{ facebook_user_id: string; facebook_page_id: string; username?: string; access_token: string } | null>(null);
   
@@ -59,7 +92,6 @@ const FacebookConnect: React.FC<FacebookConnectProps> = ({ onConnected, classNam
         // Ensure we have a current user to bind the Facebook connection to
         if (!currentUser?.uid) {
           console.error(`[${new Date().toISOString()}] Cannot store Facebook connection: No authenticated user`);
-          setIsConnecting(false);
           return;
         }
         
@@ -122,10 +154,12 @@ const FacebookConnect: React.FC<FacebookConnectProps> = ({ onConnected, classNam
     }
     
     // Build OAuth URL
-    const scopeParam = encodeURIComponent(FB_DEFAULT_SCOPE);
+        // Build scope param from user-selected permissions (always include at least `public_profile`)
+    const scopeList = selectedPermissions.length > 0 ? selectedPermissions : ['public_profile'];
+    const scopeParam = encodeURIComponent(scopeList.join(','));
     const authUrl = `https://www.facebook.com/${FB_API_VERSION}/dialog/oauth?client_id=${FB_APP_ID}&redirect_uri=${encodeURIComponent(FB_REDIRECT_URI)}&scope=${scopeParam}&response_type=code&state=${currentUser.uid}`;
 
-    setIsConnecting(true);
+    // Connecting state management removed as it's no longer used
     
     // Open popup for Facebook OAuth
     const width = 600;
@@ -188,13 +222,46 @@ const FacebookConnect: React.FC<FacebookConnectProps> = ({ onConnected, classNam
           </button>
         </>
       ) : (
-        <button 
-          className="facebook-connect-button" 
-          onClick={connectToFacebook}
-          disabled={isConnecting || !currentUser}
-        >
-          {isConnecting ? 'Connecting...' : 'Connect Facebook'}
-        </button>
+        <>
+          {/* Permission modal */}
+          <FacebookPermissionModal
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            onContinue={() => {
+              setIsModalOpen(false);
+              connectToFacebook();
+            }}
+            selectedPermissions={selectedPermissions}
+            togglePermission={togglePermission}
+          />
+          {/* Permission selector moved to modal */}<div style={{ display: 'none' }}>
+            {FB_PERMISSION_OPTIONS.map(option => (
+              <label key={option.key} className="permission-option">
+                <input
+                  type="checkbox"
+                  checked={selectedPermissions.includes(option.key)}
+                  disabled={option.default}
+                  onChange={() => togglePermission(option.key)}
+                />
+                {option.label}
+              </label>
+            ))}
+            <div className="privacy-link">
+              <a href="/privacy-policy" target="_blank" rel="noopener noreferrer">
+                View our Privacy Policy
+              </a>
+            </div>
+          </div>
+
+                    {/* ===== CONNECT BUTTON ===== */}
+          <button 
+            className="facebook-connect-button" 
+            onClick={() => setIsModalOpen(true)}
+            disabled={!currentUser}
+          >
+            {'Connect Facebook'}
+          </button>
+        </>
       )}
     </div>
   );

@@ -132,9 +132,34 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
-  padding: 0 4px;
-  min-height: 32px;
+  margin-bottom: 6px;
+  padding: 0 2px;
+  min-height: 24px;
+}
+
+.competitor-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.competitor-name-heading {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #e0e0ff;
+  margin: 0;
+  padding: 0;
+}
+
+.viewed-badge {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin: 0;
 }
 
 .add-competitor-btn {
@@ -169,11 +194,15 @@
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
-  padding: 24px;
+  padding: 12px;
   position: relative;
   overflow: hidden;
   transition: all 0.2s ease;
   backdrop-filter: blur(10px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: fit-content;
 }
 
 .competitor-sub-container.loaded {
@@ -1023,4 +1052,106 @@
   background: rgba(255, 68, 68, 0.1);
   border-color: rgba(255, 68, 68, 0.5);
   transform: translateY(-1px);
+}
+
+.preview-text {
+  color: #e0e0ff;
+  font-size: 0.85rem;
+  line-height: 1.3;
+  margin: 0;
+  opacity: 0.95;
+  font-weight: 400;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-height: 3.315em; /* Exactly 3 lines with new line-height */
+}
+
+.see-more-btn {
+  background: transparent;
+  color: #00ffcc;
+  border: 1px solid rgba(0, 255, 204, 0.4);
+  border-radius: 3px;
+  padding: 3px 6px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  align-self: flex-start;
+  text-transform: lowercase;
+  letter-spacing: 0.5px;
+  margin: 0;
+}
+
+.see-more-btn:hover {
+  background: rgba(0, 255, 204, 0.1);
+  border-color: rgba(0, 255, 204, 0.6);
+  transform: translateY(-1px);
+}
+
+.see-more-btn:active {
+  transform: scale(0.98);
+}
+
+/* ✨ MOBILE RESPONSIVENESS FOR COMPETITOR ANALYSIS */
+
+/* ✨ MOBILE PORTRAIT - COMPREHENSIVE MOBILE TRANSFORMATION */
+@media (max-width: 767px) and (orientation: portrait) {
+  .competitor-sub-container {
+    padding: 8px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    gap: 4px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .preview-text {
+    font-size: 0.75rem;
+    line-height: 1.2;
+    margin: 0;
+    color: rgba(255, 255, 255, 0.95);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-height: 2.7em; /* Exactly 3 lines for mobile */
+  }
+
+  .see-more-btn {
+    font-size: 0.65rem;
+    padding: 2px 4px;
+    border-radius: 2px;
+    align-self: flex-start;
+    margin: 0;
+  }
+}
+
+/* ✨ ULTRA-SMALL MOBILE ADJUSTMENTS */
+@media (max-width: 480px) and (orientation: portrait) {
+  .competitor-sub-container {
+    padding: 6px;
+    gap: 3px;
+  }
+
+  .preview-text {
+    font-size: 0.7rem;
+    margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-height: 2.52em; /* Exactly 3 lines for ultra-small mobile */
+  }
+
+  .see-more-btn {
+    font-size: 0.6rem;
+    padding: 1px 3px;
+    margin: 0;
+  }
 }

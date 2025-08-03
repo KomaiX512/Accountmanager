@@ -1,3 +1,4 @@
+/* ✨ MODERN RAMP-INSPIRED AUTH DESIGN */
 .auth-container {
   position: fixed;
   top: 0;
@@ -10,35 +11,25 @@
   padding: 20px;
   z-index: 10;
   overflow: hidden;
-  /* FIX: Ensure proper stacking context */
-  transform: translateZ(0);
-  will-change: transform;
-  contain: layout style;
+  background: #000000;
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  line-height: 1.6;
 }
 
-/* GLASSY AUTH CARD */
+/* Modern Auth Card */
 .glassy-auth-card {
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(30px) saturate(180%) brightness(1.1);
-  -webkit-backdrop-filter: blur(30px) saturate(180%) brightness(1.1);
-  
-  /* Refractive Border */
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 24px;
-  
-  /* Ultra Glass Shadow */
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
   box-shadow: 
     0 25px 80px rgba(0, 0, 0, 0.4),
-    0 0 120px rgba(0, 255, 204, 0.2),
-    inset 0 2px 0 rgba(255, 255, 255, 0.3),
-    inset 0 -2px 0 rgba(255, 255, 255, 0.15);
-  
-  /* FIX: Remove translateZ that causes rendering issues in production */
-  /* transform: translateZ(50px); */
+    0 0 120px rgba(0, 255, 204, 0.1);
   transform: translateZ(0);
   will-change: transform;
   transition: all 0.3s ease;
-  /* FIX: Ensure proper rendering in production */
   backface-visibility: hidden;
   perspective: 1000px;
   transform-style: preserve-3d;
@@ -47,77 +38,88 @@
 .auth-card {
   width: 100%;
   max-width: 480px;
-  padding: 40px 30px;
+  padding: 48px 40px;
   overflow: hidden;
   position: relative;
   z-index: 2;
-  /* FIX: Ensure proper stacking */
   transform: translateZ(0);
   will-change: transform;
 }
 
+/* Auth Header */
 .auth-header {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 40px;
 }
 
 .auth-header h1 {
-  color: #e0e0ff;
-  font-size: 2.2rem;
-  margin-bottom: 8px;
-  font-weight: 600;
-  background: linear-gradient(135deg, #00ffcc 0%, #007bff 100%);
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin: 0 0 12px 0;
+  background: linear-gradient(135deg, #00ffcc 0%, #00d4aa 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  text-shadow: 0 0 40px rgba(0, 255, 204, 0.3);
+  letter-spacing: -0.02em;
 }
 
 .auth-header p {
-  color: #a0a0cc;
-  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 1.1rem;
   margin: 0;
+  line-height: 1.5;
 }
 
+/* Error Messages */
 .auth-error, .auth-lockout {
-  background: rgba(255, 50, 50, 0.15);
-  border-left: 3px solid #ff5050;
+  background: rgba(255, 50, 50, 0.1);
+  border: 1px solid rgba(255, 50, 50, 0.3);
   color: #ffaaaa;
-  padding: 12px 15px;
-  margin-bottom: 25px;
-  border-radius: 6px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  border-radius: 12px;
   position: relative;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .auth-lockout {
-  background: rgba(255, 180, 50, 0.15);
-  border-left: 3px solid #ffb432;
+  background: rgba(255, 180, 50, 0.1);
+  border-color: rgba(255, 180, 50, 0.3);
   color: #ffe0aa;
 }
 
 .error-close {
   position: absolute;
-  top: 8px;
-  right: 10px;
+  top: 12px;
+  right: 16px;
   background: none;
   border: none;
-  color: #ffaaaa;
+  color: inherit;
   font-size: 1.2rem;
   cursor: pointer;
-  padding: 0;
+  padding: 4px;
   line-height: 1;
+  border-radius: 4px;
+  transition: all 0.2s ease;
 }
 
+.error-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Google Sign In Button */
 .google-signin-btn {
   width: 100%;
-  padding: 14px 20px;
-  background: linear-gradient(90deg, #181828, #252554);
-  color: #e0e0ff;
-  border: 1px solid rgba(224, 224, 255, 0.2);
-  border-radius: 8px;
+  padding: 16px 24px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.9);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
   font-size: 1rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -126,17 +128,17 @@
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
-  /* FIX: Ensure button is always visible */
   z-index: 1;
   transform: translateZ(0);
   will-change: transform;
+  letter-spacing: -0.02em;
 }
 
 .google-signin-btn:hover {
-  background: linear-gradient(90deg, #1a1a32, #2a2a60);
-  border-color: rgba(224, 224, 255, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.4);
   transform: translateY(-2px);
-  /* FIX: Ensure hover state doesn't cause rendering issues */
+  box-shadow: 0 8px 20px rgba(255, 255, 255, 0.1);
   z-index: 2;
 }
 
@@ -147,7 +149,6 @@
 .google-signin-btn:disabled {
   opacity: 0.7;
   cursor: not-allowed;
-  /* FIX: Ensure disabled state is visible */
   transform: translateZ(0);
 }
 
@@ -160,12 +161,13 @@
   padding: 2px;
 }
 
+/* Loading Spinner */
 .loading-spinner {
   width: 20px;
   height: 20px;
-  border: 2px solid rgba(224, 224, 255, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.3);
   border-radius: 50%;
-  border-top-color: #e0e0ff;
+  border-top-color: #00ffcc;
   animation: spinner 0.8s linear infinite;
   display: inline-block;
 }
@@ -176,51 +178,54 @@
   }
 }
 
+/* Auth Footer */
 .auth-footer {
-  margin-top: 30px;
+  margin-top: 32px;
   text-align: center;
-  color: #a0a0cc;
-  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.9rem;
 }
 
 .auth-footer a {
   color: #00ffcc;
   text-decoration: none;
-  transition: color 0.2s;
+  font-weight: 500;
+  transition: all 0.2s ease;
 }
 
 .auth-footer a:hover {
-  color: #66ffe0;
+  color: #00d4aa;
   text-decoration: underline;
 }
 
-/* Auth loading screen */
+/* Auth Loading Screen */
 .auth-loading {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   height: 100vh;
-  background: linear-gradient(135deg, #0a0a1a, #252554);
-  color: #e0e0ff;
+  background: #000000;
+  color: #ffffff;
 }
 
 .auth-loading .spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid rgba(224, 224, 255, 0.3);
+  border: 3px solid rgba(255, 255, 255, 0.3);
   border-radius: 50%;
   border-top-color: #00ffcc;
   animation: spinner 1s linear infinite;
-  margin-bottom: 15px;
+  margin-bottom: 16px;
 }
 
 .auth-loading p {
   font-size: 1.1rem;
   color: #00ffcc;
+  font-weight: 500;
 }
 
-/* User dropdown in TopBar */
+/* User Dropdown in TopBar */
 .user-profile {
   position: relative;
   margin-left: auto;
@@ -228,18 +233,18 @@
 }
 
 .user-avatar {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   cursor: pointer;
-  background: linear-gradient(135deg, #00ffcc, #007bff);
+  background: linear-gradient(135deg, #00ffcc, #00d4aa);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #1a1a32;
+  color: #000000;
   font-weight: 600;
-  border: 2px solid rgba(224, 224, 255, 0.2);
-  transition: all 0.2s ease;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
 }
 
 .user-avatar img {
@@ -251,44 +256,52 @@
 
 .user-avatar:hover {
   transform: scale(1.05);
-  border-color: rgba(224, 224, 255, 0.4);
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 8px 20px rgba(0, 255, 204, 0.2);
 }
 
 .user-dropdown {
   position: absolute;
   top: 100%;
   right: 0;
-  margin-top: 10px;
-  background: rgba(26, 27, 50, 0.95);
-  backdrop-filter: blur(8px);
-  border-radius: 8px;
-  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.25);
+  margin-top: 12px;
+  background: rgba(0, 0, 0, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 12px 0;
-  min-width: 180px;
+  padding: 16px 0;
+  min-width: 200px;
   z-index: 1000;
 }
 
 .dropdown-menu-item {
-  padding: 10px 16px;
+  padding: 12px 20px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  color: #e0e0ff;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.9);
   cursor: pointer;
-  transition: background 0.2s;
-  font-size: 0.9rem;
+  transition: all 0.2s ease;
+  font-size: 0.95rem;
+  font-weight: 500;
 }
 
 .dropdown-menu-item:hover {
   background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
 }
 
 .dropdown-menu-item.logout {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
-  margin-top: 5px;
-  padding-top: 12px;
+  margin-top: 8px;
+  padding-top: 16px;
   color: #ff5050;
+}
+
+.dropdown-menu-item.logout:hover {
+  background: rgba(255, 50, 50, 0.1);
+  color: #ffaaaa;
 }
 
 .dropdown-menu-item svg {
@@ -299,74 +312,75 @@
 
 /* Email/Password Authentication Styles */
 .auth-form {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .form-group {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .form-group label {
   display: block;
   margin-bottom: 8px;
-  color: #e0e0ff;
-  font-size: 0.9rem;
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
 }
 
 .form-input {
   width: 100%;
-  padding: 12px 16px;
-  background: rgba(24, 24, 40, 0.8);
-  color: #e0e0ff;
-  border: 1px solid rgba(224, 224, 255, 0.2);
-  border-radius: 6px;
-  font-size: 0.95rem;
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  font-size: 1rem;
   transition: all 0.3s ease;
-  /* FIX: Ensure inputs are always visible */
   transform: translateZ(0);
   will-change: transform;
   position: relative;
   z-index: 1;
+  letter-spacing: -0.02em;
 }
 
 .form-input:focus {
   outline: none;
   border-color: #00ffcc;
-  box-shadow: 0 0 0 2px rgba(0, 255, 204, 0.2);
-  /* FIX: Ensure focus state doesn't cause rendering issues */
+  box-shadow: 0 0 0 3px rgba(0, 255, 204, 0.2);
+  background: rgba(255, 255, 255, 0.08);
   z-index: 2;
 }
 
 .form-input::placeholder {
-  color: rgba(160, 160, 204, 0.6);
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .submit-btn {
   width: 100%;
-  padding: 14px 20px;
-  background: linear-gradient(90deg, #00c9a7, #00b4e6);
-  color: #0a0a1a;
+  padding: 16px 24px;
+  background: linear-gradient(135deg, #00ffcc 0%, #00d4aa 100%);
+  color: #000000;
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
   font-size: 1rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.3s ease;
-  margin-bottom: 16px;
-  /* FIX: Ensure submit button is always visible */
+  margin-bottom: 20px;
   z-index: 1;
   transform: translateZ(0);
   will-change: transform;
   position: relative;
+  letter-spacing: -0.02em;
 }
 
 .submit-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 12px rgba(0, 255, 204, 0.15);
-  /* FIX: Ensure hover state doesn't cause rendering issues */
+  box-shadow: 0 12px 30px rgba(0, 255, 204, 0.3);
   z-index: 2;
 }
 
@@ -377,16 +391,17 @@
 .submit-btn:disabled {
   opacity: 0.7;
   cursor: not-allowed;
-  /* FIX: Ensure disabled state is visible */
   transform: translateZ(0);
 }
 
+/* Auth Divider */
 .auth-divider {
   display: flex;
   align-items: center;
-  margin: 24px 0;
-  color: #a0a0cc;
+  margin: 32px 0;
+  color: rgba(255, 255, 255, 0.6);
   font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .auth-divider::before,
@@ -394,134 +409,209 @@
   content: "";
   flex: 1;
   height: 1px;
-  background: rgba(224, 224, 255, 0.15);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .auth-divider span {
-  padding: 0 16px;
+  padding: 0 20px;
 }
 
+/* Auth Switch */
 .auth-switch {
-  margin-top: 20px;
+  margin-top: 24px;
   text-align: center;
-  color: #a0a0cc;
-  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.95rem;
 }
 
 .auth-switch a {
   color: #00ffcc;
   text-decoration: none;
-  font-weight: 500;
-  margin-left: 5px;
+  font-weight: 600;
+  margin-left: 6px;
+  transition: all 0.2s ease;
 }
 
 .auth-switch a:hover {
+  color: #00d4aa;
   text-decoration: underline;
 }
 
+/* Forgot Password */
 .forgot-password {
   text-align: right;
-  font-size: 0.85rem;
-  margin-top: -8px;
-  margin-bottom: 20px;
+  font-size: 0.9rem;
+  margin-top: -12px;
+  margin-bottom: 24px;
 }
 
 .forgot-password a {
-  color: #a0a0cc;
+  color: rgba(255, 255, 255, 0.7);
   text-decoration: none;
-  transition: color 0.2s;
+  transition: all 0.2s ease;
+  font-weight: 500;
 }
 
 .forgot-password a:hover {
   color: #00ffcc;
 }
 
+/* Success Message */
 .success-message {
-  background: rgba(0, 204, 102, 0.15);
-  border-left: 3px solid #00cc66;
+  background: rgba(0, 204, 102, 0.1);
+  border: 1px solid rgba(0, 204, 102, 0.3);
   color: #aaffe0;
-  padding: 12px 15px;
-  margin-bottom: 25px;
-  border-radius: 6px;
-  font-size: 0.9rem;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-/* Responsive styles */
-@media (max-width: 576px) {
+/* Responsive Design */
+@media (max-width: 768px) {
   .auth-card {
-    padding: 30px 20px;
+    padding: 40px 24px;
+    max-width: 400px;
+  }
+  
+  .auth-header h1 {
+    font-size: 2rem;
+  }
+  
+  .auth-header p {
+    font-size: 1rem;
+  }
+  
+  .form-input {
+    padding: 14px 18px;
+    font-size: 0.95rem;
+  }
+  
+  .submit-btn,
+  .google-signin-btn {
+    padding: 14px 20px;
+    font-size: 0.95rem;
+  }
+  
+  .user-dropdown {
+    min-width: 180px;
+  }
+}
+
+@media (max-width: 480px) {
+  .auth-container {
+    padding: 16px;
+  }
+  
+  .auth-card {
+    padding: 32px 20px;
+    max-width: 100%;
   }
   
   .auth-header h1 {
     font-size: 1.8rem;
   }
-} 
+  
+  .auth-header p {
+    font-size: 0.9rem;
+  }
+  
+  .form-input {
+    padding: 12px 16px;
+    font-size: 0.9rem;
+  }
+  
+  .submit-btn,
+  .google-signin-btn {
+    padding: 12px 18px;
+    font-size: 0.9rem;
+  }
+  
+  .auth-error,
+  .auth-lockout,
+  .success-message {
+    padding: 12px 16px;
+    font-size: 0.85rem;
+  }
+  
+  .user-avatar {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .user-dropdown {
+    min-width: 160px;
+    padding: 12px 0;
+  }
+  
+  .dropdown-menu-item {
+    padding: 10px 16px;
+    font-size: 0.85rem;
+  }
+}
 
-/* FIX: Add production-specific fixes for VPS rendering issues */
+/* Production-specific fixes */
 @media (min-resolution: 1.5dppx) {
   .glassy-auth-card {
-    /* High DPI displays may have different rendering behavior */
     transform: translateZ(0);
     backface-visibility: hidden;
   }
 }
 
-/* FIX: Ensure proper rendering on different browsers in production */
 @supports (backdrop-filter: blur(1px)) {
   .glassy-auth-card {
-    backdrop-filter: blur(30px) saturate(180%) brightness(1.1);
-    -webkit-backdrop-filter: blur(30px) saturate(180%) brightness(1.1);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
   }
 }
 
 @supports not (backdrop-filter: blur(1px)) {
   .glassy-auth-card {
-    /* Fallback for browsers that don't support backdrop-filter */
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.08);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
 }
 
-/* FIX: Ensure buttons are always clickable and visible */
+/* Ensure buttons are always clickable and visible */
 .auth-form button,
 .google-signin-btn,
 .submit-btn {
-  /* Force hardware acceleration */
   transform: translateZ(0);
   will-change: transform;
-  /* Ensure proper stacking */
   position: relative;
   z-index: 1;
-  /* Prevent any potential clipping */
   overflow: visible;
 }
 
-/* FIX: Ensure form elements are properly rendered */
+/* Ensure form elements are properly rendered */
 .form-input {
   width: 100%;
-  padding: 12px 16px;
-  background: rgba(24, 24, 40, 0.8);
-  color: #e0e0ff;
-  border: 1px solid rgba(224, 224, 255, 0.2);
-  border-radius: 6px;
-  font-size: 0.95rem;
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  font-size: 1rem;
   transition: all 0.3s ease;
-  /* FIX: Ensure inputs are always visible */
   transform: translateZ(0);
   will-change: transform;
   position: relative;
   z-index: 1;
+  letter-spacing: -0.02em;
 }
 
 .form-input:focus {
   outline: none;
   border-color: #00ffcc;
-  box-shadow: 0 0 0 2px rgba(0, 255, 204, 0.2);
-  /* FIX: Ensure focus state doesn't cause rendering issues */
+  box-shadow: 0 0 0 3px rgba(0, 255, 204, 0.2);
+  background: rgba(255, 255, 255, 0.08);
   z-index: 2;
 }
 
 .form-input::placeholder {
-  color: rgba(160, 160, 204, 0.6);
+  color: rgba(255, 255, 255, 0.5);
 } 

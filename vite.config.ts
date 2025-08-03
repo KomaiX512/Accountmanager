@@ -42,131 +42,131 @@ export default defineConfig({
     proxy: {
       // RAG server endpoints (port 3001) - MUST come before general /api rule
       '/api/rag/post-generator': {
-        target: 'http://localhost:3001',
+        target: 'http://127.0.0.1:3001',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace('/api/rag', '/api'),
       },
       '/api/rag/discussion': {
-        target: 'http://localhost:3001',
+        target: 'http://127.0.0.1:3001',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace('/api/rag', '/api'),
       },
       '/api/rag/conversations': {
-        target: 'http://localhost:3001',
+        target: 'http://127.0.0.1:3001',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace('/api/rag', '/api'),
       },
       // Direct discussion endpoint (also needs to go to RAG server)
       '/api/discussion': {
-        target: 'http://localhost:3001',
+        target: 'http://127.0.0.1:3001',
         changeOrigin: true,
         secure: false,
       },
       // Direct conversations endpoint (also needs to go to RAG server)
       '/api/conversations': {
-        target: 'http://localhost:3001',
+        target: 'http://127.0.0.1:3001',
         changeOrigin: true,
         secure: false,
       },
       // Direct post-generator endpoint (also needs to go to RAG server)
       '/api/post-generator': {
-        target: 'http://localhost:3001',
+        target: 'http://127.0.0.1:3001',
         changeOrigin: true,
         secure: false,
       },
       '/api/rag/health': {
-        target: 'http://localhost:3001',
+        target: 'http://127.0.0.1:3001',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace('/api/rag', ''),
       },
       // Image endpoints (port 3002) - MUST come before general /api rule  
       '/api/r2-image': {
-        target: 'http://localhost:3002',
+        target: 'http://127.0.0.1:3002',
         changeOrigin: true,
         secure: false,
       },
       // User endpoints (port 3000) - Main server contains user management
       '/api/user': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
       },
       '/api/access-check': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
       },
       '/api/usage': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
         // Preserve /api prefix so backend route '/api/user/:userId/usage' matches
         // No rewrite here
       },
       '/api/instant-reply': {
-        target: 'http://localhost:3001',
+        target: 'http://127.0.0.1:3001',
         changeOrigin: true,
         secure: false,
       },
       '/api/rag-instant-reply': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
       },
       '/rag-instant-reply': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
       },
       // Connection status endpoints (port 3000) - Main server contains these endpoints
       '/api/user-instagram-status': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
         // Preserve /api prefix so backend route '/api/user-instagram-status/:userId' matches
         // No rewrite here
       },
       '/api/user-facebook-status': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
         // Preserve /api prefix so backend route '/api/user-facebook-status/:userId' matches
         // No rewrite here
       },
       '/api/user-twitter-status': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
         // Preserve /api prefix so backend route '/api/user-twitter-status/:userId' matches
         // No rewrite here
       },
       '/api/platform-reset': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
         // Preserve /api prefix so backend route '/api/platform-reset/:userId' matches
         // No rewrite here
       },
       '/api/instagram-connection': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
         // Preserve /api prefix so backend route '/api/instagram-connection/:userId' matches
         // No rewrite here
       },
       '/api/twitter-connection': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
         // Preserve /api prefix so backend route '/api/twitter-connection/:userId' matches
         // No rewrite here
       },
       '/api/facebook-connection': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
         // Preserve /api prefix so backend route '/api/facebook-connection/:userId' matches
@@ -174,7 +174,7 @@ export default defineConfig({
       },
       // Post-now endpoint (port 3000) - critical for PostNow functionality
       '/api/post-instagram-now': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
         // Preserve /api prefix so backend route '/api/post-instagram-now' matches
@@ -182,7 +182,7 @@ export default defineConfig({
       },
       // Schedule-post endpoint (port 3000) - critical for scheduling functionality
       '/api/schedule-post': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
         // Preserve /api prefix so backend route '/api/schedule-post' matches
@@ -190,144 +190,144 @@ export default defineConfig({
       },
       // Account info endpoints (port 3000)
       '/api/save-account-info': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
       '/api/retrieve-account-info': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
       // Goal management endpoints (port 3000)
       '/save-goal': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
       },
       '/goal-summary': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
       },
       '/generated-content-summary': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
       },
       '/engagement-metrics': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
       },
       '/autopilot-settings': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
       },
       // Campaign management endpoints (port 3000)
       '/campaign-posts-count': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
       },
       '/campaign-status': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
       },
       '/stop-campaign': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
       },
       // All other /api endpoints go to main server (port 3000) - strip /api prefix
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
       // Events endpoints (port 3000)
       '/events': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
         ws: true, // Support WebSocket-like connections (SSE)
       },
       '/events-list': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
       },
       // Direct pass-through endpoints
       '/retrieve-strategies': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
       },
       '/retrieve-engagement-strategies': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
       },
       '/retrieve': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
       },
       '/posts': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
       },
       // Fresh R2 posts endpoint for R2PostFetcher
       '/api/posts-fresh-r2': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path, // Keep the full path including /api
       },
       '/images': {
-        target: 'http://localhost:3002',
+        target: 'http://127.0.0.1:3002',
         changeOrigin: true,
         secure: false,
       },
       '/profit-analysis': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
       },
       '/ai-replies': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
       },
       '/fix-image': {
-        target: 'http://localhost:3002',
+        target: 'http://127.0.0.1:3002',
         changeOrigin: true,
         secure: false,
       },
       // Twitter OAuth endpoints (port 3000)
       '/twitter/auth': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
       },
       '/twitter/callback': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
       },
       '/api/twitter/auth': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
       },
       '/api/twitter/callback': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
       },

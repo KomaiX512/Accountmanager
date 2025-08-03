@@ -1789,7 +1789,7 @@ app.get(['/news-for-you/:accountHolder', '/api/news-for-you/:accountHolder'], as
     const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
     const forceRefresh = req.query.forceRefresh === 'true';
 
-    const data = await fetchDataForModule(username, 'NewForYou/{username}', forceRefresh, platform);
+    const data = await fetchDataForModule(username, 'news_for_you/{username}', forceRefresh, platform);
     if (data.length === 0) {
       res.status(404).json({ error: `No ${platform} news files found` });
     } else {
@@ -2463,15 +2463,15 @@ async function streamToBuffer(stream) {
 }
 
 // Instagram App Credentials
-const APP_ID = '576296982152813';
-const APP_SECRET = 'd48ddc9eaf0e5c4969d4ddc4e293178c';
-const REDIRECT_URI = 'https://www.sentientm.com/instagram/callback';
+const APP_ID = '1089716559763623';
+const APP_SECRET = '0733abf780036963e9f57f33a4b2fa6e';
+const REDIRECT_URI = 'https://c38b57a675c1.ngrok-free.app/instagram/callback';
 const VERIFY_TOKEN = 'myInstagramWebhook2025';
 
 // Facebook App Credentials  
-const FB_APP_ID = '581584257679639'; // Your ACTUAL Facebook App ID (NOT Configuration ID)
-const FB_APP_SECRET = 'cdd153955e347e194390333e48cb0480'; // Your actual App Secret
-const FB_REDIRECT_URI = 'https://www.sentientm.com/facebook/callback';
+const FB_APP_ID = '676612308718574'; // Your ACTUAL Facebook App ID (NOT Configuration ID)
+const FB_APP_SECRET = '0144a0685fd3182b29e2750dabe2fcda'; // Your actual App Secret
+const FB_REDIRECT_URI = 'https://c38b57a675c1.ngrok-free.app/facebook/callback';
 const FB_VERIFY_TOKEN = 'myFacebookWebhook2025';
 
 app.get([
@@ -6961,7 +6961,7 @@ async function warmupCacheForActiveUsers() {
         Promise.all([
           fetchDataForModule(username, 'ProfileInfo/{username}', false, platform),
           fetchDataForModule(username, 'recommendations/{username}', false, platform),
-          fetchDataForModule(username, 'NewForYou/{username}', false, platform)
+          fetchDataForModule(username, 'news_for_you/{username}', false, platform)
         ]).catch(err => {
           console.error(`[${new Date().toISOString()}] Error during ${platform} cache warmup for ${username}:`, err.message);
         });
@@ -8506,10 +8506,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Start the server
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
+// Server startup moved to end of file
 
 // ============= CENTRALIZED PLATFORM SCHEMA MANAGEMENT =============
 // Standardized schema builder for consistent R2 key generation
@@ -8608,7 +8605,7 @@ class PlatformSchemaManager {
 // Twitter OAuth 2.0 credentials
 const TWITTER_CLIENT_ID = 'cVNYR3UxVm5jQ3d5UWw0UHFqUTI6MTpjaQ';
 const TWITTER_CLIENT_SECRET = 'Wr8Kewh92NVB-035hAvpQeQ1Azc7chre3PUTgDoEltjO57mxzO';
-const TWITTER_REDIRECT_URI = 'https://www.sentientm.com/twitter/callback';
+const TWITTER_REDIRECT_URI = 'https://c38b57a675c1.ngrok-free.app/twitter/callback';
 
 // Debug logging for OAuth 2.0
 console.log(`[${new Date().toISOString()}] Twitter OAuth 2.0 Configuration:`);
@@ -10493,6 +10490,13 @@ async function processAutopilotReplies() {
 
 // 🚀 AUTOPILOT: Check for new messages and reply automatically
 async function checkAndReplyToNewMessages(username, platform, settings) {
+  // 🔒 RACE CONDITION PROTECTION: Implement user/platform locking for replies
+  const lockKey = `reply/${platform}/${username}`;
+  if (autopilotLocks.has(lockKey)) {
+    console.log(`[${new Date().toISOString()}] [AUTOPILOT] 🔒 Reply lock active for ${lockKey}, skipping to prevent race condition`);
+    return;
+  }
+  autopilotLocks.set(lockKey, Date.now());
   try {
     // Get platform-specific events that need replies
     const eventsPrefix = platform === 'instagram' ? `InstagramEvents/` :
@@ -10538,6 +10542,10 @@ async function checkAndReplyToNewMessages(username, platform, settings) {
     
   } catch (error) {
     console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error in checkAndReplyToNewMessages:`, error);
+  } finally {
+    // 🔓 ALWAYS RELEASE REPLY LOCK
+    autopilotLocks.delete(lockKey);
+    console.log(`[${new Date().toISOString()}] [AUTOPILOT] 🔓 Released reply lock for ${lockKey}`);
   }
 }
 
@@ -11027,6 +11035,7 @@ async function getUnhandledNotifications(username, platform) {
     
     const response = await s3Client.send(listCommand);
     const unhandledNotifications = [];
+    const seenIds = new Set(); // Prevent duplicates within a single scan
     
     if (!response.Contents || response.Contents.length === 0) {
       console.log(`[${new Date().toISOString()}] [AUTOPILOT] No events found for ${platform}`);
@@ -11050,36 +11059,44 @@ async function getUnhandledNotifications(username, platform) {
         if (Array.isArray(eventData)) {
           for (const event of eventData) {
             if (isUnhandledNotificationForUser(event, username, platform)) {
+              const eventId = event.message_id || event.comment_id || event.id || `${object.Key}_${event.timestamp || Date.now()}`;
+              if (seenIds.has(eventId)) continue;
+              seenIds.add(eventId);
               unhandledNotifications.push({
-                id: event.message_id || event.comment_id || event.id || `event_${Date.now()}`,
+                id: eventId,
                 type: event.entry?.[0]?.messaging ? 'dm' : 'comment',
                 message: event.message?.text || event.text || '',
                 from_user: event.sender?.id || event.from?.id || event.user_id,
                 timestamp: event.timestamp || Date.now(),
-                platform: platform,
-                username: username,
+                platform,
+                username,
                 original_event: event,
                 file_key: object.Key
               });
             }
           }
         } else if (isUnhandledNotificationForUser(eventData, username, platform)) {
-          unhandledNotifications.push({
-            id: eventData.message_id || eventData.comment_id || eventData.id || `event_${Date.now()}`,
-            type: eventData.entry?.[0]?.messaging ? 'dm' : 'comment',
-            message: eventData.message?.text || eventData.text || '',
-            from_user: eventData.sender?.id || eventData.from?.id || eventData.user_id,
-            timestamp: eventData.timestamp || Date.now(),
-            platform: platform,
-            username: username,
-            original_event: eventData,
-            file_key: object.Key
-          });
+          const eventId = eventData.message_id || eventData.comment_id || eventData.id || `${object.Key}_${eventData.timestamp || Date.now()}`;
+          if (!seenIds.has(eventId)) {
+            seenIds.add(eventId);
+            unhandledNotifications.push({
+              id: eventId,
+              type: eventData.entry?.[0]?.messaging ? 'dm' : 'comment',
+              message: eventData.message?.text || eventData.text || '',
+              from_user: eventData.sender?.id || eventData.from?.id || eventData.user_id,
+              timestamp: eventData.timestamp || Date.now(),
+              platform,
+              username,
+              original_event: eventData,
+              file_key: object.Key
+            });
+          }
         }
         
       } catch (error) {
         console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error reading event file ${object.Key}:`, error);
       }
+
     }
     
     console.log(`[${new Date().toISOString()}] [AUTOPILOT] 📬 Found ${unhandledNotifications.length} unhandled notifications for ${platform}/${username}`);
@@ -13125,12 +13142,12 @@ app.delete(['/stop-campaign/:username', '/api/stop-campaign/:username'], async (
     let deletedFiles = [];
     let deletionErrors = [];
 
-    // Define file prefixes to delete - including generated content for bulletproof cleanup
+    // Define file prefixes to delete - ONLY generated content and campaign data, NOT user images
     const prefixesToDelete = [
       `goal/${platform}/${username}`,
       `goal_summary/${platform}/${username}`,
-      `ready_post/${platform}/${username}`,
       `generated_content/${platform}/${username}` // ✅ BULLETPROOF: Delete generated content to prevent reuse
+      // ❌ REMOVED: ready_post/${platform}/${username} - Keep user images intact
     ];
 
     // Delete files from each prefix
@@ -13231,6 +13248,7 @@ app.delete(['/stop-campaign/:username', '/api/stop-campaign/:username'], async (
     }
 
     console.log(`[${new Date().toISOString()}] Campaign deletion completed for ${username} on ${platform}. Deleted ${deletedFiles.length} files, ${deletionErrors.length} errors.`);
+    console.log(`[${new Date().toISOString()}] ✅ PRESERVED: Ready post images kept intact for user reuse`);
 
     // 🚀 AUTOPILOT RESET: Clear autopilot settings when campaign stops
     try {
@@ -13295,7 +13313,8 @@ app.delete(['/stop-campaign/:username', '/api/stop-campaign/:username'], async (
       platform: platform,
       username: username,
       hasActiveCampaign: false,
-      generatedContentCleared: deletedFiles.some(file => file.includes('generated_content')) // ✅ BULLETPROOF: Confirm generated content cleanup
+      generatedContentCleared: deletedFiles.some(file => file.includes('generated_content')), // ✅ BULLETPROOF: Confirm generated content cleanup
+      readyPostImagesPreserved: true // ✅ PRESERVED: User images kept intact
     });
 
   } catch (error) {
@@ -13905,4 +13924,68 @@ app.delete(['/platform-reset/:userId', '/api/platform-reset/:userId'], async (re
   }
 });
 
+// Enhanced R2 Image Renderer with white image prevention
+app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
+  const { username, imageKey } = req.params;
+  const platform = req.query.platform || 'instagram';
+  const forceRefresh = req.query.t || req.query.v || req.query.refresh;
+  
+  try {
+    // Construct the R2 key path
+    const r2Key = `ready_post/${platform}/${username}/${imageKey}`;
+    
+    console.log(`[${new Date().toISOString()}] [R2-IMAGE] Fetching: ${r2Key}`);
+    
+    // Get the image from R2
+    const getCommand = new GetObjectCommand({
+      Bucket: 'tasks',
+      Key: r2Key,
+    });
+    
+    const response = await s3Client.send(getCommand);
+    const imageBuffer = await streamToString(response.Body);
+    
+    // Validate that we actually have image data
+    if (!imageBuffer || imageBuffer.length === 0) {
+      console.error(`[${new Date().toISOString()}] [R2-IMAGE] No image data returned for ${r2Key}`);
+      throw new Error('Empty image data');
+    }
+    
+    // Detect content type from file extension
+    let contentType = 'image/jpeg'; // Default
+    if (imageKey.endsWith('.png')) {
+      contentType = 'image/png';
+    } else if (imageKey.endsWith('.webp')) {
+      contentType = 'image/webp';
+    } else if (imageKey.endsWith('.gif')) {
+      contentType = 'image/gif';
+    }
+    
+    // Set appropriate headers
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', '*');
+    
+    // Send the image
+    res.send(Buffer.from(imageBuffer, 'binary'));
+    
+    console.log(`[${new Date().toISOString()}] [R2-IMAGE] ✅ Served ${r2Key} successfully`);
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [R2-IMAGE] Error serving ${imageKey}:`, error);
+    
+    // Send a placeholder image
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Cache-Control', 'no-cache, no-store');
+    res.status(404).send('Image not found');
+  }
+});
+
 // ===============================================================
+
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Server running on port ${port}`);
+});

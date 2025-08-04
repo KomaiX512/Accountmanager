@@ -2640,3 +2640,152 @@ app.get('/test-direct-image/:username/:filename', (req, res) => {
     res.status(500).send('Error reading file');
   }
 });
+
+// API endpoint for reimagining existing images with prompt improvements
+app.post('/api/reimagine-image', async (req, res) => {
+  try {
+    const { username, postKey, extraPrompt = '', platform = 'instagram' } = req.body;
+    
+    if (!username || !postKey) {
+      return res.status(400).json({ error: 'Username and postKey are required' });
+    }
+    
+    if (DEBUG_LOGS) console.log(`[REIMAGINE] Processing image reimagination for ${platform}/${username}, post: ${postKey}`);
+    if (DEBUG_LOGS) console.log(`[REIMAGINE] Extra prompt: "${extraPrompt}"`);
+    
+    // Fetch the original post data to get the current image prompt
+    // Handle both short postKey and full path formats
+    let postDataKey;
+    if (postKey.includes('.json')) {
+      // Full path format: "ready_post/twitter/elonmusk/ready_post_1754279425276.json"
+      postDataKey = postKey;
+    } else if (postKey.includes(`ready_post/${platform}/${username}/`)) {
+      // Partial path format: "ready_post/twitter/elonmusk/ready_post_1754279425276"
+      postDataKey = postKey.endsWith('.json') ? postKey : `${postKey}.json`;
+    } else {
+      // Short format: "ready_post_1754279425276"
+      postDataKey = `ready_post/${platform}/${username}/${postKey}.json`;
+    }
+    
+    if (DEBUG_LOGS) console.log(`[REIMAGINE] Constructed postDataKey: ${postDataKey}`);
+    let originalPostData;
+    
+    try {
+      const postDataResponse = await s3Client.getObject({
+        Bucket: 'structuredb',
+        Key: postDataKey
+      });
+      
+      originalPostData = JSON.parse(postDataResponse.Body.toString());
+      if (DEBUG_LOGS) console.log(`[REIMAGINE] Original post data retrieved successfully`);
+    } catch (fetchError) {
+      if (DEBUG_LOGS) console.error(`[REIMAGINE] Failed to fetch original post data:`, fetchError.message);
+      return res.status(404).json({ error: 'Original post not found' });
+    }
+    
+    // Extract the original image prompt from nested post structure
+    const originalImagePrompt = originalPostData?.post?.image_prompt || 
+                               originalPostData?.image_prompt || 
+                               originalPostData?.data?.post?.image_prompt;
+    
+    if (!originalImagePrompt) {
+      return res.status(400).json({ error: 'Original image prompt not found in post data' });
+    }
+    
+    if (DEBUG_LOGS) console.log(`[REIMAGINE] Original image prompt: "${originalImagePrompt.substring(0, 100)}..."`);
+    
+    // Create enhanced prompt by combining original with extra improvements
+    let enhancedImagePrompt = originalImagePrompt;
+    if (extraPrompt && extraPrompt.trim()) {
+      enhancedImagePrompt = `${originalImagePrompt}. ${extraPrompt.trim()}`;
+      if (DEBUG_LOGS) console.log(`[REIMAGINE] Enhanced prompt created with user improvements`);
+    }
+    
+    // Generate new image filename with timestamp to ensure uniqueness
+    const timestamp = Date.now();
+    const originalFilename = originalPostData?.post?.image_path || 
+                           originalPostData?.image_path || 
+                           originalPostData?.data?.post?.image_path || 
+                           `${postKey}_image.jpg`;
+    
+    const fileExtension = originalFilename.split('.').pop() || 'png';
+    const newImageFilename = `image_${timestamp}.${fileExtension}`;
+    
+    if (DEBUG_LOGS) console.log(`[REIMAGINE] Generating new image: ${newImageFilename}`);
+    
+    // Call RAG server to generate the new image using the enhanced prompt
+    try {
+      const imageGenResponse = await axios.post('http://localhost:3001/api/post-generator', {
+        username,
+        query: `Reimagine image with this exact prompt: ${enhancedImagePrompt}`,
+        platform
+      });
+      
+      if (DEBUG_LOGS) console.log(`[REIMAGINE] Image generation completed successfully`);
+      
+      // Extract the new image information from the response
+      const newImagePath = imageGenResponse.data.post?.image_path;
+      const newImageUrl = imageGenResponse.data.post?.image_url;
+      const newR2ImageUrl = imageGenResponse.data.post?.r2_image_url;
+      
+      if (!newImagePath) {
+        throw new Error('No image path returned from image generation');
+      }
+      
+      // Update the original post data with new image information
+      const updatedPostData = {
+        ...originalPostData,
+        post: {
+          ...originalPostData.post,
+          image_path: newImagePath,
+          image_url: newImageUrl,
+          r2_image_url: newR2ImageUrl,
+          image_prompt: enhancedImagePrompt
+        },
+        reimagined_at: new Date().toISOString(),
+        reimagined_from: originalFilename,
+        extra_prompt_used: extraPrompt || null
+      };
+      
+      // Save the updated post data
+      try {
+        await s3Client.putObject({
+          Bucket: 'structuredb',
+          Key: postDataKey,
+          Body: JSON.stringify(updatedPostData, null, 2),
+          ContentType: 'application/json'
+        });
+        if (DEBUG_LOGS) console.log(`[REIMAGINE] Updated post data saved successfully`);
+      } catch (saveError) {
+        if (DEBUG_LOGS) console.error(`[REIMAGINE] Failed to save updated post data:`, saveError.message);
+        return res.status(500).json({ error: 'Failed to save updated post data' });
+      }
+      
+      // Return success response with new image information
+      const response = {
+        success: true,
+        message: 'Image reimagined successfully',
+        postKey,
+        originalImageFilename: originalFilename,
+        newImageFilename: newImagePath,
+        originalPrompt: originalImagePrompt,
+        enhancedPrompt: enhancedImagePrompt,
+        extraPrompt: extraPrompt || null,
+        newImageUrl: newImageUrl,
+        newR2ImageUrl: newR2ImageUrl,
+        timestamp: updatedPostData.reimagined_at
+      };
+      
+      if (DEBUG_LOGS) console.log(`[REIMAGINE] Image reimagination response:`, JSON.stringify(response, null, 2));
+      return res.json(response);
+      
+    } catch (imageError) {
+      if (DEBUG_LOGS) console.error(`[REIMAGINE] Image generation failed:`, imageError.message);
+      return res.status(500).json({ error: 'Failed to generate new image', details: imageError.message });
+    }
+    
+  } catch (error) {
+    if (DEBUG_LOGS) console.error(`[REIMAGINE] Error in image reimagination:`, error);
+    return res.status(500).json({ error: 'Failed to reimagine image', details: error.message });
+  }
+});

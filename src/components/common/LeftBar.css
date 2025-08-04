@@ -8,12 +8,12 @@ motion.div.left-bar,
   position: fixed !important;
   top: 64px !important;
   left: 0 !important;
-  width: 80px !important;
+  width: clamp(40px, 6vw, 80px) !important;
   height: calc(100vh - 64px) !important;
   background: rgba(255, 255, 255, 0.08) !important;
   border-right: 1.5px solid rgba(255,255,255,0.15) !important;
   z-index: 999998 !important;
-  transition: background 0.3s, border 0.3s !important;
+  transition: all 0.3s ease !important;
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
   transform: translateZ(0) !important;
@@ -25,13 +25,12 @@ motion.div.left-bar,
   align-items: center !important;
   margin: 0 !important;
   padding: 0 !important;
-  min-width: 80px !important;
-  max-width: 80px !important;
   box-sizing: border-box !important;
   min-height: calc(100vh - 64px) !important;
   max-height: calc(100vh - 64px) !important;
   box-shadow: var(--glass-shadow);
 }
+
 .left-bar::before {
   content: '';
   position: absolute;
@@ -45,10 +44,10 @@ motion.div.left-bar,
 .icon-container {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: clamp(12px, 2.5vw, 20px);
   width: 100%;
   align-items: center;
-  padding-top: 20px;
+  padding-top: clamp(12px, 2.5vw, 20px);
   box-sizing: border-box;
 }
 
@@ -59,34 +58,39 @@ motion.div.left-bar,
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255,255,255,0.15);
   cursor: pointer;
-  width: calc(100% - 16px);
-  padding: 10px 0;
+  width: calc(100% - clamp(8px, 2vw, 16px));
+  padding: clamp(6px, 1.5vw, 10px) 0;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: 12px;
-  margin: 0 8px;
+  margin: 0 clamp(4px, 1vw, 8px);
   z-index: 2;
 }
+
 .icon-button:hover {
   background: rgba(255, 255, 255, 0.06);
   border-color: var(--glass-accent);
   transform: translateY(-1px);
 }
+
 .icon {
-  width: 28px;
-  height: 28px;
+  width: clamp(20px, 3.5vw, 28px);
+  height: clamp(20px, 3.5vw, 28px);
   fill: var(--glass-text);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
 .icon-button:hover .icon {
   fill: var(--glass-accent);
 }
+
 .icon-button span {
-  font-size: 12px;
-  margin-top: 6px;
+  font-size: clamp(8px, 1.5vw, 12px);
+  margin-top: clamp(3px, 0.8vw, 6px);
   color: var(--glass-text);
   font-weight: 500;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
 .icon-button:hover span {
   color: var(--glass-accent);
 }
@@ -118,180 +122,94 @@ motion.div.left-bar,
   50% { transform: scale(1.2); opacity: 0.7; }
 }
 
-/* Responsive Design for Smaller Laptop Screens */
-@media (max-width: 1440px) {
+/* Enhanced Responsive Design - Fluid Scaling */
+@media (max-width: 1600px) {
   .left-bar {
-    width: clamp(65px, 6.5vw, 75px) !important;
+    width: clamp(35px, 5.5vw, 70px) !important;
     top: clamp(55px, 5.5vh, 65px) !important;
     height: calc(100vh - clamp(55px, 5.5vh, 65px)) !important;
-    min-width: clamp(65px, 6.5vw, 75px) !important;
-    max-width: clamp(65px, 6.5vw, 75px) !important;
     min-height: calc(100vh - clamp(55px, 5.5vh, 65px)) !important;
     max-height: calc(100vh - clamp(55px, 5.5vh, 65px)) !important;
   }
-  
-  .icon-container {
-    gap: clamp(12px, 2.5vw, 18px);
-    padding-top: clamp(12px, 2.5vw, 18px);
-  }
-  
-  .icon-button {
-    width: calc(100% - 14px);
-    margin: 0 7px;
-    padding: clamp(7px, 1.8vw, 9px) 0;
-  }
-  
-  .icon {
-    width: clamp(22px, 3.5vw, 26px);
-    height: clamp(22px, 3.5vw, 26px);
-  }
-  
-  .icon-button span {
-    font-size: clamp(9px, 1.8vw, 11px);
-    margin-top: clamp(3px, 0.8vw, 5px);
+}
+
+@media (max-width: 1440px) {
+  .left-bar {
+    width: clamp(30px, 5vw, 60px) !important;
+    top: clamp(50px, 5vh, 60px) !important;
+    height: calc(100vh - clamp(50px, 5vh, 60px)) !important;
+    min-height: calc(100vh - clamp(50px, 5vh, 60px)) !important;
+    max-height: calc(100vh - clamp(50px, 5vh, 60px)) !important;
   }
 }
 
 @media (max-width: 1366px) {
   .left-bar {
-    width: clamp(60px, 6vw, 70px) !important;
-    top: clamp(50px, 5vh, 60px) !important;
-    height: calc(100vh - clamp(50px, 5vh, 60px)) !important;
-    min-width: clamp(60px, 6vw, 70px) !important;
-    max-width: clamp(60px, 6vw, 70px) !important;
-    min-height: calc(100vh - clamp(50px, 5vh, 60px)) !important;
-    max-height: calc(100vh - clamp(50px, 5vh, 60px)) !important;
-  }
-  
-  .icon-container {
-    gap: clamp(10px, 2.2vw, 16px);
-    padding-top: clamp(10px, 2.2vw, 16px);
-  }
-  
-  .icon-button {
-    width: calc(100% - 12px);
-    margin: 0 6px;
-    padding: clamp(6px, 1.6vw, 8px) 0;
-  }
-  
-  .icon {
-    width: clamp(20px, 3.2vw, 24px);
-    height: clamp(20px, 3.2vw, 24px);
-  }
-  
-  .icon-button span {
-    font-size: clamp(8px, 1.6vw, 10px);
-    margin-top: clamp(2px, 0.6vw, 4px);
+    width: clamp(25px, 4.5vw, 55px) !important;
+    top: clamp(48px, 4.8vh, 58px) !important;
+    height: calc(100vh - clamp(48px, 4.8vh, 58px)) !important;
+    min-height: calc(100vh - clamp(48px, 4.8vh, 58px)) !important;
+    max-height: calc(100vh - clamp(48px, 4.8vh, 58px)) !important;
   }
 }
 
 @media (max-width: 1280px) {
   .left-bar {
-    width: clamp(55px, 5.5vw, 65px) !important;
-    top: clamp(48px, 4.8vh, 58px) !important;
-    height: calc(100vh - clamp(48px, 4.8vh, 58px)) !important;
-    min-width: clamp(55px, 5.5vw, 65px) !important;
-    max-width: clamp(55px, 5.5vw, 65px) !important;
-    min-height: calc(100vh - clamp(48px, 4.8vh, 58px)) !important;
-    max-height: calc(100vh - clamp(48px, 4.8vh, 58px)) !important;
-  }
-  
-  .icon-container {
-    gap: clamp(8px, 2vw, 14px);
-    padding-top: clamp(8px, 2vw, 14px);
-  }
-  
-  .icon-button {
-    width: calc(100% - 10px);
-    margin: 0 5px;
-    padding: clamp(5px, 1.4vw, 7px) 0;
-  }
-  
-  .icon {
-    width: clamp(18px, 3vw, 22px);
-    height: clamp(18px, 3vw, 22px);
-  }
-  
-  .icon-button span {
-    font-size: clamp(7px, 1.4vw, 9px);
-    margin-top: clamp(2px, 0.5vw, 3px);
+    width: clamp(20px, 4vw, 50px) !important;
+    top: clamp(45px, 4.5vh, 55px) !important;
+    height: calc(100vh - clamp(45px, 4.5vh, 55px)) !important;
+    min-height: calc(100vh - clamp(45px, 4.5vh, 55px)) !important;
+    max-height: calc(100vh - clamp(45px, 4.5vh, 55px)) !important;
   }
 }
 
-/* Responsive Design for Different Screen Sizes */
 @media (max-width: 1200px) {
   .left-bar {
-    width: 70px;
+    width: clamp(18px, 3.5vw, 45px) !important;
+    top: clamp(42px, 4.2vh, 52px) !important;
+    height: calc(100vh - clamp(42px, 4.2vh, 52px)) !important;
+    min-height: calc(100vh - clamp(42px, 4.2vh, 52px)) !important;
+    max-height: calc(100vh - clamp(42px, 4.2vh, 52px)) !important;
   }
-  
-  .icon-button {
-    width: calc(100% - 12px);
-    margin: 0 6px;
+}
+
+@media (max-width: 1024px) {
+  .left-bar {
+    width: clamp(15px, 3vw, 40px) !important;
+    top: clamp(40px, 4vh, 50px) !important;
+    height: calc(100vh - clamp(40px, 4vh, 50px)) !important;
+    min-height: calc(100vh - clamp(40px, 4vh, 50px)) !important;
+    max-height: calc(100vh - clamp(40px, 4vh, 50px)) !important;
   }
 }
 
 @media (max-width: 768px) {
   .left-bar {
-    width: 60px;
-    top: 70px;
-    height: calc(100vh - 70px);
-  }
-  
-  .icon-button {
-    width: calc(100% - 10px);
-    margin: 0 5px;
-  }
-  
-  .icon {
-    width: clamp(20px, 3.5vw, 24px);
-    height: clamp(20px, 3.5vw, 24px);
-  }
-  
-  .icon-button span {
-    font-size: clamp(9px, 1.8vw, 11px);
+    width: clamp(12px, 2.5vw, 35px) !important;
+    top: clamp(35px, 3.5vh, 45px) !important;
+    height: calc(100vh - clamp(35px, 3.5vh, 45px)) !important;
+    min-height: calc(100vh - clamp(35px, 3.5vh, 45px)) !important;
+    max-height: calc(100vh - clamp(35px, 3.5vh, 45px)) !important;
   }
 }
 
 @media (max-width: 480px) {
   .left-bar {
-    width: 50px;
-  }
-  
-  .icon-button {
-    width: calc(100% - 8px);
-    margin: 0 4px;
-    padding: clamp(6px, 1.5vw, 8px) 0;
-  }
-  
-  .icon {
-    width: clamp(18px, 3vw, 22px);
-    height: clamp(18px, 3vw, 22px);
-  }
-  
-  .icon-button span {
-    font-size: clamp(8px, 1.6vw, 10px);
-    margin-top: clamp(2px, 0.8vw, 4px);
+    width: clamp(10px, 2vw, 30px) !important;
+    top: clamp(30px, 3vh, 40px) !important;
+    height: calc(100vh - clamp(30px, 3vh, 40px)) !important;
+    min-height: calc(100vh - clamp(30px, 3vh, 40px)) !important;
+    max-height: calc(100vh - clamp(30px, 3vh, 40px)) !important;
   }
 }
 
-/* Ultra-small screens */
 @media (max-width: 360px) {
   .left-bar {
-    width: 45px;
-  }
-  
-  .icon-button {
-    width: calc(100% - 6px);
-    margin: 0 3px;
-  }
-  
-  .icon {
-    width: clamp(16px, 2.8vw, 20px);
-    height: clamp(16px, 2.8vw, 20px);
-  }
-  
-  .icon-button span {
-    font-size: clamp(7px, 1.4vw, 9px);
+    width: clamp(8px, 1.5vw, 25px) !important;
+    top: clamp(25px, 2.5vh, 35px) !important;
+    height: calc(100vh - clamp(25px, 2.5vh, 35px)) !important;
+    min-height: calc(100vh - clamp(25px, 2.5vh, 35px)) !important;
+    max-height: calc(100vh - clamp(25px, 2.5vh, 35px)) !important;
   }
 }
 

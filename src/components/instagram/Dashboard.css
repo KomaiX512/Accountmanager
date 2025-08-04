@@ -37,7 +37,7 @@ body:has(.dashboard-wrapper) {
 /* ✨ MINIMALIST WELCOME HEADER */
 .welcome-header {
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: 8px;
 }
 
 .welcome-text {
@@ -48,7 +48,7 @@ body:has(.dashboard-wrapper) {
   background-clip: text;
   -webkit-text-fill-color: transparent;
   text-shadow: 0 0 20px rgba(0, 255, 204, 0.3);
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .welcome-subtext {
@@ -77,12 +77,12 @@ body:has(.dashboard-wrapper) {
   margin: 0 auto;
   }
 
-/* ✨ ENHANCED PREMIUM MODULES CONTAINER - VISIBLE & BEAUTIFUL */
+/* ✨ COMPACT PREMIUM MODULES CONTAINER - MINIMALIST */
 .modules-container {
   background: rgba(255, 255, 255, 0.08);
   border: 1.5px solid rgba(255, 255, 255, 0.15);
-  border-radius: 24px;
-  padding: 20px;
+  border-radius: 20px;
+  padding: 16px;
   width: 100%;
   max-width: 1400px;
   margin: 0 auto;
@@ -96,6 +96,14 @@ body:has(.dashboard-wrapper) {
   min-height: fit-content; /* Remove extra height */
 }
 
+/* Desktop specific container optimizations */
+@media (min-width: 768px) {
+  .modules-container {
+    padding: 14px;
+    border-radius: 18px;
+  }
+}
+
 .modules-container::before {
   content: '';
   position: absolute;
@@ -107,7 +115,7 @@ body:has(.dashboard-wrapper) {
   opacity: 0.6;
 }
 
-/* ✨ CLEAN GRID LAYOUT - DYNAMIC RELATIVE HEIGHT */
+/* ✨ COMPACT GRID LAYOUT */
 .dashboard-grid {
   display: grid;
   grid-template-areas:
@@ -116,22 +124,57 @@ body:has(.dashboard-wrapper) {
     "notifications post-cooked competitor-analysis"
     "post-creation post-creation post-creation";
   grid-template-columns: 1fr 1.5fr 1fr;
-  /* Put strategies and competitor analysis in same row to share space */
-  grid-template-rows: auto 1fr auto auto;
-  gap: 20px;
-  min-height: fit-content;
-  height: auto;
+  /* Reduced row heights for more compact layout with News4U */
+  grid-template-rows: auto 0.5fr 0.7fr auto;
+  gap: 16px;
+  min-height: fit-content; /* Remove extra height */
+  height: auto; /* Let content determine height */
   box-sizing: border-box;
-  align-content: start;
+  align-content: stretch;
 }
 
-/* ✨ ENHANCED PROFILE SECTION - CLEARLY VISIBLE */
+/* Desktop specific grid optimizations */
+@media (min-width: 768px) {
+  .dashboard-grid {
+    gap: 14px;
+  }
+}
+
+/* ✨ CRITICAL FIX: Ensure grid layout persists until truly mobile */
+@media (max-width: 1000px) and (min-width: 768px) {
+  .dashboard-grid {
+    display: grid !important;
+    grid-template-areas:
+      "profile profile profile"
+      "news4u post-cooked strategies"
+      "notifications post-cooked competitor-analysis"
+      "post-creation post-creation post-creation" !important;
+    grid-template-columns: 1fr 1.5fr 1fr !important;
+    grid-template-rows: auto 0.5fr 0.7fr auto !important;
+    gap: 12px !important;
+    flex-direction: unset !important;
+  }
+}
+
+@media (max-width: 900px) and (min-width: 768px) {
+  .dashboard-grid {
+    gap: 10px !important;
+  }
+}
+
+@media (max-width: 800px) and (min-width: 768px) {
+  .dashboard-grid {
+    gap: 8px !important;
+  }
+}
+
+/* ✨ COMPACT PROFILE SECTION - MINIMALIST DESIGN */
 .profile-metadata {
   grid-area: profile;
   background: rgba(255, 255, 255, 0.12);
   border: 1.5px solid rgba(255, 255, 255, 0.18);
-  border-radius: 20px;
-  padding: 20px;
+  border-radius: 16px;
+  padding: 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -142,42 +185,142 @@ body:has(.dashboard-wrapper) {
   position: relative;
   overflow: hidden;
   transition: all 0.3s ease;
+  min-height: 60px;
 }
 
-/* ✨ NEWS4U MODULE - NEW ADDITION */
-.news4u {
-  grid-area: news4u;
-  display: contents !important;
+/* Desktop specific profile optimizations */
+@media (min-width: 768px) {
+  .profile-metadata {
+    padding: 8px 12px;
+    min-height: 52px;
+  }
+  
+  .profile-bar {
+    gap: 8px;
+  }
+  
+  .stats {
+    gap: 10px;
+  }
+  
+  .stat {
+    padding: 8px 12px;
+  }
 }
 
-
-
-.news4u:hover {
-  background: transparent;
-  border: none;
-  transform: none;
-  box-shadow: none;
+/* Responsive profile scaling for smaller screens */
+@media (max-width: 1200px) {
+  .profile-metadata {
+    padding: 6px 10px;
+    min-height: 48px;
+  }
+  
+  .profile-bar {
+    gap: 6px;
+  }
+  
+  .stats {
+    gap: 8px;
+  }
+  
+  .stat {
+    padding: 6px 10px;
+  }
+  
+  .profile-pic-bar {
+    width: 44px;
+    height: 44px;
+  }
 }
 
-/* Override to remove any remaining rectangle styles */
-.news4u,
-.news4u:hover {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
+@media (max-width: 1000px) {
+  .profile-metadata {
+    padding: 4px 8px;
+    min-height: 44px;
+  }
+  
+  .profile-bar {
+    gap: 4px;
+  }
+  
+  .stats {
+    gap: 6px;
+  }
+  
+  .stat {
+    padding: 4px 8px;
+  }
+  
+  .profile-pic-bar {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .profile-pic-fallback {
+    font-size: 18px;
+  }
 }
 
-.news4u::before {
-  content: none !important;
+@media (max-width: 900px) {
+  .profile-metadata {
+    padding: 3px 6px;
+    min-height: 40px;
+  }
+  
+  .profile-bar {
+    gap: 3px;
+  }
+  
+  .profile-pic-bar {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .profile-pic-fallback {
+    font-size: 16px;
+  }
 }
 
-.news4u:hover {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(0, 255, 204, 0.3);
-  transform: translateY(-2px);
-  box-shadow: 
-    0 8px 30px rgba(0, 0, 0, 0.25),
-    0 0 0 1px rgba(0, 255, 204, 0.1) inset;
+@media (max-width: 800px) {
+  .profile-metadata {
+    padding: 2px 4px;
+    min-height: 36px;
+    overflow: visible;
+  }
+  
+  .profile-bar {
+    gap: 2px;
+    overflow: visible;
+  }
+  
+  .profile-pic-bar {
+    width: 28px;
+    height: 28px;
+  }
+  
+  .profile-pic-fallback {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 600px) {
+  .profile-metadata {
+    padding: 1px 3px;
+    min-height: 32px;
+  }
+  
+  .profile-bar {
+    gap: 1px;
+  }
+  
+  .profile-pic-bar {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .profile-pic-fallback {
+    font-size: 12px;
+  }
 }
 
 .profile-metadata::before {
@@ -203,21 +346,22 @@ body:has(.dashboard-wrapper) {
 .profile-header {
   display: flex;
   width: 100%;
-  gap: 24px;
+  gap: 12px;
   align-items: center;
 }
 
 .profile-bar {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 12px;
   width: 100%;
+  min-height: 44px;
 }
 
-/* ✨ CLEAN PROFILE PICTURE */
+/* ✨ COMPACT PROFILE PICTURE */
 .profile-pic-bar {
-  width: 64px;
-  height: 64px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: 2px solid rgba(0, 255, 204, 0.4);
   object-fit: cover;
@@ -240,26 +384,35 @@ body:has(.dashboard-wrapper) {
   color: #00ffcc;
 }
 
-/* ✨ ENHANCED STATS - BETTER VISIBILITY */
+/* ✨ COMPACT STATS - MINIMALIST DESIGN */
 .stats {
   display: flex;
-  gap: 32px;
-  flex-wrap: wrap;
+  gap: 16px;
+  flex-wrap: nowrap;
+  align-items: center;
+  height: 44px;
+  flex-direction: row !important;
+  justify-content: flex-start !important;
+  overflow: visible !important;
 }
 
 .stat {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  padding: 16px 20px;
-  border-radius: 16px;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 6px 8px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.12);
   transition: all 0.3s ease;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   position: relative;
   overflow: hidden;
+  min-width: 50px;
+  max-width: 70px;
+  height: 44px;
 }
 
 .stat::before {
@@ -281,46 +434,426 @@ body:has(.dashboard-wrapper) {
 }
 
 .label {
-  font-size: 0.8rem;
+  font-size: 0.65rem;
   color: #b8b8b8;
   font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
+  line-height: 1;
 }
 
 .value {
-  font-size: 1.2rem;
+  font-size: 0.9rem;
   font-weight: 600;
   color: #ffffff;
+  line-height: 1;
 }
 
-/* ✨ PREMIUM ACTION BUTTONS */
+/* Responsive stats text scaling */
+@media (max-width: 1200px) {
+  .label {
+    font-size: 0.6rem;
+  }
+  
+  .value {
+    font-size: 0.85rem;
+  }
+  
+  .stat {
+    padding: 6px 8px;
+    gap: 1px;
+    height: 44px;
+    min-width: 45px;
+    max-width: 65px;
+  }
+  
+  .stats {
+    gap: 10px;
+    height: 44px;
+    flex-wrap: nowrap !important;
+    flex-direction: row !important;
+    justify-content: flex-start !important;
+    overflow: visible !important;
+  }
+}
+
+@media (max-width: 1000px) {
+  .label {
+    font-size: 0.55rem;
+  }
+  
+  .value {
+    font-size: 0.8rem;
+  }
+  
+  .stat {
+    padding: 4px 6px;
+    gap: 1px;
+    min-width: 40px;
+    max-width: 60px;
+    height: 44px;
+  }
+  
+  .stats {
+    gap: 8px;
+    height: 44px;
+    flex-wrap: nowrap !important;
+    flex-direction: row !important;
+    justify-content: flex-start !important;
+    overflow: visible !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .label {
+    font-size: 0.5rem;
+  }
+  
+  .value {
+    font-size: 0.75rem;
+  }
+  
+  .stat {
+    padding: 3px 5px;
+    gap: 1px;
+    min-width: 35px;
+    max-width: 55px;
+    height: 44px;
+  }
+  
+  .stats {
+    gap: 6px;
+    height: 44px;
+    flex-wrap: nowrap !important;
+    flex-direction: row !important;
+    justify-content: flex-start !important;
+    overflow: visible !important;
+  }
+}
+
+@media (max-width: 800px) {
+  .label {
+    font-size: 0.45rem;
+  }
+  
+  .value {
+    font-size: 0.7rem;
+  }
+  
+  .stat {
+    padding: 2px 4px;
+    gap: 1px;
+    min-width: 30px;
+    max-width: 50px;
+    height: 44px;
+  }
+  
+  .stats {
+    gap: 4px;
+    height: 44px;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    flex-wrap: nowrap !important;
+    overflow: visible !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .label {
+    font-size: 0.4rem;
+  }
+  
+  .value {
+    font-size: 0.65rem;
+  }
+  
+  .stat {
+    padding: 1px 3px;
+    gap: 0px;
+    min-width: 25px;
+    max-width: 45px;
+    height: 44px;
+  }
+  
+  .stats {
+    gap: 3px;
+    height: 44px;
+    flex-wrap: nowrap !important;
+    flex-direction: row !important;
+    justify-content: flex-start !important;
+    overflow: visible !important;
+  }
+}
+
+/* ✨ COMPACT ACTION BUTTONS - HORIZONTAL ALIGNMENT */
 .profile-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   margin-left: auto;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding-right: 4px;
+  min-width: 0;
+  flex-shrink: 1;
 }
 
-/* ✨ ENHANCED MINIMALIST BUTTON DESIGN */
+/* FORCE ALL BUTTONS TO STAY VISIBLE - NEVER DISAPPEAR */
+.profile-actions .dashboard-btn {
+  flex-shrink: 0 !important;
+  min-width: 20px !important;
+  max-width: none !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.profile-actions {
+  overflow: visible !important;
+  display: flex !important;
+  visibility: visible !important;
+}
+
+/* Handle large buttons like "Disconnect Instagram" and "Connect X" */
+.profile-actions .dashboard-btn:first-child,
+.profile-actions .dashboard-btn {
+  max-width: 100px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.7rem;
+  height: 44px !important;
+  min-height: 44px !important;
+  max-height: 44px !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+@media (max-width: 1200px) {
+  .profile-actions .dashboard-btn:first-child,
+  .profile-actions .dashboard-btn {
+    max-width: 80px;
+    font-size: 0.65rem;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+  }
+}
+
+@media (max-width: 1000px) {
+  .profile-actions .dashboard-btn:first-child,
+  .profile-actions .dashboard-btn {
+    max-width: 60px;
+    font-size: 0.6rem;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .profile-actions .dashboard-btn:first-child,
+  .profile-actions .dashboard-btn {
+    max-width: 50px;
+    font-size: 0.55rem;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .profile-actions .dashboard-btn:first-child,
+  .profile-actions .dashboard-btn {
+    max-width: 35px;
+    font-size: 0.45rem;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .profile-actions .dashboard-btn:first-child,
+  .profile-actions .dashboard-btn {
+    max-width: 25px;
+    font-size: 0.4rem;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+  }
+}
+
+.profile-actions::-webkit-scrollbar {
+  display: none;
+}
+
+/* Ensure all buttons in profile actions are compact and equal height */
+.profile-actions .dashboard-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+  height: 44px !important;
+  min-height: 44px !important;
+  max-height: 44px !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Desktop specific optimizations */
+@media (min-width: 768px) {
+  .profile-actions {
+    max-width: 50%;
+    gap: 4px;
+  }
+  
+  .profile-actions .dashboard-btn {
+    min-width: 36px;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    padding: 6px 10px;
+    font-size: 0.75rem;
+  }
+}
+
+/* Responsive scaling for smaller screens */
+@media (max-width: 1200px) {
+  .profile-actions {
+    max-width: 45%;
+    gap: 3px;
+  }
+  
+  .profile-actions .dashboard-btn {
+    min-width: 32px;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    padding: 4px 8px;
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 1000px) {
+  .profile-actions {
+    max-width: 40%;
+    gap: 2px;
+  }
+  
+  .profile-actions .dashboard-btn {
+    min-width: 28px;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    padding: 3px 6px;
+    font-size: 0.65rem;
+  }
+}
+
+@media (max-width: 900px) {
+  .profile-actions {
+    max-width: 35%;
+    gap: 1px;
+  }
+  
+  .profile-actions .dashboard-btn {
+    min-width: 24px;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    padding: 2px 4px;
+    font-size: 0.6rem;
+  }
+}
+
+/* Responsive button wrapping for small screens */
+@media (max-width: 900px) {
+  .profile-actions {
+    max-width: 100%;
+    flex-wrap: wrap;
+    row-gap: 3px;
+    justify-content: flex-start;
+  }
+  .profile-actions .dashboard-btn {
+    flex: 1 1 80px;
+    min-width: 24px;
+    margin-bottom: 2px;
+  }
+}
+
+/* Fix disappearing buttons at 800px */
+@media (max-width: 800px) {
+  .profile-actions {
+    max-width: 100%;
+    flex-wrap: wrap;
+    row-gap: 2px;
+    justify-content: flex-start;
+    gap: 2px;
+  }
+  .profile-actions .dashboard-btn {
+    flex: 1 1 70px;
+    min-width: 20px;
+    margin-bottom: 1px;
+    height: 20px;
+    padding: 1px 3px;
+    font-size: 0.5rem;
+  }
+}
+
+/* Ultra-aggressive scaling for very small screens */
+@media (max-width: 700px) {
+  .profile-actions {
+    max-width: 100%;
+    gap: 1px;
+  }
+  
+  .profile-actions .dashboard-btn {
+    min-width: 14px;
+    height: 18px;
+    padding: 1px 2px;
+    font-size: 0.45rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .profile-actions {
+    max-width: 100%;
+    gap: 1px;
+  }
+  
+  .profile-actions .dashboard-btn {
+    min-width: 12px;
+    height: 16px;
+    padding: 1px 1px;
+    font-size: 0.4rem;
+  }
+}
+
+/* ✨ COMPACT BUTTON DESIGN - MINIMALIST */
 .dashboard-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 12px 18px;
-  border-radius: 14px;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 12px;
   font-weight: 500;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   cursor: pointer;
   transition: all 0.3s ease;
   border: 1.5px solid rgba(255, 255, 255, 0.15);
   background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
   text-decoration: none;
-  min-width: 48px;
-  height: 48px;
+  min-width: 44px;
+  height: 44px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   position: relative;
   overflow: hidden;
@@ -351,6 +884,19 @@ body:has(.dashboard-wrapper) {
 .dashboard-btn .btn-icon {
   font-size: 16px;
   color: #00ffcc;
+}
+
+/* Responsive button icon scaling */
+@media (max-width: 1200px) {
+  .dashboard-btn .btn-icon {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 1000px) {
+  .dashboard-btn .btn-icon {
+    font-size: 12px;
+  }
 }
 
 /* ✨ SPECIALIZED BUTTON STYLES */
@@ -402,70 +948,6 @@ body:has(.dashboard-wrapper) {
   opacity: 1;
 }
 
-/* 🚀 AUTOPILOT BUTTON - ROCKET THEME */
-.dashboard-btn.autopilot-btn {
-  border-color: rgba(99, 102, 241, 0.4);
-  position: relative;
-  overflow: hidden;
-}
-
-.dashboard-btn.autopilot-btn:hover {
-  border-color: rgba(99, 102, 241, 0.6);
-  background: rgba(99, 102, 241, 0.08);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(99, 102, 241, 0.2);
-}
-
-.dashboard-btn.autopilot-btn .btn-icon {
-  animation: rocket-pulse 2s infinite;
-}
-
-@keyframes rocket-pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.1); }
-}
-
-.dashboard-btn.autopilot-btn:hover .btn-icon {
-  animation: rocket-boost 0.3s ease-out;
-}
-
-@keyframes rocket-boost {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.2) rotate(5deg); }
-  100% { transform: scale(1.1); }
-}
-
-/* Platform-specific autopilot button colors */
-.dashboard-btn.autopilot-btn.instagram {
-  border-color: rgba(228, 64, 95, 0.4);
-}
-
-.dashboard-btn.autopilot-btn.instagram:hover {
-  border-color: rgba(228, 64, 95, 0.6);
-  background: rgba(228, 64, 95, 0.08);
-  box-shadow: 0 8px 25px rgba(228, 64, 95, 0.2);
-}
-
-.dashboard-btn.autopilot-btn.twitter {
-  border-color: rgba(0, 0, 0, 0.4);
-}
-
-.dashboard-btn.autopilot-btn.twitter:hover {
-  border-color: rgba(0, 0, 0, 0.6);
-  background: rgba(0, 0, 0, 0.08);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
-}
-
-.dashboard-btn.autopilot-btn.facebook {
-  border-color: rgba(24, 119, 242, 0.4);
-}
-
-.dashboard-btn.autopilot-btn.facebook:hover {
-  border-color: rgba(24, 119, 242, 0.6);
-  background: rgba(24, 119, 242, 0.08);
-  box-shadow: 0 8px 25px rgba(24, 119, 242, 0.2);
-}
-
 .dashboard-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -473,13 +955,13 @@ body:has(.dashboard-wrapper) {
   border-color: rgba(142, 142, 147, 0.3);
 }
 
-/* ✨ ENHANCED MODULE SECTIONS - CLEARLY VISIBLE */
+/* ✨ ULTRA-COMPACT MODULE SECTIONS - NO EXTRA SPACE */
 .notifications,
 .post-cooked {
   background: rgba(255, 255, 255, 0.1);
   border: 1.5px solid rgba(255, 255, 255, 0.18);
   border-radius: 20px;
-  padding: 20px;
+  padding: 4px;
   height: 100%;
   overflow-y: auto;
   backdrop-filter: blur(15px);
@@ -490,35 +972,29 @@ body:has(.dashboard-wrapper) {
   transition: all 0.3s ease;
 }
 
-/* ✨ STRATEGIES - MINIMAL HEIGHT, RELATIVE TO COMPETITOR */
+/* ✨ ULTRA-COMPACT STRATEGIES - NO EXTRA SPACE */
 .strategies {
   background: rgba(255, 255, 255, 0.1);
   border: 1.5px solid rgba(255, 255, 255, 0.18);
   border-radius: 20px;
-  padding: 12px;
-  height: fit-content; /* Only take space needed */
-  min-height: fit-content;
-  max-height: none; /* Remove max-height limit */
-  overflow: visible; /* No scrolling needed */
+  padding: 4px;
+  height: 100%;
+  overflow: hidden; /* No scrolling for strategies */
   backdrop-filter: blur(15px);
   position: relative;
   box-shadow: 
     0 4px 20px rgba(0, 0, 0, 0.2),
     0 0 0 1px rgba(255, 255, 255, 0.08) inset;
   transition: all 0.3s ease;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 0; /* Remove bottom margin */
 }
 
-/* ✨ COMPETITOR ANALYSIS - FILLS REMAINING SPACE */
+/* ✨ ULTRA-COMPACT COMPETITOR ANALYSIS - NO EXTRA SPACE */
 .competitor-analysis {
   background: rgba(255, 255, 255, 0.1);
   border: 1.5px solid rgba(255, 255, 255, 0.18);
   border-radius: 20px;
-  padding: 20px;
-  height: 100%; /* Fill all available space */
+  padding: 4px;
+  height: 100%;
   overflow-y: auto; /* Keep scrolling for competitor analysis */
   backdrop-filter: blur(15px);
   position: relative;
@@ -526,52 +1002,244 @@ body:has(.dashboard-wrapper) {
     0 4px 20px rgba(0, 0, 0, 0.2),
     0 0 0 1px rgba(255, 255, 255, 0.08) inset;
   transition: all 0.3s ease;
-  margin-top: 0; /* Remove top margin */
 }
 
-/* Custom scrollbar for strategies */
-.strategies::-webkit-scrollbar {
-  width: 4px;
+/* ELIMINATE ALL EXTRA SPACING IN MODULE CONTENT */
+.notifications > *:first-child,
+.post-cooked > *:first-child,
+.strategies > *:first-child,
+.competitor-analysis > *:first-child,
+.news4u > *:first-child {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
 }
 
-.strategies::-webkit-scrollbar-track {
+/* MINIMAL SPACING BETWEEN ELEMENTS IN MODULES */
+.notifications > *,
+.post-cooked > *,
+.strategies > *,
+.competitor-analysis > *,
+.news4u > * {
+  margin-top: 2px !important;
+  margin-bottom: 2px !important;
+}
+
+.notifications > *:first-child,
+.post-cooked > *:first-child,
+.strategies > *:first-child,
+.competitor-analysis > *:first-child,
+.news4u > *:first-child {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+.notifications > *:last-child,
+.post-cooked > *:last-child,
+.strategies > *:last-child,
+.competitor-analysis > *:last-child,
+.news4u > *:last-child {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* FORCE COMPACT HEADERS */
+.notifications h2,
+.post-cooked h2,
+.strategies h2,
+.competitor-analysis h2,
+.news4u h2 {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* FORCE COMPACT SECTION HEADERS */
+.notifications .section-header,
+.post-cooked .section-header,
+.strategies .section-header,
+.competitor-analysis .section-header,
+.news4u .section-header {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ✨ ULTRA-COMPACT NEWS4U MODULE - NO EXTRA SPACE */
+.news4u {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  border-radius: 20px;
+  padding: 4px;
+  height: 100%;
+  overflow-y: auto; /* Allow scrolling for news content */
+  backdrop-filter: blur(15px);
+  position: relative;
+  box-shadow: 
+    0 4px 20px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+  transition: all 0.3s ease;
+  grid-area: news4u;
+}
+
+.news4u::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 204, 0, 0.4), transparent);
+  opacity: 0.8;
+}
+
+.news4u:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 204, 0, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 30px rgba(0, 0, 0, 0.25),
+    0 0 0 1px rgba(255, 204, 0, 0.1) inset;
+}
+
+/* ✨ COMPACT NEWS4U CONTENT STYLING */
+.news4u-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 2px;
+  color: #ffffff;
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.news4u-icon {
+  color: #ffcc00;
+  font-size: 1.2rem;
+}
+
+.news4u-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.news4u-item {
   background: rgba(255, 255, 255, 0.05);
-  border-radius: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 12px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
 }
 
-.strategies::-webkit-scrollbar-thumb {
-  background: rgba(0, 255, 204, 0.4);
-  border-radius: 2px;
+.news4u-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 204, 0, 0.3), transparent);
+  opacity: 0.6;
 }
 
-.strategies::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 255, 204, 0.6);
+.news4u-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 204, 0, 0.3);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-/* Compact header for strategies */
-.strategies h2 {
-  margin-bottom: 8px;
-  font-size: 1.1rem;
-  margin-top: 0;
-  padding: 0;
+.news4u-item-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
 }
 
-.strategies .section-header {
-  gap: 6px;
-  margin: 0;
-  padding: 0;
+.news4u-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #ffffff;
+  line-height: 1.4;
+  flex: 1;
 }
 
-.strategies .section-icon {
-  font-size: 1rem;
-  margin: 0;
-  padding: 0;
+.news4u-platform {
+  background: rgba(255, 204, 0, 0.15);
+  border: 1px solid rgba(255, 204, 0, 0.3);
+  border-radius: 8px;
+  padding: 2px 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #ffcc00;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.news4u-description {
+  font-size: 0.8rem;
+  color: #b8b8b8;
+  line-height: 1.5;
+  margin-bottom: 4px;
+}
+
+.news4u-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.7rem;
+  color: #888;
+}
+
+.news4u-timestamp {
+  opacity: 0.8;
+}
+
+.news4u-source {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-weight: 500;
+}
+
+.news4u-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #888;
+  font-style: italic;
+}
+
+.news4u-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: #ffcc00;
+  font-size: 0.9rem;
+  gap: 10px;
+}
+
+.news4u-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 204, 0, 0.3);
+  border-top: 2px solid #ffcc00;
+  border-radius: 50%;
+  animation: news-spinner 1s linear infinite;
+}
+
+@keyframes news-spinner {
+  to { transform: rotate(360deg); }
 }
 
 .notifications::before,
 .post-cooked::before,
 .strategies::before,
-.competitor-analysis::before {
+.competitor-analysis::before,
+.news4u::before {
   content: '';
   position: absolute;
   top: 0;
@@ -585,7 +1253,8 @@ body:has(.dashboard-wrapper) {
 .notifications:hover,
 .post-cooked:hover,
 .strategies:hover,
-.competitor-analysis:hover {
+.competitor-analysis:hover,
+.news4u:hover {
   background: rgba(255, 255, 255, 0.12);
   border-color: rgba(0, 255, 204, 0.3);
   transform: translateY(-2px);
@@ -610,11 +1279,14 @@ body:has(.dashboard-wrapper) {
   grid-area: competitor-analysis;
 }
 
-/* ✨ SECTION HEADERS */
+/* ✨ ULTRA-COMPACT SECTION HEADERS - NO EXTRA SPACE */
 h2 {
   font-size: 1.3rem;
   color: #ffffff;
-  margin-bottom: 20px;
+  margin-bottom: 0 !important;
+  margin-top: 0 !important;
+  padding-bottom: 0 !important;
+  padding-top: 0 !important;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -627,6 +1299,10 @@ h2 {
   gap: 10px;
   width: 100%;
   flex-wrap: wrap;
+  margin-bottom: 0 !important;
+  margin-top: 0 !important;
+  padding-bottom: 0 !important;
+  padding-top: 0 !important;
 }
 
 .section-icon {
@@ -689,11 +1365,11 @@ h2 {
   line-height: 1;
 }
 
-/* ✨ ENHANCED MINIMALIST POST CREATION BAR */
+/* ✨ ULTRA-COMPACT POST CREATION BAR */
 .post-creation-bar {
   grid-area: post-creation;
-  margin-top: 8px;
-  margin-bottom: 0; /* Remove bottom margin */
+  margin-top: 4px;
+  margin-bottom: 0;
   position: relative;
   z-index: 10;
 }
@@ -701,15 +1377,15 @@ h2 {
 .post-creation-container {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   background: rgba(255, 255, 255, 0.1);
   border: 1.5px solid rgba(255, 255, 255, 0.18);
-  border-radius: 20px;
-  padding: 16px 20px;
+  border-radius: 16px;
+  padding: 12px 16px;
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
-  min-height: 56px;
+  min-height: 48px;
   box-shadow: 
     0 4px 20px rgba(0, 0, 0, 0.2),
     0 0 0 1px rgba(255, 255, 255, 0.08) inset;
@@ -738,17 +1414,17 @@ h2 {
 .post-creation-label {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   color: #e0e0ff;
   font-weight: 500;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   white-space: nowrap;
   min-width: fit-content;
 }
 
 .post-icon {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   color: #00ffcc;
 }
 
@@ -761,14 +1437,14 @@ h2 {
   width: 100%;
   background: rgba(255, 255, 255, 0.08);
   border: 1.5px solid rgba(255, 255, 255, 0.15);
-  border-radius: 14px;
-  padding: 14px 18px;
+  border-radius: 12px;
+  padding: 10px 14px;
   color: #e0e0ff;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 400;
   outline: none;
   font-family: inherit;
-  line-height: 1.4;
+  line-height: 1.3;
   transition: all 0.3s ease;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
@@ -791,18 +1467,18 @@ h2 {
 }
 
 .post-send-btn {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   background: rgba(0, 255, 204, 0.15);
   border: 1.5px solid rgba(0, 255, 204, 0.4);
-  border-radius: 14px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.3s ease;
   color: #00ffcc;
-  font-size: 16px;
+  font-size: 14px;
   position: relative;
   overflow: hidden;
   flex-shrink: 0;
@@ -825,6 +1501,65 @@ h2 {
   border-color: #00ffcc;
   transform: translateY(-2px);
   box-shadow: 0 4px 16px rgba(0, 255, 204, 0.3);
+}
+
+/* Responsive post creation bar scaling */
+@media (max-width: 1000px) {
+  .post-creation-container {
+    padding: 10px 12px;
+    gap: 8px;
+    min-height: 44px;
+  }
+  
+  .post-creation-label {
+    font-size: 0.8rem;
+    gap: 4px;
+  }
+  
+  .post-icon {
+    width: 12px;
+    height: 12px;
+  }
+  
+  .post-input-field {
+    padding: 8px 12px;
+    font-size: 0.8rem;
+  }
+  
+  .post-send-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 800px) {
+  .post-creation-container {
+    padding: 8px 10px;
+    gap: 6px;
+    min-height: 40px;
+  }
+  
+  .post-creation-label {
+    font-size: 0.75rem;
+    gap: 3px;
+  }
+  
+  .post-icon {
+    width: 10px;
+    height: 10px;
+  }
+  
+  .post-input-field {
+    padding: 6px 10px;
+    font-size: 0.75rem;
+  }
+  
+  .post-send-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 10px;
+  }
 }
 
 .post-send-btn:active {
@@ -1122,42 +1857,15 @@ h2 {
     box-shadow: none;
   }
 
+  /* ✨ CRITICAL FIX: Only apply mobile layout to truly mobile screens */
   .dashboard-grid {
-    grid-template-columns: 1fr !important;
-    grid-template-areas:
-      "profile"
-      "chatbot"
-      "notifications"
-      "post-cooked"
-      "strategies"
-      "competitor-analysis" !important;
-    grid-template-rows: auto auto auto auto auto auto !important;
-    gap: 12px !important;
-  }
-
-  .news4u, .notifications, .post-cooked, .strategies, .competitor-analysis {
-    padding: 12px;
-    border-radius: 16px;
-    margin-bottom: 12px;
-    height: fit-content; /* Dynamic height */
-    min-height: fit-content;
-    max-height: none; /* Remove max-height limits */
-    overflow: visible; /* No scrolling needed */
-  }
-
-  /* Compact strategies on mobile */
-  .strategies {
-    padding: 8px;
-    gap: 4px;
-    height: fit-content;
-    min-height: fit-content;
-  }
-
-  /* Competitor analysis fills remaining space */
-  .competitor-analysis {
-    height: auto;
-    min-height: 200px; /* Minimum height to ensure visibility */
-    overflow-y: auto;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0 !important;
+    padding: 0 !important;
+    grid-template-areas: none !important;
+    grid-template-columns: none !important;
+    grid-template-rows: none !important;
   }
 
   /* 🍎 PROFILE SECTION - APPLE CARD STYLE */
@@ -1299,7 +2007,7 @@ h2 {
   }
 
   /* 🍎 EXPANDABLE MODULES - APPLE CARD DESIGN */
-  .news4u, .notifications, .post-cooked, .strategies, .competitor-analysis {
+  .notifications, .post-cooked, .strategies, .competitor-analysis, .news4u {
     background: rgba(255, 255, 255, 0.06);
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     margin: 0;
@@ -1309,7 +2017,7 @@ h2 {
   }
 
   /* 🍎 MODULE HEADERS - CREATED WITH PSEUDO ELEMENTS */
-  .news4u::before, .notifications::before, .post-cooked::before, .strategies::before, .competitor-analysis::before {
+  .notifications::before, .post-cooked::before, .strategies::before, .competitor-analysis::before, .news4u::before {
     content: '';
     display: block;
     padding: 20px 16px;
@@ -1324,7 +2032,7 @@ h2 {
     z-index: 10;
   }
 
-  .news4u::after, .notifications::after, .strategies::after, .competitor-analysis::after {
+  .notifications::after, .strategies::after, .competitor-analysis::after, .news4u::after {
     position: absolute;
     top: 20px;
     left: 16px;
@@ -1333,10 +2041,6 @@ h2 {
     color: rgba(255, 255, 255, 0.9);
     z-index: 10;
     pointer-events: none;
-  }
-
-  .news4u::after {
-    content: '📰 News 4U';
   }
 
   .notifications::after {
@@ -1350,6 +2054,10 @@ h2 {
   .competitor-analysis::after {
     content: '🔍 Competitor Analysis';
   }
+
+  .news4u::after {
+    content: '📰 News4U';
+  }
   
   /* Post-cooked title is handled by the component */
   .post-cooked::after {
@@ -1357,7 +2065,7 @@ h2 {
   }
 
   /* 🍎 CHEVRON ICONS */
-  .news4u::before, .notifications::before, .post-cooked::before, .strategies::before, .competitor-analysis::before {
+  .notifications::before, .post-cooked::before, .strategies::before, .competitor-analysis::before, .news4u::before {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='%2300ffcc' viewBox='0 0 24 24'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: calc(100% - 16px) center;
@@ -1365,19 +2073,19 @@ h2 {
   }
 
   /* 🍎 COLLAPSED STATE BY DEFAULT */
-  .news4u > *, .notifications > *, .post-cooked > *, .strategies > *, .competitor-analysis > * {
+  .notifications > *, .post-cooked > *, .strategies > *, .competitor-analysis > *, .news4u > * {
     max-height: 0;
     overflow: hidden;
     opacity: 0;
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    padding: 0 16px;
+    padding: 0 12px;
   }
 
   /* 🍎 EXPANDED STATE ON CLICK */
-  .news4u.mobile-expanded > *, .notifications.mobile-expanded > *, .strategies.mobile-expanded > *, .competitor-analysis.mobile-expanded > * {
+  .notifications.mobile-expanded > *, .strategies.mobile-expanded > *, .competitor-analysis.mobile-expanded > *, .news4u.mobile-expanded > * {
     max-height: 800px; /* Increased for better content visibility */
     opacity: 1;
-    padding: 0 16px 20px;
+    padding: 0 12px 12px;
     overflow-y: auto; /* Allow scrolling if content is too long */
   }
 
@@ -1385,7 +2093,7 @@ h2 {
   .post-cooked.post-cooked-always-expanded > * {
     max-height: none !important;
     opacity: 1 !important;
-    padding: 0 16px 20px;
+    padding: 0 12px 12px;
     overflow-y: visible;
   }
 
@@ -1398,11 +2106,11 @@ h2 {
   .post-cooked.post-cooked-always-expanded .post-cooked-content {
     max-height: none;
     overflow-y: visible;
-    padding-bottom: 20px;
+    padding-bottom: 12px;
   }
 
   /* 🍎 ROTATE CHEVRON WHEN EXPANDED - EXCLUDE POST-COOKED */
-  .notifications.mobile-expanded::before, .strategies.mobile-expanded::before, .competitor-analysis.mobile-expanded::before {
+  .notifications.mobile-expanded::before, .strategies.mobile-expanded::before, .competitor-analysis.mobile-expanded::before, .news4u.mobile-expanded::before {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='%2300ffcc' viewBox='0 0 24 24'%3E%3Cpath d='M7 14l5-5 5 5z'/%3E%3C/svg%3E");
   }
 
@@ -1412,7 +2120,7 @@ h2 {
   }
 
   /* 🍎 CLICK FEEDBACK */
-  .news4u::before:active, .notifications::before:active, .post-cooked::before:active, .strategies::before:active, .competitor-analysis::before:active {
+  .notifications::before:active, .post-cooked::before:active, .strategies::before:active, .competitor-analysis::before:active, .news4u::before:active {
     background-color: rgba(255, 255, 255, 0.05);
     transform: scale(0.98);
   }
@@ -1425,7 +2133,7 @@ h2 {
   .module-content h3 {
     font-size: 0.95rem;
     font-weight: 600;
-    margin: 16px 0 8px;
+    margin: 8px 0 4px;
     color: rgba(255, 255, 255, 0.9);
   }
 
@@ -1433,7 +2141,7 @@ h2 {
     font-size: 0.85rem;
     line-height: 1.5;
     color: rgba(255, 255, 255, 0.7);
-    margin: 8px 0;
+    margin: 4px 0;
   }
 
   .content-badge {
@@ -1452,7 +2160,7 @@ h2 {
     font-size: 0.85rem;
     font-weight: 600;
     border-radius: 12px;
-    margin: 8px 0;
+    margin: 6px 0;
     transition: all 0.2s ease;
   }
 
@@ -1545,49 +2253,6 @@ h2 {
   textarea {
     min-height: 100px;
   }
-
-  .news4u, .notifications, .post-cooked, .strategies, .competitor-analysis {
-    padding: 8px;
-    border-radius: 12px;
-    height: fit-content; /* Dynamic height */
-    min-height: fit-content;
-    max-height: none; /* Remove max-height limits */
-    overflow: visible; /* No scrolling needed */
-  }
-
-  /* Ultra compact strategies */
-  .strategies {
-    padding: 6px;
-    gap: 3px;
-    height: fit-content;
-    min-height: fit-content;
-  }
-
-  /* Competitor analysis fills remaining space */
-  .competitor-analysis {
-    height: auto;
-    min-height: 150px; /* Minimum height for ultra-small screens */
-    overflow-y: auto;
-  }
-
-  .strategies h2 {
-    margin-bottom: 4px;
-    font-size: 0.9rem;
-    margin-top: 0;
-    padding: 0;
-  }
-
-  .strategies .section-header {
-    gap: 3px;
-    margin: 0;
-    padding: 0;
-  }
-
-  .strategies .section-icon {
-    font-size: 0.8rem;
-    margin: 0;
-    padding: 0;
-  }
 }
 
 /* ✨ ULTRA-SMALL MOBILE */
@@ -1649,7 +2314,7 @@ h2 {
     font-size: 0.7rem;
   }
 
-  .notifications, .post-cooked, .strategies, .competitor-analysis {
+  .notifications, .post-cooked, .strategies, .competitor-analysis, .news4u {
     padding: 12px;
   }
 
@@ -1706,26 +2371,71 @@ h2 {
   }
 }
 
-/* ✨ LANDSCAPE MODE - WIDTH ONLY ADJUSTMENT */
+/* ✨ PROPORTIONAL SCALING SYSTEM - NO LAYOUT REARRANGEMENT */
+/* Transform-based scaling maintains exact layout structure at all screen sizes */
 @media (orientation: landscape) {
-  /* Only adjust width for landscape, never scale */
+  /* Fixed values for landscape - no responsive behavior */
   .dashboard-wrapper {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
+    transform-origin: center top;
+  }
+  
+  /* 7 BREAKPOINTS - PROPORTIONAL SCALING SYSTEM */
+  @media (max-width: 1400px) and (orientation: landscape) {
+    .dashboard-wrapper {
+      transform: scale(0.95);
+    }
+  }
+  
+  @media (max-width: 1200px) and (orientation: landscape) {
+    .dashboard-wrapper {
+      transform: scale(0.85);
+    }
+  }
+  
+  @media (max-width: 1000px) and (orientation: landscape) {
+    .dashboard-wrapper {
+      transform: scale(0.75);
+    }
+  }
+  
+  @media (max-width: 800px) and (orientation: landscape) {
+    .dashboard-wrapper {
+      transform: scale(0.65);
+    }
+  }
+  
+  @media (max-width: 600px) and (orientation: landscape) {
+    .dashboard-wrapper {
+      transform: scale(0.55);
+    }
+  }
+  
+  @media (max-width: 480px) and (orientation: landscape) {
+    .dashboard-wrapper {
+      transform: scale(0.45);
+    }
+  }
+  
+  @media (max-width: 360px) and (orientation: landscape) {
+    .dashboard-wrapper {
+      transform: scale(0.35);
+    }
   }
   
   /* Override for larger landscape screens */
   @media (min-width: 1600px) and (orientation: landscape) {
     .dashboard-wrapper {
       max-width: 1400px;
-      margin: 0 auto;
+      transform: scale(1);
     }
   }
   
   @media (min-width: 1920px) and (orientation: landscape) {
     .dashboard-wrapper {
       max-width: 1600px;
-      margin: 0 auto;
+      transform: scale(1);
     }
   }
 }
@@ -1928,5 +2638,83 @@ h2 {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* ✨ AUTOPILOT BUTTON - MINIMALIST DESIGN */
+.dashboard-btn.autopilot-btn {
+  border-color: rgba(0, 255, 204, 0.4);
+  background: rgba(0, 255, 204, 0.08);
+}
+
+.dashboard-btn.autopilot-btn:hover {
+  border-color: rgba(0, 255, 204, 0.6);
+  background: rgba(0, 255, 204, 0.12);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 255, 204, 0.3);
+}
+
+.dashboard-btn.autopilot-btn.instagram {
+  border-color: rgba(225, 48, 108, 0.4);
+  background: rgba(225, 48, 108, 0.08);
+}
+
+.dashboard-btn.autopilot-btn.instagram:hover {
+  border-color: rgba(225, 48, 108, 0.6);
+  background: rgba(225, 48, 108, 0.12);
+  box-shadow: 0 4px 16px rgba(225, 48, 108, 0.3);
+}
+
+.dashboard-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: rgba(142, 142, 147, 0.1);
+  border-color: rgba(142, 142, 147, 0.3);
+}
+
+/* ✨ CRITICAL FIX: Ensure modules remain visible in grid areas */
+@media (max-width: 1000px) and (min-width: 768px) {
+  .notifications,
+  .post-cooked,
+  .strategies,
+  .competitor-analysis,
+  .news4u {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  
+  /* Ensure grid areas are properly assigned */
+  .notifications {
+    grid-area: notifications !important;
+  }
+  
+  .post-cooked {
+    grid-area: post-cooked !important;
+  }
+  
+  .strategies {
+    grid-area: strategies !important;
+  }
+  
+  .competitor-analysis {
+    grid-area: competitor-analysis !important;
+  }
+  
+  .news4u {
+    grid-area: news4u !important;
+  }
+  
+  /* Prevent mobile-specific hiding */
+  .notifications > *,
+  .post-cooked > *,
+  .strategies > *,
+  .competitor-analysis > *,
+  .news4u > * {
+    max-height: none !important;
+    opacity: 1 !important;
+    overflow: visible !important;
   }
 }

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { FaClock, FaExternalLinkAlt, FaNewspaper } from 'react-icons/fa';
+import { FaClock, FaExternalLinkAlt, FaNewspaper, FaPlus, FaSpinner } from 'react-icons/fa';
 import axios from 'axios';
+import RagService from '../../services/RagService';
 import './News4U.css';
 
 interface News4UProps {
@@ -25,6 +26,8 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [creatingPost, setCreatingPost] = useState<Set<number>>(new Set());
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const toggleExpand = (idx: number) => {
     setExpanded(prev => {
@@ -48,6 +51,60 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       return `${Math.floor(hrs / 24)}d ago`;
     } catch {
       return 'Recently';
+    }
+  };
+
+  // Create infographic post from news item
+  const createPostFromNews = async (newsItem: NewsItem, idx: number) => {
+    setCreatingPost(prev => new Set([...prev, idx]));
+    setToastMessage(null);
+
+    try {
+      // Create the prefixed prompt for post generation
+      const prompt = `Create an engaging infographic post about this news: ${decodeUnicode(newsItem.breaking_news_summary)}`;
+      
+      console.log(`[News4U] 🚀 Creating infographic post for ${accountHolder} on ${platform}:`, prompt);
+      
+      // Use the same RAG service as the dashboard creation bar
+      const response = await RagService.sendPostQuery(
+        accountHolder,
+        prompt,
+        platform
+      );
+      
+      if (response.success) {
+        console.log(`[News4U] ✅ Post created successfully for ${accountHolder} on ${platform}`);
+        
+        // Trigger post refresh event (same as dashboard)
+        const newPostEvent = new CustomEvent('newPostCreated', {
+          detail: {
+            username: accountHolder,
+            platform: platform,
+            timestamp: Date.now()
+          }
+        });
+        window.dispatchEvent(newPostEvent);
+        console.log(`[News4U] 🔄 Triggered PostCooked refresh event for ${platform}`);
+        
+        setToastMessage('Infographic post created successfully! Check the Cooked Posts section.');
+        
+        // Auto-hide toast after 4 seconds
+        setTimeout(() => setToastMessage(null), 4000);
+      } else {
+        console.error(`[News4U] ❌ Post creation failed for ${accountHolder} on ${platform}:`, response.error);
+        setToastMessage(response.error || 'Failed to create infographic post. Please try again.');
+        setTimeout(() => setToastMessage(null), 4000);
+      }
+    } catch (error) {
+      console.error(`[News4U] ❌ Error creating infographic post for ${accountHolder} on ${platform}:`, error);
+      setToastMessage('Failed to create infographic post. Please try again.');
+      setTimeout(() => setToastMessage(null), 4000);
+    } finally {
+      setCreatingPost(prev => {
+        const next = new Set(prev);
+        next.delete(idx);
+        return next;
+      });
     }
   };
 
@@ -151,18 +208,57 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
                 )}
               </div>
 
-              {isOpen && item.source_url && (
-                <div className="news4u-source">
-                  <a href={item.source_url} target="_blank" rel="noopener noreferrer" className="source-link">
-                    <FaExternalLinkAlt className="link-icon" />
-                    <span>Read more</span>
-                  </a>
+              {isOpen && (
+                <div className="news4u-actions">
+                  <button
+                    className="create-post-btn"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      createPostFromNews(item, idx);
+                    }}
+                    disabled={creatingPost.has(idx)}
+                    title="Create infographic post from this news"
+                  >
+                    {creatingPost.has(idx) ? (
+                      <>
+                        <FaSpinner className="btn-icon spinning" />
+                        <span>Creating...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FaPlus className="btn-icon" />
+                        <span>Create Infographic Post</span>
+                      </>
+                    )}
+                  </button>
+                  {item.source_url && (
+                    <div>
+                      <a href={item.source_url} target="_blank" rel="noopener noreferrer" className="source-link">
+                        <FaExternalLinkAlt />
+                        <span>Read more</span>
+                      </a>
+                    </div>
+                  )}
                 </div>
               )}
             </motion.div>
           );
         })}
       </div>
+      
+      {/* Toast Message */}
+      {toastMessage && (
+        <motion.div
+          className="news4u-toast"
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 50 }}
+          transition={{ duration: 0.3 }}
+        >
+          {toastMessage}
+        </motion.div>
+      )}
     </motion.div>
   );
 };

@@ -95,6 +95,14 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   
   // NEW: Reference for scrollable container
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  
+  // ✨ NEW: Reimagine Image Feature State
+  const [showContextMenu, setShowContextMenu] = useState<{ x: number; y: number; postKey: string } | null>(null);
+  const [showReimagineModal, setShowReimagineModal] = useState(false);
+  const [reimaginePostKey, setReimaginePostKey] = useState<string | null>(null);
+  const [reimagineExtraPrompt, setReimagineExtraPrompt] = useState('');
+  const [isReimagining, setIsReimagining] = useState(false);
+  const [reimagineToastMessage, setReimagineToastMessage] = useState<string | null>(null);
 
   // Request deduplication to prevent multiple simultaneous API calls
   const requestCache = useRef<Map<string, { promise: Promise<any>; timestamp: number }>>(new Map());
@@ -1704,6 +1712,127 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     });
   };
 
+  // ✨ NEW: Reimagine Image Feature Handlers
+  const handleImageRightClick = useCallback((e: React.MouseEvent, postKey: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    setShowContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      postKey
+    });
+  }, []);
+  
+  const handleReimagineClick = useCallback((postKey: string) => {
+    setReimaginePostKey(postKey);
+    setReimagineExtraPrompt('');
+    setShowReimagineModal(true);
+    setShowContextMenu(null);
+  }, []);
+  
+  const handleDownloadImage = useCallback(async (postKey: string) => {
+    try {
+      const post = localPosts.find(p => p.key === postKey);
+      if (!post) return;
+      
+      const imageUrl = getReliableImageUrl(post);
+      const link = document.createElement('a');
+      link.href = imageUrl;
+      link.download = `${username}_${postKey}_image.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      setToastMessage('🎉 Image downloaded successfully!');
+    } catch (error) {
+      console.error('Failed to download image:', error);
+      setToastMessage('❌ Failed to download image');
+    }
+    setShowContextMenu(null);
+  }, [localPosts, username, getReliableImageUrl]);
+  
+  const handleReimagineSubmit = useCallback(async () => {
+    if (!reimaginePostKey) return;
+    
+    setIsReimagining(true);
+    setReimagineToastMessage('🎨 Reimagining your image...');
+    
+    try {
+      const response = await axios.post(`${API_BASE_URL}/api/reimagine-image`, {
+        username,
+        postKey: reimaginePostKey,
+        extraPrompt: reimagineExtraPrompt.trim(),
+        platform
+      });
+      
+      if (response.data.success) {
+        setReimagineToastMessage('🎉 Image reimagined successfully! Refreshing...');
+        
+        // Update the local post with new image information
+        setLocalPosts(prev => 
+          prev.map(post => 
+            post.key === reimaginePostKey 
+              ? {
+                  ...post,
+                  data: {
+                    ...post.data,
+                    image_url: response.data.newImageUrl,
+                    r2_image_url: response.data.newImageUrl,
+                    image_filename: response.data.newImageFilename,
+                    image_path: response.data.newImageFilename
+                  }
+                }
+              : post
+          )
+        );
+        
+        // Clear image cache to force reload
+        setImageErrors(prev => {
+          const newErrors = { ...prev };
+          delete newErrors[reimaginePostKey];
+          return newErrors;
+        });
+        
+        // Force image refresh
+        setImageRefreshKey(Date.now());
+        
+        setTimeout(() => {
+          setReimagineToastMessage(null);
+          setShowReimagineModal(false);
+          setReimaginePostKey(null);
+          setReimagineExtraPrompt('');
+        }, 2000);
+      } else {
+        throw new Error(response.data.error || 'Failed to reimagine image');
+      }
+    } catch (error: any) {
+      console.error('Failed to reimagine image:', error);
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to reimagine image';
+      setReimagineToastMessage(`❌ ${errorMessage}`);
+      
+      setTimeout(() => {
+        setReimagineToastMessage(null);
+      }, 4000);
+    } finally {
+      setIsReimagining(false);
+    }
+  }, [reimaginePostKey, reimagineExtraPrompt, username, platform, setImageRefreshKey]);
+  
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (showContextMenu) {
+        setShowContextMenu(null);
+      }
+    };
+    
+    if (showContextMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [showContextMenu]);
+
   const handlePostNow = async (post: any) => {
     // ✅ PRE-ACTION CHECK: Verify post limits before proceeding
     const postAccessCheck = canUseFeature('posts');
@@ -2266,6 +2395,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                           const target = e.target as HTMLImageElement;
                           handleImageError(post.key, target);
                         }}
+                        onContextMenu={(e) => handleImageRightClick(e, post.key)}
                         key={`${post.key}-${imageRefreshKey}`} // CACHED key for React
                         style={{
                           backgroundColor: '#2a2a4a', // Ensure background is visible during loading
@@ -2749,6 +2879,284 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
               </button>
             </div>
           </motion.div>
+        </motion.div>,
+        document.body
+      )}
+      
+      {/* ✨ NEW: Context Menu for Image Right-Click */}
+      {showContextMenu && createPortal(
+        <div
+          className="image-context-menu"
+          style={{
+            position: 'fixed',
+            top: showContextMenu.y,
+            left: showContextMenu.x,
+            background: 'rgba(20, 20, 40, 0.95)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '8px',
+            padding: '8px 0',
+            minWidth: '160px',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+            backdropFilter: 'blur(20px)',
+            zIndex: 10000,
+            overflow: 'hidden'
+          }}
+        >
+          <button
+            className="context-menu-item"
+            onClick={() => handleReimagineClick(showContextMenu.postKey)}
+            style={{
+              width: '100%',
+              padding: '12px 16px',
+              background: 'none',
+              border: 'none',
+              color: '#ffffff',
+              fontSize: '14px',
+              textAlign: 'left',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 255, 204, 0.1)';
+              e.currentTarget.style.color = '#00ffcc';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'none';
+              e.currentTarget.style.color = '#ffffff';
+            }}
+          >
+            🎨 Reimagine Image
+          </button>
+          <button
+            className="context-menu-item"
+            onClick={() => handleDownloadImage(showContextMenu.postKey)}
+            style={{
+              width: '100%',
+              padding: '12px 16px',
+              background: 'none',
+              border: 'none',
+              color: '#ffffff',
+              fontSize: '14px',
+              textAlign: 'left',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 255, 204, 0.1)';
+              e.currentTarget.style.color = '#00ffcc';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'none';
+              e.currentTarget.style.color = '#ffffff';
+            }}
+          >
+            💾 Download Image
+          </button>
+        </div>,
+        document.body
+      )}
+      
+      {/* ✨ NEW: Reimagine Image Modal */}
+      {showReimagineModal && createPortal(
+        <motion.div
+          className="modal-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.3 }}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            backdropFilter: 'blur(8px)'
+          }}
+          onClick={() => !isReimagining && setShowReimagineModal(false)}
+        >
+          <motion.div
+            className="reimagine-modal"
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'rgba(20, 20, 40, 0.95)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '16px',
+              padding: '24px',
+              maxWidth: '500px',
+              width: '90%',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
+              backdropFilter: 'blur(20px)'
+            }}
+          >
+            <div style={{ marginBottom: '20px' }}>
+              <h3 style={{ 
+                color: '#ffffff', 
+                fontSize: '20px', 
+                fontWeight: 'bold', 
+                margin: '0 0 8px 0',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                🎨 Reimagine Image
+              </h3>
+              <p style={{ 
+                color: 'rgba(255, 255, 255, 0.7)', 
+                fontSize: '14px', 
+                margin: 0,
+                lineHeight: '1.4'
+              }}>
+                Add improvements or modifications to generate a new version of this image.
+              </p>
+            </div>
+            
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ 
+                color: '#ffffff', 
+                fontSize: '14px', 
+                fontWeight: '500',
+                display: 'block',
+                marginBottom: '8px'
+              }}>
+                Additional Prompt (Optional):
+              </label>
+              <textarea
+                value={reimagineExtraPrompt}
+                onChange={(e) => setReimagineExtraPrompt(e.target.value)}
+                placeholder="e.g., make it more colorful, add sunset lighting, change to minimalist style..."
+                disabled={isReimagining}
+                style={{
+                  width: '100%',
+                  height: '100px',
+                  padding: '12px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '8px',
+                  color: '#ffffff',
+                  fontSize: '14px',
+                  resize: 'vertical',
+                  fontFamily: 'inherit',
+                  outline: 'none',
+                  transition: 'all 0.2s ease'
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = 'rgba(0, 255, 204, 0.3)';
+                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                  e.target.style.background = 'rgba(255, 255, 255, 0.05)';
+                }}
+              />
+            </div>
+            
+            <div style={{ 
+              display: 'flex', 
+              gap: '12px', 
+              justifyContent: 'flex-end' 
+            }}>
+              <button
+                onClick={() => setShowReimagineModal(false)}
+                disabled={isReimagining}
+                style={{
+                  background: 'rgba(255, 68, 68, 0.15)',
+                  border: '1px solid rgba(255, 68, 68, 0.3)',
+                  color: '#ff6b6b',
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  cursor: isReimagining ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  transition: 'all 0.3s ease',
+                  opacity: isReimagining ? 0.5 : 1
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReimagineSubmit}
+                disabled={isReimagining}
+                style={{
+                  background: isReimagining 
+                    ? 'rgba(255, 255, 255, 0.05)' 
+                    : 'rgba(0, 255, 204, 0.15)',
+                  color: isReimagining ? '#666' : '#00ffcc',
+                  border: `1px solid ${isReimagining ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 255, 204, 0.3)'}`,
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  cursor: isReimagining ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  transition: 'all 0.3s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                {isReimagining ? (
+                  <>
+                    <div style={{
+                      width: '14px',
+                      height: '14px',
+                      border: '2px solid rgba(255, 255, 255, 0.2)',
+                      borderTop: '2px solid #666',
+                      borderRadius: '50%',
+                      animation: 'spin 1s linear infinite'
+                    }} />
+                    Reimagining...
+                  </>
+                ) : (
+                  '🎨 Reimagine'
+                )}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>,
+        document.body
+      )}
+      
+      {/* ✨ NEW: Reimagine Toast Messages */}
+      {reimagineToastMessage && createPortal(
+        <motion.div
+          className="reimagine-toast"
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: 20 }}
+          transition={{ duration: 0.3 }}
+          style={{
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            background: 'rgba(20, 20, 40, 0.95)',
+            color: '#ffffff',
+            padding: '16px 20px',
+            borderRadius: '12px',
+            border: '1px solid rgba(0, 255, 204, 0.3)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+            backdropFilter: 'blur(20px)',
+            zIndex: 10001,
+            fontSize: '14px',
+            fontWeight: '500',
+            maxWidth: '300px',
+            wordWrap: 'break-word'
+          }}
+        >
+          {reimagineToastMessage}
         </motion.div>,
         document.body
       )}

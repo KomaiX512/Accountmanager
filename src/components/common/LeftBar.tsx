@@ -74,15 +74,12 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
           left: '0',
           zIndex: 999998, // FIXED: Just below TopBar but above everything else
           height: 'calc(100vh - 70px)', // FIXED: Match TopBar height
-          width: '80px',
           overflow: 'visible',
           transform: 'translateZ(0)', // Hardware acceleration
           willChange: 'transform',
           // Anti-interference protection
           margin: '0',
           padding: '0',
-          minWidth: '80px',
-          maxWidth: '80px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',

@@ -27,6 +27,7 @@ import {
   FiAward
 } from 'react-icons/fi';
 import './PricingPage.css';
+import PrivacyPolicyFooter from '../common/PrivacyPolicyFooter';
 
 const PricingPage: React.FC = () => {
   const { currentUser } = useAuth();
@@ -269,6 +270,9 @@ const PricingPage: React.FC = () => {
           </button>
         </div>
       </div>
+      
+      {/* Privacy Policy Footer */}
+      <PrivacyPolicyFooter />
     </div>
   );
 };

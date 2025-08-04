@@ -659,7 +659,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     }
   };
 
-  const [showDataInfo, setShowDataInfo] = useState(false);
+
 
   // Extract counter strategies preview from competitor data
   const getCounterStrategiesPreview = (competitorData: any) => {
@@ -1198,73 +1198,9 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
             transition={{ duration: 0.3, ease: 'easeOut' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="profile-section">
-              <h3>{selectedCompetitor}</h3>
-              {profileErrors[selectedCompetitor] ? (
-                <p className="error-text">{profileErrors[selectedCompetitor]}</p>
-              ) : competitorProfiles[selectedCompetitor] ? (
-                <div className="stats">
-                  <span>Followers: {formatCount(competitorProfiles[selectedCompetitor].followersCount)}</span>
-                  <span>Following: {formatCount(competitorProfiles[selectedCompetitor].followsCount)}</span>
-                </div>
-              ) : (
-                <div className="stats">
-                  <span>Followers: Loading...</span>
-                  <span>Following: Loading...</span>
-                </div>
-              )}
-            </div>
-            
-            {/* ✅ NEW: Compact data limitation notice */}
-            <div className="compact-data-notice" onClick={() => setShowDataInfo(!showDataInfo)}>
-              <div className="notice-icon-tiny">
-                <svg 
-                  xmlns="http://www.w3.org/2000/svg" 
-                  width="12" 
-                  height="12" 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  strokeWidth="2" 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round"
-                >
-                  <circle cx="12" cy="12" r="10"/>
-                  <line x1="12" y1="8" x2="12" y2="12"/>
-                  <line x1="12" y1="16" x2="12.01" y2="16"/>
-                </svg>
-              </div>
-              <span className="notice-text-compact">
-                Limited analysis? Click for details
-              </span>
-              <div className="expand-icon">
-                <svg 
-                  xmlns="http://www.w3.org/2000/svg" 
-                  width="10" 
-                  height="10" 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  strokeWidth="2" 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round"
-                >
-                  <polyline points="6,9 12,15 18,9"/>
-                </svg>
-              </div>
-            </div>
-            
-            {/* ✅ NEW: Expandable detailed information */}
-            {showDataInfo && (
-              <div className="expanded-data-info">
-                <div className="info-content">
-                  <p>For exact competitive analysis, ensure the competitor has sufficient public content. Limited insights may indicate the competitor needs 2-3 more posts for comprehensive analysis.</p>
-                </div>
-              </div>
-            )}
+
             
             <div className="analysis-section">
-              <h4>Competitor Analysis Report</h4>
               {selectedData?.length ? (
                 <motion.div
                   key={currentAnalysisIndex}

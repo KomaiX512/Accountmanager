@@ -10,7 +10,7 @@ import PostScheduler from './PostScheduler';
 import InsightsModal from './InsightsModal';
 import GoalModal from './GoalModal';
 import CampaignModal from './CampaignModal';
-import NewsForYou from './NewsForYou';
+import News4U from '../common/News4U';
 import { motion } from 'framer-motion';
 import axios, { AxiosError } from 'axios';
 import { useAuth } from '../../context/AuthContext';
@@ -20,21 +20,17 @@ import useFeatureTracking from '../../hooks/useFeatureTracking';
 import useUpgradeHandler from '../../hooks/useUpgradeHandler';
 import AccessControlPopup from '../common/AccessControlPopup';
 import useResetPlatformState from '../../hooks/useResetPlatformState';
+import AutopilotPopup from '../common/AutopilotPopup';
 
 import ChatModal from './ChatModal';
 import RagService from '../../services/RagService';
 import type { ChatMessage as ChatModalMessage } from './ChatModal';
 import type { Notification, ProfileInfo, LinkedAccount } from '../../types/notifications';
 import { safeFilter, safeMap, safeLength } from '../../utils/safeArrayUtils';
-import AutopilotPopup from '../common/AutopilotPopup';
-import News4U from '../common/News4U';
 // Import icons from react-icons
-import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaLock, FaBell, FaUndo, FaComments, FaPencilAlt, FaPaperPlane, FaRocket, FaNewspaper } from 'react-icons/fa';
+import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaLock, FaUndo, FaPencilAlt, FaRocket, FaRobot } from 'react-icons/fa';
 import { MdAnalytics, MdOutlineSchedule, MdOutlineAutoGraph } from 'react-icons/md';
-import { BsLightningChargeFill, BsBinoculars, BsLightbulb } from 'react-icons/bs';
-import { IoMdAnalytics } from 'react-icons/io';
 import { TbTargetArrow } from 'react-icons/tb';
-import { GiSpy } from 'react-icons/gi';
 
 // Define RagService compatible ChatMessage
 interface RagChatMessage {
@@ -69,7 +65,6 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
   const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
-  const [isAutopilotPopupOpen, setIsAutopilotPopupOpen] = useState(false);
   const [showCampaignButton, setShowCampaignButton] = useState(false);
   const [replySentTracker, setReplySentTracker] = useState<{
     text: string;
@@ -142,6 +137,9 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const [isMobileChatOpen, setIsMobileChatOpen] = useState(false);
   const [isMobileImageEditorOpen, setIsMobileImageEditorOpen] = useState(false);
   const [isMobileProfilePopupOpen, setIsMobileProfilePopupOpen] = useState(false);
+  
+  // 🚀 AUTOPILOT: Autopilot popup state
+  const [isAutopilotPopupOpen, setIsAutopilotPopupOpen] = useState(false);
   
   // ✨ MOBILE DROPDOWN POSITIONING
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
@@ -1532,16 +1530,6 @@ Image Description: ${response.post.image_prompt}
     checkCampaignStatus();
   };
 
-  // 🚀 AUTOPILOT: Autopilot popup handlers
-  const handleOpenAutopilotPopup = () => {
-    console.log('[DEBUG] Autopilot button clicked in Instagram Dashboard!');
-    setIsAutopilotPopupOpen(true);
-  };
-
-  const handleCloseAutopilotPopup = () => {
-    setIsAutopilotPopupOpen(false);
-  };
-
   // Reset functionality handlers
   const handleOpenResetConfirm = () => {
     setIsResetConfirmOpen(true);
@@ -2016,6 +2004,17 @@ Image Description: ${response.post.image_prompt}
     }
   };
 
+  // 🚀 AUTOPILOT: Handlers for autopilot popup
+  const handleOpenAutopilotPopup = () => {
+    console.log(`[DEBUG] Opening autopilot popup for instagram - ${accountHolder}`);
+    setIsAutopilotPopupOpen(true);
+  };
+
+  const handleCloseAutopilotPopup = () => {
+    console.log(`[DEBUG] Closing autopilot popup for instagram - ${accountHolder}`);
+    setIsAutopilotPopupOpen(false);
+  };
+
   if (!accountHolder) {
     return null;
   }
@@ -2189,15 +2188,6 @@ Image Description: ${response.post.image_prompt}
                     </InstagramRequiredButton>
                     
                     <button
-                      onClick={handleOpenAutopilotPopup}
-                      className="dashboard-btn autopilot-btn instagram"
-                      onMouseEnter={() => console.log('[DEBUG] Autopilot button hovered!')}
-                    >
-                      <FaRocket className="btn-icon" />
-                      <span>Autopilot</span>
-                    </button>
-                    
-                    <button
                       onClick={handleOpenGoalModal}
                       className="dashboard-btn goal-btn"
                     >
@@ -2212,6 +2202,16 @@ Image Description: ${response.post.image_prompt}
                     >
                       <FaUndo className="btn-icon" />
                       <span>{isResetting ? 'Resetting...' : 'Reset'}</span>
+                    </button>
+                    
+                    {/* 🚀 AUTOPILOT: Autopilot button with glassmorphism style */}
+                    <button
+                      onClick={handleOpenAutopilotPopup}
+                      className="dashboard-btn autopilot-btn instagram"
+                      title="Autopilot Mode - Automate your dashboard"
+                    >
+                      <FaRobot className="btn-icon" />
+                      <span>Autopilot</span>
                     </button>
                     
                     {showCampaignButton && (
@@ -2301,6 +2301,20 @@ Image Description: ${response.post.image_prompt}
                 <span>{isResetting ? 'Resetting...' : 'Reset'}</span>
               </button>
               
+              {/* 🚀 AUTOPILOT: Mobile autopilot button */}
+              <button
+                onClick={() => {
+                  console.log('Mobile Autopilot clicked');
+                  handleOpenAutopilotPopup();
+                  setIsMobileProfileMenuOpen(false);
+                }}
+                className="dashboard-btn autopilot-btn instagram"
+                title="Autopilot Mode - Automate your dashboard"
+              >
+                <FaRobot className="btn-icon" />
+                <span>Autopilot</span>
+              </button>
+              
               {showCampaignButton && (
                 <button
                   onClick={() => {
@@ -2317,13 +2331,21 @@ Image Description: ${response.post.image_prompt}
             </div>
           )}
 
+          {/* ✨ NEWS4U MODULE - PLATFORM & USERNAME AWARE */}
           <div 
             className={`news4u ${expandedModules.news4u ? 'mobile-expanded' : ''}`}
             onClick={(e) => handleMobileModuleClick('news4u', e)}
           >
-
+            <h2 style={{ marginBottom: '8px' }}>
+              <div className="section-header">
+                <span>📰 News4U</span>
+                <div className="content-badge viewed">
+                  <span className="badge-text">Updated</span>
+                </div>
+              </div>
+            </h2>
             <News4U 
-              accountHolder={accountHolder}
+              accountHolder={accountHolder} 
               platform="instagram"
             />
           </div>
@@ -2332,7 +2354,11 @@ Image Description: ${response.post.image_prompt}
             className={`notifications ${expandedModules.notifications ? 'mobile-expanded' : ''}`}
             onClick={(e) => handleMobileModuleClick('notifications', e)}
           >
-
+            <h2 style={{ marginBottom: '8px' }}>
+              <div className="section-header">
+                <span>📱 Notifications</span>
+              </div>
+            </h2>
             <DmsComments 
               notifications={notifications} 
               onReply={handleReply} 
@@ -2374,18 +2400,15 @@ Image Description: ${response.post.image_prompt}
             className={`strategies ${expandedModules.strategies ? 'mobile-expanded' : ''}`}
             onClick={(e) => handleMobileModuleClick('strategies', e)}
           >
-            <h2>
+            <h2 style={{ marginBottom: '8px' }}>
               <div className="section-header">
-                <BsLightbulb className="section-icon" />
-                <span>Our Strategies</span>
+                <span>🎯 Our Strategies</span>
                 {getUnseenStrategiesCount() > 0 ? (
                   <div className="content-badge" onClick={markStrategiesAsViewed}>
-                    <FaBell className="badge-icon" />
                     <span className="badge-count">{getUnseenStrategiesCount()}</span>
                   </div>
                 ) : (
                   <div className="content-badge viewed">
-                    <FaBell className="badge-icon" />
                     <span className="badge-text">Viewed</span>
                   </div>
                 )}
@@ -2398,23 +2421,6 @@ Image Description: ${response.post.image_prompt}
             className={`competitor-analysis ${expandedModules.competitorAnalysis ? 'mobile-expanded' : ''}`}
             onClick={(e) => handleMobileModuleClick('competitorAnalysis', e)}
           >
-            <h2>
-              <div className="section-header">
-                <GiSpy className="section-icon" />
-                <span>Competitor Analysis</span>
-                {getUnseenCompetitorCount() > 0 ? (
-                  <div className="content-badge" onClick={markCompetitorDataAsViewed}>
-                    <FaBell className="badge-icon" />
-                    <span className="badge-count">{getUnseenCompetitorCount()}</span>
-                  </div>
-                ) : (
-                  <div className="content-badge viewed">
-                    <FaBell className="badge-icon" />
-                    <span className="badge-text">Viewed</span>
-                  </div>
-                )}
-              </div>
-            </h2>
             <Cs_Analysis accountHolder={accountHolder} competitors={competitors} />
           </div>
 
@@ -2514,16 +2520,6 @@ Image Description: ${response.post.image_prompt}
           onCampaignStopped={handleCampaignStopped}
         />
       )}
-
-      {/* 🚀 AUTOPILOT: Autopilot Popup Component */}
-      <AutopilotPopup
-        username={accountHolder}
-        platform="instagram"
-        isConnected={!!igBusinessId}
-        isOpen={isAutopilotPopupOpen}
-        onClose={handleCloseAutopilotPopup}
-      />
-
       {isResetConfirmOpen && (
         <motion.div
           className="post-scheduler-modal"
@@ -2600,6 +2596,16 @@ Image Description: ${response.post.image_prompt}
           isProcessing={isProcessing}
           linkedAccounts={linkedAccounts}
           platform="instagram"
+        />
+      )}
+
+      {/* 🚀 AUTOPILOT: Autopilot Popup - Exact same functionality as CampaignModal */}
+      {isAutopilotPopupOpen && (
+        <AutopilotPopup
+          username={accountHolder}
+          platform="instagram"
+          isConnected={isInstagramConnected}
+          onClose={handleCloseAutopilotPopup}
         />
       )}
 

@@ -3,7 +3,7 @@
 .cs-analysis-container {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 4px;
   background: transparent;
   padding: 0;
   position: relative;
@@ -132,9 +132,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 6px;
+  margin-bottom: 2px;
   padding: 0 2px;
-  min-height: 24px;
+  min-height: 16px;
 }
 
 .competitor-header-row {
@@ -142,7 +142,7 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .competitor-name-heading {
@@ -165,16 +165,18 @@
 .add-competitor-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   background: rgba(255, 255, 255, 0.02);
   color: #ffffff;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
-  padding: 8px 12px;
+  padding: 6px 10px;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 500;
   transition: all 0.2s ease;
+  margin: 0;
+  margin-top: 2px;
 }
 
 .add-competitor-btn:disabled {
@@ -802,11 +804,20 @@
 }
 
 .competitor-list-scrollable {
-  max-height: 350px;
-  min-height: 200px;
+  max-height: 400px;
+  min-height: 250px;
   overflow-y: auto;
   padding-right: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
+  flex: 1;
+}
+
+.competitor-list-heading {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #e0e0ff;
+  margin: 0 0 2px 0;
+  padding: 0;
 }
 
 .competitor-loading-card {
@@ -1063,6 +1074,7 @@
   font-weight: 400;
   display: -webkit-box;
   -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1099,32 +1111,65 @@
 
 /* ✨ MOBILE PORTRAIT - COMPREHENSIVE MOBILE TRANSFORMATION */
 @media (max-width: 767px) and (orientation: portrait) {
+  .cs-analysis-container {
+    gap: 6px;
+    min-height: 250px;
+  }
+
+  .competitor-header {
+    margin-bottom: 1px;
+    min-height: 14px;
+  }
+
+  .competitor-header-row {
+    margin-bottom: 1px;
+  }
+
+  .add-competitor-btn {
+    gap: 4px;
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    margin-top: 1px;
+  }
+
+  .competitor-list-scrollable {
+    max-height: 350px;
+    min-height: 200px;
+    margin-bottom: 6px;
+  }
+
+  .competitor-list-heading {
+    font-size: 0.85rem;
+    margin: 0 0 4px 0;
+  }
+
   .competitor-sub-container {
-    padding: 8px;
-    border-radius: 12px;
+    padding: 6px;
+    border-radius: 10px;
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    gap: 4px;
+    gap: 3px;
     display: flex;
     flex-direction: column;
   }
 
   .preview-text {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     line-height: 1.2;
     margin: 0;
     color: rgba(255, 255, 255, 0.95);
     display: -webkit-box;
     -webkit-line-clamp: 3;
+  line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-height: 2.7em; /* Exactly 3 lines for mobile */
+    max-height: 2.52em; /* Exactly 3 lines for mobile */
   }
 
   .see-more-btn {
-    font-size: 0.65rem;
-    padding: 2px 4px;
+    font-size: 0.6rem;
+    padding: 1px 3px;
     border-radius: 2px;
     align-self: flex-start;
     margin: 0;
@@ -1133,25 +1178,54 @@
 
 /* ✨ ULTRA-SMALL MOBILE ADJUSTMENTS */
 @media (max-width: 480px) and (orientation: portrait) {
-  .competitor-sub-container {
-    padding: 6px;
+  .cs-analysis-container {
+    gap: 4px;
+    min-height: 200px;
+  }
+
+  .competitor-header {
+    margin-bottom: 1px;
+    min-height: 12px;
+  }
+
+  .add-competitor-btn {
     gap: 3px;
+    padding: 3px 6px;
+    font-size: 0.75rem;
+    margin-top: 1px;
+  }
+
+  .competitor-list-scrollable {
+    max-height: 300px;
+    min-height: 180px;
+    margin-bottom: 4px;
+  }
+
+  .competitor-list-heading {
+    font-size: 0.8rem;
+    margin: 0 0 3px 0;
+  }
+
+  .competitor-sub-container {
+    padding: 4px;
+    gap: 2px;
   }
 
   .preview-text {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     margin: 0;
     display: -webkit-box;
     -webkit-line-clamp: 3;
+  line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-height: 2.52em; /* Exactly 3 lines for ultra-small mobile */
+    max-height: 2.34em; /* Exactly 3 lines for ultra-small mobile */
   }
 
   .see-more-btn {
-    font-size: 0.6rem;
-    padding: 1px 3px;
+    font-size: 0.55rem;
+    padding: 1px 2px;
     margin: 0;
   }
 }

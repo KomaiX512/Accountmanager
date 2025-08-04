@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 
 // Facebook OAuth configuration from environment or defaults
 const FB_APP_ID = process.env.REACT_APP_FACEBOOK_APP_ID || '676612308718574';
-const FB_REDIRECT_URI = process.env.REACT_APP_FACEBOOK_REDIRECT_URI || 'https://c38b57a675c1.ngrok-free.app/facebook/callback';
+const FB_REDIRECT_URI = process.env.REACT_APP_FACEBOOK_REDIRECT_URI || 'https://d96f2f467e80.ngrok-free.app/facebook/callback';
 const FB_API_VERSION = process.env.REACT_APP_FACEBOOK_API_VERSION || 'v17.0';
 
 /**
@@ -211,9 +211,6 @@ const FacebookConnect: React.FC<FacebookConnectProps> = ({ onConnected, classNam
     <div className={`facebook-connect ${className}`}>      
       {isConnected ? (
         <>
-          <div className="facebook-connected-info">
-            Connected to Facebook as <strong>{username || facebookId}</strong>
-          </div>
           <button 
             className="facebook-disconnect-button" 
             onClick={handleDisconnect}

@@ -84,6 +84,39 @@
   line-height: 1.4;
 }
 
+.ig-policy-scrollable {
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 10px;
+  border: 1px solid #333;
+  border-radius: 4px;
+  background: #252525;
+}
+
+.ig-policy-scrollable ul {
+  padding-left: 20px;
+  margin: 10px 0;
+}
+
+.ig-policy-scrollable li {
+  margin-bottom: 5px;
+}
+
+.ig-policy-scrollable ul ul {
+  padding-left: 15px;
+  margin: 5px 0;
+}
+
+.ig-policy-scrollable h3 {
+  margin-top: 15px;
+  margin-bottom: 10px;
+  color: #f0f0f0;
+}
+
+.ig-policy-scrollable p {
+  margin: 8px 0;
+}
+
 .ig-accept-option {
   margin: 10px 20px 0;
   display: flex;

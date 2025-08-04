@@ -21,6 +21,7 @@ import { useUsage } from '../../context/UsageContext';
 import GlobalUpgradeHandler from '../common/GlobalUpgradeHandler';
 import { useProcessing } from '../../context/ProcessingContext';
 import { safeFilter, safeMap, safeLength } from '../../utils/safeArrayUtils';
+import PrivacyPolicyFooter from '../common/PrivacyPolicyFooter';
 
 interface PlatformLoadingState {
   startTime: number;
@@ -1754,6 +1755,9 @@ const MainDashboard: React.FC = () => {
         </div>,
         document.body
       )}
+      
+      {/* Privacy Policy Footer */}
+      <PrivacyPolicyFooter />
     </div>
   );
 };

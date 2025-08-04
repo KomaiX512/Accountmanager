@@ -320,15 +320,7 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
             transition={{ duration: 0.3, ease: 'easeOut' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="profile-section">
-              <h3>{normalizedAccountHolder}</h3>
-              <div className="stats">
-                <span>Followers: TBD</span>
-                <span>Following: TBD</span>
-              </div>
-            </div>
             <div className="strategy-section">
-              <h4>Strategy Report</h4>
               {loading ? (
                 <div className="strategy-report">
                   <h5>Loading Strategies...</h5>

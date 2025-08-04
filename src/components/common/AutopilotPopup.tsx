@@ -1,52 +1,50 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import axios from 'axios';
-import { FaRocket, FaCalendarAlt, FaReply, FaTimes, FaCheck, FaExclamationTriangle } from 'react-icons/fa';
+import { FaTimes, FaRocket, FaCalendarAlt, FaReply, FaExclamationTriangle } from 'react-icons/fa';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
 import './AutopilotPopup.css';
 
+// 🚀 AUTOPILOT: Interface definitions matching CampaignModal
 interface AutopilotSettings {
   enabled: boolean;
   autoSchedule: boolean;
   autoReply: boolean;
-  lastChecked?: string;
-  autoScheduleInterval?: number; // in minutes
-  autoReplyInterval?: number; // in minutes
-  scheduledPostsCount?: number;
-  autoRepliesCount?: number;
+  autoScheduleInterval: number;
+  scheduledPostsCount: number;
+  autoRepliesCount: number;
 }
 
 interface AutopilotPopupProps {
   username: string;
-  platform: string;
+  platform: 'instagram' | 'twitter' | 'facebook';
   isConnected: boolean;
-  isOpen: boolean;
   onClose: () => void;
 }
 
-const AutopilotPopup: React.FC<AutopilotPopupProps> = ({
-  username,
-  platform,
-  isConnected,
-  isOpen,
-  onClose
+const AutopilotPopup: React.FC<AutopilotPopupProps> = ({ 
+  username, 
+  platform, 
+  isConnected, 
+  onClose 
 }) => {
   const { trackRealCampaign } = useFeatureTracking();
   
-  // 🚀 AUTOPILOT: Exact same state as CampaignModal
+  // 🚀 AUTOPILOT: State management matching CampaignModal
   const [autopilotSettings, setAutopilotSettings] = useState<AutopilotSettings>({
     enabled: false,
     autoSchedule: false,
     autoReply: false,
     autoScheduleInterval: 60, // default 1 hour
-    autoReplyInterval: 5, // default 5 minutes
     scheduledPostsCount: 0,
     autoRepliesCount: 0
   });
+  
   const [autopilotLoading, setAutopilotLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // 🚀 AUTOPILOT: Fetch current automation settings (same as CampaignModal)
+  // 🚀 AUTOPILOT: Fetch current automation settings
   const fetchAutopilotSettings = async () => {
     try {
       const response = await axios.get(`/autopilot-settings/${username}?platform=${platform}`);
@@ -62,17 +60,19 @@ const AutopilotPopup: React.FC<AutopilotPopupProps> = ({
           autoSchedule: false,
           autoReply: false,
           autoScheduleInterval: 60,
-          autoReplyInterval: 5,
           scheduledPostsCount: 0,
           autoRepliesCount: 0
         });
       } else {
         console.warn('Error fetching autopilot settings:', err);
+        setError('Failed to load autopilot settings.');
       }
+    } finally {
+      setLoading(false);
     }
   };
 
-  // 🚀 AUTOPILOT: Update automation settings (same as CampaignModal)
+  // 🚀 AUTOPILOT: Update automation settings
   const updateAutopilotSettings = async (newSettings: Partial<AutopilotSettings>) => {
     setAutopilotLoading(true);
     try {
@@ -89,7 +89,7 @@ const AutopilotPopup: React.FC<AutopilotPopupProps> = ({
         
         // Track automation usage
         await trackRealCampaign(platform.toLowerCase(), {
-          action: 'campaign_started'
+          action: 'campaign_started' // Using campaign_started for autopilot activation
         });
       }
     } catch (err: any) {
@@ -100,7 +100,7 @@ const AutopilotPopup: React.FC<AutopilotPopupProps> = ({
     }
   };
 
-  // 🚀 AUTOPILOT: Toggle main autopilot switch (same as CampaignModal)
+  // 🚀 AUTOPILOT: Toggle main autopilot switch
   const handleAutopilotToggle = async () => {
     // ✅ CONNECTION CHECK: Prevent activation if account not connected
     if (!isConnected && !autopilotSettings.enabled) {
@@ -109,7 +109,7 @@ const AutopilotPopup: React.FC<AutopilotPopupProps> = ({
     }
     
     const newEnabled = !autopilotSettings.enabled;
-    await updateAutopilotSettings({ 
+    await updateAutopilotSettings({
       enabled: newEnabled,
       // If disabling autopilot, also disable both features
       autoSchedule: newEnabled ? autopilotSettings.autoSchedule : false,
@@ -117,8 +117,8 @@ const AutopilotPopup: React.FC<AutopilotPopupProps> = ({
     });
   };
 
-  // 🚀 AUTOPILOT: Enhanced toggle functions - intervals managed globally by Dashboard
-  const handleAutoScheduleToggleWithInterval = async () => {
+  // 🚀 AUTOPILOT: Toggle auto-schedule feature
+  const handleAutoScheduleToggle = async () => {
     if (!autopilotSettings.enabled) return;
     if (!isConnected) {
       setError('Account connection required for auto-scheduling.');
@@ -127,11 +127,10 @@ const AutopilotPopup: React.FC<AutopilotPopupProps> = ({
     
     const newAutoSchedule = !autopilotSettings.autoSchedule;
     await updateAutopilotSettings({ autoSchedule: newAutoSchedule });
-    
-    console.log(`[AutopilotPopup] Auto-schedule ${newAutoSchedule ? 'enabled' : 'disabled'} - Dashboard service will handle intervals`);
   };
 
-  const handleAutoReplyToggleWithInterval = async () => {
+  // 🚀 AUTOPILOT: Toggle auto-reply feature
+  const handleAutoReplyToggle = async () => {
     if (!autopilotSettings.enabled) return;
     if (!isConnected) {
       setError('Account connection required for auto-replies.');
@@ -140,251 +139,250 @@ const AutopilotPopup: React.FC<AutopilotPopupProps> = ({
     
     const newAutoReply = !autopilotSettings.autoReply;
     await updateAutopilotSettings({ autoReply: newAutoReply });
+  };
+
+  // 🚀 AUTOPILOT: Button triggering functions
+  const triggerAutoScheduleButton = () => {
+    if (!autopilotSettings.autoSchedule || !isConnected) return;
     
-    console.log(`[AutopilotPopup] Auto-reply ${newAutoReply ? 'enabled' : 'disabled'} - Dashboard service will handle intervals`);
+    // Dispatch event to trigger the Auto Schedule button in PostCooked component
+    window.dispatchEvent(new CustomEvent('triggerAutoSchedule', {
+      detail: {
+        username,
+        platform: platform.toLowerCase(),
+        interval: autopilotSettings.autoScheduleInterval || 60
+      }
+    }));
+    
+    console.log(`[AutopilotPopup] Triggered auto-schedule for ${username} on ${platform}`);
+    
+    // Update counter
+    setAutopilotSettings(prev => ({
+      ...prev,
+      scheduledPostsCount: (prev.scheduledPostsCount || 0) + 1
+    }));
   };
 
-  // 🚀 AUTOPILOT: Update auto-schedule interval (same as CampaignModal)
-  const handleIntervalChange = async (newInterval: number) => {
-    await updateAutopilotSettings({ autoScheduleInterval: newInterval });
+  const triggerAutoReplyButton = () => {
+    if (!autopilotSettings.autoReply || !isConnected) return;
+    
+    // Dispatch event to trigger the Auto Reply All button in Dashboard component
+    window.dispatchEvent(new CustomEvent('triggerAutoReply', {
+      detail: {
+        username,
+        platform: platform.toLowerCase()
+      }
+    }));
+    
+    console.log(`[AutopilotPopup] Triggered auto-reply for ${username} on ${platform}`);
+    
+    // Update counter
+    setAutopilotSettings(prev => ({
+      ...prev,
+      autoRepliesCount: (prev.autoRepliesCount || 0) + 1
+    }));
   };
 
-  // 🚀 AUTOPILOT: Update auto-reply interval
-  const handleAutoReplyIntervalChange = async (newInterval: number) => {
-    await updateAutopilotSettings({ autoReplyInterval: newInterval });
-  };
-
-  // Fetch settings when popup opens
+  // Load settings on component mount
   useEffect(() => {
-    if (isOpen) {
-      fetchAutopilotSettings();
-    }
-  }, [isOpen, username, platform]);
+    fetchAutopilotSettings();
+  }, [username, platform]);
 
-  // Auto-dismiss error after 5 seconds
-  useEffect(() => {
-    if (error) {
-      const timer = setTimeout(() => setError(null), 5000);
-      return () => clearTimeout(timer);
+  // Handle click outside popup to close
+  const handleOverlayClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      onClose();
     }
-  }, [error]);
+  };
 
-  const platformConfig = {
-    instagram: { color: '#e4405f', name: 'Instagram' },
-    twitter: { color: '#000000', name: 'X (Twitter)' },
-    facebook: { color: '#1877f2', name: 'Facebook' }
-  }[platform] || { color: '#6366f1', name: platform };
+  // Platform-specific colors
+  const platformColors = {
+    instagram: '#E4405F',
+    twitter: '#1DA1F2',
+    facebook: '#1877F2'
+  };
+
+  const platformColor = platformColors[platform] || '#8a2be2';
+
+  if (loading) {
+    return (
+      <div className="autopilot-popup-overlay" onClick={handleOverlayClick}>
+        <motion.div
+          className="autopilot-popup"
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.8, opacity: 0 }}
+          transition={{ type: "spring", duration: 0.3 }}
+        >
+          <div className="autopilot-popup-header">
+            <div className="autopilot-popup-title">
+              <h3>Loading Autopilot Settings...</h3>
+            </div>
+            <button className="autopilot-popup-close" onClick={onClose}>
+              <FaTimes />
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          className="autopilot-popup-overlay"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-        >
-          <motion.div
-            className="autopilot-popup"
-            initial={{ scale: 0.9, opacity: 0, y: 20 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.9, opacity: 0, y: 20 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="autopilot-popup-header">
-              <div className="autopilot-popup-title">
-                <FaRocket className="title-icon" style={{ color: platformConfig.color }} />
-                <h3>Autopilot Dashboard</h3>
-                <span className="platform-badge" style={{ backgroundColor: platformConfig.color }}>
-                  {platformConfig.name}
-                </span>
-              </div>
-              <button className="autopilot-popup-close" onClick={onClose}>
-                <FaTimes />
-              </button>
+    <div className="autopilot-popup-overlay" onClick={handleOverlayClick}>
+      <motion.div
+        className="autopilot-popup"
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.8, opacity: 0 }}
+        transition={{ type: "spring", duration: 0.3 }}
+      >
+        {/* Header */}
+        <div className="autopilot-popup-header">
+          <div className="autopilot-popup-title">
+            <h3>
+              <FaRocket style={{ marginRight: '8px', color: platformColor }} />
+              Autopilot Control Center
+            </h3>
+            <div 
+              className="platform-badge" 
+              style={{ backgroundColor: platformColor }}
+            >
+              {platform}
             </div>
+          </div>
+          <button className="autopilot-popup-close" onClick={onClose}>
+            <FaTimes />
+          </button>
+        </div>
 
-            {/* Error Message */}
-            {error && (
-              <motion.div
-                className="autopilot-error"
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-              >
-                <FaExclamationTriangle />
-                <span>{error}</span>
-              </motion.div>
-            )}
+        {/* Error Display */}
+        {error && (
+          <div className="autopilot-error">
+            <FaExclamationTriangle />
+            {error}
+          </div>
+        )}
 
-            {/* Connection Status */}
-            {!isConnected && (
-              <div className="autopilot-connection-warning">
-                <FaExclamationTriangle />
-                <span>Connect your {platformConfig.name} account to enable autopilot features</span>
-              </div>
-            )}
+        {/* Connection Warning */}
+        {!isConnected && (
+          <div className="autopilot-connection-warning">
+            <FaExclamationTriangle />
+            Account not connected. Please connect your {platform} account to use autopilot features.
+          </div>
+        )}
 
-            {/* Main Autopilot Toggle */}
-            <div className="autopilot-main-control">
-              <div className="autopilot-main-toggle">
-                <div className="toggle-info">
-                  <h4>Enable Autopilot Mode</h4>
-                  <p>Automate your entire {platformConfig.name} dashboard</p>
-                </div>
-                <button
-                  className={`autopilot-toggle-btn ${autopilotSettings.enabled ? 'active' : ''}`}
-                  onClick={handleAutopilotToggle}
-                  disabled={autopilotLoading || (!isConnected && !autopilotSettings.enabled)}
-                >
-                  <div className="toggle-slider">
-                    <div className="toggle-knob">
-                      {autopilotLoading ? (
-                        <div className="loading-spinner" />
-                      ) : autopilotSettings.enabled ? (
-                        <FaCheck />
-                      ) : null}
-                    </div>
-                  </div>
-                  <span>{autopilotSettings.enabled ? 'Active' : 'Inactive'}</span>
-                </button>
-              </div>
-            </div>
+        {/* Main Autopilot Control */}
+        <div className="autopilot-main-control">
+          <div className="autopilot-main-toggle">
+            <h4>🚁 Autopilot Mode</h4>
+            <label className="autopilot-switch">
+              <input
+                type="checkbox"
+                checked={autopilotSettings.enabled}
+                onChange={handleAutopilotToggle}
+                disabled={autopilotLoading || !isConnected}
+              />
+              <span className="autopilot-slider"></span>
+              <span className="autopilot-switch-label">
+                {autopilotSettings.enabled ? 'Active' : 'Inactive'}
+              </span>
+            </label>
+          </div>
+        </div>
 
-            {/* Feature Controls */}
-            <div className={`autopilot-features ${!autopilotSettings.enabled ? 'disabled' : ''}`}>
-              {/* Auto-Schedule Feature */}
-              <div className="autopilot-feature">
-                <div className="feature-header">
-                  <div className="feature-icon">
-                    <FaCalendarAlt style={{ color: platformConfig.color }} />
-                  </div>
-                  <div className="feature-info">
+        {/* Autopilot Features */}
+        {autopilotSettings.enabled && (
+          <div className="autopilot-features">
+            {/* Auto-Schedule Feature */}
+            <div className="autopilot-feature">
+              <div className="autopilot-feature-header">
+                <div className="autopilot-feature-info">
+                  <FaCalendarAlt className="autopilot-feature-icon" />
+                  <div>
                     <h5>Auto-Schedule Posts</h5>
-                    <p>Automatically schedule your ready posts with smart intervals</p>
+                    <p>Automatically schedule new posts with smart intervals</p>
                   </div>
-                  <button
-                    className={`feature-toggle ${autopilotSettings.autoSchedule ? 'active' : ''}`}
-                    onClick={handleAutoScheduleToggleWithInterval}
-                    disabled={!autopilotSettings.enabled || autopilotLoading}
-                  >
-                    <div className="toggle-slider">
-                      <div className="toggle-knob">
-                        {autopilotSettings.autoSchedule && <FaCheck />}
-                      </div>
-                    </div>
-                  </button>
                 </div>
-
-                {autopilotSettings.autoSchedule && (
-                  <motion.div
-                    className="feature-details"
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                  >
-                    <div className="interval-selector">
-                      <label>Posting Interval:</label>
-                      <select
-                        value={autopilotSettings.autoScheduleInterval || 60}
-                        onChange={(e) => handleIntervalChange(Number(e.target.value))}
-                        disabled={autopilotLoading}
-                      >
-                        <option value={0.33}>20 Seconds (Testing)</option>
-                        <option value={1}>1 Minute (Testing)</option>
-                        <option value={5}>5 Minutes (Testing)</option>
-                        <option value={60}>1 Hour</option>
-                        <option value={120}>2 Hours</option>
-                        <option value={240}>4 Hours</option>
-                        <option value={480}>8 Hours</option>
-                        <option value={720}>12 Hours</option>
-                        <option value={1440}>24 Hours</option>
-                      </select>
-                    </div>
-                    <div className="feature-stats">
-                      <span>Scheduled: {autopilotSettings.scheduledPostsCount || 0}</span>
-                    </div>
-                  </motion.div>
-                )}
+                <label className="autopilot-feature-toggle">
+                  <input
+                    type="checkbox"
+                    checked={autopilotSettings.autoSchedule}
+                    onChange={handleAutoScheduleToggle}
+                    disabled={autopilotLoading || !isConnected}
+                  />
+                  <span className="autopilot-feature-slider"></span>
+                </label>
               </div>
-
-              {/* Auto-Reply Feature */}
-              <div className="autopilot-feature">
-                <div className="feature-header">
-                  <div className="feature-icon">
-                    <FaReply style={{ color: platformConfig.color }} />
-                  </div>
-                  <div className="feature-info">
-                    <h5>Auto-Reply Messages</h5>
-                    <p>AI responses to DMs and comments automatically</p>
-                  </div>
-                  <button
-                    className={`feature-toggle ${autopilotSettings.autoReply ? 'active' : ''}`}
-                    onClick={handleAutoReplyToggleWithInterval}
-                    disabled={!autopilotSettings.enabled || autopilotLoading}
+              
+              {autopilotSettings.autoSchedule && (
+                <div className="autopilot-feature-controls">
+                  <button 
+                    className="autopilot-trigger-btn autopilot-schedule-btn"
+                    onClick={triggerAutoScheduleButton}
+                    disabled={!isConnected}
                   >
-                    <div className="toggle-slider">
-                      <div className="toggle-knob">
-                        {autopilotSettings.autoReply && <FaCheck />}
-                      </div>
-                    </div>
+                    📅 Trigger Auto-Schedule
                   </button>
+                  <span className="autopilot-counter">
+                    Scheduled: {autopilotSettings.scheduledPostsCount || 0}
+                  </span>
                 </div>
-
-                {autopilotSettings.autoReply && (
-                  <motion.div
-                    className="feature-details"
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                  >
-                    <div className="interval-selector">
-                      <label>Reply Check Interval:</label>
-                      <select
-                        value={autopilotSettings.autoReplyInterval || 5}
-                        onChange={(e) => handleAutoReplyIntervalChange(Number(e.target.value))}
-                        disabled={autopilotLoading}
-                      >
-                        <option value={0.33}>20 Seconds (Testing)</option>
-                        <option value={1}>1 Minute (Testing)</option>
-                        <option value={5}>5 Minutes</option>
-                        <option value={10}>10 Minutes</option>
-                        <option value={30}>30 Minutes</option>
-                        <option value={60}>1 Hour</option>
-                      </select>
-                    </div>
-                    <div className="feature-stats">
-                      <span>Replies Sent: {autopilotSettings.autoRepliesCount || 0}</span>
-                    </div>
-                    <div className="feature-note">
-                      <small>AI automatically replies to new messages and comments</small>
-                    </div>
-                  </motion.div>
-                )}
-              </div>
+              )}
             </div>
 
-            {/* Status Summary */}
-            {autopilotSettings.enabled && (
-              <motion.div
-                className="autopilot-status"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                <div className="status-indicator">
-                  <div className="status-dot active" />
-                  <span>Autopilot Active</span>
+            {/* Auto-Reply Feature */}
+            <div className="autopilot-feature">
+              <div className="autopilot-feature-header">
+                <div className="autopilot-feature-info">
+                  <FaReply className="autopilot-feature-icon" />
+                  <div>
+                    <h5>Auto-Reply to DMs/Comments</h5>
+                    <p>AI responds to messages and comments automatically</p>
+                  </div>
                 </div>
-                <p>Your {platformConfig.name} dashboard is now automated!</p>
-              </motion.div>
-            )}
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+                <label className="autopilot-feature-toggle">
+                  <input
+                    type="checkbox"
+                    checked={autopilotSettings.autoReply}
+                    onChange={handleAutoReplyToggle}
+                    disabled={autopilotLoading || !isConnected}
+                  />
+                  <span className="autopilot-feature-slider"></span>
+                </label>
+              </div>
+              
+              {autopilotSettings.autoReply && (
+                <div className="autopilot-feature-controls">
+                  <button 
+                    className="autopilot-trigger-btn autopilot-reply-btn"
+                    onClick={triggerAutoReplyButton}
+                    disabled={!isConnected}
+                  >
+                    💬 Trigger Auto-Reply
+                  </button>
+                  <span className="autopilot-counter">
+                    Replied: {autopilotSettings.autoRepliesCount || 0}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Status Display */}
+        {autopilotSettings.enabled && (autopilotSettings.autoSchedule || autopilotSettings.autoReply) && (
+          <div className="autopilot-status">
+            <div className="status-indicator">
+              <div className="status-dot"></div>
+              <strong>Autopilot Active</strong>
+            </div>
+            <p>
+              Background automation is running. Features will operate automatically based on your settings.
+            </p>
+          </div>
+        )}
+      </motion.div>
+    </div>
   );
 };
 

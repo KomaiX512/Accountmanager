@@ -2465,13 +2465,13 @@ async function streamToBuffer(stream) {
 // Instagram App Credentials
 const APP_ID = '1089716559763623';
 const APP_SECRET = '0733abf780036963e9f57f33a4b2fa6e';
-const REDIRECT_URI = 'https://c38b57a675c1.ngrok-free.app/instagram/callback';
+const REDIRECT_URI = 'https://d96f2f467e80.ngrok-free.app/instagram/callback';
 const VERIFY_TOKEN = 'myInstagramWebhook2025';
 
 // Facebook App Credentials  
 const FB_APP_ID = '676612308718574'; // Your ACTUAL Facebook App ID (NOT Configuration ID)
 const FB_APP_SECRET = '0144a0685fd3182b29e2750dabe2fcda'; // Your actual App Secret
-const FB_REDIRECT_URI = 'https://c38b57a675c1.ngrok-free.app/facebook/callback';
+const FB_REDIRECT_URI = 'https://d96f2f467e80.ngrok-free.app/facebook/callback';
 const FB_VERIFY_TOKEN = 'myFacebookWebhook2025';
 
 app.get([
@@ -8605,7 +8605,7 @@ class PlatformSchemaManager {
 // Twitter OAuth 2.0 credentials
 const TWITTER_CLIENT_ID = 'cVNYR3UxVm5jQ3d5UWw0UHFqUTI6MTpjaQ';
 const TWITTER_CLIENT_SECRET = 'Wr8Kewh92NVB-035hAvpQeQ1Azc7chre3PUTgDoEltjO57mxzO';
-const TWITTER_REDIRECT_URI = 'https://c38b57a675c1.ngrok-free.app/twitter/callback';
+const TWITTER_REDIRECT_URI = 'https://d96f2f467e80.ngrok-free.app/twitter/callback';
 
 // Debug logging for OAuth 2.0
 console.log(`[${new Date().toISOString()}] Twitter OAuth 2.0 Configuration:`);

@@ -2444,6 +2444,132 @@ Visual Description for Image:
 IMPORTANT: Use EXACTLY the section headers shown above.`;
 }
 
+// API endpoint for reimagining existing images with prompt improvements
+app.post('/api/reimagine-image', async (req, res) => {
+  try {
+    const { username, postKey, extraPrompt = '', platform = 'instagram' } = req.body;
+    
+    if (!username || !postKey) {
+      return res.status(400).json({ error: 'Username and postKey are required' });
+    }
+    
+    console.log(`[RAG-Server] Processing image reimagination for ${platform}/${username}, post: ${postKey}`);
+    console.log(`[RAG-Server] Extra prompt: "${extraPrompt}"`);
+    
+    // Fetch the original post data to get the current image prompt
+    // Handle both short postKey (e.g., "ready_post_1754279425276") and full path formats
+    let postDataKey;
+    if (postKey.includes('.json')) {
+      // Full path format: "ready_post/twitter/elonmusk/ready_post_1754279425276.json"
+      postDataKey = postKey;
+    } else if (postKey.includes(`ready_post/${platform}/${username}/`)) {
+      // Partial path format: "ready_post/twitter/elonmusk/ready_post_1754279425276"
+      postDataKey = postKey.endsWith('.json') ? postKey : `${postKey}.json`;
+    } else {
+      // Short format: "ready_post_1754279425276"
+      postDataKey = `ready_post/${platform}/${username}/${postKey}.json`;
+    }
+    
+    console.log(`[RAG-Server] Constructed postDataKey: ${postDataKey}`);
+    let originalPostData;
+    
+    try {
+      const postDataResponse = await s3Operations.getObject(structuredbS3, {
+        Bucket: 'structuredb',
+        Key: postDataKey
+      });
+      
+      const postDataContent = await streamToString(postDataResponse.Body);
+      originalPostData = JSON.parse(postDataContent);
+      console.log(`[RAG-Server] Original post data retrieved successfully`);
+    } catch (fetchError) {
+      console.error(`[RAG-Server] Failed to fetch original post data:`, fetchError.message);
+      return res.status(404).json({ error: 'Original post not found' });
+    }
+    
+    // Extract the original image prompt
+    const originalImagePrompt = originalPostData.image_prompt || originalPostData.imagePrompt;
+    if (!originalImagePrompt) {
+      return res.status(400).json({ error: 'Original image prompt not found in post data' });
+    }
+    
+    console.log(`[RAG-Server] Original image prompt: "${originalImagePrompt.substring(0, 100)}..."`);
+    
+    // Create enhanced prompt by combining original with extra improvements
+    let enhancedImagePrompt = originalImagePrompt;
+    if (extraPrompt && extraPrompt.trim()) {
+      enhancedImagePrompt = `${originalImagePrompt}. ${extraPrompt.trim()}`;
+      console.log(`[RAG-Server] Enhanced prompt created with user improvements`);
+    }
+    
+    // Generate new image filename with timestamp to ensure uniqueness
+    const timestamp = Date.now();
+    const originalFilename = originalPostData.image_filename || originalPostData.imageFilename || `${postKey}_image.jpg`;
+    const fileExtension = originalFilename.split('.').pop() || 'jpg';
+    const newImageFilename = `${postKey}_reimagined_${timestamp}.${fileExtension}`;
+    
+    console.log(`[RAG-Server] Generating new image: ${newImageFilename}`);
+    
+    // Generate the new image using the enhanced prompt
+    try {
+      await generateImageFromPrompt(enhancedImagePrompt, newImageFilename, username, platform);
+      console.log(`[RAG-Server] Image reimagination completed successfully`);
+    } catch (imageError) {
+      console.error(`[RAG-Server] Image reimagination failed:`, imageError.message);
+      return res.status(500).json({ error: 'Failed to generate new image', details: imageError.message });
+    }
+    
+    // Update the post data with new image information
+    const updatedPostData = {
+      ...originalPostData,
+      image_filename: newImageFilename,
+      imageFilename: newImageFilename,
+      image_prompt: enhancedImagePrompt,
+      imagePrompt: enhancedImagePrompt,
+      image_url: `https://570f213f1410829ee9a733a77a5f40e3.r2.cloudflarestorage.com/structuredb/ready_post/${platform}/${username}/${newImageFilename}`,
+      r2_image_url: `https://570f213f1410829ee9a733a77a5f40e3.r2.cloudflarestorage.com/structuredb/ready_post/${platform}/${username}/${newImageFilename}`,
+      reimagined_at: new Date().toISOString(),
+      reimagined_from: originalPostData.image_filename || originalPostData.imageFilename,
+      extra_prompt_used: extraPrompt || null
+    };
+    
+    // Save the updated post data
+    try {
+      await s3Operations.putObject(structuredbS3, {
+        Bucket: 'structuredb',
+        Key: postDataKey,
+        Body: JSON.stringify(updatedPostData, null, 2),
+        ContentType: 'application/json'
+      });
+      console.log(`[RAG-Server] Updated post data saved successfully`);
+    } catch (saveError) {
+      console.error(`[RAG-Server] Failed to save updated post data:`, saveError.message);
+      return res.status(500).json({ error: 'Failed to save updated post data' });
+    }
+    
+    // Return success response with new image information
+    const response = {
+      success: true,
+      message: 'Image reimagined successfully',
+      postKey,
+      originalImageFilename: originalPostData.image_filename || originalPostData.imageFilename,
+      newImageFilename,
+      originalPrompt: originalImagePrompt,
+      enhancedPrompt: enhancedImagePrompt,
+      extraPrompt: extraPrompt || null,
+      newImageUrl: updatedPostData.image_url,
+      timestamp: updatedPostData.reimagined_at
+    };
+    
+    console.log(`[RAG-Server] Image reimagination response:`, JSON.stringify(response, null, 2));
+    return res.json(response);
+    
+  } catch (error) {
+    console.error(`[RAG-Server] Error in image reimagination:`, error);
+    return res.status(500).json({ error: 'Failed to reimagine image', details: error.message });
+  }
+});
+
 // API endpoint for post generator (updated with full image generation functionality)
 app.post(['/api/post-generator', '/api/rag/post-generator'], async (req, res) => {
   try {

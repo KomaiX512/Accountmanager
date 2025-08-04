@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { FaClock, FaExternalLinkAlt, FaNewspaper } from 'react-icons/fa';
+import { FaClock, FaExternalLinkAlt, FaNewspaper, FaPlus, FaSpinner } from 'react-icons/fa';
+import RagService from '../../services/RagService';
 import axios from 'axios';
 import './News4U.css';
 
@@ -22,6 +23,8 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [creatingPost, setCreatingPost] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // --- helpers --------------------------------------------------------------
   const decodeUnicode = (text?: string) =>
@@ -94,6 +97,31 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     );
   }
 
+  // --- create infographic post ---------------------------------------------
+  const createPostFromNews = async () => {
+    if (creatingPost) return;
+    setCreatingPost(true);
+    setToastMessage(null);
+    const newsItem = items[current];
+    try {
+      const prompt = `Create an engaging infographic post about this news: ${decodeUnicode(newsItem.breaking_news_summary)}`;
+      const response = await RagService.sendPostQuery(accountHolder, prompt, platform);
+      if (response.success) {
+        const evt = new CustomEvent('newPostCreated', { detail: { username: accountHolder, platform, timestamp: Date.now() } });
+        window.dispatchEvent(evt);
+        setToastMessage('Infographic post created! Check Cooked Posts.');
+      } else {
+        setToastMessage(response.error || 'Failed to create infographic post.');
+      }
+    } catch (e) {
+      console.error(e);
+      setToastMessage('Failed to create infographic post.');
+    } finally {
+      setCreatingPost(false);
+      setTimeout(()=>setToastMessage(null),4000);
+    }
+  };
+
   // --- slider handlers ------------------------------------------------------
   const next = () => {
     if (current < items.length - 1) {
@@ -136,12 +164,34 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
         )}
       </div>
 
-      {expanded && item.source_url && (
-        <div className="news4u-source">
-          <a href={item.source_url} target="_blank" rel="noopener noreferrer" className="source-link">
-            <FaExternalLinkAlt className="link-icon" />
-            <span>Read more</span>
-          </a>
+      {expanded && (
+        <div className="news4u-actions">
+          {item.source_url && (
+            <div>
+              <a href={item.source_url} target="_blank" rel="noopener noreferrer" className="source-link">
+                <FaExternalLinkAlt />
+                <span>Read more</span>
+              </a>
+            </div>
+          )}
+          <button
+            className="create-post-btn"
+            onClick={createPostFromNews}
+            disabled={creatingPost}
+            title="Create infographic post from this news"
+          >
+            {creatingPost ? (
+              <>
+                <FaSpinner className="btn-icon spinning" />
+                <span>Creating...</span>
+              </>
+            ) : (
+              <>
+                <FaPlus className="btn-icon" />
+                <span>Create Infographic Post</span>
+              </>
+            )}
+          </button>
         </div>
       )}
 
@@ -154,6 +204,15 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
           Next
         </motion.button>
       </div>
+      {toastMessage && (
+        <motion.div
+          className="news4u-toast"
+          initial={{ opacity:0, y:50 }}
+          animate={{ opacity:1, y:0 }}
+          exit={{ opacity:0, y:50 }}
+          transition={{ duration:0.3 }}
+        >{toastMessage}</motion.div>
+      )}
     </motion.div>
   );
 };

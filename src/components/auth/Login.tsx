@@ -57,7 +57,8 @@ const Login: React.FC = () => {
   const [demoVerificationCode, setDemoVerificationCode] = useState<string | null>(null);
 
   // Get the path the user was trying to access before being redirected to login
-  const from = (location.state as LocationState)?.from?.pathname || '/';
+  // Default to dashboard instead of homepage for better UX
+  const from = (location.state as LocationState)?.from?.pathname || '/account';
 
   useEffect(() => {
     // If user is already logged in, redirect to the previous page or dashboard

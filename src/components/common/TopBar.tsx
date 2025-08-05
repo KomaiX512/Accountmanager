@@ -74,7 +74,7 @@ const TopBar: React.FC = () => {
           maxHeight: '70px'
         }}
       >
-        <div className="logo" onClick={() => navigate('/')}>
+        <div className="logo" onClick={() => navigate(currentUser ? '/account' : '/')}>
           <img 
             src="/Logo/logo.png" 
             className="logo-image"

@@ -19,12 +19,13 @@ body:has(.dashboard-wrapper) {
 
 /* Ensure dashboard wrapper doesn't interfere with fixed positioned overlays */
 .dashboard-wrapper {
-  width: 100%;
   background: transparent;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 20px 0;
+  padding: 20px;
+  margin-left: 6vw; /* Default left margin */
+  margin-right: 20px; /* Default right margin */
   box-sizing: border-box;
   transform: none !important;
   perspective: none !important;
@@ -141,6 +142,8 @@ body:has(.dashboard-wrapper) {
 }
 
 /* ✨ CRITICAL FIX: Ensure grid layout persists until truly mobile */
+
+
 @media (max-width: 1000px) and (min-width: 768px) {
   .dashboard-grid {
     display: grid !important;
@@ -741,10 +744,157 @@ body:has(.dashboard-wrapper) {
   }
 }
 
+/* Smooth transition for 1200-1030px range */
+@media (max-width: 1200px) and (min-width: 1030px) {
+  .profile-actions {
+    max-width: 50%;
+    gap: 4px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-right: 4px;
+  }
+  
+  .profile-actions .dashboard-btn {
+    min-width: 34px;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    padding: 5px 9px;
+    font-size: 0.72rem;
+    flex-shrink: 0;
+  }
+  
+  /* Ensure stats stay horizontal */
+  .stats {
+    flex-wrap: nowrap !important;
+    flex-direction: row !important;
+    justify-content: flex-start !important;
+    overflow: visible !important;
+    gap: 8px;
+  }
+  
+  .stat {
+    padding: 5px 9px;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+  }
+}
+
+/* Comprehensive fix for 1030-1000px range to prevent dramatic breaks */
+@media (max-width: 1030px) and (min-width: 1000px) {
+  .profile-actions {
+    max-width: 100% !important;
+    gap: 3px !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    padding-right: 4px !important;
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+  
+  .profile-actions .dashboard-btn {
+    min-width: 32px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    padding: 4px 8px !important;
+    font-size: 0.7rem !important;
+    flex-shrink: 0 !important;
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+  
+  /* Ensure stats stay horizontal in this range */
+  .stats {
+    flex-wrap: nowrap !important;
+    flex-direction: row !important;
+    justify-content: flex-start !important;
+    overflow: visible !important;
+    gap: 6px !important;
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+  
+  .stat {
+    padding: 4px 8px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+  
+  /* Force profile bar to maintain consistent height */
+  .profile-bar {
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+  }
+  
+  .profile-metadata {
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    padding: 4px 8px !important;
+  }
+}
+
 @media (max-width: 1000px) {
   .profile-actions {
-    max-width: 40%;
+    max-width: 100%;
+    gap: 3px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-right: 4px;
+  }
+  
+  .profile-actions .dashboard-btn {
+    min-width: 32px;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    padding: 4px 8px;
+    font-size: 0.7rem;
+    flex-shrink: 0;
+  }
+}
+
+/* Smooth transition for 1000-900px range */
+@media (max-width: 1000px) and (min-width: 900px) {
+  .profile-actions {
+    max-width: 100%;
     gap: 2px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-right: 4px;
+  }
+  
+  .profile-actions .dashboard-btn {
+    min-width: 30px;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    padding: 3px 7px;
+    font-size: 0.68rem;
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 900px) {
+  .profile-actions {
+    max-width: 100%;
+    gap: 2px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-right: 4px;
   }
   
   .profile-actions .dashboard-btn {
@@ -754,37 +904,26 @@ body:has(.dashboard-wrapper) {
     max-height: 44px !important;
     padding: 3px 6px;
     font-size: 0.65rem;
+    flex-shrink: 0;
   }
 }
 
-@media (max-width: 900px) {
-  .profile-actions {
-    max-width: 35%;
-    gap: 1px;
-  }
-  
-  .profile-actions .dashboard-btn {
-    min-width: 24px;
-    height: 44px !important;
-    min-height: 44px !important;
-    max-height: 44px !important;
-    padding: 2px 4px;
-    font-size: 0.6rem;
-  }
-}
-
-/* Responsive button wrapping for small screens */
-@media (max-width: 900px) {
+/* Smooth transition to wrapping at smaller screens */
+@media (max-width: 850px) {
   .profile-actions {
     max-width: 100%;
     flex-wrap: wrap;
-    row-gap: 3px;
+    row-gap: 2px;
     justify-content: flex-start;
+    overflow-x: visible;
   }
   .profile-actions .dashboard-btn {
-    flex: 1 1 80px;
+    flex: 1 1 70px;
     min-width: 24px;
-    margin-bottom: 2px;
+    margin-bottom: 1px;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
   }
 }
 
@@ -1062,21 +1201,16 @@ body:has(.dashboard-wrapper) {
   padding-bottom: 0 !important;
 }
 
-/* ✨ ULTRA-COMPACT NEWS4U MODULE - NO EXTRA SPACE */
+/* ✨ ULTRA-COMPACT NEWS4U MODULE - APPLE PREMIUM DESIGN */
 .news4u {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1.5px solid rgba(255, 255, 255, 0.18);
-  border-radius: 20px;
-  padding: 4px;
-  height: 100%;
-  overflow-y: auto; /* Allow scrolling for news content */
-  backdrop-filter: blur(15px);
-  position: relative;
-  box-shadow: 
-    0 4px 20px rgba(0, 0, 0, 0.2),
-    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
-  transition: all 0.3s ease;
   grid-area: news4u;
+  position: relative;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 16px;
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
 }
 
 .news4u::before {
@@ -1086,33 +1220,33 @@ body:has(.dashboard-wrapper) {
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 204, 0, 0.4), transparent);
+  background: linear-gradient(90deg, transparent, rgba(0, 255, 204, 0.4), transparent);
   opacity: 0.8;
 }
 
 .news4u:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 204, 0, 0.3);
-  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(0, 255, 204, 0.2);
+  transform: translateY(-1px);
   box-shadow: 
-    0 8px 30px rgba(0, 0, 0, 0.25),
-    0 0 0 1px rgba(255, 204, 0, 0.1) inset;
+    0 4px 16px rgba(0, 0, 0, 0.15),
+    0 0 0 1px rgba(0, 255, 204, 0.1) inset;
 }
 
-/* ✨ COMPACT NEWS4U CONTENT STYLING */
+/* ✨ COMPACT NEWS4U CONTENT STYLING - APPLE DESIGN */
 .news4u-header {
   display: flex;
   align-items: center;
   gap: 10px;
   margin-bottom: 2px;
   color: #ffffff;
-  font-size: 1.3rem;
+  font-size: 1.1rem;
   font-weight: 600;
 }
 
 .news4u-icon {
-  color: #ffcc00;
-  font-size: 1.2rem;
+  color: #00ffcc;
+  font-size: 1rem;
 }
 
 .news4u-content {
@@ -1121,119 +1255,7 @@ body:has(.dashboard-wrapper) {
   gap: 8px;
 }
 
-.news4u-item {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 12px;
-  transition: all 0.3s ease;
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-}
-
-.news4u-item::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 204, 0, 0.3), transparent);
-  opacity: 0.6;
-}
-
-.news4u-item:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 204, 0, 0.3);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.news4u-item-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 4px;
-}
-
-.news4u-title {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #ffffff;
-  line-height: 1.4;
-  flex: 1;
-}
-
-.news4u-platform {
-  background: rgba(255, 204, 0, 0.15);
-  border: 1px solid rgba(255, 204, 0, 0.3);
-  border-radius: 8px;
-  padding: 2px 6px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: #ffcc00;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.news4u-description {
-  font-size: 0.8rem;
-  color: #b8b8b8;
-  line-height: 1.5;
-  margin-bottom: 4px;
-}
-
-.news4u-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 0.7rem;
-  color: #888;
-}
-
-.news4u-timestamp {
-  opacity: 0.8;
-}
-
-.news4u-source {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 6px;
-  padding: 2px 6px;
-  font-weight: 500;
-}
-
-.news4u-empty {
-  text-align: center;
-  padding: 40px 20px;
-  color: #888;
-  font-style: italic;
-}
-
-.news4u-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 20px;
-  color: #ffcc00;
-  font-size: 0.9rem;
-  gap: 10px;
-}
-
-.news4u-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255, 204, 0, 0.3);
-  border-top: 2px solid #ffcc00;
-  border-radius: 50%;
-  animation: news-spinner 1s linear infinite;
-}
-
-@keyframes news-spinner {
-  to { transform: rotate(360deg); }
-}
+/* News4U component styles are now handled by the component's own CSS file */
 
 .notifications::before,
 .post-cooked::before,
@@ -2716,5 +2738,79 @@ h2 {
     max-height: none !important;
     opacity: 1 !important;
     overflow: visible !important;
+  }
+}
+
+/* ✨ RESPONSIVE DASHBOARD WRAPPER SPACING - MATCH LEFT BAR WIDTH */
+@media (max-width: 1600px) {
+  .dashboard-wrapper {
+    margin-left: 5.5vw !important;
+    margin-right: 18px !important;
+  }
+}
+
+@media (max-width: 1440px) {
+  .dashboard-wrapper {
+    margin-left: 5vw !important;
+    margin-right: 16px !important;
+  }
+}
+
+@media (max-width: 1366px) {
+  .dashboard-wrapper {
+    margin-left: 4.5vw !important;
+    margin-right: 14px !important;
+  }
+}
+
+@media (max-width: 1280px) {
+  .dashboard-wrapper {
+    margin-left: 4vw !important;
+    margin-right: 12px !important;
+  }
+}
+
+@media (max-width: 1200px) {
+  .dashboard-wrapper {
+    margin-left: 3.5vw !important;
+    margin-right: 10px !important;
+  }
+}
+
+@media (max-width: 1024px) {
+  .dashboard-wrapper {
+    margin-left: 3vw !important;
+    margin-right: 8px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-wrapper {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding: 10px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-wrapper {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding: 8px !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .dashboard-wrapper {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding: 5px !important;
+  }
+}
+
+/* ✨ MOBILE - NO LEFT BAR, NO MARGIN NEEDED */
+@media (max-width: 767px) and (orientation: portrait) {
+  .dashboard-wrapper {
+    margin-left: 0 !important; /* No left bar on mobile, no margin needed */
   }
 }

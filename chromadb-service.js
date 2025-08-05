@@ -201,11 +201,11 @@ class ChromaDBService {
             normalized.profile = firstItem.author;
             normalized.posts = data.map(item => ({
               content: item.text || item.caption || '',
-              timestamp: item.timestamp || item.created_at,
+              timestamp: item.timestamp || item.created_at || item.createdAt,
               engagement: {
-                likes: item.likesCount || item.like_count || 0,
-                comments: item.commentsCount || item.reply_count || 0,
-                shares: item.retweetCount || item.share_count || 0
+                likes: item.likeCount || item.likesCount || item.like_count || 0,
+                comments: item.replyCount || item.commentsCount || item.reply_count || 0,
+                shares: item.retweetCount || item.shareCount || item.share_count || 0
               },
               hashtags: this.extractHashtags(item.text || item.caption || ''),
               mentions: this.extractMentions(item.text || item.caption || '')
@@ -243,6 +243,30 @@ class ChromaDBService {
         }
       } else if (typeof data === 'object') {
         // Handle object format
+        // Facebook Page format (profileInfo + posts)
+        if (data.profileInfo && Array.isArray(data.posts)) {
+          const profileObj = data.profileInfo;
+          // Normalize profile fields for consistency
+          normalized.profile = {
+            ...profileObj,
+            username: profileObj.pageName || profileObj.pageId || '',
+            fullName: profileObj.pageName || profileObj.title || profileObj.name || '',
+            followersCount: profileObj.followers || profileObj.likes || 0,
+            biography: profileObj.intro || (profileObj.about_me && profileObj.about_me.text) || ''
+          };
+
+          normalized.posts = data.posts.map(post => ({
+            content: post.text || post.message || post.caption || '',
+            timestamp: post.timestamp || post.time,
+            engagement: {
+              likes: post.likes || post.like_count || 0,
+              comments: post.comments || post.comment_count || 0,
+              shares: post.shares || post.share_count || 0
+            },
+            hashtags: this.extractHashtags(post.text || post.message || post.caption || ''),
+            mentions: this.extractMentions(post.text || post.message || post.caption || '')
+          }));
+        } else 
         if (data.username || data.name || data.fullName) {
           // Direct profile object
           normalized.profile = data;
@@ -344,7 +368,8 @@ Hashtags: ${post.hashtags.join(' ')}
 Mentions: ${post.mentions.join(' ')}
 Likes: ${(post.engagement?.likes || 0).toLocaleString()}
 Comments: ${(post.engagement?.comments || 0).toLocaleString()}
-Engagement: ${((post.engagement?.likes || 0) + (post.engagement?.comments || 0)).toLocaleString()}
+Retweets: ${(post.engagement?.shares || 0).toLocaleString()}
+Total Engagement: ${((post.engagement?.likes || 0) + (post.engagement?.comments || 0) + (post.engagement?.shares || 0)).toLocaleString()}
 Posted: ${post.timestamp || 'Recent'}`;
 
       return {

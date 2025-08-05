@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { FaClock, FaExternalLinkAlt, FaNewspaper, FaPlus, FaSpinner } from 'react-icons/fa';
+import { FaClock, FaExternalLinkAlt, FaNewspaper, FaPlus, FaSpinner, FaRss } from 'react-icons/fa';
 import axios from 'axios';
 import RagService from '../../services/RagService';
 import './News4U.css';
@@ -150,7 +150,7 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     return (
       <motion.div className="news4u-container" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
         <div className="news4u-error">
-          <FaNewspaper className="error-icon" />
+          <FaRss className="error-icon" />
           <span>{error}</span>
         </div>
       </motion.div>
@@ -161,7 +161,7 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     return (
       <motion.div className="news4u-container" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
         <div className="news4u-empty">
-          <FaNewspaper className="empty-icon" />
+          <FaRss className="empty-icon" />
           <span>No news available</span>
         </div>
       </motion.div>
@@ -173,12 +173,8 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       className="news4u-container"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={{ scale: 1.02 }}
+      whileHover={{ scale: 1.01 }}
     >
-      <div className="news4u-title-bar">
-        <FaNewspaper className="title-icon" />
-        <span className="title-text">News 4U</span>
-      </div>
       <div className="news4u-content">
         {items.map((item, idx) => {
           const isOpen = expanded.has(idx);
@@ -233,9 +229,9 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
                     )}
                   </button>
                   {item.source_url && (
-                    <div>
+                    <div className="news4u-source">
                       <a href={item.source_url} target="_blank" rel="noopener noreferrer" className="source-link">
-                        <FaExternalLinkAlt />
+                        <FaExternalLinkAlt className="link-icon" />
                         <span>Read more</span>
                       </a>
                     </div>

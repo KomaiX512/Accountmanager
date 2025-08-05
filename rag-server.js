@@ -116,10 +116,10 @@ async function streamToString(stream) {
 
 // Configure Gemini API with enhanced rate limiting
 const GEMINI_CONFIG = {
-  apiKey: 'AIzaSyDIpv14PCIuAukCFV4CILMhYk0OzpNI6EE',
-  model: 'gemini-2.0-flash',
+  apiKey: 'AIzaSyBAX0Ifkf1l1-okLEx3mIFmCtJtsPOOHns',
+  model: 'gemini-2.5-flash-lite',
   maxTokens: 2000, // Restored to 2000 for better responses
-  temperature: 0.2,
+  temperature: 0.5,
   topP: 0.95,
   topK: 40
 };
@@ -1108,14 +1108,16 @@ ${sanitizedContext}
 User Question: "${query}"
 
 INSTRUCTIONS:
-1. You MUST use the specific post data provided above
-2. You MUST quote actual captions from the "Recent Posts and Engagement" section
-3. You MUST include the exact engagement numbers (likes, comments, totals)
-4. You MUST reference the "Most Engaging Post" data if it exists
-5. DO NOT claim you lack data - all necessary data is provided above
-6. Answer based EXCLUSIVELY on the provided account data
+1. You MUST use the specific post data provided above.
+2. You MUST quote actual captions from the "Recent Posts and Engagement" section.
+3. You MUST include the exact engagement numbers (likes, comments, totals).
+4. You MUST reference the "Most Engaging Post" data if it exists.
+5. DO NOT claim you lack data - all necessary data is provided above.
+6. Answer based EXCLUSIVELY on the provided account data.
+7. If your confidence is BELOW 70% that the answer is correct, ASK a clarifying follow-up question instead of guessing.
+8. When citing evidence, INCLUDE the post \`id\` or \`url\` so the user can verify the source.
 
-Provide a detailed response that directly uses the post content and engagement metrics shown above.`;
+Provide a detailed, insight-oriented response that directly uses the post content, engagement metrics, and cited post identifiers/links shown above.`;
 
     return enhancedPrompt;
   }
@@ -2487,8 +2489,13 @@ app.post('/api/reimagine-image', async (req, res) => {
       return res.status(404).json({ error: 'Original post not found' });
     }
     
-    // Extract the original image prompt
-    const originalImagePrompt = originalPostData.image_prompt || originalPostData.imagePrompt;
+    // Extract the original image prompt from the nested post structure
+    const originalImagePrompt = originalPostData?.data?.post?.image_prompt || 
+                               originalPostData?.post?.image_prompt || 
+                               originalPostData?.image_prompt || 
+                               originalPostData?.imagePrompt ||
+                               originalPostData?.data?.image_prompt ||
+                               originalPostData?.data?.imagePrompt;
     if (!originalImagePrompt) {
       return res.status(400).json({ error: 'Original image prompt not found in post data' });
     }
@@ -2504,7 +2511,13 @@ app.post('/api/reimagine-image', async (req, res) => {
     
     // Generate new image filename with timestamp to ensure uniqueness
     const timestamp = Date.now();
-    const originalFilename = originalPostData.image_filename || originalPostData.imageFilename || `${postKey}_image.jpg`;
+    const originalFilename = originalPostData?.data?.post?.image_path || 
+                           originalPostData?.post?.image_path ||
+                           originalPostData?.image_filename || 
+                           originalPostData?.imageFilename ||
+                           originalPostData?.data?.image_filename ||
+                           originalPostData?.data?.imageFilename ||
+                           `${postKey}_image.jpg`;
     const fileExtension = originalFilename.split('.').pop() || 'jpg';
     const newImageFilename = `${postKey}_reimagined_${timestamp}.${fileExtension}`;
     
@@ -2519,17 +2532,40 @@ app.post('/api/reimagine-image', async (req, res) => {
       return res.status(500).json({ error: 'Failed to generate new image', details: imageError.message });
     }
     
-    // Update the post data with new image information
+    // Update the post data with new image information maintaining the nested structure
     const updatedPostData = {
       ...originalPostData,
+      // Update root level for backward compatibility
       image_filename: newImageFilename,
       imageFilename: newImageFilename,
       image_prompt: enhancedImagePrompt,
       imagePrompt: enhancedImagePrompt,
-      image_url: `https://570f213f1410829ee9a733a77a5f40e3.r2.cloudflarestorage.com/structuredb/ready_post/${platform}/${username}/${newImageFilename}`,
-      r2_image_url: `https://570f213f1410829ee9a733a77a5f40e3.r2.cloudflarestorage.com/structuredb/ready_post/${platform}/${username}/${newImageFilename}`,
+      image_url: `https://570f213f1410829ee9a733a77a5f40e3.r2.cloudflarestorage.com/tasks/ready_post/${platform}/${username}/${newImageFilename}`,
+      r2_image_url: `https://570f213f1410829ee9a733a77a5f40e3.r2.cloudflarestorage.com/tasks/ready_post/${platform}/${username}/${newImageFilename}`,
+      // Update nested structure if it exists
+      data: originalPostData.data ? {
+        ...originalPostData.data,
+        image_filename: newImageFilename,
+        imageFilename: newImageFilename,
+        image_url: `https://570f213f1410829ee9a733a77a5f40e3.r2.cloudflarestorage.com/tasks/ready_post/${platform}/${username}/${newImageFilename}`,
+        r2_image_url: `https://570f213f1410829ee9a733a77a5f40e3.r2.cloudflarestorage.com/tasks/ready_post/${platform}/${username}/${newImageFilename}`,
+        post: originalPostData.data.post ? {
+          ...originalPostData.data.post,
+          image_prompt: enhancedImagePrompt,
+          imagePrompt: enhancedImagePrompt,
+          image_path: newImageFilename
+        } : undefined
+      } : undefined,
+      // Update direct post structure if it exists
+      post: originalPostData.post ? {
+        ...originalPostData.post,
+        image_prompt: enhancedImagePrompt,
+        imagePrompt: enhancedImagePrompt,
+        image_path: newImageFilename
+      } : undefined,
+      // Metadata
       reimagined_at: new Date().toISOString(),
-      reimagined_from: originalPostData.image_filename || originalPostData.imageFilename,
+      reimagined_from: originalFilename,
       extra_prompt_used: extraPrompt || null
     };
     
@@ -2552,12 +2588,13 @@ app.post('/api/reimagine-image', async (req, res) => {
       success: true,
       message: 'Image reimagined successfully',
       postKey,
-      originalImageFilename: originalPostData.image_filename || originalPostData.imageFilename,
+      originalImageFilename: originalFilename,
       newImageFilename,
       originalPrompt: originalImagePrompt,
       enhancedPrompt: enhancedImagePrompt,
       extraPrompt: extraPrompt || null,
       newImageUrl: updatedPostData.image_url,
+      newR2ImageUrl: updatedPostData.r2_image_url,
       timestamp: updatedPostData.reimagined_at
     };
     

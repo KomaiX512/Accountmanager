@@ -1235,16 +1235,26 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
       return cache.has(prefix) ? cache.get(prefix) : [];
     }
     
+    // ✅ NEW: Sort files by LastModified date to get most recent items
+    const sortedFiles = files
+      .filter(file => file.Key.endsWith('.json')) // Only JSON files
+      .sort((a, b) => {
+        // Sort by LastModified in descending order (most recent first)
+        return new Date(b.LastModified).getTime() - new Date(a.LastModified).getTime();
+      });
+    
+    // ✅ NEW: Limit to most recent 3 items for strategies and competitor analysis
+    const maxItems = (module === 'recommendations' || module === 'competitor_analysis') ? 3 : sortedFiles.length;
+    const limitedFiles = sortedFiles.slice(0, maxItems);
+    
+    if (maxItems < sortedFiles.length) {
+      console.log(`[${new Date().toISOString()}] Limiting ${platform} ${module} to most recent ${maxItems} items (found ${sortedFiles.length} total)`);
+    }
+    
     // Standard processing for other module types (JSON only)
     const data = await Promise.all(
-      files.map(async (file) => {
+      limitedFiles.map(async (file) => {
         try {
-          // Only process .json files as JSON (except for ready_post which is handled separately)
-          if (!file.Key.endsWith('.json')) {
-               console.log(`[${new Date().toISOString()}] Skipping non-JSON file: ${file.Key}`);
-               return null; // Skip non-JSON files in this general fetch
-          }
-
           const getCommand = new GetObjectCommand({
             Bucket: 'tasks',
             Key: file.Key,
@@ -1260,6 +1270,7 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
           const parsedData = JSON.parse(body);
           return { 
             key: file.Key, 
+            lastModified: file.LastModified,
             data: {
               ...parsedData,
               platform: platform

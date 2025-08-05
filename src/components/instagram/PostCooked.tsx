@@ -1759,7 +1759,9 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     setReimagineToastMessage('🎨 Reimagining your image...');
     
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/reimagine-image`, {
+      // Use RAG server (port 3001) for AI image generation
+      const ragServerUrl = API_BASE_URL.replace(':3002', ':3001');
+      const response = await axios.post(`${ragServerUrl}/api/reimagine-image`, {
         username,
         postKey: reimaginePostKey,
         extraPrompt: reimagineExtraPrompt.trim(),

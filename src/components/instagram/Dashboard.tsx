@@ -12,7 +12,7 @@ import GoalModal from './GoalModal';
 import CampaignModal from './CampaignModal';
 import News4U from '../common/News4U';
 import { motion } from 'framer-motion';
-import axios, { AxiosError } from 'axios';
+import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import InstagramRequiredButton from '../common/InstagramRequiredButton';
 import { useInstagram } from '../../context/InstagramContext';
@@ -26,10 +26,9 @@ import ChatModal from './ChatModal';
 import RagService from '../../services/RagService';
 import type { ChatMessage as ChatModalMessage } from './ChatModal';
 import type { Notification, ProfileInfo, LinkedAccount } from '../../types/notifications';
-import { safeFilter, safeMap, safeLength } from '../../utils/safeArrayUtils';
+import { safeFilter, safeLength } from '../../utils/safeArrayUtils';
 // Import icons from react-icons
-import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaLock, FaUndo, FaPencilAlt, FaRocket, FaRobot } from 'react-icons/fa';
-import { MdAnalytics, MdOutlineSchedule, MdOutlineAutoGraph } from 'react-icons/md';
+import { FaChartLine, FaCalendarAlt, FaBullhorn, FaUndo, FaPencilAlt, FaRocket, FaRobot } from 'react-icons/fa';
 import { TbTargetArrow } from 'react-icons/tb';
 
 // Define RagService compatible ChatMessage
@@ -44,7 +43,17 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => {
-  const { trackPost, trackDiscussion, trackAIReply, trackCampaign, isFeatureBlocked, trackRealDiscussion, trackRealAIReply, trackRealPostCreation, canUseFeature } = useFeatureTracking();
+
+  useEffect(() => {
+    document.body.classList.add('instagram-dashboard-active');
+    // Cleanup function to remove the class when the component unmounts
+    return () => {
+      document.body.classList.remove('instagram-dashboard-active');
+    };
+  }, []); // Empty dependency array ensures this runs only once on mount and cleanup on unmount
+
+  const { currentUser } = useAuth();
+  const { isFeatureBlocked, trackRealDiscussion, trackRealAIReply, trackRealPostCreation, canUseFeature } = useFeatureTracking();
   const { showUpgradePopup, blockedFeature, handleFeatureAttempt, closeUpgradePopup, currentUsage } = useUpgradeHandler();
   const { resetAndAllowReconnection } = useResetPlatformState();
   const [query, setQuery] = useState('');
@@ -55,7 +64,6 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const [competitorData, setCompetitorData] = useState<{ key: string; data: any }[]>([]);
   const [news, setNews] = useState<{ key: string; data: any }[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-
   const [profileInfo, setProfileInfo] = useState<ProfileInfo | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -72,11 +80,68 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     type: 'dm' | 'comment';
     id: string;
   }[]>([]);
-  // ✅ FIX: Remove chat mode selector - dedicated to post creation only
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingNotifications, setProcessingNotifications] = useState<string[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatModalMessage[]>([]);
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
+  const [result, setResult] = useState('');
+  const [isMobileProfileMenuOpen, setIsMobileProfileMenuOpen] = useState(false);
+  const [isMobileChatOpen, setIsMobileChatOpen] = useState(false);
+  const [isMobileImageEditorOpen, setIsMobileImageEditorOpen] = useState(false);
+  const [isMobileProfilePopupOpen, setIsMobileProfilePopupOpen] = useState(false);
+  const [isAutopilotPopupOpen, setIsAutopilotPopupOpen] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const profileActionsRef = useRef<HTMLDivElement>(null);
+
+  // Content viewed tracking - track what has been seen vs unseen with localStorage persistence
+  const getViewedStorageKey = (section: string) => `viewed_${section}_instagram_${accountHolder}`;
+
+  const [viewedStrategies, setViewedStrategies] = useState<Set<string>>(() => {
+    const stored = localStorage.getItem(getViewedStorageKey('strategies'));
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  });
   
+  const [viewedCompetitorData, setViewedCompetitorData] = useState<Set<string>>(() => {
+    const stored = localStorage.getItem(getViewedStorageKey('competitor'));
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  });
+
+  const [viewedPosts, setViewedPosts] = useState<Set<string>>(() => {
+    const stored = localStorage.getItem(getViewedStorageKey('posts'));
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  });
+
+  const [autopilotStatus, setAutopilotStatus] = useState<{
+    enabled: boolean;
+    autoSchedule: boolean;
+    autoReply: boolean;
+    scheduledCount: number;
+    repliedCount: number;
+  }>({
+    enabled: false,
+    autoSchedule: false,
+    autoReply: false,
+    scheduledCount: 0,
+    repliedCount: 0
+  });
+
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const maxImageRetryAttempts = useRef(3);
+  const imageRetryAttemptsRef = useRef(0);
+  const firstLoadRef = useRef(true);
+  const reconnectAttempts = useRef(0);
+  const maxReconnectAttempts = 5;
+  const baseReconnectDelay = 1000;
+  const [aiProcessingNotifications, setAiProcessingNotifications] = useState<string[]>([]);
+  const [linkedAccounts, setLinkedAccounts] = useState<LinkedAccount[]>([]);
+
+  const [showInitialText, setShowInitialText] = useState(true);
+  const [showBio, setShowBio] = useState(false);
+  const [typedBio, setTypedBio] = useState('');
+  const [bioAnimationComplete, setBioAnimationComplete] = useState(false);
+
   // 🍎 Mobile expandable modules state
   const [expandedModules, setExpandedModules] = useState<{
     notifications: boolean;
@@ -91,114 +156,15 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     competitorAnalysis: false,
     news4u: false
   });
-
-  // 🍎 Toggle mobile module expansion
-  const toggleMobileModule = (module: keyof typeof expandedModules) => {
-    setExpandedModules(prev => ({
-      ...prev,
-      [module]: !prev[module]
-    }));
-  };
-
-  // 🍎 Handle mobile module header clicks
-  const handleMobileModuleClick = (module: keyof typeof expandedModules, e: React.MouseEvent) => {
-    // Only handle clicks on mobile and in the header area (top 60px)
-    if (window.innerWidth <= 767) {
-      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-      const clickY = e.clientY - rect.top;
-      
-      // Only toggle if clicked in the header area (first 60px)
-      if (clickY <= 60) {
-        e.preventDefault();
-        e.stopPropagation();
-        toggleMobileModule(module);
-      }
-    }
-  };
-  
-  // 🛑 STOP OPERATION: Auto-reply state management for Instagram
-  const [isAutoReplying, setIsAutoReplying] = useState(false);
-  const [shouldStopAutoReply, setShouldStopAutoReply] = useState(false);
-  const autoReplyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // NEW: Auto-reply progress tracking
-  const [autoReplyProgress, setAutoReplyProgress] = useState<{
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [autoReplyProgress, setAutoReplyProgress] = useState<{ 
     current: number;
     total: number;
     nextReplyIn: number;
   }>({ current: 0, total: 0, nextReplyIn: 0 });
-  
-  // Reset functionality state
-  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
-  const [isResetting, setIsResetting] = useState(false);
-  
-  // ✨ MOBILE STATE MANAGEMENT
-  const [isMobileProfileMenuOpen, setIsMobileProfileMenuOpen] = useState(false);
-  const [isMobileChatOpen, setIsMobileChatOpen] = useState(false);
-  const [isMobileImageEditorOpen, setIsMobileImageEditorOpen] = useState(false);
-  const [isMobileProfilePopupOpen, setIsMobileProfilePopupOpen] = useState(false);
-  
-  // 🚀 AUTOPILOT: Autopilot popup state
-  const [isAutopilotPopupOpen, setIsAutopilotPopupOpen] = useState(false);
-  
-  // ✨ MOBILE DROPDOWN POSITIONING
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
-  const profileActionsRef = useRef<HTMLDivElement>(null);
-  
-  // Content viewed tracking - track what has been seen vs unseen with localStorage persistence
-  const getViewedStorageKey = (section: string) => `viewed_${section}_instagram_${accountHolder}`;
-  
-  // 🚀 AUTOPILOT UI STATE: Track autopilot status for UI feedback
-  const [autopilotStatus, setAutopilotStatus] = useState<{
-    enabled: boolean;
-    autoSchedule: boolean;
-    autoReply: boolean;
-    scheduledCount: number;
-    repliedCount: number;
-  }>({
-    enabled: false,
-    autoSchedule: false,
-    autoReply: false,
-    scheduledCount: 0,
-    repliedCount: 0
-  });
-  
-  // Initialize viewed sets from localStorage
-  const [viewedStrategies, setViewedStrategies] = useState<Set<string>>(() => {
-    const stored = localStorage.getItem(getViewedStorageKey('strategies'));
-    return stored ? new Set(JSON.parse(stored)) : new Set();
-  });
-  
-  const [viewedCompetitorData, setViewedCompetitorData] = useState<Set<string>>(() => {
-    const stored = localStorage.getItem(getViewedStorageKey('competitor'));
-    return stored ? new Set(JSON.parse(stored)) : new Set();
-  });
-  
-  const [viewedPosts, setViewedPosts] = useState<Set<string>>(() => {
-    const stored = localStorage.getItem(getViewedStorageKey('posts'));
-    return stored ? new Set(JSON.parse(stored)) : new Set();
-  });
-  
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const reconnectAttempts = useRef(0);
-  const maxReconnectAttempts = 5;
-  const baseReconnectDelay = 5000;
-  const firstLoadRef = useRef(true);
-  const lastProfilePicRenderTimeRef = useRef<number>(0);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const { currentUser } = useAuth();
-  const imageRetryAttemptsRef = useRef(0);
-  const maxImageRetryAttempts = 3;
-  const [aiRepliesRefreshKey, setAiRepliesRefreshKey] = useState(0);
-  const [processingNotifications, setProcessingNotifications] = useState<Record<string, boolean>>({});
-  const [aiProcessingNotifications, setAiProcessingNotifications] = useState<Record<string, boolean>>({});
-  const [result, setResult] = useState('');
-  const [linkedAccounts, setLinkedAccounts] = useState<LinkedAccount[]>([]);
-  // Bio animation states
-  const [showInitialText, setShowInitialText] = useState(true);
-  const [showBio, setShowBio] = useState(false);
-  const [typedBio, setTypedBio] = useState('');
-  const [bioAnimationComplete, setBioAnimationComplete] = useState(false);
+  const [isAutoReplying, setIsAutoReplying] = useState(false);
+  const [shouldStopAutoReply, setShouldStopAutoReply] = useState(false);
+  const autoReplyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Helper function to get unseen count for each section
   const getUnseenStrategiesCount = () => {
@@ -1129,8 +1095,10 @@ Image Description: ${response.post.image_prompt}
 
             // Instantly remove the notification from state for immediate UI feedback
             setNotifications(prev => prev.filter(n =>
-              !((n.message_id && n.message_id === notification.message_id) ||
-                (n.comment_id && n.comment_id === notification.comment_id))
+              !(
+                (n.message_id && n.message_id === notification.message_id) ||
+                (n.comment_id && n.comment_id === notification.comment_id)
+              )
             ));
 
             successCount++;

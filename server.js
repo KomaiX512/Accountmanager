@@ -10,6 +10,8 @@ import path from 'path';
 import jpeg from 'jpeg-js';
 import multer from 'multer';
 import sharp from 'sharp';
+import * as net from 'net';
+import { exec } from 'child_process';
 
 // Add at the top of the file
 const DEBUG_LOGS = process.env.DEBUG_LOGS === 'true';
@@ -72,9 +74,6 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 // Check if port is already in use before starting
-import * as net from 'net';
-import { exec } from 'child_process';
-
 const checkPortInUse = (port) => {
   return new Promise((resolve, reject) => {
     const server = net.createServer();

@@ -197,6 +197,7 @@ export const ProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         `${platform}_processing_info`,
         `${platform}_processing_${currentUser?.uid ?? ''}`,
         'completedPlatforms',
+        'platformLoadingStates',
         // Clear account info and username data
         `${platform}_accountInfo`,
         `${platform}_username`,

@@ -357,21 +357,21 @@
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 12px;
-  padding: 16px;
+  padding: clamp(12px, 2vw, 16px);
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.2);
-  max-width: 400px;
+  max-width: clamp(280px, 90vw, 400px);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: clamp(8px, 1.5vw, 12px);
 }
 
 .entry-card h2 {
-  font-size: 1.2rem;
+  font-size: clamp(1rem, 2.5vw, 1.2rem);
   margin: 0;
   color: #ffffff;
   text-align: center;
-  padding-bottom: 8px;
+  padding-bottom: clamp(6px, 1.5vw, 8px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -379,9 +379,9 @@
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 6px;
-  padding: 10px;
+  padding: clamp(8px, 1.5vw, 10px);
   color: #ffffff;
-  font-size: 0.9rem;
+  font-size: clamp(0.8rem, 2vw, 0.9rem);
   outline: none;
   transition: border 0.2s ease;
 }
@@ -394,9 +394,9 @@
   background: rgba(255, 255, 255, 0.1);
   border: none;
   border-radius: 6px;
-  padding: 10px;
+  padding: clamp(8px, 1.5vw, 10px);
   color: #ffffff;
-  font-size: 0.9rem;
+  font-size: clamp(0.8rem, 2vw, 0.9rem);
   cursor: pointer;
   transition: background 0.2s ease, transform 0.2s ease;
 }
@@ -698,17 +698,21 @@
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .confirmation-modal {
-    padding: 1.5rem;
+    padding: clamp(0.75rem, 2vw, 1rem);
     margin: 1rem;
+    max-width: calc(100vw - 2rem);
   }
   
   .confirmation-actions {
     flex-direction: column;
+    gap: 0.75rem;
   }
   
   .importance-notice {
     flex-direction: column;
     text-align: center;
+    gap: 0.5rem;
+    padding: clamp(0.5rem, 1.5vw, 0.75rem);
   }
   
   .critical-field {
@@ -720,6 +724,128 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 0.5rem;
+  }
+  
+  .entry-card {
+    padding: clamp(0.75rem, 2vw, 1rem);
+    max-width: calc(100vw - 2rem);
+    margin: 1rem;
+    gap: clamp(6px, 1vw, 8px);
+  }
+  
+  .entry-card h2 {
+    font-size: clamp(0.85rem, 2vw, 0.95rem);
+    padding-bottom: clamp(4px, 1vw, 6px);
+  }
+  
+  .competitor-input-wrapper {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .competitor-input {
+    font-size: clamp(0.8rem, 1.8vw, 0.9rem);
+    padding: clamp(0.5rem, 1.2vw, 0.7rem);
+  }
+  
+  .remove-btn {
+    width: 100%;
+    height: clamp(32px, 7vw, 40px);
+    font-size: clamp(0.75rem, 1.8vw, 0.85rem);
+  }
+  
+  .add-btn {
+    font-size: clamp(0.8rem, 1.8vw, 0.9rem);
+    padding: clamp(0.5rem, 1.2vw, 0.7rem);
+  }
+}
+
+@media (max-width: 480px) {
+  .main-content {
+    padding: clamp(0.25rem, 1.5vw, 0.75rem);
+  }
+  
+  .entry-card {
+    padding: clamp(0.5rem, 1.5vw, 0.75rem);
+    max-width: 100%;
+    margin: 0.25rem 0;
+    gap: clamp(4px, 0.8vw, 6px);
+  }
+  
+  .entry-card h2 {
+    font-size: clamp(0.75rem, 2vw, 0.85rem);
+    letter-spacing: 0.3px;
+    padding-bottom: clamp(3px, 0.8vw, 4px);
+  }
+  
+  .entry-card input,
+  .entry-card button {
+    font-size: clamp(0.7rem, 1.6vw, 0.8rem);
+    padding: clamp(0.4rem, 1vw, 0.6rem);
+  }
+  
+  .competitor-input {
+    font-size: clamp(0.7rem, 1.6vw, 0.8rem);
+    padding: clamp(0.4rem, 1vw, 0.6rem);
+  }
+  
+  .remove-btn {
+    height: clamp(28px, 6vw, 36px);
+    font-size: clamp(0.65rem, 1.4vw, 0.75rem);
+  }
+  
+  .add-btn {
+    font-size: clamp(0.7rem, 1.6vw, 0.8rem);
+    padding: clamp(0.4rem, 1vw, 0.6rem);
+  }
+  
+  .submit-btn {
+    font-size: clamp(0.7rem, 1.6vw, 0.8rem);
+    padding: clamp(0.4rem, 1vw, 0.6rem);
+  }
+}
+
+@media (max-width: 360px) {
+  .main-content {
+    padding: clamp(0.15rem, 1vw, 0.5rem);
+  }
+  
+  .entry-card {
+    padding: clamp(0.35rem, 1.2vw, 0.5rem);
+    margin: 0.15rem 0;
+    gap: clamp(3px, 0.6vw, 4px);
+  }
+  
+  .entry-card h2 {
+    font-size: clamp(0.65rem, 1.8vw, 0.75rem);
+    letter-spacing: 0.2px;
+    padding-bottom: clamp(2px, 0.6vw, 3px);
+  }
+  
+  .entry-card input,
+  .entry-card button {
+    font-size: clamp(0.6rem, 1.4vw, 0.7rem);
+    padding: clamp(0.3rem, 0.8vw, 0.5rem);
+  }
+  
+  .competitor-input {
+    font-size: clamp(0.6rem, 1.4vw, 0.7rem);
+    padding: clamp(0.3rem, 0.8vw, 0.5rem);
+  }
+  
+  .remove-btn {
+    height: clamp(24px, 5vw, 32px);
+    font-size: clamp(0.55rem, 1.2vw, 0.65rem);
+  }
+  
+  .add-btn {
+    font-size: clamp(0.6rem, 1.4vw, 0.7rem);
+    padding: clamp(0.3rem, 0.8vw, 0.5rem);
+  }
+  
+  .submit-btn {
+    font-size: clamp(0.6rem, 1.4vw, 0.7rem);
+    padding: clamp(0.3rem, 0.8vw, 0.5rem);
   }
 }
 

@@ -29,7 +29,7 @@ import RagService from '../../services/RagService';
 import type { ChatMessage as ChatModalMessage } from '../common/ChatModal';
 import { Notification, ProfileInfo, LinkedAccount } from '../../types/notifications';
 // Import icons from react-icons
-import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaTwitter, FaInstagram, FaPen, FaFacebook, FaBell, FaUndo, FaInfoCircle, FaPencilAlt, FaRocket, FaRobot, FaNewspaper } from 'react-icons/fa';
+import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaTwitter, FaInstagram, FaPen, FaFacebook, FaBell, FaUndo, FaInfoCircle, FaPencilAlt, FaRocket, FaRobot, FaNewspaper, FaRss } from 'react-icons/fa';
 import { MdAnalytics, MdOutlineSchedule, MdOutlineAutoGraph } from 'react-icons/md';
 import { BsLightningChargeFill, BsBinoculars, BsLightbulb } from 'react-icons/bs';
 import { IoMdAnalytics } from 'react-icons/io';
@@ -2489,14 +2489,14 @@ Image Description: ${response.post.image_prompt}
               </div>
             </div>
 
-              <div className="news4u-container">
+              <div className="news4u">
                 <h2>
                   <div className="section-header">
-                    <FaNewspaper className="section-icon" />
+                    <FaRss className="section-icon" />
                     <span>News 4U</span>
                   </div>
                 </h2>
-                <News4U accountHolder={accountHolder} platform={platform} className="news4u-scrollable" />
+                <News4U accountHolder={accountHolder} platform={platform} />
               </div>
 
             {config.supportsNotifications && (

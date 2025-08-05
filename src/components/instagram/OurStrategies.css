@@ -98,8 +98,56 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
-  min-height: fit-content;
-  margin: 0;
+  margin-bottom: 8px; /* ✅ NEW: Add spacing between cards */
+}
+
+/* ✅ NEW: Strategy card header styles */
+.strategy-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  min-height: 48px;
+}
+
+.strategy-icon {
+  font-size: 1.2rem;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+.strategy-title {
+  flex: 1;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: 0.2px;
+}
+
+.strategy-status {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 400;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.strategy-status::before {
+  content: "🔔";
+  font-size: 0.7rem;
+}
+
+/* ✅ SIMPLIFIED: Simple content layout */
+.strategy-simple-content {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 80px; /* Ensure consistent height for three lines */
+  justify-content: space-between;
 }
 
 .strategy-sub-container.loaded {
@@ -115,7 +163,7 @@
 .preview-text {
   color: #e0e0ff;
   font-size: 0.85rem;
-  line-height: 1.3;
+  line-height: 1.4;
   margin: 0;
   opacity: 0.95;
   font-weight: 400;
@@ -125,7 +173,8 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-height: 3.315em; /* Exactly 3 lines with new line-height */
+  max-height: 3.92em; /* Exactly 3 lines with new line-height */
+  flex: 1; /* Take available space */
 }
 
 .see-more-btn {
@@ -667,6 +716,14 @@
     gap: 2px;
     display: flex;
     flex-direction: column;
+    margin-bottom: 6px;
+  }
+  
+  /* ✅ SIMPLIFIED: Mobile styles for simple content */
+  .strategy-simple-content {
+    padding: 10px 12px;
+    gap: 6px;
+    min-height: 70px;
   }
 
   .preview-text {
@@ -1013,6 +1070,13 @@
     padding: 4px;
     gap: 1px;
   }
+  
+  /* ✅ SIMPLIFIED: Ultra-small mobile styles */
+  .strategy-simple-content {
+    padding: 6px 8px;
+    gap: 4px;
+    min-height: 60px;
+  }
 
   .preview-text {
     font-size: 0.7rem;
@@ -1030,5 +1094,362 @@
     font-size: 0.6rem;
     padding: 1px 3px;
     margin: 0;
+  }
+}
+
+/* ✅ NEW: Strategy overview styles */
+.strategy-overview {
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.strategy-overview h4 {
+  color: #e0e0ff;
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  letter-spacing: 0.5px;
+}
+
+.strategy-count {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.85rem;
+  margin: 0;
+  font-weight: 400;
+}
+
+/* ✅ NEW: Strategy tabs styles */
+.strategy-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.strategy-tab {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px 16px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 80px;
+}
+
+.strategy-tab:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.strategy-tab.active {
+  background: rgba(0, 255, 204, 0.1);
+  border-color: rgba(0, 255, 204, 0.3);
+  color: #00ffcc;
+}
+
+.strategy-date {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 400;
+}
+
+/* ✅ NEW: Enhanced strategy header styles */
+.strategy-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.strategy-header h5 {
+  color: #e0e0ff;
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: 0.3px;
+}
+
+.strategy-timestamp {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+/* ✅ NEW: Strategy content wrapper */
+.strategy-content {
+  margin-bottom: 20px;
+}
+
+/* ✅ NEW: Enhanced navigation with counter */
+.navigation-buttons {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.strategy-counter {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-align: center;
+  min-width: 60px;
+}
+
+/* ✅ NEW: Analysis overview styles (for competitor analysis) */
+.analysis-overview {
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.analysis-overview h4 {
+  color: #e0e0ff;
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  letter-spacing: 0.5px;
+}
+
+.analysis-count {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.85rem;
+  margin: 0;
+  font-weight: 400;
+}
+
+/* ✅ NEW: Analysis tabs styles */
+.analysis-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.analysis-tab {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px 16px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 80px;
+}
+
+.analysis-tab:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.analysis-tab.active {
+  background: rgba(0, 255, 204, 0.1);
+  border-color: rgba(0, 255, 204, 0.3);
+  color: #00ffcc;
+}
+
+.analysis-date {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 400;
+}
+
+/* ✅ NEW: Enhanced analysis header styles */
+.analysis-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.analysis-header h5 {
+  color: #e0e0ff;
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: 0.3px;
+}
+
+.analysis-timestamp {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+/* ✅ NEW: Analysis content wrapper */
+.analysis-content {
+  margin-bottom: 20px;
+}
+
+/* ✅ NEW: Analysis counter */
+.analysis-counter {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-align: center;
+  min-width: 60px;
+}
+
+/* Mobile responsive styles for new elements */
+@media (max-width: 767px) and (orientation: portrait) {
+  .strategy-tabs,
+  .analysis-tabs {
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+  
+  .strategy-tab,
+  .analysis-tab {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    min-width: 70px;
+  }
+  
+  .strategy-overview h4,
+  .analysis-overview h4 {
+    font-size: 1.1rem;
+  }
+  
+  .strategy-header,
+  .analysis-header {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  
+  .strategy-timestamp,
+  .analysis-timestamp {
+    font-size: 0.7rem;
+  }
+  
+  .navigation-buttons {
+    gap: 12px;
+  }
+  
+  .strategy-counter,
+  .analysis-counter {
+    font-size: 0.8rem;
+    min-width: 50px;
+  }
+}
+
+@media (max-width: 480px) and (orientation: portrait) {
+  .strategy-tabs,
+  .analysis-tabs {
+    gap: 4px;
+  }
+  
+  .strategy-tab,
+  .analysis-tab {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    min-width: 60px;
+  }
+  
+  .strategy-date,
+  .analysis-date {
+    font-size: 0.65rem;
+  }
+  
+  .strategy-overview h4,
+  .analysis-overview h4 {
+    font-size: 1rem;
+  }
+  
+  .strategy-count,
+  .analysis-count {
+    font-size: 0.8rem;
+  }
+}
+
+/* ✅ NEW: Compact close icon button */
+.close-btn-icon {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10;
+  backdrop-filter: blur(10px);
+}
+
+.close-btn-icon:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.close-icon-text {
+  color: #ffffff;
+  font-size: 24px;
+  font-weight: bold;
+  line-height: 1;
+  text-align: center;
+  transition: all 0.2s ease;
+  user-select: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
+.close-btn-icon:hover .close-icon-text {
+  color: #00ffcc;
+  filter: drop-shadow(0 2px 4px rgba(0, 255, 204, 0.3));
+}
+
+/* Mobile responsive for close icon */
+@media (max-width: 767px) and (orientation: portrait) {
+  .close-btn-icon {
+    top: 12px;
+    right: 12px;
+    width: 36px;
+    height: 36px;
+  }
+  
+  .close-icon-text {
+    font-size: 20px;
+  }
+}
+
+@media (max-width: 480px) and (orientation: portrait) {
+  .close-btn-icon {
+    top: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+  }
+  
+  .close-icon-text {
+    font-size: 18px;
   }
 }

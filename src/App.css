@@ -45,7 +45,6 @@
 .main-content {
   display: flex;
   flex: 1;
-  padding-top: 80px; /* Space for TopBar */
   width: 100%;
   margin: 0 auto;
   box-sizing: border-box;

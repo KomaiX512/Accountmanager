@@ -147,7 +147,7 @@ const ChatModal: React.FC<ChatModalProps> = ({
     // Auto-resize textarea
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 160)}px`;
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
     }
   }, []);
 
@@ -171,16 +171,17 @@ const ChatModal: React.FC<ChatModalProps> = ({
         >
           <motion.div
             className="chat-modal-content"
-            initial={{ scale: 0.95, opacity: 0 }}
+            initial={{ scale: 0.92, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.95, opacity: 0 }}
+            exit={{ scale: 0.92, opacity: 0 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* COMPACT HEADER */}
             <div className="chat-modal-header">
               <div className="chat-header-info">
                 <div className="chat-mode-indicator">
-                  <MessageCircle size={20} className="mode-icon discussion-icon" />
+                  <MessageCircle size={16} className="mode-icon discussion-icon" />
                   <h3>AI Discussion with {username}</h3>
                 </div>
                 <span className="platform-badge">{platform}</span>
@@ -190,10 +191,11 @@ const ChatModal: React.FC<ChatModalProps> = ({
                 onClick={onClose}
                 aria-label="Close chat"
               >
-                <X size={18} strokeWidth={2.5} />
+                <X size={14} strokeWidth={2.5} />
               </button>
             </div>
 
+            {/* MAXIMIZED MESSAGES AREA */}
             <div className="chat-messages">
               {messages.length === 0 ? (
                 <motion.div 
@@ -203,7 +205,7 @@ const ChatModal: React.FC<ChatModalProps> = ({
                   transition={{ delay: 0.2 }}
                 >
                   <div className="welcome-icon">
-                    <MessageCircle size={40} className="mode-icon-large" />
+                    <MessageCircle size={32} className="mode-icon-large" />
                   </div>
                   <h4>Start an AI Discussion</h4>
                   <p>Ask questions, get strategic insights, or discuss your {platform} growth strategy!</p>
@@ -247,6 +249,7 @@ const ChatModal: React.FC<ChatModalProps> = ({
               <div ref={messagesEndRef} />
             </div>
 
+            {/* REDESIGNED INPUT AREA - COMPACT AND ALIGNED */}
             <div className="chat-input-container">
               <form onSubmit={handleSubmit} className="chat-input-form">
                 <textarea
@@ -267,9 +270,9 @@ const ChatModal: React.FC<ChatModalProps> = ({
                   aria-label={isProcessing ? 'Sending...' : 'Send message'}
                 >
                   {isProcessing ? (
-                    <Loader2 className="animate-spin" size={18} strokeWidth={2.5} />
+                    <Loader2 className="btn-spinner" size={14} strokeWidth={2.5} />
                   ) : (
-                    <Send size={18} strokeWidth={2.5} />
+                    <Send size={16} strokeWidth={2} />
                   )}
                 </button>
               </form>

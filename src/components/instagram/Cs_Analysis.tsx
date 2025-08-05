@@ -670,11 +670,8 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     
     console.log('[Cs_Analysis] Competitor data structure:', JSON.stringify(competitorData.data[0], null, 2));
     
-    // Find the best analysis with counter strategies
-    let bestAnalysis = null;
-    let bestStrategies = null;
-    
-    for (let i = 0; i < competitorData.data.length; i++) {
+    // ✅ NEW: Try to find recommended_counter_strategies from the 3 most recent analyses
+    for (let i = 0; i < Math.min(competitorData.data.length, 3); i++) {
       const analysis = competitorData.data[i];
       if (!analysis) continue;
       
@@ -682,10 +679,11 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
       if (analysis.data && analysis.data.data && analysis.data.data.recommended_counter_strategies && Array.isArray(analysis.data.data.recommended_counter_strategies)) {
         const strategies = analysis.data.data.recommended_counter_strategies;
         if (strategies.length > 0 && strategies[0] && strategies[0].length > 50) { // Check if first strategy has meaningful content
-          console.log(`[Cs_Analysis] Found good counter strategies in analysis ${i}:`, strategies);
-          bestAnalysis = analysis;
-          bestStrategies = strategies;
-          break;
+          console.log(`[Cs_Analysis] ✅ Found good counter strategies in analysis ${i}:`, strategies);
+          // Join the first few strategies with periods
+          const combinedText = strategies.slice(0, 3).join('. ');
+          console.log('[Cs_Analysis] Combined counter strategies text:', combinedText);
+          return combinedText;
         }
       }
       
@@ -693,22 +691,16 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
       if (analysis.data && analysis.data.recommended_counter_strategies && Array.isArray(analysis.data.recommended_counter_strategies)) {
         const strategies = analysis.data.recommended_counter_strategies;
         if (strategies.length > 0 && strategies[0] && strategies[0].length > 50) { // Check if first strategy has meaningful content
-          console.log(`[Cs_Analysis] Found good counter strategies (direct) in analysis ${i}:`, strategies);
-          bestAnalysis = analysis;
-          bestStrategies = strategies;
-          break;
+          console.log(`[Cs_Analysis] ✅ Found good counter strategies (direct) in analysis ${i}:`, strategies);
+          // Join the first few strategies with periods
+          const combinedText = strategies.slice(0, 3).join('. ');
+          console.log('[Cs_Analysis] Combined counter strategies text:', combinedText);
+          return combinedText;
         }
       }
     }
     
-    if (bestStrategies && bestStrategies.length > 0) {
-      // Join the first few strategies with periods
-      const combinedText = bestStrategies.slice(0, 3).join('. ');
-      console.log('[Cs_Analysis] Combined counter strategies text:', combinedText);
-      return combinedText;
-    }
-
-    // Fallback: if no good counter strategies found, try to extract from any analysis
+    // ✅ NEW: Fallback to text extraction from the most recent analysis
     const firstAnalysis = competitorData.data[0];
     if (!firstAnalysis) {
       console.log('[Cs_Analysis] No first analysis found');
@@ -1202,62 +1194,108 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
             
             <div className="analysis-section">
               {selectedData?.length ? (
-                <motion.div
-                  key={currentAnalysisIndex}
-                  className="analysis-report"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <h5>Analysis {currentAnalysisIndex + 1}</h5>
-                  {renderAnalysisContent(selectedData[currentAnalysisIndex]?.data || selectedData[currentAnalysisIndex])}
-                  <div className="navigation-buttons">
-                    <motion.button
-                      className="nav-btn"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={handlePrevAnalysis}
-                      disabled={currentAnalysisIndex === 0}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#e0e0ff"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M15 18l-6-6 6-6" />
-                      </svg>
-                      Previous
-                    </motion.button>
-                    <motion.button
-                      className="nav-btn"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={handleNextAnalysis}
-                      disabled={currentAnalysisIndex === selectedData.length - 1}
-                    >
-                      Next
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#e0e0ff"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M9 18l6-6-6-6" />
-                      </svg>
-                    </motion.button>
+                <>
+                  {/* ✅ NEW: Analysis overview header */}
+                  <div className="analysis-overview">
+                    <h4>Competitor Analysis for {selectedCompetitor}</h4>
+                    <p className="analysis-count">Showing {selectedData.length} most recent analyses</p>
                   </div>
-                </motion.div>
+                  
+                  {/* ✅ NEW: Analysis tabs for easy navigation */}
+                  <div className="analysis-tabs">
+                    {selectedData.map((analysis: any, index: number) => (
+                      <motion.button
+                        key={index}
+                        className={`analysis-tab ${currentAnalysisIndex === index ? 'active' : ''}`}
+                        onClick={() => setCurrentAnalysisIndex(index)}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        Analysis {index + 1}
+                        {analysis.lastModified && (
+                          <span className="analysis-date">
+                            {new Date(analysis.lastModified).toLocaleDateString()}
+                          </span>
+                        )}
+                      </motion.button>
+                    ))}
+                  </div>
+                  
+                  {/* ✅ NEW: Enhanced analysis content display */}
+                  <motion.div
+                    key={currentAnalysisIndex}
+                    className="analysis-report"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <div className="analysis-header">
+                      <h5>Analysis {currentAnalysisIndex + 1}</h5>
+                      {selectedData[currentAnalysisIndex]?.lastModified && (
+                        <span className="analysis-timestamp">
+                          Updated: {new Date(selectedData[currentAnalysisIndex].lastModified).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div className="analysis-content">
+                      {renderAnalysisContent(selectedData[currentAnalysisIndex]?.data || selectedData[currentAnalysisIndex])}
+                    </div>
+                    
+                    {/* ✅ NEW: Enhanced navigation with analysis count */}
+                    <div className="navigation-buttons">
+                      <motion.button
+                        className="nav-btn"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={handlePrevAnalysis}
+                        disabled={currentAnalysisIndex === 0}
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#e0e0ff"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M15 18l-6-6 6-6" />
+                        </svg>
+                        Previous
+                      </motion.button>
+                      
+                      <span className="analysis-counter">
+                        {currentAnalysisIndex + 1} of {selectedData.length}
+                      </span>
+                      
+                      <motion.button
+                        className="nav-btn"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={handleNextAnalysis}
+                        disabled={currentAnalysisIndex === selectedData.length - 1}
+                      >
+                        Next
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#e0e0ff"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M9 18l6-6-6-6" />
+                        </svg>
+                      </motion.button>
+                    </div>
+                  </motion.div>
+                </>
               ) : (
                 <div className="no-analysis-explanation">
                   <div className="explanation-header">
@@ -1387,12 +1425,12 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
               )}
             </div>
             <motion.button
-              className="close-btn"
+              className="close-btn-icon"
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               onClick={() => setSelectedCompetitor(null)}
             >
-              Close
+              <span className="close-icon-text">×</span>
             </motion.button>
           </motion.div>
         </motion.div>,

@@ -27,7 +27,7 @@
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
-  height: 64px !important;
+  height: 70px !important;
   background: var(--glass-bg) !important;
   border-bottom: 1.5px solid var(--glass-border) !important;
   display: flex !important;
@@ -40,8 +40,8 @@
   backdrop-filter: blur(var(--glass-blur)) !important;
   -webkit-backdrop-filter: blur(var(--glass-blur)) !important;
   box-sizing: border-box !important;
-  min-height: 64px !important;
-  max-height: 64px !important;
+  min-height: 70px !important;
+  max-height: 70px !important;
   box-shadow: var(--glass-shadow);
   overflow: visible;
 }
@@ -89,7 +89,7 @@
 
 .social-icons {
   display: flex;
-  gap: clamp(8px, 1.5vw, 15px);
+  gap: clamp(4px, 0.8vw, 8px);
   height: clamp(50px, 5vh, 70px);
   max-height: clamp(50px, 5vh, 70px);
   align-items: center;
@@ -100,8 +100,8 @@
 }
 
 .social-icon {
-  width: clamp(40px, 4.5vw, 60px);
-  height: clamp(40px, 4.5vw, 60px);
+  width: clamp(18px, 1.8vw, 28px);
+  height: clamp(18px, 1.8vw, 28px);
   color: rgba(255, 255, 255, 0.7);
   transition: all 0.2s ease;
   cursor: pointer;
@@ -141,8 +141,8 @@
 }
 
 .social-icon svg {
-  width: clamp(24px, 3vw, 36px);
-  height: clamp(24px, 3vw, 36px);
+  width: clamp(12px, 1.5vw, 20px);
+  height: clamp(12px, 1.5vw, 20px);
   fill: currentColor;
 }
 
@@ -191,13 +191,13 @@
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  height: 40px; /* Enforce a fixed height */
+  height: 32px; /* Reduced height */
   color: #e0e0ff;
   text-decoration: none;
-  font-size: clamp(0.9rem, 2.2vw, 1.1rem);
+  font-size: clamp(0.7rem, 1.8vw, 0.9rem); /* Smaller font size */
   font-weight: 700;
-  padding: 0 clamp(16px, 4vw, 20px); /* Adjust padding */
-  border-radius: clamp(8px, 2vw, 10px);
+  padding: 0 clamp(12px, 3vw, 16px); /* Reduced padding */
+  border-radius: clamp(6px, 1.5vw, 8px);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   background: rgba(255, 255, 255, 0.03);
@@ -497,29 +497,29 @@
 }
 
 /* Responsive adjustments for smaller laptop screens */
-@media (max-width: 1440px) {
+@media (max-width: 1600px) {
   .top-bar {
-    height: clamp(55px, 5.5vh, 65px) !important;
+    height: clamp(55px, 5.5vh, 70px) !important;
     padding-left: clamp(70px, 7vw, 90px) !important;
     padding-right: clamp(20px, 2.5vw, 25px) !important;
-    min-height: clamp(55px, 5.5vh, 65px) !important;
-    max-height: clamp(55px, 5.5vh, 65px) !important;
+    min-height: clamp(55px, 5.5vh, 70px) !important;
+    max-height: clamp(55px, 5.5vh, 70px) !important;
   }
   
   .social-icons {
-    gap: clamp(10px, 1.2vw, 12px);
-    height: clamp(55px, 5.5vh, 65px);
-    max-height: clamp(55px, 5.5vh, 65px);
+    gap: clamp(3px, 0.6vw, 6px);
+    height: clamp(55px, 5.5vh, 70px);
+    max-height: clamp(55px, 5.5vh, 70px);
   }
   
   .social-icon {
-    width: clamp(45px, 4vw, 55px);
-    height: clamp(45px, 4vw, 55px);
+    width: clamp(20px, 2vw, 28px);
+    height: clamp(20px, 2vw, 28px);
   }
   
   .social-icon svg {
-    width: clamp(28px, 2.8vw, 32px);
-    height: clamp(28px, 2.8vw, 32px);
+    width: clamp(16px, 1.6vw, 20px);
+    height: clamp(16px, 1.6vw, 20px);
   }
   
   .logo-image {
@@ -529,34 +529,34 @@
   
   .nav-link,
   .dashboard-button {
-    font-size: clamp(0.85rem, 1.8vw, 1rem);
-    padding: clamp(8px, 2vw, 10px) clamp(14px, 3.5vw, 18px);
+    font-size: clamp(0.65rem, 1.4vw, 0.8rem);
+    padding: clamp(6px, 1.5vw, 8px) clamp(10px, 2.5vw, 14px);
   }
 }
 
-@media (max-width: 1366px) {
+@media (max-width: 1440px) {
   .top-bar {
-    height: clamp(50px, 5vh, 60px) !important;
+    height: clamp(50px, 5vh, 65px) !important;
     padding-left: clamp(65px, 6.5vw, 80px) !important;
     padding-right: clamp(18px, 2.2vw, 22px) !important;
-    min-height: clamp(50px, 5vh, 60px) !important;
-    max-height: clamp(50px, 5vh, 60px) !important;
+    min-height: clamp(50px, 5vh, 65px) !important;
+    max-height: clamp(50px, 5vh, 65px) !important;
   }
   
   .social-icons {
-    gap: clamp(8px, 1vw, 10px);
-    height: clamp(50px, 5vh, 60px);
-    max-height: clamp(50px, 5vh, 60px);
+    gap: clamp(2px, 0.4vw, 4px);
+    height: clamp(50px, 5vh, 65px);
+    max-height: clamp(50px, 5vh, 65px);
   }
   
   .social-icon {
-    width: clamp(42px, 3.8vw, 50px);
-    height: clamp(42px, 3.8vw, 50px);
+    width: clamp(16px, 1.6vw, 24px);
+    height: clamp(16px, 1.6vw, 24px);
   }
   
   .social-icon svg {
-    width: clamp(26px, 2.6vw, 30px);
-    height: clamp(26px, 2.6vw, 30px);
+    width: clamp(14px, 1.4vw, 18px);
+    height: clamp(14px, 1.4vw, 18px);
   }
   
   .logo-image {
@@ -566,34 +566,34 @@
   
   .nav-link,
   .dashboard-button {
-    font-size: clamp(0.8rem, 1.6vw, 0.95rem);
-    padding: clamp(7px, 1.8vw, 9px) clamp(12px, 3.2vw, 16px);
+    font-size: clamp(0.6rem, 1.2vw, 0.75rem);
+    padding: clamp(5px, 1.3vw, 7px) clamp(8px, 2.2vw, 12px);
   }
 }
 
-@media (max-width: 1280px) {
+@media (max-width: 1366px) {
   .top-bar {
-    height: clamp(48px, 4.8vh, 58px) !important;
+    height: clamp(48px, 4.8vh, 60px) !important;
     padding-left: clamp(60px, 6vw, 75px) !important;
     padding-right: clamp(16px, 2vw, 20px) !important;
-    min-height: clamp(48px, 4.8vh, 58px) !important;
-    max-height: clamp(48px, 4.8vh, 58px) !important;
+    min-height: clamp(48px, 4.8vh, 60px) !important;
+    max-height: clamp(48px, 4.8vh, 60px) !important;
   }
   
   .social-icons {
-    gap: clamp(6px, 0.8vw, 8px);
-    height: clamp(48px, 4.8vh, 58px);
-    max-height: clamp(48px, 4.8vh, 58px);
+    gap: clamp(1px, 0.2vw, 2px);
+    height: clamp(48px, 4.8vh, 60px);
+    max-height: clamp(48px, 4.8vh, 60px);
   }
   
   .social-icon {
-    width: clamp(38px, 3.5vw, 46px);
-    height: clamp(38px, 3.5vw, 46px);
+    width: clamp(14px, 1.4vw, 20px);
+    height: clamp(14px, 1.4vw, 20px);
   }
   
   .social-icon svg {
-    width: clamp(24px, 2.4vw, 28px);
-    height: clamp(24px, 2.4vw, 28px);
+    width: clamp(12px, 1.2vw, 16px);
+    height: clamp(12px, 1.2vw, 16px);
   }
   
   .logo-image {
@@ -603,181 +603,292 @@
   
   .nav-link,
   .dashboard-button {
-    font-size: clamp(0.75rem, 1.4vw, 0.9rem);
-    padding: clamp(6px, 1.6vw, 8px) clamp(10px, 3vw, 14px);
+    font-size: clamp(0.55rem, 1vw, 0.7rem);
+    padding: clamp(4px, 1.1vw, 6px) clamp(6px, 1.8vw, 10px);
   }
 }
 
-/* ✨ MOBILE RESPONSIVE - HAMBURGER MENU */
-@media (max-width: 768px) {
+@media (max-width: 1280px) {
   .top-bar {
-    padding-left: 20px;
-    padding-right: 20px;
-    height: 60px;
+    height: clamp(45px, 4.5vh, 55px) !important;
+    padding-left: clamp(55px, 5.5vw, 70px) !important;
+    padding-right: clamp(14px, 1.8vw, 18px) !important;
+    min-height: clamp(45px, 4.5vh, 55px) !important;
+    max-height: clamp(45px, 4.5vh, 55px) !important;
   }
   
-  /* Hide desktop navigation on mobile */
+  .social-icons {
+    gap: clamp(0px, 0.1vw, 1px);
+    height: clamp(45px, 4.5vh, 55px);
+    max-height: clamp(45px, 4.5vh, 55px);
+  }
+  
+  .social-icon {
+    width: clamp(12px, 1.2vw, 18px);
+    height: clamp(12px, 1.2vw, 18px);
+  }
+  
+  .social-icon svg {
+    width: clamp(10px, 1vw, 14px);
+    height: clamp(10px, 1vw, 14px);
+  }
+  
+  .logo-image {
+    height: clamp(22px, 2.6vw, 26px);
+    max-width: clamp(70px, 9vw, 90px);
+  }
+  
+  .nav-link,
+  .dashboard-button {
+    font-size: clamp(0.5rem, 0.9vw, 0.65rem);
+    padding: clamp(3px, 0.9vw, 5px) clamp(4px, 1.4vw, 8px);
+  }
+}
+
+@media (max-width: 1200px) {
+  .top-bar {
+    height: clamp(42px, 4.2vh, 52px) !important;
+    padding-left: clamp(50px, 5vw, 65px) !important;
+    padding-right: clamp(12px, 1.6vw, 16px) !important;
+    min-height: clamp(42px, 4.2vh, 52px) !important;
+    max-height: clamp(42px, 4.2vh, 52px) !important;
+  }
+  
+  .social-icons {
+    gap: clamp(0px, 0.05vw, 0px);
+    height: clamp(42px, 4.2vh, 52px);
+    max-height: clamp(42px, 4.2vh, 52px);
+  }
+  
+  .social-icon {
+    width: clamp(10px, 1vw, 16px);
+    height: clamp(10px, 1vw, 16px);
+  }
+  
+  .social-icon svg {
+    width: clamp(8px, 0.8vw, 12px);
+    height: clamp(8px, 0.8vw, 12px);
+  }
+  
+  .logo-image {
+    height: clamp(20px, 2.4vw, 24px);
+    max-width: clamp(60px, 8vw, 80px);
+  }
+  
+  .nav-link,
+  .dashboard-button {
+    font-size: clamp(0.45rem, 0.8vw, 0.6rem);
+    padding: clamp(2px, 0.7vw, 4px) clamp(3px, 1.2vw, 6px);
+  }
+}
+
+@media (max-width: 1024px) {
+  .top-bar {
+    height: clamp(40px, 4vh, 50px) !important;
+    padding-left: clamp(45px, 4.5vw, 60px) !important;
+    padding-right: clamp(10px, 1.4vw, 14px) !important;
+    min-height: clamp(40px, 4vh, 50px) !important;
+    max-height: clamp(40px, 4vh, 50px) !important;
+  }
+  
+  .social-icons {
+    gap: clamp(0px, 0.02vw, 0px);
+    height: clamp(40px, 4vh, 50px);
+    max-height: clamp(40px, 4vh, 50px);
+  }
+  
+  .social-icon {
+    width: clamp(8px, 0.8vw, 14px);
+    height: clamp(8px, 0.8vw, 14px);
+  }
+  
+  .social-icon svg {
+    width: clamp(6px, 0.6vw, 10px);
+    height: clamp(6px, 0.6vw, 10px);
+  }
+  
+  .logo-image {
+    height: clamp(18px, 2.2vw, 22px);
+    max-width: clamp(50px, 7vw, 70px);
+  }
+  
+  .nav-link,
+  .dashboard-button {
+    font-size: clamp(0.4rem, 0.7vw, 0.55rem);
+    padding: clamp(1px, 0.5vw, 3px) clamp(2px, 0.8vw, 4px);
+  }
+}
+
+@media (max-width: 768px) {
+  .top-bar {
+    height: clamp(35px, 3.5vh, 45px) !important;
+    padding-left: clamp(40px, 4vw, 55px) !important;
+    padding-right: clamp(8px, 1.2vw, 12px) !important;
+    min-height: clamp(35px, 3.5vh, 45px) !important;
+    max-height: clamp(35px, 3.5vh, 45px) !important;
+  }
+  
   .desktop-nav {
     display: none !important;
   }
   
-  /* Show mobile hamburger menu */
   .mobile-menu-toggle {
     display: flex !important;
   }
   
   .social-icons {
-    gap: 12px;
-    height: 60px;
-    max-height: 60px;
+    gap: clamp(0px, 0px, 0px);
+    height: clamp(35px, 3.5vh, 45px);
+    max-height: clamp(35px, 3.5vh, 45px);
   }
   
   .social-icon {
-    width: 50px;
-    height: 50px;
+    width: clamp(6px, 0.6vw, 12px);
+    height: clamp(6px, 0.6vw, 12px);
   }
   
   .social-icon svg {
-    width: 28px;
-    height: 28px;
+    width: clamp(4px, 0.4vw, 8px);
+    height: clamp(4px, 0.4vw, 8px);
   }
   
   .logo-image {
-    height: 30px;
+    height: clamp(16px, 2vw, 20px);
+    max-width: clamp(40px, 6vw, 60px);
   }
   
   .nav-links {
-    gap: 8px;
+    display: none !important;
   }
   
-  .nav-link {
-    padding: 8px 12px;
-    font-size: 0.85rem;
+  .nav-link,
+  .dashboard-button {
+    display: none !important;
   }
   
   .platform-title span {
-    font-size: clamp(1rem, 2.5vw, 1.1rem);
+    display: none !important;
   }
   
   .dashboard-button {
-    padding: clamp(8px, 2vw, 10px) clamp(12px, 3vw, 16px);
-    font-size: clamp(0.85rem, 2vw, 0.95rem);
+    display: none !important;
   }
   
-  /* Mobile dashboard button container adjustments */
   .mobile-dashboard-button-container {
-    margin: 0 15px;
+    display: flex !important;
   }
   
   .mobile-dashboard-button-container .dashboard-button {
-    padding: clamp(8px, 2vw, 10px) clamp(12px, 3vw, 16px);
-    font-size: clamp(0.85rem, 2vw, 0.95rem);
+    display: flex !important;
+    font-size: clamp(0.55rem, 0.8vw, 0.7rem);
+    padding: clamp(2px, 0.8vw, 4px) clamp(3px, 1.2vw, 6px);
   }
 }
 
 @media (max-width: 480px) {
   .top-bar {
-    padding-left: 16px;
-    padding-right: 16px;
+    height: clamp(30px, 3vh, 40px) !important;
+    padding-left: clamp(35px, 3.5vw, 50px) !important;
+    padding-right: clamp(6px, 1vw, 10px) !important;
+    min-height: clamp(30px, 3vh, 40px) !important;
+    max-height: clamp(30px, 3vh, 40px) !important;
   }
   
   .social-icons {
-    gap: 8px;
+    gap: clamp(0px, 0px, 0px);
+    height: clamp(30px, 3vh, 40px);
+    max-height: clamp(30px, 3vh, 40px);
   }
   
   .social-icon {
-    width: 45px;
-    height: 45px;
+    width: clamp(4px, 0.4vw, 10px);
+    height: clamp(4px, 0.4vw, 10px);
   }
   
   .social-icon svg {
-    width: 24px;
-    height: 24px;
+    width: clamp(2px, 0.2vw, 6px);
+    height: clamp(2px, 0.2vw, 6px);
   }
   
   .logo-image {
-    height: 28px;
+    height: clamp(14px, 1.8vw, 18px);
+    max-width: clamp(30px, 5vw, 50px);
   }
   
   .platform-title span {
-    font-size: clamp(0.9rem, 2.2vw, 1rem);
+    display: none !important;
   }
   
   .login-button {
-    padding: clamp(5px, 1.2vw, 6px) clamp(10px, 2.5vw, 12px);
-    font-size: clamp(0.7rem, 1.6vw, 0.8rem);
+    font-size: clamp(0.5rem, 0.7vw, 0.65rem);
+    padding: clamp(2px, 0.6vw, 4px) clamp(3px, 1vw, 6px);
   }
   
   .dashboard-button {
-    padding: clamp(6px, 1.5vw, 8px) clamp(10px, 2.5vw, 12px);
-    font-size: clamp(0.75rem, 1.8vw, 0.85rem);
-    gap: clamp(4px, 1vw, 6px);
+    display: none !important;
   }
   
   .dashboard-button svg {
-    width: clamp(14px, 2.5vw, 16px);
-    height: clamp(14px, 2.5vw, 16px);
+    width: clamp(12px, 1.2vw, 16px);
+    height: clamp(12px, 1.2vw, 16px);
   }
   
-  /* Mobile navigation adjustments */
   .mobile-nav-menu {
-    width: 260px;
+    width: 85vw !important;
   }
   
   .mobile-nav-item {
-    padding: 14px 18px;
-    font-size: 0.95rem;
+    font-size: clamp(0.9rem, 2.2vw, 1.1rem) !important;
+    padding: clamp(12px, 3vw, 16px) clamp(16px, 4vw, 20px) !important;
   }
   
-  /* Mobile dashboard button container adjustments */
   .mobile-dashboard-button-container {
-    margin: 0 10px;
+    display: flex !important;
   }
   
   .mobile-dashboard-button-container .dashboard-button {
-    padding: clamp(6px, 1.5vw, 8px) clamp(10px, 2.5vw, 12px);
-    font-size: clamp(0.75rem, 1.8vw, 0.85rem);
+    display: flex !important;
+    font-size: clamp(0.5rem, 0.7vw, 0.65rem);
+    padding: clamp(1px, 0.6vw, 3px) clamp(2px, 0.8vw, 4px);
   }
 }
 
-/* Ultra-small screens */
 @media (max-width: 360px) {
   .social-icon {
-    width: clamp(40px, 8vw, 45px);
-    height: clamp(40px, 8vw, 45px);
+    width: clamp(2px, 0.2vw, 8px);
+    height: clamp(2px, 0.2vw, 8px);
   }
   
   .social-icon svg {
-    width: clamp(20px, 4vw, 22px);
-    height: clamp(20px, 4vw, 22px);
+    width: clamp(1px, 0.1vw, 4px);
+    height: clamp(1px, 0.1vw, 4px);
   }
   
   .logo-image {
-    height: clamp(24px, 4.5vw, 30px);
-    max-width: clamp(80px, 18vw, 100px);
+    height: clamp(12px, 1.6vw, 16px);
+    max-width: clamp(25px, 4vw, 45px);
   }
   
   .platform-title span {
-    font-size: clamp(0.8rem, 2vw, 0.9rem);
+    display: none !important;
   }
   
-  /* Mobile navigation for ultra-small screens */
   .mobile-nav-menu {
-    width: 240px;
+    width: 90vw !important;
   }
   
   .mobile-nav-item {
-    padding: 12px 16px;
-    font-size: 0.9rem;
+    font-size: clamp(0.8rem, 2vw, 1rem) !important;
+    padding: clamp(10px, 2.8vw, 14px) clamp(14px, 3.8vw, 18px) !important;
   }
   
-  /* Mobile dashboard button container adjustments */
   .mobile-dashboard-button-container {
-    margin: 0 8px;
+    display: flex !important;
   }
   
   .mobile-dashboard-button-container .dashboard-button {
-    padding: clamp(5px, 1.2vw, 7px) clamp(8px, 2vw, 10px);
-    font-size: clamp(0.7rem, 1.6vw, 0.8rem);
+    display: flex !important;
+    font-size: clamp(0.45rem, 0.6vw, 0.6rem);
+    padding: clamp(1px, 0.5vw, 2px) clamp(1px, 0.6vw, 3px);
   }
 }

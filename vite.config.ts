@@ -77,6 +77,12 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      // Reimagine image endpoint (RAG server)
+      '/api/reimagine-image': {
+        target: 'http://127.0.0.1:3001',
+        changeOrigin: true,
+        secure: false,
+      },
       '/api/rag/health': {
         target: 'http://127.0.0.1:3001',
         changeOrigin: true,
@@ -282,13 +288,6 @@ export default defineConfig({
         target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
-      },
-      // Fresh R2 posts endpoint for R2PostFetcher
-      '/api/posts-fresh-r2': {
-        target: 'http://127.0.0.1:3000',
-        changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path, // Keep the full path including /api
       },
       '/images': {
         target: 'http://127.0.0.1:3002',

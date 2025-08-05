@@ -72,8 +72,8 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
           position: 'fixed',
           top: '70px', // FIXED: Match TopBar height
           left: '0',
+          bottom: '0', // FIXED: Extend to bottom of screen
           zIndex: 999998, // FIXED: Just below TopBar but above everything else
-          height: 'calc(100vh - 70px)', // FIXED: Match TopBar height
           overflow: 'visible',
           transform: 'translateZ(0)', // Hardware acceleration
           willChange: 'transform',
@@ -87,10 +87,7 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
           borderRight: '1px solid rgba(255, 255, 255, 0.1)',
           backdropFilter: 'blur(10px)',
           WebkitBackdropFilter: 'blur(10px)',
-          boxSizing: 'border-box',
-          // Additional bulletproof properties
-          minHeight: 'calc(100vh - 70px)',
-          maxHeight: 'calc(100vh - 70px)'
+          boxSizing: 'border-box'
         }}
       >
         <div className="icon-container">

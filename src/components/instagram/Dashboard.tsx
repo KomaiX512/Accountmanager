@@ -134,6 +134,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
   const baseReconnectDelay = 1000;
+  const lastProfilePicRenderTimeRef = useRef<number>(0);
   const [aiProcessingNotifications, setAiProcessingNotifications] = useState<string[]>([]);
   const [linkedAccounts, setLinkedAccounts] = useState<LinkedAccount[]>([]);
 
@@ -300,17 +301,36 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     setImageError(false);
     try {
       const now = Date.now();
-      if (now - lastProfilePicRenderTimeRef.current < 1800000 && profileInfo) {
-        console.log('Skipping profile pic fetch due to throttle');
-        setProfileLoading(false);
-        return;
-      }
+      // 🔥 CRITICAL FIX: Only throttle profile picture fetching, not the entire profile data
+      // This ensures we always fetch follower counts and other profile data
+      console.log(`[${new Date().toISOString()}] Fetching Instagram profile info for ${accountHolder}`);
       const response = await axios.get(`/api/profile-info/${accountHolder}?forceRefresh=true`);
+      
+      // 🎯 CRITICAL DEBUG: Log the exact response to understand data structure
+      console.log(`[${new Date().toISOString()}] Profile Info Response:`, response.data);
+      console.log(`[${new Date().toISOString()}] Followers Count:`, response.data?.followersCount);
+      console.log(`[${new Date().toISOString()}] Following Count:`, response.data?.followsCount);
+      
       setProfileInfo(response.data);
       lastProfilePicRenderTimeRef.current = now;
       imageRetryAttemptsRef.current = 0;
-      console.log('Profile Info Fetched:', response.data);
+      
+      // Validate that we have the expected data structure
+      if (response.data) {
+        if (response.data.followersCount !== undefined) {
+          console.log(`[${new Date().toISOString()}] ✅ Successfully loaded followers: ${response.data.followersCount}`);
+        } else {
+          console.error(`[${new Date().toISOString()}] ❌ Missing followersCount in profile data`);
+        }
+        
+        if (response.data.followsCount !== undefined) {
+          console.log(`[${new Date().toISOString()}] ✅ Successfully loaded following: ${response.data.followsCount}`);
+        } else {
+          console.error(`[${new Date().toISOString()}] ❌ Missing followsCount in profile data`);
+        }
+      }
     } catch (err: any) {
+      console.error(`[${new Date().toISOString()}] ❌ Error fetching Instagram profile info:`, err);
       if (err.response?.status === 404) {
         setProfileInfo(null);
         setProfileError('Profile info not available.');
@@ -2306,7 +2326,7 @@ Image Description: ${response.post.image_prompt}
           >
             <h2 style={{ marginBottom: '8px' }}>
               <div className="section-header">
-                <span>📰 News4U</span>
+                <span><i className="fas fa-newspaper"></i> News For You</span>
                 <div className="content-badge viewed">
                   <span className="badge-text">Updated</span>
                 </div>
@@ -2324,7 +2344,7 @@ Image Description: ${response.post.image_prompt}
           >
             <h2 style={{ marginBottom: '8px' }}>
               <div className="section-header">
-                <span>📱 Notifications</span>
+                <span><i className="fas fa-bell"></i> Notifications</span>
               </div>
             </h2>
             <DmsComments 
@@ -2370,7 +2390,7 @@ Image Description: ${response.post.image_prompt}
           >
             <h2 style={{ marginBottom: '8px' }}>
               <div className="section-header">
-                <span>🎯 Our Strategies</span>
+                <span><i className="fas fa-bullseye"></i> Our Strategies</span>
                 {getUnseenStrategiesCount() > 0 ? (
                   <div className="content-badge" onClick={markStrategiesAsViewed}>
                     <span className="badge-count">{getUnseenStrategiesCount()}</span>

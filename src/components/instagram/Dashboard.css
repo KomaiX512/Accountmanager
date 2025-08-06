@@ -72,7 +72,9 @@ body:has(.dashboard-wrapper) {
   color: #a0a0a0;
   text-align: center;
   line-height: 1.5;
-  white-space: pre-wrap;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-style: italic;
   max-width: 600px;
   margin: 0 auto;
@@ -116,6 +118,15 @@ body:has(.dashboard-wrapper) {
   opacity: 0.6;
 }
 
+/* Force Font Awesome icons to display */
+.fas::before {
+  display: inline-block;
+  font-style: normal;
+  font-variant: normal;
+  text-rendering: auto;
+  -webkit-font-smoothing: antialiased;
+}
+
 /* ✨ COMPACT GRID LAYOUT */
 .dashboard-grid {
   display: grid;
@@ -142,6 +153,22 @@ body:has(.dashboard-wrapper) {
 }
 
 /* ✨ CRITICAL FIX: Ensure grid layout persists until truly mobile */
+
+/* NEW: Maintain grid layout between 1001px and 1200px to prevent UI break */
+@media (min-width: 1001px) and (max-width: 1200px) {
+  .dashboard-grid {
+    display: grid !important;
+    grid-template-areas:
+      "profile profile profile"
+      "news4u post-cooked strategies"
+      "notifications post-cooked competitor-analysis"
+      "post-creation post-creation post-creation" !important;
+    grid-template-columns: 1fr 1.5fr 1fr !important;
+    grid-template-rows: auto 0.5fr 0.7fr auto !important;
+    gap: 14px !important; /* Adjusted gap for this range */
+    flex-direction: unset !important;
+  }
+}
 
 
 @media (max-width: 1000px) and (min-width: 768px) {

@@ -381,7 +381,8 @@ Posted: ${post.timestamp || 'Recent'}`;
           postIndex: index,
           likes: post.engagement?.likes || 0,
           comments: post.engagement?.comments || 0,
-          totalEngagement: (post.engagement?.likes || 0) + (post.engagement?.comments || 0),
+          shares: post.engagement?.shares || 0,
+          totalEngagement: (post.engagement?.likes || 0) + (post.engagement?.comments || 0) + (post.engagement?.shares || 0),
           hashtagCount: post.hashtags.length,
           mentionCount: post.mentions.length,
           wordCount: post.content.split(/\s+/).length
@@ -884,6 +885,7 @@ Performance: ${this.categorizePerformance(engagement.engagementRate)}`;
           const performance = doc.metadata.totalEngagement || 0;
           const likes = doc.metadata.likes || 0;
           const comments = doc.metadata.comments || 0;
+          const shares = doc.metadata.shares || 0;
           
           // Extract the actual post caption from the content
           let postCaption = '';
@@ -895,7 +897,7 @@ Performance: ${this.categorizePerformance(engagement.engagementRate)}`;
           
           context += `Post ${index + 1}: "${postCaption}"\n`;
           if (performance > 0) {
-            context += `Engagement: ${likes.toLocaleString()} likes, ${comments.toLocaleString()} comments, Total: ${performance.toLocaleString()}\n`;
+            context += `Engagement: ${likes.toLocaleString()} likes, ${comments.toLocaleString()} comments, ${shares.toLocaleString()} retweets, Total: ${performance.toLocaleString()}\n`;
           }
           context += "\n";
         });

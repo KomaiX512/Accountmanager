@@ -301,65 +301,67 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
           </div>
         )}
         
-        {!loading && displayStrategies.length > 0 ? (
-          // ✅ NEW: Display multiple strategy cards
-          displayStrategies.map((strategy, index) => {
-            const tacticalPreview = getTacticalRecommendationsPreview(index);
-            const previewText = tacticalPreview ? getPreviewText(tacticalPreview) : '';
-            
-            return (
-              <motion.div
-                key={index}
-                className={`strategy-sub-container ${data ? 'loaded' : ''}`}
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={{ duration: 0.2, delay: index * 0.1 }}
-                whileHover={{ scale: 1.02 }}
-              >
-                {/* ✅ SIMPLIFIED: Just preview text and button */}
-                <div className="strategy-simple-content">
-                  {previewText ? (
-                    <div className="preview-text">
-                      {previewText}
-                    </div>
-                  ) : (
-                    <div className="preview-text">
-                      Loading strategy analysis and generating tactical recommendations. Analyzing recent performance data and preparing personalized insights...
-                    </div>
-                  )}
-                  
-                  <button 
-                    className="see-more-btn"
-                    onClick={handleOpenPopup}
-                  >
-                    see more
-                  </button>
+        <div className="strategies-scrollable">
+          {!loading && displayStrategies.length > 0 ? (
+            // ✅ NEW: Display multiple strategy cards
+            displayStrategies.map((strategy, index) => {
+              const tacticalPreview = getTacticalRecommendationsPreview(index);
+              const previewText = tacticalPreview ? getPreviewText(tacticalPreview) : '';
+              
+              return (
+                <motion.div
+                  key={index}
+                  className={`strategy-sub-container ${data ? 'loaded' : ''}`}
+                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={{ duration: 0.2, delay: index * 0.1 }}
+                  whileHover={{ scale: 1.02 }}
+                >
+                  {/* ✅ SIMPLIFIED: Just preview text and button */}
+                  <div className="strategy-simple-content">
+                    {previewText ? (
+                      <div className="preview-text">
+                        {previewText}
+                      </div>
+                    ) : (
+                      <div className="preview-text">
+                        Loading strategy analysis and generating tactical recommendations. Analyzing recent performance data and preparing personalized insights...
+                      </div>
+                    )}
+                    
+                    <button 
+                      className="see-more-btn"
+                      onClick={handleOpenPopup}
+                    >
+                      see more
+                    </button>
+                  </div>
+                </motion.div>
+              );
+            })
+          ) : !loading && (
+            // Fallback when no data is available
+            <motion.div
+              className={`strategy-sub-container ${data ? 'loaded' : ''}`}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.2 }}
+              whileHover={{ scale: 1.02 }}
+            >
+              <div className="strategy-simple-content">
+                <div className="preview-text">
+                  Content Strategy Optimization: Focus on creating more engaging visual content that resonates with your target audience. Posting Schedule Enhancement: Analyze your best performing times and increase posting frequency during peak engagement hours. Hashtag Strategy: Implement a more strategic hashtag approach...
                 </div>
-              </motion.div>
-            );
-          })
-        ) : !loading && (
-          // Fallback when no data is available
-          <motion.div
-            className={`strategy-sub-container ${data ? 'loaded' : ''}`}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.2 }}
-            whileHover={{ scale: 1.02 }}
-          >
-            <div className="strategy-simple-content">
-              <div className="preview-text">
-                Content Strategy Optimization: Focus on creating more engaging visual content that resonates with your target audience. Posting Schedule Enhancement: Analyze your best performing times and increase posting frequency during peak engagement hours. Hashtag Strategy: Implement a more strategic hashtag approach...
+                <button 
+                  className="see-more-btn"
+                  onClick={handleOpenPopup}
+                >
+                  see more
+                </button>
               </div>
-              <button 
-                className="see-more-btn"
-                onClick={handleOpenPopup}
-              >
-                see more
-              </button>
-            </div>
-          </motion.div>
-        )}
+            </motion.div>
+          )}
+        </div>
       </motion.div>
       
       {/* Render popup using React Portal for absolute screen positioning */}

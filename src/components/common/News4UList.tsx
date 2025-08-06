@@ -175,72 +175,74 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ scale: 1.01 }}
     >
-      <div className="news4u-content">
-        {items.map((item, idx) => {
-          const isOpen = expanded.has(idx);
-          return (
-            <motion.div
-              key={idx}
-              className="news4u-item"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: idx * 0.05 }}
-            >
-              <div className="news4u-item-header">
-                <FaClock className="timestamp-icon" />
-                <span>{formatTimestamp(item.timestamp)}</span>
-              </div>
-
-              <div
-                className={`news4u-summary ${isOpen ? 'expanded' : 'collapsed'}`}
-                onClick={() => toggleExpand(idx)}
-                title={isOpen ? 'Click to collapse' : 'Click to expand'}
+      <div className="news4u-scrollable">
+        <div className="news4u-content">
+          {items.map((item, idx) => {
+            const isOpen = expanded.has(idx);
+            return (
+              <motion.div
+                key={idx}
+                className="news4u-item"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: idx * 0.05 }}
               >
-                {decodeUnicode(item.breaking_news_summary)}
-                {!isOpen && (
-                  <div className="expand-indicator">
-                    <span>...</span>
-                  </div>
-                )}
-              </div>
+                <div className="news4u-item-header">
+                  <FaClock className="timestamp-icon" />
+                  <span>{formatTimestamp(item.timestamp)}</span>
+                </div>
 
-              {isOpen && (
-                <div className="news4u-actions">
-                  <button
-                    className="create-post-btn"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      createPostFromNews(item, idx);
-                    }}
-                    disabled={creatingPost.has(idx)}
-                    title="Create infographic post from this news"
-                  >
-                    {creatingPost.has(idx) ? (
-                      <>
-                        <FaSpinner className="btn-icon spinning" />
-                        <span>Creating...</span>
-                      </>
-                    ) : (
-                      <>
-                        <FaPlus className="btn-icon" />
-                        <span>Create Infographic Post</span>
-                      </>
-                    )}
-                  </button>
-                  {item.source_url && (
-                    <div className="news4u-source">
-                      <a href={item.source_url} target="_blank" rel="noopener noreferrer" className="source-link">
-                        <FaExternalLinkAlt className="link-icon" />
-                        <span>Read more</span>
-                      </a>
+                <div
+                  className={`news4u-summary ${isOpen ? 'expanded' : 'collapsed'}`}
+                  onClick={() => toggleExpand(idx)}
+                  title={isOpen ? 'Click to collapse' : 'Click to expand'}
+                >
+                  {decodeUnicode(item.breaking_news_summary)}
+                  {!isOpen && (
+                    <div className="expand-indicator">
+                      <span>...</span>
                     </div>
                   )}
                 </div>
-              )}
-            </motion.div>
-          );
-        })}
+
+                {isOpen && (
+                  <div className="news4u-actions">
+                    <button
+                      className="create-post-btn"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        createPostFromNews(item, idx);
+                      }}
+                      disabled={creatingPost.has(idx)}
+                      title="Create infographic post from this news"
+                    >
+                      {creatingPost.has(idx) ? (
+                        <>
+                          <FaSpinner className="btn-icon spinning" />
+                          <span>Creating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <FaPlus className="btn-icon" />
+                          <span>Create Infographic Post</span>
+                        </>
+                      )}
+                    </button>
+                    {item.source_url && (
+                      <div className="news4u-source">
+                        <a href={item.source_url} target="_blank" rel="noopener noreferrer" className="source-link">
+                          <FaExternalLinkAlt className="link-icon" />
+                          <span>Read more</span>
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </motion.div>
+            );
+          })}
+        </div>
       </div>
       
       {/* Toast Message */}

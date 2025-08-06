@@ -16,10 +16,12 @@
 .insights-modal {
   background: rgba(255, 255, 255, 0.08);
   border: 1.5px solid rgba(255, 255, 255, 0.15);
-  border-radius: 24px;
-  padding: 28px;
-  width: 80%;
-  max-width: 900px;
+  border-radius: clamp(12px, 3vw, 24px);
+  padding: clamp(16px, 4vw, 28px);
+  width: clamp(280px, 90vw, 900px);
+  font-size: clamp(12px, 1.8vw, 16px);
+  transform-origin: center center;
+  transition: all 0.3s ease-out;
   max-height: 85vh;
   overflow-y: auto;
   position: relative;
@@ -46,15 +48,15 @@
   
 .insights-close-btn {
   position: absolute;
-  top: 20px;
-  right: 20px;
+  top: clamp(12px, 3vw, 20px);
+  right: clamp(12px, 3vw, 20px);
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
   color: #e0e0ff;
-  font-size: 18px;
+  font-size: clamp(10px, 2.5vw, 18px);
   cursor: pointer;
-  width: 32px;
-  height: 32px;
+  width: clamp(20px, 4vw, 32px);
+  height: clamp(20px, 4vw, 32px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -69,8 +71,8 @@
   
 .insights-tabs {
   display: flex;
-  margin: 24px 0;
-  border-radius: 12px;
+  margin: clamp(10px, 2.5vw, 24px) 0;
+  border-radius: clamp(6px, 1.5vw, 12px);
   overflow: hidden;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -78,12 +80,12 @@
 
 .insights-tabs button {
   flex: 1;
-  padding: 12px 16px;
+  padding: clamp(6px, 1.5vw, 12px) clamp(8px, 2vw, 16px);
   background: transparent;
   border: none;
   color: #b8b8b8;
   cursor: pointer;
-  font-size: 14px;
+  font-size: clamp(10px, 2vw, 14px);
   font-weight: 500;
   transition: all 0.3s ease;
   position: relative;
@@ -102,19 +104,19 @@
   
   .insights-grid {
     display: grid;
-    gap: 20px;
+    gap: clamp(8px, 2vw, 20px);
   }
   
   .insight-chart {
     background: #222;
-    padding: 20px;
-    border-radius: 8px;
+    padding: clamp(8px, 2vw, 20px);
+    border-radius: clamp(4px, 1vw, 8px);
     border: 1px solid #333;
   }
   
   .insight-chart h3 {
-    margin: 0 0 15px;
-    font-size: 18px;
+    margin: 0 0 clamp(6px, 1.5vw, 15px);
+    font-size: clamp(12px, 2.2vw, 18px);
     color: #00ffcc;
   }
   
@@ -162,8 +164,8 @@
   }
 
   .analysis-header h2 {
-    margin: 0 0 10px;
-    font-size: 28px;
+    margin: 0 0 clamp(4px, 1.2vw, 10px);
+    font-size: clamp(16px, 3.2vw, 28px);
     color: #00ffcc;
     text-shadow: 0 2px 4px rgba(0, 255, 204, 0.3);
   }
@@ -171,7 +173,7 @@
   .analysis-subtitle {
     margin: 0;
     color: #aaa;
-    font-size: 16px;
+    font-size: clamp(10px, 2vw, 16px);
     font-weight: 300;
   }
 
@@ -399,7 +401,6 @@
   .connection-icon {
     font-size: 48px;
     margin-bottom: 20px;
-    opacity: 0.7;
   }
 
   .connection-required h3 {

@@ -20,10 +20,12 @@
   background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(30px);
   -webkit-backdrop-filter: blur(30px);
-  border-radius: 25px;
+  border-radius: clamp(12px, 3vw, 25px);
   padding: 0;
-  width: 100%;
-  max-width: 500px;
+  width: clamp(280px, 90vw, 500px);
+  font-size: clamp(12px, 1.8vw, 16px);
+  transform-origin: center center;
+  transition: all 0.3s ease;
   max-height: 80vh;
   overflow-y: auto;
   box-shadow: 
@@ -51,10 +53,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 30px 35px 25px;
+  padding: clamp(16px, 4vw, 30px) clamp(20px, 5vw, 35px) clamp(14px, 3.5vw, 25px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.1));
-  border-radius: 25px 25px 0 0;
+  border-radius: clamp(12px, 3vw, 25px) clamp(12px, 3vw, 25px) 0 0;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
@@ -72,8 +74,11 @@
   gap: 12px;
 }
 
-.title-icon {
-  font-size: 24px;
+.title-icon::before {
+  content: '\f1d8'; /* Font Awesome plane icon */
+  font-family: 'Font Awesome 5 Free';
+  font-weight: 900;
+  font-size: clamp(16px, 3vw, 24px);
   animation: pulse 2s infinite;
 }
 
@@ -84,7 +89,7 @@
 
 .autopilot-popup-title h3 {
   margin: 0;
-  font-size: 20px;
+  font-size: clamp(16px, 2.8vw, 20px);
   font-weight: 700;
   color: #1a1a1a;
   background: linear-gradient(135deg, #6366f1, #8b5cf6);
@@ -100,9 +105,9 @@
 }
 
 .platform-badge {
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 12px;
+  padding: clamp(3px, 1vw, 4px) clamp(8px, 2vw, 12px);
+  border-radius: clamp(12px, 3vw, 20px);
+  font-size: clamp(10px, 1.8vw, 12px);
   font-weight: 600;
   color: white;
   text-transform: uppercase;
@@ -113,8 +118,8 @@
   background: rgba(0, 0, 0, 0.1);
   border: none;
   border-radius: 50%;
-  width: 36px;
-  height: 36px;
+  width: clamp(28px, 5vw, 36px);
+  height: clamp(28px, 5vw, 36px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -396,6 +401,44 @@
   top: 3px;
   left: 3px;
   font-size: 8px;
+}
+
+/* Proportional Scaling Media Queries */
+@media (max-width: 550px) {
+  .autopilot-popup {
+    transform: scale(0.9);
+  }
+}
+
+@media (max-width: 450px) {
+  .autopilot-popup {
+    transform: scale(0.8);
+  }
+}
+
+@media (max-width: 350px) {
+  .autopilot-popup {
+    transform: scale(0.7);
+  }
+}
+
+/* Proportional Scaling Media Queries */
+@media (max-width: 550px) {
+  .autopilot-popup {
+    transform: scale(0.9);
+  }
+}
+
+@media (max-width: 450px) {
+  .autopilot-popup {
+    transform: scale(0.8);
+  }
+}
+
+@media (max-width: 350px) {
+  .autopilot-popup {
+    transform: scale(0.7);
+  }
 }
 
 .feature-toggle.active .toggle-knob {

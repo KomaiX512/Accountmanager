@@ -41,10 +41,10 @@ motion.div.left-bar,
 .icon-container {
   display: flex;
   flex-direction: column;
-  gap: clamp(12px, 2.5vw, 20px);
+  gap: clamp(8px, 1.5vw, 12px);
   width: 100%;
   align-items: center;
-  padding-top: clamp(12px, 2.5vw, 20px);
+  padding-top: clamp(8px, 1.5vw, 12px);
   box-sizing: border-box;
 }
 
@@ -56,7 +56,7 @@ motion.div.left-bar,
   border: 1px solid rgba(255,255,255,0.15);
   cursor: pointer;
   width: calc(100% - clamp(8px, 2vw, 16px));
-  padding: clamp(6px, 1.5vw, 10px) 0;
+  padding: clamp(4px, 1vw, 6px) 0;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: 12px;
   margin: 0 clamp(4px, 1vw, 8px);

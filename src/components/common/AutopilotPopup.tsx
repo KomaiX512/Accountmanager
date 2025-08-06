@@ -316,13 +316,6 @@ const AutopilotPopup: React.FC<AutopilotPopupProps> = ({
               
               {autopilotSettings.autoSchedule && (
                 <div className="autopilot-feature-controls">
-                  <button 
-                    className="autopilot-trigger-btn autopilot-schedule-btn"
-                    onClick={triggerAutoScheduleButton}
-                    disabled={!isConnected}
-                  >
-                    📅 Trigger Auto-Schedule
-                  </button>
                   <span className="autopilot-counter">
                     Scheduled: {autopilotSettings.scheduledPostsCount || 0}
                   </span>
@@ -353,13 +346,6 @@ const AutopilotPopup: React.FC<AutopilotPopupProps> = ({
               
               {autopilotSettings.autoReply && (
                 <div className="autopilot-feature-controls">
-                  <button 
-                    className="autopilot-trigger-btn autopilot-reply-btn"
-                    onClick={triggerAutoReplyButton}
-                    disabled={!isConnected}
-                  >
-                    💬 Trigger Auto-Reply
-                  </button>
                   <span className="autopilot-counter">
                     Replied: {autopilotSettings.autoRepliesCount || 0}
                   </span>

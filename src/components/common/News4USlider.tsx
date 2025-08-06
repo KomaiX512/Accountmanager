@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import { getDashboardUsername } from '../../utils/usernameHelpers';
 import { motion } from 'framer-motion';
-import { FaClock, FaExternalLinkAlt, FaPlus, FaSpinner } from 'react-icons/fa';
+import { FaClock, FaExternalLinkAlt, FaNewspaper, FaPlus, FaSpinner } from 'react-icons/fa';
 import RagService from '../../services/RagService';
 import axios from 'axios';
 import './News4U.css';
@@ -20,18 +18,9 @@ interface NewsItem {
 }
 
 const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
-  const initialAccountHolderRef = React.useRef(accountHolder);
-  
-  const { currentUser } = useAuth();
-  const [dashboardUsername, setDashboardUsername] = useState<string>(initialAccountHolderRef.current);
-
-  useEffect(() => {
-    if (!currentUser?.uid) return;
-    const stored = getDashboardUsername(platform, currentUser.uid);
-    if (stored && stored !== dashboardUsername) {
-      setDashboardUsername(stored);
-    }
-  }, [currentUser?.uid, platform]);
+  // 🚫 Never switch to connected username – lock to dashboard username on first render
+  const accountHolderRef = React.useRef(accountHolder);
+  const normalizedAccountHolder = accountHolderRef.current;
   const [items, setItems] = useState<NewsItem[]>([]);
   const [current, setCurrent] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -63,7 +52,7 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     (async () => {
       try {
         setLoading(true);
-        const res = await axios.get(`/api/news-for-you/${dashboardUsername}?platform=${platform}`);
+        const res = await axios.get(`/api/news-for-you/${normalizedAccountHolder}?platform=${platform}`);
         const raw = res.data ?? [];
         const list: NewsItem[] = raw.map((r:any)=> r?.data ?? r).filter((x:any)=>x && x.breaking_news_summary);
         setItems(list);
@@ -75,7 +64,7 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
         setLoading(false);
       }
     })();
-  }, [dashboardUsername, platform]);
+  }, [platform]);
 
   // --- early states ---------------------------------------------------------
   if (loading) {
@@ -93,7 +82,7 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     return (
       <motion.div className="news4u-container" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
         <div className="news4u-error">
-          
+          <FaNewspaper className="error-icon" />
           <span>{error}</span>
         </div>
       </motion.div>
@@ -104,7 +93,7 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     return (
       <motion.div className="news4u-container" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
         <div className="news4u-empty">
-          
+          <FaNewspaper className="empty-icon" />
           <span>No news available</span>
         </div>
       </motion.div>
@@ -119,9 +108,9 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     const newsItem = items[current];
     try {
       const prompt = `Create an engaging infographic post about this news: ${decodeUnicode(newsItem.breaking_news_summary)}`;
-      const response = await RagService.sendPostQuery(dashboardUsername, prompt, platform);
+      const response = await RagService.sendPostQuery(normalizedAccountHolder, prompt, platform);
       if (response.success) {
-        const evt = new CustomEvent('newPostCreated', { detail: { username: dashboardUsername, platform, timestamp: Date.now() } });
+        const evt = new CustomEvent('newPostCreated', { detail: { username: normalizedAccountHolder, platform, timestamp: Date.now() } });
         window.dispatchEvent(evt);
         setToastMessage('Infographic post created! Check Cooked Posts.');
       } else {

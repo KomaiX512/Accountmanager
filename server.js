@@ -467,10 +467,122 @@ app.get('/api/health-check', (req, res) => {
 
 // Clear image cache endpoint for administrators
 app.post('/admin/clear-image-cache', (req, res) => {
-  const cacheSize = imageCache.size;
-  imageCache.clear();
-  if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] Image cache cleared (${cacheSize} items)`);
-  res.json({ success: true, message: `Image cache cleared (${cacheSize} items)` });
+  try {
+    const cacheSize = imageCache.size;
+    imageCache.clear();
+    
+    // Also clear local cache directory
+    const localCacheDir = path.join(process.cwd(), 'image_cache');
+    if (fs.existsSync(localCacheDir)) {
+      fs.rmSync(localCacheDir, { recursive: true, force: true });
+      fs.mkdirSync(localCacheDir, { recursive: true });
+    }
+    
+    console.log(`[${new Date().toISOString()}] [CACHE] Cleared image cache (${cacheSize} items)`);
+    res.json({ 
+      success: true, 
+      message: `Cleared ${cacheSize} cached images`,
+      clearedCount: cacheSize 
+    });
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [CACHE] Error clearing cache:`, error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 🚀 BULLETPROOF: Clear specific image from cache endpoint
+app.post('/admin/clear-specific-image-cache', (req, res) => {
+  try {
+    const { username, filename, platform = 'instagram' } = req.body;
+    
+    if (!username || !filename) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Username and filename are required' 
+      });
+    }
+
+    // Generate all possible cache keys for this image
+    const possibleKeys = [
+      `ready_post/${platform}/${username}/${filename}`,
+      `${platform}/${username}/${filename}`,
+      `${username}/${filename}`,
+      filename
+    ];
+
+    let clearedCount = 0;
+    
+    // Clear from memory cache
+    possibleKeys.forEach(key => {
+      if (imageCache.has(key)) {
+        imageCache.delete(key);
+        clearedCount++;
+        console.log(`[${new Date().toISOString()}] [CACHE] Cleared memory cache for: ${key}`);
+      }
+    });
+
+    // Clear from local file cache
+    const localCacheDir = path.join(process.cwd(), 'image_cache');
+    possibleKeys.forEach(key => {
+      const localPath = path.join(localCacheDir, key);
+      if (fs.existsSync(localPath)) {
+        fs.unlinkSync(localPath);
+        clearedCount++;
+        console.log(`[${new Date().toISOString()}] [CACHE] Cleared local file cache: ${localPath}`);
+      }
+    });
+
+    console.log(`[${new Date().toISOString()}] [CACHE] Specific image cache cleared for ${platform}/${username}/${filename} (${clearedCount} entries)`);
+    
+    res.json({
+      success: true,
+      message: `Cleared cache for specific image: ${filename}`,
+      clearedCount,
+      username,
+      filename,
+      platform
+    });
+
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [CACHE] Error clearing specific image cache:`, error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 🚀 BULLETPROOF: Force refresh specific image endpoint
+app.get('/api/force-refresh-image/:username/:filename', async (req, res) => {
+  try {
+    const { username, filename } = req.params;
+    const platform = req.query.platform || 'instagram';
+    
+    // Clear specific image from all caches first
+    const possibleKeys = [
+      `ready_post/${platform}/${username}/${filename}`,
+      `${platform}/${username}/${filename}`,
+      `${username}/${filename}`,
+      filename
+    ];
+
+    possibleKeys.forEach(key => {
+      if (imageCache.has(key)) {
+        imageCache.delete(key);
+        console.log(`[${new Date().toISOString()}] [FORCE-REFRESH] Cleared cache for: ${key}`);
+      }
+    });
+
+    // Now fetch fresh image with cache-busting
+    const imageKey = `ready_post/${platform}/${username}/${filename}`;
+    const freshImageUrl = `/api/r2-image/${username}/${filename}?platform=${platform}&force=true&t=${Date.now()}`;
+    
+    console.log(`[${new Date().toISOString()}] [FORCE-REFRESH] Forcing fresh fetch for: ${imageKey}`);
+    
+    // Redirect to the fresh image URL with cache-busting parameters
+    res.redirect(freshImageUrl);
+
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [FORCE-REFRESH] Error:`, error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 // Simple placeholder image endpoint
@@ -696,31 +808,33 @@ function generatePlaceholderImage(text = 'Image Not Available', width = 512, hei
 
 // Enhanced image retrieval with multi-level fallbacks
 async function fetchImageWithFallbacks(key, fallbackImagePath = null, username = null, filename = null) {
-  // NUCLEAR CACHE-BUSTING: Check for cache-busting parameters in the key
-  const cacheBustMatch = key.match(/[?&](nuclear|reimagined|force|no-cache|bypass)=([^&]*)/);
-  const shouldBypassCache = cacheBustMatch || key.includes('nuclear') || key.includes('reimagined') || key.includes('force');
-  
-  // DEBUG: Log cache-busting detection
-  console.log(`[${new Date().toISOString()}] [IMAGE] 🔍 Cache-busting check for key: ${key}`);
-  console.log(`[${new Date().toISOString()}] [IMAGE] 🔍 Cache-busting match: ${cacheBustMatch ? 'YES' : 'NO'}`);
-  console.log(`[${new Date().toISOString()}] [IMAGE] 🔍 Should bypass cache: ${shouldBypassCache ? 'YES' : 'NO'}`);
+  // 🚀 BULLETPROOF: Enhanced cache-busting detection with multiple methods
+  const cacheBustParams = ['nuclear', 'reimagined', 'force', 'no-cache', 'bypass', 't', 'v', 'refresh', 'bust'];
+  const shouldBypassCache = cacheBustParams.some(param => 
+    key.includes(`${param}=`) || key.includes(`&${param}=`) || key.includes(`?${param}=`)
+  ) || key.includes('nuclear') || key.includes('reimagined') || key.includes('force');
   
   // Extract the clean key without cache-busting parameters
   const cleanKey = key.split('?')[0];
   const cacheKey = `r2_${cleanKey}`;
   
-  // NUCLEAR CACHE-BUSTING: Skip cache if cache-busting parameters are present
+  // 🚀 NUCLEAR CACHE-BUSTING: Debug logging and forced cache invalidation
   if (shouldBypassCache) {
-    console.log(`[${new Date().toISOString()}] [IMAGE] 🚀 NUCLEAR CACHE-BUSTING: Bypassing cache for ${cleanKey}`);
-    // Remove from cache to force fresh fetch
-    imageCache.delete(cacheKey);
+    console.log(`[${new Date().toISOString()}] [IMAGE] 🚀 NUCLEAR CACHE-BUSTING ACTIVATED: ${cleanKey}`);
+    console.log(`[${new Date().toISOString()}] [IMAGE] 🚀 Full key with params: ${key}`);
     
-    // Remove local cache file
+    // Remove from memory cache
+    if (imageCache.has(cacheKey)) {
+      imageCache.delete(cacheKey);
+      console.log(`[${new Date().toISOString()}] [IMAGE] 🧹 Cleared memory cache for: ${cacheKey}`);
+    }
+    
+    // Remove from local cache file
     const hashedKey = Buffer.from(cleanKey).toString('base64').replace(/[\/\+=]/g, '_');
     const localCacheFilePath = path.join(localCacheDir, hashedKey);
     if (fs.existsSync(localCacheFilePath)) {
       fs.unlinkSync(localCacheFilePath);
-      console.log(`[${new Date().toISOString()}] [IMAGE] 🧹 Removed local cache file: ${localCacheFilePath}`);
+      console.log(`[${new Date().toISOString()}] [IMAGE] 🧹 Cleared local cache file: ${localCacheFilePath}`);
     }
   } else {
     // Normal cache check
@@ -775,7 +889,7 @@ async function fetchImageWithFallbacks(key, fallbackImagePath = null, username =
     }
     
     // If not in cache, fetch from R2 using the proper s3Client wrapper
-    console.log(`[${new Date().toISOString()}] [IMAGE] Fetching from R2: ${cleanKey}`);
+    console.log(`[${new Date().toISOString()}] [IMAGE] 🌐 Fetching fresh from R2: ${cleanKey}`);
     
     // Use the s3Client wrapper (not getS3Client) for proper Buffer handling
     const data = await s3Client.getObject({
@@ -810,6 +924,7 @@ async function fetchImageWithFallbacks(key, fallbackImagePath = null, username =
       imageCache.delete(oldestKey);
     }
     
+    console.log(`[${new Date().toISOString()}] [IMAGE] ✅ Fresh image cached successfully: ${cleanKey} (${data.Body.length} bytes)`);
     return { data: data.Body, source: 'r2' };
   } catch (error) {
     console.error(`[${new Date().toISOString()}] [IMAGE] Error fetching from R2: ${cleanKey}`, error.message);

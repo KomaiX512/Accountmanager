@@ -1,6 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import { getDashboardUsername } from '../../utils/usernameHelpers';
 import { motion } from 'framer-motion';
 import { FaClock, FaExternalLinkAlt, FaPlus, FaSpinner, FaRss } from 'react-icons/fa';
 import axios from 'axios';
@@ -24,19 +22,9 @@ interface NewsItem {
  * It shows ALL news items in a vertically scrollable card – no prev/next buttons.
  */
 const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
-  const initialAccountHolderRef = React.useRef(accountHolder);
-  
-  const { currentUser } = useAuth();
-  const [dashboardUsername, setDashboardUsername] = useState<string>(initialAccountHolderRef.current);
-
-  // Keep dashboardUsername in sync with localStorage value for the current user
-  useEffect(() => {
-    if (!currentUser?.uid) return;
-    const stored = getDashboardUsername(platform, currentUser.uid);
-    if (stored && stored !== dashboardUsername) {
-      setDashboardUsername(stored);
-    }
-  }, [currentUser?.uid, platform]);
+  // 🚫 Never switch to connected username – lock to dashboard username on first render
+  const accountHolderRef = React.useRef(accountHolder);
+  const normalizedAccountHolder = accountHolderRef.current;
   const [items, setItems] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,22 +66,22 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       // Create the prefixed prompt for post generation
       const prompt = `Create an engaging infographic post about this news: ${decodeUnicode(newsItem.breaking_news_summary)}`;
       
-      console.log(`[News4U] 🚀 Creating infographic post for ${dashboardUsername} on ${platform}:`, prompt);
+      console.log(`[News4U] 🚀 Creating infographic post for ${normalizedAccountHolder} on ${platform}:`, prompt);
       
       // Use the same RAG service as the dashboard creation bar
       const response = await RagService.sendPostQuery(
-        dashboardUsername,
+        normalizedAccountHolder,
         prompt,
         platform
       );
       
       if (response.success) {
-        console.log(`[News4U] ✅ Post created successfully for ${dashboardUsername} on ${platform}`);
+        console.log(`[News4U] ✅ Post created successfully for ${normalizedAccountHolder} on ${platform}`);
         
         // Trigger post refresh event (same as dashboard)
         const newPostEvent = new CustomEvent('newPostCreated', {
           detail: {
-            username: dashboardUsername,
+            username: normalizedAccountHolder,
             platform: platform,
             timestamp: Date.now()
           }
@@ -127,7 +115,7 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     const fetch = async () => {
       try {
         setLoading(true);
-        const res = await axios.get(`/api/news-for-you/${dashboardUsername}?platform=${platform}`);
+        const res = await axios.get(`/api/news-for-you/${normalizedAccountHolder}?platform=${platform}`);
         const raw: NewsItem[] = (res.data ?? []).map((r: any) => r.data).filter(Boolean);
         // Remove duplicate stories based on identical summary text
         const deduped: NewsItem[] = [];
@@ -148,7 +136,7 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       }
     };
     fetch();
-  }, [dashboardUsername, platform]);
+  }, [platform]);
 
   if (loading) {
     return (

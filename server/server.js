@@ -3844,6 +3844,12 @@ app.post(['/send-dm-reply/:userId', '/api/send-dm-reply/:userId'], async (req, r
   const { userId } = req.params;
   const { sender_id, text, message_id, platform = 'instagram' } = req.body;
 
+  // Ensure the API response from sending the DM is accessible throughout this handler
+  // This avoids the "response is not defined" ReferenceError that occurs when we
+  // attempt to access the scoped "response" variable declared inside the try block
+  // further down in the code.
+  let dmResponse = null;
+
   if (!sender_id || !text || !message_id) {
     console.log(`[${new Date().toISOString()}] Missing required fields for DM reply`);
     return res.status(400).json({error: 'Missing sender_id, text, or message_id'});
@@ -4031,8 +4037,7 @@ app.post(['/send-dm-reply/:userId', '/api/send-dm-reply/:userId'], async (req, r
     try {
       // Send the DM reply
       console.log(`[${new Date().toISOString()}] Attempting to send DM to sender_id: ${sender_id} with access token for ${instagram_graph_id}`);
-      
-      const response = await axios({
+      dmResponse = await axios({
         method: 'post',
         url: `https://graph.instagram.com/v22.0/${instagram_graph_id}/messages`,
         headers: {
@@ -4146,7 +4151,7 @@ app.post(['/send-dm-reply/:userId', '/api/send-dm-reply/:userId'], async (req, r
       instagram_user_id: userId,
       instagram_graph_id: instagram_graph_id,
       recipient_id: sender_id,
-      message_id: response?.data?.id || `reply_${Date.now()}`,
+      message_id: dmResponse?.data?.id || `reply_${Date.now()}`,
       text,
       timestamp: Date.now(),
       sent_at: new Date().toISOString(),
@@ -4160,7 +4165,7 @@ app.post(['/send-dm-reply/:userId', '/api/send-dm-reply/:userId'], async (req, r
     }));
     console.log(`[${new Date().toISOString()}] Reply stored in R2 at ${replyKey}`);
 
-    res.json({ success: true, message_id: response?.data?.id });
+    res.json({ success: true, message_id: dmResponse?.data?.id });
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Error sending DM reply:`, error.response?.data || error.message);
     res.status(500).json({ 
@@ -10309,7 +10314,9 @@ async function processAutopilotScheduling() {
 }
 
 // � BULLETPROOF AUTOPILOT: Critical race condition protection
-const autopilotLocks = new Map(); // Prevent concurrent autopilot runs for same user/platform
+const autopilotLocks = new Map();
+// In-memory cache of recently auto-replied event ids to prevent duplicate sends within the same process
+const sentEventCache = new Map(); // key: eventId, value: timestamp // Prevent concurrent autopilot runs for same user/platform
 
 // Cleanup old locks periodically (every 10 minutes) to prevent memory leaks
 setInterval(() => {
@@ -10520,7 +10527,13 @@ async function checkAndReplyToNewMessages(username, platform, settings) {
     }
     
     // Find events for this user that are unhandled
-    const notifications = await getUnhandledNotifications(username, platform);
+    let notifications = await getUnhandledNotifications(username, platform);
+    // Filter out events we very recently replied to within this process (5 minutes window)
+    const nowMs = Date.now();
+    notifications = notifications.filter(n => {
+      const last = sentEventCache.get(n.id);
+      return !last || (nowMs - last) > 5 * 60 * 1000; // 5 minutes
+    });
     
     if (notifications.length === 0) {
       console.log(`[${new Date().toISOString()}] [AUTOPILOT] No unhandled notifications for ${platform}/${username}`);
@@ -10533,6 +10546,8 @@ async function checkAndReplyToNewMessages(username, platform, settings) {
     const limitedNotifications = notifications.slice(0, 5);
     
     for (const notification of limitedNotifications) {
+      // Double-check cache right before sending
+      if (sentEventCache.has(notification.id)) continue;
       try {
         // Generate AI reply using the existing RAG system
         const aiReplyResult = await generateAutopilotReply(notification, username, platform);
@@ -10542,6 +10557,10 @@ async function checkAndReplyToNewMessages(username, platform, settings) {
           const sendResult = await sendAutopilotReply(notification, aiReplyResult.reply, username, platform);
           
           if (sendResult.success) {
+            // Add to in-memory cache so we skip this event in future scans
+            sentEventCache.set(notification.id, Date.now());
+            // Respect 45-second throttle between consecutive replies
+            await new Promise(r => setTimeout(r, 45 * 1000));
             console.log(`[${new Date().toISOString()}] [AUTOPILOT] ✅ Auto-replied to ${notification.type} ${notification.message_id || notification.comment_id}`);
           }
         }
@@ -11334,18 +11353,33 @@ async function markNotificationAsAutoReplied(notification) {
     const response = await s3Client.send(getCommand);
     const eventData = JSON.parse(await response.Body.transformToString());
     
-    // Mark as auto-replied
+    // Mark event(s) as replied. Prefer exact id match but fall back to first
+    let matched = false;
+    const markEvent = ev => {
+      ev.autopilot_replied = true;
+      ev.auto_replied = true;
+      ev.rag_replied = true;
+      const ts = new Date().toISOString();
+      ev.autopilot_replied_at = ts;
+      ev.auto_replied_at = ts;
+      ev.rag_replied_at = ts;
+      ev.status = 'replied';
+    };
+
     if (Array.isArray(eventData)) {
       for (let event of eventData) {
         if ((event.message_id || event.comment_id || event.id) === notification.id) {
-          event.autopilot_replied = true;
-          event.autopilot_replied_at = new Date().toISOString();
+          markEvent(event);
+          matched = true;
           break;
         }
       }
+      // If no element matched (e.g., synthetic ID), mark the first unhandled event in the file
+      if (!matched && eventData.length > 0) {
+        markEvent(eventData[0]);
+      }
     } else {
-      eventData.autopilot_replied = true;
-      eventData.autopilot_replied_at = new Date().toISOString();
+      markEvent(eventData);
     }
     
     // Save back to R2

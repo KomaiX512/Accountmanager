@@ -323,11 +323,10 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
       {/* Header Row with Notification Count and Tiny Refresh Icon */}
       <div className="notifications-header-row">
         <span className="notifications-header-title">
-          Notifications
-          {validNotifications.length > 0 && (
-            <span className="notifications-count-badge">{validNotifications.length}</span>
-          )}
-        </span>
+           {validNotifications.length > 0 && (
+             <span className="notifications-count-badge">{validNotifications.length}</span>
+           )}
+         </span>
         <button
           className="tiny-refresh-btn"
           onClick={onRefresh}
@@ -388,12 +387,10 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
             onClick={handleAutoReplyAll}
             disabled={isAutoReplying || isLoading}
             className="auto-reply-all-btn"
+            title="AI will reply to all pending Comments and Dms based on rule set and according to yours personalization."
           >
             {isAutoReplying ? 'Auto-Replying...' : `Auto-Reply All (${safeFilter(validNotifications, (n: any) => !n.status || n.status === 'pending').length})`}
           </button>
-          <span className="auto-reply-info">
-            AI will reply to all pending Comments and Dms based on rule set and according to yours personalization.
-          </span>
         </div>
       )}
 

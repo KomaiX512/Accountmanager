@@ -1,13 +1,13 @@
 /* Modern DMs & Comments Container */
 .dms-comments-container {
-  padding: 12px;
+  padding: 8px;
   background: transparent;
   color: #ffffff;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   overflow: hidden; /* Prevent container overflow */
 }
 
@@ -16,16 +16,16 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-right: 8px;
-  margin-right: -8px;
-  max-height: calc(100vh - 200px); /* Adjusted for better visibility */
-  min-height: 250px; /* Increased minimum height */
+  padding-right: 4px;
+  margin-right: -4px;
+  max-height: calc(100vh - 180px); /* Reduced for more space */
+  min-height: 200px; /* Reduced minimum height */
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
   position: relative;
   scroll-behavior: smooth;
   /* Ensure we can scroll to the very end */
-  scroll-padding: 10px;
+  scroll-padding: 8px;
 }
 
 /* Scroll fade indicators */
@@ -164,23 +164,23 @@
 
 .no-notifications {
   text-align: center;
-  padding: 40px 20px;
+  padding: 30px 16px;
   color: #8e8e93;
   font-size: 16px;
   font-weight: 500;
   background: rgba(255, 255, 255, 0.02);
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .not-connected-message {
   text-align: center;
-  padding: 30px 20px;
+  padding: 24px 16px;
   color: #ff3b30;
   font-size: 14px;
   font-weight: 500;
   background: rgba(255, 59, 48, 0.1);
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid rgba(255, 59, 48, 0.3);
 }
 
@@ -188,12 +188,12 @@
 .auto-reply-section {
   background: rgba(0, 255, 204, 0.05);
   border: 1px solid rgba(0, 255, 204, 0.2);
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 16px;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 /* ✨ MINIMALIST AUTO-REPLY BUTTON */
@@ -335,9 +335,9 @@
 .notification-item {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 12px;
-  margin-bottom: 12px;
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 8px;
   transition: all 0.2s ease;
   position: relative;
   overflow: hidden;
@@ -345,6 +345,15 @@
   scroll-snap-align: start;
   /* Highlight new DMs */
   animation: highlightNewDM 2s ease-in-out;
+}
+
+/* First DM item - More prominent */
+.notification-item:first-child {
+  background: rgba(0, 122, 255, 0.1);
+  border: 1px solid rgba(0, 122, 255, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.2);
+  transform: scale(1.02);
+  margin-bottom: 12px;
 }
 
 .notification-item::before {
@@ -385,8 +394,8 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 8px;
-  gap: 8px;
+  margin-bottom: 6px;
+  gap: 6px;
 }
 
 .notification-type {
@@ -408,9 +417,9 @@
 
 .notification-content {
   background: rgba(0, 0, 0, 0.2);
-  border-radius: 8px;
-  padding: 12px;
-  margin-bottom: 12px;
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 8px;
   font-size: 14px;
   line-height: 1.4;
   color: #e0e0ff;
@@ -846,8 +855,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 

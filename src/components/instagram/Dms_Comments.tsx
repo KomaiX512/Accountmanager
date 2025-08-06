@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import './Dms_Comments.css';
 import { useInstagram } from '../../context/InstagramContext';
 import { useTwitter } from '../../context/TwitterContext';
@@ -70,15 +70,19 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
   
   // NEW: State for scroll position
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
   
   // NEW: Reference for scrollable container
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // Handle scroll events to show/hide scroll-to-top button
+  // Handle scroll events to show/hide scroll-to-top and scroll-to-bottom buttons
   const handleScroll = () => {
     if (scrollContainerRef.current) {
-      const { scrollTop } = scrollContainerRef.current;
+      const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+      const scrolledToBottom = scrollTop + clientHeight >= scrollHeight - 10; // 10px tolerance
+      
       setShowScrollTop(scrollTop > 200);
+      setShowScrollBottom(!scrolledToBottom && validNotifications.length > 5);
     }
   };
 
@@ -92,9 +96,21 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
     }
   };
 
+  // Scroll to bottom function - NEW: For better DM visibility
+  const scrollToBottom = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({
+        top: scrollContainerRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  };
+
   // Derived values after all hooks
   // 🛑 STOP OPERATION: Use parent's isAutoReplying state
   const isAutoReplying = parentIsAutoReplying;
+
+
 
   // CRITICAL FIX: Add validation for notifications array
   const validNotifications = React.useMemo(() => {
@@ -132,6 +148,27 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
       return true;
     });
   }, [notifications, platform]);
+
+  // Auto-scroll to bottom when new notifications arrive - NEW: Improved DM arrival detection
+  useEffect(() => {
+    if (validNotifications.length > 0 && scrollContainerRef.current) {
+      // Only auto-scroll if user is near the bottom
+      const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+      const scrolledToBottom = scrollTop + clientHeight >= scrollHeight - 100; // 100px tolerance
+      
+      if (scrolledToBottom) {
+        // Small delay to ensure DOM is updated
+        setTimeout(() => {
+          if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollTo({
+              top: scrollContainerRef.current.scrollHeight,
+              behavior: 'smooth'
+            });
+          }
+        }, 100);
+      }
+    }
+  }, [validNotifications]);
 
   console.log(`[${new Date().toISOString()}] [${platform.toUpperCase()}] Dms_Comments render:`, {
     originalCount: notifications?.length || 0, validCount: validNotifications.length,
@@ -525,6 +562,19 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
         </div>
       )}
 
+      {/* Scroll to bottom button - NEW: For better DM visibility */}
+      {showScrollBottom && validNotifications.length > 5 && (
+        <button 
+          className="scroll-to-bottom-btn"
+          onClick={scrollToBottom}
+          title="Scroll to bottom for new DMs"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+      )}
+      
       {/* Scroll to top button */}
       {showScrollTop && validNotifications.length > 5 && (
         <button 

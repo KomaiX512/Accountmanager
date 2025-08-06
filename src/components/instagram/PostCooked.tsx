@@ -15,7 +15,7 @@ import { schedulePost, fetchImageFromR2, extractImageKey } from '../../utils/sch
 import axios from 'axios';
 import { safeFilter } from '../../utils/safeArrayUtils';
 import { BsLightbulb } from 'react-icons/bs';
-import { FaBell } from 'react-icons/fa';
+import { FaBell, FaPalette, FaDownload } from 'react-icons/fa';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
 import { getApiUrl } from '../../config/api';
 // Missing modules - comment out until they're available
@@ -97,11 +97,12 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   
   // ✨ NEW: Reimagine Image Feature State
-  const [showContextMenu, setShowContextMenu] = useState<{ x: number; y: number; postKey: string } | null>(null);
+  const [showContextMenu, setShowContextMenu] = useState<{ x: number; y: number; postKey: string; imageElement: HTMLElement } | null>(null);
   const [showReimagineModal, setShowReimagineModal] = useState(false);
   const [reimaginePostKey, setReimaginePostKey] = useState<string | null>(null);
   const [reimagineExtraPrompt, setReimagineExtraPrompt] = useState('');
   const [isReimagining, setIsReimagining] = useState(false);
+  const [reimaginingPostKey, setReimaginingPostKey] = useState<string | null>(null);
   const [reimagineToastMessage, setReimagineToastMessage] = useState<string | null>(null);
 
   // Request deduplication to prevent multiple simultaneous API calls
@@ -564,11 +565,11 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       return `${API_BASE_URL}/placeholder.jpg?post=${encodeURIComponent(postKey)}&reason=no_pattern`;
     }
     
-    // Create timestamp for cache busting
-    const timestamp = forceRefresh ? Date.now() : Math.floor(Date.now() / 60000); // 1-minute cache
+    // Create timestamp for cache busting - force fresh fetch if imageRefreshKey changed
+    const timestamp = forceRefresh || imageRefreshKey > Math.floor(Date.now() / 60000) ? Date.now() : Math.floor(Date.now() / 60000);
     
-    // 🎯 FIXED: Use the R2 image endpoint to avoid CORS issues
-    const reliableUrl = `${API_BASE_URL}/api/r2-image/${username}/${imageFilename}?platform=${platform}&t=${timestamp}&v=${imageRefreshKey}&post=${encodeURIComponent(postKey)}`;
+    // 🎯 Use the R2 image endpoint with strong cache busting
+    const reliableUrl = `${API_BASE_URL}/api/r2-image/${username}/${imageFilename}?platform=${platform}&t=${timestamp}&refresh=${imageRefreshKey}&post=${encodeURIComponent(postKey)}`;
     
     console.log(`[ImageURL] Final URL: ${reliableUrl}`);
     return reliableUrl;
@@ -1713,14 +1714,17 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   };
 
   // ✨ NEW: Reimagine Image Feature Handlers
-  const handleImageRightClick = useCallback((e: React.MouseEvent, postKey: string) => {
+  const handleImageClick = useCallback((e: React.MouseEvent, postKey: string) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    const imageElement = e.currentTarget as HTMLElement;
     
     setShowContextMenu({
       x: e.clientX,
       y: e.clientY,
-      postKey
+      postKey,
+      imageElement
     });
   }, []);
   
@@ -1755,23 +1759,67 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   const handleReimagineSubmit = useCallback(async () => {
     if (!reimaginePostKey) return;
     
-    setIsReimagining(true);
-    setReimagineToastMessage('🎨 Reimagining your image...');
+    // Validate that prompt is provided
+    if (!reimagineExtraPrompt.trim()) {
+      setReimagineToastMessage('Please provide a complete image prompt');
+      setTimeout(() => setReimagineToastMessage(null), 3000);
+      return;
+    }
+    
+          setIsReimagining(true);
+      setReimaginingPostKey(reimaginePostKey);
+      setReimagineToastMessage('Reimagining your image...');
     
     try {
-      // Use RAG server (port 3001) for AI image generation
-      const ragServerUrl = API_BASE_URL.replace(':3002', ':3001');
-      const response = await axios.post(`${ragServerUrl}/api/reimagine-image`, {
+      // Use relative URL to leverage vite proxy for RAG server
+      const response = await axios.post('/api/reimagine-image', {
         username,
         postKey: reimaginePostKey,
         extraPrompt: reimagineExtraPrompt.trim(),
         platform
       });
       
-      if (response.data.success) {
-        setReimagineToastMessage('🎉 Image reimagined successfully! Refreshing...');
+            if (response.data.success) {
+        setReimagineToastMessage('Image reimagined successfully!');
         
-        // Update the local post with new image information
+        // NUCLEAR CACHE-BUSTING: Generate completely unique URL
+        const nuclearTimestamp = Date.now();
+        const nuclearCacheBust = `&nuclear=${nuclearTimestamp}&v=${Math.random()}&reimagined=1&force=1&no-cache=1&bypass=1`;
+        const nuclearImageUrl = `${response.data.newImageUrl}${nuclearCacheBust}`;
+        
+        console.log(`[PostCooked] 🚀 NUCLEAR IMAGE REPLACEMENT: ${nuclearImageUrl}`);
+        
+        // NUCLEAR APPROACH: Complete image element replacement
+        const postImage = document.querySelector(`img[data-post-key="${reimaginePostKey}"]`) as HTMLImageElement;
+        if (postImage) {
+          // Step 1: Remove the image completely
+          postImage.style.display = 'none';
+          postImage.removeAttribute('src');
+          
+          // Step 2: Create brand new image element
+          setTimeout(() => {
+            const newImg = document.createElement('img');
+            newImg.src = nuclearImageUrl;
+            newImg.alt = 'Post visual';
+            newImg.setAttribute('data-post-key', reimaginePostKey);
+            newImg.className = postImage.className;
+            newImg.style.cssText = postImage.style.cssText;
+            newImg.style.display = 'block';
+            
+            // Copy all event handlers
+            newImg.onloadstart = postImage.onloadstart;
+            newImg.onload = postImage.onload;
+            newImg.onerror = postImage.onerror;
+            newImg.onclick = postImage.onclick;
+            
+            // Replace the old image
+            postImage.parentNode?.replaceChild(newImg, postImage);
+            
+            console.log(`[PostCooked] ✅ NUCLEAR REPLACEMENT COMPLETE: ${nuclearImageUrl}`);
+          }, 50);
+        }
+        
+        // Update the local post state
         setLocalPosts(prev => 
           prev.map(post => 
             post.key === reimaginePostKey 
@@ -1779,31 +1827,46 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                   ...post,
                   data: {
                     ...post.data,
-                    image_url: response.data.newImageUrl,
-                    r2_image_url: response.data.newImageUrl,
-                    image_filename: response.data.newImageFilename,
-                    image_path: response.data.newImageFilename
+                    image_url: nuclearImageUrl,
+                    r2_image_url: nuclearImageUrl,
+                    image_filename: response.data.imageFilename,
+                    image_path: response.data.imageFilename,
+                    reimagined_at: new Date().toISOString()
                   }
                 }
               : post
           )
         );
         
-        // Clear image cache to force reload
+        // Clear image errors for this post
         setImageErrors(prev => {
           const newErrors = { ...prev };
           delete newErrors[reimaginePostKey];
           return newErrors;
         });
         
-        // Force image refresh
-        setImageRefreshKey(Date.now());
+        // Force React re-render with new timestamp
+        setImageRefreshKey(nuclearTimestamp);
         
         setTimeout(() => {
           setReimagineToastMessage(null);
           setShowReimagineModal(false);
           setReimaginePostKey(null);
+          setReimaginingPostKey(null);
           setReimagineExtraPrompt('');
+          
+          // NUCLEAR CACHE CLEAR: Force complete refresh after 2 seconds
+          setTimeout(() => {
+            console.log(`[PostCooked] 🧹 NUCLEAR CACHE CLEAR for post: ${reimaginePostKey}`);
+            // Force all images to reload
+            const allImages = document.querySelectorAll('img[data-post-key]');
+            allImages.forEach(img => {
+              const currentSrc = (img as HTMLImageElement).src;
+              if (currentSrc.includes('r2-image')) {
+                (img as HTMLImageElement).src = currentSrc + `&nuclear-clear=${Date.now()}`;
+              }
+            });
+          }, 2000);
         }, 2000);
       } else {
         throw new Error(response.data.error || 'Failed to reimagine image');
@@ -1818,6 +1881,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       }, 4000);
     } finally {
       setIsReimagining(false);
+      setReimaginingPostKey(null);
     }
   }, [reimaginePostKey, reimagineExtraPrompt, username, platform, setImageRefreshKey]);
   
@@ -1829,9 +1893,26 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       }
     };
     
+    const handleScroll = () => {
+      if (showContextMenu) {
+        const { imageElement } = showContextMenu;
+        const imageRect = imageElement.getBoundingClientRect();
+        
+        // Hide menu if image is out of viewport
+        if (imageRect.bottom < 0 || imageRect.top > window.innerHeight || 
+            imageRect.right < 0 || imageRect.left > window.innerWidth) {
+          setShowContextMenu(null);
+        }
+      }
+    };
+    
     if (showContextMenu) {
       document.addEventListener('click', handleClickOutside);
-      return () => document.removeEventListener('click', handleClickOutside);
+      window.addEventListener('scroll', handleScroll, true);
+      return () => {
+        document.removeEventListener('click', handleClickOutside);
+        window.removeEventListener('scroll', handleScroll, true);
+      };
     }
   }, [showContextMenu]);
 
@@ -2381,29 +2462,73 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                     return shouldShowPlaceholder ? (
                       <ImagePlaceholder postKey={post.key} />
                     ) : (
-                      <img
-                        src={imageUrl}
-                        alt="Post visual"
-                        className={`post-image ${loadingImages.has(post.key) ? 'loading' : 'loaded'}`}
-                        onLoadStart={() => {
-                          console.log(`[PostCooked] Image load started for ${post.key}: ${imageUrl}`);
-                          handleImageLoadStart(post.key);
-                        }}
-                        onLoad={(e) => {
-                          console.log(`[PostCooked] Image loaded successfully for ${post.key}`);
-                          handleImageLoad(post.key, e.target as HTMLImageElement);
-                        }}
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          handleImageError(post.key, target);
-                        }}
-                        onContextMenu={(e) => handleImageRightClick(e, post.key)}
-                        key={`${post.key}-${imageRefreshKey}`} // CACHED key for React
-                        style={{
-                          backgroundColor: '#2a2a4a', // Ensure background is visible during loading
-                          minHeight: '450px' // Ensure container has height even if image fails
-                        }}
-                      />
+                      <div style={{ position: 'relative' }}>
+                        <img
+                          src={imageUrl}
+                          alt="Post visual"
+                          data-post-key={post.key}
+                          className={`post-image ${loadingImages.has(post.key) || reimaginingPostKey === post.key ? 'loading' : 'loaded'}`}
+                          onLoadStart={() => {
+                            console.log(`[PostCooked] Image load started for ${post.key}: ${imageUrl}`);
+                            handleImageLoadStart(post.key);
+                          }}
+                          onLoad={(e) => {
+                            console.log(`[PostCooked] Image loaded successfully for ${post.key}`);
+                            handleImageLoad(post.key, e.target as HTMLImageElement);
+                          }}
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            handleImageError(post.key, target);
+                          }}
+                          onClick={(e) => handleImageClick(e, post.key)}
+                          key={`${post.key}-${imageRefreshKey}`} // CACHED key for React
+                          style={{
+                            backgroundColor: '#2a2a4a', // Ensure background is visible during loading
+                            minHeight: '450px', // Ensure container has height even if image fails
+                            filter: reimaginingPostKey === post.key ? 'blur(4px) brightness(0.7)' : 'none',
+                            transition: 'filter 0.3s ease'
+                          }}
+                        />
+                        {reimaginingPostKey === post.key && (
+                          <div style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 1000
+                          }}>
+                            <div style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: '16px'
+                            }}>
+                              <div style={{
+                                width: '48px',
+                                height: '48px',
+                                border: '3px solid rgba(0, 255, 204, 0.3)',
+                                borderTop: '3px solid #00ffcc',
+                                borderRadius: '50%',
+                                animation: 'spin 1s linear infinite'
+                              }}></div>
+                              <div style={{
+                                color: '#ffffff',
+                                fontSize: '14px',
+                                fontWeight: '500',
+                                textAlign: 'center',
+                                textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)'
+                              }}>
+                                Reimagining image...
+                              </div>
+                                                         </div>
+                           </div>
+                         )}
+                      </div>
                     );
                   })()}
                   <div className="interaction-icons">
@@ -2930,7 +3055,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
               e.currentTarget.style.color = '#ffffff';
             }}
           >
-            🎨 Reimagine Image
+            <FaPalette /> Reimagine Image
           </button>
           <button
             className="context-menu-item"
@@ -2958,7 +3083,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
               e.currentTarget.style.color = '#ffffff';
             }}
           >
-            💾 Download Image
+            <FaDownload /> Download Image
           </button>
         </div>,
         document.body
@@ -3015,7 +3140,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                 alignItems: 'center',
                 gap: '8px'
               }}>
-                🎨 Reimagine Image
+                <FaPalette style={{ marginRight: '8px' }} />Reimagine Image
               </h3>
               <p style={{ 
                 color: 'rgba(255, 255, 255, 0.7)', 
@@ -3023,7 +3148,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                 margin: 0,
                 lineHeight: '1.4'
               }}>
-                Add improvements or modifications to generate a new version of this image.
+                Provide a complete and detailed prompt to generate a new image. This will be enhanced with our magic prompt system.
               </p>
             </div>
             
@@ -3035,12 +3160,12 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                 display: 'block',
                 marginBottom: '8px'
               }}>
-                Additional Prompt (Optional):
+                Complete Image Prompt (Required):
               </label>
               <textarea
                 value={reimagineExtraPrompt}
                 onChange={(e) => setReimagineExtraPrompt(e.target.value)}
-                placeholder="e.g., make it more colorful, add sunset lighting, change to minimalist style..."
+                placeholder="Provide a complete and detailed description of the image you want to generate..."
                 disabled={isReimagining}
                 style={{
                   width: '100%',
@@ -3092,16 +3217,16 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
               </button>
               <button
                 onClick={handleReimagineSubmit}
-                disabled={isReimagining}
+                disabled={isReimagining || !reimagineExtraPrompt.trim()}
                 style={{
-                  background: isReimagining 
+                  background: (isReimagining || !reimagineExtraPrompt.trim()) 
                     ? 'rgba(255, 255, 255, 0.05)' 
                     : 'rgba(0, 255, 204, 0.15)',
-                  color: isReimagining ? '#666' : '#00ffcc',
-                  border: `1px solid ${isReimagining ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 255, 204, 0.3)'}`,
+                  color: (isReimagining || !reimagineExtraPrompt.trim()) ? '#666' : '#00ffcc',
+                  border: `1px solid ${(isReimagining || !reimagineExtraPrompt.trim()) ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 255, 204, 0.3)'}`,
                   padding: '10px 20px',
                   borderRadius: '8px',
-                  cursor: isReimagining ? 'not-allowed' : 'pointer',
+                  cursor: (isReimagining || !reimagineExtraPrompt.trim()) ? 'not-allowed' : 'pointer',
                   fontSize: '14px',
                   fontWeight: 'bold',
                   transition: 'all 0.3s ease',
@@ -3123,7 +3248,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                     Reimagining...
                   </>
                 ) : (
-                  '🎨 Reimagine'
+                  'Reimagine'
                 )}
               </button>
             </div>

@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { S3Client, GetObjectCommand, PutObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, PutObjectCommand, ListObjectsV2Command, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
@@ -126,8 +126,8 @@ const GEMINI_CONFIG = {
 
 // OPTIMAL Rate limiting configuration based on Gemini API Free Tier limits
 const RATE_LIMIT = {
-  maxRequestsPerMinute: 15, // Gemini 2.0 Flash Free Tier: 15 RPM
-  maxRequestsPerDay: 1500,  // Gemini 2.0 Flash Free Tier: 1,500 RPD
+  maxRequestsPerMinute: 15, // Gemini 2.5 Flash Lite Free Tier: 15 RPM
+  maxRequestsPerDay: 1500,  // Gemini 2.5 Flash Lite Free Tier: 1,500 RPD
   requestWindow: 60 * 1000, // 1 minute
   dayWindow: 24 * 60 * 60 * 1000, // 24 hours
   minDelayBetweenRequests: 2000 // Reduced to 2 seconds for better user experience
@@ -1108,16 +1108,14 @@ ${sanitizedContext}
 User Question: "${query}"
 
 INSTRUCTIONS:
-1. You MUST use the specific post data provided above.
-2. You MUST quote actual captions from the "Recent Posts and Engagement" section.
-3. You MUST include the exact engagement numbers (likes, comments, totals).
-4. You MUST reference the "Most Engaging Post" data if it exists.
-5. DO NOT claim you lack data - all necessary data is provided above.
-6. Answer based EXCLUSIVELY on the provided account data.
-7. If your confidence is BELOW 70% that the answer is correct, ASK a clarifying follow-up question instead of guessing.
-8. When citing evidence, INCLUDE the post \`id\` or \`url\` so the user can verify the source.
+1. You MUST use the specific post data provided above
+2. You MUST quote actual captions from the "Recent Posts and Engagement" section
+3. You MUST include the exact engagement numbers (likes, comments, totals)
+4. You MUST reference the "Most Engaging Post" data if it exists
+5. DO NOT claim you lack data - all necessary data is provided above
+6. Answer based EXCLUSIVELY on the provided account data
 
-Provide a detailed, insight-oriented response that directly uses the post content, engagement metrics, and cited post identifiers/links shown above.`;
+Provide a detailed response that directly uses the post content and engagement metrics shown above.`;
 
     return enhancedPrompt;
   }
@@ -2455,147 +2453,174 @@ app.post('/api/reimagine-image', async (req, res) => {
       return res.status(400).json({ error: 'Username and postKey are required' });
     }
     
+    if (!extraPrompt || !extraPrompt.trim()) {
+      return res.status(400).json({ error: 'Complete image prompt is required' });
+    }
+    
     console.log(`[RAG-Server] Processing image reimagination for ${platform}/${username}, post: ${postKey}`);
-    console.log(`[RAG-Server] Extra prompt: "${extraPrompt}"`);
+    console.log(`[RAG-Server] User prompt: "${extraPrompt}"`);
     
-    // Fetch the original post data to get the current image prompt
-    // Handle both short postKey (e.g., "ready_post_1754279425276") and full path formats
-    let postDataKey;
+    // Use user's complete prompt for image generation
+    const enhancedImagePrompt = extraPrompt.trim();
+    console.log(`[RAG-Server] Using user-provided prompt for reimagination`);
+    
+    // Extract the image filename from postKey by fetching the post data
+    // PostKey comes in format: "ready_post_1754451459676.json" 
+    let imageFilename;
+    let postId;
+    
     if (postKey.includes('.json')) {
-      // Full path format: "ready_post/twitter/elonmusk/ready_post_1754279425276.json"
-      postDataKey = postKey;
-    } else if (postKey.includes(`ready_post/${platform}/${username}/`)) {
-      // Partial path format: "ready_post/twitter/elonmusk/ready_post_1754279425276"
-      postDataKey = postKey.endsWith('.json') ? postKey : `${postKey}.json`;
-    } else {
-      // Short format: "ready_post_1754279425276"
-      postDataKey = `ready_post/${platform}/${username}/${postKey}.json`;
-    }
-    
-    console.log(`[RAG-Server] Constructed postDataKey: ${postDataKey}`);
-    let originalPostData;
-    
-    try {
-      const postDataResponse = await s3Operations.getObject(structuredbS3, {
-        Bucket: 'structuredb',
-        Key: postDataKey
-      });
+      // Handle different postKey formats:
+      // 1. "ready_post_1754451459676.json" (simple format)
+      // 2. "ready_post/instagram/mrbeast/campaign_ready_post_1754451342775_e7b4ca4b.json" (full path)
       
-      const postDataContent = await streamToString(postDataResponse.Body);
-      originalPostData = JSON.parse(postDataContent);
-      console.log(`[RAG-Server] Original post data retrieved successfully`);
-    } catch (fetchError) {
-      console.error(`[RAG-Server] Failed to fetch original post data:`, fetchError.message);
-      return res.status(404).json({ error: 'Original post not found' });
+      let match = postKey.match(/ready_post_(\d+)\.json$/);
+      if (!match) {
+        // Try campaign format: campaign_ready_post_ID_hash.json
+        match = postKey.match(/campaign_ready_post_(\d+)_[^/]+\.json$/);
+      }
+      if (!match) {
+        // Try any format with a timestamp ID
+        match = postKey.match(/(\d{13,})_[^/]*\.json$/);
+      }
+      
+      if (match) {
+        postId = match[1];
+        
+        // Extract the hash from the postKey if it exists
+        // postKey format: "ready_post/instagram/mrbeast/campaign_ready_post_1754451390339_6ce234f8.json"
+        let hashSuffix = '';
+        const hashMatch = postKey.match(/campaign_ready_post_\d+_([^.]+)\.json$/);
+        if (hashMatch) {
+          hashSuffix = `_${hashMatch[1]}`;
+        }
+        
+        // Construct the expected image filename with hash (this is the file we need to REPLACE)
+        imageFilename = `campaign_ready_post_${postId}${hashSuffix}.jpg`;
+        
+        console.log(`[RAG-Server] Target image to replace: ${imageFilename}`);
+      } else {
+        throw new Error(`Invalid postKey format: ${postKey}`);
+      }
+    } else if (postKey.includes('image_')) {
+      // Direct image filename passed
+      imageFilename = postKey;
+      const match = postKey.match(/image_(\d+)/);
+      postId = match ? match[1] : Date.now().toString();
+    } else {
+      throw new Error(`Unsupported postKey format: ${postKey}`);
     }
     
-    // Extract the original image prompt from the nested post structure
-    const originalImagePrompt = originalPostData?.data?.post?.image_prompt || 
-                               originalPostData?.post?.image_prompt || 
-                               originalPostData?.image_prompt || 
-                               originalPostData?.imagePrompt ||
-                               originalPostData?.data?.image_prompt ||
-                               originalPostData?.data?.imagePrompt;
-    if (!originalImagePrompt) {
-      return res.status(400).json({ error: 'Original image prompt not found in post data' });
-    }
+    console.log(`[RAG-Server] PostKey: ${postKey}, Extracted ID: ${postId}, Target image: ${imageFilename}`);
     
-    console.log(`[RAG-Server] Original image prompt: "${originalImagePrompt.substring(0, 100)}..."`);
-    
-    // Create enhanced prompt by combining original with extra improvements
-    let enhancedImagePrompt = originalImagePrompt;
-    if (extraPrompt && extraPrompt.trim()) {
-      enhancedImagePrompt = `${originalImagePrompt}. ${extraPrompt.trim()}`;
-      console.log(`[RAG-Server] Enhanced prompt created with user improvements`);
-    }
-    
-    // Generate new image filename with timestamp to ensure uniqueness
-    const timestamp = Date.now();
-    const originalFilename = originalPostData?.data?.post?.image_path || 
-                           originalPostData?.post?.image_path ||
-                           originalPostData?.image_filename || 
-                           originalPostData?.imageFilename ||
-                           originalPostData?.data?.image_filename ||
-                           originalPostData?.data?.imageFilename ||
-                           `${postKey}_image.jpg`;
-    const fileExtension = originalFilename.split('.').pop() || 'jpg';
-    const newImageFilename = `${postKey}_reimagined_${timestamp}.${fileExtension}`;
-    
-    console.log(`[RAG-Server] Generating new image: ${newImageFilename}`);
-    
-    // Generate the new image using the enhanced prompt
+    // Step 1: Delete the old image files (both local and R2)
     try {
-      await generateImageFromPrompt(enhancedImagePrompt, newImageFilename, username, platform);
-      console.log(`[RAG-Server] Image reimagination completed successfully`);
+      // Delete from local storage
+      const localImagePath = path.join(process.cwd(), 'ready_post', platform, username, imageFilename);
+      if (fs.existsSync(localImagePath)) {
+        fs.unlinkSync(localImagePath);
+        console.log(`[RAG-Server] Deleted old local image: ${imageFilename}`);
+      }
+      
+      // Delete from R2
+      const r2ImageKey = `ready_post/${platform}/${username}/${imageFilename}`;
+      try {
+        const deleteCommand = new DeleteObjectCommand({
+          Bucket: 'tasks',
+          Key: r2ImageKey
+        });
+        await tasksS3.send(deleteCommand);
+        console.log(`[RAG-Server] Deleted old R2 image: ${r2ImageKey}`);
+      } catch (r2DeleteError) {
+        console.warn(`[RAG-Server] Could not delete R2 image (may not exist):`, r2DeleteError.message);
+      }
+    } catch (deleteError) {
+      console.warn(`[RAG-Server] Error deleting old image files:`, deleteError.message);
+    }
+    
+    // Step 2: Generate the new image using the enhanced prompt
+    try {
+      await generateImageFromPrompt(enhancedImagePrompt, imageFilename, username, platform);
+      console.log(`[RAG-Server] New image generated successfully: ${imageFilename}`);
     } catch (imageError) {
       console.error(`[RAG-Server] Image reimagination failed:`, imageError.message);
       return res.status(500).json({ error: 'Failed to generate new image', details: imageError.message });
     }
     
-    // Update the post data with new image information maintaining the nested structure
-    const updatedPostData = {
-      ...originalPostData,
-      // Update root level for backward compatibility
-      image_filename: newImageFilename,
-      imageFilename: newImageFilename,
-      image_prompt: enhancedImagePrompt,
-      imagePrompt: enhancedImagePrompt,
-      image_url: `https://570f213f1410829ee9a733a77a5f40e3.r2.cloudflarestorage.com/tasks/ready_post/${platform}/${username}/${newImageFilename}`,
-      r2_image_url: `https://570f213f1410829ee9a733a77a5f40e3.r2.cloudflarestorage.com/tasks/ready_post/${platform}/${username}/${newImageFilename}`,
-      // Update nested structure if it exists
-      data: originalPostData.data ? {
-        ...originalPostData.data,
-        image_filename: newImageFilename,
-        imageFilename: newImageFilename,
-        image_url: `https://570f213f1410829ee9a733a77a5f40e3.r2.cloudflarestorage.com/tasks/ready_post/${platform}/${username}/${newImageFilename}`,
-        r2_image_url: `https://570f213f1410829ee9a733a77a5f40e3.r2.cloudflarestorage.com/tasks/ready_post/${platform}/${username}/${newImageFilename}`,
-        post: originalPostData.data.post ? {
-          ...originalPostData.data.post,
-          image_prompt: enhancedImagePrompt,
-          imagePrompt: enhancedImagePrompt,
-          image_path: newImageFilename
-        } : undefined
-      } : undefined,
-      // Update direct post structure if it exists
-      post: originalPostData.post ? {
-        ...originalPostData.post,
-        image_prompt: enhancedImagePrompt,
-        imagePrompt: enhancedImagePrompt,
-        image_path: newImageFilename
-      } : undefined,
-      // Metadata
-      reimagined_at: new Date().toISOString(),
-      reimagined_from: originalFilename,
-      extra_prompt_used: extraPrompt || null
-    };
-    
-    // Save the updated post data
+    // Step 3: Update ONLY the image-related fields in the JSON file (preserve original content)
     try {
-      await s3Operations.putObject(structuredbS3, {
+      const jsonDataKey = postKey;
+      
+      // Try to fetch the existing JSON data to preserve the original content
+      let existingData = null;
+      try {
+        const getCommand = new GetObjectCommand({
+          Bucket: 'structuredb',
+          Key: jsonDataKey
+        });
+        const response = await structuredbS3.send(getCommand);
+        const content = await streamToString(response.Body);
+        existingData = JSON.parse(content);
+        console.log(`[RAG-Server] Retrieved existing JSON data for update`);
+      } catch (fetchError) {
+        console.warn(`[RAG-Server] Could not fetch existing JSON data:`, fetchError.message);
+      }
+      
+      // Update only the image-related fields, preserve everything else
+      const updatedData = existingData || { key: jsonDataKey, data: {} };
+      
+      // Update the image URLs and metadata
+      updatedData.data = {
+        ...updatedData.data,
+        image_url: `https://tasks.570f213f1410829ee9a733a77a5f40e3.r2.cloudflarestorage.com/ready_post/${platform}/${username}/${imageFilename}`,
+        r2_image_url: `https://pub-ba72672df3c041a3844f278dd3c32b22.r2.dev/ready_post/${platform}/${username}/${imageFilename}`,
+        updated_at: new Date().toISOString(),
+        reimagined_at: new Date().toISOString(),
+        reimagined_prompt: enhancedImagePrompt
+      };
+      
+      // Update the post's image_url if it exists
+      if (updatedData.data.post) {
+        updatedData.data.post = {
+          ...updatedData.data.post,
+          image_url: `ready_post/${platform}/${username}/${imageFilename}`,
+          image_prompt: enhancedImagePrompt
+        };
+      }
+      
+      const putCommand = new PutObjectCommand({
         Bucket: 'structuredb',
-        Key: postDataKey,
-        Body: JSON.stringify(updatedPostData, null, 2),
+        Key: jsonDataKey,
+        Body: JSON.stringify(updatedData, null, 2),
         ContentType: 'application/json'
       });
-      console.log(`[RAG-Server] Updated post data saved successfully`);
-    } catch (saveError) {
-      console.error(`[RAG-Server] Failed to save updated post data:`, saveError.message);
-      return res.status(500).json({ error: 'Failed to save updated post data' });
+      await structuredbS3.send(putCommand);
+      console.log(`[RAG-Server] Updated JSON file with new image information: ${jsonDataKey}`);
+    } catch (jsonError) {
+      console.warn(`[RAG-Server] Could not update JSON file:`, jsonError.message);
     }
     
-    // Return success response with new image information
+    // Use the original postKey for frontend notification (it's already in the correct format)
+    const actualPostKey = postKey;
+    
+    console.log(`[RAG-Server] Image replacement completed - notifying frontend to refresh ${actualPostKey}`);
+    
+    // Add timestamp for cache busting
+    const timestamp = Date.now();
+    
+    // Create cache-busted image URL
+    const cacheBustedUrl = `/api/r2-image/${username}/${imageFilename}?platform=${platform}&reimagined=${timestamp}&force=1`;
+    
+    // Return success response
     const response = {
       success: true,
       message: 'Image reimagined successfully',
-      postKey,
-      originalImageFilename: originalFilename,
-      newImageFilename,
-      originalPrompt: originalImagePrompt,
-      enhancedPrompt: enhancedImagePrompt,
-      extraPrompt: extraPrompt || null,
-      newImageUrl: updatedPostData.image_url,
-      newR2ImageUrl: updatedPostData.r2_image_url,
-      timestamp: updatedPostData.reimagined_at
+      postKey: actualPostKey,
+      imageFilename: imageFilename,
+      newImageUrl: cacheBustedUrl,
+      newR2ImageUrl: cacheBustedUrl,
+      timestamp: new Date().toISOString(),
+      cacheKey: timestamp
     };
     
     console.log(`[RAG-Server] Image reimagination response:`, JSON.stringify(response, null, 2));

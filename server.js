@@ -696,34 +696,61 @@ function generatePlaceholderImage(text = 'Image Not Available', width = 512, hei
 
 // Enhanced image retrieval with multi-level fallbacks
 async function fetchImageWithFallbacks(key, fallbackImagePath = null, username = null, filename = null) {
-  // CRITICAL FIX: Enhanced memory cache check with proper validation
-  const cacheKey = `r2_${key}`;
-  if (imageCache.has(cacheKey)) {
-    const { data, timestamp } = imageCache.get(cacheKey);
-    if (Date.now() - timestamp < IMAGE_CACHE_TTL) {
-      console.log(`[${new Date().toISOString()}] [IMAGE] Using cached image for ${key}`);
-      // Validate that cached data is a proper Buffer
-      if (Buffer.isBuffer(data) && data.length > 0) {
-        return { data, source: 'memory-cache' };
+  // NUCLEAR CACHE-BUSTING: Check for cache-busting parameters in the key
+  const cacheBustMatch = key.match(/[?&](nuclear|reimagined|force|no-cache|bypass)=([^&]*)/);
+  const shouldBypassCache = cacheBustMatch || key.includes('nuclear') || key.includes('reimagined') || key.includes('force');
+  
+  // DEBUG: Log cache-busting detection
+  console.log(`[${new Date().toISOString()}] [IMAGE] 🔍 Cache-busting check for key: ${key}`);
+  console.log(`[${new Date().toISOString()}] [IMAGE] 🔍 Cache-busting match: ${cacheBustMatch ? 'YES' : 'NO'}`);
+  console.log(`[${new Date().toISOString()}] [IMAGE] 🔍 Should bypass cache: ${shouldBypassCache ? 'YES' : 'NO'}`);
+  
+  // Extract the clean key without cache-busting parameters
+  const cleanKey = key.split('?')[0];
+  const cacheKey = `r2_${cleanKey}`;
+  
+  // NUCLEAR CACHE-BUSTING: Skip cache if cache-busting parameters are present
+  if (shouldBypassCache) {
+    console.log(`[${new Date().toISOString()}] [IMAGE] 🚀 NUCLEAR CACHE-BUSTING: Bypassing cache for ${cleanKey}`);
+    // Remove from cache to force fresh fetch
+    imageCache.delete(cacheKey);
+    
+    // Remove local cache file
+    const hashedKey = Buffer.from(cleanKey).toString('base64').replace(/[\/\+=]/g, '_');
+    const localCacheFilePath = path.join(localCacheDir, hashedKey);
+    if (fs.existsSync(localCacheFilePath)) {
+      fs.unlinkSync(localCacheFilePath);
+      console.log(`[${new Date().toISOString()}] [IMAGE] 🧹 Removed local cache file: ${localCacheFilePath}`);
+    }
+  } else {
+    // Normal cache check
+    if (imageCache.has(cacheKey)) {
+      const { data, timestamp } = imageCache.get(cacheKey);
+      if (Date.now() - timestamp < IMAGE_CACHE_TTL) {
+        console.log(`[${new Date().toISOString()}] [IMAGE] Using cached image for ${cleanKey}`);
+        // Validate that cached data is a proper Buffer
+        if (Buffer.isBuffer(data) && data.length > 0) {
+          return { data, source: 'memory-cache' };
+        } else {
+          console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid cached data type for ${cleanKey}, removing from cache`);
+          imageCache.delete(cacheKey);
+        }
       } else {
-        console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid cached data type for ${key}, removing from cache`);
+        // Cache expired - remove it
+        console.log(`[${new Date().toISOString()}] [IMAGE] Cache expired for ${cleanKey}, removing`);
         imageCache.delete(cacheKey);
       }
-    } else {
-      // Cache expired - remove it
-      console.log(`[${new Date().toISOString()}] [IMAGE] Cache expired for ${key}, removing`);
-      imageCache.delete(cacheKey);
     }
   }
   
   // Create path for local file cache
-  const hashedKey = Buffer.from(key).toString('base64').replace(/[\/\+=]/g, '_');
+  const hashedKey = Buffer.from(cleanKey).toString('base64').replace(/[\/\+=]/g, '_');
   const localCacheFilePath = path.join(localCacheDir, hashedKey);
   
   try {
-    // Try local file cache first
-    if (fs.existsSync(localCacheFilePath)) {
-      console.log(`[${new Date().toISOString()}] [IMAGE] Using local cached image for ${key}`);
+    // Try local file cache first (only if not bypassing cache)
+    if (!shouldBypassCache && fs.existsSync(localCacheFilePath)) {
+      console.log(`[${new Date().toISOString()}] [IMAGE] Using local cached image for ${cleanKey}`);
       const data = fs.readFileSync(localCacheFilePath);
       
       // Validate the cached file is a proper Buffer
@@ -748,12 +775,12 @@ async function fetchImageWithFallbacks(key, fallbackImagePath = null, username =
     }
     
     // If not in cache, fetch from R2 using the proper s3Client wrapper
-    console.log(`[${new Date().toISOString()}] [IMAGE] Fetching from R2: ${key}`);
+    console.log(`[${new Date().toISOString()}] [IMAGE] Fetching from R2: ${cleanKey}`);
     
     // Use the s3Client wrapper (not getS3Client) for proper Buffer handling
     const data = await s3Client.getObject({
       Bucket: 'tasks',
-      Key: key
+      Key: cleanKey
     }).promise();
     
     // Validate that we got a proper Buffer
@@ -764,7 +791,7 @@ async function fetchImageWithFallbacks(key, fallbackImagePath = null, username =
     // Validate image data integrity (check for valid image headers)
     const isValidImage = validateImageBuffer(data.Body);
     if (!isValidImage) {
-      console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid image data detected for ${key}, not caching`);
+      console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid image data detected for ${cleanKey}, not caching`);
       return { data: data.Body, source: 'r2-invalid' };
     }
     
@@ -785,7 +812,7 @@ async function fetchImageWithFallbacks(key, fallbackImagePath = null, username =
     
     return { data: data.Body, source: 'r2' };
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] [IMAGE] Error fetching from R2: ${key}`, error.message);
+    console.error(`[${new Date().toISOString()}] [IMAGE] Error fetching from R2: ${cleanKey}`, error.message);
     
     // Try fallback image path if provided
     if (fallbackImagePath && fs.existsSync(fallbackImagePath)) {
@@ -1506,13 +1533,17 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
   }
   
   try {
-    // Construct the R2 key path
+    // Construct the R2 key path with cache-busting parameters
     const r2Key = `ready_post/${platform}/${username}/${imageKey}`;
     
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] Fetching: ${r2Key} (cache key: ${cacheKey})`);
+    // NUCLEAR CACHE-BUSTING: Pass the full URL with query parameters to detect cache-busting
+    const fullUrl = `${r2Key}?${new URLSearchParams(req.query).toString()}`;
     
-    // Use enhanced fetch with all fallbacks and validation
-    const { data, source } = await fetchImageWithFallbacks(r2Key, null, username, imageKey);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] Fetching: ${r2Key} (cache key: ${cacheKey})`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] Full URL with params: ${fullUrl}`);
+    
+    // Use enhanced fetch with all fallbacks and validation - pass the full URL for cache-busting detection
+    const { data, source } = await fetchImageWithFallbacks(fullUrl, null, username, imageKey);
     
     // CRITICAL: Validate that we actually have image data (prevent white images)
     if (!data || data.length === 0) {

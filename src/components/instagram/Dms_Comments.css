@@ -11,18 +11,21 @@
   overflow: hidden; /* Prevent container overflow */
 }
 
-/* Notifications Scroll Container - NEW: Scrollable notifications list */
+/* Notifications Scroll Container - FIXED: Improved scroll behavior and DM arrival detection */
 .notifications-scroll-container {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 8px;
   margin-right: -8px;
-  max-height: calc(100vh - 300px); /* Adjust based on header and controls height */
-  min-height: 200px;
+  max-height: calc(100vh - 200px); /* Adjusted for better visibility */
+  min-height: 250px; /* Increased minimum height */
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
   position: relative;
+  scroll-behavior: smooth;
+  /* Ensure we can scroll to the very end */
+  scroll-padding: 10px;
 }
 
 /* Scroll fade indicators */
@@ -68,9 +71,11 @@
   background: linear-gradient(135deg, rgba(0, 122, 255, 0.8), rgba(88, 86, 214, 0.8));
 }
 
-/* Smooth scrolling behavior */
+/* Enhanced scrolling behavior with better end detection */
 .notifications-scroll-container {
   scroll-behavior: smooth;
+  /* Improved scroll snap for better DM visibility */
+  scroll-snap-type: y proximity;
 }
 
 /* Hide scrollbar on mobile for cleaner look */
@@ -103,6 +108,27 @@
   align-items: center;
   justify-content: center;
   box-shadow: 0 4px 16px rgba(0, 122, 255, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 10;
+  /* Add scroll to bottom button as well */
+}
+
+/* Scroll to Bottom Button - NEW: For better DM visibility */
+.scroll-to-bottom-btn {
+  position: absolute;
+  bottom: 80px; /* Positioned above scroll to top */
+  right: 20px;
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, #34c759, #00cc66);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(52, 199, 89, 0.3);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 10;
 }
@@ -305,16 +331,20 @@
   font-weight: 400;
 }
 
-/* Notification Items */
+/* Notification Items - ENHANCED: Better DM arrival detection */
 .notification-item {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
-  padding: 16px;
+  padding: 12px;
   margin-bottom: 12px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s ease;
   position: relative;
   overflow: hidden;
+  /* Scroll snap alignment for better visibility */
+  scroll-snap-align: start;
+  /* Highlight new DMs */
+  animation: highlightNewDM 2s ease-in-out;
 }
 
 .notification-item::before {
@@ -330,9 +360,21 @@
 }
 
 .notification-item:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.15);
-  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+/* Animation for new DMs */
+@keyframes highlightNewDM {
+  0% {
+    background: rgba(0, 122, 255, 0.3);
+    box-shadow: 0 0 10px rgba(0, 122, 255, 0.5);
+  }
+  100% {
+    background: rgba(255, 255, 255, 0.05);
+    box-shadow: none;
+  }
 }
 
 .notification-item:hover::before {

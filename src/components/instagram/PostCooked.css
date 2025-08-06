@@ -1,5 +1,15 @@
 /* ✨ APPLE-STYLE MINIMALIST REDESIGN - COMPLETE OVERHAUL */
 
+/* Spinner animation for reimagining loading */
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
 .post-cooked-container {
   height: 100%;
   display: flex;

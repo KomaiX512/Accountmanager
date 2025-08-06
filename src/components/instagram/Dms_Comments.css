@@ -19,7 +19,7 @@
   padding-right: 4px;
   margin-right: -4px;
   max-height: calc(100vh - 180px); /* Reduced for more space */
-  min-height: 200px; /* Reduced minimum height */
+  min-height: 400px; /* Increased minimum height for better visibility */
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
   position: relative;

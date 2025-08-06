@@ -127,7 +127,7 @@ body:has(.dashboard-wrapper) {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ✨ COMPACT GRID LAYOUT */
+/* ✨ INCREASED HEIGHT GRID LAYOUT */
 .dashboard-grid {
   display: grid;
   grid-template-areas:
@@ -136,8 +136,8 @@ body:has(.dashboard-wrapper) {
     "notifications post-cooked competitor-analysis"
     "post-creation post-creation post-creation";
   grid-template-columns: 1fr 1.5fr 1fr;
-  /* Reduced row heights for more compact layout with News4U */
-  grid-template-rows: auto 0.5fr 0.7fr auto;
+  /* Increased row heights for better visibility of modules */
+  grid-template-rows: auto 0.8fr 1fr auto;
   gap: 16px;
   min-height: fit-content; /* Remove extra height */
   height: auto; /* Let content determine height */
@@ -164,7 +164,7 @@ body:has(.dashboard-wrapper) {
       "notifications post-cooked competitor-analysis"
       "post-creation post-creation post-creation" !important;
     grid-template-columns: 1fr 1.5fr 1fr !important;
-    grid-template-rows: auto 0.5fr 0.7fr auto !important;
+    grid-template-rows: auto 0.8fr 1fr auto !important;
     gap: 14px !important; /* Adjusted gap for this range */
     flex-direction: unset !important;
   }
@@ -180,7 +180,7 @@ body:has(.dashboard-wrapper) {
       "notifications post-cooked competitor-analysis"
       "post-creation post-creation post-creation" !important;
     grid-template-columns: 1fr 1.5fr 1fr !important;
-    grid-template-rows: auto 0.5fr 0.7fr auto !important;
+    grid-template-rows: auto 0.8fr 1fr auto !important;
     gap: 12px !important;
     flex-direction: unset !important;
   }
@@ -1121,7 +1121,7 @@ body:has(.dashboard-wrapper) {
   border-color: rgba(142, 142, 147, 0.3);
 }
 
-/* ✨ ULTRA-COMPACT MODULE SECTIONS - NO EXTRA SPACE */
+/* ✨ INCREASED HEIGHT MODULE SECTIONS - BETTER VISIBILITY */
 .notifications,
 .post-cooked {
   background: rgba(255, 255, 255, 0.1);
@@ -1129,6 +1129,7 @@ body:has(.dashboard-wrapper) {
   border-radius: 20px;
   padding: 4px;
   height: 100%;
+  min-height: 400px; /* Increased minimum height for better visibility */
   overflow-y: auto;
   backdrop-filter: blur(15px);
   position: relative;
@@ -1138,13 +1139,14 @@ body:has(.dashboard-wrapper) {
   transition: all 0.3s ease;
 }
 
-/* ✨ ULTRA-COMPACT STRATEGIES - NO EXTRA SPACE */
+/* ✨ INCREASED HEIGHT STRATEGIES - BETTER VISIBILITY */
 .strategies {
   background: rgba(255, 255, 255, 0.1);
   border: 1.5px solid rgba(255, 255, 255, 0.18);
   border-radius: 20px;
   padding: 4px;
   height: 100%;
+  min-height: 400px; /* Increased minimum height for better visibility */
   overflow: hidden; /* No scrolling for strategies */
   backdrop-filter: blur(15px);
   position: relative;
@@ -1154,13 +1156,14 @@ body:has(.dashboard-wrapper) {
   transition: all 0.3s ease;
 }
 
-/* ✨ ULTRA-COMPACT COMPETITOR ANALYSIS - NO EXTRA SPACE */
+/* ✨ INCREASED HEIGHT COMPETITOR ANALYSIS - BETTER VISIBILITY */
 .competitor-analysis {
   background: rgba(255, 255, 255, 0.1);
   border: 1.5px solid rgba(255, 255, 255, 0.18);
   border-radius: 20px;
   padding: 4px;
   height: 100%;
+  min-height: 400px; /* Increased minimum height for better visibility */
   overflow-y: auto; /* Keep scrolling for competitor analysis */
   backdrop-filter: blur(15px);
   position: relative;

@@ -100,15 +100,7 @@ const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHas
     }
   };
 
-  const handleLike = (key: string) => {
-    handleViewResponse(key);
-    setToastMessage('Your enthusiasm lights up our path - thank you for the love!');
-  };
-
-  const handleDislike = (key: string) => {
-    handleViewResponse(key);
-    setIsFeedbackOpen(key);
-  };
+  // Removed social interaction handlers - no longer needed
 
   const handleFeedbackSubmit = async (key: string) => {
     if (!feedbackText.trim()) return;
@@ -257,54 +249,7 @@ const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHas
                       </p>
                       <p className="message-content">{res.data.response}</p>
                     </div>
-                    <div className="message-actions">
-                      <motion.button
-                        className="like-button"
-                        whileHover={{ scale: 1.2 }}
-                        whileTap={{ scale: 0.9 }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleLike(res.key);
-                        }}
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="24"
-                          height="24"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#00ffcc"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M7 22v-9h3V7a3 3 0 0 1 3-3h2l3 3v6h3l-8 8-6-6h3z" />
-                        </svg>
-                      </motion.button>
-                      <motion.button
-                        className="dislike-button"
-                        whileHover={{ scale: 1.2 }}
-                        whileTap={{ scale: 0.9 }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDislike(res.key);
-                        }}
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="24"
-                          height="24"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#ff4444"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M17 2v9h-3v6a3 3 0 0 1-3 3h-2l-3-3v-6h-3l8-8 6 6h-3z" />
-                        </svg>
-                      </motion.button>
-                    </div>
+                    {/* Removed social interaction buttons */}
                     {!viewedKeys.includes(res.key) && <span className="new-badge">New</span>}
                   </motion.div>
                 ))}

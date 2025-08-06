@@ -105,7 +105,6 @@ local_storage/
 nginx-*.conf
 ultimate-nginx-*.conf
 sentientm.nginx.conf
-VPS.conf
 
 # Scripts that are temporary
 *.sh

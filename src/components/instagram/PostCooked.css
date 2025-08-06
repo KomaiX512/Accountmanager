@@ -182,7 +182,7 @@
 .minimal-auto-schedule-btn {
   background: rgba(0, 255, 204, 0.8) !important;
   border: 1px solid transparent !important;
-  color: #ffffff !important;
+  color: #000000 !important;
   border-radius: 6px !important;
   padding: 6px 12px !important;
   font-size: 11px !important;
@@ -195,23 +195,23 @@
 
 .minimal-auto-schedule-btn:hover:not(:disabled) {
   background: rgba(0, 255, 204, 0.9) !important;
-  color: #ffffff !important;
+  color: #000000 !important;
   transform: translateY(-1px);
 }
 
 .minimal-auto-schedule-btn.instagram {
   background: rgba(0, 255, 204, 0.8) !important;
-  color: #ffffff !important;
+  color: #000000 !important;
 }
 
 .minimal-auto-schedule-btn.twitter {
   background: rgba(29, 161, 242, 0.8) !important;
-  color: #ffffff !important;
+  color: #000000 !important;
 }
 
 .minimal-auto-schedule-btn.facebook {
   background: rgba(24, 119, 242, 0.8) !important;
-  color: #ffffff !important;
+  color: #000000 !important;
 }
 
 .minimal-auto-schedule-btn:disabled {
@@ -320,6 +320,8 @@
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  min-height: 100%; /* Ensure card takes full available height */
+  height: 100%; /* Force full height utilization */
 }
 
 .post-card::before {
@@ -437,42 +439,9 @@
   transform: translateY(-1px);
 }
 
-/* ✨ INTERACTION ICONS - MINIMALIST, NO BACKGROUND */
-.interaction-icons {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-  padding: 0;
-}
+/* ✨ INTERACTION ICONS - REMOVED */
 
-.interaction-icon {
-  width: 20px;
-  height: 20px;
-  color: rgba(255, 255, 255, 0.6);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  background: none !important;
-  border: none !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.interaction-icon:hover {
-  color: rgba(255, 255, 255, 0.9);
-  transform: scale(1.1);
-}
-
-.interaction-icon svg {
-  width: 16px;
-  height: 16px;
-  color: inherit;
-}
-
-/* ✨ PERFECT POST ACTIONS - RESPONSIVE GRID */
+/* ✨ PERFECT POST ACTIONS - RESPONSIVE FLEX */
 .post-actions {
   display: flex;
   justify-content: space-between;
@@ -485,18 +454,18 @@
 }
 
 .post-control-buttons {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  display: flex;
+  flex-direction: row;
   gap: 8px;
   width: 100%;
   align-items: center;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
 }
 
-/* ✨ INVERTED BUTTON STYLES - COLORFUL BACKGROUNDS, COLORLESS BORDERS */
+/* ✨ INVERTED BUTTON STYLES - COLORFUL BACKGROUNDS, BLACK TEXT FOR CONTRAST */
 .schedule-button,
 .reject-button,
-.like-button,
-.dislike-button,
 .edit-button,
 .post-now-button {
   padding: 6px 12px;
@@ -513,69 +482,51 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
-  color: #ffffff;
+  color: #000000;
   margin: 0;
   box-shadow: none !important;
   outline: none !important;
+  flex-shrink: 0;
 }
 
 .schedule-button {
   background: rgba(52, 199, 89, 0.8) !important;
-  color: #ffffff;
+  color: #000000;
 }
 
 .schedule-button:hover {
   background: rgba(52, 199, 89, 0.9) !important;
   transform: translateY(-1px);
-  color: #ffffff;
+  color: #000000;
 }
 
 .reject-button {
   background: rgba(255, 59, 48, 0.8) !important;
-  color: #ffffff;
+  color: #000000;
 }
 
 .reject-button:hover {
   background: rgba(255, 59, 48, 0.9) !important;
   transform: translateY(-1px);
-  color: #ffffff;
+  color: #000000;
 }
 
 .post-now-button {
   background: rgba(0, 255, 204, 0.8) !important;
-  color: #ffffff;
+  color: #000000;
 }
 
 .post-now-button:hover {
   background: rgba(0, 255, 204, 0.9) !important;
   transform: translateY(-1px);
-  color: #ffffff;
+  color: #000000;
 }
 
-.like-button,
-.dislike-button {
-  background: rgba(142, 142, 147, 0.8) !important;
-  color: #ffffff;
-  padding: 4px 8px;
-  font-size: 10px;
-  min-width: 50px;
-}
-
-.like-button:hover {
-  background: rgba(52, 199, 89, 0.9) !important;
-  color: #ffffff;
-  transform: translateY(-1px);
-}
-
-.dislike-button:hover {
-  background: rgba(255, 59, 48, 0.9) !important;
-  color: #ffffff;
-  transform: translateY(-1px);
-}
+/* Removed like and dislike button styles */
 
 .edit-button {
   background: rgba(0, 122, 255, 0.8) !important;
-  color: #ffffff;
+  color: #000000;
   padding: 4px 8px;
   font-size: 10px;
   min-width: 50px;
@@ -584,13 +535,11 @@
 .edit-button:hover {
   background: rgba(0, 122, 255, 0.9) !important;
   transform: translateY(-1px);
-  color: #ffffff;
+  color: #000000;
 }
 
 .schedule-button svg,
 .reject-button svg,
-.like-button svg,
-.dislike-button svg,
 .edit-button svg,
 .post-now-button svg {
   width: 12px;
@@ -601,19 +550,9 @@
 
 .schedule-button:hover svg,
 .reject-button:hover svg,
-.like-button:hover svg,
-.dislike-button:hover svg,
 .edit-button:hover svg,
 .post-now-button:hover svg {
   transform: scale(1.1);
-}
-
-.dislike-button svg {
-  transform: rotate(180deg);
-}
-
-.dislike-button:hover svg {
-  transform: rotate(180deg) scale(1.1);
 }
 
 /* ✨ PERFECT POST CONTENT */
@@ -625,6 +564,10 @@
   width: 100%;
   word-wrap: break-word;
   overflow-wrap: break-word;
+  flex: 1; /* Expand to fill available space */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start; /* Align content to top */
 }
 
 .post-content:hover {
@@ -645,6 +588,11 @@
   width: 100%;
   box-sizing: border-box;
   white-space: pre-line;
+  flex: 1; /* Expand to fill available space */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start; /* Align content to top */
+  min-height: 0; /* Allow shrinking */
 }
 
 .post-hashtags {
@@ -1406,19 +1354,18 @@
   }
   
   .post-control-buttons {
-    grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
     gap: 4px;
+    flex-wrap: nowrap;
   }
   
   .schedule-button,
   .reject-button,
-  .like-button,
-  .dislike-button,
   .edit-button,
   .post-now-button {
     padding: 5px 10px;
     font-size: 10px;
     min-width: 55px;
+    flex-shrink: 0;
   }
 }
 
@@ -1437,19 +1384,18 @@
   }
   
   .post-control-buttons {
-    grid-template-columns: repeat(auto-fit, minmax(65px, 1fr));
     gap: 3px;
+    flex-wrap: nowrap;
   }
   
   .schedule-button,
   .reject-button,
-  .like-button,
-  .dislike-button,
   .edit-button,
   .post-now-button {
     padding: 4px 8px;
     font-size: 9px;
     min-width: 50px;
+    flex-shrink: 0;
   }
 }
 
@@ -1468,19 +1414,18 @@
   }
   
   .post-control-buttons {
-    grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
     gap: 2px;
+    flex-wrap: nowrap;
   }
   
   .schedule-button,
   .reject-button,
-  .like-button,
-  .dislike-button,
   .edit-button,
   .post-now-button {
     padding: 3px 6px;
     font-size: 8px;
     min-width: 45px;
+    flex-shrink: 0;
   }
 }
 
@@ -1522,21 +1467,21 @@
   }
   
   .post-control-buttons {
-    grid-template-columns: repeat(2, 1fr);
     gap: 4px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
   }
   
   .schedule-button,
   .reject-button,
-  .like-button,
-  .dislike-button,
   .edit-button,
   .post-now-button {
-    width: 100%;
     justify-content: center;
     padding: 6px 8px;
     font-size: 10px;
     min-width: auto;
+    flex-shrink: 0;
   }
 }
 
@@ -1567,13 +1512,19 @@
     font-size: 9px;
   }
   
+  .post-control-buttons {
+    gap: 2px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+  
   .schedule-button,
   .reject-button,
-  .like-button,
-  .dislike-button,
   .edit-button,
   .post-now-button {
     padding: 4px 6px;
     font-size: 9px;
+    flex-shrink: 0;
   }
 }

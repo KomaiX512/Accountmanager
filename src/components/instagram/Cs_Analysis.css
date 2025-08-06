@@ -8,6 +8,7 @@
   padding: 0;
   position: relative;
   height: 100%;
+  min-height: 400px; /* Increased minimum height for better visibility */
 }
 
 /* ✅ NEW: Compact data limitation notice styles */

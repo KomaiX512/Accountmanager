@@ -202,26 +202,7 @@
     white-space: pre-wrap;
   }
   
-  .message-actions {
-    display: flex;
-    gap: 15px;
-    margin-top: 10px;
-    justify-content: flex-end;
-  }
-  
-  .like-button, .dislike-button {
-    background: none;
-    border: none;
-    cursor: pointer;
-  }
-  
-  .like-button:hover svg {
-    filter: drop-shadow(0 0 6px rgba(0, 255, 204, 0.8));
-  }
-  
-  .dislike-button:hover svg {
-    filter: drop-shadow(0 0 6px rgba(255, 68, 68, 0.8));
-  }
+  /* Removed social interaction button styles */
   
   .new-badge {
     position: absolute;

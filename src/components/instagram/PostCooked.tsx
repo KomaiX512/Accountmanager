@@ -36,7 +36,10 @@ interface ImageErrorState {
 }
 
 // Base URL for all API requests (using relative URLs with Vite proxy)
-const API_BASE_URL = 'http://localhost:3002'; // Use the correct server port
+// Base URL for all API requests – use relative path so that reverse-proxy / nginx can
+// automatically route to the correct upstream no matter which host serves the bundle.
+// An empty string forces every fetch to be relative to window.location.origin.
+const API_BASE_URL = '';
 
 // Debug flag - set to true to enable verbose logging
 const DEBUG_LOGGING = false;
@@ -753,21 +756,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     setLoadingImages(prev => new Set([...prev, postKey]));
   }, []);
 
-  const handleLike = () => {
-    setToastMessage('Liked! Thanks for the love! ❤️');
-  };
-
-  const handleDislike = (key: string) => {
-    setIsFeedbackOpen(key);
-  };
-
-  const handleComment = () => {
-    setToastMessage('Comment feature coming soon! 📝');
-  };
-
-  const handleShare = () => {
-    setToastMessage('Share feature coming soon! 📲');
-  };
+  // Removed social interaction handlers - no longer needed
 
   const handleFeedbackSubmit = async (key: string) => {
     if (!feedbackText.trim() || !username) return;
@@ -2438,92 +2427,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                       />
                     );
                   })()}
-                  <div className="interaction-icons">
-                    <motion.button
-                      className="interaction-icon like-button"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => handleLike()}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                      </svg>
-                    </motion.button>
-                    <motion.button
-                      className="interaction-icon comment-button"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => handleComment()}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-                      </svg>
-                    </motion.button>
-                    <motion.button
-                      className="interaction-icon share-button"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => handleShare()}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <circle cx="18" cy="5" r="3" />
-                        <circle cx="6" cy="12" r="3" />
-                        <circle cx="18" cy="19" r="3" />
-                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-                        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-                      </svg>
-                    </motion.button>
-                    <motion.button
-                      className="interaction-icon dislike-button"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => handleDislike(post.key)}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
-                      </svg>
-                    </motion.button>
-                  </div>
+                  {/* Removed social interaction icons */}
                   <div className="post-actions">
                     <div className="post-control-buttons">
                     {platform === 'twitter' ? (

@@ -122,7 +122,7 @@ const InstagramConnect: React.FC<InstagramConnectProps> = ({ onConnected, classN
   const handleModalContinue = () => {
     setIsModalOpen(false);
     const appId = '576296982152813';
-    const redirectUri = 'https://sentientm.com/instagram/callback';
+    const redirectUri = 'https://www.sentientm.com/instagram/callback';
     const scope = selectedPermissions.length > 0 ? selectedPermissions.join(',') : 'instagram_business_basic';
     const authUrl = `https://www.instagram.com/oauth/authorize?force_reauth=true&client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}`;
 

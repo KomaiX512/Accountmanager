@@ -189,7 +189,7 @@ const MainDashboard: React.FC = () => {
   }, [completedPlatforms, platformLoadingStates, getProcessingRemainingMs]);
 
   // Function to start platform loading state
-  const startPlatformLoading = (platformId: string, durationMinutes: number = 15) => {
+  const startPlatformLoading = (platformId: string, durationMinutes: number = 25) => {
     // Don't start loading for completed platforms
     if (completedPlatforms.has(platformId)) {
       console.log(`🔥 TIMER SKIP: ${platformId} already completed, skipping timer`);
@@ -809,13 +809,13 @@ const MainDashboard: React.FC = () => {
     
     // If this is first access and not claimed, start loading state
     if (!isPlatformLoading(platform.id) && !platform.claimed) {
-      console.log(`🔥 TIMER START: Starting 15-minute processing for ${platform.id}`);
+      console.log(`🔥 TIMER START: Starting 25-minute processing for ${platform.id}`);
       startPlatformLoading(platform.id);
       safeNavigate(navigate, `/processing/${platform.id}`, {
         state: {
           platform: platform.id,
           username: currentUser?.displayName || '',
-          remainingMinutes: 15
+          remainingMinutes: 25
         }
       }, 7);
       return;

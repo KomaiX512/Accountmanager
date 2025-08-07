@@ -442,26 +442,26 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
         onClick={(e) => e.stopPropagation()}
       >
         <button className="insights-close-btn" onClick={onClose}>×</button>
-        <h2>{platform === 'instagram' ? 'Instagram' : platform === 'twitter' ? 'Twitter' : 'Facebook'} Insights</h2>
+        <h2>{platform === 'instagram' ? 'Instagram' : platform === 'twitter' ? 'Twitter' : 'Facebook'} Stats</h2>
         
         <div className="insights-tabs">
           <button
             className={activeTab === 'analysis' ? 'active' : ''}
             onClick={() => setActiveTab('analysis')}
           >
-            Statistical Analysis
+            Statistical Stats
           </button>
           <button
             className={activeTab === 'reach' ? 'active' : ''}
             onClick={() => setActiveTab('reach')}
           >
-            Daily Reach
+            Daily Stats
           </button>
           <button
             className={activeTab === 'other' ? 'active' : ''}
             onClick={() => setActiveTab('other')}
           >
-            Other Insights
+            Other Stats
           </button>
         </div>
         

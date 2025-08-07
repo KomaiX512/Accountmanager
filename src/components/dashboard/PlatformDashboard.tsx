@@ -190,8 +190,9 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       return;
     }
     try {
-      console.log(`[PlatformDashboard] ⚡ Fetching data efficiently for ${platform}`);
-      const platformParam = `?platform=${platform}`;
+      console.log(`[PlatformDashboard] ⚡ Fetching fresh data for ${platform}`);
+      const timestamp = Date.now();
+      const platformParam = `?platform=${platform}&forceRefresh=true&t=${timestamp}`;
       
       const [responsesData, strategiesData, postsData, competitorData] = await Promise.all([
         axios.get(`/api/responses/${accountHolder}${platformParam}`).catch(err => {
@@ -245,17 +246,18 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       console.log(`[PlatformDashboard] ⚡ Fetching profile info for ${platform}`);
       
       // 🎯 CRITICAL FIX: Try different endpoints for different platforms to handle R2 bucket structure
+      const timestamp = Date.now();
       let response;
       let profileData = null;
       
       if (platform === 'instagram') {
         // Instagram works with the original endpoint (no platform param needed)
-        response = await axios.get(`/api/profile-info/${accountHolder}`);
+        response = await axios.get(`/api/profile-info/${accountHolder}?forceRefresh=true&t=${timestamp}`);
         profileData = response.data;
         } else {
         // Twitter and Facebook need platform-specific path handling
         try {
-          const platformParam = `?platform=${platform}`;
+          const platformParam = `?platform=${platform}&forceRefresh=true&t=${timestamp}`;
           response = await axios.get(`/api/profile-info/${accountHolder}${platformParam}`);
           const rawData = response.data;
           // Map Twitter raw fields to unified profileData format

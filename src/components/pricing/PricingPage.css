@@ -68,17 +68,25 @@
   align-items: center;
 }
 
-/* Pricing Container */
+/* Pricing Container - PROPORTIONAL 3-CARD LAYOUT */
 .pricing-container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 80px 20px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 32px;
+  box-sizing: border-box;
 }
 
-/* Pricing Cards */
+/* FORCE 3-CARD LAYOUT: Maintain 3 columns until exactly 800px */
+@media (min-width: 800px) {
+  .pricing-container {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}
+
+/* Pricing Cards - VPS OPTIMIZED & PROPORTIONALLY SCALABLE */
 .pricing-card {
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -86,11 +94,17 @@
   padding: 40px 32px;
   position: relative;
   transition: all 0.3s ease;
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  transform: translateZ(0) !important;
+  will-change: auto !important;
+  min-width: 0; /* Allow cards to shrink below content width */
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .pricing-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-4px) translateZ(0) !important;
   border-color: rgba(0, 255, 204, 0.3);
   box-shadow: 0 20px 40px rgba(0, 255, 204, 0.1);
 }
@@ -102,7 +116,7 @@
 }
 
 .pricing-card.popular:hover {
-  transform: scale(1.02) translateY(-4px);
+  transform: scale(1.02) translateY(-4px) translateZ(0) !important;
   border-color: rgba(0, 255, 204, 0.6);
 }
 
@@ -279,7 +293,7 @@
 .btn-primary:hover {
   background: rgba(0, 255, 204, 0.1);
   border-color: #00ffcc;
-  transform: translateY(-2px);
+  transform: translateY(-2px) translateZ(0) !important;
   box-shadow: 0 8px 20px rgba(0, 255, 204, 0.2);
 }
 
@@ -292,7 +306,7 @@
 .btn-secondary:hover {
   background: rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 255, 255, 0.5);
-  transform: translateY(-2px);
+  transform: translateY(-2px) translateZ(0) !important;
   box-shadow: 0 8px 20px rgba(255, 255, 255, 0.1);
 }
 
@@ -305,7 +319,7 @@
 .btn-contact:hover {
   background: rgba(255, 142, 83, 0.1);
   border-color: #ff8e53;
-  transform: translateY(-2px);
+  transform: translateY(-2px) translateZ(0) !important;
   box-shadow: 0 8px 20px rgba(255, 142, 83, 0.2);
 }
 
@@ -342,7 +356,7 @@
   gap: 6px;
 }
 
-/* FAQ Section */
+/* FAQ Section - VPS OPTIMIZED */
 .pricing-faq {
   max-width: 1000px;
   margin: 80px auto;
@@ -350,7 +364,10 @@
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 20px;
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  transform: translateZ(0) !important;
+  will-change: auto !important;
 }
 
 .pricing-faq h2 {
@@ -442,7 +459,7 @@
 }
 
 .btn-cta:hover {
-  transform: translateY(-2px);
+  transform: translateY(-2px) translateZ(0) !important;
   box-shadow: 0 12px 30px rgba(0, 255, 204, 0.3);
 }
 
@@ -466,8 +483,106 @@
   margin-bottom: 16px;
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
+/* PROPORTIONAL SCALING - Maintains 3 cards until 800px */
+@media (max-width: 1200px) {
+  .pricing-container {
+    gap: 28px;
+    padding: 70px 18px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .pricing-container {
+    gap: 24px;
+    padding: 60px 16px;
+  }
+  
+  .pricing-card {
+    padding: 36px 28px;
+  }
+  
+  .plan-header h3 {
+    font-size: 1.4rem;
+  }
+  
+  .price {
+    font-size: 2.2rem;
+  }
+}
+
+@media (max-width: 900px) {
+  .hero-content h1 {
+    font-size: 2.8rem;
+  }
+  
+  .hero-content h2 {
+    font-size: 2rem;
+  }
+  
+  .pricing-container {
+    gap: 20px;
+    padding: 50px 14px;
+  }
+  
+  .pricing-card {
+    padding: 30px 22px;
+  }
+  
+  .plan-header h3 {
+    font-size: 1.3rem;
+  }
+  
+  .price {
+    font-size: 2rem;
+  }
+  
+  .plan-features li {
+    font-size: 0.85rem;
+    padding: 6px 0;
+  }
+  
+  .btn-select, .btn-contact, .btn-current {
+    padding: 14px 18px;
+    font-size: 0.9rem;
+  }
+}
+
+/* FINE-TUNING: 800px - 850px range for perfect scaling */
+@media (max-width: 850px) and (min-width: 800px) {
+  .pricing-container {
+    gap: 16px;
+    padding: 45px 12px;
+  }
+  
+  .pricing-card {
+    padding: 28px 20px;
+  }
+  
+  .plan-header h3 {
+    font-size: 1.2rem;
+  }
+  
+  .price {
+    font-size: 1.8rem;
+  }
+  
+  .plan-features li {
+    font-size: 0.8rem;
+    padding: 5px 0;
+  }
+  
+  .btn-select, .btn-contact, .btn-current {
+    padding: 12px 16px;
+    font-size: 0.85rem;
+  }
+  
+  .plan-description {
+    font-size: 0.85rem;
+  }
+}
+
+/* BREAKPOINT: Switch to single column only below 800px */
+@media (max-width: 799px) {
   .hero-content h1 {
     font-size: 2.5rem;
   }
@@ -484,6 +599,7 @@
     grid-template-columns: 1fr;
     gap: 24px;
     padding: 40px 20px;
+    max-width: 500px;
   }
   
   .pricing-card {
@@ -607,5 +723,28 @@
   .btn-cta {
     padding: 14px 24px;
     font-size: 1rem;
+  }
+}
+
+/* VPS COMPATIBILITY OVERRIDES */
+@media screen {
+  /* Force proper rendering on VPS */
+  .pricing-card,
+  .pricing-faq,
+  .btn-select,
+  .btn-contact,
+  .btn-current,
+  .btn-cta {
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    transform: translateZ(0) !important;
+    will-change: auto !important;
+  }
+  
+  /* Remove problematic 3D properties on VPS */
+  * {
+    backface-visibility: visible !important;
+    perspective: none !important;
+    transform-style: flat !important;
   }
 }

@@ -384,6 +384,68 @@ if (!fs.existsSync(localCacheDir)) {
   fs.mkdirSync(localCacheDir, { recursive: true });
 }
 
+// =============================================================================
+// IMAGE CACHE MANAGEMENT UTILITIES
+// =============================================================================
+
+/**
+ * Clear cached image from both memory and local file cache
+ * @param {string} imageR2Key - The R2 key for the image (e.g., "ready_post/instagram/username/image_123.png")
+ * @param {string} context - Context for logging (e.g., "SAVE-EDITED-POST", "REIMAGINE")
+ */
+function clearImageCache(imageR2Key, context = 'CACHE-CLEAR') {
+  try {
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [${context}] Clearing cache for image: ${imageR2Key}`);
+    
+    // Clear memory cache
+    if (imageCache.has(imageR2Key)) {
+      imageCache.delete(imageR2Key);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [${context}] Cleared memory cache for: ${imageR2Key}`);
+    }
+    
+    // Clear local file cache
+    const hashedKey = Buffer.from(imageR2Key).toString('base64').replace(/[\/\+=]/g, '_');
+    const cachedFilePath = path.join(localCacheDir, hashedKey);
+    
+        if (fs.existsSync(cachedFilePath)) {
+      fs.unlinkSync(cachedFilePath);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [${context}] Cleared local cache file: ${cachedFilePath}`);
+      return true;
+    } else {
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [${context}] No cache file found for: ${hashedKey}`);
+      return false;
+    }
+  } catch (error) {
+    if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [${context}] Error clearing cache for ${imageR2Key}:`, error.message);
+    return false;
+  }
+}
+
+/**
+ * Clear cached images by filename pattern across all platforms
+ * Useful when an image is reimagined and we need to clear all variations
+ * @param {string} imageFilename - The image filename (e.g., "image_123456789.png")
+ * @param {string} username - Username
+ * @param {string} context - Context for logging
+ */
+function clearImageCacheByFilename(imageFilename, username, context = 'CACHE-CLEAR') {
+  const platforms = ['instagram', 'twitter', 'facebook'];
+  let clearedCount = 0;
+  
+  platforms.forEach(platform => {
+    const imageR2Key = `ready_post/${platform}/${username}/${imageFilename}`;
+    if (clearImageCache(imageR2Key, context)) {
+      clearedCount++;
+    }
+  });
+  
+  if (DEBUG_LOGS && clearedCount > 0) {
+    console.log(`[${new Date().toISOString()}] [${context}] Cleared ${clearedCount} cache entries for filename: ${imageFilename}`);
+  }
+  
+  return clearedCount;
+}
+
 // Create directory for public files
 const publicDir = path.join(process.cwd(), 'public');
 if (!fs.existsSync(publicDir)) {
@@ -696,13 +758,15 @@ function generatePlaceholderImage(text = 'Image Not Available', width = 512, hei
 
 // Enhanced image retrieval with multi-level fallbacks
 async function fetchImageWithFallbacks(key, fallbackImagePath = null, username = null, filename = null) {
-  // NUCLEAR CACHE-BUSTING: Check for cache-busting parameters in the key
-  const cacheBustMatch = key.match(/[?&](nuclear|reimagined|force|no-cache|bypass)=([^&]*)/);
-  const shouldBypassCache = cacheBustMatch || key.includes('nuclear') || key.includes('reimagined') || key.includes('force');
+  // ENHANCED CACHE-BUSTING: Check for any cache-busting parameters in the key
+  const cacheBustMatch = key.match(/[?&](nuclear|reimagined|force|no-cache|bypass|t|v|refresh|refreshKey|nocache|bust|_t|timestamp|cacheBuster)=([^&]*)/);
+  const hasQueryParams = key.includes('?');
+  const shouldBypassCache = cacheBustMatch || hasQueryParams || key.includes('nuclear') || key.includes('reimagined') || key.includes('force');
   
   // DEBUG: Log cache-busting detection
   console.log(`[${new Date().toISOString()}] [IMAGE] 🔍 Cache-busting check for key: ${key}`);
   console.log(`[${new Date().toISOString()}] [IMAGE] 🔍 Cache-busting match: ${cacheBustMatch ? 'YES' : 'NO'}`);
+  console.log(`[${new Date().toISOString()}] [IMAGE] 🔍 Has query params: ${hasQueryParams ? 'YES' : 'NO'}`);
   console.log(`[${new Date().toISOString()}] [IMAGE] 🔍 Should bypass cache: ${shouldBypassCache ? 'YES' : 'NO'}`);
   
   // Extract the clean key without cache-busting parameters
@@ -1523,7 +1587,12 @@ app.get('/api/signed-image-url/:username/:imageKey', async (req, res) => {
 app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
   const { username, imageKey } = req.params;
   const platform = req.query.platform || 'instagram';
-  const forceRefresh = req.query.t || req.query.v || req.query.refresh;
+  
+  // ENHANCED FORCE REFRESH DETECTION: Detect all cache-busting parameters
+  const forceRefresh = req.query.t || req.query.v || req.query.refresh || 
+                      req.query.force || req.query.edited || req.query.refreshKey || 
+                      req.query.nocache || req.query.nuclear || req.query.reimagined || 
+                      req.query.bypass;
   
   // Generate unique cache key for this specific request
   const cacheKey = `r2_image_${platform}_${username}_${imageKey}_${forceRefresh || 'default'}`;
@@ -1649,24 +1718,37 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
     res.setHeader('X-Image-Valid', 'true');
     res.setHeader('X-Image-Size', data.length.toString());
     
-    // Cache control based on request type
+    // Cache control based on request type - ENHANCED FOR EDITED IMAGES
     if (forceRefresh) {
+      // NUCLEAR CACHE BUSTING: Multiple headers to prevent ANY caching
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
+      res.setHeader('Last-Modified', new Date().toUTCString());
       res.setHeader('X-Cache-Mode', 'force-refresh');
+      res.setHeader('X-Edited-Image', 'true');
+      
+      // Aggressive cache prevention headers
+      res.setHeader('Surrogate-Control', 'no-store');
+      res.setHeader('X-Accel-Expires', '0');
+      
+      // CRITICAL: Dynamic ETag for edited images to prevent browser cache
+      const dynamicEtag = `"${imageKey}-${data.length}-edited-${Date.now()}-${Math.random().toString(36).substr(2, 9)}"`;
+      res.setHeader('ETag', dynamicEtag);
     } else {
       res.setHeader('Cache-Control', 'public, max-age=21600'); // 6 hours (optimized from 1 hour)
       res.setHeader('X-Cache-Mode', 'normal');
+      
+      // STABLE ETag for normal images (don't use Date.now())
+      const stableEtag = `"${imageKey}-${data.length}-v2"`;
+      res.setHeader('ETag', stableEtag);
     }
     
-    // CRITICAL FIX: Stable ETag for proper caching (don't use Date.now())
-    const etag = `"${imageKey}-${data.length}-v2"`;
-    res.setHeader('ETag', etag);
-    
-    // Set consistent Last-Modified to prevent unnecessary cache invalidation
-    const lastModified = new Date(Math.floor(Date.now() / (1000 * 60 * 60)) * 1000 * 60 * 60); // Round to hour
-    res.setHeader('Last-Modified', lastModified.toUTCString());
+    // Set consistent Last-Modified only for normal images (not edited)
+    if (!forceRefresh) {
+      const lastModified = new Date(Math.floor(Date.now() / (1000 * 60 * 60)) * 1000 * 60 * 60); // Round to hour
+      res.setHeader('Last-Modified', lastModified.toUTCString());
+    }
     
     // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -1976,7 +2058,7 @@ async function handlePostsEndpoint(req, res) {
         
         if (imageKey) {
           // Use absolute URLs for proper image loading
-          const baseUrl = req.get('host') ? `${req.protocol}://${req.get('host')}` : 'https:/www.sentientm.com';
+          const baseUrl = req.get('host') ? `${req.protocol}://${req.get('host')}` : 'https://www.sentientm.com';
           imageUrl = `${baseUrl}/fix-image/${username}/${imageKey}?platform=${platform}`;
           r2ImageUrl = `${baseUrl}/api/r2-image/${username}/${imageKey}?platform=${platform}`;
         }
@@ -2096,7 +2178,12 @@ app.post('/api/save-edited-post/:username', upload.single('image'), async (req, 
       Key: imageR2Key,
       Body: imageData,
       ContentType: 'image/jpeg',
-      CacheControl: 'no-cache' // Force refresh
+      CacheControl: 'no-cache, no-store, must-revalidate', // More aggressive cache control
+      Metadata: {
+        'last-modified': new Date().toISOString(),
+        'edited-timestamp': Date.now().toString(),
+        'cache-version': Date.now().toString() // Force cache invalidation
+      }
     };
     
     await client.putObject(putImageParams).promise();
@@ -2158,31 +2245,77 @@ app.post('/api/save-edited-post/:username', upload.single('image'), async (req, 
       }
     }
     
-    // Clear ALL caches for this user/platform to force refresh
-    const cacheKey = `ready_post/${platform}/${username}/`;
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Clearing all caches for: ${cacheKey}`);
+    // ===============================================
+    // ENHANCED CACHE INVALIDATION FOR FRESH IMAGES
+    // ===============================================
     
-    // Clear memory cache
-    for (const key of imageCache.keys()) {
-      if (key.startsWith(cacheKey)) {
-        imageCache.delete(key);
-        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Cleared memory cache key: ${key}`);
+    // Clear SPECIFIC cache for the edited image to force refresh from R2
+    const specificImageR2Key = `ready_post/${platform}/${username}/${imageKey}`;
+    clearImageCache(specificImageR2Key, 'SAVE-EDITED-POST');
+    
+    // NUCLEAR CACHE CLEARING: Clear ALL possible cache variations for this image
+    const imageName = imageKey.replace(/\.(jpg|jpeg|png|webp)$/i, '');
+    const allCacheVariations = [
+      `r2_${specificImageR2Key}`,
+      `r2_image_${platform}_${username}_${imageKey}_default`,
+      `ready_post_${platform}_${username}_${imageKey}`,
+      specificImageR2Key,
+      imageKey,
+      imageName,
+      `${platform}_${username}_${imageKey}`,
+      `${username}_${imageKey}`,
+      `image_cache_${imageKey}`,
+      `cached_${imageKey}`
+    ];
+    
+    // Clear all memory cache variations
+    for (const variation of allCacheVariations) {
+      if (imageCache.has(variation)) {
+        imageCache.delete(variation);
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Cleared memory cache variation: ${variation}`);
       }
     }
     
-         // Clear local cache files
-     try {
-       const cacheFiles = fs.readdirSync(localCacheDir).filter(file => 
-         file.startsWith(`${username}_${platform}_`)
-       );
-       for (const file of cacheFiles) {
-         const fullPath = path.join(localCacheDir, file);
-         fs.unlinkSync(fullPath);
-         if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Cleared local cache file: ${fullPath}`);
-       }
-     } catch (cacheError) {
-       if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Error clearing local cache:`, cacheError.message);
-     }
+    // AGGRESSIVE CACHE CLEARING: Clear ALL memory cache entries that contain this image key
+    for (const [cacheKey, value] of imageCache.entries()) {
+      if (cacheKey.includes(imageKey) || cacheKey.includes(imageName)) {
+        imageCache.delete(cacheKey);
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Cleared related memory cache: ${cacheKey}`);
+      }
+    }
+    
+    // Clear any cached files for this specific image with different encodings
+    try {
+      const cachePattern = imageKey.replace(/\.(jpg|jpeg|png|webp)$/i, '');
+      const cacheFiles = fs.readdirSync(localCacheDir);
+      
+      for (const file of cacheFiles) {
+        // Decode base64 filename to check if it contains our image
+        try {
+          const decodedKey = Buffer.from(file.replace(/_/g, '/'), 'base64').toString('utf-8');
+          if (decodedKey.includes(imageKey) || decodedKey.includes(cachePattern)) {
+            const fullPath = path.join(localCacheDir, file);
+            fs.unlinkSync(fullPath);
+            if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Cleared related cache file: ${file}`);
+          }
+        } catch (decodeError) {
+          // Skip files that can't be decoded
+        }
+      }
+    } catch (cacheError) {
+      if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Error clearing related cache files:`, cacheError.message);
+    }
+    
+    // ALSO clear the local ready_post directory cache (if it exists)
+    const localReadyPostPath = path.join(process.cwd(), 'ready_post', platform, username, imageKey);
+    if (fs.existsSync(localReadyPostPath)) {
+      try {
+        fs.unlinkSync(localReadyPostPath);
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Cleared local ready_post cache: ${localReadyPostPath}`);
+      } catch (localError) {
+        if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Error clearing local ready_post cache:`, localError.message);
+      }
+    }
     
     if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Successfully saved edited post for ${username}/${imageKey}`);
     
@@ -2578,66 +2711,6 @@ const startServer = async () => {
 // Start the server with enterprise-grade reliability
 startServer();
 
-// Enhanced R2 Image Renderer with white image prevention
-app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
-  const { username, imageKey } = req.params;
-  const platform = req.query.platform || 'instagram';
-  const forceRefresh = req.query.t || req.query.v || req.query.refresh;
-  
-  try {
-    // Construct the R2 key path
-    const r2Key = `ready_post/${platform}/${username}/${imageKey}`;
-    
-    console.log(`[${new Date().toISOString()}] [R2-IMAGE] Fetching: ${r2Key}`);
-    
-    // Get the image from R2
-    const getCommand = new GetObjectCommand({
-      Bucket: 'tasks',
-      Key: r2Key,
-    });
-    
-    const response = await s3Client.send(getCommand);
-    const imageBuffer = await streamToString(response.Body);
-    
-    // Validate that we actually have image data
-    if (!imageBuffer || imageBuffer.length === 0) {
-      console.error(`[${new Date().toISOString()}] [R2-IMAGE] No image data returned for ${r2Key}`);
-      throw new Error('Empty image data');
-    }
-    
-    // Detect content type from file extension
-    let contentType = 'image/jpeg'; // Default
-    if (imageKey.endsWith('.png')) {
-      contentType = 'image/png';
-    } else if (imageKey.endsWith('.webp')) {
-      contentType = 'image/webp';
-    } else if (imageKey.endsWith('.gif')) {
-      contentType = 'image/gif';
-    }
-    
-    // Set appropriate headers
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
-    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', '*');
-    
-    // Send the image
-    res.send(Buffer.from(imageBuffer, 'binary'));
-    
-    console.log(`[${new Date().toISOString()}] [R2-IMAGE] ✅ Served ${r2Key} successfully`);
-    
-  } catch (error) {
-    console.error(`[${new Date().toISOString()}] [R2-IMAGE] Error serving ${imageKey}:`, error);
-    
-    // Send a placeholder image
-    res.setHeader('Content-Type', 'image/jpeg');
-    res.setHeader('Cache-Control', 'no-cache, no-store');
-    res.status(404).send('Image not found');
-  }
-});
-
 // Test endpoint to directly serve local image file
 app.get('/test-direct-image/:username/:filename', (req, res) => {
   const { username, filename } = req.params;
@@ -2791,6 +2864,14 @@ app.post('/api/reimagine-image', async (req, res) => {
         return res.status(500).json({ error: 'Failed to save updated post data' });
       }
       
+      // Clear cache for both old and new images to ensure fresh loading
+      if (originalFilename) {
+        clearImageCacheByFilename(originalFilename, username, 'REIMAGINE-OLD');
+      }
+      if (newImagePath && newImagePath !== originalFilename) {
+        clearImageCacheByFilename(newImagePath, username, 'REIMAGINE-NEW');
+      }
+      
       // Return success response with new image information
       const response = {
         success: true,
@@ -2817,5 +2898,59 @@ app.post('/api/reimagine-image', async (req, res) => {
   } catch (error) {
     if (DEBUG_LOGS) console.error(`[REIMAGINE] Error in image reimagination:`, error);
     return res.status(500).json({ error: 'Failed to reimagine image', details: error.message });
+  }
+});
+
+// =============================================================================
+// IMAGE CACHE MANAGEMENT ENDPOINTS
+// =============================================================================
+
+/**
+ * Endpoint for RAG server and other services to clear image cache
+ * Called when new images are generated to ensure fresh loading
+ */
+app.post('/api/clear-image-cache', (req, res) => {
+  try {
+    const { imageFilename, username, platform, imageR2Key } = req.body;
+    
+    if (!username) {
+      return res.status(400).json({ error: 'Username is required' });
+    }
+    
+    let clearedCount = 0;
+    
+    if (imageR2Key) {
+      // Clear specific R2 key
+      if (clearImageCache(imageR2Key, 'API-CLEAR')) {
+        clearedCount++;
+      }
+    } else if (imageFilename) {
+      // Clear by filename across platforms
+      if (platform) {
+        const specificKey = `ready_post/${platform}/${username}/${imageFilename}`;
+        if (clearImageCache(specificKey, 'API-CLEAR')) {
+          clearedCount++;
+        }
+      } else {
+        // Clear across all platforms
+        clearedCount = clearImageCacheByFilename(imageFilename, username, 'API-CLEAR');
+      }
+    } else {
+      return res.status(400).json({ error: 'Either imageFilename or imageR2Key is required' });
+    }
+    
+    res.json({ 
+      success: true, 
+      message: `Cache cleared for ${clearedCount} image(s)`,
+      clearedCount,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [API-CLEAR] Error clearing image cache:`, error);
+    res.status(500).json({ 
+      error: 'Failed to clear image cache',
+      details: error.message 
+    });
   }
 });

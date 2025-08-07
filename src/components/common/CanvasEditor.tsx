@@ -1191,13 +1191,19 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
       const result = await response.json();
       setNotification('Post saved successfully!');
       
-      // INSTANT UPDATE: Trigger immediate cache busting event
+      // INSTANT UPDATE: Trigger immediate cache busting event with server data
       window.dispatchEvent(new CustomEvent('postUpdated', { 
         detail: { 
           postKey, 
           platform: detectedPlatform,
           timestamp: Date.now(),
-          action: 'edited'
+          action: 'edited',
+          // Include server cache-busting data
+          imageKey: result.imageKey,
+          r2Key: result.r2Key,
+          cacheBuster: result.cacheBuster,
+          serverTimestamp: result.timestamp,
+          forceRefresh: true // Signal that images should be force-refreshed
         } 
       }));
       

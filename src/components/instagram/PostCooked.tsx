@@ -852,13 +852,16 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   };
 
   const handleScheduleSubmit = async () => {
+    setIsScheduling(true);
     if (!selectedPostKey || !userId) {
       setToastMessage('No post or user ID selected.');
+      setIsScheduling(false);
       return;
     }
     const post = localPosts.find(p => p.key === selectedPostKey);
     if (!post) {
       setToastMessage('Selected post not found.');
+      setIsScheduling(false);
       return;
     }
     const scheduleTime = new Date(scheduleDateTime);
@@ -866,6 +869,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     const minSchedule = new Date(now.getTime() + 60 * 1000);
     if (scheduleTime < minSchedule) {
       setToastMessage('Schedule time must be at least 1 minute in the future.');
+      setIsScheduling(false);
       return;
     }
 
@@ -904,12 +908,14 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         imageBlob = await fetchImageFromR2(username, imageKey, platform);
         if (!imageBlob) {
           setToastMessage('Failed to fetch image for post.');
+          setIsScheduling(false);
           return;
         }
       } else {
         // ✨ BULLETPROOF: Handle missing image key for ALL image-required platforms
         if (platform === 'instagram' || platform === 'facebook') {
           setToastMessage(`Could not determine image for ${platform} post.`);
+          setIsScheduling(false);
           return;
         }
       }
@@ -940,6 +946,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     setShowScheduleModal(false);
     setSelectedPostKey(null);
     setScheduleDateTime('');
+    setIsScheduling(false);
   };
 
   const handleScheduleCancel = () => {

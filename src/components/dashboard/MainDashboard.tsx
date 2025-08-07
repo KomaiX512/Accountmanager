@@ -78,6 +78,9 @@ const MainDashboard: React.FC = () => {
   const [showInstagramScheduler, setShowInstagramScheduler] = useState<boolean>(false);
   const [showTwitterComposer, setShowTwitterComposer] = useState<boolean>(false);
   
+  // Loading state for instant post
+  const [isPostingInstantPost, setIsPostingInstantPost] = useState<boolean>(false);
+  
   // Account Agent wishlist state
   const [isWishlisted, setIsWishlisted] = useState<boolean>(false);
   const [showWishlistConfirmation, setShowWishlistConfirmation] = useState<boolean>(false);
@@ -992,9 +995,12 @@ const MainDashboard: React.FC = () => {
   
   // ✅ INSTANT POST FIX: Enhanced instant post handler with proper tracking
   const handleInstantPost = async () => {
+    setIsPostingInstantPost(true);
+    
     // Verify post has content
     if (postContent.text.trim() === '' && postContent.images.length === 0) {
       alert("Please enter some text or add an image for your post.");
+      setIsPostingInstantPost(false);
       return;
     }
     
@@ -1007,6 +1013,7 @@ const MainDashboard: React.FC = () => {
     if (selectedPlatforms.length === 0) {
       alert("Your post has been saved as a draft. Please make sure platforms are both acquired and connected to post.");
       setShowInstantPostModal(false);
+      setIsPostingInstantPost(false);
       return;
     }
     
@@ -1016,6 +1023,7 @@ const MainDashboard: React.FC = () => {
       // This will trigger the upgrade popup via event
       alert(postCheckResult.reason);
       setShowInstantPostModal(false);
+      setIsPostingInstantPost(false);
       return;
     }
     
@@ -1023,6 +1031,7 @@ const MainDashboard: React.FC = () => {
     const hasInstagram = selectedPlatforms.some(p => p.id === 'instagram');
     if (hasInstagram && postContent.images.length === 0) {
       alert("Instagram posts require at least one image. Please add an image for Instagram or uncheck Instagram.");
+      setIsPostingInstantPost(false);
       return;
     }
     
@@ -1112,6 +1121,8 @@ const MainDashboard: React.FC = () => {
       platformIds: [],
       scheduleDate: null
     });
+    
+    setIsPostingInstantPost(false);
   };
 
   // Handle change of schedule date
@@ -1740,15 +1751,21 @@ const MainDashboard: React.FC = () => {
               <button 
                 className="cancel-button"
                 onClick={() => setShowInstantPostModal(false)}
+                disabled={isPostingInstantPost}
               >
                 Cancel
               </button>
               <button 
                 className="post-button"
-                disabled={postContent.text.trim() === '' && postContent.images.length === 0}
+                disabled={isPostingInstantPost || (postContent.text.trim() === '' && postContent.images.length === 0)}
                 onClick={handleInstantPost}
               >
-                {postContent.scheduleDate ? 'Schedule Post' : 'Post Now'}
+                {isPostingInstantPost 
+                  ? 'Processing...' 
+                  : postContent.scheduleDate 
+                    ? 'Schedule Post' 
+                    : 'Post Now'
+                }
               </button>
             </div>
           </div>

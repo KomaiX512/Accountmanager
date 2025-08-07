@@ -17,7 +17,7 @@
   line-height: 1.6;
 }
 
-/* Modern Auth Card */
+/* Modern Auth Card - VPS OPTIMIZED */
 .glassy-auth-card {
   background: rgba(255, 255, 255, 0.02);
   backdrop-filter: blur(20px);
@@ -27,12 +27,13 @@
   box-shadow: 
     0 25px 80px rgba(0, 0, 0, 0.4),
     0 0 120px rgba(0, 255, 204, 0.1);
-  transform: translateZ(0);
-  will-change: transform;
+  transform: translateZ(0) !important;
+  will-change: auto !important;
   transition: all 0.3s ease;
-  backface-visibility: hidden;
-  perspective: 1000px;
-  transform-style: preserve-3d;
+  /* VPS FIX: Removed problematic 3D properties */
+  /* backface-visibility: hidden; */
+  /* perspective: 1000px; */
+  /* transform-style: preserve-3d; */
 }
 
 .auth-card {
@@ -42,8 +43,8 @@
   overflow: hidden;
   position: relative;
   z-index: 2;
-  transform: translateZ(0);
-  will-change: transform;
+  transform: translateZ(0) !important;
+  will-change: auto !important;
 }
 
 /* Auth Header */
@@ -356,6 +357,28 @@
   color: rgba(255, 255, 255, 0.5);
 }
 
+/* VPS COMPATIBILITY OVERRIDES */
+@media screen {
+  /* Force proper backdrop-filter rendering on VPS */
+  .glassy-auth-card,
+  .auth-form button,
+  .google-signin-btn,
+  .submit-btn,
+  .form-input {
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    transform: translateZ(0) !important;
+    will-change: auto !important;
+  }
+  
+  /* Remove problematic 3D properties on VPS */
+  * {
+    backface-visibility: visible !important;
+    perspective: none !important;
+    transform-style: flat !important;
+  }
+}
+
 .submit-btn {
   width: 100%;
   padding: 16px 24px;
@@ -553,41 +576,41 @@
   }
 }
 
-/* Production-specific fixes */
+/* VPS-OPTIMIZED Production fixes */
 @media (min-resolution: 1.5dppx) {
   .glassy-auth-card {
-    transform: translateZ(0);
-    backface-visibility: hidden;
+    transform: translateZ(0) !important;
+    will-change: auto !important;
   }
 }
 
-@supports (backdrop-filter: blur(1px)) {
-  .glassy-auth-card {
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-  }
+/* VPS FIX: Simplified backdrop-filter support */
+.glassy-auth-card {
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
 }
 
+/* VPS FALLBACK: For browsers without backdrop-filter */
 @supports not (backdrop-filter: blur(1px)) {
   .glassy-auth-card {
-    background: rgba(255, 255, 255, 0.08);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
+    background: rgba(255, 255, 255, 0.08) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
 }
 
-/* Ensure buttons are always clickable and visible */
+/* VPS FIX: Ensure buttons are always clickable and visible */
 .auth-form button,
 .google-signin-btn,
 .submit-btn {
-  transform: translateZ(0);
-  will-change: transform;
+  transform: translateZ(0) !important;
+  will-change: auto !important;
   position: relative;
   z-index: 1;
   overflow: visible;
 }
 
-/* Ensure form elements are properly rendered */
+/* VPS FIX: Ensure form elements are properly rendered */
 .form-input {
   width: 100%;
   padding: 16px 20px;
@@ -597,8 +620,8 @@
   border-radius: 12px;
   font-size: 1rem;
   transition: all 0.3s ease;
-  transform: translateZ(0);
-  will-change: transform;
+  transform: translateZ(0) !important;
+  will-change: auto !important;
   position: relative;
   z-index: 1;
   letter-spacing: -0.02em;

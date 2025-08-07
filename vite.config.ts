@@ -95,6 +95,12 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      // Save edited post endpoint (port 3002) - Image processing server
+      '/api/save-edited-post': {
+        target: 'http://127.0.0.1:3002',
+        changeOrigin: true,
+        secure: false,
+      },
       // User endpoints (port 3000) - Main server contains user management
       '/api/user': {
         target: 'http://127.0.0.1:3000',

@@ -2476,13 +2476,13 @@ async function streamToBuffer(stream) {
 // Instagram App Credentials
 const APP_ID = '576296982152813';
 const APP_SECRET = 'd48ddc9eaf0e5c4969d4ddc4e293178c';
-const REDIRECT_URI = 'https:/www.sentientm.com/instagram/callback';
+const REDIRECT_URI = 'https://www.sentientm.com/instagram/callback';
 const VERIFY_TOKEN = 'myInstagramWebhook2025';
 
 // Facebook App Credentials  
 const FB_APP_ID = '581584257679639'; // Your ACTUAL Facebook App ID (NOT Configuration ID)
 const FB_APP_SECRET = 'cdd153955e347e194390333e48cb0480'; // Your actual App Secret
-const FB_REDIRECT_URI = 'https:/www.sentientm.com/facebook/callback';
+const FB_REDIRECT_URI = 'https://www.sentientm.com/facebook/callback';
 const FB_VERIFY_TOKEN = 'myFacebookWebhook2025';
 
 app.get([
@@ -4696,12 +4696,7 @@ async function filterHandledNotifications(notifications, userId, platform) {
                      platform === 'facebook' ? 'FacebookEvents' :
                      'InstagramEvents';
 
-  // BEGIN DEBUG LOGGING
-  console.log(`[DEBUG] [FILTER] Initial notifications for ${platform}/${userId}:`);
-  notifications.forEach((n, i) => {
-    console.log(`  [${i}] id=${n.message_id || n.comment_id}, status=${n.status}`);
-  });
-  // END DEBUG LOGGING
+
 
   // OPTIMIZED: Batch fetch all status files at once like ready post strategies
   try {
@@ -4761,25 +4756,15 @@ async function filterHandledNotifications(notifications, userId, platform) {
       
       // PERMANENTLY FILTER OUT: Skip notifications that are already handled, replied, ignored, or ai_handled
       if (status && ['replied', 'ignored', 'ai_handled', 'handled', 'sent', 'scheduled', 'posted', 'published'].includes(status)) {
-        console.log(`[DEBUG] [FILTER] Filtering out ${platform} notification ${notificationId} with status: ${status}`);
         return false; // Skip this notification completely
       }
       
       // Update notification status if available
       if (status) {
         notification.status = status;
-        console.log(`[DEBUG] [FILTER] Keeping ${platform} notification ${notificationId} with status: ${status}`);
-      } else {
-        console.log(`[DEBUG] [FILTER] Keeping ${platform} notification ${notificationId} with no status file (pending)`);
       }
       
       return true; // Keep this notification
-    });
-    
-    // DEBUG LOGGING: Log the filtered notifications
-    console.log(`[DEBUG] [FILTER] Filtered notifications for ${platform}/${userId}:`);
-    filteredNotifications.forEach((n, i) => {
-      console.log(`  [${i}] id=${n.message_id || n.comment_id}, status=${n.status}`);
     });
     
     console.log(`[${new Date().toISOString()}] Filtered ${platform} notifications: ${notifications.length} -> ${filteredNotifications.length}`);
@@ -9341,8 +9326,6 @@ function startFacebookScheduler() {
       const listResponse = await s3Client.send(listCommand);
       const files = listResponse.Contents || [];
       
-      console.log(`[${new Date().toISOString()}] Found ${files.length} Facebook scheduled files in 'scheduled_posts/facebook/'`);
-      
       const now = new Date();
       
       for (const file of files) {
@@ -9358,7 +9341,6 @@ function startFacebookScheduler() {
           const scheduledPost = JSON.parse(await streamToString(data.Body));
           
           const scheduledTime = new Date(scheduledPost.scheduleDate || scheduledPost.scheduledTime);
-          console.log(`[${new Date().toISOString()}] Facebook post ${scheduledPost.id}: scheduled for ${scheduledTime.toISOString()}, status: ${scheduledPost.status}, current time: ${now.toISOString()}`);
           
           // Check if post is due (within 1 minute tolerance)
           if (scheduledTime <= now && (scheduledPost.status === 'pending' || scheduledPost.status === 'scheduled')) {
@@ -9522,8 +9504,6 @@ function startFacebookScheduler() {
                 Body: JSON.stringify(scheduledPost, null, 2),
                 ContentType: 'application/json'
               }));
-
-              console.log(`[${new Date().toISOString()}] Facebook post ${scheduledPost.id} marked as completed`);
 
             } catch (postError) {
               console.error(`[${new Date().toISOString()}] Error publishing Facebook post ${scheduledPost.id}:`, postError.message);
@@ -9849,11 +9829,13 @@ async function processScheduledInstagramPosts() {
     const listCommand = new ListObjectsV2Command({
       Bucket: 'tasks',
       Prefix: 'scheduled_posts/instagram/',
-      MaxKeys: 100
+      MaxKeys: 1000 // Increased from 100 to 1000 to process more posts
     });
     
     const response = await s3Client.send(listCommand);
     const now = new Date();
+    
+    console.log(`[${new Date().toISOString()}] [SCHEDULER] Found ${response.Contents?.length || 0} scheduled posts to check`);
     
     if (response.Contents) {
       for (const object of response.Contents) {
@@ -9888,9 +9870,67 @@ async function processScheduledInstagramPosts() {
           // Check if it's time to post
           const scheduleTime = new Date(scheduleData.scheduleDate);
           
+          // 🚫 CRITICAL FIX: Skip posts already being processed
+          if (scheduleData.status === 'processing') {
+            // Check if processing has been stuck for too long (5 minutes)
+            if (scheduleData.processing_started_at) {
+              const processingStart = new Date(scheduleData.processing_started_at);
+              const processingDuration = now.getTime() - processingStart.getTime();
+              const maxProcessingTime = 5 * 60 * 1000; // 5 minutes
+              
+              if (processingDuration > maxProcessingTime) {
+                console.log(`[${new Date().toISOString()}] [SCHEDULER] Post ${scheduleData.id} stuck in processing for ${Math.round(processingDuration/1000)}s, resetting to scheduled`);
+                scheduleData.status = 'scheduled';
+                delete scheduleData.processing_started_at;
+                
+                await s3Client.send(new PutObjectCommand({
+                  Bucket: 'tasks',
+                  Key: object.Key,
+                  Body: JSON.stringify(scheduleData, null, 2),
+                  ContentType: 'application/json',
+                }));
+              } else {
+                console.log(`[${new Date().toISOString()}] [SCHEDULER] Post ${scheduleData.id} being processed for ${Math.round(processingDuration/1000)}s, skipping`);
+                continue;
+              }
+            } else {
+              console.log(`[${new Date().toISOString()}] [SCHEDULER] Post ${scheduleData.id} already being processed, skipping`);
+              continue;
+            }
+          }
+          
           if (scheduleData.status === 'scheduled' && scheduleTime <= now) {
-            await executeScheduledPost(scheduleData);
+            console.log(`[${new Date().toISOString()}] [SCHEDULER] 🎯 Found due post: ${scheduleData.id} for user ${scheduleData.userId}`);
+            
+            // 🚫 CRITICAL FIX: Atomic locking to prevent duplicate processing
+            try {
+              // Immediately mark as processing to prevent race conditions
+              scheduleData.status = 'processing';
+              scheduleData.processing_started_at = new Date().toISOString();
+              
+              // Atomic update - if this fails, another worker already grabbed it
+              await s3Client.send(new PutObjectCommand({
+                Bucket: 'tasks',
+                Key: object.Key,
+                Body: JSON.stringify(scheduleData, null, 2),
+                ContentType: 'application/json',
+              }));
+              
+              console.log(`[${new Date().toISOString()}] [SCHEDULER] ✅ Locked post ${scheduleData.id} for processing`);
+              
+              // Now safely execute the post
+              await executeScheduledPost(scheduleData);
+              
+            } catch (lockError) {
+              // Another worker already grabbed this post
+              console.log(`[${new Date().toISOString()}] [SCHEDULER] ⚠️ Post ${scheduleData.id} already being processed by another worker`);
+              continue;
+            }
           } else {
+            // Log if post is not due for debugging
+            if (scheduleData.status === 'scheduled') {
+              console.log(`[${new Date().toISOString()}] [SCHEDULER] Post ${scheduleData.id} not due yet: scheduled for ${scheduleData.scheduleDate}, current time: ${now.toISOString()}`);
+            }
           }
           
         } catch (itemError) {
@@ -9907,6 +9947,12 @@ async function processScheduledInstagramPosts() {
 async function executeScheduledPost(scheduleData) {
   const { userId, imageKey, caption, scheduleId } = scheduleData;
   console.log(`[SCHEDULER-TRACE] Starting scheduled post: scheduleId=${scheduleId}, userId=${userId}, imageKey=${imageKey}`);
+  
+  // 🚫 CRITICAL FIX: Verify we still have the lock (processing status)
+  if (scheduleData.status !== 'processing') {
+    console.log(`[SCHEDULER-TRACE] ⚠️ Post ${scheduleId} lost processing lock, skipping`);
+    return;
+  }
   let tokenData;
   try {
     tokenData = await getTokenData(userId);

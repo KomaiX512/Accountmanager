@@ -136,13 +136,13 @@ body:has(.dashboard-wrapper) {
     "notifications post-cooked competitor-analysis"
     "post-creation post-creation post-creation";
   grid-template-columns: 1fr 1.5fr 1fr;
-  /* Increased row heights for better visibility of modules */
-  grid-template-rows: auto 0.8fr 1fr auto;
+  /* FIXED HEIGHTS: Prevent any module expansion affecting grid layout */
+  grid-template-rows: auto 320px 400px auto;
   gap: 16px;
-  min-height: fit-content; /* Remove extra height */
-  height: auto; /* Let content determine height */
+  min-height: fit-content;
+  height: fit-content; /* Fixed height based on defined rows */
   box-sizing: border-box;
-  align-content: stretch;
+  align-content: start; /* Prevent stretching */
 }
 
 /* Desktop specific grid optimizations */
@@ -164,9 +164,10 @@ body:has(.dashboard-wrapper) {
       "notifications post-cooked competitor-analysis"
       "post-creation post-creation post-creation" !important;
     grid-template-columns: 1fr 1.5fr 1fr !important;
-    grid-template-rows: auto 0.8fr 1fr auto !important;
-    gap: 14px !important; /* Adjusted gap for this range */
+    grid-template-rows: auto 300px 380px auto !important; /* Fixed heights for this breakpoint */
+    gap: 14px !important;
     flex-direction: unset !important;
+    align-content: start !important; /* Prevent stretching */
   }
 }
 
@@ -180,9 +181,10 @@ body:has(.dashboard-wrapper) {
       "notifications post-cooked competitor-analysis"
       "post-creation post-creation post-creation" !important;
     grid-template-columns: 1fr 1.5fr 1fr !important;
-    grid-template-rows: auto 0.8fr 1fr auto !important;
+    grid-template-rows: auto 280px 360px auto !important; /* Fixed heights for this breakpoint */
     gap: 12px !important;
     flex-direction: unset !important;
+    align-content: start !important; /* Prevent stretching */
   }
 }
 
@@ -1122,15 +1124,32 @@ body:has(.dashboard-wrapper) {
 }
 
 /* ✨ INCREASED HEIGHT MODULE SECTIONS - BETTER VISIBILITY */
-.notifications,
+.notifications {
+  grid-area: notifications;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  border-radius: 20px;
+  padding: 4px;
+  height: 100%; /* Fill the grid cell exactly */
+  max-height: 100%; /* Never exceed grid cell height */
+  overflow-y: auto; /* Always use scrolling for overflow content */
+  backdrop-filter: blur(15px);
+  position: relative;
+  box-shadow: 
+    0 4px 20px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+  transition: all 0.3s ease;
+}
+
 .post-cooked {
+  grid-area: post-cooked;
   background: rgba(255, 255, 255, 0.1);
   border: 1.5px solid rgba(255, 255, 255, 0.18);
   border-radius: 20px;
   padding: 4px;
-  height: 100%;
-  min-height: 400px; /* Increased minimum height for better visibility */
-  overflow-y: auto;
+  height: 100%; /* Fill the grid cell exactly */
+  max-height: 100%; /* Never exceed grid cell height */
+  overflow-y: auto; /* Always use scrolling for overflow content */
   backdrop-filter: blur(15px);
   position: relative;
   box-shadow: 
@@ -1139,15 +1158,16 @@ body:has(.dashboard-wrapper) {
   transition: all 0.3s ease;
 }
 
-/* ✨ INCREASED HEIGHT STRATEGIES - BETTER VISIBILITY */
+/* ✨ FIXED HEIGHT STRATEGIES - CONTAINED WITHIN GRID */
 .strategies {
+  grid-area: strategies;
   background: rgba(255, 255, 255, 0.1);
   border: 1.5px solid rgba(255, 255, 255, 0.18);
   border-radius: 20px;
   padding: 4px;
-  height: 100%;
-  min-height: 400px; /* Increased minimum height for better visibility */
-  overflow: hidden; /* No scrolling for strategies */
+  height: 100%; /* Fill the grid cell exactly */
+  max-height: 100%; /* Never exceed grid cell height */
+  overflow-y: auto; /* Use scrolling if content overflows */
   backdrop-filter: blur(15px);
   position: relative;
   box-shadow: 
@@ -1156,15 +1176,16 @@ body:has(.dashboard-wrapper) {
   transition: all 0.3s ease;
 }
 
-/* ✨ INCREASED HEIGHT COMPETITOR ANALYSIS - BETTER VISIBILITY */
+/* ✨ FIXED HEIGHT COMPETITOR ANALYSIS - CONTAINED WITHIN GRID */
 .competitor-analysis {
+  grid-area: competitor-analysis;
   background: rgba(255, 255, 255, 0.1);
   border: 1.5px solid rgba(255, 255, 255, 0.18);
   border-radius: 20px;
   padding: 4px;
-  height: 100%;
-  min-height: 400px; /* Increased minimum height for better visibility */
-  overflow-y: auto; /* Keep scrolling for competitor analysis */
+  height: 100%; /* Fill the grid cell exactly */
+  max-height: 100%; /* Never exceed grid cell height */
+  overflow-y: auto; /* Always use scrolling for overflow content */
   backdrop-filter: blur(15px);
   position: relative;
   box-shadow: 
@@ -1241,6 +1262,10 @@ body:has(.dashboard-wrapper) {
   padding: 16px;
   backdrop-filter: blur(10px);
   transition: all 0.3s ease;
+  height: 100%; /* Fill the grid cell exactly */
+  max-height: 100%; /* Never exceed grid cell height */
+  overflow-y: auto; /* Use scrolling if content overflows */
+  box-sizing: border-box;
 }
 
 .news4u::before {
@@ -2177,7 +2202,13 @@ h2 {
     transform: scale(0.98);
   }
 
-  /* 🍎 CONTENT STYLING */
+  /* 🍎 CONTENT STYLING - ENSURE HEIGHT CONSTRAINTS */
+  .module-content {
+    height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+  }
+  
   .module-content > * {
     margin-top: 0;
   }
@@ -2293,6 +2324,41 @@ h2 {
 
   .module-content::-webkit-scrollbar-thumb:hover {
     background: rgba(0, 255, 204, 0.5);
+  }
+  
+  /* Enhanced scrollbar styling for all modules */
+  .notifications::-webkit-scrollbar,
+  .post-cooked::-webkit-scrollbar,
+  .strategies::-webkit-scrollbar,
+  .competitor-analysis::-webkit-scrollbar,
+  .news4u::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .notifications::-webkit-scrollbar-track,
+  .post-cooked::-webkit-scrollbar-track,
+  .strategies::-webkit-scrollbar-track,
+  .competitor-analysis::-webkit-scrollbar-track,
+  .news4u::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+  }
+  
+  .notifications::-webkit-scrollbar-thumb,
+  .post-cooked::-webkit-scrollbar-thumb,
+  .strategies::-webkit-scrollbar-thumb,
+  .competitor-analysis::-webkit-scrollbar-thumb,
+  .news4u::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+  }
+  
+  .notifications::-webkit-scrollbar-thumb:hover,
+  .post-cooked::-webkit-scrollbar-thumb:hover,
+  .strategies::-webkit-scrollbar-thumb:hover,
+  .competitor-analysis::-webkit-scrollbar-thumb:hover,
+  .news4u::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
   }
   
   /* ✨ COMPACT INPUT STYLING FOR MOBILE */

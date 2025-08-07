@@ -255,7 +255,7 @@ const RATE_LIMIT = {
   maxRequestsPerDay: 1500,  // Gemini 2.0 Flash Free Tier: 1,500 RPD
   requestWindow: 60 * 1000, // 1 minute
   dayWindow: 24 * 60 * 60 * 1000, // 24 hours
-  minDelayBetweenRequests: 2000 // Reduced to 2 seconds for better user experience
+  minDelayBetweenRequests: 45000 // 🚀 CRITICAL FIX: Align with frontend 45-second delay
 };
 
 // Request tracking for rate limiting
@@ -268,6 +268,14 @@ const requestTracker = {
 // Request queue to handle throttling
 const requestQueue = [];
 let isProcessingQueue = false;
+
+// 🚀 CRITICAL FIX: Add notification deduplication tracking
+const processedNotifications = new Map(); // Track processed notifications to prevent duplicates
+const NOTIFICATION_DEDUP_TTL = 5 * 60 * 1000; // 5 minutes to prevent duplicate processing
+
+// 🚀 CRITICAL FIX: Add request locking to prevent race conditions
+const activeRequests = new Map(); // Track active requests by user/platform
+const REQUEST_LOCK_TTL = 60 * 1000; // 1 minute lock to prevent concurrent processing
 
 // Enhanced cache configuration with aggressive caching to reduce API calls
 const profileCache = new Map();
@@ -283,6 +291,40 @@ let quotaExhausted = false;
 let quotaResetTime = null;
 let consecutiveQuotaErrors = 0;
 const MAX_QUOTA_ERRORS_BEFORE_EXHAUSTION = 3; // Require 3 consecutive quota errors
+
+// 🚀 CRITICAL FIX: Cleanup processed notifications cache to prevent memory bloat
+setInterval(() => {
+  const now = Date.now();
+  let cleanedCount = 0;
+  
+  for (const [key, value] of processedNotifications.entries()) {
+    if (now - value.timestamp > NOTIFICATION_DEDUP_TTL) {
+      processedNotifications.delete(key);
+      cleanedCount++;
+    }
+  }
+  
+  if (cleanedCount > 0) {
+    console.log(`[RAG-Server] 🧹 Cleaned ${cleanedCount} expired processed notifications`);
+  }
+}, 5 * 60 * 1000); // Clean every 5 minutes
+
+// 🚀 CRITICAL FIX: Cleanup active requests cache to prevent memory bloat
+setInterval(() => {
+  const now = Date.now();
+  let cleanedCount = 0;
+  
+  for (const [key, value] of activeRequests.entries()) {
+    if (now - value.timestamp > REQUEST_LOCK_TTL) {
+      activeRequests.delete(key);
+      cleanedCount++;
+    }
+  }
+  
+  if (cleanedCount > 0) {
+    console.log(`[RAG-Server] 🧹 Cleaned ${cleanedCount} expired active requests`);
+  }
+}, 2 * 60 * 1000); // Clean every 2 minutes
 
 // Fallback responses for when quota is exhausted
 const FALLBACK_RESPONSES = {
@@ -3987,6 +4029,59 @@ app.post('/api/instant-reply', async (req, res) => {
     return res.status(400).json({ error: 'Username and notification with text are required' });
   }
 
+  // 🚀 CRITICAL FIX: Check for duplicate notification processing
+  const notificationId = notification.message_id || notification.comment_id || notification.id;
+  if (notificationId) {
+    const dedupKey = `${platform}_${username}_${notificationId}`;
+    const now = Date.now();
+    
+    // Check if this notification was recently processed
+    if (processedNotifications.has(dedupKey)) {
+      const { timestamp, reply } = processedNotifications.get(dedupKey);
+      if (now - timestamp < NOTIFICATION_DEDUP_TTL) {
+        console.log(`[RAG-Server] 🚫 Duplicate notification detected: ${dedupKey}, returning cached reply`);
+        return res.json({ 
+          reply,
+          success: true,
+          notification_type: notification.type,
+          platform,
+          usedFallback: false,
+          hasProfileData: true,
+          hasConversationHistory: false,
+          duplicate: true,
+          cached: true
+        });
+      } else {
+        // Clean up expired entry
+        processedNotifications.delete(dedupKey);
+      }
+    }
+  }
+
+  // 🚀 CRITICAL FIX: Check for active request lock to prevent race conditions
+  const requestLockKey = `${platform}_${username}`;
+  const now = Date.now();
+  
+  if (activeRequests.has(requestLockKey)) {
+    const { timestamp, type } = activeRequests.get(requestLockKey);
+    if (now - timestamp < REQUEST_LOCK_TTL) {
+      console.log(`[RAG-Server] 🔒 Request lock active for ${requestLockKey}, rejecting concurrent request`);
+      return res.status(429).json({ 
+        error: 'Request in progress. Please wait before making another request.',
+        retryAfter: Math.ceil((REQUEST_LOCK_TTL - (now - timestamp)) / 1000)
+      });
+    } else {
+      // Clean up expired lock
+      activeRequests.delete(requestLockKey);
+    }
+  }
+  
+  // Set request lock
+  activeRequests.set(requestLockKey, {
+    timestamp: now,
+    type: 'instant-reply'
+  });
+
   try {
     // Fetch profile and rules data with platform
     console.log(`[RAG-Server] Processing advanced AI reply for ${platform}/${username}: "${notification.text.substring(0, 50)}..."`);
@@ -4171,6 +4266,16 @@ app.post('/api/instant-reply', async (req, res) => {
       console.error(`[RAG-Server] Error saving instant reply to R2: ${err.message}`);
     });
     
+    // 🚀 CRITICAL FIX: Store processed notification to prevent duplicates
+    if (notificationId) {
+      const dedupKey = `${platform}_${username}_${notificationId}`;
+      processedNotifications.set(dedupKey, {
+        timestamp: Date.now(),
+        reply: reply
+      });
+      console.log(`[RAG-Server] ✅ Stored processed notification: ${dedupKey}`);
+    }
+
     // Mark original event as replied to prevent duplicate processing (fire-and-forget)
     markEventAsReplied(notification, platform).catch(err => {
       console.error(`[RAG-Server] Error marking event replied: ${err.message}`);
@@ -4192,6 +4297,7 @@ app.post('/api/instant-reply', async (req, res) => {
       usedFallback,
       hasProfileData: hasRealProfileData,
       hasConversationHistory: conversationHistory.length > 0,
+      duplicate: false,
       quotaInfo: usedFallback && quotaExhausted ? {
         exhausted: true,
         resetTime: quotaResetTime?.toISOString(),
@@ -4201,6 +4307,9 @@ app.post('/api/instant-reply', async (req, res) => {
   } catch (error) {
     console.error('[RAG-Server] Instant reply endpoint error:', error.message);
     res.status(500).json({ error: error.message });
+  } finally {
+    // 🚀 CRITICAL FIX: Clean up request lock
+    activeRequests.delete(requestLockKey);
   }
 });
 
@@ -4239,6 +4348,34 @@ app.post('/api/auto-reply-all', async (req, res) => {
     for (let i = 0; i < notifications.length; i++) {
       const notification = notifications[i];
       const notificationId = notification.message_id || notification.comment_id || `unknown_${i}`;
+
+      // 🚀 CRITICAL FIX: Check for duplicate notification processing in auto-reply
+      if (notificationId && notificationId !== `unknown_${i}`) {
+        const dedupKey = `${platform}_${username}_${notificationId}`;
+        const now = Date.now();
+        
+        // Check if this notification was recently processed
+        if (processedNotifications.has(dedupKey)) {
+          const { timestamp, reply } = processedNotifications.get(dedupKey);
+          if (now - timestamp < NOTIFICATION_DEDUP_TTL) {
+            console.log(`[RAG-Server] 🚫 Duplicate notification detected in auto-reply: ${dedupKey}, skipping`);
+            
+            results.push({
+              notificationId,
+              success: true,
+              reply: reply,
+              notification,
+              duplicate: true
+            });
+            
+            successCount++;
+            continue; // Skip to next notification
+          } else {
+            // Clean up expired entry
+            processedNotifications.delete(dedupKey);
+          }
+        }
+      }
 
       try {
         console.log(`[RAG-Server] Auto-replying to notification ${i + 1}/${notifications.length}: ${notificationId}`);
@@ -4287,6 +4424,16 @@ app.post('/api/auto-reply-all', async (req, res) => {
           if (cleanReply.toLowerCase().startsWith(prefix.toLowerCase())) {
             cleanReply = cleanReply.substring(prefix.length).trim();
           }
+        }
+
+        // 🚀 CRITICAL FIX: Store processed notification to prevent duplicates in auto-reply
+        if (notificationId && notificationId !== `unknown_${i}`) {
+          const dedupKey = `${platform}_${username}_${notificationId}`;
+          processedNotifications.set(dedupKey, {
+            timestamp: Date.now(),
+            reply: cleanReply
+          });
+          console.log(`[RAG-Server] ✅ Stored processed notification in auto-reply: ${dedupKey}`);
         }
 
         // Mark original event as replied (fire-and-forget)

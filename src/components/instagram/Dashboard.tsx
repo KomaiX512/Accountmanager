@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './Dashboard.css';
 import Cs_Analysis from './Cs_Analysis';
 import OurStrategies from './OurStrategies';
@@ -166,6 +166,8 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const [isAutoReplying, setIsAutoReplying] = useState(false);
   const [shouldStopAutoReply, setShouldStopAutoReply] = useState(false);
   const autoReplyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // 🛡️ CRITICAL BUG FIX: Track processed notification IDs to prevent duplicate processing
+  const processedNotificationIds = useRef<Set<string>>(new Set());
 
   // Helper function to get unseen count for each section
   const getUnseenStrategiesCount = () => {
@@ -969,7 +971,7 @@ Image Description: ${response.post.image_prompt}
   };
 
   // Handle auto-reply to all notifications with defensive UX like Facebook
-  const handleAutoReplyAll = async (notifications: Notification[]) => {
+  const handleAutoReplyAll = useCallback(async (notifications: Notification[]) => {
     if (!igBusinessId || !accountHolder) {
       setToast('Instagram account not properly connected');
       return;
@@ -987,10 +989,20 @@ Image Description: ${response.post.image_prompt}
       return;
     }
     
-    // CRITICAL FIX: Filter only pending notifications
-    const pendingNotifications = notifications.filter((notif: any) => 
-      !notif.status || notif.status === 'pending'
-    );
+    // CRITICAL FIX: Filter only pending notifications and prevent duplicates
+    const pendingNotifications = notifications.filter((notif: any) => {
+      const notificationId = notif.message_id || notif.comment_id || '';
+      // Skip if already processed in this session
+      if (processedNotificationIds.current.has(notificationId)) {
+        console.log(`[Instagram] 🚫 Skipping already processed notification: ${notificationId}`);
+        return false;
+      }
+      // Skip if already handled
+      if (notif.status && notif.status !== 'pending') {
+        return false;
+      }
+      return true;
+    });
     
     if (pendingNotifications.length === 0) {
       return;
@@ -998,6 +1010,10 @@ Image Description: ${response.post.image_prompt}
     
     setIsAutoReplying(true);
     setShouldStopAutoReply(false); // 🛑 STOP OPERATION: Reset stop flag
+    
+    // 🛡️ CRITICAL BUG FIX: Clear processed IDs for fresh start
+    processedNotificationIds.current.clear();
+    console.log(`[Instagram] 🧹 Cleared processed notification IDs for fresh auto-reply session`);
     
     // NEW: Initialize progress tracking
     setAutoReplyProgress({ current: 0, total: pendingNotifications.length, nextReplyIn: 0 });
@@ -1020,6 +1036,10 @@ Image Description: ${response.post.image_prompt}
         
         const notification = pendingNotifications[i];
         const notificationId = notification.message_id || notification.comment_id || '';
+        
+        // 🛡️ CRITICAL BUG FIX: Mark as processed immediately to prevent duplicates
+        processedNotificationIds.current.add(notificationId);
+        console.log(`[Instagram] 🔒 Marked notification ${notificationId} as processed`);
         
         if (!notification.text) {
           failCount++;
@@ -1213,18 +1233,14 @@ Image Description: ${response.post.image_prompt}
     
     // 🛑 STOP OPERATION: Final status message
     if (shouldStopAutoReply) {
-      setToast(`Instagram auto-reply stopped by user: ${successCount} sent, ${failCount} failed`);
+      setToast(`Auto-reply stopped (${successCount} successful, ${failCount} failed)`);
     } else {
-      setToast(`Instagram auto-reply completed: ${successCount} sent, ${failCount} failed`);
+      setToast(`Auto-reply completed (${successCount} successful, ${failCount} failed)`);
     }
     
-    // Refresh notifications
-    setTimeout(() => {
-      if (igBusinessId) {
-        fetchNotifications(igBusinessId);
-      }
-    }, 2000);
-  };
+    // Reset progress
+    setAutoReplyProgress({ current: 0, total: 0, nextReplyIn: 0 });
+  }, [igBusinessId, accountHolder, shouldStopAutoReply, autoReplyTimeoutRef, setToast, setNotifications, setAutoReplyProgress, setIsAutoReplying, setShouldStopAutoReply, trackRealAIReply, canUseFeature, getApiUrl]);
 
   const refreshAllData = async () => {
     if (!accountHolder) {
@@ -1703,7 +1719,7 @@ Image Description: ${response.post.image_prompt}
       window.removeEventListener('showUpgradePopup', handleShowUpgradePopup);
       window.removeEventListener('triggerAutoReply', handleAutoReplyTrigger as EventListener);
     };
-  }, [accountHolder, igBusinessId, notifications, handleAutoReplyAll]);
+  }, [accountHolder, igBusinessId, notifications]);
 
   // Clean old entries from reply tracker (older than 10 minutes)
   useEffect(() => {

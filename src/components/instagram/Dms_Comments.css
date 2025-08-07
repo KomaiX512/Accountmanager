@@ -18,37 +18,49 @@
   overflow-x: hidden;
   padding-right: 4px;
   margin-right: -4px;
-  max-height: calc(100vh - 180px); /* Reduced for more space */
-  min-height: 400px; /* Increased minimum height for better visibility */
+  /* IMPROVED HEIGHT CALCULATION: Ensure all items are visible */
+  max-height: calc(100vh - 200px); /* Adjusted for better space allocation */
+  min-height: 450px; /* Increased minimum height for better visibility */
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
   position: relative;
   scroll-behavior: smooth;
-  /* Ensure we can scroll to the very end */
-  scroll-padding: 8px;
+  /* ENHANCED SCROLL PADDING: Ensure last item is fully visible */
+  scroll-padding-bottom: 20px;
+  scroll-padding-top: 10px;
+  /* IMPROVED SCROLL SNAP: Better item alignment */
+  scroll-snap-type: y proximity;
+  scroll-snap-stop: always;
 }
 
-/* Scroll fade indicators */
-.notifications-scroll-container::before,
+/* ENHANCED SCROLL CONTAINER: Better end visibility */
 .notifications-scroll-container::after {
   content: '';
   position: absolute;
+  bottom: 0;
   left: 0;
   right: 8px;
-  height: 20px;
+  height: 30px; /* Increased height for better end visibility */
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.4), transparent);
   pointer-events: none;
   z-index: 1;
   transition: opacity 0.3s ease;
+  /* Ensure gradient doesn't interfere with last item */
+  opacity: 0.6;
 }
 
+/* Scroll fade indicators */
 .notifications-scroll-container::before {
+  content: '';
+  position: absolute;
   top: 0;
+  left: 0;
+  right: 8px;
+  height: 20px;
   background: linear-gradient(to bottom, rgba(0, 0, 0, 0.3), transparent);
-}
-
-.notifications-scroll-container::after {
-  bottom: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.3), transparent);
+  pointer-events: none;
+  z-index: 1;
+  transition: opacity 0.3s ease;
 }
 
 /* Custom Scrollbar for Webkit browsers */
@@ -113,13 +125,13 @@
   /* Add scroll to bottom button as well */
 }
 
-/* Scroll to Bottom Button - NEW: For better DM visibility */
+/* Scroll to Bottom Button - ENHANCED: For perfect DM visibility */
 .scroll-to-bottom-btn {
   position: absolute;
   bottom: 80px; /* Positioned above scroll to top */
   right: 20px;
-  width: 48px;
-  height: 48px;
+  width: 52px; /* Slightly larger for better visibility */
+  height: 52px;
   background: linear-gradient(135deg, #34c759, #00cc66);
   color: white;
   border: none;
@@ -128,9 +140,94 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 16px rgba(52, 199, 89, 0.3);
+  box-shadow: 0 6px 20px rgba(52, 199, 89, 0.4); /* Enhanced shadow */
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  z-index: 10;
+  z-index: 15; /* Higher z-index for better visibility */
+  /* ENHANCED VISIBILITY: Add subtle glow effect */
+  filter: drop-shadow(0 0 8px rgba(52, 199, 89, 0.3));
+}
+
+.scroll-to-bottom-btn:hover {
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 8px 24px rgba(52, 199, 89, 0.5);
+  filter: drop-shadow(0 0 12px rgba(52, 199, 89, 0.4));
+}
+
+.scroll-to-bottom-btn:active {
+  transform: translateY(-1px) scale(1.02);
+}
+
+.scroll-to-bottom-btn svg {
+  width: 22px; /* Slightly larger icon */
+  height: 22px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+/* ENHANCED MOBILE RESPONSIVENESS */
+@media (max-width: 768px) {
+  .scroll-to-bottom-btn {
+    width: 48px;
+    height: 48px;
+    bottom: 70px; /* Adjusted position for mobile */
+    right: 16px;
+  }
+  
+  .scroll-to-bottom-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+/* NEW ITEMS INDICATOR: Visual cue for new notifications */
+.scroll-to-bottom-btn.has-new-items {
+  animation: pulse-new-items 2s ease-in-out infinite;
+  background: linear-gradient(135deg, #ff6b35, #f7931e); /* Orange gradient for new items */
+  box-shadow: 0 6px 20px rgba(255, 107, 53, 0.5);
+}
+
+.scroll-to-bottom-btn.has-new-items:hover {
+  box-shadow: 0 8px 24px rgba(255, 107, 53, 0.6);
+  filter: drop-shadow(0 0 12px rgba(255, 107, 53, 0.4));
+}
+
+.new-items-indicator {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.new-items-dot {
+  width: 8px;
+  height: 8px;
+  background: #ffffff;
+  border-radius: 50%;
+  animation: blink-new-items 1.5s ease-in-out infinite;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+}
+
+@keyframes pulse-new-items {
+  0%, 100% {
+    transform: translateY(-3px) scale(1.05);
+  }
+  50% {
+    transform: translateY(-3px) scale(1.08);
+  }
+}
+
+@keyframes blink-new-items {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.2);
+  }
 }
 
 .scroll-to-top-btn:hover {
@@ -341,10 +438,17 @@
   transition: all 0.2s ease;
   position: relative;
   overflow: hidden;
-  /* Scroll snap alignment for better visibility */
+  /* IMPROVED SCROLL SNAP: Better item visibility */
   scroll-snap-align: start;
+  scroll-margin-bottom: 10px; /* Ensure last item has proper margin */
   /* Highlight new DMs */
   animation: highlightNewDM 2s ease-in-out;
+}
+
+/* LAST ITEM ENHANCEMENT: Ensure perfect visibility */
+.notification-item:last-child {
+  margin-bottom: 20px; /* Extra margin for last item */
+  scroll-margin-bottom: 20px; /* Ensure last item is fully visible */
 }
 
 /* First DM item - More prominent */
@@ -354,6 +458,7 @@
   box-shadow: 0 2px 8px rgba(0, 122, 255, 0.2);
   transform: scale(1.02);
   margin-bottom: 12px;
+  scroll-margin-top: 10px; /* Ensure first item is fully visible */
 }
 
 .notification-item::before {

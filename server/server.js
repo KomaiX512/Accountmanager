@@ -2327,6 +2327,12 @@ app.get(['/posts/:username', '/api/posts/:username'], async (req, res) => {
             return null;
           }
           
+          // 🔥 ENHANCED: Additional status checks for edge cases
+          if (postData.status && typeof postData.status === 'string' && postData.status.toLowerCase().includes('scheduled')) {
+            console.log(`[${new Date().toISOString()}] Skipping ${platform} post ${file.Key} with scheduled-like status: ${postData.status}`);
+            return null;
+          }
+          
           // Look for matching image file
           // 🔥 ENHANCED: Build image keys based on post type and extracted fileId
           let potentialImageKeys = [];
@@ -2726,9 +2732,29 @@ app.post([
             continue;
           }
           
+          // 🚀 CRITICAL FIX: Check for duplicate message before storing
+          const userKey = `InstagramEvents/${storeUserId}/${eventData.message_id}.json`;
+          
+          try {
+            // Check if this message already exists
+            const existingCheck = await s3Client.send(new HeadObjectCommand({
+              Bucket: 'tasks',
+              Key: userKey
+            }));
+            
+            if (existingCheck) {
+              console.log(`[${new Date().toISOString()}] 🚫 Duplicate webhook message detected: ${eventData.message_id}, skipping storage`);
+              continue; // Skip storing duplicate message
+            }
+          } catch (error) {
+            if (error.name !== 'NotFound') {
+              console.error(`[${new Date().toISOString()}] Error checking for duplicate message:`, error.message);
+            }
+            // If NotFound, message doesn't exist, so we can proceed
+          }
+          
           console.log(`[${new Date().toISOString()}] Storing DM event with USER ID: ${storeUserId}`);
           
-          const userKey = `InstagramEvents/${storeUserId}/${eventData.message_id}.json`;
           await s3Client.send(new PutObjectCommand({
             Bucket: 'tasks',
             Key: userKey,
@@ -2802,9 +2828,29 @@ app.post([
             continue;
           }
           
+          // 🚀 CRITICAL FIX: Check for duplicate comment before storing
+          const userKey = `InstagramEvents/${storeUserId}/comment_${eventData.comment_id}.json`;
+          
+          try {
+            // Check if this comment already exists
+            const existingCheck = await s3Client.send(new HeadObjectCommand({
+              Bucket: 'tasks',
+              Key: userKey
+            }));
+            
+            if (existingCheck) {
+              console.log(`[${new Date().toISOString()}] 🚫 Duplicate webhook comment detected: ${eventData.comment_id}, skipping storage`);
+              continue; // Skip storing duplicate comment
+            }
+          } catch (error) {
+            if (error.name !== 'NotFound') {
+              console.error(`[${new Date().toISOString()}] Error checking for duplicate comment:`, error.message);
+            }
+            // If NotFound, comment doesn't exist, so we can proceed
+          }
+          
           console.log(`[${new Date().toISOString()}] Storing comment event with USER ID: ${storeUserId}`);
           
-          const userKey = `InstagramEvents/${storeUserId}/comment_${eventData.comment_id}.json`;
           await s3Client.send(new PutObjectCommand({
             Bucket: 'tasks',
             Key: userKey,
@@ -3607,11 +3653,31 @@ app.post(['/webhook/facebook', '/api/webhook/facebook'], async (req, res) => {
                 continue;
               }
               
+              // 🚀 CRITICAL FIX: Check for duplicate Facebook message before storing
+              const userKey = `FacebookEvents/${storageUserId}/${eventData.message_id}.json`;
+              
+              try {
+                // Check if this message already exists
+                const existingCheck = await s3Client.send(new HeadObjectCommand({
+                  Bucket: 'tasks',
+                  Key: userKey
+                }));
+                
+                if (existingCheck) {
+                  console.log(`[${new Date().toISOString()}] 🚫 Duplicate Facebook webhook message detected: ${eventData.message_id}, skipping storage`);
+                  continue; // Skip storing duplicate message
+                }
+              } catch (error) {
+                if (error.name !== 'NotFound') {
+                  console.error(`[${new Date().toISOString()}] Error checking for duplicate Facebook message:`, error.message);
+                }
+                // If NotFound, message doesn't exist, so we can proceed
+              }
+              
               console.log(`💾 Storing Facebook DM event for Page ID: ${storageUserId}`);
               console.log(`📝 Message: "${eventData.text}" (ID: ${eventData.message_id})`);
               
               // Store with PAGE ID to match frontend expectations
-              const userKey = `FacebookEvents/${storageUserId}/${eventData.message_id}.json`;
               await s3Client.send(new PutObjectCommand({
                 Bucket: 'tasks',
                 Key: userKey,
@@ -9481,9 +9547,32 @@ function startFacebookScheduler() {
                   // Create FormData for image upload
                   const formData = new FormData();
                   formData.append('message', scheduledPost.caption || '');
+                  
+                  // 🔥 FIX: Detect actual image format instead of hardcoding JPG
+                  let detectedFormat = 'jpeg';
+                  let detectedMimeType = 'image/jpeg';
+                  
+                  // Check image buffer signature to detect actual format
+                  if (imageBuffer.length >= 4) {
+                    // Check for PNG signature (89 50 4E 47)
+                    if (imageBuffer[0] === 0x89 && imageBuffer[1] === 0x50 && 
+                        imageBuffer[2] === 0x4E && imageBuffer[3] === 0x47) {
+                      detectedFormat = 'png';
+                      detectedMimeType = 'image/png';
+                    }
+                    // Check for WebP signature (RIFF + WEBP)
+                    else if (imageBuffer.length >= 12 &&
+                             imageBuffer.toString('ascii', 0, 4) === 'RIFF' &&
+                             imageBuffer.toString('ascii', 8, 12) === 'WEBP') {
+                      detectedFormat = 'webp';
+                      detectedMimeType = 'image/webp';
+                    }
+                    // JPEG signature (FF D8) is the default
+                  }
+                  
                   formData.append('source', imageBuffer, {
-                    filename: 'image.jpg',
-                    contentType: 'image/jpeg'
+                    filename: `facebook_post.${detectedFormat}`,
+                    contentType: detectedMimeType
                   });
 
                   // Post with image using photo endpoint
@@ -11030,7 +11119,19 @@ async function schedulePostAutomatically(postData, postKey, username, platform, 
     
     // Prepare FormData for scheduling
     const formData = new FormData();
-    formData.append('image', imageBlob, `autopilot_${platform}_post_${Date.now()}.jpg`);
+    
+    // 🔥 FIX: Detect actual image format instead of hardcoding JPG
+    let detectedFormat = 'jpeg';
+    
+    // Check image blob type to detect actual format
+    if (imageBlob.type === 'image/png') {
+      detectedFormat = 'png';
+    } else if (imageBlob.type === 'image/webp') {
+      detectedFormat = 'webp';
+    }
+    // JPEG is the default
+    
+    formData.append('image', imageBlob, `autopilot_${platform}_post_${Date.now()}.${detectedFormat}`);
     formData.append('caption', postData.caption || postData.text || '');
     formData.append('scheduleDate', scheduleTime.toISOString());
     formData.append('platform', platform);

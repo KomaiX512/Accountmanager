@@ -218,10 +218,22 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       if (post.data?.status === 'scheduled' || 
           post.data?.status === 'posted' || 
           post.data?.status === 'rejected' ||
-          post.data?.status === 'ignored') {
+          post.data?.status === 'ignored' ||
+          post.data?.status === 'processed' ||
+          post.data?.status === 'published') {
         // Mark as processed if not already
         if (!processedPosts.has(post.key)) {
           markPostAsProcessed(post.key, `status: ${post.data.status}`);
+        }
+        return false;
+      }
+      
+      // 🔥 ENHANCED: Additional status checks for edge cases
+      if (post.data?.status && typeof post.data.status === 'string' && 
+          post.data.status.toLowerCase().includes('scheduled')) {
+        console.log(`[PostCooked] 🚫 Filtering out post with scheduled-like status: ${post.data.status}`);
+        if (!processedPosts.has(post.key)) {
+          markPostAsProcessed(post.key, `scheduled-like-status: ${post.data.status}`);
         }
         return false;
       }
@@ -336,7 +348,6 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
              console.log(`[PostCooked] NEW POSTS: ${lastPostCount} → ${newPostCount}`);
            }
            setLocalPosts(response.data);
-           setToastMessage('✨ New post arrived! PostCooked module refreshed automatically.');
            lastPostCount = newPostCount;
          }
        } catch (error: any) {
@@ -941,6 +952,12 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     if (result.success) {
       console.log(`[Schedule] 🚫 Marking post ${selectedPostKey} as permanently processed (manually scheduled)`);
       markPostAsProcessed(selectedPostKey, 'manually-scheduled');
+      
+      // 🔥 ENHANCED: Force refresh after scheduling to ensure status is updated
+      setTimeout(() => {
+        console.log(`[Schedule] 🔄 Forcing refresh after scheduling to update status`);
+        handleRefreshPosts();
+      }, 2000); // 2 second delay to ensure R2 update is processed
     }
     
     setShowScheduleModal(false);
@@ -1404,11 +1421,9 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       }
       
       console.log(`[PostCooked] ✅ Successfully refreshed ${response.data.length} posts with fresh data`);
-      setToastMessage(`✅ Refreshed ${response.data.length} posts with fresh data!`);
       
     } catch (error: any) {
       console.error('[PostCooked] ❌ Error refreshing posts:', error);
-      setToastMessage(`❌ Refresh failed: ${error.message}`);
     } finally {
       setIsRefreshing(false);
     }
@@ -1548,8 +1563,19 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                 const imageBlob = await fetchImageBlob(post, 'facebookAutoSchedule');
                 
                 if (imageBlob && imageBlob.size > 0) {
-                  formData.append('image', imageBlob, `facebook_post_${postNumber}.jpg`);
-                  console.log(`[AutoSchedule] 📷 Image added to Facebook post ${postNumber} (${imageBlob.size} bytes)`);
+                  // 🔥 FIX: Detect actual image format instead of hardcoding JPG
+                  let detectedFormat = 'jpeg';
+                  
+                  // Check image blob type to detect actual format
+                  if (imageBlob.type === 'image/png') {
+                    detectedFormat = 'png';
+                  } else if (imageBlob.type === 'image/webp') {
+                    detectedFormat = 'webp';
+                  }
+                  // JPEG is the default
+                  
+                  formData.append('image', imageBlob, `facebook_post_${postNumber}.${detectedFormat}`);
+                  console.log(`[AutoSchedule] 📷 Image added to Facebook post ${postNumber} (${imageBlob.size} bytes, format: ${detectedFormat})`);
                 } else {
                   console.warn(`[AutoSchedule] ⚠️ Facebook post ${postNumber}: Image fetch failed, posting text-only`);
                 }
@@ -1600,7 +1626,19 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
 
             // Submit to our NATIVE Instagram scheduler
             const formData = new FormData();
-            formData.append('image', imageBlob, `auto_instagram_post_${postNumber}.jpg`);
+            
+            // 🔥 FIX: Detect actual image format instead of hardcoding JPG
+            let detectedFormat = 'jpeg';
+            
+            // Check image blob type to detect actual format
+            if (imageBlob.type === 'image/png') {
+              detectedFormat = 'png';
+            } else if (imageBlob.type === 'image/webp') {
+              detectedFormat = 'webp';
+            }
+            // JPEG is the default
+            
+            formData.append('image', imageBlob, `auto_instagram_post_${postNumber}.${detectedFormat}`);
             formData.append('caption', caption);
             formData.append('scheduleDate', scheduleTime.toISOString());
             formData.append('platform', 'instagram');

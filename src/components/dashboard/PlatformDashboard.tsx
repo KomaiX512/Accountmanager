@@ -1839,8 +1839,24 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
             
             console.log(`[PlatformDashboard] ✅ Auto AI Reply tracked: ${platform} ${notification.type}`);
 
+            // 🚀 CRITICAL FIX: Remove notification from UI state to prevent double processing
+            setNotifications(prev => prev.filter(n =>
+              !(
+                (n.message_id && n.message_id === notification.message_id) ||
+                (n.comment_id && n.comment_id === notification.comment_id)
+              )
+            ));
+
             successCount++;
           } else {
+            // 🚀 CRITICAL FIX: Remove notification from UI state even on failure to prevent reprocessing
+            setNotifications(prev => prev.filter(n =>
+              !(
+                (n.message_id && n.message_id === notification.message_id) ||
+                (n.comment_id && n.comment_id === notification.comment_id)
+              )
+            ));
+            
             failCount++;
           }
           
@@ -1879,6 +1895,14 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           } else if (error.response?.data?.error) {
             console.error('API error in auto-reply:', error.response.data.error);
           }
+          
+          // 🚀 CRITICAL FIX: Remove notification from UI state even on exception to prevent reprocessing
+          setNotifications(prev => prev.filter(n =>
+            !(
+              (n.message_id && n.message_id === notification.message_id) ||
+              (n.comment_id && n.comment_id === notification.comment_id)
+            )
+          ));
           
           failCount++;
           

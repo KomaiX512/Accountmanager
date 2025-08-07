@@ -68,25 +68,51 @@
   align-items: center;
 }
 
-/* Pricing Container - PROPORTIONAL 3-CARD LAYOUT */
+/* BULLETPROOF 3-CARD LAYOUT - MULTIPLE OVERRIDES */
 .pricing-container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 80px 20px;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
   gap: 32px;
   box-sizing: border-box;
+  width: 100%;
 }
 
-/* FORCE 3-CARD LAYOUT: Maintain 3 columns until exactly 800px */
+/* BULLETPROOF OVERRIDE 1: Force 3 columns for all screen sizes above 800px */
 @media (min-width: 800px) {
   .pricing-container {
     grid-template-columns: repeat(3, 1fr) !important;
+    display: grid !important;
   }
 }
 
-/* Pricing Cards - VPS OPTIMIZED & PROPORTIONALLY SCALABLE */
+/* BULLETPROOF OVERRIDE 2: Additional specificity for critical range */
+@media (min-width: 800px) and (max-width: 1200px) {
+  .pricing-container {
+    grid-template-columns: repeat(3, 1fr) !important;
+    display: grid !important;
+  }
+}
+
+/* BULLETPROOF OVERRIDE 3: Ultra-specific selector for maximum priority */
+body .pricing-container,
+div .pricing-container,
+.pricing-page .pricing-container {
+  grid-template-columns: repeat(3, 1fr) !important;
+  display: grid !important;
+}
+
+/* BULLETPROOF OVERRIDE 4: Force layout for any screen width above 800px */
+@media screen and (min-width: 800px) {
+  .pricing-container {
+    grid-template-columns: repeat(3, 1fr) !important;
+    display: grid !important;
+  }
+}
+
+/* BULLETPROOF PRICING CARDS - NEVER BREAK LAYOUT */
 .pricing-card {
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -98,9 +124,22 @@
   -webkit-backdrop-filter: blur(10px) !important;
   transform: translateZ(0) !important;
   will-change: auto !important;
-  min-width: 0; /* Allow cards to shrink below content width */
-  box-sizing: border-box;
-  width: 100%;
+  min-width: 0 !important; /* CRITICAL: Allow cards to shrink */
+  max-width: none !important; /* CRITICAL: Remove any max-width constraints */
+  box-sizing: border-box !important;
+  width: 100% !important;
+  flex-shrink: 1 !important; /* CRITICAL: Allow flex shrinking */
+  overflow: hidden !important; /* CRITICAL: Prevent content overflow */
+}
+
+/* BULLETPROOF CARD OVERRIDE: Force proper sizing */
+@media (min-width: 800px) {
+  .pricing-card {
+    min-width: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
+    flex: 1 1 0% !important; /* CRITICAL: Equal flex distribution */
+  }
 }
 
 .pricing-card:hover {
@@ -547,37 +586,58 @@
   }
 }
 
-/* FINE-TUNING: 800px - 850px range for perfect scaling */
+/* BULLETPROOF FINE-TUNING: 800px - 850px range for perfect scaling */
 @media (max-width: 850px) and (min-width: 800px) {
   .pricing-container {
-    gap: 16px;
-    padding: 45px 12px;
+    gap: 16px !important;
+    padding: 45px 12px !important;
   }
   
   .pricing-card {
-    padding: 28px 20px;
+    padding: 28px 20px !important;
+    min-width: 0 !important;
+    max-width: none !important;
   }
   
   .plan-header h3 {
-    font-size: 1.2rem;
+    font-size: 1.2rem !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
   }
   
   .price {
-    font-size: 1.8rem;
+    font-size: 1.8rem !important;
   }
   
   .plan-features li {
-    font-size: 0.8rem;
-    padding: 5px 0;
+    font-size: 0.8rem !important;
+    padding: 5px 0 !important;
+    word-wrap: break-word !important;
   }
   
   .btn-select, .btn-contact, .btn-current {
-    padding: 12px 16px;
-    font-size: 0.85rem;
+    padding: 12px 16px !important;
+    font-size: 0.85rem !important;
+    white-space: nowrap !important;
   }
   
   .plan-description {
-    font-size: 0.85rem;
+    font-size: 0.85rem !important;
+    word-wrap: break-word !important;
+  }
+  
+  /* BULLETPROOF TEXT SCALING */
+  .plan-features h4 {
+    font-size: 0.9rem !important;
+  }
+  
+  .period {
+    font-size: 0.85rem !important;
+  }
+  
+  .plan-icon {
+    width: 48px !important;
+    height: 48px !important;
   }
 }
 
@@ -746,5 +806,55 @@
     backface-visibility: visible !important;
     perspective: none !important;
     transform-style: flat !important;
+  }
+}
+
+/* ULTIMATE BULLETPROOF OVERRIDE - MAXIMUM PRIORITY */
+@media (min-width: 800px) {
+  /* Force 3-column layout with maximum specificity */
+  .pricing-page .pricing-container,
+  body .pricing-container,
+  div .pricing-container,
+  .pricing-container {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    grid-template-rows: auto !important;
+    gap: 16px !important;
+    width: 100% !important;
+    max-width: 1200px !important;
+  }
+  
+  /* Force card sizing with maximum specificity */
+  .pricing-page .pricing-card,
+  body .pricing-card,
+  div .pricing-card,
+  .pricing-card {
+    min-width: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
+    flex: 1 1 0% !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+  
+  /* Prevent any layout breaking */
+  .pricing-container > * {
+    min-width: 0 !important;
+    max-width: none !important;
+  }
+}
+
+/* NUCLEAR OPTION: Force layout for any screen above 800px */
+@media screen and (min-width: 800px) {
+  .pricing-container {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    grid-template-rows: auto !important;
+  }
+  
+  .pricing-card {
+    min-width: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
   }
 }

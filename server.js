@@ -1,5 +1,5 @@
 import express from 'express';
-import { S3Client, GetObjectCommand, PutObjectCommand, ListObjectsV2Command, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, PutObjectCommand, ListObjectsV2Command, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import cors from 'cors';
 import axios from 'axios';
 import fetch from 'node-fetch';
@@ -2030,28 +2030,72 @@ async function handlePostsEndpoint(req, res) {
         
         // 🔥 ROBUST PATTERN MATCHING: Handle both traditional and campaign ready posts if no explicit image_path
         if (!imageKey && file.Key.endsWith('.json')) {
-          // Pattern 1: Traditional format - ready_post_<ID>.json → image_<ID>.jpg
+          // Pattern 1: Traditional format - ready_post_<ID>.json → image_<ID>.[ext]
           if (file.Key.includes('ready_post_') && !file.Key.includes('campaign_ready_post_')) {
             const match = file.Key.match(/ready_post_(\d+)\.json$/);
             if (match) {
-              imageKey = `image_${match[1]}.jpg`;
+              // 🔥 FIX: Try multiple extensions to find the actual image file
+              const fileId = match[1];
+              const prefix = file.Key.replace(/[^\/]+$/, ''); // Get directory path
+              const extensions = ['jpg', 'jpeg', 'png', 'webp'];
+              
+              // Find the first existing image file with any of these extensions
+              for (const ext of extensions) {
+                const potentialKey = `${prefix}image_${fileId}.${ext}`;
+                try {
+                  const headCommand = new HeadObjectCommand({
+                    Bucket: 'tasks',
+                    Key: potentialKey
+                  });
+                  await s3Client.send(headCommand);
+                  imageKey = `image_${fileId}.${ext}`;
+                  if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [API-POSTS] Found image with extension .${ext}: ${imageKey}`);
+                  break;
+                } catch (error) {
+                  // Image doesn't exist with this extension, try next
+                  continue;
+                }
+              }
+              
+              // If no image found with any extension, fallback to jpg (for backward compatibility)
+              if (!imageKey) {
+                imageKey = `image_${fileId}.jpg`;
+                if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [API-POSTS] No image found, using fallback: ${imageKey}`);
+              }
             }
           }
-          // Pattern 2: Campaign format - campaign_ready_post_<ID>_<hash>.json → campaign_ready_post_<ID>_<hash>.jpg  
+          // Pattern 2: Campaign format - campaign_ready_post_<ID>_<hash>.json → campaign_ready_post_<ID>_<hash>.[ext]  
           else if (file.Key.includes('campaign_ready_post_')) {
             const campaignMatch = file.Key.match(/campaign_ready_post_(\d+_[a-f0-9]+)\.json$/);
             if (campaignMatch) {
-              // 🔥 ENHANCED: Try to find the actual image file extension by checking what exists in R2
+              // 🔥 FIX: Try multiple extensions to find the actual image file
               const campaignId = campaignMatch[1];
               const prefix = file.Key.replace(/[^\/]+$/, ''); // Get directory path
+              const extensions = ['jpg', 'jpeg', 'png', 'webp'];
               
-              // Try multiple extensions in priority order
-              const extensionPriority = ['jpg', 'jpeg', 'png', 'webp'];
-              let foundExtension = 'jpg'; // Default fallback
+              // Find the first existing image file with any of these extensions
+              for (const ext of extensions) {
+                const potentialKey = `${prefix}campaign_ready_post_${campaignId}.${ext}`;
+                try {
+                  const headCommand = new HeadObjectCommand({
+                    Bucket: 'tasks',
+                    Key: potentialKey
+                  });
+                  await s3Client.send(headCommand);
+                  imageKey = `campaign_ready_post_${campaignId}.${ext}`;
+                  if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [API-POSTS] Found campaign image with extension .${ext}: ${imageKey}`);
+                  break;
+                } catch (error) {
+                  // Image doesn't exist with this extension, try next
+                  continue;
+                }
+              }
               
-              // For performance, we'll use jpg as default since most images are JPEG
-              // The fix-image endpoint will handle extension detection dynamically
-              imageKey = `campaign_ready_post_${campaignId}.jpg`;
+              // If no image found with any extension, fallback to jpg (for backward compatibility)
+              if (!imageKey) {
+                imageKey = `campaign_ready_post_${campaignId}.jpg`;
+                if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [API-POSTS] No campaign image found, using fallback: ${imageKey}`);
+              }
             }
           }
         }
@@ -2143,18 +2187,71 @@ app.post('/api/save-edited-post/:username', upload.single('image'), async (req, 
     
     if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Processing save for postKey: ${postKey}`);
     
-    // Extract image key from post key
+    // Extract image key from post key with dynamic extension detection
     // Expected format: ready_post/instagram/username/ready_post_1749203937329.json or campaign_ready_post_1752000987874_9c14f1fd.json
     let imageKey = null;
+    const client = getS3Client();
+    
     if (postKey.includes('campaign_ready_post_') && postKey.endsWith('.json')) {
-      // Campaign pattern: campaign_ready_post_1752000987874_9c14f1fd.json -> image_1752000987874_9c14f1fd.jpg
+      // Campaign pattern: campaign_ready_post_1752000987874_9c14f1fd.json -> campaign_ready_post_1752000987874_9c14f1fd.[ext]
       const baseName = postKey.replace(/^.*\/([^\/]+)\.json$/, '$1');
-      imageKey = `${baseName}.jpg`;
+      const prefix = postKey.replace(/[^\/]+$/, ''); // Get directory path
+      const extensions = ['jpg', 'jpeg', 'png', 'webp'];
+      
+      // Find the first existing image file with any of these extensions
+      for (const ext of extensions) {
+        const potentialKey = `${prefix}${baseName}.${ext}`;
+        try {
+          const headCommand = new HeadObjectCommand({
+            Bucket: 'tasks',
+            Key: potentialKey
+          });
+          await client.send(headCommand);
+          imageKey = `${baseName}.${ext}`;
+          if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Found existing image with extension .${ext}: ${imageKey}`);
+          break;
+        } catch (error) {
+          // Image doesn't exist with this extension, try next
+          continue;
+        }
+      }
+      
+      // If no image found with any extension, fallback to jpg (for backward compatibility)
+      if (!imageKey) {
+        imageKey = `${baseName}.jpg`;
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] No existing image found, using fallback: ${imageKey}`);
+      }
     } else if (postKey.includes('ready_post_') && postKey.endsWith('.json')) {
-      // Traditional pattern: ready_post_1234567890.json -> image_1234567890.jpg
+      // Traditional pattern: ready_post_1234567890.json -> image_1234567890.[ext]
       const match = postKey.match(/ready_post_(\d+)\.json$/);
       if (match) {
-        imageKey = `image_${match[1]}.jpg`;
+        const fileId = match[1];
+        const prefix = postKey.replace(/[^\/]+$/, ''); // Get directory path
+        const extensions = ['jpg', 'jpeg', 'png', 'webp'];
+        
+        // Find the first existing image file with any of these extensions
+        for (const ext of extensions) {
+          const potentialKey = `${prefix}image_${fileId}.${ext}`;
+          try {
+            const headCommand = new HeadObjectCommand({
+              Bucket: 'tasks',
+              Key: potentialKey
+            });
+            await client.send(headCommand);
+            imageKey = `image_${fileId}.${ext}`;
+            if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Found existing image with extension .${ext}: ${imageKey}`);
+            break;
+          } catch (error) {
+            // Image doesn't exist with this extension, try next
+            continue;
+          }
+        }
+        
+        // If no image found with any extension, fallback to jpg (for backward compatibility)
+        if (!imageKey) {
+          imageKey = `image_${fileId}.jpg`;
+          if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] No existing image found, using fallback: ${imageKey}`);
+        }
       }
     }
     
@@ -2169,7 +2266,6 @@ app.post('/api/save-edited-post/:username', upload.single('image'), async (req, 
     
     // Save the edited image to R2 with the EXACT same name and location
     const imageR2Key = `ready_post/${platform}/${username}/${imageKey}`;
-    const client = getS3Client();
     
     if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Saving edited image to R2: ${imageR2Key}`);
     

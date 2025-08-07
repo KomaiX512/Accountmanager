@@ -71,6 +71,8 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
   // NEW: State for scroll position
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const [hasNewItemsAtBottom, setHasNewItemsAtBottom] = useState(false);
+  const [lastNotificationCount, setLastNotificationCount] = useState(0);
   
   // NEW: Reference for scrollable container
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -79,10 +81,21 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
   const handleScroll = () => {
     if (scrollContainerRef.current) {
       const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
-      const scrolledToBottom = scrollTop + clientHeight >= scrollHeight - 10; // 10px tolerance
       
-      setShowScrollTop(scrollTop > 200);
-      setShowScrollBottom(!scrolledToBottom && validNotifications.length > 5);
+      // Show scroll to top button when scrolled down
+      setShowScrollTop(scrollTop > 100);
+      
+      // Show scroll to bottom button when not at bottom
+      setShowScrollBottom(scrollTop + clientHeight < scrollHeight - 50);
+      
+      // ENHANCED: Detect if user is near bottom but not at the very end
+      const isNearBottom = scrollTop + clientHeight >= scrollHeight - 100;
+      const isAtBottom = scrollTop + clientHeight >= scrollHeight - 10;
+      
+      // If user is near bottom but not at the very end, and we have new items
+      if (isNearBottom && !isAtBottom && hasNewItemsAtBottom) {
+        setShowScrollBottom(true);
+      }
     }
   };
 
@@ -96,13 +109,33 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
     }
   };
 
-  // Scroll to bottom function - NEW: For better DM visibility
+
+
+  // ENHANCED SCROLL TO BOTTOM: Ensure perfect visibility of last item
   const scrollToBottom = () => {
     if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTo({
-        top: scrollContainerRef.current.scrollHeight,
-        behavior: 'smooth'
-      });
+      const container = scrollContainerRef.current;
+      const lastItem = container.lastElementChild as HTMLElement;
+      
+      if (lastItem) {
+        // Calculate position to show complete last item
+        const lastItemBottom = lastItem.offsetTop + lastItem.offsetHeight;
+        const containerBottom = container.offsetTop + container.offsetHeight;
+        
+        container.scrollTo({
+          top: Math.max(0, lastItemBottom - containerBottom + 30), // 30px padding
+          behavior: 'smooth'
+        });
+      } else {
+        // Fallback
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: 'smooth'
+        });
+      }
+      
+      // Clear the new items indicator
+      setHasNewItemsAtBottom(false);
     }
   };
 
@@ -149,26 +182,63 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
     });
   }, [notifications, platform]);
 
-  // Auto-scroll to bottom when new notifications arrive - NEW: Improved DM arrival detection
+  // Auto-scroll to bottom when new notifications arrive - ENHANCED: Improved DM arrival detection and visibility
   useEffect(() => {
     if (validNotifications.length > 0 && scrollContainerRef.current) {
+      // Check if we have new notifications
+      const hasNewNotifications = validNotifications.length > lastNotificationCount;
+      
+      if (hasNewNotifications) {
+        // Update the count
+        setLastNotificationCount(validNotifications.length);
+        
+        // Check if user is at bottom
+        const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+        const isAtBottom = scrollTop + clientHeight >= scrollHeight - 50;
+        
+        if (!isAtBottom) {
+          // User is not at bottom, set indicator for new items
+          setHasNewItemsAtBottom(true);
+        }
+      }
+      
       // Only auto-scroll if user is near the bottom
       const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
-      const scrolledToBottom = scrollTop + clientHeight >= scrollHeight - 100; // 100px tolerance
+      const scrolledToBottom = scrollTop + clientHeight >= scrollHeight - 150; // Increased tolerance for better detection
       
       if (scrolledToBottom) {
-        // Small delay to ensure DOM is updated
+        // Enhanced delay to ensure DOM is fully updated
         setTimeout(() => {
           if (scrollContainerRef.current) {
-            scrollContainerRef.current.scrollTo({
-              top: scrollContainerRef.current.scrollHeight,
-              behavior: 'smooth'
-            });
+            // ENHANCED SCROLL: Ensure last item is fully visible
+            const container = scrollContainerRef.current;
+            const lastItem = container.lastElementChild as HTMLElement;
+            
+            if (lastItem) {
+              // Scroll to show the complete last item
+              const lastItemBottom = lastItem.offsetTop + lastItem.offsetHeight;
+              const containerBottom = container.offsetTop + container.offsetHeight;
+              
+              // Ensure we scroll to show the complete last item with some padding
+              container.scrollTo({
+                top: Math.max(0, lastItemBottom - containerBottom + 30), // 30px padding
+                behavior: 'smooth'
+              });
+            } else {
+              // Fallback to scroll to bottom
+              container.scrollTo({
+                top: container.scrollHeight,
+                behavior: 'smooth'
+              });
+            }
+            
+            // Clear the new items indicator since we've scrolled to bottom
+            setHasNewItemsAtBottom(false);
           }
-        }, 100);
+        }, 150); // Increased delay for better DOM update
       }
     }
-  }, [validNotifications]);
+  }, [validNotifications, lastNotificationCount]);
 
   console.log(`[${new Date().toISOString()}] [${platform.toUpperCase()}] Dms_Comments render:`, {
     originalCount: notifications?.length || 0, validCount: validNotifications.length,
@@ -559,16 +629,21 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
         </div>
       )}
 
-      {/* Scroll to bottom button - NEW: For better DM visibility */}
+      {/* Scroll to bottom button - ENHANCED: For perfect DM visibility */}
       {showScrollBottom && validNotifications.length > 5 && (
         <button 
-          className="scroll-to-bottom-btn"
+          className={`scroll-to-bottom-btn ${hasNewItemsAtBottom ? 'has-new-items' : ''}`}
           onClick={scrollToBottom}
-          title="Scroll to bottom for new DMs"
+          title={hasNewItemsAtBottom ? "New DMs available - Click to view" : "Scroll to bottom for new DMs"}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
+          {hasNewItemsAtBottom && (
+            <div className="new-items-indicator">
+              <span className="new-items-dot"></span>
+            </div>
+          )}
         </button>
       )}
       

@@ -2239,27 +2239,22 @@ app.get(['/posts/:username', '/api/posts/:username'], async (req, res) => {
   try {
     const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
     const forceRefresh = req.query.forceRefresh === 'true';
+    const isRealTime = req.query.realtime || req.query.nocache;
     
     // Create platform-specific prefix using centralized schema manager
     const prefix = PlatformSchemaManager.buildPath('ready_post', platform, username);
 
-    const now = Date.now();
-    const lastFetch = cacheTimestamps.get(prefix) || 0;
-
-    if (!forceRefresh && cache.has(prefix)) {
-      // Reduce repetitive posts cache hit logging
-    const postsLogKey = `lastPostsCacheLog_${prefix}`;
-    const lastPostsLogTime = global[postsLogKey] || 0;
-    if (Date.now() - lastPostsLogTime > 300000) { // Log every 5 minutes per prefix
-      console.log(`Cache hit for ${platform} posts: ${prefix}`);
-      global[postsLogKey] = Date.now();
-    }
-      return res.json(cache.get(prefix));
-    }
-
-    if (!forceRefresh && now - lastFetch < THROTTLE_INTERVAL) {
-      console.log(`Throttled fetch for ${platform} posts: ${prefix}`);
-      return res.json(cache.has(prefix) ? cache.get(prefix) : []);
+    // 🔥 FIX: Remove posts cache to ensure fresh data on refresh
+    // The posts cache was preventing refresh from working properly
+    // Now every request will fetch fresh data from R2
+    
+    // Set real-time headers if requested
+    if (isRealTime) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('X-Real-Time', 'true');
+      console.log(`[${new Date().toISOString()}] [API-POSTS] REAL-TIME mode activated for ${username}`);
     }
 
     console.log(`Fetching ${platform} posts from R2 for prefix: ${prefix}/`);
@@ -2398,9 +2393,8 @@ app.get(['/posts/:username', '/api/posts/:username'], async (req, res) => {
     // Filter out null results from skipped posts
     const validPosts = posts.filter(post => post !== null);
 
-    cache.set(prefix, validPosts);
-    cacheTimestamps.set(prefix, now);
-    console.log(`[${new Date().toISOString()}] Returning ${validPosts.length} valid posts for ${username}`);
+    // 🔥 FIX: Don't cache posts to ensure fresh data on every request
+    console.log(`[${new Date().toISOString()}] Returning ${validPosts.length} fresh posts for ${username} (no cache)`);
     res.json(validPosts);
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Retrieve posts error for ${username}:`, error);
@@ -9342,34 +9336,60 @@ function startFacebookScheduler() {
           
           const scheduledTime = new Date(scheduledPost.scheduleDate || scheduledPost.scheduledTime);
           
+          // 🚫 CRITICAL FIX: Skip posts already being processed
+          if (scheduledPost.status === 'processing') {
+            // Check if processing has been stuck for too long (5 minutes)
+            if (scheduledPost.processing_started_at) {
+              const processingStart = new Date(scheduledPost.processing_started_at);
+              const processingDuration = now.getTime() - processingStart.getTime();
+              const maxProcessingTime = 5 * 60 * 1000; // 5 minutes
+              
+              if (processingDuration > maxProcessingTime) {
+                console.log(`[${new Date().toISOString()}] Facebook post ${scheduledPost.id} stuck in processing for ${Math.round(processingDuration/1000)}s, resetting to scheduled`);
+                scheduledPost.status = 'scheduled';
+                delete scheduledPost.processing_started_at;
+                
+                await s3Client.send(new PutObjectCommand({
+                  Bucket: 'tasks',
+                  Key: file.Key,
+                  Body: JSON.stringify(scheduledPost, null, 2),
+                  ContentType: 'application/json',
+                }));
+              } else {
+                console.log(`[${new Date().toISOString()}] Facebook post ${scheduledPost.id} being processed for ${Math.round(processingDuration/1000)}s, skipping`);
+                continue;
+              }
+            } else {
+              console.log(`[${new Date().toISOString()}] Facebook post ${scheduledPost.id} already being processed, skipping`);
+              continue;
+            }
+          }
+          
           // Check if post is due (within 1 minute tolerance)
           if (scheduledTime <= now && (scheduledPost.status === 'pending' || scheduledPost.status === 'scheduled')) {
             console.log(`[${new Date().toISOString()}] Processing due Facebook post: ${scheduledPost.id}`);
 
-              // ---- BULLETPROOF DEDUPLICATION ----
-              // Immediately mark the schedule as processing so no other worker can pick it up.
-              const scheduleKey = file.Key;
-              if (scheduledPost.status !== 'scheduled' && scheduledPost.status !== 'pending') {
-                // Another worker already grabbed it after our first check
-                console.log(`[${new Date().toISOString()}] Skipping ${scheduledPost.id} – status changed to ${scheduledPost.status}`);
-                continue;
-              }
+            // 🚫 CRITICAL FIX: Atomic locking to prevent duplicate processing
+            try {
+              // Immediately mark as processing to prevent race conditions
               scheduledPost.status = 'processing';
               scheduledPost.processing_started_at = new Date().toISOString();
-              try {
-                await s3Client.putObject({
-                  Bucket: 'tasks',
-                  Key: scheduleKey,
-                  Body: JSON.stringify(scheduledPost, null, 2),
-                  ContentType: 'application/json',
-                  CacheControl: 'no-cache'
-                }).promise();
-                console.log(`[${new Date().toISOString()}] Locked ${scheduledPost.id} with status=processing`);
-              } catch (lockErr) {
-                console.error(`[${new Date().toISOString()}] Failed to lock schedule ${scheduledPost.id}:`, lockErr.message);
-                continue; // Skip processing to avoid duplicates
-              }
-              // ---- END DEDUPLICATION ----
+              
+              // Atomic update - if this fails, another worker already grabbed it
+              await s3Client.send(new PutObjectCommand({
+                Bucket: 'tasks',
+                Key: file.Key,
+                Body: JSON.stringify(scheduledPost, null, 2),
+                ContentType: 'application/json',
+              }));
+              
+              console.log(`[${new Date().toISOString()}] ✅ Locked Facebook post ${scheduledPost.id} for processing`);
+              
+            } catch (lockError) {
+              // Another worker already grabbed this post
+              console.log(`[${new Date().toISOString()}] ⚠️ Facebook post ${scheduledPost.id} already being processed by another worker`);
+              continue;
+            }
             
             try {
               // Get Facebook access token
@@ -9490,7 +9510,7 @@ function startFacebookScheduler() {
                   console.log(`[${new Date().toISOString()}] Facebook text post published successfully: ${postResponse.data.id}`);
                 }
                 
-                // Store the post ID for tracking
+                                // Store the post ID for tracking
                 scheduledPost.facebook_post_id = postResponse.data.id;
               }
 

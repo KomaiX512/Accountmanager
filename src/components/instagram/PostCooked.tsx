@@ -1362,22 +1362,53 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   const handleRefreshPosts = useCallback(async () => {
     if (!username || isRefreshing) return;
     
+    console.log(`[PostCooked] 🔄 Starting manual refresh for ${username} on ${platform}`);
     setIsRefreshing(true);
+    
+    // 🔥 ENHANCED: Temporarily disable background refresh to prevent interference
+    const wasBackgroundRefreshEnabled = !isRefreshing;
+    
     try {
-      const response = await axios.get(`${API_BASE_URL}/posts/${username}?platform=${platform}&nocache=${Date.now()}`, {
+      // 🔥 ENHANCED: Force fresh data with multiple cache-busting parameters
+      const timestamp = Date.now();
+      const randomBust = Math.random().toString(36).substr(2, 9);
+      const refreshUrl = `${API_BASE_URL}/posts/${username}?platform=${platform}&nocache=${timestamp}&forceRefresh=true&t=${timestamp}&v=${randomBust}&realtime=true`;
+      
+      console.log(`[PostCooked] 📡 Fetching fresh posts from: ${refreshUrl}`);
+      
+      const response = await axios.get(refreshUrl, {
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache'
+          'Pragma': 'no-cache',
+          'X-Force-Refresh': 'true'
         },
-        timeout: 10000
+        timeout: 15000 // Increased timeout for reliability
       });
       
+      console.log(`[PostCooked] 📦 Received ${response.data.length} fresh posts`);
+      
+      // Clear all caches and force fresh data
       setLocalPosts(response.data);
       setImageErrors({});
-      setImageRefreshKey(prev => prev + 1);
-      console.log(`[PostCooked] ✅ Manually refreshed ${response.data.length} posts`);
+      setImageRefreshKey(timestamp); // Use timestamp for unique refresh
+      
+      // Clear any request cache for this user to ensure fresh data
+      if (requestCache.current) {
+        const keysToDelete = Array.from(requestCache.current.keys()).filter(key => 
+          key.includes(username) || key.includes(platform) || key.includes('posts') || key.includes('check_posts')
+        );
+        keysToDelete.forEach(key => {
+          requestCache.current.delete(key);
+          console.log(`[PostCooked] 🗑️ Cleared request cache: ${key}`);
+        });
+      }
+      
+      console.log(`[PostCooked] ✅ Successfully refreshed ${response.data.length} posts with fresh data`);
+      setToastMessage(`✅ Refreshed ${response.data.length} posts with fresh data!`);
+      
     } catch (error: any) {
-      console.error('[PostCooked] Error refreshing posts:', error);
+      console.error('[PostCooked] ❌ Error refreshing posts:', error);
+      setToastMessage(`❌ Refresh failed: ${error.message}`);
     } finally {
       setIsRefreshing(false);
     }

@@ -45,6 +45,7 @@ import { safeFilter, safeMap, safeLength } from '../../utils/safeArrayUtils';
 import useDashboardRefresh from '../../hooks/useDashboardRefresh';
 import useResetPlatformState from '../../hooks/useResetPlatformState';
 import AutopilotPopup from '../common/AutopilotPopup';
+import CacheManager, { appendBypassParam } from '../../utils/cacheManager';
 
 // Define RagService compatible ChatMessage
 interface RagChatMessage {
@@ -152,6 +153,45 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   // ✅ ADDED: Track auto-replied notifications to prevent redundancy
   const [autoRepliedNotifications, setAutoRepliedNotifications] = useState<Set<string>>(new Set());
 
+  // 🍎 Mobile profile menu state
+  const [isMobileProfileMenuOpen, setIsMobileProfileMenuOpen] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 60, right: 10 });
+
+  // 🍎 Mobile expandable modules state
+  const [expandedModules, setExpandedModules] = useState<{
+    notifications: boolean;
+    postCooked: boolean;
+    strategies: boolean;
+    competitorAnalysis: boolean;
+    news4u: boolean;
+  }>({
+    notifications: false,
+    postCooked: false,
+    strategies: false,
+    competitorAnalysis: false,
+    news4u: false
+  });
+
+  // 🍎 Mobile module click handler for expandable modules
+  const handleMobileModuleClick = (moduleKey: keyof typeof expandedModules, e: React.MouseEvent) => {
+    // Only handle clicks on mobile (portrait mode)
+    if (window.innerWidth > 767 || window.innerHeight < window.innerWidth) return;
+    
+    // Check if click is in the header area (top 60px of module)
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const clickY = e.clientY - rect.top;
+    
+    if (clickY <= 60) {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      setExpandedModules(prev => ({
+        ...prev,
+        [moduleKey]: !prev[moduleKey]
+      }));
+    }
+  };
+
   // ALL REF HOOKS
   const firstLoadRef = useRef(true);
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -190,27 +230,26 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       return;
     }
     try {
-      console.log(`[PlatformDashboard] ⚡ Fetching fresh data for ${platform}`);
-      const timestamp = Date.now();
-      const platformParam = `?platform=${platform}&forceRefresh=true&t=${timestamp}`;
+      console.log(`[PlatformDashboard] ⚡ Fetching data efficiently for ${platform}`);
+      const platformParam = `?platform=${platform}`;
       
       const [responsesData, strategiesData, postsData, competitorData] = await Promise.all([
-        axios.get(`/api/responses/${accountHolder}${platformParam}`).catch(err => {
+        axios.get(appendBypassParam(`/api/responses/${accountHolder}${platformParam}`, platform, accountHolder, 'responses')).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        axios.get(getApiUrl(`/${accountType === 'branding' ? 'retrieve-strategies' : 'retrieve-engagement-strategies'}/${accountHolder}${platformParam}`)).catch(err => {
+        axios.get(appendBypassParam(getApiUrl(`/${accountType === 'branding' ? 'retrieve-strategies' : 'retrieve-engagement-strategies'}/${accountHolder}${platformParam}`), platform, accountHolder, 'strategies')).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        axios.get(`/api/posts/${accountHolder}${platformParam}`).catch(err => {
+        axios.get(appendBypassParam(`/api/posts/${accountHolder}${platformParam}`, platform, accountHolder, 'posts')).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
         // Always fetch competitor data for both account types
         Promise.all(
           competitors.map(comp =>
-            axios.get(getApiUrl(`/retrieve/${accountHolder}/${comp}${platformParam}`)).catch(err => {
+            axios.get(appendBypassParam(getApiUrl(`/retrieve/${accountHolder}/${comp}${platformParam}`), platform, accountHolder, 'competitor')).catch(err => {
               if (err.response?.status === 404) {
                 console.warn(`No ${platform} competitor data found for ${comp}`);
                 return { data: [] };
@@ -246,19 +285,18 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       console.log(`[PlatformDashboard] ⚡ Fetching profile info for ${platform}`);
       
       // 🎯 CRITICAL FIX: Try different endpoints for different platforms to handle R2 bucket structure
-      const timestamp = Date.now();
       let response;
       let profileData = null;
       
       if (platform === 'instagram') {
         // Instagram works with the original endpoint (no platform param needed)
-        response = await axios.get(`/api/profile-info/${accountHolder}?forceRefresh=true&t=${timestamp}`);
+        response = await axios.get(appendBypassParam(`/api/profile-info/${accountHolder}`, platform, accountHolder, 'profile'));
         profileData = response.data;
         } else {
         // Twitter and Facebook need platform-specific path handling
         try {
-          const platformParam = `?platform=${platform}&forceRefresh=true&t=${timestamp}`;
-          response = await axios.get(`/api/profile-info/${accountHolder}${platformParam}`);
+          const platformParam = `?platform=${platform}`;
+          response = await axios.get(appendBypassParam(`/api/profile-info/${accountHolder}${platformParam}`, platform, accountHolder, 'profile'));
           const rawData = response.data;
           // Map Twitter raw fields to unified profileData format
           if (platform === 'twitter' && rawData && rawData.username) {
@@ -2509,24 +2547,211 @@ Image Description: ${response.post.image_prompt}
                         <span>Campaign</span>
                       </button>
                     )}
+                    
+                    {/* ✨ MOBILE PROFILE MENU BUTTON */}
+                    <button
+                      className="mobile-profile-menu"
+                      onClick={() => {
+                        console.log('Hamburger button clicked, current state:', isMobileProfileMenuOpen);
+                        setIsMobileProfileMenuOpen(!isMobileProfileMenuOpen);
+                      }}
+                    >
+                      ☰
+                    </button>
                   </div>
                 </div>
-                <div className="chart-placeholder"></div>
-              </div>
+              <div className="chart-placeholder"></div>
             </div>
+          </div>
 
-              <div className="news4u">
+          {/* ✨ MOBILE PROFILE DROPDOWN - RENDERED OUTSIDE CONTAINER */}
+          {isMobileProfileMenuOpen && (
+            <div className="mobile-profile-dropdown" style={{ position: 'fixed', top: dropdownPosition.top, right: dropdownPosition.right }}>
+              {/* ✨ PLATFORM-SPECIFIC CONNECT BUTTON INSIDE DROPDOWN */}
+              <div className="mobile-connect-wrapper">
+                {platform === 'instagram' ? (
+                  <InstagramConnect onConnected={handleInstagramConnected} />
+                ) : platform === 'twitter' ? (
+                  <TwitterConnect onConnected={handleTwitterConnected} />
+                ) : platform === 'facebook' ? (
+                  <FacebookConnect onConnected={handleFacebookConnected} />
+                ) : null}
+              </div>
+              
+              {/* Platform-specific buttons */}
+              {platform === 'instagram' ? (
+                <>
+                  <InstagramRequiredButton
+                    isConnected={isConnected}
+                    onClick={() => {
+                      console.log('Mobile Insights clicked');
+                      handleOpenInsights();
+                      setIsMobileProfileMenuOpen(false);
+                    }}
+                    bypassConnectionRequirement={true}
+                    className="dashboard-btn insights-btn"
+                  >
+                    <FaChartLine className="btn-icon" />
+                    <span>Insights</span>
+                  </InstagramRequiredButton>
+                  
+                  <InstagramRequiredButton
+                    isConnected={isConnected}
+                    onClick={() => {
+                      console.log('Mobile Schedule clicked');
+                      handleOpenScheduler();
+                      setIsMobileProfileMenuOpen(false);
+                    }}
+                    className="dashboard-btn schedule-btn"
+                  >
+                    <FaCalendarAlt className="btn-icon" />
+                    <span>Schedule</span>
+                  </InstagramRequiredButton>
+                </>
+              ) : platform === 'twitter' ? (
+                <>
+                  <TwitterRequiredButton
+                    isConnected={isTwitterConnected}
+                    onClick={() => {
+                      console.log('Mobile Compose clicked');
+                      handleOpenTwitterCompose();
+                      setIsMobileProfileMenuOpen(false);
+                    }}
+                    className="dashboard-btn compose-btn twitter"
+                  >
+                    <FaPen className="btn-icon" />
+                    <span>Compose</span>
+                  </TwitterRequiredButton>
+                  
+                  <TwitterRequiredButton
+                    isConnected={isTwitterConnected}
+                    onClick={() => {
+                      console.log('Mobile Insights clicked');
+                      handleOpenTwitterInsights();
+                      setIsMobileProfileMenuOpen(false);
+                    }}
+                    bypassConnectionRequirement={true}
+                    className="dashboard-btn insights-btn twitter"
+                  >
+                    <FaChartLine className="btn-icon" />
+                    <span>Insights</span>
+                  </TwitterRequiredButton>
+                </>
+              ) : platform === 'facebook' ? (
+                <>
+                  <FacebookRequiredButton
+                    isConnected={isConnected}
+                    onClick={() => {
+                      console.log('Mobile Insights clicked');
+                      handleOpenFacebookInsights();
+                      setIsMobileProfileMenuOpen(false);
+                    }}
+                    bypassConnectionRequirement={true}
+                    className="dashboard-btn insights-btn facebook"
+                  >
+                    <FaChartLine className="btn-icon" />
+                    <span>Insights</span>
+                  </FacebookRequiredButton>
+                  
+                  <FacebookRequiredButton
+                    isConnected={isConnected}
+                    onClick={() => {
+                      console.log('Mobile Schedule clicked');
+                      handleOpenFacebookScheduler();
+                      setIsMobileProfileMenuOpen(false);
+                    }}
+                    className="dashboard-btn schedule-btn facebook"
+                  >
+                    <FaCalendarAlt className="btn-icon" />
+                    <span>Schedule</span>
+                  </FacebookRequiredButton>
+                </>
+              ) : null}
+              
+              <button
+                onClick={() => {
+                  console.log('Mobile Goal clicked');
+                  handleOpenGoalModal();
+                  setIsMobileProfileMenuOpen(false);
+                }}
+                className={`dashboard-btn goal-btn ${platform}`}
+              >
+                <TbTargetArrow className="btn-icon" />
+                <span>Goal</span>
+              </button>
+              
+              <button
+                onClick={() => {
+                  console.log('Mobile Reset clicked');
+                  handleOpenResetConfirm();
+                  setIsMobileProfileMenuOpen(false);
+                }}
+                className={`dashboard-btn reset-btn ${platform}`}
+                disabled={isResetting}
+              >
+                <FaUndo className="btn-icon" />
+                <span>{isResetting ? 'Resetting...' : 'Reset'}</span>
+              </button>
+              
+              {/* 🚀 AUTOPILOT: Mobile autopilot button */}
+              <button
+                onClick={() => {
+                  console.log('Mobile Autopilot clicked');
+                  handleOpenAutopilotPopup();
+                  setIsMobileProfileMenuOpen(false);
+                }}
+                className={`dashboard-btn autopilot-btn ${platform}`}
+                title="Autopilot Mode - Automate your dashboard"
+              >
+                <FaRobot className="btn-icon" />
+                <span>Autopilot</span>
+              </button>
+              
+              {showCampaignButton && (
+                <button
+                  onClick={() => {
+                    console.log('Mobile Campaign clicked');
+                    handleOpenCampaignModal();
+                    setIsMobileProfileMenuOpen(false);
+                  }}
+                  className="dashboard-btn campaign-btn"
+                >
+                  <FaBullhorn className="btn-icon" />
+                  <span>Campaign</span>
+                </button>
+              )}
+            </div>
+          )}
+
+              <div 
+                className={`news4u ${expandedModules.news4u ? 'mobile-expanded' : ''}`}
+                onClick={(e) => handleMobileModuleClick('news4u', e)}
+              >
                 <h2>
                   <div className="section-header">
                     <FaRss className="section-icon" />
                     <span>News 4U</span>
+                    <div className="content-badge premium">
+                      <span className="badge-text">Premium</span>
+                    </div>
                   </div>
                 </h2>
                 <News4U accountHolder={accountHolder} platform={platform} />
               </div>
 
             {config.supportsNotifications && (
-              <div className="notifications">
+              <div 
+                className={`notifications ${expandedModules.notifications ? 'mobile-expanded' : ''}`}
+                onClick={(e) => handleMobileModuleClick('notifications', e)}
+              >
+                <h2 style={{ marginBottom: '8px' }}>
+                  <div className="section-header">
+                    <span><i className="fas fa-bell"></i> Notifications</span>
+                    <div className="content-badge premium">
+                      <span className="badge-text">Premium</span>
+                    </div>
+                  </div>
+                </h2>
                 <DmsComments 
                   notifications={notifications} 
                   onReply={handleReply} 
@@ -2569,7 +2794,10 @@ Image Description: ${response.post.image_prompt}
               />
             </div>
 
-            <div className="strategies">
+            <div 
+              className={`strategies ${expandedModules.strategies ? 'mobile-expanded' : ''}`}
+              onClick={(e) => handleMobileModuleClick('strategies', e)}
+            >
               <h2>
                 <div className="section-header">
                   <BsLightbulb className="section-icon" />
@@ -2590,7 +2818,10 @@ Image Description: ${response.post.image_prompt}
               <OurStrategies accountHolder={accountHolder} accountType={accountType} platform={platform} />
             </div>
 
-            <div className="competitor-analysis">
+            <div 
+              className={`competitor-analysis ${expandedModules.competitorAnalysis ? 'mobile-expanded' : ''}`}
+              onClick={(e) => handleMobileModuleClick('competitorAnalysis', e)}
+            >
               {/* Always show competitor analysis for both account types */}
               <h2>
                 <div className="section-header">

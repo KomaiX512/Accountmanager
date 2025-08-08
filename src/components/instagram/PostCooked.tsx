@@ -18,6 +18,7 @@ import { BsLightbulb } from 'react-icons/bs';
 import { FaBell, FaPalette, FaDownload } from 'react-icons/fa';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
 import { getApiUrl } from '../../config/api';
+import CacheManager from '../../utils/cacheManager';
 // Missing modules - comment out until they're available
 
 
@@ -178,8 +179,9 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   });
 
   const [viewedPosts, setViewedPosts] = useState<Set<string>>(() => {
-    const stored = localStorage.getItem(getViewedStorageKey());
-    return stored ? new Set(JSON.parse(stored)) : new Set();
+    const cacheKey = getViewedStorageKey();
+    const cachedData = CacheManager.getCacheData<string[]>(cacheKey, platform, username, 'posts');
+    return cachedData ? new Set(cachedData) : new Set();
   });
 
   // ✨ BULLETPROOF: Function to mark posts as permanently processed
@@ -251,7 +253,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   const markPostsAsViewed = () => {
     const newViewedPosts = new Set(localPosts.map(p => p.key));
     setViewedPosts(newViewedPosts);
-    localStorage.setItem(getViewedStorageKey(), JSON.stringify(Array.from(newViewedPosts)));
+    CacheManager.setCacheData(getViewedStorageKey(), Array.from(newViewedPosts), platform, username, 'posts');
   };
 
   // Auto-mark posts as viewed when container is in view
@@ -2216,32 +2218,32 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                 <span className="badge-text">Viewed</span>
               </div>
             )}
-            <button 
-              className="refresh-button minimal-refresh"
-              onClick={handleRefreshPosts}
-              disabled={isRefreshing}
-              aria-label="Refresh posts"
-            >
-              {isRefreshing ? (
-                <div className="refresh-spinner"></div>
-              ) : (
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="22"
-                  height="22"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="refresh-icon"
-                >
-                  <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
-                </svg>
-              )}
-            </button>
           </div>
+          <button 
+            className="refresh-button minimal-refresh"
+            onClick={handleRefreshPosts}
+            disabled={isRefreshing}
+            aria-label="Refresh posts"
+          >
+            {isRefreshing ? (
+              <div className="refresh-spinner"></div>
+            ) : (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="refresh-icon"
+              >
+                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+              </svg>
+            )}
+          </button>
         </div>
         <div className="auto-schedule-row">
           {platform === 'twitter' ? (

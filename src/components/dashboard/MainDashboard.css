@@ -1688,7 +1688,7 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
   /* Platform Grid - 2x2 Layout for Mobile */
   .platforms-container {
     grid-template-columns: repeat(2, 1fr);
-    gap: clamp(0.4rem, 1vw, 0.8rem);
+    gap: clamp(0.3rem, 0.8vw, 0.6rem);
     margin-bottom: clamp(1rem, 2.5vw, 1.5rem);
   }
   
@@ -1700,7 +1700,7 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
   
   .platform-row {
     aspect-ratio: 1;
-    padding: clamp(0.4rem, 1vw, 0.8rem);
+    padding: clamp(0.3rem, 0.8vw, 0.6rem);
     /* COMPLETELY STATIC - NO TRANSITIONS OR ANIMATIONS */
     transition: none !important;
     animation: none !important;
@@ -1711,7 +1711,7 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
     transition-duration: 0s !important;
     transition-delay: 0s !important;
     transition-timing-function: none !important;
-    gap: clamp(0.2rem, 0.5vw, 0.6rem);
+    gap: clamp(0.15rem, 0.4vw, 0.4rem);
   }
   
   .platform-info {
@@ -1753,13 +1753,14 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
   /* Usage Overview - 2x2 Grid for Mobile - COMPACT CARDS */
   .usage-container .usage-stats {
     grid-template-columns: repeat(2, 1fr);
-    gap: clamp(0.6rem, 1.5vw, 1rem);
+    gap: clamp(0.6rem, 1.5vw, 0.8rem);
   }
 
   .usage-container .usage-stat {
-    padding: clamp(0.8rem, 2vw, 1.2rem);
+    padding: clamp(0.6rem, 1.5vw, 0.8rem);
     transform: none; /* Remove 3D transform on mobile */
     min-height: auto; /* Remove fixed height for better mobile fit */
+    border-radius: clamp(8px, 2vw, 12px);
   }
 
   .usage-container .usage-stat:hover {
@@ -1790,12 +1791,13 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
   /* Platform Usage Stats - Horizontal Layout for Mobile */
   .platform-usage-stats .usage-stats {
     grid-template-columns: repeat(2, 1fr);
-    gap: clamp(0.8rem, 2vw, 1rem);
+    gap: clamp(0.6rem, 1.5vw, 0.8rem);
   }
 
   .platform-usage-stats .usage-stat {
-    padding: clamp(0.8rem, 2vw, 1rem);
+    padding: clamp(0.6rem, 1.5vw, 0.8rem);
     transform: none; /* Remove 3D transform on mobile */
+    min-height: auto; /* Allow flexible height */
   }
 
   .platform-usage-stats .usage-stat:hover {
@@ -1999,12 +2001,13 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
   /* Usage Overview - 2x2 Grid for Ultra-small screens - COMPACT */
   .usage-container .usage-stats {
     grid-template-columns: repeat(2, 1fr);
-    gap: clamp(0.5rem, 1.2vw, 0.8rem);
+    gap: clamp(0.4rem, 1vw, 0.6rem);
   }
 
   .usage-container .usage-stat {
-    padding: clamp(0.6rem, 1.5vw, 1rem);
+    padding: clamp(0.5rem, 1.2vw, 0.8rem);
     min-height: auto;
+    border-radius: clamp(6px, 1.5vw, 10px);
   }
 
   .usage-container .stat-icon {
@@ -2031,11 +2034,11 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
   /* Platform Usage Stats - Horizontal Layout for Ultra-small screens */
   .platform-usage-stats .usage-stats {
     grid-template-columns: repeat(2, 1fr);
-    gap: clamp(0.6rem, 1.5vw, 1rem);
+    gap: clamp(0.5rem, 1.2vw, 0.7rem);
   }
 
   .platform-usage-stats .usage-stat {
-    padding: clamp(0.6rem, 1.5vw, 1rem);
+    padding: clamp(0.5rem, 1.2vw, 0.7rem);
   }
 
   .platform-usage-stats .stat-icon {
@@ -2218,8 +2221,9 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
   }
 
   .usage-container .usage-stat {
-    padding: clamp(0.5rem, 1.2vw, 0.8rem);
+    padding: clamp(0.4rem, 1vw, 0.6rem);
     min-height: auto;
+    border-radius: clamp(6px, 1.5vw, 8px);
   }
 
   .usage-container .stat-icon {
@@ -2250,7 +2254,7 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
   }
 
   .platform-usage-stats .usage-stat {
-    padding: clamp(0.5rem, 1.2vw, 0.8rem);
+    padding: clamp(0.4rem, 1vw, 0.6rem);
   }
 
   .platform-usage-stats .stat-icon {

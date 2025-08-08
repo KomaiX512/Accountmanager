@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import CacheManager from '../utils/cacheManager';
 
 interface FetchState<T> {
   data: T | null;
@@ -32,8 +33,18 @@ const useR2Fetch = <T>(url: string, expectedPlatform?: string): FetchState<T> =>
       }
       
       try {
-        console.log(`[useR2Fetch] ✅ Fetching: ${url}`);
-        const response = await axios.get(url);
+        // Apply 12h global bypass at hook level if caller didn't already append
+        let finalUrl = url;
+        try {
+          const accountMatch = url.match(/\/api\/(?:retrieve|profile-info|posts|responses|news-for-you|retrieve-multiple|retrieve-strategies|retrieve-engagement-strategies)\/([^/?&]+)/);
+          const accountHolder = accountMatch ? decodeURIComponent(accountMatch[1]) : undefined;
+          if (expectedPlatform && accountHolder) {
+            finalUrl = CacheManager.appendBypassParam(url, expectedPlatform, accountHolder);
+          }
+        } catch {}
+
+        console.log(`[useR2Fetch] ✅ Fetching: ${finalUrl}`);
+        const response = await axios.get(finalUrl);
         setState({ data: response.data, loading: false, error: null });
       } catch (error: any) {
         console.error(`Error fetching from ${url}:`, error);

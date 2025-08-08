@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 
 // Facebook OAuth configuration from environment or defaults
 const FB_APP_ID = process.env.REACT_APP_FACEBOOK_APP_ID || '581584257679639';
-const FB_REDIRECT_URI = process.env.REACT_APP_FACEBOOK_REDIRECT_URI || 'https:/www.sentientm.com/facebook/callback';
+const FB_REDIRECT_URI = process.env.REACT_APP_FACEBOOK_REDIRECT_URI || 'https://www.sentientm.com/facebook/callback';
 const FB_API_VERSION = process.env.REACT_APP_FACEBOOK_API_VERSION || 'v17.0';
 
 /**

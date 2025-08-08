@@ -157,6 +157,27 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     competitorAnalysis: false,
     news4u: false
   });
+
+  // 🍎 Mobile module click handler for expandable modules
+  const handleMobileModuleClick = (moduleKey: keyof typeof expandedModules, e: React.MouseEvent) => {
+    // Only handle clicks on mobile (portrait mode)
+    if (window.innerWidth > 767 || window.innerHeight < window.innerWidth) return;
+    
+    // Check if click is in the header area (top 60px of module)
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const clickY = e.clientY - rect.top;
+    
+    if (clickY <= 60) {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      setExpandedModules(prev => ({
+        ...prev,
+        [moduleKey]: !prev[moduleKey]
+      }));
+    }
+  };
+
   const [refreshKey, setRefreshKey] = useState(0);
   const [autoReplyProgress, setAutoReplyProgress] = useState<{ 
     current: number;
@@ -306,7 +327,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
       // 🔥 CRITICAL FIX: Only throttle profile picture fetching, not the entire profile data
       // This ensures we always fetch follower counts and other profile data
       console.log(`[${new Date().toISOString()}] Fetching Instagram profile info for ${accountHolder}`);
-      const response = await axios.get(`/api/profile-info/${accountHolder}?forceRefresh=true&t=${new Date().getTime()}`);
+      const response = await axios.get(`/api/profile-info/${accountHolder}?forceRefresh=true`);
       
       // 🎯 CRITICAL DEBUG: Log the exact response to understand data structure
       console.log(`[${new Date().toISOString()}] Profile Info Response:`, response.data);
@@ -348,7 +369,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     if (!accountHolder) return;
     
     try {
-      const response = await axios.get(`/api/profile-info/${accountHolder}?forceRefresh=true&t=${new Date().getTime()}`);
+      const response = await axios.get(`/api/profile-info/${accountHolder}`);
       const userId = response.data?.id;
       if (userId && !igBusinessId) {
         if (!isInstagramConnected) {
@@ -375,14 +396,14 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     }
   };
 
-  const fetchNotifications = async (userId: string, forceRefresh = false, attempt = 1, maxAttempts = 3) => {
+  const fetchNotifications = async (userId: string, attempt = 1, maxAttempts = 3) => {
     if (!userId) return;
     
     console.log(`[${new Date().toISOString()}] Fetching notifications for ${userId} (attempt ${attempt}/${maxAttempts})`);
     
     try {
       // Fetch notifications
-      const response = await fetch(`/events-list/${userId}?platform=instagram&forceRefresh=${forceRefresh}&t=${new Date().getTime()}`);
+      const response = await fetch(`/events-list/${userId}?platform=instagram`);
       if (!response.ok) {
         throw new Error(`Failed to fetch notifications: ${response.status} ${response.statusText}`);
       }
@@ -429,7 +450,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
       console.error(`[${new Date().toISOString()}] Error fetching notifications (attempt ${attempt}/${maxAttempts}):`, error);
       if (attempt < maxAttempts) {
         // Retry after a delay
-        setTimeout(() => fetchNotifications(userId, forceRefresh, attempt + 1, maxAttempts), 2000);
+        setTimeout(() => fetchNotifications(userId, attempt + 1, maxAttempts), 2000);
       }
     }
   };
@@ -932,14 +953,14 @@ Image Description: ${response.post.image_prompt}
         console.error(`[${new Date().toISOString()}] Server error ignoring AI reply: ${res.status}`);
         // Refresh to ensure we have the latest state
         if (notification.instagram_user_id) {
-          fetchNotifications(notification.instagram_user_id, true);
+          fetchNotifications(notification.instagram_user_id);
         }
       } else {
         console.log(`[${new Date().toISOString()}] Successfully ignored AI reply`);
         // Restore the original notification if needed (handled by backend refresh)
         if (notification.status === 'ai_reply_ready') {
           if (notification.instagram_user_id) {
-            fetchNotifications(notification.instagram_user_id, true);
+            fetchNotifications(notification.instagram_user_id);
           }
         }
       }
@@ -947,7 +968,7 @@ Image Description: ${response.post.image_prompt}
       console.error(`[${new Date().toISOString()}] Error ignoring AI reply:`, error);
       // Refresh to ensure we have the latest state
       if (notification.instagram_user_id) {
-        fetchNotifications(notification.instagram_user_id, true);
+        fetchNotifications(notification.instagram_user_id);
       }
     }
   };
@@ -2343,8 +2364,8 @@ Image Description: ${response.post.image_prompt}
             <h2 style={{ marginBottom: '8px' }}>
               <div className="section-header">
                 <span><i className="fas fa-newspaper"></i> News For You</span>
-                <div className="content-badge viewed">
-                  <span className="badge-text">Updated</span>
+                <div className="content-badge premium">
+                  <span className="badge-text">Premium</span>
                 </div>
               </div>
             </h2>
@@ -2361,6 +2382,9 @@ Image Description: ${response.post.image_prompt}
             <h2 style={{ marginBottom: '8px' }}>
               <div className="section-header">
                 <span><i className="fas fa-bell"></i> Notifications</span>
+                <div className="content-badge premium">
+                  <span className="badge-text">Premium</span>
+                </div>
               </div>
             </h2>
             <DmsComments 

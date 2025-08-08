@@ -3,10 +3,12 @@ import { createPortal } from 'react-dom';
 import './OurStrategies.css';
 import '../../utils/jsonDecoder.css';
 import useR2Fetch from '../../hooks/useR2Fetch';
+import CacheManager, { appendBypassParam } from '../../utils/cacheManager';
 import { motion } from 'framer-motion';
 import ErrorBoundary from '../ErrorBoundary';
 import { decodeJSONToReactElements } from '../../utils/jsonDecoder';
 import { registerComponent, unregisterComponent } from '../../utils/componentRegistry';
+import { smartContentExtraction, extractFirstThreeSentences, isMeaningfulContent } from '../../utils/dynamicContentExtractor';
 
 interface OurStrategiesProps {
   accountHolder: string;
@@ -38,14 +40,15 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
   // Construct endpoint - ALWAYS use strategies endpoint for now since that's where data exists
   // This is a temporary fix until we have proper engagement strategies data
   const baseEndpoint = `/api/retrieve-strategies/${normalizedAccountHolder}`;
-  const endpoint = `${baseEndpoint}?platform=${platform}`;
+  const rawEndpoint = `${baseEndpoint}?platform=${platform}`;
+  const endpoint = appendBypassParam(rawEndpoint, platform, normalizedAccountHolder, 'strategies');
 
   // Debug the endpoint being called
   console.log(`[OurStrategies] ${componentId.current} calling endpoint: ${endpoint} (forced to strategies)`);
 
   const { data, loading, error } = useR2Fetch<any[]>(endpoint, platform);
 
-  // Extract tactical recommendations preview from a specific strategy
+  // ✅ NEW: Dynamic content extraction without hardcoded assumptions
   const getTacticalRecommendationsPreview = (strategyIndex: number = 0) => {
     if (!data || data.length === 0) {
       console.log('[OurStrategies] No data available');
@@ -60,114 +63,19 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
     const strategy = data[strategyIndex];
     console.log(`[OurStrategies] Processing strategy ${strategyIndex}:`, JSON.stringify(strategy, null, 2));
     
-    // ✅ NEW: Try to find personal_intelligence.growth_opportunities first (highest priority)
-    if (strategy.data && strategy.data.data && strategy.data.data.personal_intelligence && 
-        strategy.data.data.personal_intelligence.growth_opportunities) {
-      const growthOpportunities = strategy.data.data.personal_intelligence.growth_opportunities;
-      if (growthOpportunities && typeof growthOpportunities === 'string' && growthOpportunities.length > 50) {
-        console.log(`[OurStrategies] ✅ Found personal_intelligence.growth_opportunities for strategy ${strategyIndex}:`, growthOpportunities.substring(0, 100) + '...');
-        return growthOpportunities;
-      }
+    // ✅ NEW: Use smart content extraction that tries multiple strategies
+    const extractedContent = smartContentExtraction(strategy);
+    
+    if (extractedContent && isMeaningfulContent(extractedContent)) {
+      console.log(`[OurStrategies] ✅ Successfully extracted content for strategy ${strategyIndex}:`, extractedContent.substring(0, 100) + '...');
+      return extractedContent;
     }
     
-    // Also check direct data structure
-    if (strategy.data && strategy.data.personal_intelligence && strategy.data.personal_intelligence.growth_opportunities) {
-      const growthOpportunities = strategy.data.personal_intelligence.growth_opportunities;
-      if (growthOpportunities && typeof growthOpportunities === 'string' && growthOpportunities.length > 50) {
-        console.log(`[OurStrategies] ✅ Found personal_intelligence.growth_opportunities (direct) for strategy ${strategyIndex}:`, growthOpportunities.substring(0, 100) + '...');
-        return growthOpportunities;
-      }
-    }
-    
-    // ✅ NEW: Try to find tactical_recommendations array in the data structure
-    if (strategy.data && strategy.data.data && strategy.data.data.tactical_recommendations && Array.isArray(strategy.data.data.tactical_recommendations)) {
-      const recommendations = strategy.data.data.tactical_recommendations;
-      if (recommendations.length > 0) {
-        console.log(`[OurStrategies] Found tactical recommendations array in strategy ${strategyIndex}:`, recommendations);
-        // Join the first few recommendations with periods
-        const combinedText = recommendations.slice(0, 3).join('. ');
-        console.log('[OurStrategies] Combined recommendations text:', combinedText);
-        return combinedText;
-      }
-    }
-
-    // Also check the direct data structure
-    if (strategy.data && strategy.data.tactical_recommendations && Array.isArray(strategy.data.tactical_recommendations)) {
-      const recommendations = strategy.data.tactical_recommendations;
-      if (recommendations.length > 0) {
-        console.log(`[OurStrategies] Found tactical recommendations array (direct) in strategy ${strategyIndex}:`, recommendations);
-        // Join the first few recommendations with periods
-        const combinedText = recommendations.slice(0, 3).join('. ');
-        console.log('[OurStrategies] Combined recommendations text:', combinedText);
-        return combinedText;
-      }
-    }
-
-    // ✅ NEW: Fallback to text extraction from the strategy
-    // Check different possible data structures for text content
-    let response = null;
-    
-    // Try different possible data structures
-    if (strategy.data && typeof strategy.data === 'string') {
-      response = strategy.data;
-    } else if (strategy.data && strategy.data.response && typeof strategy.data.response === 'string') {
-      response = strategy.data.response;
-    } else if (strategy.response && typeof strategy.response === 'string') {
-      response = strategy.response;
-    } else if (typeof strategy === 'string') {
-      response = strategy;
-    }
-
-    if (!response) {
-      console.log(`[OurStrategies] No response text found in strategy ${strategyIndex}`);
-      return null;
-    }
-
-    console.log(`[OurStrategies] Found response text for strategy ${strategyIndex}:`, response.substring(0, 200) + '...');
-
-    // Find tactical recommendations section with more flexible patterns
-    const patterns = [
-      /\*\*.*[Tt]actical.*[Rr]ecommendations.*\*\*.*?\n(.*?)(?=\n\*\*|\n\n|$)/s,
-      /\*\*.*[Rr]ecommendations.*\*\*.*?\n(.*?)(?=\n\*\*|\n\n|$)/s,
-      /[Tt]actical.*[Rr]ecommendations.*?\n(.*?)(?=\n\*\*|\n\n|$)/s,
-      /[Rr]ecommendations.*?\n(.*?)(?=\n\*\*|\n\n|$)/s,
-      /[Aa]ctionable.*[Rr]ecommendations.*?\n(.*?)(?=\n\*\*|\n\n|$)/s
-    ];
-
-    for (let i = 0; i < patterns.length; i++) {
-      const match = response.match(patterns[i]);
-      if (match) {
-        console.log(`[OurStrategies] Found recommendations with pattern ${i + 1} for strategy ${strategyIndex}:`, match[1].substring(0, 100) + '...');
-        return match[1];
-      }
-    }
-
-    // Fallback: extract any meaningful content from the response
-    console.log(`[OurStrategies] No specific recommendations found for strategy ${strategyIndex}, trying fallback extraction`);
-    
-    // Try to find any content after "Analysis" or "Assessment" sections
-    const fallbackPatterns = [
-      /\*\*.*[Aa]nalysis.*\*\*.*?\n(.*?)(?=\n\*\*|\n\n|$)/s,
-      /\*\*.*[Aa]ssessment.*\*\*.*?\n(.*?)(?=\n\*\*|\n\n|$)/s,
-      /\*\*.*[Ii]nsights.*\*\*.*?\n(.*?)(?=\n\*\*|\n\n|$)/s,
-      /[Aa]nalysis.*?\n(.*?)(?=\n\*\*|\n\n|$)/s,
-      /[Aa]ssessment.*?\n(.*?)(?=\n\*\*|\n\n|$)/s
-    ];
-
-    for (let i = 0; i < fallbackPatterns.length; i++) {
-      const match = response.match(fallbackPatterns[i]);
-      if (match) {
-        console.log(`[OurStrategies] Found fallback content with pattern ${i + 1} for strategy ${strategyIndex}:`, match[1].substring(0, 100) + '...');
-        return match[1];
-      }
-    }
-
-    // Last resort: take first 200 characters of the response
-    console.log(`[OurStrategies] Using last resort for strategy ${strategyIndex}: first 200 characters`);
-    return response.substring(0, 200);
+    console.log(`[OurStrategies] No meaningful content found for strategy ${strategyIndex}, using fallback`);
+    return null;
   };
 
-  // Get preview text (first 2-3 sentences)
+  // ✅ NEW: Dynamic preview text extraction using the utility function
   const getPreviewText = (fullText: string) => {
     if (!fullText) {
       console.log('[OurStrategies] No full text provided for preview');
@@ -176,35 +84,34 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
     
     console.log('[OurStrategies] Processing preview text:', fullText.substring(0, 100) + '...');
     
-    // Clean the text and get first few sentences
-    const cleanedText = fullText
-      .replace(/\*\*/g, '') // Remove bold markers
-      .replace(/\*/g, '') // Remove italic markers
-      .replace(/\n/g, ' ') // Replace newlines with spaces
-      .replace(/\s+/g, ' ') // Normalize whitespace
-      .trim();
+    // Use the dynamic utility function to extract first 3 sentences
+    const previewText = extractFirstThreeSentences(fullText);
     
-    console.log('[OurStrategies] Cleaned text:', cleanedText.substring(0, 100) + '...');
-    
-    // Split into sentences and take first 2-3
-    const sentences = cleanedText.split(/[.!?]+/).filter(s => s.trim().length > 0);
-    console.log('[OurStrategies] Found sentences:', sentences.length);
-    
-    const previewSentences = sentences.slice(0, 2); // Take only 2 sentences to fit in 3 lines
-    const result = previewSentences.join('. ') + (sentences.length > 2 ? '...' : '');
-    
-    console.log('[OurStrategies] Preview result:', result);
-    return result;
+    console.log('[OurStrategies] Preview result:', previewText);
+    return previewText;
   };
 
-  // Generate strategy titles based on index
+  // ✅ NEW: Dynamic strategy title generation
   const getStrategyTitle = (index: number) => {
-    const titles = [
-      `${platform.charAt(0).toUpperCase() + platform.slice(1)} Strategies`,
-      `${platform.charAt(0).toUpperCase() + platform.slice(1)} Strategies`,
-      `${platform.charAt(0).toUpperCase() + platform.slice(1)} Strategies`
-    ];
-    return titles[index] || `Strategy ${index + 1}`;
+    if (!data || !data[index]) {
+      return `Strategy ${index + 1}`;
+    }
+    
+    const strategy = data[index];
+    
+    // Try to extract meaningful title from the strategy data
+    if (strategy.data && typeof strategy.data === 'object') {
+      // Look for common title fields
+      const titleFields = ['title', 'name', 'strategy_name', 'type'];
+      for (const field of titleFields) {
+        if (strategy.data[field] && typeof strategy.data[field] === 'string') {
+          return strategy.data[field];
+        }
+      }
+    }
+    
+    // Fallback to platform-based title
+    return `${platform.charAt(0).toUpperCase() + platform.slice(1)} Strategy ${index + 1}`;
   };
 
   // Get strategy icon based on index
@@ -222,7 +129,7 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
       return <p className="strategy-detail">No details available.</p>;
     }
 
-    // Use the new comprehensive JSON decoder with complete decoding configuration
+    // ✅ NEW: Dynamic JSON decoder configuration without hardcoded assumptions
     const decodedSections = decodeJSONToReactElements(strategyData, {
       customClassPrefix: 'strategy',
       enableBoldFormatting: true,
@@ -232,17 +139,9 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
       enableEmphasis: true,
       preserveJSONStructure: true,
       smartParagraphDetection: true,
-      maxNestingLevel: 6, // ✅ Increased to handle deeper nesting
-      enableDebugLogging: false, // ✅ Debug logging for troubleshooting (disable in production)
-      skipDecodingForElements: [
-        'Module Type',
-        'Platform', 
-        'Primary Username',
-        'Competitor',
-        'Timestamp',
-        'Intelligence Source'
-        // ✅ REMOVED 'Data' - we want to decode the Data content, just skip the metadata
-      ]
+      maxNestingLevel: 8, // ✅ Increased for deeper nesting
+      enableDebugLogging: false,
+      skipDecodingForElements: [] // ✅ REMOVED all hardcoded skips - decode everything dynamically
     });
 
     return decodedSections.map((section, idx) => (
@@ -325,7 +224,7 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
                       </div>
                     ) : (
                       <div className="preview-text">
-                        Loading strategy analysis and generating tactical recommendations. Analyzing recent performance data and preparing personalized insights...
+                        {smartContentExtraction({})} {/* Use dynamic fallback */}
                       </div>
                     )}
                     
@@ -350,7 +249,7 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
             >
               <div className="strategy-simple-content">
                 <div className="preview-text">
-                  Content Strategy Optimization: Focus on creating more engaging visual content that resonates with your target audience. Posting Schedule Enhancement: Analyze your best performing times and increase posting frequency during peak engagement hours. Hashtag Strategy: Implement a more strategic hashtag approach...
+                  {smartContentExtraction({})} {/* Use dynamic fallback */}
                 </div>
                 <button 
                   className="see-more-btn"

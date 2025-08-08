@@ -2001,14 +2001,20 @@ h2 {
     z-index: 1000;
   }
 
+  /* CRITICAL FIX: Hide ALL profile buttons on mobile - only show menu */
   .profile-actions .dashboard-btn {
-    display: none;
+    display: none !important;
   }
 
   .profile-actions > div:first-child {
-    display: none;
+    display: none !important;
   }
 
+  .profile-actions > .dashboard-btn {
+    display: none !important;
+  }
+
+  /* Ensure the mobile profile menu is the only visible element */
   .mobile-profile-menu {
     display: flex !important;
     align-items: center;
@@ -2032,19 +2038,19 @@ h2 {
 
   .mobile-profile-dropdown {
     position: fixed;
-    top: 72px; /* Immediately below profile icon */
-    right: 16px; /* Aligned exactly with menu icon */
-    width: 260px;
+    top: 68px; /* Much closer to profile icon */
+    right: 12px; /* Closer to the right edge where icon is */
+    width: 240px; /* Slightly smaller for better positioning */
     background: rgba(20, 20, 35, 0.98);
     backdrop-filter: blur(40px);
     border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 16px;
-    padding: 16px;
+    padding: 12px; /* Reduced padding */
     z-index: 999999;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
     animation: mobileDropdownSlide 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     transform-origin: top right;
-    margin-top: 4px; /* Small gap from icon */
+    margin-top: 2px; /* Minimal gap from icon */
   }
 
   @keyframes mobileDropdownSlide {
@@ -2084,21 +2090,61 @@ h2 {
   }
 
   /* 🍎 EXPANDABLE MODULES - APPLE CARD DESIGN */
-  .notifications, .post-cooked, .strategies, .competitor-analysis, .news4u {
+  .notifications, .strategies, .competitor-analysis, .news4u {
     background: rgba(255, 255, 255, 0.06);
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     margin: 0;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
     position: relative;
+    cursor: pointer;
+    /* CRITICAL: Set fixed height when collapsed to match other modules */
+    height: 60px;
+  }
+
+  /* Post-cooked module - always expanded, no cursor pointer */
+  .post-cooked {
+    background: rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    margin: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: visible;
+    position: relative;
+    cursor: default;
+    height: auto; /* Auto height for always-expanded */
+  }
+
+  /* When expanded, allow modules to grow */
+  .notifications.mobile-expanded,
+  .strategies.mobile-expanded,
+  .competitor-analysis.mobile-expanded,
+  .news4u.mobile-expanded {
+    height: auto;
+    max-height: 800px;
   }
 
   /* 🍎 MODULE HEADERS - CREATED WITH PSEUDO ELEMENTS */
-  .notifications::before, .post-cooked::before, .strategies::before, .competitor-analysis::before, .news4u::before {
+  .notifications::before, .strategies::before, .competitor-analysis::before, .news4u::before {
     content: '';
     display: block;
     padding: 20px 16px;
     cursor: pointer;
+    background: transparent;
+    border: none;
+    margin: 0;
+    transition: all 0.2s ease;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    position: relative;
+    z-index: 10;
+  }
+
+  /* Post-cooked header - no clickable behavior */
+  .post-cooked::before {
+    content: '';
+    display: block;
+    padding: 20px 16px;
+    cursor: default;
     background: transparent;
     border: none;
     margin: 0;
@@ -2118,22 +2164,27 @@ h2 {
     color: rgba(255, 255, 255, 0.9);
     z-index: 10;
     pointer-events: none;
+    display: block;
   }
 
   .notifications::after {
-    content: '📱 Notifications';
+    content: '� Notifications';
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   }
 
   .strategies::after {
     content: '🎯 Our Strategies';
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   }
 
   .competitor-analysis::after {
-    content: '🔍 Competitor Analysis';
+    content: '🚀 Competitor Analysis';
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI Emoji', 'Segoe UI Symbol', 'Apple Color Emoji', system-ui, sans-serif;
   }
 
   .news4u::after {
-    content: '📰 News4U';
+    content: '⭐ News4U';
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI Emoji', 'Segoe UI Symbol', 'Apple Color Emoji', system-ui, sans-serif;
   }
   
   /* Post-cooked title is handled by the component */
@@ -2141,63 +2192,141 @@ h2 {
     display: none;
   }
 
-  /* 🍎 CHEVRON ICONS */
-  .notifications::before, .post-cooked::before, .strategies::before, .competitor-analysis::before, .news4u::before {
+  /* 🍎 CHEVRON ICONS - Only for expandable modules */
+  .notifications::before, .strategies::before, .competitor-analysis::before, .news4u::before {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='%2300ffcc' viewBox='0 0 24 24'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: calc(100% - 16px) center;
     background-size: 24px 24px;
   }
 
-  /* 🍎 COLLAPSED STATE BY DEFAULT */
-  .notifications > *, .post-cooked > *, .strategies > *, .competitor-analysis > *, .news4u > * {
-    max-height: 0;
-    overflow: hidden;
-    opacity: 0;
+  /* Post-cooked has no chevron since it's always expanded */
+  .post-cooked::before {
+    background-image: none;
+  }
+
+  /* 🍎 COLLAPSED STATE BY DEFAULT - Only for expandable modules */
+  /* Universal hiding for ALL content when collapsed */
+  .notifications:not(.mobile-expanded) > *,
+  .strategies:not(.mobile-expanded) > *, 
+  .competitor-analysis:not(.mobile-expanded) > *,
+  .news4u:not(.mobile-expanded) > * {
+    max-height: 0 !important;
+    overflow: hidden !important;
+    opacity: 0 !important;
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    padding: 0 12px;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
   }
 
-  /* 🍎 EXPANDED STATE ON CLICK */
-  .notifications.mobile-expanded > *, .strategies.mobile-expanded > *, .competitor-analysis.mobile-expanded > *, .news4u.mobile-expanded > * {
-    max-height: 800px; /* Increased for better content visibility */
-    opacity: 1;
-    padding: 0 12px 12px;
-    overflow-y: auto; /* Allow scrolling if content is too long */
+  /* Force hide any nested content regardless of structure */
+  .notifications:not(.mobile-expanded) *,
+  .strategies:not(.mobile-expanded) *, 
+  .competitor-analysis:not(.mobile-expanded) *,
+  .news4u:not(.mobile-expanded) * {
+    visibility: hidden !important;
   }
 
-  /* 🍎 ALWAYS EXPANDED POST-COOKED MODULE */
-  .post-cooked.post-cooked-always-expanded > * {
+  /* Keep the clickable header area visible */
+  .notifications:not(.mobile-expanded)::before,
+  .strategies:not(.mobile-expanded)::before, 
+  .competitor-analysis:not(.mobile-expanded)::before,
+  .news4u:not(.mobile-expanded)::before,
+  .notifications:not(.mobile-expanded)::after,
+  .strategies:not(.mobile-expanded)::after, 
+  .competitor-analysis:not(.mobile-expanded)::after,
+  .news4u:not(.mobile-expanded)::after {
+    visibility: visible !important;
+  }
+
+  /* 🍎 POST-COOKED ALWAYS EXPANDED */
+  .post-cooked > * {
     max-height: none !important;
     opacity: 1 !important;
-    padding: 0 12px 12px;
-    overflow-y: visible;
+    padding: 0 12px 12px !important;
+    overflow-y: visible !important;
+    transition: none !important;
   }
 
-  .post-cooked.post-cooked-always-expanded {
+  /* ⚡ PREMIUM ICONS FIX - Higher specificity */
+  @media (max-width: 767px) {
+    .notifications.mobile-module::after {
+      content: '⚡ Notifications' !important;
+      color: #00d4ff !important;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+    }
+    
+    .strategies.mobile-module::after {
+      content: '💎 Our Strategies' !important;
+      color: #ff6b6b !important;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+    }
+    
+    .competitor-analysis.mobile-module::after {
+      content: '🚀 Competitor Analysis' !important;
+      color: #4ecdc4 !important;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+    }
+    
+    .news4u.mobile-module::after {
+      content: '⭐ News4U' !important;
+      color: #ffe66d !important;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+    }
+  }
+
+  /* 🍎 EXPANDED STATE ON CLICK - Only for expandable modules */
+  .notifications.mobile-expanded > *,
+  .strategies.mobile-expanded > *, 
+  .competitor-analysis.mobile-expanded > *,
+  .news4u.mobile-expanded > * {
     max-height: none !important;
     opacity: 1 !important;
+    padding: inherit !important;
+    margin: inherit !important;
+    overflow-y: auto !important;
+    border: inherit !important;
   }
 
-  /* 🍎 Post content container for always-expanded state */
-  .post-cooked.post-cooked-always-expanded .post-cooked-content {
-    max-height: none;
-    overflow-y: visible;
+  /* Restore visibility for all nested content when expanded */
+  .notifications.mobile-expanded *,
+  .strategies.mobile-expanded *, 
+  .competitor-analysis.mobile-expanded *,
+  .news4u.mobile-expanded * {
+    visibility: visible !important;
+  }
+
+  /* Add some spacing for the first child when expanded */
+  .notifications.mobile-expanded > *:first-child,
+  .strategies.mobile-expanded > *:first-child,
+  .competitor-analysis.mobile-expanded > *:first-child,
+  .news4u.mobile-expanded > *:first-child {
+    margin-top: 50px !important; /* Reduced space for header */
+    padding: 8px 12px 12px !important; /* Better padding */
+  }
+
+  /* Ensure proper content display for expanded modules */
+  .notifications.mobile-expanded,
+  .strategies.mobile-expanded,
+  .competitor-analysis.mobile-expanded,
+  .news4u.mobile-expanded {
     padding-bottom: 12px;
   }
 
-  /* 🍎 ROTATE CHEVRON WHEN EXPANDED - EXCLUDE POST-COOKED */
+  /* 🍎 POST-COOKED SPECIAL HANDLING - Remove the special class approach */
+  .post-cooked {
+    max-height: none !important;
+    opacity: 1 !important;
+  }
+
+  /* 🍎 ROTATE CHEVRON WHEN EXPANDED - Only for expandable modules */
   .notifications.mobile-expanded::before, .strategies.mobile-expanded::before, .competitor-analysis.mobile-expanded::before, .news4u.mobile-expanded::before {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='%2300ffcc' viewBox='0 0 24 24'%3E%3Cpath d='M7 14l5-5 5 5z'/%3E%3C/svg%3E");
   }
 
-  /* 🍎 REMOVE CHEVRON FOR ALWAYS-EXPANDED POST-COOKED */
-  .post-cooked.post-cooked-always-expanded::before {
-    display: none;
-  }
-
-  /* 🍎 CLICK FEEDBACK */
-  .notifications::before:active, .post-cooked::before:active, .strategies::before:active, .competitor-analysis::before:active, .news4u::before:active {
+  /* 🍎 CLICK FEEDBACK - Only for expandable modules */
+  .notifications::before:active, .strategies::before:active, .competitor-analysis::before:active, .news4u::before:active {
     background-color: rgba(255, 255, 255, 0.05);
     transform: scale(0.98);
   }
@@ -2449,11 +2578,15 @@ h2 {
   /* Mobile profile dropdown adjustments */
   .mobile-profile-dropdown {
     width: 200px;
+    right: 8px; /* Closer to edge on small screens */
+    top: 64px; /* Higher up on small screens */
+    padding: 8px; /* Smaller padding */
   }
 
   .mobile-profile-dropdown .dashboard-btn {
-    padding: 10px 14px;
-    font-size: 0.85rem;
+    padding: 8px 12px; /* Smaller button padding */
+    font-size: 0.8rem; /* Smaller text */
+    margin: 4px 0; /* Tighter spacing */
   }
 
   /* Mobile floating buttons adjustments */

@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { FaClock, FaExternalLinkAlt, FaPlus, FaSpinner, FaRss } from 'react-icons/fa';
 import axios from 'axios';
 import RagService from '../../services/RagService';
+import CacheManager, { appendBypassParam } from '../../utils/cacheManager';
 import './News4U.css';
 
 interface News4UProps {
@@ -31,6 +33,60 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [creatingPost, setCreatingPost] = useState<Set<number>>(new Set());
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [openMenuIndex, setOpenMenuIndex] = useState<number | null>(null);
+  const [customInputByIndex, setCustomInputByIndex] = useState<Record<number, string>>({});
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const menuAnchorRef = useRef<HTMLElement | null>(null);
+  const portalRootRef = useRef<HTMLElement | null>(null);
+
+  // Ensure a portal root exists
+  useEffect(() => {
+    let node = document.getElementById('news4u-portal-root') as HTMLElement | null;
+    if (!node) {
+      node = document.createElement('div');
+      node.id = 'news4u-portal-root';
+      document.body.appendChild(node);
+    }
+    portalRootRef.current = node;
+    return () => {
+      // keep node persistent for page lifetime; do not remove on unmount
+    };
+  }, []);
+
+  const updateMenuPosition = () => {
+    const anchor = menuAnchorRef.current;
+    if (!anchor) {
+      setMenuPosition(null);
+      return;
+    }
+    const rect = anchor.getBoundingClientRect();
+    const top = rect.bottom + 8; // small gap below button
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - 280)); // keep inside viewport
+    setMenuPosition({ top, left });
+  };
+
+  useEffect(() => {
+    if (openMenuIndex !== null) {
+      updateMenuPosition();
+      const handleWindow = () => updateMenuPosition();
+      const handleOutside = (e: MouseEvent) => {
+        const anchor = menuAnchorRef.current;
+        const portalEl = document.getElementById('news4u-dropdown-portal');
+        if (portalEl && (portalEl.contains(e.target as Node) || (anchor && anchor.contains(e.target as Node)))) {
+          return;
+        }
+        setOpenMenuIndex(null);
+      };
+      window.addEventListener('resize', handleWindow, { passive: true });
+      window.addEventListener('scroll', handleWindow, { passive: true });
+      document.addEventListener('mousedown', handleOutside, true);
+      return () => {
+        window.removeEventListener('resize', handleWindow);
+        window.removeEventListener('scroll', handleWindow);
+        document.removeEventListener('mousedown', handleOutside, true);
+      };
+    }
+  }, [openMenuIndex]);
 
   const toggleExpand = (idx: number) => {
     setExpanded(prev => {
@@ -57,16 +113,76 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     }
   };
 
-  // Create infographic post from news item
-  const createPostFromNews = async (newsItem: NewsItem, idx: number) => {
+  type PostStyle = 'infographic' | 'typographic' | 'single_image' | 'meme';
+
+  const styleLabel: Record<PostStyle, string> = useMemo(() => ({
+    infographic: 'Infographic',
+    typographic: 'Typographical',
+    single_image: 'Single Image',
+    meme: 'Meme',
+  }), []);
+
+  const buildPrompt = (newsItem: NewsItem, style: PostStyle, customInstruction?: string) => {
+    const summary = decodeUnicode(newsItem.breaking_news_summary).trim();
+
+    const VISUAL_GUIDELINES: Record<PostStyle, string[]> = {
+      infographic: [
+        'Data‑rich infographic with clear hierarchy: bold headline, concise sub‑points, supportive icons',
+        'Use clean grid layout, generous spacing, and accessible color contrast',
+        'Include simple charts/diagrams when relevant (bars, pie, timeline) with clear labels',
+        'Brand‑friendly modern style; avoid clutter; ensure instant legibility on mobile',
+      ],
+      typographic: [
+        'Bold headline‑driven typography as the hero; minimal background',
+        'High contrast palette; premium editorial look; precise alignment and spacing',
+        'Use hierarchy (H1/H2/eyebrow) and subtle accents; no complex imagery',
+        'Keep message punchy and elegant; ensure crisp anti‑aliased text rendering',
+      ],
+      single_image: [
+        'Single striking image/illustration that directly represents the news subject',
+        'Cinematic composition; clear focal subject; shallow depth‑of‑field feel',
+        'Cohesive color grading; minimal overlay; tasteful brand accent only',
+        'Avoid busy collages; keep it story‑centric and emotionally resonant',
+      ],
+      meme: [
+        'Meme format with witty top/bottom text or trending template that fits the news',
+        'Use readable bold font (e.g., Impact‑style), white text with subtle black stroke',
+        'Humorous but safe tone; no offensive or sensitive content; keep brand tiny',
+        'High contrast framing; clear facial/subject expressions for comedic effect',
+      ],
+    };
+
+    const guidelines = VISUAL_GUIDELINES[style]
+      .map((g, i) => `${i + 1}. ${g}`)
+      .join('\n');
+
+    const custom = (customInstruction || '').trim();
+
+    // Enrich the query with explicit, style‑aligned guidance so backend can craft a very specific image prompt
+    const prompt = [
+      `NEWS: ${summary}`,
+      `REQUESTED_POST_STYLE: ${styleLabel[style]}`,
+      'VISUAL_STYLE_GUIDELINES:',
+      guidelines,
+      custom ? `ADDITIONAL_CREATIVE_DIRECTION: ${custom}` : null,
+      'DELIVERABLES: Create a compelling caption, relevant high‑performing hashtags, a persuasive call‑to‑action,',
+      'and a highly specific Visual Description for the image that strictly follows the requested style and direction.',
+      'The Visual Description must include composition, color palette, lighting, typography/overlay (if any),',
+      'layout/arrangement, and mood, with strong, concrete details (no generic phrasing).'
+    ].filter(Boolean).join('\n');
+
+    return prompt;
+  };
+
+  // Create post from news item with selected style and optional custom instruction
+  const createPostFromNews = async (newsItem: NewsItem, idx: number, style: PostStyle, customInstruction?: string) => {
     setCreatingPost(prev => new Set([...prev, idx]));
     setToastMessage(null);
 
     try {
-      // Create the prefixed prompt for post generation
-      const prompt = `Create an engaging infographic post about this news: ${decodeUnicode(newsItem.breaking_news_summary)}`;
+      const prompt = buildPrompt(newsItem, style, customInstruction);
       
-      console.log(`[News4U] 🚀 Creating infographic post for ${normalizedAccountHolder} on ${platform}:`, prompt);
+      console.log(`[News4U] 🚀 Creating ${styleLabel[style]} post for ${normalizedAccountHolder} on ${platform}`);
       
       // Use the same RAG service as the dashboard creation bar
       const response = await RagService.sendPostQuery(
@@ -89,18 +205,18 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
         window.dispatchEvent(newPostEvent);
         console.log(`[News4U] 🔄 Triggered PostCooked refresh event for ${platform}`);
         
-        setToastMessage('Infographic post created successfully! Check the Cooked Posts section.');
+        setToastMessage(`${styleLabel[style]} post created successfully! Check the Cooked Posts section.`);
         
         // Auto-hide toast after 4 seconds
         setTimeout(() => setToastMessage(null), 4000);
       } else {
         console.error(`[News4U] ❌ Post creation failed for ${accountHolder} on ${platform}:`, response.error);
-        setToastMessage(response.error || 'Failed to create infographic post. Please try again.');
+        setToastMessage(response.error || `Failed to create ${styleLabel[style]} post. Please try again.`);
         setTimeout(() => setToastMessage(null), 4000);
       }
     } catch (error) {
-      console.error(`[News4U] ❌ Error creating infographic post for ${accountHolder} on ${platform}:`, error);
-      setToastMessage('Failed to create infographic post. Please try again.');
+      console.error(`[News4U] ❌ Error creating ${styleLabel[style]} post for ${accountHolder} on ${platform}:`, error);
+      setToastMessage(`Failed to create ${styleLabel[style]} post. Please try again.`);
       setTimeout(() => setToastMessage(null), 4000);
     } finally {
       setCreatingPost(prev => {
@@ -108,14 +224,27 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
         next.delete(idx);
         return next;
       });
+      setOpenMenuIndex(null);
     }
+  };
+
+  const handleToggleMenu = (anchorEl: HTMLElement, idx: number) => {
+    if (openMenuIndex === idx) {
+      setOpenMenuIndex(null);
+      return;
+    }
+    menuAnchorRef.current = anchorEl;
+    setOpenMenuIndex(idx);
+    // position will be updated by effect
   };
 
   useEffect(() => {
     const fetch = async () => {
       try {
         setLoading(true);
-        const res = await axios.get(`/api/news-for-you/${normalizedAccountHolder}?platform=${platform}`);
+        const baseUrl = `/api/news-for-you/${normalizedAccountHolder}?platform=${platform}`;
+        const url = appendBypassParam(baseUrl, platform, normalizedAccountHolder, 'news');
+        const res = await axios.get(url);
         const raw: NewsItem[] = (res.data ?? []).map((r: any) => r.data).filter(Boolean);
         // Remove duplicate stories based on identical summary text
         const deduped: NewsItem[] = [];
@@ -209,29 +338,78 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
                 </div>
 
                 {isOpen && (
-                  <div className="news4u-actions">
-                    <button
-                      className="create-post-btn"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        createPostFromNews(item, idx);
-                      }}
-                      disabled={creatingPost.has(idx)}
-                      title="Create infographic post from this news"
-                    >
-                      {creatingPost.has(idx) ? (
-                        <>
-                          <FaSpinner className="btn-icon spinning" />
-                          <span>Creating...</span>
-                        </>
-                      ) : (
-                        <>
-                          <FaPlus className="btn-icon" />
-                          <span>Create Infographic Post</span>
-                        </>
-                      )}
-                    </button>
+                  <div className="news4u-actions" onClick={(e) => e.stopPropagation()}>
+                    <div className="news4u-post-menu">
+                      <button
+                        className="create-post-btn"
+                        onClick={(e) => handleToggleMenu(e.currentTarget as HTMLElement, idx)}
+                        disabled={creatingPost.has(idx)}
+                        title="Create post from this news"
+                      >
+                        {creatingPost.has(idx) ? (
+                          <>
+                            <FaSpinner className="btn-icon spinning" />
+                            <span>Creating...</span>
+                          </>
+                        ) : (
+                          <>
+                            <FaPlus className="btn-icon" />
+                            <span>Create Post</span>
+                          </>
+                        )}
+                      </button>
+
+                      {null}
+                    </div>
+
+                    {openMenuIndex === idx && portalRootRef.current && menuPosition && createPortal(
+                      <div
+                        id="news4u-dropdown-portal"
+                        className="news4u-dropdown news4u-dropdown-portal"
+                        role="menu"
+                        style={{ position: 'fixed', top: menuPosition.top, left: menuPosition.left }}
+                      >
+                        <button
+                          className="dropdown-item"
+                          onClick={() => createPostFromNews(item, idx, 'infographic', customInputByIndex[idx])}
+                          disabled={creatingPost.has(idx)}
+                        >Infographic</button>
+                        <button
+                          className="dropdown-item"
+                          onClick={() => createPostFromNews(item, idx, 'typographic', customInputByIndex[idx])}
+                          disabled={creatingPost.has(idx)}
+                        >Typographical</button>
+                        <button
+                          className="dropdown-item"
+                          onClick={() => createPostFromNews(item, idx, 'single_image', customInputByIndex[idx])}
+                          disabled={creatingPost.has(idx)}
+                        >Single Image</button>
+                        <button
+                          className="dropdown-item"
+                          onClick={() => createPostFromNews(item, idx, 'meme', customInputByIndex[idx])}
+                          disabled={creatingPost.has(idx)}
+                        >Meme</button>
+                        <div className="dropdown-separator" />
+                        <div className="dropdown-custom">
+                          <input
+                            type="text"
+                            className="dropdown-input"
+                            placeholder="Optional custom theme/instruction..."
+                            value={customInputByIndex[idx] || ''}
+                            onChange={(e) => setCustomInputByIndex(prev => ({ ...prev, [idx]: e.target.value }))}
+                          />
+                          <button
+                            className="dropdown-apply"
+                            onClick={() => {
+                              createPostFromNews(item, idx, 'infographic', customInputByIndex[idx]);
+                            }}
+                            disabled={creatingPost.has(idx)}
+                          >Create with Custom</button>
+                        </div>
+                      </div>,
+                      portalRootRef.current
+                    )}
+
                     {item.source_url && (
                       <div className="news4u-source">
                         <a href={item.source_url} target="_blank" rel="noopener noreferrer" className="source-link">

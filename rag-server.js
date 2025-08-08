@@ -2563,7 +2563,8 @@ INSTRUCTIONS:
 3. Use hashtags that have performed well based on the data
 4. Match the tone and style shown in the actual post content
 5. Create content that aligns with proven engagement patterns
-6. DO NOT use generic templates - use insights from the real data
+    6. DO NOT use generic templates - use insights from the real data
+    7. If the user's request includes explicit visual style directives (e.g., REQUESTED_POST_STYLE, VISUAL_STYLE_GUIDELINES, ADDITIONAL_CREATIVE_DIRECTION), strictly follow them when crafting the Visual Description and overall creative direction
 
 RESPOND WITH EXACTLY THIS FORMAT (no additional text):
 
@@ -2576,8 +2577,8 @@ Hashtags:
 Call to Action:
 [Create a call-to-action that matches engagement patterns from the real data]
 
-Visual Description for Image:
-[Write a detailed description for an image that aligns with the visual style and themes shown in the successful posts from the data above. Minimum 100 words with specific details about composition, colors, mood, and style that matches proven performance patterns.]
+    Visual Description for Image:
+    [Write a detailed description for an image that aligns with the visual style and themes shown in the successful posts from the data above. Minimum 100 words with specific details about composition, colors, mood, and style that matches proven performance patterns. If the user's request includes REQUESTED_POST_STYLE, VISUAL_STYLE_GUIDELINES, or ADDITIONAL_CREATIVE_DIRECTION, prioritize and explicitly implement those instructions.]
 
 IMPORTANT: Use EXACTLY the section headers shown above. Base everything on the real account data provided above.`;
   }
@@ -2605,8 +2606,8 @@ Hashtags:
 Call to Action:
 [Create an engaging call-to-action that encourages interaction]
 
-Visual Description for Image:
-[Write a detailed description for an image that would accompany this ${platformName} post. Include composition, colors, mood, and style details.]
+  Visual Description for Image:
+  [Write a detailed description for an image that would accompany this ${platformName} post. Include composition, colors, mood, and style details. If the user's request includes REQUESTED_POST_STYLE, VISUAL_STYLE_GUIDELINES, or ADDITIONAL_CREATIVE_DIRECTION, prioritize and explicitly implement those instructions.]
 
 IMPORTANT: Use EXACTLY the section headers shown above.`;
 }

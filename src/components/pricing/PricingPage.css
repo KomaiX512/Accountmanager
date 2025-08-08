@@ -657,21 +657,23 @@ div .pricing-container,
   
   .pricing-container {
     grid-template-columns: 1fr;
-    gap: 24px;
+    gap: 32px;
     padding: 40px 20px;
-    max-width: 500px;
+    max-width: 600px; /* Increased from 500px for better mobile visibility */
   }
   
   .pricing-card {
-    padding: 32px 24px;
+    padding: 40px 32px; /* Increased padding for larger mobile cards */
+    min-height: auto;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); /* Enhanced shadow */
   }
   
   .plan-header h3 {
-    font-size: 1.3rem;
+    font-size: 1.5rem; /* Increased from 1.3rem */
   }
   
   .price {
-    font-size: 2rem;
+    font-size: 2.2rem; /* Increased from 2rem */
   }
   
   .faq-grid {
@@ -721,29 +723,31 @@ div .pricing-container,
   
   .pricing-container {
     padding: 32px 16px;
-    gap: 20px;
+    gap: 28px; /* Increased gap for better spacing */
+    max-width: calc(100vw - 32px); /* Responsive width */
   }
   
   .pricing-card {
-    padding: 24px 20px;
+    padding: 36px 24px; /* Increased padding for better mobile experience */
+    border-radius: 16px; /* More rounded corners for modern mobile look */
   }
   
   .plan-icon {
-    width: 56px;
-    height: 56px;
+    width: 64px; /* Increased from 56px */
+    height: 64px; /* Increased from 56px */
   }
   
   .plan-header h3 {
-    font-size: 1.2rem;
+    font-size: 1.3rem; /* Increased from 1.2rem */
   }
   
   .price {
-    font-size: 1.8rem;
+    font-size: 2rem; /* Increased from 1.8rem */
   }
   
   .plan-features li {
-    font-size: 0.85rem;
-    padding: 6px 0;
+    font-size: 0.9rem; /* Increased from 0.85rem */
+    padding: 8px 0; /* Increased from 6px */
   }
   
   .btn-select, .btn-contact, .btn-current {

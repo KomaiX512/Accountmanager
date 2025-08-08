@@ -8,6 +8,7 @@ import ErrorBoundary from '../ErrorBoundary';
 import { decodeJSONToReactElements, formatCount } from '../../utils/jsonDecoder';
 import axios from 'axios';
 import { registerComponent, unregisterComponent } from '../../utils/componentRegistry';
+import CacheManager, { appendBypassParam } from '../../utils/cacheManager';
 
 interface ProfileInfo {
   followersCount?: number;
@@ -174,8 +175,12 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
   }, [normalizedAccountHolder, platform]);
 
   const competitorsQuery = localCompetitors.length > 0 ? localCompetitors.join(',') : '';
-  const competitorEndpoint = competitorsQuery 
-    ? `/api/retrieve-multiple/${normalizedAccountHolder}?competitors=${encodeURIComponent(competitorsQuery)}&platform=${platform}&forceRefresh=true&_t=${refreshKey}` 
+  // Build endpoint and apply cache-bypass rules (15m after competitor edit, 12h global)
+  const baseCompetitorEndpoint = competitorsQuery 
+    ? `/api/retrieve-multiple/${normalizedAccountHolder}?competitors=${encodeURIComponent(competitorsQuery)}&platform=${platform}&forceRefresh=true&_t=${refreshKey}`
+    : '';
+  const competitorEndpoint = baseCompetitorEndpoint
+    ? appendBypassParam(baseCompetitorEndpoint, platform, normalizedAccountHolder, 'competitor')
     : '';
   
   const allCompetitorsFetch = useR2Fetch<any[]>(competitorEndpoint, platform);
@@ -430,6 +435,8 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
         });
         
         console.log('[Cs_Analysis] ✅ Successfully reset and re-uploaded account info with updated competitors');
+        // Mark competitor edit so all dashboards bypass cache for 15 minutes
+        CacheManager.markCompetitorEdit(platform, normalizedAccountHolder);
       } catch (err) {
         console.error('[Cs_Analysis] ❌ Failed to reset and re-upload account info:', err);
       }
@@ -509,6 +516,8 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
         });
         
         console.log('[Cs_Analysis] ✅ Successfully reset and re-uploaded account info with updated competitors');
+        // Mark competitor edit so all dashboards bypass cache for 15 minutes
+        CacheManager.markCompetitorEdit(platform, normalizedAccountHolder);
       } catch (err) {
         console.error('[Cs_Analysis] ❌ Failed to reset and re-upload account info:', err);
       }
@@ -575,6 +584,9 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
         });
         
         console.log('[Cs_Analysis] ✅ Successfully reset and re-uploaded account info with updated competitors');
+        
+        // ✅ NEW: Mark competitor edit to invalidate cache for 15 minutes
+        CacheManager.markCompetitorEdit(platform, normalizedAccountHolder);
       } catch (err) {
         console.error('[Cs_Analysis] ❌ Failed to reset and re-upload account info:', err);
       }

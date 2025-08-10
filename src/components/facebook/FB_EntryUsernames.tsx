@@ -291,7 +291,7 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
         showMessage('Submission successful', 'success');
         
         // Start the processing phase using unified ProcessingContext
-        startProcessing('facebook', confirmationData.accountData.name, 2); // 2 minutes duration
+        startProcessing('facebook', confirmationData.accountData.name, 25); // 25 minutes duration
       }
     } catch (error: any) {
       console.error('Error submitting Facebook data:', error);
@@ -400,7 +400,7 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
                   <li>✓ Can be any name you want to use for this account</li>
                   <li>✓ No restrictions on format or characters</li>
                   <li>✓ This name will be mapped to your Facebook URL</li>
-                  <li>✓ Used for 2 minutes of AI processing</li>
+                  <li>✓ Used for 25 minutes of AI processing</li>
                 </ul>
               </div>
             </div>
@@ -428,7 +428,7 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
                     <li>✓ Must be a valid Facebook page or profile URL</li>
                     <li>✓ Format: https://facebook.com/yourpage or https://facebook.com/profile.php?id=123456789</li>
                     <li>✓ Profile must not be locked/private</li>
-                    <li>✓ This URL will be scraped for 2 minutes</li>
+                    <li>✓ This URL will be scraped for 25 minutes</li>
                   </ul>
                 </div>
             </div>
@@ -617,7 +617,7 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
                 </div>
                 <div className="confirmation-item">
                   <strong>Facebook URL:</strong> {confirmationData.accountData.url}
-                  <div className="critical-warning">⚠️ This URL will be scraped for 2 minutes!</div>
+                  <div className="critical-warning">⚠️ This URL will be scraped for 25 minutes!</div>
                 </div>
                 <div className="confirmation-item">
                   <strong>Account Type:</strong> {confirmationData.accountType}

@@ -3,18 +3,21 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import ProcessingLoadingState from '../components/common/ProcessingLoadingState';
 import ProcessingErrorBoundary from '../components/common/ProcessingErrorBoundary';
 import { useProcessing } from '../context/ProcessingContext';
-import { useAuth } from '../context/AuthContext';
+// import { useAuth } from '../context/AuthContext';
 import { safeNavigate, safeHistoryManipulation } from '../utils/navigationGuard';
+import axios from 'axios';
+import { API_CONFIG, getApiUrl } from '../config/api';
 
 const Processing: React.FC = () => {
   const navigate = useNavigate();
   const { platform } = useParams<{ platform: string }>();
   const location = useLocation();
   const { completeProcessing } = useProcessing();
-  const { currentUser } = useAuth();
+  // const { currentUser } = useAuth();
   const [isValidating, setIsValidating] = useState(true);
   const [shouldRender, setShouldRender] = useState(false);
   const validationRef = useRef(false);
+  const [extensionMessage, setExtensionMessage] = useState<string | null>(null);
 
   // Get data from navigation state or defaults
   const stateData = location.state as {
@@ -42,6 +45,34 @@ const Processing: React.FC = () => {
   
   const remainingMinutes = stateData?.remainingMinutes;
   const forcedRedirect = stateData?.forcedRedirect || false;
+
+  // Helper: check R2 run status existence for platform/username
+  const checkRunStatus = async (platformId: string, primaryUsername: string): Promise<{ exists: boolean; status?: string | null }> => {
+    try {
+      const url = getApiUrl(`${API_CONFIG.ENDPOINTS.RUN_STATUS}/${platformId}/${encodeURIComponent(primaryUsername)}`);
+      const res = await axios.get(url, { timeout: 10000 });
+      return { exists: !!res.data?.exists, status: res.data?.status ?? null };
+    } catch (e) {
+      return { exists: false };
+    }
+  };
+
+  // Helper: finalize and navigate to dashboard consistently
+  const finalizeAndNavigate = (plat: string) => {
+    try {
+      localStorage.removeItem(`${plat}_processing_countdown`);
+      localStorage.removeItem(`${plat}_processing_info`);
+      const completedPlatforms = localStorage.getItem('completedPlatforms');
+      const completed = completedPlatforms ? JSON.parse(completedPlatforms) : [];
+      if (!completed.includes(plat)) {
+        completed.push(plat);
+        localStorage.setItem('completedPlatforms', JSON.stringify(completed));
+      }
+    } catch {}
+    completeProcessing();
+    const dashboardPath = getDashboardPath(plat);
+    safeNavigate(navigate, dashboardPath, { replace: true }, 8);
+  };
 
   // Validate timer and check if platform is completed
   const validateTimer = () => {
@@ -73,14 +104,14 @@ const Processing: React.FC = () => {
       
       // Check if timer has expired
       if (now >= endTime) {
-        return { isValid: false, reason: 'expired' };
+        return { isValid: false, reason: 'expired', endTime };
       }
       
       const remainingMs = endTime - now;
       const remainingMinutes = Math.ceil(remainingMs / 1000 / 60);
       
       console.log(`🛡️ PROCESSING PAGE: Valid timer for ${targetPlatform} - ${remainingMinutes} minutes remaining`);
-      return { isValid: true, remainingMs, remainingMinutes };
+      return { isValid: true, remainingMs, remainingMinutes, endTime };
     } catch (error) {
       console.error('Error validating timer:', error);
       return { isValid: false, reason: 'error' };
@@ -92,26 +123,52 @@ const Processing: React.FC = () => {
     if (validationRef.current) return;
     validationRef.current = true;
 
-    const validate = () => {
+    const validate = async () => {
       const timer = validateTimer();
       
       if (!timer.isValid) {
-        // No valid timer found - this could be:
-        // 1. Timer expired naturally
-        // 2. Direct access without timer
-        // 3. Refresh attack on processing page
-        
+        // Timer is not valid. If it's expired, perform R2 RunStatus check before redirecting
+        if (timer.reason === 'expired') {
+          const infoRaw = localStorage.getItem(`${targetPlatform}_processing_info`);
+          let primaryUsername = username;
+          try {
+            if (infoRaw) {
+              const info = JSON.parse(infoRaw);
+              if (info.username) primaryUsername = info.username;
+            }
+          } catch {}
+
+          const status = await checkRunStatus(targetPlatform, primaryUsername);
+          if (status.exists) {
+            // If file exists (completed or failed), allow dashboard immediately
+            finalizeAndNavigate(targetPlatform);
+            return;
+          }
+
+          // No status file yet → grant +5 minutes grace and show message
+          const newEnd = Date.now() + 5 * 60 * 1000;
+          localStorage.setItem(`${targetPlatform}_processing_countdown`, newEnd.toString());
+          // keep original info; update endTime & totalDuration to include extension window for progress
+          try {
+            const info = infoRaw ? JSON.parse(infoRaw) : {};
+            const updated = {
+              ...info,
+              endTime: newEnd,
+              // Keep original totalDuration to preserve 100% progress during grace window
+            } as any;
+            localStorage.setItem(`${targetPlatform}_processing_info`, JSON.stringify(updated));
+          } catch {}
+          setExtensionMessage('We are facing a bit of difficulty while fetching your data. Please allow 5 more minutes while we finalize your dashboard.');
+
+          // Allow render in processing page with extension
+          setShouldRender(true);
+          setIsValidating(false);
+          return;
+        }
+
+        // For other invalid reasons, redirect to dashboard
         console.log(`🛡️ PROCESSING PAGE: No valid timer for ${targetPlatform}, redirecting to dashboard`);
-        
-        // Clean up any stale storage
-        localStorage.removeItem(`${targetPlatform}_processing_countdown`);
-        localStorage.removeItem(`${targetPlatform}_processing_info`);
-        
-        // Reset global processing state & redirect to appropriate dashboard
-        completeProcessing();
-        // Redirect to appropriate dashboard
-        const dashboardPath = getDashboardPath(targetPlatform);
-        safeNavigate(navigate, dashboardPath, { replace: true }, 8);
+        finalizeAndNavigate(targetPlatform);
         return;
       }
 
@@ -122,7 +179,7 @@ const Processing: React.FC = () => {
     };
 
     // Add slight delay to prevent flash
-    setTimeout(validate, 100);
+    setTimeout(() => { void validate(); }, 100);
   }, [targetPlatform, navigate, completeProcessing]);
 
   // Helper function to get dashboard path
@@ -140,26 +197,72 @@ const Processing: React.FC = () => {
   useEffect(() => {
     if (!shouldRender) return;
 
-    const interval = setInterval(() => {
+    const interval = setInterval(async () => {
       const timer = validateTimer();
       
       if (!timer.isValid) {
-        console.log(`🛡️ PROCESSING PAGE: Timer expired for ${targetPlatform}, redirecting to dashboard`);
-        
-        // Clean up storage
-        localStorage.removeItem(`${targetPlatform}_processing_countdown`);
-        localStorage.removeItem(`${targetPlatform}_processing_info`);
-        
-        // Reset global processing state & redirect to appropriate dashboard
-        completeProcessing();
-        // Redirect to appropriate dashboard
-        const dashboardPath = getDashboardPath(targetPlatform);
-        safeNavigate(navigate, dashboardPath, { replace: true }, 8);
+        // On any expiry, perform R2 check
+        const infoRaw = localStorage.getItem(`${targetPlatform}_processing_info`);
+        let primaryUsername = username;
+        try {
+          if (infoRaw) {
+            const info = JSON.parse(infoRaw);
+            if (info.username) primaryUsername = info.username;
+          }
+        } catch {}
+
+        const status = await checkRunStatus(targetPlatform, primaryUsername);
+        if (status.exists) {
+          finalizeAndNavigate(targetPlatform);
+          return;
+        }
+
+        // Treat ANY interval completion (missing or expired countdown) as a 5-minute extension
+        const countdownRaw = localStorage.getItem(`${targetPlatform}_processing_countdown`);
+        const currentEnd = countdownRaw ? parseInt(countdownRaw, 10) : NaN;
+        const intervalCompleted = !currentEnd || Number.isNaN(currentEnd) || Date.now() >= currentEnd;
+        if (intervalCompleted) {
+          const newEnd = Date.now() + 5 * 60 * 1000;
+          localStorage.setItem(`${targetPlatform}_processing_countdown`, newEnd.toString());
+          try {
+            const info = infoRaw ? JSON.parse(infoRaw) : {};
+            const updated = {
+              ...info,
+              endTime: newEnd,
+            } as any;
+            localStorage.setItem(`${targetPlatform}_processing_info`, JSON.stringify(updated));
+          } catch {}
+          setExtensionMessage('We are facing a bit of difficulty while fetching your data. Please allow 5 more minutes while we finalize your dashboard.');
+          return;
+        }
+
+        // If we already extended and this expiry matches the extended window, re-check and extend again (fallback)
+        // This block is no longer needed as we always extend 5 minutes
+        // if (extendedUntil && Date.now() >= extendedUntil) {
+        //   const finalStatus = await checkRunStatus(targetPlatform, primaryUsername);
+        //   if (finalStatus.exists) {
+        //     finalizeAndNavigate(targetPlatform);
+        //     return;
+        //   }
+        //   const newEnd = Date.now() + 5 * 60 * 1000;
+        //   localStorage.setItem(`${targetPlatform}_processing_countdown`, newEnd.toString());
+        //   try {
+        //     const info = infoRaw ? JSON.parse(infoRaw) : {};
+        //     const updated = {
+        //       ...info,
+        //       endTime: newEnd,
+        //     } as any;
+        //     localStorage.setItem(`${targetPlatform}_processing_info`, JSON.stringify(updated));
+        //   } catch {}
+        //   setExtendedUntil(newEnd);
+        //   setExtensionMessage('We are facing a bit of difficulty while fetching your data. Please allow 5 more minutes while we finalize your dashboard.');
+        //   return;
+        // }
       }
-    }, 1000); // Check every second
+    }, 1000); // Check every second to sync finish
 
     return () => clearInterval(interval);
-  }, [shouldRender, targetPlatform, navigate, completeProcessing]);
+  }, [shouldRender, targetPlatform, navigate, completeProcessing, username]);
 
   // FORCED REDIRECT protection - prevent users from staying on processing if they shouldn't be
   useEffect(() => {
@@ -278,6 +381,12 @@ const Processing: React.FC = () => {
         username={username}
         onComplete={handleComplete}
         remainingMinutes={remainingMinutes}
+        // Expose extension state to child for messaging (prop not required in child typings)
+        // @ts-ignore
+        extensionMessage={extensionMessage}
+         // prevent auto-complete inside child; parent orchestrates finalization
+         // @ts-ignore
+         allowAutoComplete={false}
       />
     </ProcessingErrorBoundary>
   );

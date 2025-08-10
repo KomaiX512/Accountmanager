@@ -503,7 +503,7 @@ server {
     }
     
     # All other main server endpoints with comprehensive patterns
-    location ~ ^/(user-instagram-status|user-facebook-status|user-twitter-status|instagram-connection|facebook-connection|twitter-connection|post-instagram-now|schedule-post|scheduled-posts|post-tweet|schedule-tweet|schedule-tweet-with-image|scheduled-tweets|post-tweet-with-image|insights|check-username-availability|system/cache-stats|update-post-status|rag-instant-reply|facebook-posting-capabilities|test-facebook-post|sync-facebook-tokens|scheduler-health|scheduler-retry|scheduler-process-overdue|debug|save-goal|goal-summary|campaign-posts-count|engagement-metrics|generated-content-summary|campaign-status|stop-campaign)/(.+)$ {
+    location ~ ^/(user-instagram-status|user-facebook-status|user-twitter-status|instagram-connection|facebook-connection|twitter-connection|post-instagram-now|post-facebook-now|schedule-post|scheduled-posts|post-tweet|schedule-tweet|schedule-tweet-with-image|scheduled-tweets|post-tweet-with-image|insights|check-username-availability|system/cache-stats|update-post-status|rag-instant-reply|facebook-posting-capabilities|test-facebook-post|sync-facebook-tokens|scheduler-health|scheduler-retry|scheduler-process-overdue|debug|save-goal|goal-summary|campaign-posts-count|engagement-metrics|generated-content-summary|campaign-status|stop-campaign)/(.+)$ {
         proxy_pass http://localhost:3000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -511,7 +511,7 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
     
-    location ~ ^/api/(user-instagram-status|user-facebook-status|user-twitter-status|instagram-connection|facebook-connection|twitter-connection|post-instagram-now|schedule-post|scheduled-posts|post-tweet|schedule-tweet|schedule-tweet-with-image|scheduled-tweets|post-tweet-with-image|insights|check-username-availability|system/cache-stats|update-post-status|rag-instant-reply|scheduler-health|scheduler-retry|scheduler-process-overdue|debug|save-goal|goal-summary|campaign-posts-count|engagement-metrics|generated-content-summary|campaign-status|stop-campaign)/(.+)$ {
+    location ~ ^/api/(user-instagram-status|user-facebook-status|user-twitter-status|instagram-connection|facebook-connection|twitter-connection|post-instagram-now|post-facebook-now|schedule-post|scheduled-posts|post-tweet|schedule-tweet|schedule-tweet-with-image|scheduled-tweets|post-tweet-with-image|insights|check-username-availability|system/cache-stats|update-post-status|rag-instant-reply|scheduler-health|scheduler-retry|scheduler-process-overdue|debug|save-goal|goal-summary|campaign-posts-count|engagement-metrics|generated-content-summary|campaign-status|stop-campaign)/(.+)$ {
         proxy_pass http://localhost:3000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

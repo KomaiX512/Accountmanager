@@ -29,6 +29,7 @@ export const API_CONFIG = {
     SCHEDULE_TWEET: '/api/schedule-tweet',
     SCHEDULE_TWEET_WITH_IMAGE: '/api/schedule-tweet-with-image',
     SCHEDULE_POST: '/api/schedule-post',
+    POST_FACEBOOK_NOW: '/api/post-facebook-now',
     POST_TWEET: '/api/post-tweet',
     POST_TWEET_WITH_IMAGE: '/api/post-tweet-with-image',
     // DMs and comments
@@ -39,6 +40,7 @@ export const API_CONFIG = {
     RULES: '/api/rules',
     PROXY_IMAGE: '/api/proxy-image',
     R2_IMAGE: '/api/r2-image',
+    RUN_STATUS: '/api/run-status',
     // Events and SSE
     EVENTS_LIST: '/api/events-list',
   }

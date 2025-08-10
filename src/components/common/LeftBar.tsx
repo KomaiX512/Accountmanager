@@ -20,6 +20,7 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
   const [showChatModal, setShowChatModal] = useState(false);
   const [showCanvasEditor, setShowCanvasEditor] = useState(false);
   const [chatMessages, setChatMessages] = useState<{role: 'user' | 'assistant', content: string}[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     // Close any popups on route change
@@ -36,10 +37,14 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
     { icon: 'profile', label: 'Profile', action: () => setShowProfilePopup(true) }
   ];
 
-  const handleSendMessage = async (message: string) => {
+  const handleSendMessage = async (message: string, model?: string) => {
+    if (isProcessing) return; // Prevent double submits
+    setIsProcessing(true);
     // Add user message to chat
     const userMessage = { role: 'user' as const, content: message };
-    setChatMessages(prev => [...prev, userMessage]);
+    // Compute nextMessages to avoid using stale state when calling the API
+    const nextMessages = [...chatMessages, userMessage];
+    setChatMessages(nextMessages);
     
     // Call actual RAG API instead of placeholder response
     try {
@@ -50,13 +55,29 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
         return;
       }
 
-      const response = await RagService.sendDiscussionQuery(accountHolder, message, chatMessages, platform || 'instagram');
+      // Pass the latest messages (including the one we just added) with selected model
+      const response = await RagService.sendDiscussionQuery(
+        accountHolder,
+        message,
+        nextMessages,
+        platform || 'instagram',
+        model || 'gemini-2.5-flash'
+      );
       const assistantResponse = { role: 'assistant' as const, content: response.response };
-      setChatMessages(prev => [...prev, assistantResponse]);
+      // Avoid duplicate consecutive assistant messages
+      setChatMessages(prev => {
+        const last = prev[prev.length - 1];
+        if (last && last.role === 'assistant' && last.content.trim() === assistantResponse.content.trim()) {
+          return prev; // skip duplicate
+        }
+        return [...prev, assistantResponse];
+      });
     } catch (error) {
       console.error('[LeftBar] Error getting AI response:', error);
       const errorResponse = { role: 'assistant' as const, content: 'Sorry, I encountered an error. Please try again.' };
       setChatMessages(prev => [...prev, errorResponse]);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -136,6 +157,7 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
           username={accountHolder}
           onSendMessage={handleSendMessage}
           platform={platform}
+          isProcessing={isProcessing}
         />
       )}
       

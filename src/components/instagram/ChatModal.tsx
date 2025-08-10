@@ -16,7 +16,7 @@ export interface ChatModalProps {
   open: boolean;
   onClose: () => void;
   messages: ChatMessage[];
-  onSendMessage?: (message: string) => void;
+  onSendMessage?: (message: string, model?: string) => void;
   username?: string;
   isProcessing?: boolean;
   linkedAccounts?: LinkedAccount[];

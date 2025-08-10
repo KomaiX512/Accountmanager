@@ -84,6 +84,8 @@ interface ProcessingLoadingStateProps {
   onComplete?: () => void;
   countdownMinutes?: number;
   remainingMinutes?: number;
+  extensionMessage?: string;
+  allowAutoComplete?: boolean;
 }
 
 const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
@@ -91,7 +93,9 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   username: propUsername,
   onComplete,
   countdownMinutes = 15,
-  remainingMinutes
+  remainingMinutes,
+  extensionMessage,
+  allowAutoComplete = true
 }) => {
   const navigate = useNavigate();
   const { completeProcessing } = useProcessing();
@@ -216,24 +220,28 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
       const remaining = getRemainingMs();
       
       if (remaining <= 0 && !timerCompleted) {
-        setTimerCompleted(true);
-        
-        // Clean up localStorage
-        try {
-          localStorage.removeItem(`${platform}_processing_countdown`);
-          localStorage.removeItem(`${platform}_processing_info`);
-          
-          // Mark platform as completed
-          const completedPlatforms = localStorage.getItem('completedPlatforms');
-          const completed = completedPlatforms ? JSON.parse(completedPlatforms) : [];
-          if (!completed.includes(platform)) {
-            completed.push(platform);
-            localStorage.setItem('completedPlatforms', JSON.stringify(completed));
+        if (allowAutoComplete) {
+          setTimerCompleted(true);
+          // Clean up localStorage only when auto-completing
+          try {
+            localStorage.removeItem(`${platform}_processing_countdown`);
+            localStorage.removeItem(`${platform}_processing_info`);
+            
+            // Mark platform as completed
+            const completedPlatforms = localStorage.getItem('completedPlatforms');
+            const completed = completedPlatforms ? JSON.parse(completedPlatforms) : [];
+            if (!completed.includes(platform)) {
+              completed.push(platform);
+              localStorage.setItem('completedPlatforms', JSON.stringify(completed));
+            }
+            
+            console.log(`🔥 BULLETPROOF TIMER: Completed ${platform} processing`);
+          } catch (error) {
+            console.error('Error cleaning up timer:', error);
           }
-          
-          console.log(`🔥 BULLETPROOF TIMER: Completed ${platform} processing`);
-        } catch (error) {
-          console.error('Error cleaning up timer:', error);
+        } else {
+          // Do not mark as completed; parent may extend time and continue updates
+          // Keep interval running so UI can reflect extended endTime written by parent
         }
       }
     };
@@ -292,11 +300,11 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
 
   // Handle completion on mount if countdown is already 0
   useEffect(() => {
-    if (timerCompleted && onComplete) {
+    if (timerCompleted && onComplete && allowAutoComplete) {
       completeProcessing();
       onComplete();
     }
-  }, [timerCompleted, onComplete, completeProcessing]);
+  }, [timerCompleted, onComplete, completeProcessing, allowAutoComplete]);
 
   // ✅ SELECTIVE NAVIGATION BLOCKING - Only block the specific platform being processed
   // This allows users to explore other parts of the app while timer runs
@@ -671,7 +679,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
 
           {/* Current Stage Info */}
           <AnimatePresence mode="wait">
-            {timerCompleted ? (
+            {allowAutoComplete && timerCompleted ? (
               <motion.div
                 className="completion-stage"
                 initial={{ opacity: 0, y: 10 }}
@@ -722,7 +730,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
                 </div>
                 <div className="remaining-setup-info">
                   <span className="setup-note">
-                    ⚡ This one-time setup ensures lightning-fast performance forever
+                    {extensionMessage || '⚡ This one-time setup ensures lightning-fast performance forever'}
                   </span>
                 </div>
               </motion.div>

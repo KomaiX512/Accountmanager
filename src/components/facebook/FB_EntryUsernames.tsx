@@ -1,17 +1,27 @@
-import React, { useState, ChangeEvent, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './FB_EntryUsernames.css';
 import { motion } from 'framer-motion';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import ProcessingLoadingState from '../common/ProcessingLoadingState';
 import { useProcessing } from '../../context/ProcessingContext';
 
 interface FB_EntryUsernamesProps {
-  onSubmitSuccess: (username: string, competitors: string[], accountType: 'branding' | 'non-branding') => void;
+  onSubmitSuccess: (accountData: any, competitors: any[], accountType: 'branding' | 'non-branding') => void;
   redirectIfCompleted?: boolean;
   markPlatformAccessed?: (platformId: string) => void;
   onComplete?: () => void;
+}
+
+interface AccountData {
+  name: string;
+  url: string;
+}
+
+interface CompetitorData {
+  name: string;
+  url: string;
 }
 
 const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({ 
@@ -20,21 +30,19 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
   markPlatformAccessed,
   onComplete
 }) => {
-  const [username, setUsername] = useState<string>('');
+  const [accountData, setAccountData] = useState<AccountData>({ name: '', url: '' });
   const [accountType, setAccountType] = useState<'branding' | 'non-branding'>('branding');
   const [postingStyle, setPostingStyle] = useState<string>('');
-  const [competitors, setCompetitors] = useState<string[]>(['', '', '']);
+  const [competitors, setCompetitors] = useState<CompetitorData[]>([
+    { name: '', url: '' },
+    { name: '', url: '' },
+    { name: '', url: '' }
+  ]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
   const [message, setMessage] = useState<string>('');
   const [messageType, setMessageType] = useState<'info' | 'success' | 'error'>('info');
-  
-  const [isCheckingUsername, setIsCheckingUsername] = useState<boolean>(false);
-  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
-  const [usernameMessage, setUsernameMessage] = useState<string>('');
-  const [usernameValid, setUsernameValid] = useState<boolean>(true);
-  const [usernameTouched, setUsernameTouched] = useState<boolean>(false);
   
   // New state for pre-submission confirmation
   const [showConfirmation, setShowConfirmation] = useState<boolean>(false);
@@ -44,18 +52,14 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
   const { currentUser } = useAuth();
   const { startProcessing, processingState } = useProcessing();
 
-  const apiUrl = '/api/save-account-info';
-const statusApiUrl = '/api/user-facebook-status';
-const usernameCheckUrl = '/api/check-username-availability';
+  // const apiUrl = '/api/save-account-info';
 
-  // Facebook username validation (letters, numbers, periods only - no underscores for Facebook)
-  const facebookUsernameRegex = /^[a-zA-Z0-9.]+$/;
+  // Facebook URL validation - supports both pages and profiles with IDs
+  const facebookUrlRegex = /^https?:\/\/(www\.)?facebook\.com\/([a-zA-Z0-9._%+-]+|profile\.php\?id=\d+)\/?$/;
 
   // Initialize component
   useEffect(() => {
-    // Only check for active processing state, not completed state
-    // The dashboards will handle redirecting completed users
-      setIsInitializing(false);
+    setIsInitializing(false);
   }, []);
 
   useEffect(() => {
@@ -71,17 +75,17 @@ const usernameCheckUrl = '/api/check-username-availability';
       
       if (hasAccessed && redirectIfCompleted) {
         // User has already accessed, try to get saved data from localStorage or backend
-        const savedUsername = localStorage.getItem(`facebook_username_${currentUser.uid}`);
+        const savedAccountData = JSON.parse(localStorage.getItem(`facebook_account_data_${currentUser.uid}`) || '{}');
         const savedAccountType = localStorage.getItem(`facebook_account_type_${currentUser.uid}`) as 'branding' | 'non-branding' || 'branding';
         const savedCompetitors = JSON.parse(localStorage.getItem(`facebook_competitors_${currentUser.uid}`) || '[]');
         
-        if (savedUsername) {
-          onSubmitSuccess(savedUsername, savedCompetitors, savedAccountType);
+        if (savedAccountData.name && savedAccountData.url) {
+          onSubmitSuccess(savedAccountData, savedCompetitors, savedAccountType);
           
           if (savedAccountType === 'branding') {
             navigate('/facebook-dashboard', { 
               state: { 
-                accountHolder: savedUsername, 
+                accountData: savedAccountData, 
                 competitors: savedCompetitors,
                 accountType: 'branding',
                 platform: 'facebook'
@@ -90,7 +94,7 @@ const usernameCheckUrl = '/api/check-username-availability';
           } else {
             navigate('/facebook-non-branding-dashboard', { 
               state: { 
-                accountHolder: savedUsername,
+                accountData: savedAccountData,
                 competitors: savedCompetitors,
                 accountType: 'non-branding',
                 platform: 'facebook'
@@ -101,177 +105,53 @@ const usernameCheckUrl = '/api/check-username-availability';
         }
       }
       
-      // If not in localStorage, try backend API as fallback
-      try {
-        const response = await axios.get(`${statusApiUrl}/${currentUser.uid}`);
-        
-        if (response.data.hasEnteredFacebookUsername && redirectIfCompleted) {
-          const savedUsername = response.data.facebook_username;
-          const savedCompetitors = response.data.competitors || [];
-          const savedAccountType = response.data.accountType || 'branding';
-          
-          // Save to localStorage for future use
-          localStorage.setItem(`facebook_accessed_${currentUser.uid}`, 'true');
-          localStorage.setItem(`facebook_username_${currentUser.uid}`, savedUsername);
-          localStorage.setItem(`facebook_account_type_${currentUser.uid}`, savedAccountType);
-          localStorage.setItem(`facebook_competitors_${currentUser.uid}`, JSON.stringify(savedCompetitors));
-          
-          onSubmitSuccess(savedUsername, savedCompetitors, savedAccountType as 'branding' | 'non-branding');
-          
-          if (savedAccountType === 'branding') {
-            navigate('/facebook-dashboard', { 
-              state: { 
-                accountHolder: savedUsername, 
-                competitors: savedCompetitors,
-                accountType: 'branding',
-                platform: 'facebook'
-              } 
-            });
-          } else {
-            navigate('/facebook-non-branding-dashboard', { 
-              state: { 
-                accountHolder: savedUsername,
-                competitors: savedCompetitors,
-                accountType: 'non-branding',
-                platform: 'facebook'
-              } 
-            });
-          }
-        } else {
-          setIsInitializing(false);
-        }
-      } catch (error) {
-        console.error('Error checking user Facebook status:', error);
-        // If backend fails, just show the form
-        setIsInitializing(false);
-      }
+      // If not in localStorage, just show the form
+      setIsInitializing(false);
     };
     
     checkUserStatus();
   }, [currentUser, navigate, onSubmitSuccess, redirectIfCompleted]);
 
-  const checkUsernameAvailability = useCallback(
-    async (value: string) => {
-      if (!value.trim()) {
-        setUsernameAvailable(null);
-        setUsernameMessage('');
-        return;
-      }
-
-      if (!facebookUsernameRegex.test(value)) {
-        setUsernameValid(false);
-        setUsernameMessage('Username can only contain letters, numbers, and periods');
-        setUsernameAvailable(null);
-        return;
-      }
-
-      setUsernameValid(true);
-      setIsCheckingUsername(true);
-
-      try {
-        const response = await axios.get(`${usernameCheckUrl}/${value}?platform=facebook`);
-        setUsernameAvailable(response.data.available);
-        setUsernameMessage(response.data.message);
-      } catch (error) {
-        console.error('Error checking username availability:', error);
-        setUsernameAvailable(null);
-        setUsernameMessage('Unable to check username availability');
-      } finally {
-        setIsCheckingUsername(false);
-      }
-    },
-    [usernameCheckUrl]
-  );
-
-  useEffect(() => {
-    if (!usernameTouched || !username.trim()) return;
-
-    const handler = setTimeout(() => {
-      checkUsernameAvailability(username);
-    }, 500);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [username, checkUsernameAvailability, usernameTouched]);
-
-  const handleUsernameChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const inputValue = e.target.value;
-    setUsername(inputValue);
-    
-    // Reset validation states when user types
-    setUsernameValid(true);
-    setUsernameAvailable(null);
-    setUsernameMessage('');
-    
-    if (!usernameTouched) {
-      setUsernameTouched(true);
-    }
+  const validateFacebookUrl = (url: string): boolean => {
+    if (!url.trim()) return true; // Empty is valid (optional field)
+    return facebookUrlRegex.test(url.trim());
   };
 
-  const validateCompetitorUsername = (value: string): boolean => {
-    return value.trim() === '' || facebookUsernameRegex.test(value);
+  const handleAccountDataChange = (field: 'name' | 'url', value: string) => {
+    setAccountData(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
-  const handleCompetitorChange = (index: number, value: string) => {
+  const handleCompetitorChange = (index: number, field: 'name' | 'url', value: string) => {
     const newCompetitors = [...competitors];
-    newCompetitors[index] = value;
+    newCompetitors[index] = {
+      ...newCompetitors[index],
+      [field]: value
+    };
     setCompetitors(newCompetitors);
   };
 
   const isValidForSubmission = (): boolean => {
     // Check basic required fields
-    if (!username.trim() || !accountType || !postingStyle.trim()) return false;
+    if (!accountData.name.trim() || !accountData.url.trim() || !accountType || !postingStyle.trim()) return false;
     
-    // Check username format validity (not availability)
-    if (username.trim() && !facebookUsernameRegex.test(username.trim())) return false;
+    // Check URL format validity
+    if (!validateFacebookUrl(accountData.url)) return false;
     
-    // Check competitors
+    // Check competitors (first 3 are required)
     if (competitors.length < 3) return false;
-    if (!competitors.slice(0, 3).every(comp => comp.trim() !== '')) return false;
-    if (!competitors.every(validateCompetitorUsername)) return false;
+    if (!competitors.slice(0, 3).every(comp => comp.name.trim() !== '' && comp.url.trim() !== '')) return false;
+    if (!competitors.every(comp => !comp.url.trim() || validateFacebookUrl(comp.url))) return false;
     
     return true;
   };
 
-  const validationErrors = (): string[] => {
-    const errors: string[] = [];
-    
-    // Username validation
-    if (!username.trim()) {
-      errors.push('Username is required');
-    } else if (!facebookUsernameRegex.test(username.trim())) {
-      errors.push('Username format is invalid (only letters, numbers, and periods allowed)');
-    }
-    
-    // Account type validation
-    if (!accountType) {
-      errors.push('Account type is required');
-    }
-    
-    // Posting style validation
-    if (!postingStyle.trim()) {
-      errors.push('Posting style is required');
-    }
-    
-    // Competitor validation
-    if (competitors.length < 3) {
-      errors.push('At least 3 competitors are required');
-    } else {
-      competitors.forEach((comp, index) => {
-        if (index < 3 && !comp.trim()) {
-          errors.push(`Competitor ${index + 1} username is required`);
-        } else if (comp.trim() && !validateCompetitorUsername(comp)) {
-          errors.push(`Competitor ${index + 1} username format is invalid`);
-        }
-      });
-    }
-    
-    return errors;
-  };
+  // validationErrors helper removed (unused)
 
   const addCompetitor = () => {
-    setCompetitors([...competitors, '']);
+    setCompetitors([...competitors, { name: '', url: '' }]);
   };
 
   const removeCompetitor = (index: number) => {
@@ -282,14 +162,15 @@ const usernameCheckUrl = '/api/check-username-availability';
   };
 
   const resetForm = () => {
-    setUsername('');
+    setAccountData({ name: '', url: '' });
     setAccountType('branding');
     setPostingStyle('');
-    setCompetitors(['', '', '']);
+    setCompetitors([
+      { name: '', url: '' },
+      { name: '', url: '' },
+      { name: '', url: '' }
+    ]);
     setMessage('');
-    setUsernameAvailable(null);
-    setUsernameMessage('');
-    setUsernameTouched(false);
   };
 
   const showMessage = (msg: string, type: 'info' | 'success' | 'error' = 'info') => {
@@ -328,14 +209,22 @@ const usernameCheckUrl = '/api/check-username-availability';
     }
 
     // Show confirmation dialog before proceeding
-    const finalCompetitors = competitors.filter(comp => comp.trim() !== '');
-    const dataToConfirm = {
-      username: username.trim(),
-      accountType,
-      competitors: finalCompetitors,
-      postingStyle: postingStyle.trim() || 'General posting style',
-      platform: 'facebook'
-    };
+    const finalCompetitors = competitors.filter(comp => comp.name.trim() !== '' && comp.url.trim() !== '');
+          const dataToConfirm = {
+        // New format for enhanced functionality
+        accountData: {
+          name: accountData.name.trim(),
+          url: accountData.url.trim()
+        },
+        // Backward compatibility - maintain old format for API
+        username: accountData.name.trim(),
+        accountType,
+        competitors: finalCompetitors.map(comp => comp.name), // Send competitor names as strings for backward compatibility
+        // Include full competitor data for confirmation modal display
+        competitor_data: finalCompetitors,
+        postingStyle: postingStyle.trim() || 'General posting style',
+        platform: 'facebook'
+      };
     
     setConfirmationData(dataToConfirm);
     setShowConfirmation(true);
@@ -349,35 +238,65 @@ const usernameCheckUrl = '/api/check-username-availability';
 
     try {
       const apiUrl = `/api/save-account-info`;
-      const statusApiUrl = `/api/user-status`;
 
-      // Save to account info API
-      const response = await axios.post(apiUrl, confirmationData, {
+      // Log the data being sent for debugging
+      console.log('Submitting Facebook data:', confirmationData);
+
+      // Save to account info API (send augmented facebook payload including URLs)
+      const response = await axios.post(apiUrl, {
+        ...confirmationData,
+        // Ensure platform stays facebook and payload shape includes full competitor_data
+        platform: 'facebook',
+      }, {
         headers: { 'Content-Type': 'application/json' },
         timeout: 30000,
       });
 
       if (response.status === 200) {
-        // Now save the user's Facebook username entry state
-        await axios.post(`/api/user-facebook-status/${currentUser.uid}`, {
-          facebook_username: confirmationData.username,
-          accountType: confirmationData.accountType,
-          competitors: confirmationData.competitors
-        });
+        console.log('Account info saved successfully to R2!');
         
         // Save to localStorage immediately for future use
         localStorage.setItem(`facebook_accessed_${currentUser.uid}`, 'true');
-        localStorage.setItem(`facebook_username_${currentUser.uid}`, confirmationData.username);
-        localStorage.setItem(`facebook_account_type_${currentUser.uid}`, confirmationData.accountType);
-        localStorage.setItem(`facebook_competitors_${currentUser.uid}`, JSON.stringify(confirmationData.competitors));
+        localStorage.setItem(
+          `facebook_account_data_${currentUser.uid}`,
+          JSON.stringify(confirmationData.accountData)
+        );
+        localStorage.setItem(
+          `facebook_account_type_${currentUser.uid}`,
+          confirmationData.accountType
+        );
+        // Store competitor names where the app expects them
+        try {
+          const competitorNames = Array.isArray(confirmationData.competitor_data)
+            ? confirmationData.competitor_data
+                .map((c: any) => (c && typeof c.name === 'string' ? c.name : ''))
+                .filter((n: string) => n && n.trim() !== '')
+            : [];
+          localStorage.setItem(
+            `facebook_competitors_${currentUser.uid}`,
+            JSON.stringify(competitorNames)
+          );
+          // Preserve full competitor objects for FB-specific flows
+          localStorage.setItem(
+            `facebook_competitor_data_${currentUser.uid}`,
+            JSON.stringify(confirmationData.competitor_data)
+          );
+        } catch {}
+        // Critical for dashboard routing: persist platform-scoped username used by App routing logic
+        localStorage.setItem(
+          `facebook_username_${currentUser.uid}`,
+          confirmationData.accountData.name
+        );
         
         showMessage('Submission successful', 'success');
         
         // Start the processing phase using unified ProcessingContext
-        startProcessing('facebook', confirmationData.username, 25); // 25 minutes duration
+        startProcessing('facebook', confirmationData.accountData.name, 2); // 2 minutes duration
       }
     } catch (error: any) {
       console.error('Error submitting Facebook data:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
       const errorMessage = error.response?.data?.error || 'Failed to save Facebook account information. Please try again.';
       showMessage(errorMessage, 'error');
     } finally {
@@ -391,23 +310,23 @@ const usernameCheckUrl = '/api/check-username-availability';
       setIsProcessing(true);
       setIsInitializing(false);
       
-      // Restore username from processing state or localStorage
-      if (processingState.username) {
-        setUsername(processingState.username);
-      } else {
-        // Fallback to localStorage
-        try {
-          const processingInfo = localStorage.getItem('facebook_processing_info');
-          if (processingInfo) {
-            const info = JSON.parse(processingInfo);
-            if (info.username) {
-              setUsername(info.username);
+              // Restore account data from processing state or localStorage
+        if (processingState.username) {
+          setAccountData(prev => ({ ...prev, name: processingState.username || '' }));
+        } else {
+          // Fallback to localStorage
+          try {
+            const processingInfo = localStorage.getItem('facebook_processing_info');
+            if (processingInfo) {
+              const info = JSON.parse(processingInfo);
+              if (info.accountData) {
+                setAccountData(info.accountData);
+              }
             }
+          } catch (error) {
+            console.error('Error reading account data from localStorage:', error);
           }
-        } catch (error) {
-          console.error('Error reading username from localStorage:', error);
         }
-      }
     } else {
       // No active processing, show the form
       setIsInitializing(false);
@@ -434,7 +353,7 @@ const usernameCheckUrl = '/api/check-username-availability';
     return (
       <ProcessingLoadingState
         platform="facebook"
-        username={username}
+        username={accountData.name}
         onComplete={handleProcessingComplete}
       />
     );
@@ -453,7 +372,7 @@ const usernameCheckUrl = '/api/check-username-availability';
           <h1>Setup Your Facebook Account</h1>
           <div className="importance-notice">
             <div className="importance-icon">⚠️</div>
-            <p><strong>Critical Setup:</strong> This information initiates a 20-minute AI analysis process. Please ensure all details are accurate before submission.</p>
+            <p><strong>Critical Setup:</strong> This information initiates a 25-minute AI analysis process. Please ensure all details are accurate before submission.</p>
           </div>
         </div>
 
@@ -462,34 +381,56 @@ const usernameCheckUrl = '/api/check-username-availability';
             <h2>Account Information</h2>
             
             <div className="form-group">
-              <label htmlFor="facebook-username">
-                Your Facebook Username * 
+              <label htmlFor="facebook-account-name">
+                Your Facebook Account Name * 
                 <span className="critical-field">CRITICAL</span>
               </label>
               <input
                 type="text"
-                id="facebook-username"
-                value={username}
-                onChange={handleUsernameChange}
-                placeholder="e.g., yourpage or your.profile.name"
-                className={`form-input ${usernameTouched && !usernameValid ? 'error' : ''} ${usernameAvailable === true ? 'success' : ''} ${usernameAvailable === false ? 'error' : ''}`}
+                id="facebook-account-name"
+                value={accountData.name}
+                onChange={(e) => handleAccountDataChange('name', e.target.value)}
+                placeholder="e.g., Your Brand Name or Personal Name"
+                className="form-input"
                 disabled={isLoading}
               />
-              {isCheckingUsername && <div className="username-check-indicator">Checking availability...</div>}
-              {usernameMessage && (
-                <div className={`username-message ${usernameAvailable === true ? 'success' : 'error'}`}>
-                  {usernameMessage}
-                </div>
-              )}
               <div className="field-description">
-                <p><strong>Why this matters:</strong> Your username is the foundation for all AI-generated content, competitor analysis, and strategic recommendations.</p>
+                <p><strong>Account Name:</strong> This is the display name that will be mapped to your Facebook URL for AI analysis.</p>
                 <ul>
-                  <li>✓ Must be your exact Facebook page name or profile username</li>
-                  <li>✓ Only letters, numbers, and periods allowed</li>
-                  <li>✓ No spaces or special characters</li>
-                  <li>✓ This will be used for 20 minutes of AI processing</li>
+                  <li>✓ Can be any name you want to use for this account</li>
+                  <li>✓ No restrictions on format or characters</li>
+                  <li>✓ This name will be mapped to your Facebook URL</li>
+                  <li>✓ Used for 2 minutes of AI processing</li>
                 </ul>
               </div>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="facebook-account-url">
+                Your Facebook Page/Profile URL * 
+                <span className="critical-field">CRITICAL</span>
+              </label>
+              <input
+                type="url"
+                id="facebook-account-url"
+                value={accountData.url}
+                onChange={(e) => handleAccountDataChange('url', e.target.value)}
+                placeholder="https://facebook.com/yourpage or https://facebook.com/yourprofile"
+                className={`form-input ${accountData.url && !validateFacebookUrl(accountData.url) ? 'error' : ''}`}
+                disabled={isLoading}
+              />
+              {accountData.url && !validateFacebookUrl(accountData.url) && (
+                <div className="error-message">Please enter a valid Facebook URL (e.g., https://facebook.com/yourpage or https://facebook.com/profile.php?id=123456789)</div>
+              )}
+                              <div className="field-description">
+                  <p><strong>Facebook URL:</strong> This is the actual Facebook page or profile URL that will be scraped for AI analysis.</p>
+                  <ul>
+                    <li>✓ Must be a valid Facebook page or profile URL</li>
+                    <li>✓ Format: https://facebook.com/yourpage or https://facebook.com/profile.php?id=123456789</li>
+                    <li>✓ Profile must not be locked/private</li>
+                    <li>✓ This URL will be scraped for 2 minutes</li>
+                  </ul>
+                </div>
             </div>
 
             <div className="form-group">
@@ -541,7 +482,7 @@ const usernameCheckUrl = '/api/check-username-availability';
               {competitors.map((competitor, index) => (
                 <div key={index} className="competitor-input-group">
                   <div className="competitor-header">
-                    <label htmlFor={`competitor-${index}`} className="competitor-label">
+                    <label className="competitor-label">
                       Competitor {index + 1} {index < 3 ? '*' : ''}
                       {index < 3 && <span className="required-badge">Required</span>}
                     </label>
@@ -553,15 +494,32 @@ const usernameCheckUrl = '/api/check-username-availability';
                   </div>
                   
                   <div className="competitor-input-wrapper">
-                    <input
-                      type="text"
-                      id={`competitor-${index}`}
-                      value={competitor}
-                      onChange={(e) => handleCompetitorChange(index, e.target.value)}
-                      placeholder="e.g., competitor.page"
-                      className={`competitor-input ${competitor.trim() && !validateCompetitorUsername(competitor) ? 'error' : ''}`}
-                      disabled={isLoading}
-                    />
+                    <div className="competitor-name-input">
+                      <label htmlFor={`competitor-name-${index}`}>Name</label>
+                      <input
+                        type="text"
+                        id={`competitor-name-${index}`}
+                        value={competitor.name}
+                        onChange={(e) => handleCompetitorChange(index, 'name', e.target.value)}
+                        placeholder="Competitor name"
+                        className="competitor-input"
+                        disabled={isLoading}
+                      />
+                    </div>
+                    
+                    <div className="competitor-url-input">
+                      <label htmlFor={`competitor-url-${index}`}>URL</label>
+                      <input
+                        type="url"
+                        id={`competitor-url-${index}`}
+                        value={competitor.url}
+                        onChange={(e) => handleCompetitorChange(index, 'url', e.target.value)}
+                        placeholder="https://facebook.com/competitor"
+                        className={`competitor-input ${competitor.url && !validateFacebookUrl(competitor.url) ? 'error' : ''}`}
+                        disabled={isLoading}
+                      />
+                    </div>
+                    
                     {index >= 3 && (
                       <button
                         type="button"
@@ -574,9 +532,9 @@ const usernameCheckUrl = '/api/check-username-availability';
                     )}
                   </div>
                   
-                  {competitor.trim() && !validateCompetitorUsername(competitor) && (
-                    <div className="error-message">Invalid Facebook username format</div>
-                  )}
+                                     {competitor.url && !validateFacebookUrl(competitor.url) && (
+                     <div className="error-message">Invalid Facebook URL format (e.g., https://facebook.com/competitor or https://facebook.com/profile.php?id=123456789)</div>
+                   )}
                 </div>
               ))}
             </div>
@@ -652,10 +610,14 @@ const usernameCheckUrl = '/api/check-username-availability';
             
             <div className="confirmation-content">
               <div className="confirmation-section">
-                <h4>📝 Your Information</h4>
+                <h4>📝 Your Account Information</h4>
                 <div className="confirmation-item">
-                  <strong>Username:</strong> {confirmationData.username}
-                  <div className="critical-warning">⚠️ This is critical - check spelling carefully!</div>
+                  <strong>Account Name:</strong> {confirmationData.accountData.name}
+                  <div className="critical-warning">⚠️ This name will be mapped to your Facebook URL!</div>
+                </div>
+                <div className="confirmation-item">
+                  <strong>Facebook URL:</strong> {confirmationData.accountData.url}
+                  <div className="critical-warning">⚠️ This URL will be scraped for 2 minutes!</div>
                 </div>
                 <div className="confirmation-item">
                   <strong>Account Type:</strong> {confirmationData.accountType}
@@ -666,10 +628,12 @@ const usernameCheckUrl = '/api/check-username-availability';
               </div>
               
               <div className="confirmation-section">
-                <h4>🎯 Competitors ({confirmationData.competitors.length})</h4>
-                {confirmationData.competitors.map((comp: string, index: number) => (
+                <h4>🎯 Competitors ({confirmationData.competitor_data.length})</h4>
+                {confirmationData.competitor_data.map((comp: any, index: number) => (
                   <div key={index} className="confirmation-item">
-                    <strong>Competitor {index + 1}:</strong> {comp}
+                    <strong>Competitor {index + 1}:</strong>
+                    <div>Name: {comp.name}</div>
+                    <div>URL: {comp.url}</div>
                   </div>
                 ))}
               </div>

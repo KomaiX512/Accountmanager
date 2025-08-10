@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle, Send, X, Loader2 } from 'lucide-react';
 import './ChatModal.css';
@@ -14,9 +14,10 @@ interface ChatModalProps {
   messages: ChatMessage[];
   onClose: () => void;
   username: string;
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: string, model?: string) => void;
   isProcessing?: boolean;
   platform?: string;
+  suggestedQuestions?: string[];
 }
 
 const ChatModal: React.FC<ChatModalProps> = ({
@@ -26,12 +27,49 @@ const ChatModal: React.FC<ChatModalProps> = ({
   username,
   onSendMessage,
   isProcessing = false,
-  platform = 'instagram'
+  platform = 'instagram',
+  suggestedQuestions
 }) => {
   const [message, setMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { trackRealDiscussion, canUseFeature } = useFeatureTracking();
+
+  // Gemini model configuration removed – single default model is now used.
+
+  // Derive 5 context-aware defaults if not provided by parent
+  const defaultSuggestions = useMemo(() => {
+    const lower = (platform || 'instagram').toLowerCase();
+    const who = username || 'manager';
+    if (lower.includes('instagram')) {
+      return [
+        `Give me 10 trending hashtags for ${who}`,
+        'Write 3 caption ideas with a strong hook',
+        'Best time to post this week and why?',
+        'Suggest a carousel content plan for tomorrow',
+        'How can we improve reach from our last post?'
+      ];
+    }
+    if (lower.includes('twitter')) {
+      return [
+        'Draft 3 engaging tweets on our latest update',
+        'What are trending topics to join today?',
+        'Create a 5-tweet thread outline',
+        'Propose 10 high-relevance hashtags',
+        'What is the best posting schedule this week?'
+      ];
+    }
+    return [
+      'Summarize key insights from recent comments',
+      'Suggest 3 post ideas for higher engagement',
+      'What\'s a good CTA that fits our brand?',
+      'Create a short copy for a product spotlight',
+      'How to increase saves and shares fast?'
+    ];
+  }, [platform, username]);
+  const quickQuestions = (suggestedQuestions && suggestedQuestions.length > 0)
+    ? suggestedQuestions.slice(0, 5)
+    : defaultSuggestions;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -41,13 +79,12 @@ const ChatModal: React.FC<ChatModalProps> = ({
     scrollToBottom();
   }, [messages]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!message.trim() || isProcessing) return;
+  const sendMessage = useCallback(async (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || isProcessing) return;
 
-    console.log(`[ChatModal] 🚀 SUBMIT STARTED: platform=${platform}, message="${message.trim().substring(0, 50)}..."`);
+    console.log(`[ChatModal] 🚀 SUBMIT STARTED: platform=${platform}, model=default, message="${trimmed.substring(0, 50)}..."`);
 
-    // Verify discussion limits before proceeding
     const discussionAccessCheck = canUseFeature('discussions');
     if (!discussionAccessCheck.allowed) {
       console.warn(`[ChatModal] 🚫 DISCUSSION BLOCKED:`, discussionAccessCheck.reason);
@@ -55,32 +92,30 @@ const ChatModal: React.FC<ChatModalProps> = ({
       return;
     }
 
-    const messageToSend = message.trim();
+    // Clear input immediately for snappy UX
     setMessage('');
 
-    // Track actual discussion engagement
     try {
-      console.log(`[ChatModal] 🎯 Calling trackRealDiscussion for ${platform}...`);
       const trackingSuccess = await trackRealDiscussion(platform, {
         messageCount: messages.length + 1,
         type: 'chat'
       });
-      
-      console.log(`[ChatModal] 📊 Tracking result: ${trackingSuccess ? 'SUCCESS' : 'FAILED'}`);
-      
       if (!trackingSuccess) {
         console.warn(`[ChatModal] 🚫 Tracking failed, aborting message send`);
         return;
       }
-      
-      console.log(`[ChatModal] ✅ Tracking successful, proceeding with message send`);
     } catch (trackingError) {
       console.error(`[ChatModal] ❌ Discussion tracking error:`, trackingError);
-      // Continue with sending message even if tracking fails
+      // continue anyway
     }
 
-    console.log(`[ChatModal] 📤 Sending message to parent component...`);
-    onSendMessage(messageToSend);
+    // Send message
+    onSendMessage(trimmed);
+  }, [canUseFeature, isProcessing, messages.length, onSendMessage, platform, trackRealDiscussion]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await sendMessage(message);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -89,6 +124,8 @@ const ChatModal: React.FC<ChatModalProps> = ({
       handleSubmit(e as any);
     }
   };
+
+  // Model toggle removed
 
   // Format message content for better display and JSON handling
   const formatMessageContent = (content: string) => {
@@ -158,6 +195,8 @@ const ChatModal: React.FC<ChatModalProps> = ({
     }
   }, [open]);
 
+  // Model variables removed
+
   return (
     <AnimatePresence>
       {open && (
@@ -177,14 +216,16 @@ const ChatModal: React.FC<ChatModalProps> = ({
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* COMPACT HEADER */}
+            {/* ENHANCED HEADER WITH MODEL SWITCHER */}
             <div className="chat-modal-header">
               <div className="chat-header-info">
                 <div className="chat-mode-indicator">
                   <MessageCircle size={16} className="mode-icon discussion-icon" />
                   <h3>AI Discussion with {username}</h3>
                 </div>
-                <span className="platform-badge">{platform}</span>
+                <div className="header-controls">
+                  <span className="platform-badge">{platform}</span>
+                </div>
               </div>
               <button 
                 className="chat-close-btn" 
@@ -195,6 +236,8 @@ const ChatModal: React.FC<ChatModalProps> = ({
               </button>
             </div>
 
+            {/* Model status bar removed */}
+
             {/* MAXIMIZED MESSAGES AREA */}
             <div className="chat-messages">
               {messages.length === 0 ? (
@@ -204,11 +247,12 @@ const ChatModal: React.FC<ChatModalProps> = ({
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}
                 >
-                  <div className="welcome-icon">
+                  <div className="welcome-icon" style={{display:'none'}}>
                     <MessageCircle size={32} className="mode-icon-large" />
                   </div>
-                  <h4>Start an AI Discussion</h4>
-                  <p>Ask questions, get strategic insights, or discuss your {platform} growth strategy!</p>
+                  <h4 style={{textAlign:'left', marginBottom: 4}}>Start an AI Discussion</h4>
+                  <p style={{textAlign:'left'}}>Ask questions, get strategic insights, or discuss your {platform} growth strategy.</p>
+                  {/* Model capability hint removed */}
                 </motion.div>
               ) : (
                 messages.map((msg, index) => (
@@ -243,10 +287,27 @@ const ChatModal: React.FC<ChatModalProps> = ({
                       <span></span>
                       <span></span>
                     </div>
+                    {/* Processing model indicator removed */}
                   </div>
                 </motion.div>
               )}
               <div ref={messagesEndRef} />
+            </div>
+
+            {/* Quick question chips */}
+            <div className="quick-questions" aria-hidden={!!message.trim()}>
+              {!message.trim() && quickQuestions.map((q, i) => (
+                <button
+                  key={`${i}-${q}`}
+                  type="button"
+                  className="quick-question-chip"
+                  disabled={isProcessing}
+                  onClick={() => sendMessage(q)}
+                  title={q}
+                >
+                  {q}
+                </button>
+              ))}
             </div>
 
             {/* REDESIGNED INPUT AREA - COMPACT AND ALIGNED */}

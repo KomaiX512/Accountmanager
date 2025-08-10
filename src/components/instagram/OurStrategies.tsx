@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import './OurStrategies.css';
 import '../../utils/jsonDecoder.css';
 import useR2Fetch from '../../hooks/useR2Fetch';
-import CacheManager, { appendBypassParam } from '../../utils/cacheManager';
+import CacheManager from '../../utils/cacheManager';
 import { motion } from 'framer-motion';
 import ErrorBoundary from '../ErrorBoundary';
 import { decodeJSONToReactElements } from '../../utils/jsonDecoder';
@@ -40,13 +40,12 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
   // Construct endpoint - ALWAYS use strategies endpoint for now since that's where data exists
   // This is a temporary fix until we have proper engagement strategies data
   const baseEndpoint = `/api/retrieve-strategies/${normalizedAccountHolder}`;
-  const rawEndpoint = `${baseEndpoint}?platform=${platform}`;
-  const endpoint = appendBypassParam(rawEndpoint, platform, normalizedAccountHolder, 'strategies');
+  const endpoint = `${baseEndpoint}?platform=${platform}`;
 
   // Debug the endpoint being called
   console.log(`[OurStrategies] ${componentId.current} calling endpoint: ${endpoint} (forced to strategies)`);
 
-  const { data, loading, error } = useR2Fetch<any[]>(endpoint, platform);
+  const { data, loading, error } = useR2Fetch<any[]>(endpoint, platform, 'strategies');
 
   // ✅ NEW: Dynamic content extraction without hardcoded assumptions
   const getTacticalRecommendationsPreview = (strategyIndex: number = 0) => {
@@ -115,14 +114,7 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
   };
 
   // Get strategy icon based on index
-  const getStrategyIcon = (index: number) => {
-    const icons = [
-      '💡', // Lightbulb for strategies
-      '💡', // Lightbulb for strategies
-      '💡'  // Lightbulb for strategies
-    ];
-    return icons[index] || '💡';
-  };
+  // Icons handled via CSS; no need for a runtime helper
 
   const renderStrategyContent = (strategyData: any) => {
     if (!strategyData || typeof strategyData !== 'object') {
@@ -171,9 +163,9 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
     setShowPopup(true);
     // Force refresh the data when popup is opened
     if (!data || data.length === 0) {
-      // Trigger a refresh by updating the endpoint with forceRefresh
-      const refreshEndpoint = `${baseEndpoint}?platform=${platform}&forceRefresh=true`;
-      console.log('[OurStrategies] Force refreshing strategies:', refreshEndpoint);
+      // Trigger a refresh by updating cache keys rather than duplicating query params
+      CacheManager.markCacheTime(platform, normalizedAccountHolder, 'strategies');
+      console.log('[OurStrategies] Force refreshing strategies via cache time mark');
     }
   };
 
@@ -203,7 +195,7 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
         <div className="strategies-scrollable">
           {!loading && displayStrategies.length > 0 ? (
             // ✅ NEW: Display multiple strategy cards
-            displayStrategies.map((strategy, index) => {
+            displayStrategies.map((_, index) => {
               const tacticalPreview = getTacticalRecommendationsPreview(index);
               const previewText = tacticalPreview ? getPreviewText(tacticalPreview) : '';
               

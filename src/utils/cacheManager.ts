@@ -1,7 +1,4 @@
-interface CacheInvalidationConfig {
-  competitorEditTime?: number;
-  lastCacheTime?: number;
-}
+// Removed unused Interface to satisfy linter
 
 class CacheManager {
   private static readonly COMPETITOR_CACHE_DURATION = 15 * 60 * 1000; // 15 minutes in milliseconds
@@ -136,6 +133,11 @@ class CacheManager {
   static appendBypassParam(url: string, platform: string, accountHolder: string, section?: string): string {
     try {
       if (!url) return url;
+      // Idempotency: if bypass params already exist, don't add again
+      if (/[?&]bypass_cache=/.test(url) || /[?&]_cb=/.test(url)) {
+        this.markCacheTime(platform, accountHolder, section);
+        return url;
+      }
       const bypass = this.shouldBypassCache(platform, accountHolder, section);
       if (!bypass) {
         this.markCacheTime(platform, accountHolder, section);

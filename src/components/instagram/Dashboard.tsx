@@ -29,7 +29,7 @@ import type { Notification, ProfileInfo, LinkedAccount } from '../../types/notif
 import { safeFilter, safeLength } from '../../utils/safeArrayUtils';
 // Import icons from react-icons
 import { FaChartLine, FaCalendarAlt, FaBullhorn, FaUndo, FaPencilAlt, FaRocket, FaRobot } from 'react-icons/fa';
-import { TbTargetArrow } from 'react-icons/tb';
+import { Bell, Newspaper, Target } from 'lucide-react';
 
 // Define RagService compatible ChatMessage
 interface RagChatMessage {
@@ -2216,7 +2216,7 @@ Image Description: ${response.post.image_prompt}
                       onClick={handleOpenGoalModal}
                       className="dashboard-btn goal-btn"
                     >
-                      <TbTargetArrow className="btn-icon" />
+                      <Target className="btn-icon" />
                       <span>Goal</span>
                     </button>
                     
@@ -2309,7 +2309,7 @@ Image Description: ${response.post.image_prompt}
                 }}
                 className="dashboard-btn goal-btn"
               >
-                <TbTargetArrow className="btn-icon" />
+                <Target className="btn-icon" />
                 <span>Goal</span>
               </button>
               
@@ -2363,7 +2363,7 @@ Image Description: ${response.post.image_prompt}
           >
             <h2 style={{ marginBottom: '8px' }}>
               <div className="section-header">
-                <span><i className="fas fa-newspaper"></i> News For You</span>
+                <span><Newspaper className="section-icon" size={18} /> News4U</span>
                 <div className="content-badge premium">
                   <span className="badge-text">Premium</span>
                 </div>
@@ -2381,7 +2381,7 @@ Image Description: ${response.post.image_prompt}
           >
             <h2 style={{ marginBottom: '8px' }}>
               <div className="section-header">
-                <span><i className="fas fa-bell"></i> Notifications</span>
+                <span><Bell className="section-icon" size={18} /> Notifications</span>
                 <div className="content-badge premium">
                   <span className="badge-text">Premium</span>
                 </div>
@@ -2430,7 +2430,7 @@ Image Description: ${response.post.image_prompt}
           >
             <h2 style={{ marginBottom: '8px' }}>
               <div className="section-header">
-                <span><i className="fas fa-bullseye"></i> Our Strategies</span>
+                <span><Target className="section-icon" size={18} /> Our Strategies</span>
                 {getUnseenStrategiesCount() > 0 ? (
                   <div className="content-badge" onClick={markStrategiesAsViewed}>
                     <span className="badge-count">{getUnseenStrategiesCount()}</span>
@@ -2596,11 +2596,11 @@ Image Description: ${response.post.image_prompt}
           messages={chatMessages}
           onClose={() => setIsChatModalOpen(false)}
           username={accountHolder}
-          onSendMessage={(message: string) => {
+          onSendMessage={(message: string, model?: string) => {
             // Handle sending additional messages in the chat modal
             if (!message.trim() || !accountHolder) return;
             setIsProcessing(true);
-            RagService.sendDiscussionQuery(accountHolder, message, chatMessages as RagChatMessage[], 'instagram')
+            RagService.sendDiscussionQuery(accountHolder, message, chatMessages as RagChatMessage[], 'instagram', model)
               .then(response => {
                 const updatedMessages = [
                   ...chatMessages,
@@ -2681,10 +2681,10 @@ Image Description: ${response.post.image_prompt}
           messages={chatMessages}
           onClose={() => setIsMobileChatOpen(false)}
           username={accountHolder}
-          onSendMessage={(message: string) => {
+          onSendMessage={(message: string, model?: string) => {
             if (!message.trim() || !accountHolder) return;
             setIsProcessing(true);
-            RagService.sendDiscussionQuery(accountHolder, message, chatMessages as RagChatMessage[], 'instagram')
+            RagService.sendDiscussionQuery(accountHolder, message, chatMessages as RagChatMessage[], 'instagram', model)
               .then(response => {
                 const updatedMessages = [
                   ...chatMessages,

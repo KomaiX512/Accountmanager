@@ -866,6 +866,14 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
 
   const handleScheduleSubmit = async () => {
     setIsScheduling(true);
+    // Close modal immediately for better UX
+    setShowScheduleModal(false);
+    setSelectedPostKey(null);
+    setScheduleDateTime('');
+    
+    // Show processing toast to confirm action was received
+    setToastMessage('📅 Post is being scheduled... Please wait.');
+    
     if (!selectedPostKey || !userId) {
       setToastMessage('No post or user ID selected.');
       setIsScheduling(false);
@@ -962,9 +970,6 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       }, 2000); // 2 second delay to ensure R2 update is processed
     }
     
-    setShowScheduleModal(false);
-    setSelectedPostKey(null);
-    setScheduleDateTime('');
     setIsScheduling(false);
   };
 
@@ -1956,6 +1961,13 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     }
     
     setIsPosting(true);
+    // Close modal immediately for better UX
+    setShowPostNowModal(false);
+    setSelectedPostForPosting(null);
+    
+    // Show processing toast to confirm action was received
+    setToastMessage('🚀 Post is processing... Please wait.');
+    
     console.log(`[PostNow] 🚀 Starting PostNow process for user ${userId}`);
     
     // ✨ CUSTOMER NETWORK SUPPORT: Add retry mechanism for network issues
@@ -1977,7 +1989,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         
         // Validate platform connection
         if (!isConnected) {
-          throw new Error('Instagram account not connected. Please connect your Instagram account first.');
+          const platformLabel = platform.charAt(0).toUpperCase() + platform.slice(1);
+          throw new Error(`${platformLabel} account not connected. Please connect your ${platformLabel} account first.`);
         }
         
         // Validate post data
@@ -1986,7 +1999,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         }
         
         // Validate caption length for Instagram
-        if (caption.length > 2200) {
+        if (platform === 'instagram' && caption.length > 2200) {
           throw new Error('Caption too long. Instagram captions must be under 2200 characters.');
         }
         
@@ -1996,36 +2009,43 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         console.log(`[PostNow] 📷 Fetching image for posting...`);
         const imageBlob = await fetchImageBlob(post, 'postNow');
         
-        if (!imageBlob) {
+        // Image is required for Instagram; for Facebook we allow text-only fallback
+        if (!imageBlob && platform === 'instagram') {
           throw new Error('Failed to fetch image for posting. Please try again or contact support.');
         }
         
-        // Additional image validation
-        if (imageBlob.size < 1000) {
-          throw new Error(`Image too small (${imageBlob.size} bytes). Please use a larger image.`);
+        if (imageBlob) {
+          // Additional image validation
+          if (imageBlob.size < 1000) {
+            throw new Error(`Image too small (${imageBlob.size} bytes). Please use a larger image.`);
+          }
+          
+          if (imageBlob.size > 8 * 1024 * 1024) {
+            throw new Error(`Image too large (${Math.round(imageBlob.size / 1024 / 1024)}MB). Please use an image under 8MB.`);
+          }
+          
+          console.log(`[PostNow] ✅ Image validated: ${imageBlob.size} bytes, type: ${imageBlob.type}`);
         }
-        
-        if (imageBlob.size > 8 * 1024 * 1024) {
-          throw new Error(`Image too large (${Math.round(imageBlob.size / 1024 / 1024)}MB). Please use an image under 8MB.`);
-        }
-        
-        console.log(`[PostNow] ✅ Image validated: ${imageBlob.size} bytes, type: ${imageBlob.type}`);
         
         // Prepare form data
         const formData = new FormData();
-        formData.append('image', imageBlob, 'post_image.jpg');
+        if (imageBlob) {
+          formData.append('image', imageBlob, 'post_image.jpg');
+        }
         formData.append('caption', caption);
         formData.append('platform', platform);
         formData.append('postKey', post.key);
         
-        console.log(`[PostNow] 📤 Submitting to Instagram API for user ${userId}...`);
+        const platformLabel = platform.charAt(0).toUpperCase() + platform.slice(1);
+        console.log(`[PostNow] 📤 Submitting to ${platformLabel} API for user ${userId}...`);
         console.log(`[PostNow] 📝 Caption preview: "${caption.substring(0, 100)}${caption.length > 100 ? '...' : ''}"`);
         
         // Make the API call with enhanced error handling
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 90000); // 90 second timeout - accommodates slower customer connections
         
-        const postNowUrl = getApiUrl('/api/post-instagram-now', `/${userId}`);
+        const endpoint = platform === 'facebook' ? '/api/post-facebook-now' : '/api/post-instagram-now';
+        const postNowUrl = getApiUrl(endpoint, `/${userId}`);
         
         const response = await fetch(postNowUrl, {
           method: 'POST',
@@ -2038,7 +2058,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         
         clearTimeout(timeoutId);
         
-        console.log(`[PostNow] 📊 Instagram API Response: Status ${response.status}`);
+        console.log(`[PostNow] 📊 ${platformLabel} API Response: Status ${response.status}`);
         
         // Enhanced response handling
         let responseData: any = {};
@@ -2063,18 +2083,18 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
           if (response.status === 400) {
             errorMessage = responseData.error || responseData.message || 'Bad request - check your post content and try again';
           } else if (response.status === 401) {
-            errorMessage = 'Instagram authentication failed. Please reconnect your Instagram account.';
+            errorMessage = `${platformLabel} authentication failed. Please reconnect your ${platformLabel} account.`;
           } else if (response.status === 403) {
-            errorMessage = 'Instagram API access denied. Your account may need verification.';
+            errorMessage = `${platformLabel} API access denied. Your account may need verification.`;
           } else if (response.status === 429) {
-            errorMessage = 'Instagram rate limit exceeded. Please wait a few minutes and try again.';
+            errorMessage = `${platformLabel} rate limit exceeded. Please wait a few minutes and try again.`;
           } else if (response.status >= 500) {
-            errorMessage = 'Instagram server error. Please try again in a few minutes.';
+            errorMessage = `${platformLabel} server error. Please try again in a few minutes.`;
           } else {
             errorMessage = responseData.error || responseData.message || `HTTP ${response.status}: ${response.statusText}`;
           }
           
-          console.error(`[PostNow] ❌ Instagram API Error (${response.status}):`, {
+          console.error(`[PostNow] ❌ ${platformLabel} API Error (${response.status}):`, {
             status: response.status,
             statusText: response.statusText,
             responseData,
@@ -2085,7 +2105,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         }
         
         // Success handling
-        console.log(`[PostNow] ✅ Instagram posting successful:`, responseData);
+        console.log(`[PostNow] ✅ ${platformLabel} posting successful:`, responseData);
         
         // ✅ REAL USAGE TRACKING: Track actual post publication
         console.log(`[PostNow] 📊 Tracking usage...`);
@@ -2114,7 +2134,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         
         // Success message with post details
         const postId = responseData.id || responseData.post_id || 'unknown';
-        setToastMessage(`🎉 Posted to Instagram successfully! Post ID: ${postId}`);
+        setToastMessage(`🎉 Posted to ${platformLabel} successfully! Post ID: ${postId}`);
         
         // ✨ BULLETPROOF: Mark successfully posted post as permanently processed
         console.log(`[PostNow] 🚫 Marking successfully posted post ${post.key} as permanently processed`);
@@ -2130,8 +2150,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                               error.message.includes('network') ||
                               error.message.includes('timeout');
         
-        const isRetryableServerError = error.message.includes('Instagram server error') ||
-                                      error.message.includes('rate limit');
+        const isRetryableServerError = error.message.includes('server error') ||
+                                      error.message.toLowerCase().includes('rate limit');
         
         if ((isNetworkError || isRetryableServerError) && retryCount < maxRetries) {
           retryCount++;
@@ -2164,10 +2184,10 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
           userMessage = 'Network connection interrupted. Please check your internet stability and try again.';
         } else if (error.message.includes('Failed to fetch image')) {
           userMessage = 'Could not load image. Please refresh the page and try again.';
-        } else if (error.message.includes('rate limit')) {
-          userMessage = 'Instagram is temporarily limiting posts. Please wait 5 minutes and try again.';
+        } else if (error.message.toLowerCase().includes('rate limit')) {
+          userMessage = `${platform.charAt(0).toUpperCase() + platform.slice(1)} is temporarily limiting posts. Please wait 5 minutes and try again.`;
         } else if (error.message.includes('authentication') || error.message.includes('token')) {
-          userMessage = 'Instagram connection expired. Please reconnect your Instagram account.';
+          userMessage = `${platform.charAt(0).toUpperCase() + platform.slice(1)} connection expired. Please reconnect your ${platform.charAt(0).toUpperCase() + platform.slice(1)} account.`;
         }
         
         const finalMessage = retryCount > 0 
@@ -2180,8 +2200,6 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     }
     
     setIsPosting(false);
-    setShowPostNowModal(false);
-    setSelectedPostForPosting(null);
     console.log(`[PostNow] 🏁 PostNow process completed (attempts: ${retryCount + 1})`);
   };
 
@@ -2600,7 +2618,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                       </svg>
                       Edit
                     </motion.button>
-                    {platform === 'instagram' && isConnected && (
+                    {(platform === 'instagram' || platform === 'facebook') && isConnected && (
                       <motion.button
                         className="post-now-button"
                         whileHover={{ scale: 1.05 }}

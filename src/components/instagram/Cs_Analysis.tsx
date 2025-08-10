@@ -5,10 +5,10 @@ import '../../utils/jsonDecoder.css';
 import useR2Fetch from '../../hooks/useR2Fetch';
 import { motion } from 'framer-motion';
 import ErrorBoundary from '../ErrorBoundary';
-import { decodeJSONToReactElements, formatCount } from '../../utils/jsonDecoder';
+import { decodeJSONToReactElements } from '../../utils/jsonDecoder';
 import axios from 'axios';
 import { registerComponent, unregisterComponent } from '../../utils/componentRegistry';
-import CacheManager, { appendBypassParam } from '../../utils/cacheManager';
+import CacheManager from '../../utils/cacheManager';
 
 interface ProfileInfo {
   followersCount?: number;
@@ -23,9 +23,14 @@ interface AccountInfo {
   competitors: string[];
 }
 
+interface AccountData {
+  name: string;
+  url: string;
+}
+
 interface Cs_AnalysisProps {
   accountHolder: string;
-  competitors: string[];
+  competitors: Array<string | { name: string; url?: string }>;
   platform?: 'instagram' | 'twitter' | 'facebook';
 }
 
@@ -55,8 +60,20 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
   const [showEditModal, setShowEditModal] = useState(false);
   const [newCompetitor, setNewCompetitor] = useState('');
   const [editCompetitor, setEditCompetitor] = useState('');
+  // For Facebook-specific competitor URL editing
+  const [editCompetitorUrl, setEditCompetitorUrl] = useState('');
   const [currentCompetitor, setCurrentCompetitor] = useState<string | null>(null);
-  const [localCompetitors, setLocalCompetitors] = useState<string[]>(competitors);
+  // Normalize competitor input (can be names or objects with name/url)
+  const normalizeCompetitorNames = (input: any): string[] => {
+    if (!Array.isArray(input)) return [];
+    return input
+      .map((item: any) => (typeof item === 'string' ? item : item?.name))
+      .filter((name: any) => typeof name === 'string' && name.trim() !== '');
+  };
+
+  const [localCompetitors, setLocalCompetitors] = useState<string[]>(
+    normalizeCompetitorNames(competitors)
+  );
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +82,12 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
   // Add state for accountType and postingStyle
   const [accountType, setAccountType] = useState<string>('branding');
   const [postingStyle, setPostingStyle] = useState<string>('I post about NewYork lives');
+  
+  // Facebook-specific primary account data and competitor data map: name -> { url, status? } (status is UI-only)
+  const [primaryAccountData, setPrimaryAccountData] = useState<AccountData | null>(null);
+  const [facebookCompetitorsMap, setFacebookCompetitorsMap] = useState<Record<string, { url: string; status?: string }>>({});
+  // For Facebook-specific competitor add URL input
+  const [newCompetitorUrl, setNewCompetitorUrl] = useState('');
   
   // ✅ NEW: Smart loading state for newly added/edited competitors
   const [competitorLoadingStates, setCompetitorLoadingStates] = useState<Record<string, {
@@ -155,10 +178,34 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
         if (info.accountType) setAccountType(info.accountType);
         if (info.postingStyle) setPostingStyle(info.postingStyle);
         
-        // Update competitors from saved data if available and different from props
-        if (info.competitors && Array.isArray(info.competitors) && info.competitors.length > 0) {
-          console.log(`[Cs_Analysis] ✅ Using competitors from account info:`, info.competitors);
-          setLocalCompetitors(info.competitors);
+        // Update competitors from saved data (normalize). Fallback to competitor_data for Facebook
+        const namesFromInfo = normalizeCompetitorNames(info.competitors);
+        if (namesFromInfo.length > 0) {
+          console.log(`[Cs_Analysis] ✅ Using competitors from account info:`, namesFromInfo);
+          setLocalCompetitors(namesFromInfo);
+        }
+
+        // Facebook-specific: load primary accountData and competitor_data map (name+url)
+        if (platform === 'facebook' && info.competitor_data && Array.isArray(info.competitor_data)) {
+          if (info.accountData && typeof info.accountData === 'object') {
+            const { name, url } = info.accountData as { name?: string; url?: string };
+            if (typeof name === 'string' && typeof url === 'string') {
+              setPrimaryAccountData({ name, url });
+            }
+          }
+          const map: Record<string, { url: string; status?: string }> = {};
+          const namesFromData: string[] = [];
+          info.competitor_data.forEach((c: any) => {
+            if (c && typeof c.name === 'string') {
+              map[c.name] = { url: typeof c.url === 'string' ? c.url : '', status: c.status };
+              namesFromData.push(c.name);
+            }
+          });
+          setFacebookCompetitorsMap(map);
+          // If no names from info.competitors, fallback to names from competitor_data
+          if (namesFromInfo.length === 0 && namesFromData.length > 0) {
+            setLocalCompetitors(namesFromData);
+          }
         }
       } catch (error: any) {
         console.warn(`[Cs_Analysis] ⚠️ Could not fetch account info for ${normalizedAccountHolder}:`, error.response?.status);
@@ -179,11 +226,9 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
   const baseCompetitorEndpoint = competitorsQuery 
     ? `/api/retrieve-multiple/${normalizedAccountHolder}?competitors=${encodeURIComponent(competitorsQuery)}&platform=${platform}&forceRefresh=true&_t=${refreshKey}`
     : '';
-  const competitorEndpoint = baseCompetitorEndpoint
-    ? appendBypassParam(baseCompetitorEndpoint, platform, normalizedAccountHolder, 'competitor')
-    : '';
+  const competitorEndpoint = baseCompetitorEndpoint || '';
   
-  const allCompetitorsFetch = useR2Fetch<any[]>(competitorEndpoint, platform);
+  const allCompetitorsFetch = useR2Fetch<any[]>(competitorEndpoint, platform, 'competitor');
 
   // Debug logging for endpoint and competitors
   console.log(`[Cs_Analysis] 🔍 Component state for ${normalizedAccountHolder}:`, {
@@ -284,17 +329,33 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     return null;
   }, [normalizedAccountHolder, platform]);
 
-  const updateCompetitors = useCallback(async (updatedCompetitors: string[]) => {
+  const updateCompetitors = useCallback(async (updatedCompetitors: string[], competitorDataObjects?: Array<{ name: string; url: string; status?: string }>) => {
     try {
       console.log(`[Cs_Analysis] 📝 Updating competitors for ${normalizedAccountHolder} on ${platform}:`, updatedCompetitors);
       
-      const response = await axios.post(`/api/save-account-info?platform=${platform}`, {
+      // Build payload that mirrors the expected structure strictly
+      const payload: any = {
         username: normalizedAccountHolder,
         accountType,
         postingStyle,
-        competitors: updatedCompetitors,
-        platform: platform
-      });
+        platform: platform,
+        competitors: updatedCompetitors
+      };
+
+      // Facebook-specific: include primary accountData and competitor_data with only name/url (no status in persisted schema)
+      if (platform === 'facebook') {
+        if (primaryAccountData && primaryAccountData.name && primaryAccountData.url) {
+          payload.accountData = { name: primaryAccountData.name, url: primaryAccountData.url };
+        }
+        if (competitorDataObjects && Array.isArray(competitorDataObjects)) {
+          payload.competitor_data = competitorDataObjects.map(({ name, url }) => ({ name, url }));
+        } else {
+          // Derive from current map if not explicitly provided
+          payload.competitor_data = updatedCompetitors.map(name => ({ name, url: facebookCompetitorsMap[name]?.url || '' }));
+        }
+      }
+
+      const response = await axios.post(`/api/save-account-info?platform=${platform}`, payload);
       
       if (response.status === 200) {
         console.log(`[Cs_Analysis] ✅ Successfully updated competitors for ${normalizedAccountHolder}`);
@@ -307,7 +368,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
       console.error(`[Cs_Analysis] ❌ Error updating ${platform} competitors for ${normalizedAccountHolder}:`, error.response?.data || error.message);
       return false;
     }
-  }, [normalizedAccountHolder, platform, accountType, postingStyle]);
+  }, [normalizedAccountHolder, platform, accountType, postingStyle, primaryAccountData, facebookCompetitorsMap]);
 
   useEffect(() => {
     const syncInitialState = async () => {
@@ -315,7 +376,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
       
       // First try to get competitors from the saved account info
       const serverCompetitors = await fetchAccountInfoWithRetry();
-      if (serverCompetitors && serverCompetitors.length > 0) {
+        if (serverCompetitors && serverCompetitors.length > 0) {
         console.log(`[Cs_Analysis] ✅ Loaded ${serverCompetitors.length} competitors from AccountInfo API:`, serverCompetitors);
         setLocalCompetitors(serverCompetitors);
         // Force refresh of competitor data when competitors are loaded
@@ -323,8 +384,9 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
       } else {
         console.log(`[Cs_Analysis] ⚠️ No competitors found in AccountInfo, using fallback from props:`, competitors);
         // Use competitors from props (usually from dashboard state)
-        if (competitors && competitors.length > 0) {
-          setLocalCompetitors(competitors);
+          const normalized = normalizeCompetitorNames(competitors);
+          if (normalized && normalized.length > 0) {
+            setLocalCompetitors(normalized);
         } else {
           console.log(`[Cs_Analysis] ❌ No competitors available from props either - account holder needs to set up competitors`);
           setError(`No competitors configured for ${normalizedAccountHolder}. Please add competitors to enable analysis.`);
@@ -402,6 +464,14 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
       return;
     }
 
+    // Facebook-specific validation for URL
+    if (platform === 'facebook') {
+      if (!newCompetitorUrl.trim()) {
+        setToast('Competitor URL is required for Facebook.');
+        return;
+      }
+    }
+
     setLoading(true);
     const originalCompetitors = [...localCompetitors];
     const updatedCompetitors = [...localCompetitors, newCompetitor];
@@ -411,35 +481,17 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     // ✅ NEW: Start smart loading for the new competitor
     startCompetitorLoading(newCompetitor);
 
-    const success = await updateCompetitors(updatedCompetitors);
+      // Build Facebook competitor_data array if needed (UI uses status but persistence must exclude it)
+      let competitorDataObjects: Array<{ name: string; url: string; status?: string }> | undefined;
+    if (platform === 'facebook') {
+      const currentMap = { ...facebookCompetitorsMap, [newCompetitor]: { url: newCompetitorUrl.trim(), status: 'pending' } };
+      competitorDataObjects = updatedCompetitors.map(name => ({ name, url: currentMap[name]?.url || '', status: currentMap[name]?.status }));
+    }
+
+    const success = await updateCompetitors(updatedCompetitors, competitorDataObjects);
     if (success) {
-      // ✅ FIXED: Only backend operations, NO global processing state trigger
-      try {
-        // Step 1: Reset/delete the existing account info
-        await axios.post('/api/reset-account-info', {
-          username: normalizedAccountHolder,
-          platform,
-        }, { headers: { 'Content-Type': 'application/json' } });
-        
-        // Step 2: Re-upload the account info with updated competitors
-        const accountInfoPayload = {
-          username: normalizedAccountHolder,
-          accountType,
-          postingStyle,
-          competitors: updatedCompetitors,
-          platform
-        };
-        
-        await axios.post(`/api/save-account-info?platform=${platform}`, accountInfoPayload, {
-          headers: { 'Content-Type': 'application/json' }
-        });
-        
-        console.log('[Cs_Analysis] ✅ Successfully reset and re-uploaded account info with updated competitors');
-        // Mark competitor edit so all dashboards bypass cache for 15 minutes
+        // ✅ Do not reset the file; respect and mirror existing schema. Just mark cache for refresh.
         CacheManager.markCompetitorEdit(platform, normalizedAccountHolder);
-      } catch (err) {
-        console.error('[Cs_Analysis] ❌ Failed to reset and re-upload account info:', err);
-      }
       
       // ✅ FIXED: Stay in dashboard, show container-level loading only
       setRefreshKey(prev => prev + 1); // Force refresh of competitor data
@@ -451,6 +503,11 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
         setLocalCompetitors(updatedCompetitors);
         setToast('Competitor added successfully! Analysis will be ready within 15 minutes.');
       }
+
+      // Update local Facebook map after success
+      if (platform === 'facebook') {
+          setFacebookCompetitorsMap(prev => ({ ...prev, [newCompetitor]: { url: newCompetitorUrl.trim(), status: prev[newCompetitor]?.status || 'pending' } }));
+      }
     } else {
       setLocalCompetitors(originalCompetitors);
       // ✅ NEW: Stop loading if addition failed
@@ -459,6 +516,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     }
 
     setNewCompetitor('');
+    setNewCompetitorUrl('');
     setShowAddModal(false);
     setLoading(false);
   };
@@ -477,6 +535,14 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
       return;
     }
 
+    // Facebook-specific URL requirement
+    if (platform === 'facebook') {
+      if (!editCompetitorUrl.trim()) {
+        setToast('Competitor URL is required for Facebook.');
+        return;
+      }
+    }
+
     setLoading(true);
     const originalCompetitors = [...localCompetitors];
     const updatedCompetitors = localCompetitors.map(comp =>
@@ -492,35 +558,24 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
       stopCompetitorLoading(currentCompetitor);
     }
 
-    const success = await updateCompetitors(updatedCompetitors);
-    if (success) {
-      // ✅ FIXED: Only backend operations, NO global processing state trigger
-      try {
-        // Step 1: Reset/delete the existing account info
-        await axios.post('/api/reset-account-info', {
-          username: normalizedAccountHolder,
-          platform,
-        }, { headers: { 'Content-Type': 'application/json' } });
-        
-        // Step 2: Re-upload the account info with updated competitors
-        const accountInfoPayload = {
-          username: normalizedAccountHolder,
-          accountType,
-          postingStyle,
-          competitors: updatedCompetitors,
-          platform
-        };
-        
-        await axios.post(`/api/save-account-info?platform=${platform}`, accountInfoPayload, {
-          headers: { 'Content-Type': 'application/json' }
-        });
-        
-        console.log('[Cs_Analysis] ✅ Successfully reset and re-uploaded account info with updated competitors');
-        // Mark competitor edit so all dashboards bypass cache for 15 minutes
-        CacheManager.markCompetitorEdit(platform, normalizedAccountHolder);
-      } catch (err) {
-        console.error('[Cs_Analysis] ❌ Failed to reset and re-upload account info:', err);
+    // Build Facebook competitor_data array if needed (UI uses status but persistence excludes it)
+    let competitorDataObjects: Array<{ name: string; url: string; status?: string }> | undefined;
+    if (platform === 'facebook') {
+      const nextMap: Record<string, { url: string; status?: string }> = { ...facebookCompetitorsMap };
+      if (editCompetitor !== currentCompetitor) {
+        // Rename key
+        delete nextMap[currentCompetitor];
+        nextMap[editCompetitor] = { url: editCompetitorUrl.trim(), status: nextMap[editCompetitor]?.status || 'pending' };
+      } else {
+        nextMap[editCompetitor] = { url: editCompetitorUrl.trim(), status: nextMap[editCompetitor]?.status || 'pending' };
       }
+      competitorDataObjects = updatedCompetitors.map(name => ({ name, url: nextMap[name]?.url || '', status: nextMap[name]?.status }));
+    }
+
+    const success = await updateCompetitors(updatedCompetitors, competitorDataObjects);
+    if (success) {
+      // ✅ Respect existing schema; only update target fields and refresh caches
+      CacheManager.markCompetitorEdit(platform, normalizedAccountHolder);
       
       // ✅ FIXED: Stay in dashboard, show container-level loading only
       setRefreshKey(prev => prev + 1); // Force refresh of competitor data
@@ -536,6 +591,18 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
           ? 'Competitor updated successfully! Analysis will be ready within 15 minutes.' 
           : 'Competitor updated successfully!');
       }
+
+      // Update local Facebook map after success
+      if (platform === 'facebook') {
+        setFacebookCompetitorsMap(prev => {
+          const next: Record<string, { url: string; status?: string }> = { ...prev };
+          if (editCompetitor !== currentCompetitor) {
+            delete next[currentCompetitor];
+          }
+          next[editCompetitor] = { url: editCompetitorUrl.trim(), status: next[editCompetitor]?.status || 'pending' };
+          return next;
+        });
+      }
     } else {
       setLocalCompetitors(originalCompetitors);
       // ✅ NEW: Stop loading if edit failed
@@ -546,6 +613,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     }
 
     setEditCompetitor('');
+    setEditCompetitorUrl('');
     setCurrentCompetitor(null);
     setShowEditModal(false);
     setLoading(false);
@@ -560,36 +628,18 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     // ✅ NEW: Stop smart loading for deleted competitor
     stopCompetitorLoading(competitor);
 
-    const success = await updateCompetitors(updatedCompetitors);
+    // Build Facebook competitor_data array if needed (UI uses status but persistence excludes it)
+    let competitorDataObjects: Array<{ name: string; url: string; status?: string }> | undefined;
+    if (platform === 'facebook') {
+      const nextMap: Record<string, { url: string; status?: string }> = { ...facebookCompetitorsMap };
+      delete nextMap[competitor];
+      competitorDataObjects = updatedCompetitors.map(name => ({ name, url: nextMap[name]?.url || '', status: nextMap[name]?.status }));
+    }
+
+    const success = await updateCompetitors(updatedCompetitors, competitorDataObjects);
     if (success) {
-      // ✅ FIXED: Only backend operations, NO global processing state trigger
-      try {
-        // Step 1: Reset/delete the existing account info
-        await axios.post('/api/reset-account-info', {
-          username: normalizedAccountHolder,
-          platform,
-        }, { headers: { 'Content-Type': 'application/json' } });
-        
-        // Step 2: Re-upload the account info with updated competitors
-        const accountInfoPayload = {
-          username: normalizedAccountHolder,
-          accountType,
-          postingStyle,
-          competitors: updatedCompetitors,
-          platform
-        };
-        
-        await axios.post(`/api/save-account-info?platform=${platform}`, accountInfoPayload, {
-          headers: { 'Content-Type': 'application/json' }
-        });
-        
-        console.log('[Cs_Analysis] ✅ Successfully reset and re-uploaded account info with updated competitors');
-        
-        // ✅ NEW: Mark competitor edit to invalidate cache for 15 minutes
-        CacheManager.markCompetitorEdit(platform, normalizedAccountHolder);
-      } catch (err) {
-        console.error('[Cs_Analysis] ❌ Failed to reset and re-upload account info:', err);
-      }
+      // ✅ Respect schema; just refresh caches
+      CacheManager.markCompetitorEdit(platform, normalizedAccountHolder);
       
       // ✅ FIXED: Stay in dashboard, no navigation to loading state
       setRefreshKey(prev => prev + 1); // Force refresh of competitor data
@@ -600,6 +650,15 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
       } else {
         setLocalCompetitors(updatedCompetitors);
         setToast('Competitor deleted successfully!');
+      }
+
+      // Update local Facebook map after success
+      if (platform === 'facebook') {
+        setFacebookCompetitorsMap(prev => {
+          const next = { ...prev } as Record<string, { url: string; status?: string }>;
+          delete next[competitor];
+          return next;
+        });
       }
     } else {
       setLocalCompetitors(originalCompetitors);
@@ -926,6 +985,9 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
                       onClick={() => {
                         setCurrentCompetitor(competitor);
                         setEditCompetitor(competitor);
+                        if (platform === 'facebook') {
+                          setEditCompetitorUrl(facebookCompetitorsMap[competitor]?.url || '');
+                        }
                         setShowEditModal(true);
                       }}
                       disabled={loading}
@@ -1098,13 +1160,23 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
               className="competitor-input"
               disabled={loading}
             />
+            {platform === 'facebook' && (
+              <input
+                type="url"
+                value={newCompetitorUrl}
+                onChange={(e) => setNewCompetitorUrl(e.target.value)}
+                placeholder="Enter competitor Facebook URL"
+                className="competitor-input"
+                disabled={loading}
+              />
+            )}
             <div className="modal-actions">
               <motion.button
                 className="modal-btn save-btn"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={handleAddCompetitor}
-                disabled={loading || !newCompetitor.trim()}
+                disabled={loading || !newCompetitor.trim() || (platform === 'facebook' && !newCompetitorUrl.trim())}
               >
                 {loading ? 'Saving...' : 'Save'}
               </motion.button>
@@ -1156,13 +1228,23 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
               className="competitor-input"
               disabled={loading}
             />
+            {platform === 'facebook' && (
+              <input
+                type="url"
+                value={editCompetitorUrl}
+                onChange={(e) => setEditCompetitorUrl(e.target.value)}
+                placeholder="Edit competitor Facebook URL"
+                className="competitor-input"
+                disabled={loading}
+              />
+            )}
             <div className="modal-actions">
               <motion.button
                 className="modal-btn save-btn"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={handleEditCompetitor}
-                disabled={loading || !editCompetitor.trim()}
+                disabled={loading || !editCompetitor.trim() || (platform === 'facebook' && !editCompetitorUrl.trim())}
               >
                 {loading ? 'Saving...' : 'Save'}
               </motion.button>

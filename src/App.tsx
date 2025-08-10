@@ -78,14 +78,49 @@ const AppContent: React.FC = () => {
     const platformId = getCurrentPlatform();
     const uid = currentUser.uid;
 
-    const username = localStorage.getItem(`${platformId}_username_${uid}`) || '';
+    // Primary source for username used across the app
+    let username = localStorage.getItem(`${platformId}_username_${uid}`) || '';
 
-    const competitorsRaw = localStorage.getItem(`${platformId}_competitors_${uid}`) || '[]';
-    let parsedCompetitors: string[];
+    // Facebook-specific backfill: if missing, try account_data.name
+    if (platformId === 'facebook' && !username) {
+      try {
+        const raw = localStorage.getItem(`facebook_account_data_${uid}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed.name === 'string' && parsed.name.trim()) {
+            username = parsed.name.trim();
+            // Backfill the canonical key to prevent future misses
+            localStorage.setItem(`facebook_username_${uid}`, username);
+          }
+        }
+      } catch {}
+    }
+
+    // Load competitors (names array). For Facebook, backfill from full competitor_data if needed
+    let parsedCompetitors: string[] = [];
     try {
+      const competitorsRaw = localStorage.getItem(`${platformId}_competitors_${uid}`) || '[]';
       parsedCompetitors = JSON.parse(competitorsRaw);
+      if (!Array.isArray(parsedCompetitors)) parsedCompetitors = [];
     } catch {
       parsedCompetitors = [];
+    }
+    if (platformId === 'facebook' && parsedCompetitors.length === 0) {
+      try {
+        const fullRaw = localStorage.getItem(`facebook_competitor_data_${uid}`);
+        if (fullRaw) {
+          const full = JSON.parse(fullRaw);
+          if (Array.isArray(full)) {
+            const names = full
+              .map((c: any) => (c && typeof c.name === 'string' ? c.name : ''))
+              .filter((n: string) => n && n.trim() !== '');
+            if (names.length > 0) {
+              parsedCompetitors = names;
+              localStorage.setItem(`facebook_competitors_${uid}`, JSON.stringify(names));
+            }
+          }
+        }
+      } catch {}
     }
 
     const savedAccountType = (localStorage.getItem(`${platformId}_account_type_${uid}`) as 'branding' | 'non-branding') || 'branding';

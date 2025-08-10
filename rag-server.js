@@ -5,6 +5,7 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import chromaDBService from './chromadb-service.js';
+import { GoogleGenAI } from '@google/genai';
 
 const app = express();
 const port = process.env.RAG_SERVER_PORT || 3001;
@@ -247,6 +248,27 @@ const GEMINI_CONFIG = {
   temperature: 0.2,
   topP: 0.95,
   topK: 40
+};
+
+// Initialize GoogleGenAI client for web search grounding
+const ai = new GoogleGenAI({
+  apiKey: GEMINI_CONFIG.apiKey
+});
+
+// Define the grounding tool for web search
+const groundingTool = {
+  googleSearch: {}
+};
+
+// Configure generation settings for web search
+const webSearchConfig = {
+  tools: [groundingTool],
+  generationConfig: {
+    maxOutputTokens: GEMINI_CONFIG.maxTokens,
+    temperature: GEMINI_CONFIG.temperature,
+    topP: GEMINI_CONFIG.topP,
+    topK: GEMINI_CONFIG.topK
+  }
 };
 
 // OPTIMAL Rate limiting configuration based on Gemini API Free Tier limits
@@ -1226,15 +1248,286 @@ async function callGeminiAPI(prompt, messages = [], retries = 2) {
   return await queuedGeminiAPICall(prompt, messages, retries);
 }
 
-// 🚀 ENHANCED RAG prompt using ChromaDB semantic search for superior context quality
-async function createEnhancedRagPrompt(profileData, rulesData, query, platform = 'instagram', usingFallbackProfile = false, username = 'user') {
+// 🌐 WEB SEARCH ENABLED Gemini API call with Google Search grounding
+async function callGeminiAPIWithWebSearch(prompt, messages = [], retries = 2) {
+  console.log('[RAG-Server] 🌐 Calling Gemini API with Google Search grounding');
+  
+  // Check for quota exhaustion first
+  if (quotaExhausted && quotaResetTime && new Date() < quotaResetTime) {
+    console.log(`[RAG-Server] Quota exhausted until ${quotaResetTime.toISOString()}, using fallback response`);
+    throw new Error('QUOTA_EXHAUSTED');
+  }
+  
+  // Reset quota exhausted status if reset time has passed
+  if (quotaExhausted && quotaResetTime && new Date() >= quotaResetTime) {
+    console.log('[RAG-Server] Quota reset time reached, clearing exhausted status');
+    quotaExhausted = false;
+    quotaResetTime = null;
+    consecutiveQuotaErrors = 0;
+  }
+
+  let lastError = null;
+  
+  for (let attempt = 1; attempt <= retries + 1; attempt++) {
+    try {
+      console.log(`[RAG-Server] 🌐 Web search attempt ${attempt} for query`);
+      
+      // Format the conversation for the new API
+      let contents = prompt;
+      
+      // If we have previous messages, append them to the content
+      if (messages && messages.length > 0) {
+        const recentMessages = messages.slice(-4); // Limit to recent messages
+        const conversationContext = recentMessages.map(msg => {
+          const role = msg.role === 'assistant' ? 'Assistant' : 'User';
+          const content = msg.parts && msg.parts[0] ? msg.parts[0].text : 
+                         msg.content ? msg.content :
+                         msg.text ? msg.text : 
+                         String(msg);
+          return `${role}: ${content}`;
+        }).join('\n\n');
+        
+        contents = `${prompt}\n\nConversation Context:\n${conversationContext}`;
+      }
+
+      // Make the API call with web search grounding
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: contents,
+        config: webSearchConfig
+      });
+
+      const generatedText = response.text;
+      
+      if (!generatedText || generatedText.trim() === '') {
+        console.log('[RAG-Server] 🌐 Empty response from web search API');
+        throw new Error('CONTENT_FILTERED: Empty response from web search API');
+      }
+
+      console.log(`[RAG-Server] ✅ Web search API call successful, response length: ${generatedText.length}`);
+      
+      // Reset quota error counter on successful API call
+      consecutiveQuotaErrors = 0;
+      
+      return generatedText;
+      
+    } catch (error) {
+      lastError = error;
+      console.log(`[RAG-Server] 🌐 Web search attempt ${attempt} failed:`, error.message);
+      
+      // Handle specific error types
+      if (error.message && error.message.includes('QUOTA_EXHAUSTED')) {
+        consecutiveQuotaErrors++;
+        if (consecutiveQuotaErrors >= 3) {
+          quotaExhausted = true;
+          quotaResetTime = new Date(Date.now() + 60 * 60 * 1000); // Reset in 1 hour
+          console.log(`[RAG-Server] Quota exhausted, reset time: ${quotaResetTime.toISOString()}`);
+        }
+        throw error;
+      }
+      
+      // If this is the last attempt, throw the error
+      if (attempt > retries) {
+        break;
+      }
+      
+      // Wait before retrying
+      const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // Exponential backoff, max 5 seconds
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  console.log('[RAG-Server] 🌐 All web search attempts failed');
+  throw new Error(`Web search API failed after ${retries + 1} attempts: ${lastError?.message || 'Unknown error'}`);
+}
+
+// Function to detect if a query needs web search
+function shouldUseWebSearch(query) {
+  const webSearchIndicators = [
+    // Current events and trends
+    'trending', 'latest', 'recent', 'current', 'today', 'this week', 'this month', 'news',
+    'breaking', 'happening now', 'just announced', 'recently launched',
+    
+    // Specific domains that benefit from real-time data
+    'beauty trends', 'fashion trends', 'tech news', 'market trends', 'stock price',
+    'weather', 'events', 'conferences', 'launches', 'updates',
+    
+    // Question words that often require current information
+    'what\'s new', 'what happened', 'who won', 'when did', 'where is',
+    
+    // Beauty industry specific
+    'new makeup', 'beauty launches', 'skincare trends', 'cosmetic news',
+    'beauty brands', 'influencer collaboration', 'makeup artist',
+    
+    // Blockchain and tech specific
+    'blockchain news', 'crypto trends', 'new protocols', 'defi updates',
+    'ai developments', 'tech innovations',
+    
+    // URLs and links
+    'url', 'link', 'website', 'source'
+  ];
+  
+  const queryLower = query.toLowerCase();
+  return webSearchIndicators.some(indicator => queryLower.includes(indicator));
+}
+
+// Function to analyze user's domain/theme from profile data
+function analyzeUserDomain(profileData, username) {
+  console.log(`[RAG-Server] 🎯 Analyzing domain for ${username}`);
+  
+  let domains = [];
+  let contentThemes = [];
+  
+  if (!profileData || (Array.isArray(profileData) && profileData.length === 0)) {
+    console.log(`[RAG-Server] ⚠️ No profile data for domain analysis`);
+    return { primaryDomain: 'general', themes: [], confidence: 0 };
+  }
+  
+  // Extract content from profile data
+  let allContent = '';
+  
+  if (Array.isArray(profileData)) {
+    profileData.forEach(item => {
+      if (item.latestPosts) {
+        item.latestPosts.forEach(post => {
+          allContent += ` ${post.caption || ''} ${post.text || ''}`;
+        });
+      }
+      allContent += ` ${item.bio || ''} ${item.description || ''}`;
+    });
+  } else if (profileData.latestPosts) {
+    profileData.latestPosts.forEach(post => {
+      allContent += ` ${post.caption || ''} ${post.text || ''}`;
+    });
+    allContent += ` ${profileData.bio || ''} ${profileData.description || ''}`;
+  }
+  
+  const contentLower = allContent.toLowerCase();
+  
+  // Domain detection keywords
+  const domainKeywords = {
+    blockchain: ['blockchain', 'crypto', 'bitcoin', 'ethereum', 'defi', 'nft', 'web3', 'decentralized', 'smart contract', 'token'],
+    beauty: ['beauty', 'makeup', 'skincare', 'cosmetics', 'lipstick', 'foundation', 'skincare', 'facial', 'serum'],
+    technology: ['tech', 'ai', 'artificial intelligence', 'software', 'programming', 'innovation', 'digital'],
+    business: ['business', 'entrepreneur', 'startup', 'investment', 'finance', 'corporate', 'leadership'],
+    education: ['education', 'university', 'research', 'academic', 'professor', 'learning', 'study'],
+    health: ['health', 'fitness', 'wellness', 'nutrition', 'medical', 'doctor', 'healthcare'],
+    travel: ['travel', 'vacation', 'trip', 'adventure', 'destination', 'tourism', 'journey'],
+    fashion: ['fashion', 'style', 'clothing', 'outfit', 'designer', 'trend', 'wardrobe'],
+    food: ['food', 'cooking', 'recipe', 'restaurant', 'cuisine', 'chef', 'dining'],
+    sports: ['sports', 'fitness', 'gym', 'training', 'athlete', 'competition', 'exercise']
+  };
+  
+  // Count keyword matches for each domain
+  const domainScores = {};
+  Object.keys(domainKeywords).forEach(domain => {
+    domainScores[domain] = 0;
+    domainKeywords[domain].forEach(keyword => {
+      const matches = (contentLower.match(new RegExp(keyword, 'g')) || []).length;
+      domainScores[domain] += matches;
+    });
+  });
+  
+  // Find primary domain
+  const primaryDomain = Object.keys(domainScores).reduce((a, b) => 
+    domainScores[a] > domainScores[b] ? a : b
+  );
+  
+  const maxScore = domainScores[primaryDomain];
+  const confidence = Math.min(maxScore * 10, 100); // Rough confidence score
+  
+  // Get themes (domains with scores > 0)
+  const themes = Object.keys(domainScores)
+    .filter(domain => domainScores[domain] > 0)
+    .sort((a, b) => domainScores[b] - domainScores[a]);
+  
+  console.log(`[RAG-Server] 🎯 Domain analysis result: Primary=${primaryDomain}, Themes=[${themes.join(', ')}], Confidence=${confidence}%`);
+  
+  return {
+    primaryDomain: maxScore > 0 ? primaryDomain : 'general',
+    themes,
+    confidence,
+    scores: domainScores
+  };
+}
+
+// Function to determine optimal response strategy
+function determineResponseStrategy(query, profileData, username) {
+  const needsWebSearch = shouldUseWebSearch(query);
+  const userDomain = analyzeUserDomain(profileData, username);
+  
+  const queryLower = query.toLowerCase();
+  
+  // Strategy types
+  const strategies = {
+    PERSONALIZED_WEB_SEARCH: 'web_search_personalized',  // Web search + personal context
+    INTELLIGENT_ANALYSIS: 'intelligent_analysis',        // Smart analysis of profile data
+    TREND_SUGGESTIONS: 'trend_suggestions',              // Current trends + how to use them
+    ENGAGEMENT_ANALYSIS: 'engagement_analysis',          // Deep dive into engagement patterns
+    TRADITIONAL_RAG: 'traditional_rag'                   // Standard RAG response
+  };
+  
+  // Determine strategy based on query intent
+  if (needsWebSearch && (queryLower.includes('trend') || queryLower.includes('news'))) {
+    return {
+      strategy: strategies.PERSONALIZED_WEB_SEARCH,
+      useWebSearch: true,
+      focusOnDomain: userDomain.primaryDomain,
+      includePersonalization: true,
+      includeMetrics: false
+    };
+  }
+  
+  if (queryLower.includes('high engag') || queryLower.includes('best post') || queryLower.includes('popular post')) {
+    return {
+      strategy: strategies.ENGAGEMENT_ANALYSIS,
+      useWebSearch: false,
+      focusOnDomain: userDomain.primaryDomain,
+      includePersonalization: true,
+      includeMetrics: true,
+      requireIntelligentAnalysis: true
+    };
+  }
+  
+  if (queryLower.includes('suggest') || queryLower.includes('recommend') || queryLower.includes('how to post')) {
+    return {
+      strategy: strategies.TREND_SUGGESTIONS,
+      useWebSearch: needsWebSearch,
+      focusOnDomain: userDomain.primaryDomain,
+      includePersonalization: true,
+      includeMetrics: false
+    };
+  }
+  
+  if (queryLower.includes('why') || queryLower.includes('reason') || queryLower.includes('analysis')) {
+    return {
+      strategy: strategies.INTELLIGENT_ANALYSIS,
+      useWebSearch: false,
+      focusOnDomain: userDomain.primaryDomain,
+      includePersonalization: true,
+      includeMetrics: true,
+      requireIntelligentAnalysis: true
+    };
+  }
+  
+  return {
+    strategy: strategies.TRADITIONAL_RAG,
+    useWebSearch: needsWebSearch,
+    focusOnDomain: userDomain.primaryDomain,
+    includePersonalization: true,
+    includeMetrics: false
+  };
+}
+
+// 🎯 PERSONALIZED RAG prompt with intelligent strategy and domain awareness
+async function createPersonalizedRagPrompt(profileData, rulesData, query, platform = 'instagram', usingFallbackProfile = false, username = 'user', responseStrategy = null) {
   const platformName = platform === 'twitter' ? 'X (Twitter)' : 
                       platform === 'facebook' ? 'Facebook' : 
                       'Instagram';
   
-  console.log(`[RAG-Server] 🚀 Creating ENHANCED RAG prompt with ChromaDB semantic search for ${platform}/${username}`);
+  console.log(`[RAG-Server] 🎯 Creating PERSONALIZED prompt using strategy: ${responseStrategy?.strategy || 'default'} for ${platform}/${username}`);
   
-  // 🔥 STEP 1: Get semantically relevant context using ChromaDB
+  // Get enhanced context from ChromaDB if available
   let enhancedContext = '';
   try {
     if (chromaDBInitialized) {
@@ -1242,54 +1535,166 @@ async function createEnhancedRagPrompt(profileData, rulesData, query, platform =
       enhancedContext = await chromaDBService.createEnhancedContext(query, username, platform);
       
       if (enhancedContext) {
-        console.log(`[RAG-Server] ✅ Retrieved ${enhancedContext.length} characters of semantically relevant context`);
-      } else {
-        console.log(`[RAG-Server] ⚠️ No semantic context found, falling back to traditional RAG`);
+        console.log(`[RAG-Server] ✅ Retrieved ${enhancedContext.length} characters of contextual data`);
+        enhancedContext = sanitizeContextForGemini(enhancedContext, username);
       }
-    } else {
-      console.log(`[RAG-Server] ⚠️ ChromaDB not initialized, using traditional RAG approach`);
     }
   } catch (error) {
     console.error(`[RAG-Server] Error in semantic search:`, error);
-    enhancedContext = null;
+    enhancedContext = '';
   }
   
-  // 🔥 STEP 2: If we have enhanced context, use it; otherwise fallback to traditional approach
-  if (enhancedContext) {
-    console.log(`[RAG-Server] 🎯 Using ENHANCED semantic context for superior response quality`);
-    
-    // 🛡️ Apply content sanitization to prevent Gemini filtering
-    console.log(`[RAG-Server] 🛡️ Applying AGGRESSIVE content sanitization for enhanced context...`);
-    const sanitizedContext = sanitizeContextForGemini(enhancedContext, username);
-    console.log(`[RAG-Server] 🛡️ Context sanitized: ${sanitizedContext.length} chars (was ${enhancedContext.length})`);
-    
-    // Create explicit, directive enhanced prompt that forces data usage
-    const enhancedPrompt = `You are a social media data analyst. You have been provided with SPECIFIC, REAL DATA about the ${platform} account @${username}. This data includes actual post content, engagement metrics, and performance statistics.
-
-YOUR TASK: Answer the user's question using ONLY the provided data below. You MUST reference specific numbers, captions, and metrics from the data provided.
-
-===== REAL ACCOUNT DATA FOR @${username} =====
-${sanitizedContext}
-===== END OF REAL DATA =====
-
-User Question: "${query}"
-
-INSTRUCTIONS:
-1. You MUST use the specific post data provided above
-2. You MUST quote actual captions from the "Recent Posts and Engagement" section
-3. You MUST include the exact engagement numbers (likes, comments, totals)
-4. You MUST reference the "Most Engaging Post" data if it exists
-5. DO NOT claim you lack data - all necessary data is provided above
-6. Answer based EXCLUSIVELY on the provided account data
-
-Provide a detailed response that directly uses the post content and engagement metrics shown above.`;
-
-    return enhancedPrompt;
-  }
+  // Analyze user domain for personalization
+  const userDomain = analyzeUserDomain(profileData, username);
   
-  // 🔄 FALLBACK: Traditional RAG approach for when ChromaDB is not available
-  console.log(`[RAG-Server] 📋 Using traditional RAG approach as fallback`);
-  return createTraditionalRagPrompt(profileData, rulesData, query, platform, usingFallbackProfile, username);
+  // Create strategy-specific prompts
+  switch (responseStrategy?.strategy) {
+    case 'web_search_personalized':
+      return createWebSearchPersonalizedPrompt(enhancedContext, query, platform, username, userDomain);
+    
+    case 'engagement_analysis':
+      return createEngagementAnalysisPrompt(enhancedContext, query, platform, username, userDomain);
+    
+    case 'intelligent_analysis':
+      return createIntelligentAnalysisPrompt(enhancedContext, query, platform, username, userDomain);
+    
+    case 'trend_suggestions':
+      return createTrendSuggestionsPrompt(enhancedContext, query, platform, username, userDomain);
+    
+    default:
+      return createTraditionalSmartPrompt(enhancedContext, query, platform, username, userDomain);
+  }
+}
+
+// 🌐 Web search + personalized context prompt
+function createWebSearchPersonalizedPrompt(context, query, platform, username, userDomain) {
+  return `You are an intelligent social media strategist with access to real-time web information and deep user profile analysis.
+
+USER PROFILE CONTEXT:
+- Platform: ${platform}
+- Username: @${username}
+- Primary Domain: ${userDomain.primaryDomain}
+- Content Themes: [${userDomain.themes.join(', ')}]
+
+PROFILE DATA:
+${context}
+
+USER QUERY: "${query}"
+
+STRATEGY: Use your real-time web search capabilities to find current trending information related to the user's query. Then, intelligently connect these trends to the user's profile domain (${userDomain.primaryDomain}) to provide personalized, actionable insights.
+
+RESPONSE GUIDELINES:
+1. Focus on current, real-time information from web search
+2. Connect trends specifically to ${userDomain.primaryDomain} domain
+3. Provide actionable suggestions for ${username}'s ${platform} strategy
+4. Be conversational and insightful, not robotic
+5. Include URLs and sources when available
+6. Don't mention post metrics unless directly relevant
+
+Provide a personalized response that combines current trends with strategic insights for this ${userDomain.primaryDomain} content creator.`;
+}
+
+// 📊 Engagement analysis with intelligent predictions
+function createEngagementAnalysisPrompt(context, query, platform, username, userDomain) {
+  return `You are an expert social media analyst with deep expertise in ${userDomain.primaryDomain} content performance.
+
+USER PROFILE:
+- Platform: ${platform}
+- Username: @${username}
+- Content Domain: ${userDomain.primaryDomain}
+- Expertise Areas: [${userDomain.themes.join(', ')}]
+
+PERFORMANCE DATA:
+${context}
+
+USER QUERY: "${query}"
+
+ANALYSIS STRATEGY: Use your analytical intelligence to identify the highest-performing content and provide intelligent predictions about WHY it performed well.
+
+CRITICAL: You MUST make intelligent predictions and analysis. NEVER say "data doesn't provide specific reason" - use your expertise to analyze patterns and provide insights.
+
+RESPONSE FRAMEWORK:
+1. Identify the highest-engaging content with specific metrics
+2. Analyze WHY it performed well using content analysis principles
+3. Consider ${userDomain.primaryDomain} audience preferences
+4. Provide intelligent predictions about success factors
+5. Be specific about engagement patterns and audience psychology
+
+Make intelligent deductions about audience preferences, content timing, emotional appeal, and ${userDomain.primaryDomain}-specific factors that drove engagement.`;
+}
+
+// 🧠 Intelligent analysis with predictive insights
+function createIntelligentAnalysisPrompt(context, query, platform, username, userDomain) {
+  return `You are a brilliant content strategist specializing in ${userDomain.primaryDomain} with advanced analytical capabilities.
+
+ACCOUNT PROFILE:
+- Platform: ${platform}
+- Creator: @${username}  
+- Domain Expertise: ${userDomain.primaryDomain}
+- Content Themes: [${userDomain.themes.join(', ')}]
+
+AVAILABLE DATA:
+${context}
+
+ANALYSIS REQUEST: "${query}"
+
+INTELLIGENCE MANDATE: You possess advanced analytical capabilities. Use pattern recognition, audience psychology, and ${userDomain.primaryDomain} industry knowledge to provide intelligent insights and predictions.
+
+NEVER claim lack of data - instead, use your analytical intelligence to:
+1. Identify patterns in the available data
+2. Make educated predictions based on content analysis
+3. Apply ${userDomain.primaryDomain} industry knowledge
+4. Consider audience psychology and engagement drivers
+5. Provide actionable insights with confident reasoning
+
+Analyze the available information and provide intelligent, confident insights that go beyond just reporting data.`;
+}
+
+// 🎯 Trend suggestions with personalized recommendations
+function createTrendSuggestionsPrompt(context, query, platform, username, userDomain) {
+  return `You are a trend-savvy content strategist for ${userDomain.primaryDomain} creators with expertise in ${platform} optimization.
+
+CREATOR PROFILE:
+- Platform: ${platform}
+- Username: @${username}
+- Specialization: ${userDomain.primaryDomain}
+- Content Style: Derived from profile analysis
+
+PROFILE INSIGHTS:
+${context}
+
+REQUEST: "${query}"
+
+STRATEGY: Provide personalized trend suggestions and content recommendations specifically tailored to this ${userDomain.primaryDomain} creator's audience and style.
+
+RESPONSE APPROACH:
+1. Suggest trends relevant to ${userDomain.primaryDomain}
+2. Recommend how to adapt trends to this creator's style
+3. Provide specific content ideas for ${platform}
+4. Include timing and engagement optimization tips
+5. Focus on actionable recommendations, not just metrics
+
+Be creative, strategic, and highly personalized to this creator's ${userDomain.primaryDomain} niche and ${platform} presence.`;
+}
+
+// 📚 Traditional smart prompt with domain awareness
+function createTraditionalSmartPrompt(context, query, platform, username, userDomain) {
+  return `You are a knowledgeable social media consultant specializing in ${userDomain.primaryDomain} content strategy.
+
+ACCOUNT OVERVIEW:
+- Platform: ${platform}
+- Creator: @${username}
+- Content Focus: ${userDomain.primaryDomain}
+- Audience Type: ${userDomain.primaryDomain} enthusiasts
+
+AVAILABLE INSIGHTS:
+${context}
+
+QUESTION: "${query}"
+
+APPROACH: Provide helpful, intelligent insights about this ${userDomain.primaryDomain} creator's ${platform} presence. Be conversational, insightful, and avoid being overly focused on metrics unless specifically asked.
+
+Focus on strategic advice, content insights, and actionable recommendations tailored to the ${userDomain.primaryDomain} audience.`;
 }
 
 // 🛡️ Comprehensive content sanitization to prevent Gemini filtering
@@ -2307,23 +2712,44 @@ app.all(['/api/rag/discussion', '/api/discussion', '/api/rag/discussion/', '/api
       rulesData = {};
     }
     
-    // 🚀 Use the ENHANCED RAG prompt with ChromaDB semantic search
-    const ragPrompt = await createEnhancedRagPrompt(profileData, rulesData, query, platform, usingFallbackProfile, username);
+    // 🎯 INTELLIGENT STRATEGY DETERMINATION
+    const responseStrategy = determineResponseStrategy(query, profileData, username);
+    console.log(`[RAG-Server] 🧠 Strategy: ${responseStrategy.strategy}, Domain: ${responseStrategy.focusOnDomain}, WebSearch: ${responseStrategy.useWebSearch}`);
     
-    // Call Gemini API with multiple prompt strategies
+    // 🚀 Create PERSONALIZED RAG prompt based on strategy
+    const ragPrompt = await createPersonalizedRagPrompt(
+      profileData, 
+      rulesData, 
+      query, 
+      platform, 
+      usingFallbackProfile, 
+      username,
+      responseStrategy
+    );
+    
+    // Call Gemini API with intelligent strategy
     let response;
     let usedFallback = false;
     
     try {
-      // Strategy 1: Try the ultra-safe business prompt first
-      console.log(`[RAG-Server] Attempting ultra-safe business prompt for ${platform}/${username}`);
+      console.log(`[RAG-Server] 🎯 Executing ${responseStrategy.strategy} strategy for ${platform}/${username}`);
       
-      const apiCallPromise = callGeminiAPI(ragPrompt, previousMessages);
+      const apiCallPromise = responseStrategy.useWebSearch 
+        ? callGeminiAPIWithWebSearch(ragPrompt, previousMessages)
+        : callGeminiAPI(ragPrompt, previousMessages);
+      
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('API_TIMEOUT')), 45000) // 45 second timeout
       );
       
       response = await Promise.race([apiCallPromise, timeoutPromise]);
+      
+      // Add strategy indicator
+      if (responseStrategy.useWebSearch && response) {
+        console.log(`[RAG-Server] ✅ ${responseStrategy.strategy} with web search completed for ${platform}/${username}`);
+      } else if (response) {
+        console.log(`[RAG-Server] ✅ ${responseStrategy.strategy} completed for ${platform}/${username}`);
+      }
       
       // Verify we have a valid response
       if (!response || response.trim() === '' || response.length < 10) {
@@ -2332,14 +2758,45 @@ app.all(['/api/rag/discussion', '/api/discussion', '/api/rag/discussion/', '/api
       
       console.log(`[RAG-Server] Successfully generated response for ${platform}/${username}`);
     } catch (error) {
-      console.log(`[RAG-Server] Ultra-safe prompt failed: ${error.message}`);
+      console.log(`[RAG-Server] ${responseStrategy.useWebSearch ? 'Web search enabled' : 'Traditional'} prompt failed: ${error.message}`);
       
-      // Check if this is content filtering
-      if (error.message && error.message.includes('CONTENT_FILTERED')) {
-        console.log(`[RAG-Server] Content filtering detected for ${platform}/${username}, trying alternative approach`);
+      // If web search failed, try traditional RAG as fallback
+      if (responseStrategy.useWebSearch) {
+        try {
+          console.log(`[RAG-Server] 🔄 Web search failed, falling back to traditional RAG for ${platform}/${username}`);
+          
+          // Create fallback strategy for traditional RAG
+          const fallbackStrategy = { ...responseStrategy, useWebSearch: false, strategy: 'traditional_rag' };
+          const fallbackPrompt = await createPersonalizedRagPrompt(
+            profileData, rulesData, query, platform, usingFallbackProfile, username, fallbackStrategy
+          );
+          
+          const fallbackApiCallPromise = callGeminiAPI(fallbackPrompt, previousMessages);
+          const fallbackTimeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('API_TIMEOUT')), 45000)
+          );
+          
+          response = await Promise.race([fallbackApiCallPromise, fallbackTimeoutPromise]);
+          
+          if (response && response.trim() !== '' && response.length >= 10) {
+            console.log(`[RAG-Server] ✅ Traditional RAG fallback successful for ${platform}/${username}`);
+          } else {
+            throw new Error('Fallback also returned invalid response');
+          }
+        } catch (fallbackError) {
+          console.log(`[RAG-Server] ❌ Traditional RAG fallback also failed: ${fallbackError.message}`);
+          // Continue to existing fallback strategies below
+        }
       }
       
-              try {
+      // Only continue to minimal prompts if we still don't have a response
+      if (!response || response.trim() === '' || response.length < 10) {
+        // Check if this is content filtering
+        if (error.message && error.message.includes('CONTENT_FILTERED')) {
+          console.log(`[RAG-Server] Content filtering detected for ${platform}/${username}, trying alternative approach`);
+        }
+        
+        try {
           // Strategy 2: Try ultra-minimal business prompt with just numbers
           console.log(`[RAG-Server] Trying ultra-minimal business prompt for ${platform}/${username}`);
           
@@ -2391,7 +2848,7 @@ Provide analysis using the metrics above.`;
         } catch (secondError) {
           console.log(`[RAG-Server] Minimal prompt also failed: ${secondError.message}`);
         
-                  try {
+          try {
             // Strategy 3: Data-driven response without AI when we have real data
             if (!usingFallbackProfile && profileData) {
               console.log(`[RAG-Server] Creating data-driven response for ${platform}/${username}`);
@@ -2443,6 +2900,7 @@ Your metrics indicate a well-established ${platformName} presence with good grow
             console.log(`[RAG-Server] ✅ Generated intelligent response using real data for ${platform}/${username}`);
             usedFallback = false; // This is not a fallback, it's intelligent data processing
           }
+        }
       }
     }
     

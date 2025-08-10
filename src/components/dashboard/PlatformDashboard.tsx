@@ -24,12 +24,12 @@ import FacebookRequiredButton from '../common/FacebookRequiredButton';
 import { useInstagram } from '../../context/InstagramContext';
 import { useTwitter } from '../../context/TwitterContext';
 import { useFacebook } from '../../context/FacebookContext';
-import ChatModal from '../common/ChatModal';
+import ChatModal from '../instagram/ChatModal';
 import RagService from '../../services/RagService';
-import type { ChatMessage as ChatModalMessage } from '../common/ChatModal';
-import { Notification, ProfileInfo, LinkedAccount } from '../../types/notifications';
+import type { ChatMessage as ChatModalMessage, LinkedAccount } from '../instagram/ChatModal';
+import { Notification, ProfileInfo } from '../../types/notifications';
 // Import icons from react-icons
-import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaTwitter, FaInstagram, FaPen, FaFacebook, FaBell, FaUndo, FaInfoCircle, FaPencilAlt, FaRocket, FaRobot, FaNewspaper, FaRss } from 'react-icons/fa';
+import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaTwitter, FaInstagram, FaPen, FaFacebook, FaBell, FaUndo, FaInfoCircle, FaPencilAlt, FaRocket, FaRobot, FaNewspaper, FaRss, FaComments } from 'react-icons/fa';
 import { MdAnalytics, MdOutlineSchedule, MdOutlineAutoGraph } from 'react-icons/md';
 import { BsLightningChargeFill, BsBinoculars, BsLightbulb } from 'react-icons/bs';
 import { IoMdAnalytics } from 'react-icons/io';
@@ -105,7 +105,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const [chatMessages, setChatMessages] = useState<ChatModalMessage[]>([]);
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const [result, setResult] = useState('');
-  const [linkedAccounts, setLinkedAccounts] = useState<any[]>([]);
+  const [linkedAccounts, setLinkedAccounts] = useState<LinkedAccount[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [aiProcessingNotifications, setAiProcessingNotifications] = useState<Record<string, boolean>>({});
   const [showInitialText, setShowInitialText] = useState(true);
@@ -169,8 +169,13 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     postCooked: false,
     strategies: false,
     competitorAnalysis: false,
-    news4u: false
+    news4u: false,
   });
+
+  // 🍎 Mobile floating actions state
+  const [isMobileChatOpen, setIsMobileChatOpen] = useState(false);
+  const [isMobileImageEditorOpen, setIsMobileImageEditorOpen] = useState(false);
+  const [isMobileProfilePopupOpen, setIsMobileProfilePopupOpen] = useState(false);
 
   // 🍎 Mobile module click handler for expandable modules
   const handleMobileModuleClick = (moduleKey: keyof typeof expandedModules, e: React.MouseEvent) => {
@@ -2521,6 +2526,16 @@ Image Description: ${response.post.image_prompt}
                       <span>Autopilot</span>
                     </button>
                     
+                    {/* 💬 CHAT: AI Chat button for general conversations */}
+                    <button
+                      onClick={() => setIsChatModalOpen(true)}
+                      className={`dashboard-btn chat-btn ${platform === 'twitter' ? 'twitter' : platform === 'facebook' ? 'facebook' : platform === 'instagram' ? 'instagram' : ''}`}
+                      title="AI Chat - Ask questions and get help"
+                    >
+                      <FaComments className="btn-icon" />
+                      <span>Chat</span>
+                    </button>
+                    
                     <button
                       onClick={handleOpenGoalModal}
                       className={`dashboard-btn goal-btn ${platform === 'twitter' ? 'twitter' : platform === 'facebook' ? 'facebook' : platform === 'instagram' ? 'instagram' : ''}`}
@@ -2912,10 +2927,10 @@ Image Description: ${response.post.image_prompt}
           onClose={() => setIsChatModalOpen(false)}
           username={`${accountHolder} (${config.name})`}
           platform={platform}
-          onSendMessage={(message: string) => {
+          onSendMessage={(message: string, model?: string) => {
             if (!message.trim() || !accountHolder) return;
             setIsProcessing(true);
-            RagService.sendDiscussionQuery(accountHolder, message, chatMessages as RagChatMessage[], platform)
+            RagService.sendDiscussionQuery(accountHolder, message, chatMessages as RagChatMessage[], platform, model)
               .then(response => {
                 const updatedMessages = [
                   ...chatMessages,
@@ -2936,6 +2951,7 @@ Image Description: ${response.post.image_prompt}
               });
           }}
           isProcessing={isProcessing}
+          linkedAccounts={linkedAccounts}
         />
       )}
       {isTwitterSchedulerOpen && (
@@ -3093,6 +3109,107 @@ Image Description: ${response.post.image_prompt}
           isConnected={isConnected}
           onClose={handleCloseAutopilotPopup}
         />
+      )}
+
+      {/* ✨ MOBILE FLOATING ACTION BUTTONS */}
+      <div className="mobile-floating-actions">
+        <button
+          className="mobile-floating-btn chat-btn"
+          onClick={() => setIsMobileChatOpen(true)}
+          title="AI Chat"
+        >
+          💬
+        </button>
+        <button
+          className="mobile-floating-btn image-btn"
+          onClick={() => setIsMobileImageEditorOpen(true)}
+          title="Image Editor"
+        >
+          🎨
+        </button>
+        <button
+          className="mobile-floating-btn profile-btn"
+          onClick={() => setIsMobileProfilePopupOpen(true)}
+          title="Profile"
+        >
+          👤
+        </button>
+      </div>
+
+      {/* ✨ MOBILE CHAT MODAL */}
+      {isMobileChatOpen && (
+        <ChatModal 
+          open={isMobileChatOpen}
+          messages={chatMessages}
+          onClose={() => setIsMobileChatOpen(false)}
+          username={accountHolder}
+          onSendMessage={(message: string, model?: string) => {
+            if (!message.trim() || !accountHolder) return;
+            setIsProcessing(true);
+            RagService.sendDiscussionQuery(accountHolder, message, chatMessages as RagChatMessage[], platform, model)
+              .then(response => {
+                const updatedMessages = [
+                  ...chatMessages,
+                  { role: 'user' as const, content: message },
+                  { role: 'assistant' as const, content: response.response }
+                ];
+                setChatMessages(updatedMessages);
+                
+                RagService.saveConversation(accountHolder, updatedMessages, platform)
+                  .catch(err => console.error('Error saving conversation:', err));
+              })
+              .catch(error => {
+                console.error('Error with chat message:', error);
+                setToast('Failed to send message.');
+              })
+              .finally(() => {
+                setIsProcessing(false);
+              });
+          }}
+          isProcessing={isProcessing}
+          linkedAccounts={linkedAccounts}
+          platform={platform}
+        />
+      )}
+
+      {/* ✨ MOBILE IMAGE EDITOR MODAL */}
+      {isMobileImageEditorOpen && (
+        <div className="mobile-image-editor-overlay">
+          <div className="mobile-image-editor-content">
+            <div className="mobile-image-editor-header">
+              <h3>Image Editor</h3>
+              <button 
+                className="close-mobile-image-editor"
+                onClick={() => setIsMobileImageEditorOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="mobile-image-editor-body">
+              <p>Image editor functionality coming soon...</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✨ MOBILE PROFILE POPUP */}
+      {isMobileProfilePopupOpen && (
+        <div className="mobile-profile-popup-overlay">
+          <div className="mobile-profile-popup-content">
+            <div className="mobile-profile-popup-header">
+              <h3>Profile</h3>
+              <button 
+                className="close-mobile-profile-popup"
+                onClick={() => setIsMobileProfilePopupOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="mobile-profile-popup-body">
+              <p>Profile management functionality coming soon...</p>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

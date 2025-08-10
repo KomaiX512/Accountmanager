@@ -3301,3 +3301,116 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
     font-size: 0.85rem;
   }
 } 
+/* Mobile-specific styles for 2x2 grid layout */
+@media (max-width: 768px) {
+  .platform-selection-container {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+    padding: 10px;
+  }
+
+  .platform-card {
+    margin: 0;
+    height: auto;
+    min-height: 150px; /* Adjust as needed */
+  }
+
+  .platform-card .platform-icon {
+    transform: scale(0.8);
+  }
+
+  .platform-card h3 {
+    font-size: 1rem;
+  }
+}
+
+
+/* Mobile-specific styles for 2x2 grid layout */
+@media (max-width: 768px) {
+  /* Transform container to 2x2 grid */
+  .dashboard-content .platforms-container {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    grid-template-rows: repeat(2, 1fr) !important;
+    gap: 10px !important;
+    padding: 10px !important;
+    max-width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Scale down each platform card */
+  .dashboard-content .platform-row {
+    margin: 0 !important;
+    padding: 10px !important;
+    height: 140px !important;
+    min-height: unset !important;
+    max-height: 140px !important;
+    border-radius: 12px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    position: relative !important;
+    width: 100% !important;
+  }
+
+  /* Restructure clickable area for vertical layout */
+  .dashboard-content .platform-row .clickable-area {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    flex: 1 !important;
+    padding: 5px !important;
+  }
+
+  /* Scale down icon */
+  .dashboard-content .platform-row .platform-icon {
+    width: 35px !important;
+    height: 35px !important;
+    margin-bottom: 5px !important;
+  }
+
+  .dashboard-content .platform-row .platform-icon img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+  }
+
+  /* Adjust platform name */
+  .dashboard-content .platform-row .platform-name {
+    font-size: 0.85rem !important;
+    text-align: center !important;
+    font-weight: 500 !important;
+    margin: 5px 0 !important;
+  }
+
+  /* Reposition status info */
+  .dashboard-content .platform-row .platform-info {
+    position: relative !important;
+    width: 100% !important;
+    display: flex !important;
+    justify-content: center !important;
+    margin-top: auto !important;
+  }
+
+  .dashboard-content .platform-row .status-indicators {
+    font-size: 0.65rem !important;
+  }
+
+  .dashboard-content .platform-row .status-indicator {
+    padding: 2px 6px !important;
+    font-size: 0.6rem !important;
+    border-radius: 4px !important;
+  }
+
+  /* Hide the connect button text on mobile to save space */
+  .dashboard-content .platform-row .connect-button {
+    padding: 2px 8px !important;
+    font-size: 0.65rem !important;
+  }
+}
+

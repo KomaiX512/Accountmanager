@@ -27,12 +27,13 @@ body:has(.dashboard-wrapper) {
   margin-left: 6vw; /* Default left margin */
   margin-right: 20px; /* Default right margin */
   box-sizing: border-box;
-  transform: none !important;
-  perspective: none !important;
-  contain: none !important;
-  position: static !important;
-  transform-style: flat !important;
-  backface-visibility: visible !important;
+  transform-origin: center top;
+  transform: none;
+  perspective: none;
+  contain: none;
+  position: static;
+  transform-style: flat;
+  backface-visibility: visible;
 }
 
 /* ✨ MINIMALIST WELCOME HEADER */
@@ -135,7 +136,8 @@ body:has(.dashboard-wrapper) {
     "news4u post-cooked strategies"
     "notifications post-cooked competitor-analysis"
     "post-creation post-creation post-creation";
-  grid-template-columns: 1fr 1.5fr 1fr;
+  /* Allow columns to shrink without forcing overflow */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr);
   /* FIXED HEIGHTS: Prevent any module expansion affecting grid layout */
   grid-template-rows: auto 320px 400px auto;
   gap: 16px;
@@ -143,6 +145,12 @@ body:has(.dashboard-wrapper) {
   height: fit-content; /* Fixed height based on defined rows */
   box-sizing: border-box;
   align-content: start; /* Prevent stretching */
+}
+
+/* Prevent intrinsic min-content sizing from causing horizontal overflow */
+.dashboard-grid > * {
+  min-width: 0;
+  min-height: 0;
 }
 
 /* Desktop specific grid optimizations */
@@ -163,7 +171,7 @@ body:has(.dashboard-wrapper) {
       "news4u post-cooked strategies"
       "notifications post-cooked competitor-analysis"
       "post-creation post-creation post-creation" !important;
-    grid-template-columns: 1fr 1.5fr 1fr !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr) !important;
     grid-template-rows: auto 300px 380px auto !important; /* Fixed heights for this breakpoint */
     gap: 14px !important;
     flex-direction: unset !important;
@@ -180,7 +188,7 @@ body:has(.dashboard-wrapper) {
       "news4u post-cooked strategies"
       "notifications post-cooked competitor-analysis"
       "post-creation post-creation post-creation" !important;
-    grid-template-columns: 1fr 1.5fr 1fr !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr) !important;
     grid-template-rows: auto 280px 360px auto !important; /* Fixed heights for this breakpoint */
     gap: 12px !important;
     flex-direction: unset !important;
@@ -425,7 +433,8 @@ body:has(.dashboard-wrapper) {
   height: 44px;
   flex-direction: row !important;
   justify-content: flex-start !important;
-  overflow: visible !important;
+  overflow-x: hidden;
+  overflow-y: visible;
 }
 
 .stat {
@@ -505,7 +514,8 @@ body:has(.dashboard-wrapper) {
     flex-wrap: nowrap !important;
     flex-direction: row !important;
     justify-content: flex-start !important;
-    overflow: visible !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
   }
 }
 
@@ -532,7 +542,8 @@ body:has(.dashboard-wrapper) {
     flex-wrap: nowrap !important;
     flex-direction: row !important;
     justify-content: flex-start !important;
-    overflow: visible !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
   }
 }
 
@@ -559,7 +570,8 @@ body:has(.dashboard-wrapper) {
     flex-wrap: nowrap !important;
     flex-direction: row !important;
     justify-content: flex-start !important;
-    overflow: visible !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
   }
 }
 
@@ -588,7 +600,8 @@ body:has(.dashboard-wrapper) {
     align-items: center !important;
     justify-content: flex-start !important;
     flex-wrap: nowrap !important;
-    overflow: visible !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
   }
 }
 
@@ -615,7 +628,8 @@ body:has(.dashboard-wrapper) {
     flex-wrap: nowrap !important;
     flex-direction: row !important;
     justify-content: flex-start !important;
-    overflow: visible !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
   }
 }
 
@@ -649,7 +663,8 @@ body:has(.dashboard-wrapper) {
 }
 
 .profile-actions {
-  overflow: visible !important;
+  overflow-x: auto;
+  overflow-y: visible;
   display: flex !important;
   visibility: visible !important;
 }
@@ -798,7 +813,8 @@ body:has(.dashboard-wrapper) {
     flex-wrap: nowrap !important;
     flex-direction: row !important;
     justify-content: flex-start !important;
-    overflow: visible !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
     gap: 8px;
   }
   
@@ -841,7 +857,8 @@ body:has(.dashboard-wrapper) {
     flex-wrap: nowrap !important;
     flex-direction: row !important;
     justify-content: flex-start !important;
-    overflow: visible !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
     gap: 6px !important;
     display: flex !important;
     visibility: visible !important;
@@ -944,7 +961,7 @@ body:has(.dashboard-wrapper) {
     flex-wrap: wrap;
     row-gap: 2px;
     justify-content: flex-start;
-    overflow-x: visible;
+    overflow-x: hidden; /* Prevent header actions from bleeding horizontally */
   }
   .profile-actions .dashboard-btn {
     flex: 1 1 70px;
@@ -1133,6 +1150,7 @@ body:has(.dashboard-wrapper) {
   height: 100%; /* Fill the grid cell exactly */
   max-height: 100%; /* Never exceed grid cell height */
   overflow-y: auto; /* Always use scrolling for overflow content */
+  overflow-x: hidden; /* Prevent any lateral spillover */
   backdrop-filter: blur(15px);
   position: relative;
   box-shadow: 
@@ -1150,6 +1168,7 @@ body:has(.dashboard-wrapper) {
   height: 100%; /* Fill the grid cell exactly */
   max-height: 100%; /* Never exceed grid cell height */
   overflow-y: auto; /* Always use scrolling for overflow content */
+  overflow-x: hidden; /* Prevent any lateral spillover */
   backdrop-filter: blur(15px);
   position: relative;
   box-shadow: 
@@ -1168,6 +1187,7 @@ body:has(.dashboard-wrapper) {
   height: 100%; /* Fill the grid cell exactly */
   max-height: 100%; /* Never exceed grid cell height */
   overflow-y: auto; /* Use scrolling if content overflows */
+  overflow-x: hidden; /* Prevent any lateral spillover */
   backdrop-filter: blur(15px);
   position: relative;
   box-shadow: 
@@ -1186,6 +1206,7 @@ body:has(.dashboard-wrapper) {
   height: 100%; /* Fill the grid cell exactly */
   max-height: 100%; /* Never exceed grid cell height */
   overflow-y: auto; /* Always use scrolling for overflow content */
+  overflow-x: hidden; /* Prevent any lateral spillover */
   backdrop-filter: blur(15px);
   position: relative;
   box-shadow: 
@@ -1212,6 +1233,19 @@ body:has(.dashboard-wrapper) {
 .news4u > * {
   margin-top: 2px !important;
   margin-bottom: 2px !important;
+  /* Allow children to shrink within their containers */
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+/* Ensure media never exceeds its container width inside modules */
+.notifications img,
+.post-cooked img,
+.strategies img,
+.competitor-analysis img,
+.news4u img {
+  max-width: 100%;
+  height: auto;
 }
 
 .notifications > *:first-child,
@@ -2168,22 +2202,22 @@ h2 {
   }
 
   .notifications::after {
-    content: '� Notifications';
+    content: 'Notifications';
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   }
 
   .strategies::after {
-    content: '🎯 Our Strategies';
+    content: 'Our Strategies';
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   }
 
   .competitor-analysis::after {
-    content: '🚀 Competitor Analysis';
+    content: 'Competitor Analysis';
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI Emoji', 'Segoe UI Symbol', 'Apple Color Emoji', system-ui, sans-serif;
   }
 
   .news4u::after {
-    content: '⭐ News4U';
+    content: 'News4U';
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI Emoji', 'Segoe UI Symbol', 'Apple Color Emoji', system-ui, sans-serif;
   }
   
@@ -2252,25 +2286,25 @@ h2 {
   /* ⚡ PREMIUM ICONS FIX - Higher specificity */
   @media (max-width: 767px) {
     .notifications.mobile-module::after {
-      content: '⚡ Notifications' !important;
+      content: 'Notifications' !important;
       color: #00d4ff !important;
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
     }
     
     .strategies.mobile-module::after {
-      content: '💎 Our Strategies' !important;
+      content: 'Our Strategies' !important;
       color: #ff6b6b !important;
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
     }
     
     .competitor-analysis.mobile-module::after {
-      content: '🚀 Competitor Analysis' !important;
+      content: 'Competitor Analysis' !important;
       color: #4ecdc4 !important;
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
     }
     
     .news4u.mobile-module::after {
-      content: '⭐ News4U' !important;
+      content: 'News4U' !important;
       color: #ffe66d !important;
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
     }
@@ -2691,6 +2725,59 @@ h2 {
   }
 }
 
+/* ✨ PROPORTIONAL SCALING SYSTEM - PORTRAIT (mirrors landscape) */
+@media (orientation: portrait) {
+  /* Establish transform origin and max width for portrait */
+  .dashboard-wrapper {
+    max-width: 1400px;
+    margin: 0 auto;
+    transform-origin: center top;
+  }
+
+  /* 7 BREAKPOINTS - PROPORTIONAL SCALING SYSTEM (portrait) */
+  @media (max-width: 1400px) and (orientation: portrait) {
+    .dashboard-wrapper {
+      transform: scale(0.95);
+    }
+  }
+
+  @media (max-width: 1200px) and (orientation: portrait) {
+    .dashboard-wrapper {
+      transform: scale(0.85);
+    }
+  }
+
+  @media (max-width: 1000px) and (orientation: portrait) {
+    .dashboard-wrapper {
+      transform: scale(0.75);
+    }
+  }
+
+  @media (max-width: 800px) and (orientation: portrait) {
+    .dashboard-wrapper {
+      transform: scale(0.65);
+    }
+  }
+
+  @media (max-width: 600px) and (orientation: portrait) {
+    .dashboard-wrapper {
+      transform: scale(0.55);
+    }
+  }
+
+  @media (max-width: 480px) and (orientation: portrait) {
+    .dashboard-wrapper {
+      transform: scale(0.45);
+    }
+  }
+
+  @media (max-width: 360px) and (orientation: portrait) {
+    .dashboard-wrapper {
+      transform: scale(0.35);
+    }
+  }
+}
+
 /* 🚀 AUTOPILOT UI OVERLAYS - MINIMALIST DESIGN */
 .autopilot-overlay {
   position: absolute;
@@ -2933,8 +3020,10 @@ h2 {
     display: block !important;
     visibility: visible !important;
     opacity: 1 !important;
-    max-height: none !important;
-    overflow: visible !important;
+    height: 100% !important;
+    max-height: 100% !important; /* Constrain to grid row height */
+    overflow-y: auto !important;  /* Internal scrolling */
+    overflow-x: hidden !important; /* No horizontal bleed */
   }
   
   /* Ensure grid areas are properly assigned */
@@ -2966,7 +3055,7 @@ h2 {
   .news4u > * {
     max-height: none !important;
     opacity: 1 !important;
-    overflow: visible !important;
+    /* overflow handled by parent container to prevent horizontal bleed */
   }
 }
 

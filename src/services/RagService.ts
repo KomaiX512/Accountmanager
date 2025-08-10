@@ -259,7 +259,8 @@ class RagService {
     username: string, 
     query: string, 
     previousMessages: ChatMessage[] = [],
-    platform: string = 'instagram'
+    platform: string = 'instagram',
+    model: string = 'gemini-2.5-flash'
   ): Promise<{ 
     response: string; 
     usedFallback?: boolean; 
@@ -293,7 +294,8 @@ class RagService {
                 role: msg.role,
                 content: msg.content
               })),
-              platform
+              platform,
+              model
             };
 
             if (this.VERBOSE_LOGGING) {

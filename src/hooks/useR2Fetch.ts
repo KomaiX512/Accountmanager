@@ -8,7 +8,7 @@ interface FetchState<T> {
   error: string | null;
 }
 
-const useR2Fetch = <T>(url: string, expectedPlatform?: string): FetchState<T> => {
+const useR2Fetch = <T>(url: string, expectedPlatform?: string, section?: string): FetchState<T> => {
   const [state, setState] = useState<FetchState<T>>({
     data: null,
     loading: true,
@@ -36,10 +36,12 @@ const useR2Fetch = <T>(url: string, expectedPlatform?: string): FetchState<T> =>
         // Apply 12h global bypass at hook level if caller didn't already append
         let finalUrl = url;
         try {
+          const alreadyHasBypass = /[?&]bypass_cache=/.test(url) || /[?&]_cb=/.test(url);
           const accountMatch = url.match(/\/api\/(?:retrieve|profile-info|posts|responses|news-for-you|retrieve-multiple|retrieve-strategies|retrieve-engagement-strategies)\/([^/?&]+)/);
           const accountHolder = accountMatch ? decodeURIComponent(accountMatch[1]) : undefined;
-          if (expectedPlatform && accountHolder) {
-            finalUrl = CacheManager.appendBypassParam(url, expectedPlatform, accountHolder);
+          if (!alreadyHasBypass && expectedPlatform && accountHolder) {
+            // ✅ FIXED: Pass section parameter for proper cache invalidation
+            finalUrl = CacheManager.appendBypassParam(url, expectedPlatform, accountHolder, section);
           }
         } catch {}
 
@@ -61,7 +63,7 @@ const useR2Fetch = <T>(url: string, expectedPlatform?: string): FetchState<T> =>
     } else {
       setState({ data: null, loading: false, error: 'No URL provided' });
     }
-  }, [url, expectedPlatform]);
+  }, [url, expectedPlatform, section]);
 
   return state;
 };

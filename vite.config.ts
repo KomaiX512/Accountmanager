@@ -192,6 +192,13 @@ export default defineConfig({
         // Preserve /api prefix so backend route '/api/post-instagram-now' matches
         // No rewrite here
       },
+      '/api/post-facebook-now': {
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+        secure: false,
+        // Preserve /api prefix so backend route '/api/post-facebook-now' matches
+        // No rewrite here
+      },
       // Schedule-post endpoint (port 3000) - critical for scheduling functionality
       '/api/schedule-post': {
         target: 'http://127.0.0.1:3000',

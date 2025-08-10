@@ -725,6 +725,16 @@ class AdvancedJSONDecoder {
         type: 'content'
       }];
     }
+
+    // ✅ NEW: Special handling for hashtag arrays
+    if (this.isHashtagArray(data)) {
+      return [this.createHashtagContainer(data, level)];
+    }
+    
+    // ✅ NEW: Check if parent context suggests this might be hashtags
+    if (this.shouldTreatAsHashtags(data, level)) {
+      return [this.createHashtagContainer(data, level)];
+    }
     
     data.forEach((item, index) => {
       if (this.options.enableDebugLogging) {
@@ -759,6 +769,86 @@ class AdvancedJSONDecoder {
     });
     
     return sections;
+  }
+
+  /**
+   * ✅ NEW: Check if an array contains hashtags
+   */
+  private isHashtagArray(data: any[]): boolean {
+    if (!Array.isArray(data) || data.length === 0) return false;
+    
+    // Check if all items are strings that look like hashtags
+    const hashtagPattern = /^#?[A-Za-z0-9]+$/;
+    const commonHashtagWords = [
+      'blockchain', 'ai', 'decentralization', 'web3', 'innovation', 'technology', 
+      'futuretech', 'crypto', 'artificialintelligence', 'fintech', 'marketing',
+      'socialmedia', 'instagram', 'facebook', 'twitter', 'branding', 'business',
+      'startup', 'entrepreneur', 'digital', 'online', 'content', 'creative'
+    ];
+    
+    return data.every(item => {
+      if (typeof item !== 'string') return false;
+      
+      // Check if it's a hashtag format
+      if (hashtagPattern.test(item)) return true;
+      
+      // Check if it's a common hashtag word (case insensitive)
+      const cleanItem = item.toLowerCase().replace(/^#/, '');
+      return commonHashtagWords.some(word => 
+        cleanItem.includes(word) || word.includes(cleanItem)
+      );
+    });
+  }
+
+  /**
+   * ✅ NEW: Check if parent context suggests this should be treated as hashtags
+   */
+  private shouldTreatAsHashtags(data: any[], level: number): boolean {
+    // This method will be called when we have context about the parent structure
+    // For now, we'll use a simple heuristic based on data characteristics
+    if (!Array.isArray(data) || data.length === 0) return false;
+    
+    // If we have a small array of short strings, it's likely hashtags
+    if (data.length <= 15 && data.every(item => 
+      typeof item === 'string' && item.length <= 30
+    )) {
+      // Check if most items contain common hashtag characteristics
+      const hashtagIndicators = data.filter(item => {
+        if (typeof item !== 'string') return false;
+        const cleanItem = item.toLowerCase().replace(/^#/, '');
+        return cleanItem.length > 0 && cleanItem.length <= 25 && 
+               /^[a-z0-9]+$/i.test(cleanItem);
+      });
+      
+      return hashtagIndicators.length >= data.length * 0.8; // 80% threshold
+    }
+    
+    return false;
+  }
+
+  /**
+   * ✅ NEW: Create a beautiful hashtag container
+   */
+  private createHashtagContainer(hashtags: string[], level: number): DecodedSection {
+    const hashtagElements = hashtags.map((hashtag, index) => {
+      const cleanTag = hashtag.startsWith('#') ? hashtag : `#${hashtag}`;
+      return React.createElement('span', {
+        key: index,
+        className: `${this.options.customClassPrefix}-hashtag`
+      }, cleanTag);
+    });
+
+    return {
+      heading: 'Trending Hashtags',
+      content: [
+        React.createElement('div', {
+          key: 'hashtag-container',
+          className: `${this.options.customClassPrefix}-hashtag-container`
+        }, hashtagElements)
+      ],
+      level: level,
+      type: 'content'
+    };
   }
 
   /**

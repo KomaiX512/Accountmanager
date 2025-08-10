@@ -1515,6 +1515,7 @@ app.post(['/save-account-info', '/api/save-account-info'], async (req, res) => {
       // Username is not in use, which is the normal case
     }
 
+    // Build base payload (backward compatible for all platforms)
     const payload = {
       username: normalizedUsername,
       accountType,
@@ -1523,6 +1524,31 @@ app.post(['/save-account-info', '/api/save-account-info'], async (req, res) => {
       ...(competitors && { competitors: competitors.map(c => platformConfig.normalizeUsername(c)) }),
       timestamp: new Date().toISOString(),
     };
+
+    // Facebook-specific: persist full accountData and competitor_data with URLs untouched
+    if (platformParam.toLowerCase() === 'facebook') {
+      try {
+        if (req.body && typeof req.body.accountData === 'object' && req.body.accountData) {
+          // Preserve exactly as sent (name and url)
+          payload.accountData = {
+            name: req.body.accountData.name,
+            url: req.body.accountData.url,
+          };
+        }
+        if (Array.isArray(req.body.competitor_data)) {
+          // Preserve exactly as sent (array of objects with name and url)
+          payload.competitor_data = req.body.competitor_data.map((c) => ({ name: c.name, url: c.url }));
+          // Ensure competitors (names) field remains present for backward compatibility if omitted
+          if (!payload.competitors) {
+            payload.competitors = req.body.competitor_data
+              .map((c) => (c && typeof c.name === 'string' ? platformConfig.normalizeUsername(c.name) : ''))
+              .filter((n) => n);
+          }
+        }
+      } catch {
+        // Silently ignore malformed optional fields
+      }
+    }
 
     console.log(`Saving ${platformParam} account info to: ${key}`);
     const putCommand = new PutObjectCommand({
@@ -14193,6 +14219,54 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
     res.setHeader('Content-Type', 'image/jpeg');
     res.setHeader('Cache-Control', 'no-cache, no-store');
     res.status(404).send('Image not found');
+  }
+});
+
+// ===============================================================
+
+// Lightweight R2 Run Status checker
+// Checks existence of RunStatus/<platform>/<username>/status.json in the 'tasks' bucket
+app.get(['/api/run-status/:platform/:username', '/run-status/:platform/:username'], async (req, res) => {
+  try {
+    const { platform, username } = req.params;
+
+    if (!platform || !username) {
+      return res.status(400).json({ error: 'platform and username are required' });
+    }
+
+    const statusKey = `RunStatus/${platform}/${username}/status.json`;
+
+    try {
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: statusKey,
+      });
+      const response = await s3Client.send(getCommand);
+
+      let statusPayload = null;
+      try {
+        const bodyText = await response.Body.transformToString();
+        statusPayload = JSON.parse(bodyText);
+      } catch {
+        // ignore parse errors, treat as exists
+      }
+
+      // Exists regardless of status value
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      return res.json({ exists: true, status: statusPayload?.status || null });
+    } catch (err) {
+      // If object not found, return exists: false
+      const message = err?.message || '';
+      if (err.name === 'NoSuchKey' || message.includes('NoSuchKey') || message.includes('does not exist')) {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        return res.json({ exists: false });
+      }
+      console.error(`[${new Date().toISOString()}] [RUN-STATUS] Error checking status:`, err);
+      return res.status(500).json({ error: 'Failed to check run status' });
+    }
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [RUN-STATUS] Unexpected error:`, error);
+    return res.status(500).json({ error: 'Unexpected error' });
   }
 });
 

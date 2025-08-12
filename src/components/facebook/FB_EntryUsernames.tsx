@@ -135,10 +135,19 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
 
   const handleCompetitorChange = (index: number, field: 'name' | 'url', value: string) => {
     const newCompetitors = [...competitors];
-    newCompetitors[index] = {
-      ...newCompetitors[index],
-      [field]: value
-    };
+    if (field === 'name') {
+      // Remove spaces and special characters for username format
+      const cleanedValue = value.replace(/\s+/g, '').replace(/[^a-zA-Z0-9._-]/g, '');
+      newCompetitors[index] = {
+        ...newCompetitors[index],
+        [field]: cleanedValue
+      };
+    } else {
+      newCompetitors[index] = {
+        ...newCompetitors[index],
+        [field]: value
+      };
+    }
     setCompetitors(newCompetitors);
   };
 
@@ -156,6 +165,10 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
     // Check competitors (first 3 are required)
     if (competitors.length < 3) return false;
     if (!competitors.slice(0, 3).every(comp => comp.name.trim() !== '' && comp.url.trim() !== '')) return false;
+    
+    // Check competitor name format (must be username format - no spaces, only valid characters)
+    if (!competitors.slice(0, 3).every(comp => usernameRegex.test(comp.name.trim()))) return false;
+    
     if (!competitors.every(comp => !comp.url.trim() || validateFacebookUrl(comp.url))) return false;
     
     return true;
@@ -504,6 +517,9 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
             <h2>Competitor Analysis</h2>
             <div className="section-description">
               <p><strong>Strategic Intelligence:</strong> These competitors will be analyzed to understand market trends, content strategies, and engagement patterns.</p>
+              <div className="competitor-format-notice">
+                <strong>⚠️ Important:</strong> Competitor names must follow username format (no spaces, only letters, numbers, dots, underscores, and hyphens)
+              </div>
             </div>
             
             <div className="competitors-container">
@@ -529,10 +545,21 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
                         id={`competitor-name-${index}`}
                         value={competitor.name}
                         onChange={(e) => handleCompetitorChange(index, 'name', e.target.value)}
-                        placeholder="Competitor name"
+                        placeholder="CompetitorName (no spaces)"
                         className="competitor-input"
                         disabled={isLoading}
                       />
+                      {competitor.name.includes(' ') && (
+                        <div className="format-warning">
+                          ⚠️ Spaces removed for username format
+                        </div>
+                      )}
+                      <div className="username-counter">
+                        Characters: {competitor.name.length} / 50
+                        {competitor.name.length > 30 && (
+                          <span className="counter-warning"> (Username getting long)</span>
+                        )}
+                      </div>
                     </div>
                     
                     <div className="competitor-url-input">
@@ -665,6 +692,9 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
                     <strong>Competitor {index + 1}:</strong>
                     <div>Name: {comp.name}</div>
                     <div>URL: {comp.url}</div>
+                    {comp.name !== competitors[index]?.name && (
+                      <div className="format-notice">✅ Spaces removed for username format</div>
+                    )}
                   </div>
                 ))}
               </div>

@@ -36,7 +36,7 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
 
   const menuItems = [
     { icon: 'chat', label: 'AI Chat', action: () => setShowChatModal(true) },
-    { icon: 'content', label: 'Image Editor', action: () => setShowCanvasEditor(true) },
+    { icon: 'studio', label: 'Image Studio', action: () => setShowCanvasEditor(true) },
     { icon: 'profile', label: 'Profile', action: () => setShowProfilePopup(true) },
     { icon: 'manual', label: 'Manual', action: () => setShowManualGuidance(true) }
   ];
@@ -133,22 +133,38 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
             >
               {item.icon === 'chat' && (
                 <svg className="icon" viewBox="0 0 24 24">
-                  <path d="M21,15A2,2 0 0,1 19,17H7L4,20V5A2,2 0 0,1 6,3H19A2,2 0 0,1 21,5V15Z" />
+                  {/* Premium AI Chat Icon - Modern speech bubble with AI elements */}
+                  <path d="M20,2H4A2,2 0 0,0 2,4V22L6,18H20A2,2 0 0,0 22,16V4A2,2 0 0,0 20,2M20,16H6L4,18V4H20V16Z" />
+                  <circle cx="7" cy="9" r="1" />
+                  <circle cx="11" cy="9" r="1" />
+                  <circle cx="15" cy="9" r="1" />
+                  <path d="M7,12H17V14H7V12Z" />
                 </svg>
               )}
-              {item.icon === 'content' && (
+              {item.icon === 'studio' && (
                 <svg className="icon" viewBox="0 0 24 24">
-                  <path d="M19,3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M19,19H5V5H19V19Z M17,17H7V15H17V17Z M17,13H7V11H17V13Z M17,9H7V7H17V9Z" />
+                  {/* Premium Image Studio Icon - Camera with artistic elements */}
+                  <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M12,6A6,6 0 0,0 6,12A6,6 0 0,0 12,18A6,6 0 0,0 18,12A6,6 0 0,0 12,6M12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8M12,10A2,2 0 0,0 10,12A2,2 0 0,0 12,14A2,2 0 0,0 14,12A2,2 0 0,0 12,10Z" />
+                  <path d="M12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9Z" />
                 </svg>
               )}
               {item.icon === 'profile' && (
                 <svg className="icon" viewBox="0 0 24 24">
+                  {/* Premium Profile Icon - Modern user silhouette */}
                   <path d="M12,4A4,4 0 0,1 16,8A4,4 0 0,1 12,12A4,4 0 0,1 8,8A4,4 0 0,1 12,4M12,14C16.42,14 20,15.79 20,18V20H4V18C4,15.79 7.58,14 12,14Z" />
+                  <path d="M12,6A2,2 0 0,0 10,8A2,2 0 0,0 12,10A2,2 0 0,0 14,8A2,2 0 0,0 12,6M12,16C14.33,16 16,16.67 16,18V19H8V18C8,16.67 9.67,16 12,16Z" />
                 </svg>
               )}
               {item.icon === 'manual' && (
                 <svg className="icon" viewBox="0 0 24 24">
-                  <path d="M19,2H5A2,2 0 0,0 3,4V20A2,2 0 0,0 5,22H19A2,2 0 0,0 21,20V4A2,2 0 0,0 19,2M19,20H5V4H19V20M17,17H7V15H17V17Z M17,13H7V11H17V13Z M17,9H7V7H17V9Z" />
+                  {/* Premium Manual Icon - Open book with guide elements */}
+                  <path d="M19,2H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,2M19,19H5V5H19V19Z" />
+                  <path d="M7,7H17V9H7V7Z" />
+                  <path d="M7,11H17V13H7V11Z" />
+                  <path d="M7,15H13V17H7V15Z" />
+                  <path d="M15,15H17V17H15V15Z" />
+                  <path d="M15,11H17V13H15V11Z" />
+                  <path d="M15,7H17V9H15V7Z" />
                 </svg>
               )}
               <span>{item.label}</span>

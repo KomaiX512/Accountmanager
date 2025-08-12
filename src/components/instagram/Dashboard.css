@@ -40,6 +40,11 @@ body:has(.dashboard-wrapper) {
 .welcome-header {
   text-align: center;
   margin-bottom: 8px;
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 
 .welcome-text {
@@ -61,24 +66,27 @@ body:has(.dashboard-wrapper) {
 
 .welcome-subtext-container {
   position: relative;
-  min-height: 24px;
+  min-height: 32px;
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 4px 0;
 }
 
 .bio-text {
   font-size: 0.95rem;
   color: #a0a0a0;
   text-align: center;
-  line-height: 1.5;
+  line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   font-style: italic;
-  max-width: 600px;
+  max-width: 800px;
   margin: 0 auto;
+  padding: 0 20px;
+  box-sizing: border-box;
   }
 
 /* ✨ COMPACT PREMIUM MODULES CONTAINER - MINIMALIST */
@@ -1813,6 +1821,37 @@ h2 {
   100% { 
     opacity: 1;
     transform: scale(1) translateY(0);
+  }
+}
+
+/* ✨ BIO TEXT RESPONSIVE ADJUSTMENTS */
+@media (max-width: 1200px) {
+  .bio-text {
+    max-width: 700px;
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 1000px) {
+  .bio-text {
+    max-width: 600px;
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 800px) {
+  .bio-text {
+    max-width: 500px;
+    font-size: 0.8rem;
+    padding: 0 16px;
+  }
+}
+
+@media (max-width: 600px) {
+  .bio-text {
+    max-width: 400px;
+    font-size: 0.75rem;
+    padding: 0 12px;
   }
 }
 

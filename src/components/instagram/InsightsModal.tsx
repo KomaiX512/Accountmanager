@@ -11,9 +11,10 @@ import { useAuth } from '../../context/AuthContext';
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 interface InsightsModalProps {
-  userId: string;
+  userId?: string;
   onClose: () => void;
   platform?: 'instagram' | 'twitter' | 'facebook';
+  accountHolder?: string; // optional username fallback passed from dashboard
 }
 
 interface InsightData {
@@ -46,10 +47,10 @@ interface ProfitAnalysisData {
   };
 }
 
-const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform = 'instagram' }) => {
+const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform = 'instagram', accountHolder }) => {
   // Get userId from platform-specific context if not provided as prop
   const { userId: igUserId, isConnected: isInstagramConnected } = useInstagram();
-  const { userId: facebookId, isConnected: isFacebookConnected } = useFacebook();
+  const { userId: facebookId, username: facebookUsername, isConnected: isFacebookConnected } = useFacebook();
   const { currentUser } = useAuth();
   
   // Use platform-specific context
@@ -85,6 +86,22 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
   const [activeTab, setActiveTab] = useState<'analysis' | 'reach' | 'other'>('analysis');
   const [accountUsername, setAccountUsername] = useState<string | null>(null);
 
+  // Fallback 1: accountHolder prop (passed by PlatformDashboard)
+  useEffect(() => {
+    if (accountHolder) {
+      setAccountUsername(accountHolder);
+      setAnalysisLoading(false);
+    }
+  }, [accountHolder]);
+
+  // Fallback 2: use context username immediately if available
+  useEffect(() => {
+    if (platform === 'facebook' && facebookUsername) {
+      setAccountUsername(facebookUsername);
+      setAnalysisLoading(false);
+    }
+  }, [platform, facebookUsername]);
+
   // Fetch account username for profit analysis
   useEffect(() => {
     const fetchAccountUsername = async () => {
@@ -97,7 +114,8 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
           ? `/api/user-facebook-status/${currentUser.uid}`
           : `/api/user-instagram-status/${currentUser.uid}`;
         
-        const response = await axios.get(statusEndpoint);
+        // Add 10-second timeout to avoid hanging forever
+        const response = await axios.get(statusEndpoint, { timeout: 10000 });
         const username = platform === 'twitter' 
           ? response.data.twitter_username 
           : platform === 'facebook'
@@ -107,13 +125,26 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
         if (username) {
           setAccountUsername(username);
           console.log(`[${new Date().toISOString()}] Found ${platform} username: ${username}`);
+        } else {
+          // No username means no analysis is possible; stop loading state
+          setAnalysisLoading(false);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error(`[${new Date().toISOString()}] Error fetching ${platform} username:`, err);
+        // Show descriptive error and ensure the loader stops
+        setAnalysisError(
+          err.response?.data?.message ||
+            `Unable to retrieve your ${platform} username. Please reconnect your account.`
+        );
+        setAnalysisLoading(false);
       }
     };
     
     fetchAccountUsername();
+    // If username is not immediately available, stop the loader to avoid infinite spin
+    if (!currentUser?.uid) {
+      setAnalysisLoading(false);
+    }
   }, [currentUser?.uid, platform]);
 
   // Fetch statistical analysisdata (works without connection)
@@ -125,13 +156,34 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
       }
 
       try {
-        console.log(`[${new Date().toISOString()}] Fetching statistical analysisfor ${platform} user: ${accountUsername}`);
-        const response = await axios.get(`/api/profit-analysis/${accountUsername}?platform=${platform}`);
+        // Ensure loading state is set when a fresh request begins
+        setAnalysisLoading(true);
+        console.log(
+          `[${new Date().toISOString()}] Fetching statistical analysis for ${platform} user: ${accountUsername}`
+        );
+
+        // Add a 15-second timeout so the UI never hangs indefinitely
+        const response = await axios.get(
+          `/api/profit-analysis/${accountUsername}?platform=${platform}`,
+          { timeout: 15000 }
+        );
+
         setProfitAnalysis(response.data);
-        console.log(`[${new Date().toISOString()}] statistical analysis fetched:`, response.data);
+        console.log(
+          `[${new Date().toISOString()}] Statistical analysis fetched:`,
+          response.data
+        );
       } catch (err: any) {
-        console.error(`[${new Date().toISOString()}] Error fetching statistical analysis:`, err);
-        setAnalysisError(err.response?.data?.message || 'No statistical analysis data available for this account.');
+        console.error(
+          `[${new Date().toISOString()}] Error fetching statistical analysis:`,
+          err
+        );
+        const message =
+          err.code === 'ECONNABORTED'
+            ? 'Statistical analysis request timed out. Please try again later.'
+            : err.response?.data?.message ||
+              'No statistical analysis data available for this account.';
+        setAnalysisError(message);
       } finally {
         setAnalysisLoading(false);
       }

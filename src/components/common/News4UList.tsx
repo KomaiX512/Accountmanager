@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { FaClock, FaExternalLinkAlt, FaPlus, FaSpinner, FaRss } from 'react-icons/fa';
 import axios from 'axios';
 import RagService from '../../services/RagService';
-import CacheManager, { appendBypassParam } from '../../utils/cacheManager';
+import { appendBypassParam } from '../../utils/cacheManager';
 import './News4U.css';
 
 interface News4UProps {
@@ -13,10 +13,16 @@ interface News4UProps {
 }
 
 interface NewsItem {
-  username: string;
-  breaking_news_summary: string;
+  username?: string;
+  title: string;
+  description: string;
+  image_url: string;
   source_url: string;
   timestamp: string;
+  source?: string;
+  id?: string;
+  fetched_at?: string;
+  iteration?: number;
 }
 
 /**
@@ -100,6 +106,12 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
   const decodeUnicode = (text?: string) =>
     text ? text.replace(/\\u[0-9A-F]{4}/gi, m => String.fromCodePoint(parseInt(m.replace('\\u', ''), 16))) : ''
 
+  // Helper to handle missing or broken images
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    img.style.display = 'none';
+  };
+
   const formatTimestamp = (ts: string) => {
     try {
       const date = new Date(ts);
@@ -123,7 +135,9 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
   }), []);
 
   const buildPrompt = (newsItem: NewsItem, style: PostStyle, customInstruction?: string) => {
-    const summary = decodeUnicode(newsItem.breaking_news_summary).trim();
+    const title = decodeUnicode(newsItem.title).trim();
+    const description = decodeUnicode(newsItem.description).trim();
+    const newsContent = `${title} - ${description}`;
 
     const VISUAL_GUIDELINES: Record<PostStyle, string[]> = {
       infographic: [
@@ -160,7 +174,9 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
 
     // Enrich the query with explicit, style‑aligned guidance so backend can craft a very specific image prompt
     const prompt = [
-      `NEWS: ${summary}`,
+      `NEWS_TITLE: ${title}`,
+      `NEWS_DESCRIPTION: ${description}`,
+      `FULL_NEWS_CONTENT: ${newsContent}`,
       `REQUESTED_POST_STYLE: ${styleLabel[style]}`,
       'VISUAL_STYLE_GUIDELINES:',
       guidelines,
@@ -242,20 +258,78 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     const fetch = async () => {
       try {
         setLoading(true);
+        // Force fresh news every time - no caching
         const baseUrl = `/api/news-for-you/${normalizedAccountHolder}?platform=${platform}`;
-        const url = appendBypassParam(baseUrl, platform, normalizedAccountHolder, 'news');
+        const url = `${baseUrl}&forceRefresh=true&_cb=${Date.now()}`;
         const res = await axios.get(url);
-        const raw: NewsItem[] = (res.data ?? []).map((r: any) => r.data).filter(Boolean);
-        // Remove duplicate stories based on identical summary text
+        console.log(`[News4U] Raw response:`, res.data);
+        
+        // Support both shapes: [{ key, lastModified, data: {...} }] and legacy: [{...}]
+        const itemsOrArrays: any[] = (res.data ?? [])
+          .map((r: any) => (r && typeof r === 'object' && 'data' in r ? r.data : r))
+          .filter(Boolean);
+        
+        console.log(`[News4U] Items after unwrapping:`, itemsOrArrays);
+
+        // Flatten possible array shapes: direct arrays, {items: [...]}, {articles: [...]}
+        const rawItems: any[] = [];
+        for (const entry of itemsOrArrays) {
+          if (!entry) continue;
+          if (Array.isArray(entry)) {
+            rawItems.push(...entry);
+          } else if (Array.isArray(entry.items)) {
+            rawItems.push(...entry.items);
+          } else if (Array.isArray(entry.articles)) {
+            rawItems.push(...entry.articles);
+          } else {
+            rawItems.push(entry);
+          }
+        }
+        
+        console.log(`[News4U] Raw items after flattening:`, rawItems);
+
+        // EXPAND: if news_data is an array, split into separate entries
+        const expanded: any[] = [];
+        for (const it of rawItems) {
+          if (it && Array.isArray(it.news_data)) {
+            for (const nd of it.news_data) {
+              expanded.push({ ...it, news_data: nd });
+            }
+          } else {
+            expanded.push(it);
+          }
+        }
+
+        // Normalize to the new shape to avoid empty UI due to schema differences
+        const normalized: NewsItem[] = expanded.map((n: any) => {
+          const base = n && typeof n === 'object' && n.news_data ? n.news_data : n;
+          const title: string = base.title || base.headline || '';
+          const description: string = base.description || base.summary || base.breaking_news_summary || '';
+          const image_url: string = base.image_url || base.image || base.thumbnail || '';
+          const source_url: string = base.source_url || base.url || base.link || '';
+          const timestamp: string = base.timestamp || base.fetched_at || base.published_at || n?.export_timestamp || new Date().toISOString();
+          const source: string | undefined = base.source || base.publisher || undefined;
+          const iteration: number | undefined = n?.iteration || base?.export_iteration;
+          const fetched_at: string | undefined = base.fetched_at;
+          // Prefer R2 export path or API key for uniqueness
+          const id: string | undefined = n?.export_metadata?.export_path || n?.key || (source_url && fetched_at ? `${source_url}::${fetched_at}` : undefined) || (source_url && timestamp ? `${source_url}::${timestamp}` : undefined) || (title ? `${title}::${timestamp}` : undefined);
+          return { id, title, description, image_url, source_url, timestamp, source, fetched_at, iteration };
+        });
+
+        // Remove duplicate stories based on unique id (fallback to composite)
         const deduped: NewsItem[] = [];
         const seen = new Set<string>();
-        raw.forEach(n => {
-          const key = n.breaking_news_summary?.trim();
+        normalized.forEach(n => {
+          const key = (n.id || `${n.source_url || ''}::${n.fetched_at || n.timestamp || ''}` || `${n.title || ''}::${n.timestamp || ''}`).toLowerCase();
           if (key && !seen.has(key)) {
             seen.add(key);
             deduped.push(n);
           }
         });
+        
+        console.log(`[News4U] Final normalized items:`, normalized);
+        console.log(`[News4U] Final deduped items:`, deduped);
+
         setItems(deduped);
       } catch (err: any) {
         console.error(err);
@@ -324,17 +398,34 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
                   <span>{formatTimestamp(item.timestamp)}</span>
                 </div>
 
-                <div
-                  className={`news4u-summary ${isOpen ? 'expanded' : 'collapsed'}`}
-                  onClick={() => toggleExpand(idx)}
-                  title={isOpen ? 'Click to collapse' : 'Click to expand'}
-                >
-                  {decodeUnicode(item.breaking_news_summary)}
-                  {!isOpen && (
-                    <div className="expand-indicator">
-                      <span>...</span>
+                <div className="news4u-item-content">
+                  {item.image_url && (
+                    <div className="news4u-image">
+                      <img 
+                        src={item.image_url} 
+                        alt={item.title}
+                        onError={handleImageError}
+                        loading="lazy"
+                      />
                     </div>
                   )}
+                  <div className="news4u-text-content">
+                    <div className="news4u-title">
+                      {decodeUnicode(item.title)}
+                    </div>
+                    <div
+                      className={`news4u-description ${isOpen ? 'expanded' : 'collapsed'}`}
+                      onClick={() => toggleExpand(idx)}
+                      title={isOpen ? 'Click to collapse' : 'Click to expand'}
+                    >
+                      {decodeUnicode(item.description)}
+                      {!isOpen && (
+                        <div className="expand-indicator">
+                          <span>...</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {isOpen && (

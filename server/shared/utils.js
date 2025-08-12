@@ -436,7 +436,9 @@ const MODULE_CACHE_CONFIG = {
   'competitor_analysis': CACHE_CONFIG.STANDARD,
   'recommendations': CACHE_CONFIG.STANDARD,
   'engagement_strategies': CACHE_CONFIG.STANDARD,
-  'NewForYou': CACHE_CONFIG.STANDARD,
+  'NewForYou': CACHE_CONFIG.REALTIME, // No caching for news - always fresh
+  'news_for_you': CACHE_CONFIG.REALTIME, // No caching for news - always fresh
+  'news-for-you': CACHE_CONFIG.REALTIME, // No caching for news - always fresh
   'ProfileInfo': CACHE_CONFIG.REALTIME, // Disable caching for ProfileInfo to always get fresh data
   'queries': CACHE_CONFIG.STANDARD,
   'rules': CACHE_CONFIG.STANDARD,

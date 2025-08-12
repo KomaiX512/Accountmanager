@@ -1,5 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+/**
+ * PLATFORM TIMING CONFIGURATION:
+ * - Facebook: 20 minutes initial setup
+ * - Instagram: 15 minutes initial setup  
+ * - Twitter: 15 minutes initial setup
+ * - All platforms: 5 minutes extension when running statistics not found
+ * 
+ * The component automatically detects whether it's an initial setup or extension
+ * based on the remainingMinutes prop and adjusts timing accordingly.
+ */
 import { 
   FiTarget,
   FiClock,
@@ -14,7 +25,9 @@ import {
   FiDatabase,
   FiCpu,
   FiLayers,
-  FiCheckCircle
+  FiCheckCircle,
+  FiX,
+  FiAlertTriangle
 } from 'react-icons/fi';
 import './ProcessingLoadingState.css';
 import { useNavigate } from 'react-router-dom';
@@ -23,6 +36,7 @@ import { FaChartLine, FaFlag, FaInstagram, FaTwitter, FaFacebook } from 'react-i
 import { MdAnalytics } from 'react-icons/md';
 import { BsLightningChargeFill } from 'react-icons/bs';
 import { useProcessing } from '../../context/ProcessingContext';
+import { useAuth } from '../../context/AuthContext';
 
 interface ProcessingStage {
   id: number;
@@ -46,6 +60,8 @@ type PlatformConfigType = {
   primaryColor: string;
   secondaryColor: string;
   icon: React.ReactNode;
+  initialMinutes: number; // Add initial timing for each platform
+  extensionMinutes: number; // Add extension timing for all platforms
 };
 
 // Define platform configurations
@@ -54,19 +70,25 @@ const PLATFORM_CONFIGS: Record<string, PlatformConfigType> = {
     name: 'Instagram',
     primaryColor: '#e4405f',
     secondaryColor: '#00ffcc',
-    icon: <FaInstagram />
+    icon: <FaInstagram />,
+    initialMinutes: 15, // Instagram gets 15 minutes initially
+    extensionMinutes: 5  // 5 minutes extension for all platforms
   },
   twitter: {
     name: 'X (Twitter)',
     primaryColor: '#000000',
     secondaryColor: '#ffffff',
-    icon: <FaTwitter />
+    icon: <FaTwitter />,
+    initialMinutes: 15, // Twitter gets 15 minutes initially
+    extensionMinutes: 5  // 5 minutes extension for all platforms
   },
   facebook: {
     name: 'Facebook',
     primaryColor: '#1877f2',
     secondaryColor: '#42a5f5',
-    icon: <FaFacebook />
+    icon: <FaFacebook />,
+    initialMinutes: 20, // Facebook gets 20 minutes initially
+    extensionMinutes: 5  // 5 minutes extension for all platforms
   }
 };
 
@@ -75,7 +97,9 @@ const DEFAULT_PLATFORM_CONFIG: PlatformConfigType = {
   name: 'Platform',
   primaryColor: '#666666',
   secondaryColor: '#cccccc',
-  icon: <BsLightningChargeFill />
+  icon: <BsLightningChargeFill />,
+  initialMinutes: 15, // Default to 15 minutes
+  extensionMinutes: 5  // Default extension time
 };
 
 interface ProcessingLoadingStateProps {
@@ -86,19 +110,26 @@ interface ProcessingLoadingStateProps {
   remainingMinutes?: number;
   extensionMessage?: string;
   allowAutoComplete?: boolean;
+  onExit?: () => void; // Add exit callback prop
 }
 
 const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   platform,
   username: propUsername,
   onComplete,
-  countdownMinutes = 15,
+  countdownMinutes, // Remove default value - we'll use platform-specific timing
   remainingMinutes,
   extensionMessage,
-  allowAutoComplete = true
+  allowAutoComplete = true,
+  onExit
 }) => {
   const navigate = useNavigate();
   const { completeProcessing } = useProcessing();
+  const { currentUser } = useAuth();
+  
+  // Add exit confirmation modal state
+  const [isExitModalOpen, setIsExitModalOpen] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
   
   // Get platform configuration with fallback
   const platformConfig = PLATFORM_CONFIGS[platform] || DEFAULT_PLATFORM_CONFIG;
@@ -120,7 +151,58 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   };
 
   // Get username from props or localStorage (fixed lexical scoping)
-  const username = propUsername || getUsernameFromStorage(platform);
+  const username = (() => {
+    // Prefer prop if it is a meaningful username (not the generic fallback)
+    if (propUsername && typeof propUsername === 'string') {
+      const trimmed = propUsername.trim();
+      if (trimmed && trimmed.toLowerCase() !== 'user') {
+        return trimmed;
+      }
+    }
+    // Otherwise, use stored username (never overwrite with 'User')
+    const stored = getUsernameFromStorage(platform);
+    if (stored && stored.trim() && stored.toLowerCase() !== 'user') {
+      return stored.trim();
+    }
+    // As an absolute last resort only, return 'User'
+    return 'User';
+  })();
+
+  // ✅ PLATFORM-SPECIFIC TIMING LOGIC
+  // Determine the appropriate countdown duration based on platform and context
+  const getCountdownDuration = (): number => {
+    // If remainingMinutes is provided (extension scenario), use that
+    if (remainingMinutes !== undefined) {
+      return remainingMinutes;
+    }
+    
+    // If countdownMinutes is explicitly provided, use that
+    if (countdownMinutes !== undefined) {
+      return countdownMinutes;
+    }
+    
+    // Otherwise, use platform-specific initial timing
+    return platformConfig.initialMinutes;
+  };
+
+  // Get the final countdown duration
+  const finalCountdownMinutes = getCountdownDuration();
+
+  // Helper function to get appropriate extension message
+  const getExtensionMessage = (): string => {
+    if (remainingMinutes !== undefined) {
+      return `⚡ Extension: ${remainingMinutes} minutes remaining to complete setup`;
+    }
+    return '⚡ This one-time setup ensures lightning-fast performance forever';
+  };
+
+  // Helper function to get appropriate setup description
+  const getSetupDescription = (): string => {
+    if (remainingMinutes !== undefined) {
+      return `Extension setup: ${remainingMinutes} minutes remaining to complete your dashboard configuration.`;
+    }
+    return `This ${platformConfig.initialMinutes}-minute initialization creates your custom analytics engine, competitor analysis, and automation tools. You'll never have to wait again!`;
+  };
 
   // State to trigger re-renders for real-time updates
   const [currentTime, setCurrentTime] = useState(Date.now());
@@ -147,7 +229,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
       return {
         endTime,
         startTime: processingInfo.startTime,
-        totalDuration: processingInfo.totalDuration || (countdownMinutes * 60 * 1000),
+        totalDuration: processingInfo.totalDuration || (finalCountdownMinutes * 60 * 1000),
         username: processingInfo.username || username
       };
     } catch (error) {
@@ -166,26 +248,46 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     const existingTimer = getTimerData();
     
     if (!existingTimer) {
-      // First time setup - create new timer
+      // First time setup - create new timer with platform-specific timing
       const now = Date.now();
-      const durationMs = (remainingMinutes || countdownMinutes) * 60 * 1000;
+      const durationMs = finalCountdownMinutes * 60 * 1000;
       const endTime = now + durationMs;
+      
+      // ✅ CRITICAL FIX: Check if there's already a username in localStorage and preserve it
+      // This prevents overwriting the crucial inter-username form username
+      let finalUsername = username;
+      try {
+        const existingProcessingInfo = localStorage.getItem(`${platform}_processing_info`);
+        if (existingProcessingInfo) {
+          const existingInfo = JSON.parse(existingProcessingInfo);
+          if (existingInfo.username && typeof existingInfo.username === 'string' && existingInfo.username.trim()) {
+            const preserved = existingInfo.username.trim();
+            if (preserved.toLowerCase() !== 'user') {
+              console.log(`🔒 PRESERVING USERNAME: Keeping existing username '${preserved}' for ${platform} (not overwriting with '${username}')`);
+              finalUsername = preserved;
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error checking existing username in localStorage:', err);
+      }
       
       localStorage.setItem(`${platform}_processing_countdown`, endTime.toString());
       localStorage.setItem(`${platform}_processing_info`, JSON.stringify({
         platform,
-        username,
+        username: finalUsername, // Use the preserved username
         startTime: now,
         endTime,
-        totalDuration: durationMs
+        totalDuration: durationMs,
+        isExtension: remainingMinutes !== undefined // Track if this is an extension
       }));
       
-      console.log(`🔥 BULLETPROOF TIMER: Initialized ${platform} timer for ${Math.ceil(durationMs / 1000 / 60)} minutes`);
+      console.log(`🔥 BULLETPROOF TIMER: Initialized ${platform} timer for ${finalCountdownMinutes} minutes (${remainingMinutes !== undefined ? 'EXTENSION' : `INITIAL - ${platformConfig.initialMinutes}min`}) with username '${finalUsername}'`);
     } else {
-      console.log(`🔥 BULLETPROOF TIMER: Resumed existing ${platform} timer`);
+      console.log(`🔥 BULLETPROOF TIMER: Resumed existing ${platform} timer with username '${existingTimer.username}'`);
     }
-  // Added timerCompleted to dependencies to ensure effect re-runs correctly only when necessary
-  }, [platform, username, countdownMinutes, remainingMinutes, timerCompleted]);
+  // Added finalCountdownMinutes to dependencies to ensure effect re-runs correctly
+  }, [platform, username, finalCountdownMinutes, remainingMinutes, timerCompleted]);
 
   // Real-time calculation functions
   const getRemainingMs = (): number => {
@@ -554,13 +656,19 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
             event.preventDefault();
             setIsAutoPlaying(prev => !prev);
             break;
+          case 'Escape':
+            if (isExitModalOpen) {
+              event.preventDefault();
+              handleCloseExitModal();
+            }
+            break;
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [timerCompleted]);
+  }, [timerCompleted, isExitModalOpen]);
 
   // Touch/swipe support for mobile
   const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -590,9 +698,141 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     }
   };
 
+  // Handle exit button click
+  const handleExitClick = () => {
+    setIsExitModalOpen(true);
+  };
+
+  // Handle exit confirmation - COMPREHENSIVE RESET LIKE RESET BUTTON
+  const handleConfirmExit = async () => {
+    if (!currentUser?.uid) {
+      console.error('🔥 EXIT: No authenticated user found');
+      return;
+    }
+
+    console.log(`🔥 EXIT LOADING STATE: User confirmed exit for ${platform} (user: ${currentUser.uid})`);
+    setIsExiting(true);
+    
+    try {
+      // Step 1: Clear frontend caches first (immediate feedback)
+      console.log(`🔥 EXIT: Clearing frontend caches for ${platform}`);
+      
+      // Clear all processing-related localStorage data
+      const keysToRemove = [
+        `${platform}_processing_countdown`,
+        `${platform}_processing_info`,
+        'completedPlatforms',
+        'processingState'
+      ];
+      
+      keysToRemove.forEach(key => {
+        localStorage.removeItem(key);
+      });
+      
+      // Clear any platform-specific username/account data
+      const allKeys = Object.keys(localStorage);
+      const platformLower = platform.toLowerCase();
+      const usernameLower = username.toLowerCase();
+      
+      allKeys.forEach(key => {
+        const keyLower = key.toLowerCase();
+        if (keyLower.includes(platformLower) || keyLower.includes(usernameLower)) {
+          if (key.includes('processing') || key.includes('username') || key.includes('account')) {
+            localStorage.removeItem(key);
+            console.log(`🔥 EXIT: Cleared localStorage key: ${key}`);
+          }
+        }
+      });
+
+      // Step 2: Call backend reset API (same as reset button)
+      console.log(`🔥 EXIT: Calling backend reset API for ${platform}`);
+      const response = await fetch(`/api/platform-reset/${currentUser.uid}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ platform })
+      });
+
+      if (!response.ok) {
+        console.warn(`🔥 EXIT: Backend reset failed: ${response.statusText}, but continuing with frontend reset`);
+      } else {
+        const result = await response.json();
+        console.log(`🔥 EXIT: Backend reset successful:`, result);
+      }
+
+      // Step 3: Reset processing context
+      completeProcessing();
+      
+      // Step 4: Call onExit callback if provided, otherwise navigate to main dashboard
+      if (onExit) {
+        onExit();
+      } else {
+        // Navigate to main dashboard with reset state
+        safeNavigate(navigate, '/account', { 
+          replace: true,
+          state: { 
+            resetPlatform: platform,
+            resetTimestamp: Date.now(),
+            exitReason: 'setup_exited'
+          }
+        }, 8);
+      }
+      
+      console.log(`🔥 EXIT: Successfully exited loading state for ${platform}`);
+      
+    } catch (error) {
+      console.error('🔥 EXIT: Error during exit cleanup:', error);
+      
+      // Fallback: still clear frontend and navigate
+      completeProcessing();
+      if (onExit) {
+        onExit();
+      } else {
+        safeNavigate(navigate, '/account', { replace: true }, 8);
+      }
+    } finally {
+      setIsExiting(false);
+    }
+  };
+
+  // Handle exit modal close
+  const handleCloseExitModal = () => {
+    if (!isExiting) {
+      setIsExitModalOpen(false);
+    }
+  };
+
   return (
     <div className="processing-container">
       <div className="processing-backdrop" />
+      
+      {/* Exit Button - Fixed position at bottom right, only show when timer is running */}
+      {countdown > 0 && (
+        <motion.button
+          className="exit-loading-button"
+          onClick={handleExitClick}
+          disabled={isExiting}
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 1.0, duration: 0.4 }}
+          whileHover={{ scale: isExiting ? 1 : 1.05 }}
+          whileTap={{ scale: isExiting ? 1 : 0.95 }}
+          title="Exit Loading State (Esc)"
+          aria-label="Exit setup process"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleExitClick();
+            }
+          }}
+        >
+          <FiX size={20} />
+          <span className="exit-button-text">{isExiting ? 'Exiting...' : 'Exit'}</span>
+        </motion.button>
+      )}
       
       <motion.div
         className="processing-content"
@@ -633,8 +873,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
               We're preparing your personalized dashboard with AI-powered insights.
             </p>
             <p className="setup-description">
-              This 15-minute initialization creates your custom analytics engine, 
-              competitor analysis, and automation tools. You'll never have to wait again!
+              {getSetupDescription()}
             </p>
           </div>
           
@@ -730,7 +969,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
                 </div>
                 <div className="remaining-setup-info">
                   <span className="setup-note">
-                    {extensionMessage || '⚡ This one-time setup ensures lightning-fast performance forever'}
+                    {extensionMessage || getExtensionMessage()}
                   </span>
                 </div>
               </motion.div>
@@ -834,6 +1073,69 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
           </div>
         </motion.div>
       </motion.div>
+
+      {/* Exit Confirmation Modal */}
+      <AnimatePresence>
+        {isExitModalOpen && (
+          <motion.div
+            className="exit-modal-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={handleCloseExitModal}
+          >
+            <motion.div
+              className="exit-modal-content"
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="exit-modal-header">
+                <div className="exit-modal-icon">
+                  <FiAlertTriangle size={24} />
+                </div>
+                <h3>Exit Setup Process?</h3>
+              </div>
+              
+              <div className="exit-modal-body">
+                <p>Are you sure you want to exit the {platformConfig.name} setup process?</p>
+                <div className="exit-warning">
+                  <strong>This will completely reset the platform:</strong>
+                  <ul>
+                    <li>Stop the current setup process</li>
+                    <li>Clear your username entry for this platform</li>
+                    <li>Remove platform from "acquired" status</li>
+                    <li>Delete backend cache and mapping data</li>
+                    <li>Return you to the main dashboard</li>
+                    <li>Require you to re-enter username details to restart</li>
+                  </ul>
+                  <p><strong>Note:</strong> This is the same as a complete platform reset - you'll need to start over.</p>
+                </div>
+              </div>
+              
+              <div className="exit-modal-actions">
+                <button
+                  className="exit-modal-cancel"
+                  onClick={handleCloseExitModal}
+                  disabled={isExiting}
+                >
+                  Continue Setup
+                </button>
+                <button
+                  className="exit-modal-confirm"
+                  onClick={handleConfirmExit}
+                  disabled={isExiting}
+                  style={{ backgroundColor: platformConfig.primaryColor }}
+                >
+                  {isExiting ? 'Exiting...' : 'Exit Setup'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

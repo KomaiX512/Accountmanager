@@ -40,7 +40,7 @@ export const API_CONFIG = {
     RULES: '/api/rules',
     PROXY_IMAGE: '/api/proxy-image',
     R2_IMAGE: '/api/r2-image',
-    RUN_STATUS: '/api/run-status',
+    RUN_STATUS: '/api/run-status', // Fixed: Use API route that goes through server, not direct R2 access
     // Events and SSE
     EVENTS_LIST: '/api/events-list',
   }

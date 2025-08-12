@@ -99,14 +99,14 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
   // ✅ NEW: Tooltip state for smart loading hover
   const [showLoadingTooltip, setShowLoadingTooltip] = useState<string | null>(null);
   
-  // ✅ NEW: Check if competitor is in smart loading period (up to 15 minutes)
+  // ✅ NEW: Check if competitor is in smart loading period (up to 20 minutes)
   const isCompetitorInLoadingPeriod = (competitor: string): boolean => {
     const state = competitorLoadingStates[competitor];
     if (!state || !state.isLoading) return false;
     
     const currentTime = Date.now();
     const elapsedTime = currentTime - state.timestamp;
-    const maxLoadingTime = 15 * 60 * 1000; // 15 minutes in milliseconds
+    const maxLoadingTime = 20 * 60 * 1000; // 20 minutes in milliseconds
     
     return elapsedTime < maxLoadingTime;
   };
@@ -114,14 +114,20 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
   // ✅ NEW: Start smart loading for a competitor
   const startCompetitorLoading = (competitor: string) => {
     console.log(`[Cs_Analysis] 🔄 Starting smart loading for competitor: ${competitor}`);
+    const loadingState = {
+      timestamp: Date.now(),
+      retryCount: 0,
+      isLoading: true
+    };
+    
     setCompetitorLoadingStates(prev => ({
       ...prev,
-      [competitor]: {
-        timestamp: Date.now(),
-        retryCount: 0,
-        isLoading: true
-      }
+      [competitor]: loadingState
     }));
+    
+    // ✅ NEW: Persist loading state to localStorage
+    const storageKey = `competitor_loading_${platform}_${normalizedAccountHolder}_${competitor}`;
+    localStorage.setItem(storageKey, JSON.stringify(loadingState));
   };
 
   // ✅ NEW: Stop smart loading for a competitor
@@ -132,6 +138,10 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
       delete newState[competitor];
       return newState;
     });
+    
+    // ✅ NEW: Remove loading state from localStorage
+    const storageKey = `competitor_loading_${platform}_${normalizedAccountHolder}_${competitor}`;
+    localStorage.removeItem(storageKey);
   };
 
   // ✅ NEW: Get remaining loading time for a competitor (in seconds)
@@ -141,7 +151,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     
     const currentTime = Date.now();
     const elapsedTime = currentTime - state.timestamp;
-    const maxLoadingTime = 15 * 60 * 1000; // 15 minutes
+    const maxLoadingTime = 20 * 60 * 1000; // 20 minutes
     const remainingTime = Math.max(0, maxLoadingTime - elapsedTime);
     
     return Math.ceil(remainingTime / 1000); // Return in seconds
@@ -165,6 +175,59 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     const seconds = remainingTime % 60;
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
+
+  // ✅ NEW: Load persistent loading states from localStorage on mount
+  const loadPersistentLoadingStates = useCallback(() => {
+    const now = Date.now();
+    const maxLoadingTime = 20 * 60 * 1000; // 20 minutes
+    const persistentStates: Record<string, { timestamp: number; retryCount: number; isLoading: boolean }> = {};
+    
+    // Load all competitors from localStorage for this platform and account
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(`competitor_loading_${platform}_${normalizedAccountHolder}_`)) {
+        try {
+          const competitor = key.replace(`competitor_loading_${platform}_${normalizedAccountHolder}_`, '');
+          const stateData = localStorage.getItem(key);
+          if (stateData) {
+            const state = JSON.parse(stateData);
+            const elapsedTime = now - state.timestamp;
+            
+            // Only restore if still within loading period
+            if (elapsedTime < maxLoadingTime) {
+              persistentStates[competitor] = state;
+              console.log(`[Cs_Analysis] 🔄 Restored persistent loading state for ${competitor}`);
+            } else {
+              // Clean up expired state
+              localStorage.removeItem(key);
+              console.log(`[Cs_Analysis] 🧹 Cleaned up expired persistent state for ${competitor}`);
+            }
+          }
+        } catch (error) {
+          console.warn(`[Cs_Analysis] ⚠️ Failed to parse persistent loading state:`, error);
+        }
+      }
+    }
+    
+    if (Object.keys(persistentStates).length > 0) {
+      setCompetitorLoadingStates(persistentStates);
+      console.log(`[Cs_Analysis] ✅ Restored ${Object.keys(persistentStates).length} persistent loading states`);
+    }
+  }, [platform, normalizedAccountHolder]);
+
+  // ✅ NEW: Auto-refresh competitor data after loading period completes
+  const autoRefreshAfterLoading = useCallback(async (competitor: string) => {
+    console.log(`[Cs_Analysis] 🔄 Auto-refreshing data for ${competitor} after loading period`);
+    
+    // Force refresh of competitor data
+    setRefreshKey(prev => prev + 1);
+    
+    // Stop loading state
+    stopCompetitorLoading(competitor);
+    
+    // Show success message
+    setToast(`Analysis for ${competitor} is now complete! Data has been refreshed.`);
+  }, []);
   // Fetch account info on mount to get accountType and postingStyle
   useEffect(() => {
     const fetchAccountInfo = async () => {
@@ -416,7 +479,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     const cleanupInterval = setInterval(() => {
       setCompetitorLoadingStates(prev => {
         const now = Date.now();
-        const maxLoadingTime = 15 * 60 * 1000; // 15 minutes
+        const maxLoadingTime = 20 * 60 * 1000; // 20 minutes
         let hasExpired = false;
         
         const cleaned = Object.entries(prev).reduce((acc, [competitor, state]) => {
@@ -424,6 +487,10 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
           if (elapsedTime >= maxLoadingTime) {
             console.log(`[Cs_Analysis] ⏰ Smart loading expired for competitor: ${competitor}`);
             hasExpired = true;
+            
+            // ✅ NEW: Auto-refresh data when loading period completes
+            autoRefreshAfterLoading(competitor);
+            
             // Don't include expired entries
           } else {
             acc[competitor] = state;
@@ -440,7 +507,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     }, 60000); // Check every minute
     
     return () => clearInterval(cleanupInterval);
-  }, []);
+  }, [autoRefreshAfterLoading]);
 
   // ✅ NEW: Update countdown timer every 10 seconds for better UX
   useEffect(() => {
@@ -453,6 +520,11 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     
     return () => clearInterval(updateInterval);
   }, []);
+
+  // ✅ NEW: Load persistent loading states on mount
+  useEffect(() => {
+    loadPersistentLoadingStates();
+  }, [loadPersistentLoadingStates]);
 
   const handleAddCompetitor = async () => {
     if (!newCompetitor.trim()) {
@@ -498,10 +570,10 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
       const serverCompetitors = await fetchAccountInfoWithRetry();
       if (serverCompetitors) {
         setLocalCompetitors(serverCompetitors);
-        setToast('Competitor added successfully! Analysis will be ready within 15 minutes.');
+        setToast('Competitor added successfully! Analysis will be ready within 20 minutes.');
       } else {
         setLocalCompetitors(updatedCompetitors);
-        setToast('Competitor added successfully! Analysis will be ready within 15 minutes.');
+        setToast('Competitor added successfully! Analysis will be ready within 20 minutes.');
       }
 
       // Update local Facebook map after success
@@ -583,12 +655,12 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
       if (serverCompetitors) {
         setLocalCompetitors(serverCompetitors);
         setToast(editCompetitor !== currentCompetitor 
-          ? 'Competitor updated successfully! Analysis will be ready within 15 minutes.' 
+          ? 'Competitor updated successfully! Analysis will be ready within 20 minutes.' 
           : 'Competitor updated successfully!');
       } else {
         setLocalCompetitors(updatedCompetitors);
         setToast(editCompetitor !== currentCompetitor 
-          ? 'Competitor updated successfully! Analysis will be ready within 15 minutes.' 
+          ? 'Competitor updated successfully! Analysis will be ready within 20 minutes.' 
           : 'Competitor updated successfully!');
       }
 
@@ -970,7 +1042,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
                           Competitor analysis will be ready in approximately <strong>{getFormattedRemainingTime(competitor)}</strong>
                         </div>
                         <div className="tooltip-note">
-                          Analysis typically completes within 15 minutes. The container will update automatically when ready.
+                          Analysis typically completes within 20 minutes. The container will update automatically when ready.
                         </div>
                       </div>
                       <div className="tooltip-arrow"></div>
@@ -1429,12 +1501,12 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
                         </div>
                       </div>
                       
-                      <div className="reason-item">
-                        <span className="reason-icon">🆕</span>
-                        <div className="reason-text">
-                          <strong>New Competitor:</strong> Recently added competitor - analysis is still processing (can take up to 15 minutes)
+                                              <div className="reason-item">
+                          <span className="reason-icon">🆕</span>
+                          <div className="reason-text">
+                            <strong>New Competitor:</strong> Recently added competitor - analysis is still processing (can take up to 20 minutes)
+                          </div>
                         </div>
-                      </div>
                       
                       <div className="reason-item">
                         <span className="reason-icon">⚠️</span>
@@ -1449,7 +1521,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
                       <ul>
                         <li><strong>Verify Username:</strong> Double-check the competitor's {platform} username for typos</li>
                         <li><strong>Check Profile:</strong> Ensure the competitor's profile is public and accessible</li>
-                        <li><strong>Wait for Processing:</strong> If recently added, wait 10-15 minutes for analysis to complete</li>
+                        <li><strong>Wait for Processing:</strong> If recently added, wait 15-20 minutes for analysis to complete</li>
                         <li><strong>Edit or Delete:</strong> Use the edit button to correct the username or delete if no longer needed</li>
                         <li><strong>Try Again:</strong> Refresh the page and check if analysis becomes available</li>
                       </ul>

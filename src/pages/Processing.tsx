@@ -3,7 +3,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import ProcessingLoadingState from '../components/common/ProcessingLoadingState';
 import ProcessingErrorBoundary from '../components/common/ProcessingErrorBoundary';
 import { useProcessing } from '../context/ProcessingContext';
-// import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 import { safeNavigate, safeHistoryManipulation } from '../utils/navigationGuard';
 import axios from 'axios';
 import { API_CONFIG, getApiUrl } from '../config/api';
@@ -13,7 +13,7 @@ const Processing: React.FC = () => {
   const { platform } = useParams<{ platform: string }>();
   const location = useLocation();
   const { completeProcessing } = useProcessing();
-  // const { currentUser } = useAuth();
+  const { currentUser } = useAuth();
   const [isValidating, setIsValidating] = useState(true);
   const [shouldRender, setShouldRender] = useState(false);
   const validationRef = useRef(false);
@@ -29,13 +29,19 @@ const Processing: React.FC = () => {
 
   const targetPlatform = platform || stateData?.platform || 'instagram';
   
-  // Get username from state or localStorage
-  const username = stateData?.username || (() => {
+  // Get username from state or localStorage (STRICT: never fall back to any other username source)
+  const username = (() => {
+    // Strong source of truth order: stateData.username -> processing_info.username -> fallback 'User'
+    if (stateData?.username && typeof stateData.username === 'string' && stateData.username.trim()) {
+      return stateData.username.trim();
+    }
     try {
       const processingInfo = localStorage.getItem(`${targetPlatform}_processing_info`);
       if (processingInfo) {
         const info = JSON.parse(processingInfo);
-        return info.username || 'User';
+        if (info && typeof info.username === 'string' && info.username.trim()) {
+          return info.username.trim();
+        }
       }
     } catch (error) {
       console.error('Error reading username from localStorage:', error);
@@ -46,13 +52,135 @@ const Processing: React.FC = () => {
   const remainingMinutes = stateData?.remainingMinutes;
   const forcedRedirect = stateData?.forcedRedirect || false;
 
+  // ✅ USERNAME NORMALIZATION: Ensure username is properly formatted for API calls
+  const normalizeUsername = (username: string): string => {
+    if (!username || typeof username !== 'string') return 'User';
+    
+    // Remove leading/trailing whitespace
+    let normalized = username.trim();
+    
+    // Remove any special characters that might cause API issues
+    normalized = normalized.replace(/[^\w\s-]/g, '');
+    
+    // Ensure it's not empty after normalization
+    if (!normalized) return 'User';
+    
+    console.log(`🔧 USERNAME NORMALIZATION: "${username}" -> "${normalized}"`);
+    return normalized;
+  };
+
+  // ✅ API HEALTH CHECK: Verify if the server endpoint is working
+  const checkApiHealth = async (): Promise<boolean> => {
+    try {
+      const healthUrl = getApiUrl('/api/health');
+      console.log(`🏥 API HEALTH CHECK: Testing endpoint ${healthUrl}`);
+      const response = await axios.get(healthUrl, { timeout: 5000 });
+      console.log(`🏥 API HEALTH CHECK: Status ${response.status}`);
+      return response.status === 200;
+    } catch (error) {
+      console.warn(`🏥 API HEALTH CHECK: Failed - ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return false;
+    }
+  };
+
   // Helper: check R2 run status existence for platform/username
   const checkRunStatus = async (platformId: string, primaryUsername: string): Promise<{ exists: boolean; status?: string | null }> => {
+    // Add cache-buster to avoid any stale 404 caching at the proxy/browser layer
+    const cacheBuster = `?cb=${Date.now()}`;
+    
     try {
-      const url = getApiUrl(`${API_CONFIG.ENDPOINTS.RUN_STATUS}/${platformId}/${encodeURIComponent(primaryUsername)}`);
+      // ✅ API HEALTH CHECK: Verify server is working before main request
+      const isApiHealthy = await checkApiHealth();
+      if (!isApiHealthy) {
+        console.warn(`🔍 RUNSTATUS: API health check failed, proceeding with main request anyway`);
+      }
+      
+      // ✅ NORMALIZE USERNAME: Ensure username is properly formatted for API
+      const normalizedUsername = normalizeUsername(primaryUsername);
+      
+      const url = getApiUrl(`${API_CONFIG.ENDPOINTS.RUN_STATUS}/${platformId}/${encodeURIComponent(normalizedUsername)}${cacheBuster}`);
+      
+      // ✅ ENHANCED DEBUGGING: Log all details to diagnose username mismatch
+      console.log(`🔍 RUNSTATUS DEBUG INFO:`);
+      console.log(`  - Platform: ${platformId}`);
+      console.log(`  - Username (raw): "${primaryUsername}"`);
+      console.log(`  - Username (normalized): "${normalizedUsername}"`);
+      console.log(`  - Username (length): ${normalizedUsername.length}`);
+      console.log(`  - Username (encoded): ${encodeURIComponent(normalizedUsername)}`);
+      console.log(`  - Full URL: ${url}`);
+      console.log(`  - Expected R2 path: RunStatus/${platformId}/${normalizedUsername}/status.json`);
+      console.log(`  - API Health: ${isApiHealthy ? 'OK' : 'FAILED'}`);
+      
       const res = await axios.get(url, { timeout: 10000 });
-      return { exists: !!res.data?.exists, status: res.data?.status ?? null };
-    } catch (e) {
+      console.log(`🔍 RUNSTATUS RESPONSE:`, res.status, res.data);
+      
+      // Enhanced response validation
+      if (res.status === 200 && res.data) {
+        const exists = !!res.data.exists;
+        const status = res.data.status || null;
+        console.log(`🔍 RUNSTATUS PARSED: exists=${exists}, status=${status}`);
+        return { exists, status };
+      } else {
+        console.warn(`🔍 RUNSTATUS UNEXPECTED: status=${res.status}, data=`, res.data);
+        return { exists: false };
+      }
+    } catch (e: any) {
+      console.error(`🔍 RUNSTATUS ERROR:`, e.message, e.response?.status, e.response?.data);
+      
+      // ✅ ENHANCED ERROR DEBUGGING: Log more details about the error
+      if (e.response) {
+        console.error(`  - Response status: ${e.response.status}`);
+        console.error(`  - Response data:`, e.response.data);
+        console.error(`  - Response headers:`, e.response.headers);
+        console.error(`  - Response URL: ${e.response.config?.url}`);
+        console.error(`  - Request method: ${e.response.config?.method}`);
+      } else if (e.request) {
+        console.error(`  - Request was made but no response received`);
+        console.error(`  - Request URL: ${e.request.url}`);
+        console.error(`  - Request method: ${e.request.method}`);
+      } else {
+        console.error(`  - Error setting up request:`, e.message);
+      }
+      
+      // ✅ FALLBACK: Try alternative username formats if the first attempt fails
+      if (e.response?.status === 404) {
+        console.log(`🔄 RUNSTATUS FALLBACK: 404 error, trying alternative username formats...`);
+        
+        // Try lowercase version
+        const lowerUsername = primaryUsername.toLowerCase();
+        if (lowerUsername !== primaryUsername) {
+          try {
+            const fallbackUrl = getApiUrl(`${API_CONFIG.ENDPOINTS.RUN_STATUS}/${platformId}/${encodeURIComponent(lowerUsername)}${cacheBuster}`);
+            console.log(`🔄 FALLBACK ATTEMPT 1: Trying lowercase username "${lowerUsername}"`);
+            const fallbackRes = await axios.get(fallbackUrl, { timeout: 5000 });
+            if (fallbackRes.status === 200 && fallbackRes.data) {
+              console.log(`✅ FALLBACK SUCCESS: Found with lowercase username "${lowerUsername}"`);
+              return { exists: !!fallbackRes.data.exists, status: fallbackRes.data.status || null };
+            }
+          } catch (fallbackError: any) {
+            console.log(`🔄 FALLBACK ATTEMPT 1 failed:`, fallbackError.message);
+          }
+        }
+        
+        // Try removing any extra spaces or special characters
+        const cleanUsername = primaryUsername.replace(/\s+/g, '').replace(/[^\w-]/g, '');
+        if (cleanUsername !== primaryUsername && cleanUsername.length > 0) {
+          try {
+            const fallbackUrl = getApiUrl(`${API_CONFIG.ENDPOINTS.RUN_STATUS}/${platformId}/${encodeURIComponent(cleanUsername)}${cacheBuster}`);
+            console.log(`🔄 FALLBACK ATTEMPT 2: Trying cleaned username "${cleanUsername}"`);
+            const fallbackRes = await axios.get(fallbackUrl, { timeout: 5000 });
+            if (fallbackRes.status === 200 && fallbackRes.data) {
+              console.log(`✅ FALLBACK SUCCESS: Found with cleaned username "${cleanUsername}"`);
+              return { exists: !!fallbackRes.data.exists, status: fallbackRes.data.status || null };
+            }
+          } catch (fallbackError: any) {
+            console.log(`🔄 FALLBACK ATTEMPT 2 failed:`, fallbackError.message);
+          }
+        }
+        
+        console.log(`🔄 FALLBACK EXHAUSTED: All username variations failed`);
+      }
+      
       return { exists: false };
     }
   };
@@ -134,13 +262,23 @@ const Processing: React.FC = () => {
           try {
             if (infoRaw) {
               const info = JSON.parse(infoRaw);
-              if (info.username) primaryUsername = info.username;
+              if (info.username && typeof info.username === 'string' && info.username.trim()) {
+                primaryUsername = info.username.trim();
+                // ✅ DEBUGGING: Log username source for run status check
+                console.log(`🔍 USERNAME SOURCE DEBUG:`);
+                console.log(`  - Initial username: "${username}"`);
+                console.log(`  - localStorage username: "${info.username}"`);
+                console.log(`  - Final primaryUsername: "${primaryUsername}"`);
+                console.log(`  - Username match: ${username === primaryUsername ? 'YES' : 'NO'}`);
+              }
             }
           } catch {}
 
           const status = await checkRunStatus(targetPlatform, primaryUsername);
+          console.log(`🔍 INITIAL RUNSTATUS CHECK: ${targetPlatform}/${primaryUsername} - exists: ${status.exists}, status: ${status.status}`);
           if (status.exists) {
             // If file exists (completed or failed), allow dashboard immediately
+            console.log(`✅ INITIAL RUNSTATUS FOUND: Navigating to dashboard for ${targetPlatform}`);
             finalizeAndNavigate(targetPlatform);
             return;
           }
@@ -148,15 +286,23 @@ const Processing: React.FC = () => {
           // No status file yet → grant +5 minutes grace and show message
           const newEnd = Date.now() + 5 * 60 * 1000;
           localStorage.setItem(`${targetPlatform}_processing_countdown`, newEnd.toString());
-          // keep original info; update endTime & totalDuration to include extension window for progress
+          // keep original info; update endTime & ensure mandatory fields exist
           try {
             const info = infoRaw ? JSON.parse(infoRaw) : {};
-            const updated = {
-              ...info,
+            const safeInfo = {
+              // Always preserve/ensure required fields
+              platform: targetPlatform,
+              username: normalizeUsername(primaryUsername || username),
+              // Preserve previous startTime if present; otherwise, approximate to maintain continuity
+              startTime: info.startTime || Date.now(),
+              // Preserve totalDuration if present (represents initial 15/20 minutes)
+              totalDuration: info.totalDuration || undefined,
+              // Flags
+              isExtension: true,
+              // Updated endTime
               endTime: newEnd,
-              // Keep original totalDuration to preserve 100% progress during grace window
             } as any;
-            localStorage.setItem(`${targetPlatform}_processing_info`, JSON.stringify(updated));
+            localStorage.setItem(`${targetPlatform}_processing_info`, JSON.stringify(safeInfo));
           } catch {}
           setExtensionMessage('We are facing a bit of difficulty while fetching your data. Please allow 5 more minutes while we finalize your dashboard.');
 
@@ -207,12 +353,24 @@ const Processing: React.FC = () => {
         try {
           if (infoRaw) {
             const info = JSON.parse(infoRaw);
-            if (info.username) primaryUsername = info.username;
+            if (info.username && typeof info.username === 'string' && info.username.trim()) {
+              primaryUsername = info.username.trim();
+              // ✅ DEBUGGING: Log username source for run status check
+              console.log(`🔍 USERNAME SOURCE DEBUG (INTERVAL):`);
+              console.log(`  - Initial username: "${username}"`);
+              console.log(`  - localStorage username: "${info.username}"`);
+              console.log(`  - Final primaryUsername: "${primaryUsername}"`);
+              console.log(`  - Username match: ${username === primaryUsername ? 'YES' : 'NO'}`);
+            }
           }
         } catch {}
 
         const status = await checkRunStatus(targetPlatform, primaryUsername);
+        console.log(`🔍 RUNSTATUS CHECK: ${targetPlatform}/${primaryUsername} - exists: ${status.exists}, status: ${status.status}`);
         if (status.exists) {
+          // 🚨 CRITICAL FIX: Clear interval and navigate immediately
+          console.log(`✅ RUNSTATUS FOUND: Navigating to dashboard for ${targetPlatform}`);
+          clearInterval(interval);
           finalizeAndNavigate(targetPlatform);
           return;
         }
@@ -226,38 +384,19 @@ const Processing: React.FC = () => {
           localStorage.setItem(`${targetPlatform}_processing_countdown`, newEnd.toString());
           try {
             const info = infoRaw ? JSON.parse(infoRaw) : {};
-            const updated = {
-              ...info,
+            const safeInfo = {
+              platform: targetPlatform,
+              username: normalizeUsername(primaryUsername || username),
+              startTime: info.startTime || Date.now(),
+              totalDuration: info.totalDuration || undefined,
+              isExtension: true,
               endTime: newEnd,
             } as any;
-            localStorage.setItem(`${targetPlatform}_processing_info`, JSON.stringify(updated));
+            localStorage.setItem(`${targetPlatform}_processing_info`, JSON.stringify(safeInfo));
           } catch {}
           setExtensionMessage('We are facing a bit of difficulty while fetching your data. Please allow 5 more minutes while we finalize your dashboard.');
           return;
         }
-
-        // If we already extended and this expiry matches the extended window, re-check and extend again (fallback)
-        // This block is no longer needed as we always extend 5 minutes
-        // if (extendedUntil && Date.now() >= extendedUntil) {
-        //   const finalStatus = await checkRunStatus(targetPlatform, primaryUsername);
-        //   if (finalStatus.exists) {
-        //     finalizeAndNavigate(targetPlatform);
-        //     return;
-        //   }
-        //   const newEnd = Date.now() + 5 * 60 * 1000;
-        //   localStorage.setItem(`${targetPlatform}_processing_countdown`, newEnd.toString());
-        //   try {
-        //     const info = infoRaw ? JSON.parse(infoRaw) : {};
-        //     const updated = {
-        //       ...info,
-        //       endTime: newEnd,
-        //     } as any;
-        //     localStorage.setItem(`${targetPlatform}_processing_info`, JSON.stringify(updated));
-        //   } catch {}
-        //   setExtendedUntil(newEnd);
-        //   setExtensionMessage('We are facing a bit of difficulty while fetching your data. Please allow 5 more minutes while we finalize your dashboard.');
-        //   return;
-        // }
       }
     }, 1000); // Check every second to sync finish
 
@@ -345,6 +484,85 @@ const Processing: React.FC = () => {
     safeNavigate(navigate, dashboardPath, { replace: true }, 8);
   };
 
+  // Handle exit from loading state
+  const handleExitLoading = async () => {
+    if (!currentUser?.uid) {
+      console.error('🛡️ PROCESSING PAGE: No authenticated user found for exit');
+      return;
+    }
+
+    console.log(`🛡️ PROCESSING PAGE: User exited loading state for ${targetPlatform} (user: ${currentUser?.uid})`);
+    
+    try {
+      // Step 1: Clear all processing-related localStorage data
+      console.log(`🛡️ PROCESSING PAGE: Clearing frontend caches for ${targetPlatform}`);
+      
+      const keysToRemove = [
+        `${targetPlatform}_processing_countdown`,
+        `${targetPlatform}_processing_info`,
+        'completedPlatforms',
+        'processingState'
+      ];
+      
+      keysToRemove.forEach(key => {
+        localStorage.removeItem(key);
+      });
+      
+      // Clear any platform-specific username/account data
+      const allKeys = Object.keys(localStorage);
+      const platformLower = targetPlatform.toLowerCase();
+      const usernameLower = username.toLowerCase();
+      
+      allKeys.forEach(key => {
+        const keyLower = key.toLowerCase();
+        if (keyLower.includes(platformLower) || keyLower.includes(usernameLower)) {
+          if (key.includes('processing') || key.includes('username') || key.includes('account')) {
+            localStorage.removeItem(key);
+            console.log(`🔥 EXIT: Cleared localStorage key: ${key}`);
+          }
+        }
+      });
+
+      // Step 2: Call backend reset API (same as reset button)
+      console.log(`🛡️ PROCESSING PAGE: Calling backend reset API for ${targetPlatform}`);
+      const response = await fetch(`/api/platform-reset/${currentUser?.uid}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ platform: targetPlatform })
+      });
+
+      if (!response.ok) {
+        console.warn(`🛡️ PROCESSING PAGE: Backend reset failed: ${response.statusText}, but continuing with frontend reset`);
+      } else {
+        const result = await response.json();
+        console.log(`🛡️ PROCESSING PAGE: Backend reset successful:`, result);
+      }
+
+      // Step 3: Reset processing context
+      completeProcessing();
+      
+      // Step 4: Navigate to main dashboard with reset state
+      console.log(`🛡️ PROCESSING PAGE: Navigating to main dashboard after exit`);
+      safeNavigate(navigate, '/account', { 
+        replace: true,
+        state: { 
+          resetPlatform: targetPlatform,
+          resetTimestamp: Date.now(),
+          exitReason: 'setup_exited'
+        }
+      }, 8);
+      
+    } catch (error) {
+      console.error('🛡️ PROCESSING PAGE: Error during exit cleanup:', error);
+      
+      // Fallback: still clear frontend and navigate
+      completeProcessing();
+      safeNavigate(navigate, '/account', { replace: true }, 8);
+    }
+  };
+
   // Show loading while validating
   if (isValidating || !shouldRender) {
     return (
@@ -387,6 +605,7 @@ const Processing: React.FC = () => {
          // prevent auto-complete inside child; parent orchestrates finalization
          // @ts-ignore
          allowAutoComplete={false}
+        onExit={handleExitLoading}
       />
     </ProcessingErrorBoundary>
   );

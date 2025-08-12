@@ -318,28 +318,33 @@
 }
 
 .chat-input-form {
-  padding: 10px 14px !important;
-  border-top: 1px solid rgba(0, 255, 204, 0.12) !important;
-  background: transparent !important;
   display: flex !important;
   gap: 8px !important;
-  align-items: flex-end !important;
+  padding: 16px !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: rgba(255, 255, 255, 0.03) !important;
+  backdrop-filter: blur(10px) !important;
+  margin-top: auto !important;
+  position: relative !important;
+  z-index: 1000 !important;
 }
 
 .chat-input {
   flex: 1 !important;
-  border: 1px solid rgba(0, 255, 204, 0.25) !important;
-  border-radius: 8px !important;
-  padding: 10px 12px !important;
-  font-size: 13px !important;
-  line-height: 1.4 !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 20px !important;
+  padding: 12px 16px !important;
+  color: #ffffff !important;
+  font-size: 14px !important;
+  outline: none !important;
+  transition: all 0.2s ease !important;
   resize: none !important;
-  font-family: inherit !important;
-  background: #121a2b !important;
-  color: #e0e0ff !important;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
-  min-height: 36px !important;
   max-height: 120px !important;
+  min-height: 40px !important;
+  line-height: 1.4 !important;
+  font-size: 16px !important; /* Prevent zoom on iOS */
+  min-height: 44px !important; /* iOS minimum touch target */
 }
 
 .chat-input:focus {
@@ -615,8 +620,10 @@
 @media (max-width: 768px) {
   .chat-modal-content {
     width: 98% !important;
-    height: 94vh !important;
+    height: 70vh !important; /* Reduced from 94vh to prevent keyboard overlap */
+    max-height: calc(100vh - 120px) !important; /* Ensure space for keyboard */
     border-radius: 16px !important;
+    margin-bottom: 20vh !important; /* Reserve space for keyboard */
   }
   
   .chat-modal-header {
@@ -633,6 +640,8 @@
   
   .chat-input-form {
     padding: 10px 12px !important;
+    margin-bottom: env(keyboard-inset-height, 0px) !important; /* iOS keyboard safe area */
+    transition: margin-bottom 0.3s ease !important;
   }
   
   .message-content {
@@ -644,8 +653,10 @@
 @media (max-width: 480px) {
   .chat-modal-content {
     width: 100% !important;
-    height: 100vh !important;
+    height: 75vh !important; /* Reduced from 100vh to prevent keyboard overlap */
+    max-height: calc(100vh - 100px) !important; /* Ensure space for keyboard */
     border-radius: 0 !important;
+    margin-bottom: 25vh !important; /* Reserve space for keyboard */
   }
   
   .chat-modal-header {
@@ -662,6 +673,23 @@
   
   .chat-input-form {
     padding: 8px 10px !important;
+    margin-bottom: env(keyboard-inset-height, 0px) !important; /* iOS keyboard safe area */
+    transition: margin-bottom 0.3s ease !important;
+    position: relative !important;
+    z-index: 1000 !important;
+  }
+  
+  /* Ensure input field is always visible above keyboard */
+  .chat-input {
+    font-size: 16px !important; /* Prevent zoom on iOS */
+    min-height: 44px !important; /* iOS minimum touch target */
+  }
+  
+  /* Add safe area for keyboard on iOS */
+  @supports (padding-bottom: env(keyboard-inset-height)) {
+    .chat-modal-content {
+      padding-bottom: env(keyboard-inset-height, 20px) !important;
+    }
   }
   
   .message-content {

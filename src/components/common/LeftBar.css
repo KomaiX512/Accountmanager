@@ -18,7 +18,7 @@ motion.div.left-bar,
   -webkit-backdrop-filter: blur(20px) !important;
   transform: translateZ(0) !important;
   will-change: transform !important;
-  overflow: visible !important;
+  overflow: hidden !important;
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
@@ -45,7 +45,15 @@ motion.div.left-bar,
   width: 100%;
   align-items: center;
   padding-top: clamp(8px, 1.5vw, 12px);
+  padding-bottom: clamp(8px, 1.5vw, 12px);
   box-sizing: border-box;
+  max-height: calc(100vh - 70px - clamp(16px, 3vw, 24px));
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
 }
 
 .icon-button {
@@ -92,6 +100,46 @@ motion.div.left-bar,
   color: var(--glass-accent);
 }
 
+/* Custom Scrollbar Styling for Left Bar */
+.icon-container::-webkit-scrollbar {
+  width: 4px;
+}
+
+.icon-container::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 2px;
+}
+
+.icon-container::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  transition: background 0.2s ease;
+}
+
+.icon-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* Scroll indicator for small screens */
+.icon-container::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 4px;
+  background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.2));
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.icon-container:has(.icon-button:nth-child(n+5))::after {
+  opacity: 1;
+}
+
 .left-bar * {
   color: var(--glass-text) !important;
   background: none;
@@ -126,6 +174,10 @@ motion.div.left-bar,
     top: clamp(55px, 5.5vh, 70px) !important;
     bottom: 0 !important;
   }
+  
+  .icon-container {
+    max-height: calc(100vh - clamp(55px, 5.5vh, 70px) - clamp(16px, 3vw, 24px));
+  }
 }
 
 @media (max-width: 1440px) {
@@ -134,6 +186,10 @@ motion.div.left-bar,
     top: clamp(50px, 5vh, 65px) !important;
     bottom: 0 !important;
   }
+  
+  .icon-container {
+    max-height: calc(100vh - clamp(50px, 5vh, 65px) - clamp(16px, 3vw, 24px));
+  }
 }
 
 @media (max-width: 1366px) {
@@ -141,6 +197,10 @@ motion.div.left-bar,
     width: clamp(25px, 4.5vw, 55px) !important;
     top: clamp(48px, 4.8vh, 60px) !important;
     bottom: 0 !important;
+  }
+  
+  .icon-container {
+    max-height: calc(100vh - clamp(48px, 4.8vh, 60px) - clamp(16px, 3vw, 24px));
   }
 }
 
@@ -189,6 +249,14 @@ motion.div.left-bar,
     width: clamp(8px, 1.5vw, 25px) !important;
     top: clamp(25px, 2.5vh, 35px) !important;
     bottom: 0 !important;
+  }
+  
+  .icon-container {
+    max-height: calc(100vh - clamp(25px, 2.5vh, 35px) - clamp(16px, 3vw, 24px));
+  }
+  
+  .icon-container::-webkit-scrollbar {
+    width: 3px;
   }
 }
 

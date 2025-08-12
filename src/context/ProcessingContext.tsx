@@ -128,9 +128,25 @@ export const ProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const startTime = Date.now();
     const duration = durationMinutes * 60 * 1000;
 
+    // ✅ CRITICAL FIX: Check if there's already a username in localStorage and preserve it
+    // This prevents overwriting the crucial inter-username form username
+    let finalUsername = username;
+    try {
+      const existingProcessingInfo = localStorage.getItem(`${platform}_processing_info`);
+      if (existingProcessingInfo) {
+        const existingInfo = JSON.parse(existingProcessingInfo);
+        if (existingInfo.username && existingInfo.username.trim()) {
+          console.log(`🔒 PRESERVING USERNAME: Keeping existing username '${existingInfo.username}' for ${platform} (not overwriting with '${username}')`);
+          finalUsername = existingInfo.username;
+        }
+      }
+    } catch (err) {
+      console.error('Error checking existing username in localStorage:', err);
+    }
+
     const newState: ProcessingState = {
       platform,
-      username,
+      username: finalUsername, // Use the preserved username
       startTime,
       duration,
       isProcessing: true,
@@ -152,7 +168,7 @@ export const ProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const endTime = startTime + duration;
     try {
       localStorage.setItem(`${platform}_processing_countdown`, endTime.toString());
-      localStorage.setItem(`${platform}_processing_info`, JSON.stringify({ platform, username, startTime, endTime }));
+      localStorage.setItem(`${platform}_processing_info`, JSON.stringify({ platform, username: finalUsername, startTime, endTime }));
     } catch (err) {
       console.error('Error setting processing countdown in localStorage', err);
     }

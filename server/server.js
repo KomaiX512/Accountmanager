@@ -250,7 +250,9 @@ const MODULE_CACHE_CONFIG = {
   'competitor_analysis': CACHE_CONFIG.STANDARD,
   'recommendations': CACHE_CONFIG.STANDARD,
   'engagement_strategies': CACHE_CONFIG.STANDARD,
-  'NewForYou': CACHE_CONFIG.STANDARD,
+  'NewForYou': CACHE_CONFIG.REALTIME, // No caching for news - always fresh
+  'news_for_you': CACHE_CONFIG.REALTIME, // No caching for news - always fresh
+  'news-for-you': CACHE_CONFIG.REALTIME, // No caching for news - always fresh
   'ProfileInfo': CACHE_CONFIG.REALTIME, // Disable caching for ProfileInfo to always get fresh data
   'queries': CACHE_CONFIG.STANDARD,
   'rules': CACHE_CONFIG.STANDARD,
@@ -749,7 +751,6 @@ app.get(['/api/user/:userId/usage/:period', '/user/:userId/usage/:period'], asyn
     }
   }
 });
-
 // Update usage stats
 app.patch(['/api/user/:userId/usage', '/user/:userId/usage'], async (req, res) => {
   const { userId } = req.params;
@@ -1205,6 +1206,22 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
     // Generate standardized prefix using centralized schema manager
     const prefix = PlatformSchemaManager.buildPath(module, platform, username, additional);
     
+    // 🔥 HOTFIX: Some uploads use alternative prefixes for the same module name.
+    // If we are fetching the news module, pull from ALL known prefixes and merge.
+    const altPrefixes = [];
+    if (module === 'news_for_you') {
+      const dashed = prefix.replace('news_for_you', 'news-for-you');
+      if (dashed !== prefix) {
+        altPrefixes.push(dashed);
+      }
+
+      // Also support historical/camel-cased prefix used by older pipelines
+      const newForYou = prefix.replace('news_for_you', 'NewForYou');
+      if (newForYou !== prefix && newForYou !== dashed) {
+        altPrefixes.push(newForYou);
+      }
+    }
+ 
     // Check if we should use cache based on the enhanced caching rules
     if (!forceRefresh && shouldUseCache(prefix)) {
       return cache.get(prefix);
@@ -1217,31 +1234,30 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
       console.log(`[${new Date().toISOString()}] Fetching fresh ${platform} data from R2 for prefix: ${prefix}`);
       global[fetchLogKey] = Date.now();
     }
-    const listCommand = new ListObjectsV2Command({
-      Bucket: 'tasks',
-      Prefix: prefix,
-    });
-    const listResponse = await s3Client.send(listCommand);
 
-    const files = listResponse.Contents || [];
-    
-    // Special handling for ready_post directory since it contains both JSON and JPG files
-    if (prefix.includes('ready_post/')) {
-      // For ready_post, this is handled separately by the /posts/:username endpoint
-      // Here we'll just set the cache timestamp for tracking
-      cacheTimestamps.set(prefix, Date.now());
-      
-      // Return existing data if available, otherwise empty array
-      return cache.has(prefix) ? cache.get(prefix) : [];
+    // Helper to list JSON objects for a specific prefix
+    const listJsonObjects = async (pref) => {
+      const listCommand = new ListObjectsV2Command({ Bucket: 'tasks', Prefix: pref });
+      const listResponse = await s3Client.send(listCommand);
+      return (listResponse.Contents || [])
+        .filter(file => file.Key.endsWith('.json'));
+    };
+
+    let files = await listJsonObjects(prefix);
+    // If alt prefixes exist, fetch and merge
+    for (const alt of altPrefixes) {
+      try {
+        const altFiles = await listJsonObjects(alt);
+        files = files.concat(altFiles);
+      } catch (err) {
+        // Ignore missing alt prefix
+      }
     }
-    
+
+    // Sort and process as before
     // ✅ NEW: Sort files by LastModified date to get most recent items
     const sortedFiles = files
-      .filter(file => file.Key.endsWith('.json')) // Only JSON files
-      .sort((a, b) => {
-        // Sort by LastModified in descending order (most recent first)
-        return new Date(b.LastModified).getTime() - new Date(a.LastModified).getTime();
-      });
+      .sort((a, b) => new Date(b.LastModified).getTime() - new Date(a.LastModified).getTime());
     
     // ✅ NEW: Limit to most recent 3 items for strategies and competitor analysis
     const maxItems = (module === 'recommendations' || module === 'competitor_analysis') ? 3 : sortedFiles.length;
@@ -1481,7 +1497,6 @@ app.get(['/api/data/cache/:filename', '/data/cache/:filename'], async (req, res)
     return res.status(500).json({ error: 'Failed to read cached data' });
   }
 });
-
 app.post(['/save-account-info', '/api/save-account-info'], async (req, res) => {
   try {
     const { username, accountType, postingStyle, competitors, platform } = req.body;
@@ -2260,7 +2275,6 @@ app.get(['/retrieve-account-info/:username', '/api/retrieve-account-info/:userna
     res.status(500).json({ error: 'Failed to retrieve account info', details: error.message });
   }
 });
-
 app.get(['/posts/:username', '/api/posts/:username'], async (req, res) => {
   try {
     const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
@@ -3008,7 +3022,6 @@ async function fetchInstagramComments(userId) {
     return [];
   }
 }
-
 // Facebook OAuth callback endpoint
 app.get(['/facebook/callback', '/api/facebook/callback'], async (req, res) => {
   // Check if this is a webhook verification request
@@ -3517,7 +3530,6 @@ app.get(['/webhook/facebook', '/api/webhook/facebook'], (req, res) => {
     res.sendStatus(403);
   }
 });
-
 // Facebook Webhook POST Handler
 app.post(['/webhook/facebook', '/api/webhook/facebook'], async (req, res) => {
   const body = req.body;
@@ -4260,7 +4272,6 @@ app.post(['/send-dm-reply/:userId', '/api/send-dm-reply/:userId'], async (req, r
     });
   }
 });
-
 // Send Comment Reply
 app.post(['/send-comment-reply/:userId', '/api/send-comment-reply/:userId'], async (req, res) => {
   // Set CORS headers explicitly for this endpoint
@@ -5002,7 +5013,6 @@ async function sendTwitterMentionReply(userId, commentId, text) {
     throw error;
   }
 }
-
 // SIMPLE BULLETPROOF: Facebook notifications from R2 only
 async function fetchFacebookNotifications(userId, forceRefresh = false) {
   console.log(`[${new Date().toISOString()}] [FACEBOOK-SIMPLE] Fetching notifications for userId: ${userId}`);
@@ -5702,7 +5712,6 @@ app.get('/instagram-token-check/:graphId', async (req, res) => {
     res.status(500).json({ error: 'Failed to check Instagram token' });
   }
 });
-
 // Real-time Instagram posting endpoint
 app.post(['/api/post-instagram-now/:userId', '/post-instagram-now/:userId'], upload.single('image'), async (req, res) => {
   setCorsHeaders(res);
@@ -6477,7 +6486,6 @@ app.get(['/facebook-connection/:userId', '/api/facebook-connection/:userId'], as
     res.status(500).json({ error: 'Failed to retrieve Facebook connection' });
   }
 });
-
 // This endpoint stores the user's Facebook connection
 app.post(['/facebook-connection/:userId', '/api/facebook-connection/:userId'], async (req, res) => {
   setCorsHeaders(res);
@@ -7187,10 +7195,8 @@ function scheduleConnectionHealthCheck() {
   
   console.log(`[${new Date().toISOString()}] SSE connection health check scheduler started`);
 }
-
 // Start connection health check
 scheduleConnectionHealthCheck();
-
 // Enhance event streaming with reconnection support and event persistence for missed updates
 app.get(['/events-missed/:username', '/api/events-missed/:username'], async (req, res) => {
   const { username } = req.params;
@@ -7720,7 +7726,6 @@ app.options(['/update-post-status/:username', '/api/update-post-status/:username
   setCorsHeaders(res);
   res.status(204).send();
 });
-
 // RAG server proxy endpoint for instant AI replies to DMs/comments
 app.post(['/rag-instant-reply/:username', '/api/rag-instant-reply/:username'], async (req, res, next) => {
   // Set CORS headers for this specific endpoint
@@ -8506,7 +8511,6 @@ app.get(['/twitter-connection/:userId', '/api/twitter-connection/:userId'], asyn
     }
   }
 });
-
 app.delete(['/twitter-connection/:userId', '/api/twitter-connection/:userId'], async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
   
@@ -9220,7 +9224,6 @@ app.post(['/schedule-tweet/:userId', '/api/schedule-tweet/:userId'], async (req,
     res.status(500).json({ error: 'Failed to schedule tweet' });
   }
 });
-
 // Schedule tweet with image endpoint - for future posting with OAuth 2.0 and image
 app.post(['/schedule-tweet-with-image/:userId', '/api/schedule-tweet-with-image/:userId'], upload.single('image'), async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
@@ -9956,7 +9959,6 @@ function startInstagramScheduler() {
     }
   }, 60000); // Check every minute
 }
-
 async function processScheduledInstagramPosts() {
   try {
     console.log(`[${new Date().toISOString()}] [SCHEDULER] processScheduledInstagramPosts started.`);
@@ -10686,7 +10688,6 @@ async function processAutopilotReplies() {
     console.error(`[${new Date().toISOString()}] [AUTOPILOT] Error in processAutopilotReplies:`, error);
   }
 }
-
 // 🚀 AUTOPILOT: Check for new messages and reply automatically
 async function checkAndReplyToNewMessages(username, platform, settings) {
   // 🔒 RACE CONDITION PROTECTION: Implement user/platform locking for replies
@@ -10759,7 +10760,6 @@ async function checkAndReplyToNewMessages(username, platform, settings) {
     console.log(`[${new Date().toISOString()}] [AUTOPILOT] 🔓 Released reply lock for ${lockKey}`);
   }
 }
-
 // Helper functions for autopilot (implementations simplified for core functionality)
 
 async function getLastScheduledPostTime(username, platform) {
@@ -11474,7 +11474,6 @@ async function sendAutopilotReply(notification, reply, username, platform) {
     return { success: false, error: error.message };
   }
 }
-
 async function sendInstagramAutopilotReply(notification, reply, username) {
   try {
     // Use existing Instagram reply functionality
@@ -11532,7 +11531,6 @@ async function sendFacebookAutopilotReply(notification, reply, username) {
     return { success: false, error: error.message };
   }
 }
-
 async function markNotificationAsAutoReplied(notification) {
   try {
     // Update the original event file to mark as auto-replied
@@ -12224,7 +12222,6 @@ app.options(['/debug/campaign-posts/:username', '/api/debug/campaign-posts/:user
   setCorsHeaders(res);
   res.status(204).send();
 });
-
 // Post tweet with image endpoint - immediate posting with OAuth 2.0 and chunked media upload
 app.post(['/post-tweet-with-image/:userId', '/api/post-tweet-with-image/:userId'], upload.single('image'), async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
@@ -13002,7 +12999,6 @@ app.post(['/test-autopilot-schedule/:username', '/api/test-autopilot-schedule/:u
     });
   }
 });
-
 app.post(['/test-autopilot-reply/:username', '/api/test-autopilot-reply/:username'], async (req, res) => {
   setCorsHeaders(res);
   
@@ -13761,9 +13757,7 @@ app.options(['/api/signed-image-url/:username/:imageKey', '/signed-image-url/:us
   setCorsHeaders(res);
   res.status(204).send();
 });
-
 // ... existing code ...
-
 // Send verification email endpoint
 app.post(['/api/send-verification-email', '/send-verification-email'], async (req, res) => {
   setCorsHeaders(res);

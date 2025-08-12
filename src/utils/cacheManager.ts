@@ -131,13 +131,26 @@ class CacheManager {
    * Also refreshes the last-cache timestamp to avoid repeated bypasses unless needed.
    */
   static appendBypassParam(url: string, platform: string, accountHolder: string, section?: string): string {
+    // --- NEW: Always bust cache for critical real-time sections ---
+    const ALWAYS_BYPASS_SECTIONS = ['news', 'strategies'];
+
     try {
       if (!url) return url;
+
+      // If section is critical – force fresh every time without touching last_cache_time
+      if (section && ALWAYS_BYPASS_SECTIONS.includes(section)) {
+        const separator = url.includes('?') ? '&' : '?';
+        const timestamp = Date.now();
+        // Include server-recognized param
+        return `${url}${separator}forceRefresh=true&_cb=${timestamp}`;
+      }
+
       // Idempotency: if bypass params already exist, don't add again
       if (/[?&]bypass_cache=/.test(url) || /[?&]_cb=/.test(url)) {
         this.markCacheTime(platform, accountHolder, section);
         return url;
       }
+
       const bypass = this.shouldBypassCache(platform, accountHolder, section);
       if (!bypass) {
         this.markCacheTime(platform, accountHolder, section);

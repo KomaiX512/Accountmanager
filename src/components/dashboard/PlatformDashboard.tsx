@@ -29,7 +29,7 @@ import RagService from '../../services/RagService';
 import type { ChatMessage as ChatModalMessage, LinkedAccount } from '../instagram/ChatModal';
 import { Notification, ProfileInfo } from '../../types/notifications';
 // Import icons from react-icons
-import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaTwitter, FaInstagram, FaPen, FaFacebook, FaBell, FaUndo, FaInfoCircle, FaPencilAlt, FaRocket, FaRobot, FaNewspaper, FaRss, FaComments } from 'react-icons/fa';
+import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaTwitter, FaInstagram, FaPen, FaFacebook, FaBell, FaUndo, FaInfoCircle, FaPencilAlt, FaRocket, FaRobot, FaNewspaper, FaRss } from 'react-icons/fa';
 import { MdAnalytics, MdOutlineSchedule, MdOutlineAutoGraph } from 'react-icons/md';
 import { BsLightningChargeFill, BsBinoculars, BsLightbulb } from 'react-icons/bs';
 import { IoMdAnalytics } from 'react-icons/io';
@@ -1193,10 +1193,13 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           // Verify this loading state belongs to the current platform and is still active
           if (info.platform === platform && now < endTime) {
             const remainingMinutes = Math.ceil((endTime - now) / 1000 / 60);
+            
+            // ✅ CRITICAL FIX: NEVER pass username when re-navigating to prevent overwriting inter-username form data
+            // The ProcessingLoadingState will get the username from localStorage, which is the source of truth
             navigate(`/processing/${platform}`, {
               state: {
                 platform,
-                username: info.username || accountHolder,
+                // username: info.username || accountHolder, // REMOVED: This was overwriting the crucial inter-username form username
                 remainingMinutes
               },
               replace: true
@@ -1206,8 +1209,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         }
         
         // If we reach here, either no loading state or it's expired/invalid
-        localStorage.removeItem(`${platform}_processing_countdown`);
-        localStorage.removeItem(`${platform}_processing_info`);
+        // Do NOT remove processing keys here; the processing page owns lifecycle
         setIsLoading(false);
       } catch (error) {
         console.error('Error checking loading state:', error);
@@ -2526,15 +2528,7 @@ Image Description: ${response.post.image_prompt}
                       <span>Autopilot</span>
                     </button>
                     
-                    {/* 💬 CHAT: AI Chat button for general conversations */}
-                    <button
-                      onClick={() => setIsChatModalOpen(true)}
-                      className={`dashboard-btn chat-btn ${platform === 'twitter' ? 'twitter' : platform === 'facebook' ? 'facebook' : platform === 'instagram' ? 'instagram' : ''}`}
-                      title="AI Chat - Ask questions and get help"
-                    >
-                      <FaComments className="btn-icon" />
-                      <span>Chat</span>
-                    </button>
+
                     
                     <button
                       onClick={handleOpenGoalModal}
@@ -2915,7 +2909,7 @@ Image Description: ${response.post.image_prompt}
         }} />
       )}
       {isInsightsOpen && config.supportsInsights && (
-        <InsightsModal userId={userId!} onClose={() => {
+        <InsightsModal userId={userId!} accountHolder={accountHolder} onClose={() => {
           console.log(`[${new Date().toISOString()}] Closing InsightsModal`);
           setIsInsightsOpen(false);
         }} />
@@ -2969,6 +2963,7 @@ Image Description: ${response.post.image_prompt}
         <InsightsModal 
           userId={twitterId!} 
           platform="twitter"
+          accountHolder={accountHolder}
           onClose={() => {
             console.log(`[${new Date().toISOString()}] Closing Twitter InsightsModal`);
             setIsTwitterInsightsOpen(false);
@@ -3001,6 +2996,7 @@ Image Description: ${response.post.image_prompt}
         <InsightsModal 
           userId={facebookPageId!} 
           platform="facebook"
+          accountHolder={accountHolder}
           onClose={() => {
             console.log(`[${new Date().toISOString()}] Closing Facebook InsightsModal`);
             setIsFacebookInsightsOpen(false);

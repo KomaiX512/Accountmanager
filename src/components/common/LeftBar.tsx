@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import ProfilePopup from './ProfilePopup';
 import CanvasEditor from './CanvasEditor';
 import ChatModal from './ChatModal';
+import ManualGuidance from './ManualGuidance';
 import RagService from '../../services/RagService';
 
 interface LeftBarProps {
@@ -19,6 +20,7 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
   const [showProfilePopup, setShowProfilePopup] = useState(false);
   const [showChatModal, setShowChatModal] = useState(false);
   const [showCanvasEditor, setShowCanvasEditor] = useState(false);
+  const [showManualGuidance, setShowManualGuidance] = useState(false);
   const [chatMessages, setChatMessages] = useState<{role: 'user' | 'assistant', content: string}[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -28,13 +30,15 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
       setShowProfilePopup(false);
       setShowChatModal(false);
       setShowCanvasEditor(false);
+      setShowManualGuidance(false);
     };
   }, [navigate]);
 
   const menuItems = [
     { icon: 'chat', label: 'AI Chat', action: () => setShowChatModal(true) },
     { icon: 'content', label: 'Image Editor', action: () => setShowCanvasEditor(true) },
-    { icon: 'profile', label: 'Profile', action: () => setShowProfilePopup(true) }
+    { icon: 'profile', label: 'Profile', action: () => setShowProfilePopup(true) },
+    { icon: 'manual', label: 'Manual', action: () => setShowManualGuidance(true) }
   ];
 
   const handleSendMessage = async (message: string, model?: string) => {
@@ -142,6 +146,11 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
                   <path d="M12,4A4,4 0 0,1 16,8A4,4 0 0,1 12,12A4,4 0 0,1 8,8A4,4 0 0,1 12,4M12,14C16.42,14 20,15.79 20,18V20H4V18C4,15.79 7.58,14 12,14Z" />
                 </svg>
               )}
+              {item.icon === 'manual' && (
+                <svg className="icon" viewBox="0 0 24 24">
+                  <path d="M19,2H5A2,2 0 0,0 3,4V20A2,2 0 0,0 5,22H19A2,2 0 0,0 21,20V4A2,2 0 0,0 19,2M19,20H5V4H19V20M17,17H7V15H17V17Z M17,13H7V11H17V13Z M17,9H7V7H17V9Z" />
+                </svg>
+              )}
               <span>{item.label}</span>
             </motion.button>
           ))}
@@ -175,6 +184,12 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
           userId={userId}
           platform={platform}
           onClose={() => setShowCanvasEditor(false)} 
+        />
+      )}
+      
+      {showManualGuidance && (
+        <ManualGuidance 
+          onClose={() => setShowManualGuidance(false)} 
         />
       )}
     </>

@@ -140,7 +140,9 @@ body:has(.dashboard-wrapper) {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr);
   /* FIXED HEIGHTS: Prevent any module expansion affecting grid layout */
   grid-template-rows: auto 320px 400px auto;
-  gap: 16px;
+  /* Keep vertical spacing constant; adjust horizontal spacing per breakpoint */
+  row-gap: 16px;
+  column-gap: 16px;
   min-height: fit-content;
   height: fit-content; /* Fixed height based on defined rows */
   box-sizing: border-box;
@@ -156,7 +158,7 @@ body:has(.dashboard-wrapper) {
 /* Desktop specific grid optimizations */
 @media (min-width: 768px) {
   .dashboard-grid {
-    gap: 14px;
+    column-gap: 14px;
   }
 }
 
@@ -172,8 +174,8 @@ body:has(.dashboard-wrapper) {
       "notifications post-cooked competitor-analysis"
       "post-creation post-creation post-creation" !important;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr) !important;
-    grid-template-rows: auto 300px 380px auto !important; /* Fixed heights for this breakpoint */
-    gap: 14px !important;
+    grid-template-rows: auto 320px 400px auto !important; /* Keep rows constant to avoid height spikes */
+    column-gap: 14px !important;
     flex-direction: unset !important;
     align-content: start !important; /* Prevent stretching */
   }
@@ -189,8 +191,8 @@ body:has(.dashboard-wrapper) {
       "notifications post-cooked competitor-analysis"
       "post-creation post-creation post-creation" !important;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr) !important;
-    grid-template-rows: auto 280px 360px auto !important; /* Fixed heights for this breakpoint */
-    gap: 12px !important;
+    grid-template-rows: auto 320px 400px auto !important; /* Keep rows constant to avoid height spikes */
+    column-gap: 12px !important;
     flex-direction: unset !important;
     align-content: start !important; /* Prevent stretching */
   }
@@ -198,13 +200,13 @@ body:has(.dashboard-wrapper) {
 
 @media (max-width: 900px) and (min-width: 768px) {
   .dashboard-grid {
-    gap: 10px !important;
+    column-gap: 10px !important;
   }
 }
 
 @media (max-width: 800px) and (min-width: 768px) {
   .dashboard-grid {
-    gap: 8px !important;
+    column-gap: 8px !important;
   }
 }
 
@@ -684,36 +686,49 @@ body:has(.dashboard-wrapper) {
   justify-content: center !important;
 }
 
-@media (max-width: 1200px) {
-  .profile-actions .dashboard-btn:first-child,
-  .profile-actions .dashboard-btn {
-    max-width: 80px;
-    font-size: 0.65rem;
-    height: 44px !important;
-    min-height: 44px !important;
-    max-height: 44px !important;
-  }
+/* SMOOTH PROFILE ACTIONS SCALING - No more hardcoded breakpoints */
+.profile-actions {
+  display: flex !important;
+  gap: clamp(2px, 0.5vw, 8px) !important;
+  flex-wrap: nowrap !important;
+  overflow: visible !important;
+  padding-right: 0 !important;
+  width: 100% !important;
+  justify-content: flex-end !important;
 }
 
-@media (max-width: 1000px) {
-  .profile-actions .dashboard-btn:first-child,
-  .profile-actions .dashboard-btn {
-    max-width: 60px;
-    font-size: 0.6rem;
-    height: 44px !important;
-    min-height: 44px !important;
-    max-height: 44px !important;
-  }
+.profile-actions .dashboard-btn {
+  /* Fluid scaling based on viewport width */
+  width: clamp(45px, 6vw, 90px) !important;
+  min-width: 45px !important;
+  max-width: 90px !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  max-height: 44px !important;
+  font-size: clamp(0.5rem, 0.8vw, 0.75rem) !important;
+  padding: clamp(2px, 0.3vw, 8px) clamp(4px, 0.5vw, 12px) !important;
+  flex-shrink: 1 !important;
+  flex-grow: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }
 
-@media (max-width: 900px) {
-  .profile-actions .dashboard-btn:first-child,
+/* COMPACT SCALING FOR SMALLER SCREENS */
+@media (max-width: 800px) {
+  .profile-actions {
+    gap: 1px !important;
+  }
+  
   .profile-actions .dashboard-btn {
-    max-width: 50px;
-    font-size: 0.55rem;
-    height: 44px !important;
-    min-height: 44px !important;
-    max-height: 44px !important;
+    width: clamp(35px, 8vw, 55px) !important;
+    min-width: 35px !important;
+    font-size: clamp(0.4rem, 1.2vw, 0.55rem) !important;
+    padding: 1px clamp(2px, 0.5vw, 6px) !important;
   }
 }
 
@@ -826,30 +841,17 @@ body:has(.dashboard-wrapper) {
   }
 }
 
-/* Comprehensive fix for 1030-1000px range to prevent dramatic breaks */
-@media (max-width: 1030px) and (min-width: 1000px) {
+/* ENHANCED SCALING FOR MEDIUM SCREENS - Smooth transition */
+@media (max-width: 1030px) and (min-width: 800px) {
   .profile-actions {
-    max-width: 100% !important;
-    gap: 3px !important;
-    flex-wrap: nowrap !important;
-    overflow-x: auto !important;
-    padding-right: 4px !important;
-    display: flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
+    gap: clamp(1px, 0.3vw, 4px) !important;
   }
   
   .profile-actions .dashboard-btn {
-    min-width: 32px !important;
-    height: 44px !important;
-    min-height: 44px !important;
-    max-height: 44px !important;
-    padding: 4px 8px !important;
-    font-size: 0.7rem !important;
-    flex-shrink: 0 !important;
-    display: flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
+    width: clamp(40px, 5.5vw, 75px) !important;
+    min-width: 40px !important;
+    font-size: clamp(0.45rem, 0.7vw, 0.65rem) !important;
+    padding: clamp(1px, 0.2vw, 6px) clamp(3px, 0.4vw, 10px) !important;
   }
   
   /* Ensure stats stay horizontal in this range */
@@ -1925,7 +1927,7 @@ h2 {
 }
 
 /* 🍎 APPLE-INSPIRED MOBILE UI - STUNNING & PROFESSIONAL */
-@media (max-width: 767px) and (orientation: portrait) {
+@media (max-width: 699px) and (orientation: portrait) {
   .dashboard-wrapper {
     padding: 0;
     max-width: 100vw;
@@ -2146,6 +2148,8 @@ h2 {
     position: relative;
     cursor: default;
     height: auto; /* Auto height for always-expanded */
+    /* Reserve space for sticky UI overlap on small screens */
+    padding-bottom: var(--chatbar-safe, 88px);
   }
 
   /* When expanded, allow modules to grow */
@@ -2317,10 +2321,10 @@ h2 {
   .news4u.mobile-expanded > * {
     max-height: none !important;
     opacity: 1 !important;
-    padding: inherit !important;
-    margin: inherit !important;
-    overflow-y: auto !important;
-    border: inherit !important;
+    /* Avoid inherited padding/margins/overflow which caused layout spikes */
+    margin: 0 !important;
+    padding: 0 12px 12px !important;
+    border: none !important;
   }
 
   /* Restore visibility for all nested content when expanded */
@@ -2344,8 +2348,10 @@ h2 {
   .notifications.mobile-expanded,
   .strategies.mobile-expanded,
   .competitor-analysis.mobile-expanded,
-  .news4u.mobile-expanded {
-    padding-bottom: 12px;
+  .news4u.mobile-expanded,
+  .post-cooked {
+    padding-bottom: var(--chatbar-safe, 88px);
+    scroll-padding-bottom: var(--chatbar-safe, 88px);
   }
 
   /* 🍎 POST-COOKED SPECIAL HANDLING - Remove the special class approach */
@@ -2370,6 +2376,10 @@ h2 {
     height: 100%;
     overflow-y: auto;
     box-sizing: border-box;
+    /* Reserve space so the last item isn't hidden under sticky UI (chat bar, floating actions) */
+    padding-bottom: var(--chatbar-safe, 88px);
+    scroll-padding-bottom: var(--chatbar-safe, 88px);
+    scrollbar-gutter: stable both-edges;
   }
   
   .module-content > * {
@@ -2413,6 +2423,23 @@ h2 {
   .module-content .dashboard-btn:hover {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Safe area token for sticky UI (chat bar, floating actions) */
+  :root {
+    --chatbar-safe: 0px; /* default: no reservation on wide screens */
+  }
+  @media (max-width: 1200px) {
+    :root { --chatbar-safe: 56px; }
+  }
+  @media (max-width: 1000px) {
+    :root { --chatbar-safe: 72px; }
+  }
+  @media (max-width: 850px) {
+    :root { --chatbar-safe: 88px; }
+  }
+  @media (max-width: 768px) {
+    :root { --chatbar-safe: 104px; }
   }
 
   /* 🍎 CHAT BAR MOBILE OPTIMIZATION */

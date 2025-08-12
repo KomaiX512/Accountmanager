@@ -1,6 +1,32 @@
 /* Premium Dashboard Page with Dark Sophisticated Background - PROPORTIONAL SCALING */
+:root {
+  --module-gap: 1.5rem;       /* Standard gap between modules */
+  --module-padding: 1.5rem;   /* Standard padding inside modules */
+  --section-margin: 2rem;     /* Margin between sections */
+  --border-radius: 12px;      /* Standard border radius */
+  
+  /* Responsive adjustments */
+  @media (max-width: 1200px) {
+    --module-gap: 1.25rem;
+    --module-padding: 1.25rem;
+    --section-margin: 1.75rem;
+  }
+  
+  @media (max-width: 768px) {
+    --module-gap: 1rem;
+    --module-padding: 1rem;
+    --section-margin: 1.5rem;
+  }
+  
+  @media (max-width: 480px) {
+    --module-gap: 0.75rem;
+    --module-padding: 0.75rem;
+    --section-margin: 1.25rem;
+  }
+}
+
 .dashboard-page {
-  padding: 80px 20px 20px;
+  padding: 80px var(--module-padding) var(--module-padding);
   min-height: 100vh;
   box-sizing: border-box;
   background: radial-gradient(ellipse at center, 
@@ -195,7 +221,7 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
 
 /* Instant post section - Premium Compact Container */
 .instant-post-section {
-  margin-bottom: 0;
+  margin-bottom: var(--module-gap);
   aspect-ratio: 2.8 / 1;
   min-height: 70px;
   max-height: 120px;
@@ -618,7 +644,7 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
 /* Post content section */
 .post-content-section {
   padding: 0 2rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: var(--module-gap);
 }
 
 .instant-post-textarea {
@@ -656,7 +682,7 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
 /* Image upload section */
 .image-upload-section {
   padding: 0 2rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: var(--module-gap);
 }
 
 .upload-button {
@@ -802,10 +828,12 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
 .platforms-container {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: clamp(0.8rem, 1.5vw, 1.2rem);
+  gap: var(--module-gap);
   max-height: none;
   padding: 0;
-  margin-bottom: clamp(1.5rem, 3vw, 2rem);
+  margin: var(--module-gap) 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .platforms-container::-webkit-scrollbar {
@@ -836,8 +864,8 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
   backdrop-filter: blur(20px) saturate(160%);
   -webkit-backdrop-filter: blur(20px) saturate(160%);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  padding: clamp(0.8rem, 1.5vw, 1.4rem);
+  border-radius: var(--border-radius);
+  padding: var(--module-padding);
   /* COMPLETELY STATIC - NO TRANSITIONS OR ANIMATIONS */
   transition: none !important;
   animation: none !important;
@@ -845,24 +873,21 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
   position: relative;
   overflow: hidden;
   aspect-ratio: 1.1;
-  gap: clamp(0.4rem, 0.8vw, 0.8rem);
-  /* VIEWPORT LOCK FIX: Removed translateZ that interferes with position: fixed */
-  /* transform: translateZ(20px); */
-  /* will-change: transform; */
+  gap: 0.75rem;
   box-shadow: 
     0 6px 24px rgba(0, 0, 0, 0.15),
     inset 0 1px 0 rgba(255, 255, 255, 0.15),
     inset 0 -1px 0 rgba(255, 255, 255, 0.08);
   justify-content: space-between;
-  /* STATIC CONTAINER - No hover effects to avoid confusion */
   cursor: default;
-  /* OVERRIDE ANY GLOBAL TRANSITIONS */
   will-change: auto !important;
-  /* OVERRIDE GLOBAL CSS TRANSITIONS */
   transition-property: none !important;
   transition-duration: 0s !important;
   transition-delay: 0s !important;
   transition-timing-function: none !important;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
 }
 
 /* Ensure platform icons never rotate or animate */
@@ -1685,11 +1710,21 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
     padding: clamp(0.2rem, 0.8vw, 0.3rem) clamp(0.4rem, 1.2vw, 0.6rem);
   }
 
-  /* Platform Grid - 2x2 Layout for Mobile */
+  /* Platform Grid - STRICT 2x2 Layout for Mobile - ALWAYS 2 COLUMNS */
   .platforms-container {
-    grid-template-columns: repeat(2, 1fr);
-    gap: clamp(0.3rem, 0.8vw, 0.6rem);
+    grid-template-columns: repeat(2, 1fr) !important;
+    grid-template-rows: repeat(2, 1fr) !important;
+    gap: clamp(0.4rem, 1vw, 0.8rem);
     margin-bottom: clamp(1rem, 2.5vw, 1.5rem);
+    max-height: none;
+    overflow: visible;
+    /* Force exactly 4 items in 2x2 grid */
+    display: grid !important;
+  }
+  
+  /* Ensure only first 4 platform items are visible in 2x2 grid */
+  .platforms-container .platform-row:nth-child(n+5) {
+    display: none !important;
   }
   
   .instant-post-section {
@@ -1917,6 +1952,22 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
     padding: 70px 4px 4px;
     margin-left: 0; /* Remove any left margin that might cause overlap */
   }
+  
+  /* STRICT 2x2 Grid - FORCE 2 COLUMNS ONLY */
+  .platforms-container {
+    grid-template-columns: repeat(2, 1fr) !important;
+    grid-template-rows: repeat(2, 1fr) !important;
+    gap: clamp(0.3rem, 0.8vw, 0.6rem);
+    margin-bottom: clamp(1rem, 2.5vw, 1.5rem);
+    max-height: none;
+    overflow: visible;
+    display: grid !important;
+  }
+  
+  /* Hide any platform items beyond the first 4 to maintain 2x2 */
+  .platforms-container .platform-row:nth-child(n+5) {
+    display: none !important;
+  }
 
   .welcome-banner {
     padding: clamp(0.6rem, 1.5vw, 1rem);
@@ -2136,8 +2187,24 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
 /* Extra small screens (very small phones) */
 @media (max-width: 360px) {
   .dashboard-page {
-    padding: 60px 4px 4px;
+    padding: 70px 2px 2px;
     margin-left: 0;
+  }
+  
+  /* ULTRA STRICT 2x2 Grid - FORCE 2 COLUMNS ONLY */
+  .platforms-container {
+    grid-template-columns: repeat(2, 1fr) !important;
+    grid-template-rows: repeat(2, 1fr) !important;
+    gap: clamp(0.2rem, 0.6vw, 0.5rem);
+    margin-bottom: clamp(0.8rem, 2vw, 1.2rem);
+    max-height: none;
+    overflow: visible;
+    display: grid !important;
+  }
+  
+  /* Hide any platform items beyond the first 4 to maintain 2x2 */
+  .platforms-container .platform-row:nth-child(n+5) {
+    display: none !important;
   }
 
   .welcome-banner {

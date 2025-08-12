@@ -118,10 +118,19 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
   };
 
   const handleAccountDataChange = (field: 'name' | 'url', value: string) => {
-    setAccountData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    if (field === 'name') {
+      // Remove spaces and special characters for username format
+      const cleanedValue = value.replace(/\s+/g, '').replace(/[^a-zA-Z0-9._-]/g, '');
+      setAccountData(prev => ({
+        ...prev,
+        [field]: cleanedValue
+      }));
+    } else {
+      setAccountData(prev => ({
+        ...prev,
+        [field]: value
+      }));
+    }
   };
 
   const handleCompetitorChange = (index: number, field: 'name' | 'url', value: string) => {
@@ -136,6 +145,10 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
   const isValidForSubmission = (): boolean => {
     // Check basic required fields
     if (!accountData.name.trim() || !accountData.url.trim() || !accountType || !postingStyle.trim()) return false;
+    
+    // Check account name format (must be username format - no spaces, only valid characters)
+    const usernameRegex = /^[a-zA-Z0-9._-]+$/;
+    if (!usernameRegex.test(accountData.name.trim())) return false;
     
     // Check URL format validity
     if (!validateFacebookUrl(accountData.url)) return false;
@@ -291,7 +304,7 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
         showMessage('Submission successful', 'success');
         
         // Start the processing phase using unified ProcessingContext
-        startProcessing('facebook', confirmationData.accountData.name, 25); // 25 minutes duration
+        startProcessing('facebook', confirmationData.accountData.name, 20); // 20 minutes duration
       }
     } catch (error: any) {
       console.error('Error submitting Facebook data:', error);
@@ -370,10 +383,10 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
       <div className="fb-entry-wrapper">
         <div className="fb-entry-header">
           <h1>Setup Your Facebook Account</h1>
-          <div className="importance-notice">
-            <div className="importance-icon">⚠️</div>
-            <p><strong>Critical Setup:</strong> This information initiates a 25-minute AI analysis process. Please ensure all details are accurate before submission.</p>
-          </div>
+                      <div className="importance-notice">
+              <div className="importance-icon">⚠️</div>
+              <p><strong>Critical Setup:</strong> This information initiates a 20-minute AI analysis process. Please ensure all details are accurate before submission.</p>
+            </div>
         </div>
 
         <form className="fb-entry-form" onSubmit={(e) => { e.preventDefault(); submitData(); }}>
@@ -390,18 +403,33 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
                 id="facebook-account-name"
                 value={accountData.name}
                 onChange={(e) => handleAccountDataChange('name', e.target.value)}
-                placeholder="e.g., Your Brand Name or Personal Name"
+                placeholder="e.g., YourBrandName (no spaces allowed)"
                 className="form-input"
                 disabled={isLoading}
               />
+              {accountData.name.includes(' ') && (
+                <div className="format-warning">
+                  ⚠️ Spaces detected and automatically removed for username format
+                </div>
+              )}
+              <div className="username-counter">
+                Characters: {accountData.name.length} / 50
+                {accountData.name.length > 30 && (
+                  <span className="counter-warning"> (Username getting long)</span>
+                )}
+              </div>
               <div className="field-description">
                 <p><strong>Account Name:</strong> This is the display name that will be mapped to your Facebook URL for AI analysis.</p>
                 <ul>
-                  <li>✓ Can be any name you want to use for this account</li>
-                  <li>✓ No restrictions on format or characters</li>
+                  <li>✓ Must be a single word (no spaces allowed)</li>
+                  <li>✓ Only letters, numbers, dots, underscores, and hyphens allowed</li>
+                  <li>✓ Spaces will be automatically removed</li>
                   <li>✓ This name will be mapped to your Facebook URL</li>
-                  <li>✓ Used for 25 minutes of AI processing</li>
+                  <li>✓ Used for 20 minutes of AI processing</li>
                 </ul>
+                <div className="format-example">
+                  <strong>Examples:</strong> "YourBrandName", "YourName", "Brand_123", "Company-Name"
+                </div>
               </div>
             </div>
 
@@ -428,7 +456,7 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
                     <li>✓ Must be a valid Facebook page or profile URL</li>
                     <li>✓ Format: https://facebook.com/yourpage or https://facebook.com/profile.php?id=123456789</li>
                     <li>✓ Profile must not be locked/private</li>
-                    <li>✓ This URL will be scraped for 25 minutes</li>
+                    <li>✓ This URL will be scraped for 20 minutes</li>
                   </ul>
                 </div>
             </div>
@@ -605,7 +633,7 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
           >
             <div className="confirmation-header">
               <h3>🔍 Final Review Required</h3>
-              <p><strong>Please verify your information before starting the 25-minute AI analysis:</strong></p>
+                              <p><strong>Please verify your information before starting the 20-minute AI analysis:</strong></p>
             </div>
             
             <div className="confirmation-content">
@@ -614,10 +642,13 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
                 <div className="confirmation-item">
                   <strong>Account Name:</strong> {confirmationData.accountData.name}
                   <div className="critical-warning">⚠️ This name will be mapped to your Facebook URL!</div>
+                  {confirmationData.accountData.name !== accountData.name && (
+                    <div className="format-notice">✅ Spaces removed for username format</div>
+                  )}
                 </div>
                 <div className="confirmation-item">
                   <strong>Facebook URL:</strong> {confirmationData.accountData.url}
-                  <div className="critical-warning">⚠️ This URL will be scraped for 25 minutes!</div>
+                  <div className="critical-warning">⚠️ This URL will be scraped for 20 minutes!</div>
                 </div>
                 <div className="confirmation-item">
                   <strong>Account Type:</strong> {confirmationData.accountType}
@@ -639,7 +670,7 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
               </div>
               
               <div className="confirmation-warning">
-                <p><strong>⚠️ Important:</strong> Once submitted, this will initiate a 25-minute AI analysis process. Make sure all information is correct!</p>
+                <p><strong>⚠️ Important:</strong> Once submitted, this will initiate a 20-minute AI analysis process. Make sure all information is correct!</p>
               </div>
             </div>
             

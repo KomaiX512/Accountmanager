@@ -32,8 +32,12 @@ const getRemainingMs = (platformId: string): number => {
           return 0;
         }
         
-        // Check if timer duration is realistic (max 20 minutes)
-        const maxDuration = 20 * 60 * 1000; // 20 minutes
+            // Check if timer duration is realistic (platform-specific max)
+    const getMaxDuration = (platformId: string) => {
+      const maxMinutes = platformId === 'facebook' ? 20 : 15;
+      return maxMinutes * 60 * 1000;
+    };
+    const maxDuration = getMaxDuration(platformId);
         if (info.endTime && (info.endTime - info.startTime) > maxDuration) {
           // Suspicious timer duration - clear data
           localStorage.removeItem(getCountdownKey(platformId));
@@ -71,8 +75,12 @@ const detectTimerManipulation = (platformId: string): boolean => {
       return true;
     }
     
-    // Check if timer extends beyond realistic future
-    const maxFutureTime = Date.now() + (25 * 60 * 1000); // 25 minutes from now
+    // Check if timer extends beyond realistic future (platform-specific)
+    const getMaxFutureTime = (platformId: string) => {
+      const maxMinutes = platformId === 'facebook' ? 20 : 15;
+      return Date.now() + (maxMinutes * 60 * 1000);
+    };
+    const maxFutureTime = getMaxFutureTime(platformId);
     if (endTime > maxFutureTime) {
       console.warn(`🚨 TIMER MANIPULATION DETECTED: ${platformId} - unrealistic end time`);
       return true;
@@ -128,10 +136,12 @@ export default function useProcessingGuard(platformId: string, username?: string
       const remainingMinutes = Math.ceil(ms / 1000 / 60);
       console.log(`🛡️ GUARD ENFORCED: ${platformId} - ${remainingMinutes} minutes remaining`);
       
+      // ✅ CRITICAL FIX: NEVER pass username when re-navigating to prevent overwriting inter-username form data
+      // The ProcessingLoadingState will get the username from localStorage, which is the source of truth
       navigate(`/processing/${platformId}`, {
         state: {
           platform: platformId,
-          username,
+          // username, // REMOVED: This was overwriting the crucial inter-username form username
           remainingMinutes,
           forcedRedirect: true
         },

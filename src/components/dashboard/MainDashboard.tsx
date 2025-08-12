@@ -189,7 +189,11 @@ const MainDashboard: React.FC = () => {
   }, [completedPlatforms, platformLoadingStates, getProcessingRemainingMs]);
 
   // Function to start platform loading state
-  const startPlatformLoading = (platformId: string, durationMinutes: number = 25) => {
+  const startPlatformLoading = (platformId: string, durationMinutes?: number) => {
+    // Use platform-specific timing if not explicitly provided
+    if (durationMinutes === undefined) {
+      durationMinutes = platformId === 'facebook' ? 20 : 15;
+    }
     // Don't start loading for completed platforms
     if (completedPlatforms.has(platformId)) {
       console.log(`🔥 TIMER SKIP: ${platformId} already completed, skipping timer`);
@@ -777,10 +781,12 @@ const MainDashboard: React.FC = () => {
       const remainingTime = Math.ceil(remainingMs / 1000 / 60);
       console.log(`🔥 SELECTIVE BLOCK: Redirecting ${platform.id} to processing page (${remainingTime} min remaining)`);
       
+      // ✅ CRITICAL FIX: NEVER pass username when re-navigating to prevent overwriting inter-username form data
+      // The ProcessingLoadingState will get the username from localStorage, which is the source of truth
       safeNavigate(navigate, `/processing/${platform.id}`, {
         state: {
           platform: platform.id,
-          username: currentUser?.displayName || '',
+          // username: currentUser?.displayName || '', // REMOVED: This was overwriting the crucial inter-username form username
           remainingMinutes: remainingTime
         }
       }, 7);
@@ -809,13 +815,17 @@ const MainDashboard: React.FC = () => {
     
     // If this is first access and not claimed, start loading state
     if (!isPlatformLoading(platform.id) && !platform.claimed) {
-      console.log(`🔥 TIMER START: Starting 25-minute processing for ${platform.id}`);
+      // Get platform-specific timing
+      const platformTiming = platform.id === 'facebook' ? 20 : 15;
+      console.log(`🔥 TIMER START: Starting ${platformTiming}-minute processing for ${platform.id}`);
       startPlatformLoading(platform.id);
+      
+      // ✅ FIRST TIME SETUP: Only pass username for first-time setup, never for re-navigation
       safeNavigate(navigate, `/processing/${platform.id}`, {
         state: {
           platform: platform.id,
-          username: currentUser?.displayName || '',
-          remainingMinutes: 25
+          username: currentUser?.displayName || '', // This is OK for first-time setup only
+          remainingMinutes: platformTiming
         }
       }, 7);
       return;
@@ -891,10 +901,13 @@ const MainDashboard: React.FC = () => {
     if (isPlatformLoading(platform.id)) {
       const remainingMs = getProcessingRemainingMs(platform.id);
       const remainingMinutes = Math.ceil(remainingMs / 1000 / 60);
+      
+      // ✅ CRITICAL FIX: NEVER pass username when re-navigating to prevent overwriting inter-username form data
+      // The ProcessingLoadingState will get the username from localStorage, which is the source of truth
       safeNavigate(navigate, `/processing/${platform.id}`, {
         state: {
           platform: platform.id,
-          username: currentUser?.displayName || '',
+          // username: currentUser?.displayName || '', // REMOVED: This was overwriting the crucial inter-username form username
           remainingMinutes
         }
       }, 7);

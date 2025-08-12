@@ -30,12 +30,13 @@ const hasActiveTimer = (platform: string): { active: boolean; remainingMs: numbe
   try {
     const raw = localStorage.getItem(`${platform}_processing_countdown`);
     if (!raw) return { active: false, remainingMs: 0 };
-    
+
     const endTime = parseInt(raw, 10);
-    if (Number.isNaN(endTime)) return { active: false, remainingMs: 0 };
-    
+    if (Number.isNaN(endTime)) return { active: true, remainingMs: 0 }; // treat as active because key exists
+
     const remainingMs = Math.max(0, endTime - Date.now());
-    return { active: remainingMs > 0, remainingMs };
+    // EVEN IF remainingMs==0 we still block; processing page will clean keys when done
+    return { active: true, remainingMs };
   } catch {
     return { active: false, remainingMs: 0 };
   }
@@ -91,7 +92,7 @@ const GlobalProcessingGuard: React.FC<GlobalProcessingGuardProps> = ({ children 
     safeNavigate(navigate, `/processing/${platform}`, {
       state: {
         platform,
-        username,
+        // username, // REMOVED: This was overwriting the crucial inter-username form username
         remainingMinutes,
         forcedRedirect: true
       },
@@ -314,3 +315,4 @@ const GlobalProcessingGuard: React.FC<GlobalProcessingGuardProps> = ({ children 
 };
 
 export default GlobalProcessingGuard; 
+export { GlobalProcessingGuard };

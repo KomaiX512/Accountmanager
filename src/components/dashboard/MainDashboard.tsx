@@ -145,6 +145,175 @@ const MainDashboard: React.FC = () => {
     localStorage.setItem('completedPlatforms', JSON.stringify(Array.from(completedPlatforms)));
   }, [completedPlatforms]);
 
+  // ✅ CROSS-DEVICE PROCESSING STATUS MIRROR: Periodically fetch backend status and mirror locally
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+
+    const platformsList = ['instagram', 'twitter', 'facebook', 'linkedin'];
+
+    const mirrorFromServer = async () => {
+      try {
+        const resp = await fetch(`/api/processing-status/${currentUser.uid}`);
+        if (!resp.ok) return;
+        const json = await resp.json();
+        const data = json?.data || {};
+
+        console.log(`[MainDashboard] 🔍 BACKEND SYNC: Received processing status data:`, data);
+
+        const now = Date.now();
+        const updatedStates: Record<string, PlatformLoadingState> = { ...platformLoadingStates };
+        let hasChanges = false;
+
+        platformsList.forEach(pid => {
+          const s = data[pid];
+          const wasActive = platformLoadingStates[pid] && !platformLoadingStates[pid].isComplete && now < platformLoadingStates[pid].endTime;
+          
+          console.log(`[MainDashboard] 🔍 Platform ${pid}:`, { 
+            exists: !!s, 
+            active: s?.active, 
+            endTime: s?.endTime, 
+            wasActive 
+          });
+          
+          // CRITICAL FIX: Use backend's active flag instead of manual time calculation
+          if (s && s.active === true && typeof s.endTime === 'number') {
+            // Platform is active on server (in loading state)
+            const newState = {
+              startTime: s.startTime,
+              endTime: s.endTime,
+              isComplete: false,
+            };
+            
+            // Check if state actually changed
+            const currentState = platformLoadingStates[pid];
+            if (!currentState || currentState.endTime !== s.endTime || currentState.startTime !== s.startTime) {
+              updatedStates[pid] = newState;
+              hasChanges = true;
+              console.log(`[MainDashboard] 🔄 Processing status updated for ${pid}: ${Math.ceil((s.endTime - now) / 1000 / 60)}min remaining (LOADING STATE)`);
+            }
+            
+            // Mirror to localStorage for consistency
+            localStorage.setItem(getProcessingCountdownKey(pid), String(s.endTime));
+            try {
+              const info: any = {
+                platform: pid,
+                startTime: s.startTime,
+                endTime: s.endTime,
+                totalDuration: s.totalDuration,
+              };
+              if (s.username) info.username = s.username;
+              localStorage.setItem(`${pid}_processing_info`, JSON.stringify(info));
+            } catch {}
+            
+            // CRITICAL FIX: Force clear platform access status while in loading state
+            const accessKey = `${pid}_accessed_${currentUser.uid}`;
+            const wasClaimed = localStorage.getItem(accessKey) === 'true';
+            if (wasClaimed) {
+              localStorage.removeItem(accessKey);
+              hasChanges = true; // Force UI update
+              console.log(`[MainDashboard] 🔥 CRITICAL: Cleared platform access status for ${pid} while in loading state - forcing UI update`);
+            }
+          } else {
+            // Platform not active on server
+            if (wasActive) {
+              // Was active locally but not on server - clear it
+              delete updatedStates[pid];
+              hasChanges = true;
+              console.log(`[MainDashboard] 🔄 Processing status cleared for ${pid} (no longer active on server)`);
+              
+              // Also clear localStorage
+              localStorage.removeItem(getProcessingCountdownKey(pid));
+              localStorage.removeItem(`${pid}_processing_info`);
+            }
+          }
+        });
+
+        if (hasChanges) {
+          console.log(`[MainDashboard] 🔄 Processing status changes detected, updating state`);
+          setPlatformLoadingStates(updatedStates);
+          // Force platform refresh to update "Acquiring" status
+          setPlatforms(prev => [...prev]);
+          
+          // CRITICAL: Force immediate re-render to show loading state
+          console.log(`[MainDashboard] 🔥 FORCING IMMEDIATE RE-RENDER for loading state changes`);
+          setTimeout(() => {
+            setPlatforms(prev => [...prev]);
+          }, 100);
+        }
+      } catch (error) {
+        console.warn(`[MainDashboard] Failed to sync processing status:`, error);
+      }
+    };
+
+    // Initial and periodic sync
+    mirrorFromServer();
+    const id = setInterval(mirrorFromServer, 1000);
+    return () => clearInterval(id);
+  }, [currentUser?.uid, platformLoadingStates]);
+
+  // ✅ CROSS-DEVICE CLAIMED STATUS MIRROR: Periodically fetch backend claimed state and mirror to localStorage
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+
+    const mirrorClaimed = async () => {
+      try {
+        const resp = await fetch(`/api/platform-access/${currentUser.uid}`);
+        if (!resp.ok) return;
+        const json = await resp.json();
+        const data = json?.data || {};
+        
+        console.log(`[MainDashboard] 🔍 BACKEND SYNC: Received platform access data:`, data);
+        
+        let hasChanges = false;
+        
+        ['instagram', 'twitter', 'facebook', 'linkedin'].forEach(pid => {
+          const entry = data[pid];
+          const key = `${pid}_accessed_${currentUser.uid}`;
+          const wasClaimed = localStorage.getItem(key) === 'true';
+          const isNowClaimed = entry && entry.claimed === true;
+          
+          // CRITICAL FIX: Check if platform is currently in loading state
+          const isCurrentlyLoading = platformLoadingStates[pid] && !platformLoadingStates[pid].isComplete && Date.now() < platformLoadingStates[pid].endTime;
+          
+          if (isCurrentlyLoading) {
+            // Platform is in loading state - force clear claimed status
+            if (wasClaimed) {
+              localStorage.removeItem(key);
+              hasChanges = true;
+              console.log(`[MainDashboard] 🔥 CRITICAL: Platform ${pid} in loading state - forced clear claimed status`);
+            }
+          } else if (isNowClaimed && !wasClaimed) {
+            localStorage.setItem(key, 'true');
+            hasChanges = true;
+            console.log(`[MainDashboard] 🔄 Platform ${pid} now claimed (was not claimed)`);
+          } else if (!isNowClaimed && wasClaimed) {
+            localStorage.removeItem(key);
+            hasChanges = true;
+            console.log(`[MainDashboard] 🔄 Platform ${pid} no longer claimed (was claimed)`);
+          }
+        });
+        
+        // Only force platform refresh if there were actual changes
+        if (hasChanges) {
+          console.log(`[MainDashboard] 🔄 Claimed status changes detected, refreshing platforms`);
+          setPlatforms(prev => [...prev]);
+          
+          // CRITICAL: Force immediate re-render for claimed status changes
+          console.log(`[MainDashboard] 🔥 FORCING IMMEDIATE RE-RENDER for claimed status changes`);
+          setTimeout(() => {
+            setPlatforms(prev => [...prev]);
+          }, 100);
+        }
+      } catch (error) {
+        console.warn(`[MainDashboard] Failed to sync claimed status:`, error);
+      }
+    };
+
+    mirrorClaimed();
+    const id = setInterval(mirrorClaimed, 1000); // Increased frequency for immediate sync
+    return () => clearInterval(id);
+  }, [currentUser?.uid, platformLoadingStates]);
+
   // ✅ BULLETPROOF TIMER SYSTEM - Synchronized with ProcessingLoadingState
   const getProcessingCountdownKey = (platformId: string) => `${platformId}_processing_countdown`;
 
@@ -153,6 +322,18 @@ const MainDashboard: React.FC = () => {
     if (completedPlatforms.has(platformId)) return 0;
 
     try {
+      // ✅ CRITICAL FIX: Use the already-synced state from platformLoadingStates instead of localStorage
+      // This ensures we use the backend-synced state that's updated every 1 second
+      const loadingState = platformLoadingStates[platformId];
+      if (loadingState && !loadingState.isComplete && Date.now() < loadingState.endTime) {
+        const remaining = Math.max(0, loadingState.endTime - Date.now());
+        if (remaining > 0) {
+          console.log(`🔥 TIMER SYNC: ${platformId} has ${Math.ceil(remaining / 1000 / 60)} minutes remaining (from synced state)`);
+          return remaining;
+        }
+      }
+
+      // Fallback to localStorage if no synced state
       const raw = localStorage.getItem(getProcessingCountdownKey(platformId));
       if (!raw) return 0;
       
@@ -165,26 +346,31 @@ const MainDashboard: React.FC = () => {
       console.error(`Error reading timer for ${platformId}:`, error);
       return 0;
     }
-  }, [completedPlatforms]);
+  }, [completedPlatforms, platformLoadingStates]);
 
   const isPlatformLoading = useCallback((platformId: string): boolean => {
+    // ✅ CRITICAL FIX: Use the backend-synced state directly for immediate accuracy
+    const loadingState = platformLoadingStates[platformId];
+    if (loadingState && !loadingState.isComplete && Date.now() < loadingState.endTime) {
+      const remaining = Math.max(0, loadingState.endTime - Date.now());
+      if (remaining > 0) {
+        console.log(`🔥 TIMER SYNC: ${platformId} has ${Math.ceil(remaining / 1000 / 60)} minutes remaining (from backend sync)`);
+        return true;
+      }
+    }
+
+    // Fallback to localStorage if no synced state
+    const remaining = getProcessingRemainingMs(platformId);
+    if (remaining > 0) {
+      console.log(`🔥 TIMER FALLBACK: ${platformId} has ${Math.ceil(remaining / 1000 / 60)} minutes remaining (from localStorage)`);
+      return true;
+    }
+
     // Never show loading for completed platforms
     if (completedPlatforms.has(platformId)) return false;
 
-    // Primary check: localStorage timer (bulletproof method)
-    const remaining = getProcessingRemainingMs(platformId);
-    if (remaining > 0) {
-      console.log(`🔥 TIMER SYNC: ${platformId} has ${Math.ceil(remaining / 1000 / 60)} minutes remaining`);
-      return true;
-    }
-
-    // Fallback: in-memory state (backup method)
-    const loadingState = platformLoadingStates[platformId];
-    if (loadingState && !loadingState.isComplete && Date.now() < loadingState.endTime) {
-      console.log(`🔥 TIMER FALLBACK: ${platformId} loading from memory state`);
-      return true;
-    }
-
+    // DEBUG: Log when platform is not loading
+    console.log(`🔥 TIMER DEBUG: ${platformId} is NOT loading - loadingState:`, loadingState, 'remaining:', remaining);
     return false;
   }, [completedPlatforms, platformLoadingStates, getProcessingRemainingMs]);
 
@@ -245,6 +431,41 @@ const MainDashboard: React.FC = () => {
     }
 
     localStorage.setItem(`${platformId}_processing_info`, JSON.stringify(infoPayload));
+
+    // Persist to backend for cross-device sync
+    if (currentUser?.uid) {
+      // Step 1: Save processing status (timer data)
+      fetch(`/api/processing-status/${currentUser.uid}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          platform: platformId,
+          startTime: now,
+          endTime,
+          totalDuration: durationMs,
+          username: infoPayload.username
+        })
+      }).catch(() => {});
+      
+      // Step 2: CRITICAL FIX - Mark platform as NOT claimed (in loading state) for cross-device sync
+      fetch(`/api/platform-access/${currentUser.uid}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          platform: platformId,
+          claimed: false, // NOT claimed while in loading state
+          username: infoPayload.username
+        })
+      }).then(response => {
+        if (response.ok) {
+          console.log(`🔥 BACKEND SYNC: Platform ${platformId} marked as NOT claimed (loading state) for cross-device sync`);
+        } else {
+          console.warn(`🔥 BACKEND SYNC: Failed to mark platform ${platformId} as NOT claimed`);
+        }
+      }).catch(error => {
+        console.error(`🔥 BACKEND SYNC: Error marking platform ${platformId} as NOT claimed:`, error);
+      });
+    }
     
     console.log(`🔥 TIMER START: ${platformId} timer set for ${durationMinutes} minutes (${endTime})`);
   };
@@ -268,13 +489,27 @@ const MainDashboard: React.FC = () => {
     // Clean up localStorage
     localStorage.removeItem(getProcessingCountdownKey(platformId));
     localStorage.removeItem(`${platformId}_processing_info`);
+    // Clean up backend persisted status
+    if (currentUser?.uid) {
+      fetch(`/api/processing-status/${currentUser.uid}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform: platformId })
+      }).catch(() => {});
+    }
     
     console.log(`🔥 TIMER CLEANUP: ${platformId} processing completed and cleaned up`);
-  }, [completedPlatforms]);
+  }, [completedPlatforms, currentUser?.uid]);
 
   // ✅ PLATFORM STATUS SYNC FIX: Improved platform access tracking
   const getPlatformAccessStatus = useCallback((platformId: string): boolean => {
     if (!currentUser?.uid) return false;
+    
+    // CRITICAL FIX: If platform is in loading state, it's NOT acquired yet
+    if (isPlatformLoading(platformId)) {
+      console.log(`🔥 PLATFORM STATUS: ${platformId} is in loading state, showing as NOT acquired`);
+      return false;
+    }
     
     // Check localStorage for platform access (fallback)
     const accessedFromStorage = localStorage.getItem(`${platformId}_accessed_${currentUser.uid}`) === 'true';
@@ -288,7 +523,7 @@ const MainDashboard: React.FC = () => {
     // If either localStorage or context shows accessed, return true
     // This ensures that once a user has submitted the entry form, they won't see it again
     return accessedFromStorage || accessedFromContext;
-  }, [currentUser?.uid, hasAccessedInstagram, hasAccessedTwitter, hasAccessedFacebook]);
+  }, [currentUser?.uid, hasAccessedInstagram, hasAccessedTwitter, hasAccessedFacebook, isPlatformLoading]);
 
   // ✅ PLATFORM CONNECTION SYNC FIX: Improved connection status tracking
   const getPlatformConnectionStatus = useCallback((platformId: string): boolean => {
@@ -659,18 +894,41 @@ const MainDashboard: React.FC = () => {
 
   // ✅ UNIFIED PLATFORM STATUS UPDATE: Single effect that handles both claimed and connected status
   useEffect(() => {
+    // Mirror claimed state from backend to enforce global consistency
+    const mirrorClaimedFromServer = async () => {
+      if (!currentUser?.uid) return;
+      try {
+        const resp = await fetch(`/api/platform-access/${currentUser.uid}`);
+        if (!resp.ok) return;
+        const json = await resp.json();
+        const data = json?.data || {};
+        ['instagram', 'twitter', 'facebook', 'linkedin'].forEach(pid => {
+          const entry = data[pid];
+          if (entry && entry.claimed === true) {
+            localStorage.setItem(`${pid}_accessed_${currentUser.uid}`, 'true');
+          } else if (entry && entry.claimed === false) {
+            localStorage.removeItem(`${pid}_accessed_${currentUser.uid}`);
+          }
+        });
+      } catch {}
+    };
+    mirrorClaimedFromServer();
+
     setPlatforms(prev => 
       prev.map(platform => {
         const newClaimed = getPlatformAccessStatus(platform.id);
         const newConnected = getPlatformConnectionStatus(platform.id);
         const isCurrentlyLoading = isPlatformLoading(platform.id);
         
+        // CRITICAL FIX: If platform is loading, it's NEVER claimed
+        const finalClaimed = isCurrentlyLoading ? false : newClaimed;
+        
         // Only update if status actually changed
-        if (platform.claimed !== newClaimed || platform.connected !== newConnected) {
-          console.log(`[MainDashboard] 🔄 Platform ${platform.id} status update: claimed=${newClaimed}, connected=${newConnected}, loading=${isCurrentlyLoading}`);
+        if (platform.claimed !== finalClaimed || platform.connected !== newConnected) {
+          console.log(`[MainDashboard] 🔄 Platform ${platform.id} status update: claimed=${finalClaimed} (was ${platform.claimed}, loading=${isCurrentlyLoading}), connected=${newConnected}`);
           return { 
             ...platform, 
-            claimed: newClaimed,
+            claimed: finalClaimed,
             connected: newConnected
           };
         }
@@ -876,6 +1134,12 @@ const MainDashboard: React.FC = () => {
     if (!currentUser?.uid) return;
     
     localStorage.setItem(`${platformId}_accessed_${currentUser.uid}`, 'true');
+    // Persist claimed=true to backend for cross-device sync
+    fetch(`/api/platform-access/${currentUser.uid}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ platform: platformId, claimed: true })
+    }).catch(() => {});
     
     setPlatforms(prev => 
       prev.map(p => {

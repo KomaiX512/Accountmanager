@@ -32,6 +32,7 @@ import AdminPanel from './components/admin/AdminPanel';
 import { ProcessingProvider } from './context/ProcessingContext';
 import Processing from './pages/Processing';
 import GlobalProcessingGuard from './components/guards/GlobalProcessingGuard';
+import LoadingStateGuard from './components/guards/LoadingStateGuard';
 import RagService from './services/RagService';
 import ErrorBoundary from './components/common/ErrorBoundary';
 
@@ -508,7 +509,8 @@ const AppContent: React.FC = () => {
         {!shouldHideLeftBar && <LeftBar accountHolder={accountHolder} userId={userId} platform={currentPlatform} onOpenChat={handleOpenChatFromMessages} />}
         <div className={`content-area ${shouldHideLeftBar ? 'full-width' : ''}`}>
           <GlobalProcessingGuard>
-            <Routes>
+            <LoadingStateGuard>
+              <Routes>
               <Route path="/login" element={<Login />} />
               <Route
                 path="/"
@@ -657,6 +659,7 @@ const AppContent: React.FC = () => {
                 }
               />
             </Routes>
+            </LoadingStateGuard>
           </GlobalProcessingGuard>
         </div>
       </div>

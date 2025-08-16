@@ -270,12 +270,99 @@ const Processing: React.FC = () => {
     }
   };
 
+  // ✅ BACKEND VALIDATION: Ensure processing state is valid from server perspective
+  const validateWithBackend = async (): Promise<{ isValid: boolean; reason?: string; shouldRedirect?: string }> => {
+    if (!currentUser?.uid || !targetPlatform) {
+      return { isValid: false, reason: 'no_auth' };
+    }
+
+    try {
+      console.log(`🔍 BACKEND VALIDATION: Validating processing state for ${targetPlatform} with backend`);
+      
+      const response = await fetch(`/api/validate-dashboard-access/${currentUser.uid}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          platform: targetPlatform
+        })
+      });
+
+      if (!response.ok) {
+        console.warn(`🔍 BACKEND VALIDATION: Request failed with status ${response.status}`);
+        return { isValid: false, reason: 'api_error' };
+      }
+
+      const data = await response.json();
+      console.log(`🔍 BACKEND VALIDATION: Server response:`, data);
+
+      if (data.success) {
+        if (data.accessAllowed === false && data.reason === 'processing_active') {
+          // Backend confirms processing is active - valid to stay on processing page
+          console.log(`🔍 BACKEND VALIDATION: ✅ Processing state confirmed by backend for ${targetPlatform}`);
+          
+          // Sync backend state to localStorage to ensure consistency
+          if (data.processingData) {
+            localStorage.setItem(`${targetPlatform}_processing_countdown`, data.processingData.endTime.toString());
+            localStorage.setItem(`${targetPlatform}_processing_info`, JSON.stringify({
+              platform: targetPlatform,
+              username: data.processingData.username || '',
+              startTime: data.processingData.startTime,
+              endTime: data.processingData.endTime,
+              syncedFromBackend: true
+            }));
+          }
+          
+          return { isValid: true };
+        } else if (data.accessAllowed === true) {
+          // Backend says processing is complete - should redirect to dashboard
+          console.log(`🔍 BACKEND VALIDATION: ❌ Backend says processing complete for ${targetPlatform}, redirecting to dashboard`);
+          return { 
+            isValid: false, 
+            reason: 'completed_by_backend',
+            shouldRedirect: getDashboardPath(targetPlatform)
+          };
+        }
+      }
+
+      console.warn(`🔍 BACKEND VALIDATION: Unexpected response format:`, data);
+      return { isValid: false, reason: 'unexpected_response' };
+
+    } catch (error) {
+      console.error(`🔍 BACKEND VALIDATION: Error validating with backend:`, error);
+      return { isValid: false, reason: 'network_error' };
+    }
+  };
+
   // BULLETPROOF processing page protection
   useEffect(() => {
     if (validationRef.current) return;
     validationRef.current = true;
 
     const validate = async () => {
+      // Step 1: Backend validation first (source of truth)
+      console.log(`🔍 PROCESSING VALIDATION: Starting backend validation for ${targetPlatform}`);
+      const backendCheck = await validateWithBackend();
+      
+      if (!backendCheck.isValid) {
+        if (backendCheck.shouldRedirect) {
+          console.log(`🔍 BACKEND REDIRECT: Backend says redirect to ${backendCheck.shouldRedirect}`);
+          safeNavigate(navigate, backendCheck.shouldRedirect, { replace: true }, 8);
+          return;
+        } else if (backendCheck.reason === 'completed_by_backend') {
+          console.log(`🔍 BACKEND COMPLETION: Processing completed according to backend`);
+          const dashboardPath = getDashboardPath(targetPlatform);
+          safeNavigate(navigate, dashboardPath, { replace: true }, 8);
+          return;
+        }
+        // For other backend errors, fall back to local validation
+        console.warn(`🔍 BACKEND FALLBACK: Backend validation failed (${backendCheck.reason}), checking local state`);
+      } else {
+        console.log(`🔍 BACKEND CONFIRMED: Processing state valid according to backend`);
+      }
+
+      // Step 2: Local timer validation (fallback or confirmation)
       const timer = validateTimer();
       
       if (!timer.isValid) {
@@ -630,6 +717,18 @@ const Processing: React.FC = () => {
       // Step 3: Reset processing context
       completeProcessing();
       
+      // ✅ CRITICAL: Also clear claimed status globally on backend
+      try {
+        await fetch(`/api/platform-access/${currentUser?.uid}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ platform: targetPlatform, claimed: false })
+        });
+        console.log(`🛡️ PROCESSING PAGE: Cleared claimed status for ${targetPlatform} on backend`);
+      } catch (error) {
+        console.warn(`🛡️ PROCESSING PAGE: Failed to clear claimed status for ${targetPlatform} on backend:`, error);
+      }
+
       // ✅ CRITICAL: Fire custom event to notify MainDashboard of platform reset
       window.dispatchEvent(new CustomEvent('platformReset', {
         detail: {

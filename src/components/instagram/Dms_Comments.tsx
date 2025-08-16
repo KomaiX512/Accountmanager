@@ -36,7 +36,7 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
   onIgnore, 
   onRefresh, 
   onReplyWithAI, 
-  // username, // TODO: Use for display if needed
+  username, // 🛡️ DEFENSIVE FILTER: Use username to filter out own replies
   // refreshKey, // Handled by parent
   // aiRepliesRefreshKey = 0, // Handled by parent 
   // onAIRefresh, // Handled by parent
@@ -145,7 +145,7 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
 
 
 
-  // CRITICAL FIX: Add validation for notifications array
+  // CRITICAL FIX: Add validation for notifications array AND defensive filtering for own replies
   const validNotifications = React.useMemo(() => {
     if (!Array.isArray(notifications)) {
       console.error(`[${new Date().toISOString()}] [${platform.toUpperCase()}] Invalid notifications data:`, notifications);
@@ -169,8 +169,48 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
         return false;
       }
 
-      // Platform-specific validation
-      if (platform === 'facebook') {
+      // 🛡️ DEFENSIVE FILTER: Exclude own replies/comments to prevent infinite loop
+      // Multiple defensive checks to catch all possible scenarios where own content appears
+      if (username && notif.username) {
+        // Primary check: exact username match (case insensitive for safety)
+        if (notif.username.toLowerCase() === username.toLowerCase()) {
+          console.log(`[${new Date().toISOString()}] [${platform.toUpperCase()}] 🛡️ FILTERED OUT own reply/comment from ${notif.username} (matches ${username})`);
+          return false;
+        }
+        
+        // Additional safety: remove @ symbol if present and compare
+        const cleanNotifUsername = notif.username.replace(/^@/, '').toLowerCase();
+        const cleanOwnUsername = username.replace(/^@/, '').toLowerCase();
+        if (cleanNotifUsername === cleanOwnUsername) {
+          console.log(`[${new Date().toISOString()}] [${platform.toUpperCase()}] 🛡️ FILTERED OUT own reply/comment (cleaned usernames match): ${cleanNotifUsername} === ${cleanOwnUsername}`);
+          return false;
+        }
+      }
+
+      // 🛡️ DEFENSIVE FILTER: Additional platform-specific filtering
+      if (platform === 'instagram' && username) {
+        // For Instagram, also check sender_id or instagram_user_id if available
+        if (notif.sender_id && notif.sender_id === username) {
+          console.log(`[${new Date().toISOString()}] [INSTAGRAM] 🛡️ FILTERED OUT own reply by sender_id: ${notif.sender_id}`);
+          return false;
+        }
+      }
+      
+      if (platform === 'twitter' && username) {
+        // For Twitter, check twitter_user_id or sender variations
+        if (notif.twitter_user_id && notif.twitter_user_id === username) {
+          console.log(`[${new Date().toISOString()}] [TWITTER] 🛡️ FILTERED OUT own reply by twitter_user_id: ${notif.twitter_user_id}`);
+          return false;
+        }
+      }
+      
+      if (platform === 'facebook' && username) {
+        // For Facebook, check facebook_user_id or page-related IDs
+        if (notif.facebook_user_id && notif.facebook_user_id === username) {
+          console.log(`[${new Date().toISOString()}] [FACEBOOK] 🛡️ FILTERED OUT own reply by facebook_user_id: ${notif.facebook_user_id}`);
+          return false;
+        }
+        
         // Additional Facebook-specific validation
         if (!notif.facebook_page_id && !notif.facebook_user_id) {
           console.warn(`[${new Date().toISOString()}] [FACEBOOK] Notification missing Facebook ID at index ${index}:`, notif);
@@ -178,9 +218,29 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
         }
       }
 
+      // 🛡️ DEFENSIVE FILTER: Text-based filtering as final safety net
+      // If we detect patterns that suggest this is our own reply coming back
+      if (username && notif.text) {
+        // Check if the notification text contains patterns that suggest it's our own automated reply
+        const suspiciousPatterns = [
+          /^Thanks for your message/i,
+          /^Thank you for reaching out/i,
+          /^I appreciate your comment/i,
+          /^Auto-reply:/i,
+          /^Automated response:/i,
+          /^\[AI Reply\]/i
+        ];
+        
+        const containsSuspiciousPattern = suspiciousPatterns.some(pattern => pattern.test(notif.text));
+        if (containsSuspiciousPattern && notif.username && notif.username.toLowerCase() === username.toLowerCase()) {
+          console.log(`[${new Date().toISOString()}] [${platform.toUpperCase()}] 🛡️ FILTERED OUT suspected own auto-reply by text pattern: "${notif.text.substring(0, 50)}..."`);
+          return false;
+        }
+      }
+
       return true;
     });
-  }, [notifications, platform]);
+  }, [notifications, platform, username]);
 
   // Auto-scroll to bottom when new notifications arrive - ENHANCED: Improved DM arrival detection and visibility
   useEffect(() => {
@@ -241,7 +301,10 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
   }, [validNotifications, lastNotificationCount]);
 
   console.log(`[${new Date().toISOString()}] [${platform.toUpperCase()}] Dms_Comments render:`, {
-    originalCount: notifications?.length || 0, validCount: validNotifications.length,
+    originalCount: notifications?.length || 0, 
+    validCount: validNotifications.length,
+    ownUsername: username,
+    filteredOut: (notifications?.length || 0) - validNotifications.length,
     platform,
     isConnected: platform === 'instagram' ? isInstagramConnected : 
                  platform === 'twitter' ? !!twitterId : 
@@ -254,6 +317,13 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
   };
 
   const handleReply = (notif: Notification) => {
+    // 🛡️ DEFENSIVE CHECK: Don't reply to own notifications
+    if (username && notif.username && notif.username.toLowerCase() === username.toLowerCase()) {
+      console.warn(`[${platform.toUpperCase()}] 🛡️ BLOCKED attempt to reply to own notification from ${notif.username}`);
+      setError('Cannot reply to your own messages');
+      return;
+    }
+    
     if (!replyText[notif.message_id || notif.comment_id || '']) {
       setError('Please enter a reply message');
       return;
@@ -263,11 +333,31 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
     setShowReplyInput(prev => ({ ...prev, [notif.message_id || notif.comment_id || '']: false }));
   };
 
+  // 🛡️ DEFENSIVE WRAPPER: Handle AI reply with safety checks
+  const handleReplyWithAI = (notif: Notification) => {
+    // Don't AI reply to own notifications
+    if (username && notif.username && notif.username.toLowerCase() === username.toLowerCase()) {
+      console.warn(`[${platform.toUpperCase()}] 🛡️ BLOCKED attempt to AI reply to own notification from ${notif.username}`);
+      setError('Cannot AI reply to your own messages');
+      return;
+    }
+    
+    // Call the parent's AI reply handler
+    onReplyWithAI(notif);
+  };
+
   const handleIgnore = (notif: Notification) => {
     onIgnore(notif);
   };
 
   const handleSendAIReply = async (notification: Notification) => {
+    // 🛡️ DEFENSIVE CHECK: Don't AI reply to own notifications
+    if (username && notification.username && notification.username.toLowerCase() === username.toLowerCase()) {
+      console.warn(`[${platform.toUpperCase()}] 🛡️ BLOCKED attempt to AI reply to own notification from ${notification.username}`);
+      setError('Cannot AI reply to your own messages');
+      return;
+    }
+    
     if (!onSendAIReply) return;
     try {
       setIsLoading(true);
@@ -328,14 +418,31 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
       !notif.status || notif.status === 'pending'
     );
     
-    if (pendingNotifications.length === 0) {
+    // 🛡️ DEFENSIVE FILTER: Remove own notifications from auto-reply candidates
+    const filteredForAutoReply = safeFilter(pendingNotifications, (notif: any) => {
+      // Skip if this is our own notification
+      if (username && notif.username) {
+        const isOwnNotification = notif.username.toLowerCase() === username.toLowerCase() ||
+                                 notif.username.replace(/^@/, '').toLowerCase() === username.replace(/^@/, '').toLowerCase();
+        if (isOwnNotification) {
+          console.log(`[${platform.toUpperCase()}] 🛡️ SKIPPING auto-reply to own notification from ${notif.username}`);
+          return false;
+        }
+      }
+      return true;
+    });
+    
+    if (filteredForAutoReply.length === 0) {
+      console.log(`[${platform.toUpperCase()}] No valid notifications to auto-reply after filtering`);
       return;
     }
+
+    console.log(`[${platform.toUpperCase()}] Auto-replying to ${filteredForAutoReply.length} notifications (filtered from ${pendingNotifications.length} pending)`);
 
     try {
       // 🛑 STOP OPERATION: Just call parent's auto-reply function
       // Parent handles the state management
-      await onAutoReplyAll(pendingNotifications);
+      await onAutoReplyAll(filteredForAutoReply);
     } catch (error) {
       console.error('Error in handleAutoReplyAll:', error);
       setError('Auto-reply failed. Please try again.');
@@ -604,7 +711,7 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
                         Reply
                       </button>
                       <button
-                        onClick={() => onReplyWithAI(notif)}
+                        onClick={() => handleReplyWithAI(notif)}
                         disabled={aiProcessingNotifications[notif.message_id || notif.comment_id || '']}
                         className={`ai-reply-btn ${aiProcessingNotifications[notif.message_id || notif.comment_id || ''] ? 'loading' : ''}`}
                       >

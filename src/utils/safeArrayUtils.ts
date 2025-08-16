@@ -138,4 +138,74 @@ export function safeEvery<T>(data: any, predicate: (item: T, index: number, arra
     return false;
   }
   return data.every(predicate);
+}
+
+/**
+ * 🛡️ DEFENSIVE: Filter notifications excluding user's own messages (ANTI-LOOP PROTECTION)
+ * @param notifications - Array of notifications to filter
+ * @param username - Current user's username
+ * @param platform - Platform (instagram, twitter, facebook)
+ * @param additionalFilter - Optional additional filter function
+ * @returns Filtered notifications excluding user's own messages
+ */
+export function safeFilterOwnMessages(
+  notifications: any[], 
+  username: string | undefined,
+  platform: 'instagram' | 'twitter' | 'facebook' = 'instagram',
+  additionalFilter?: (item: any) => boolean
+): any[] {
+  if (!Array.isArray(notifications)) {
+    console.warn('🛡️ DEFENSE: Notifications is not an array:', notifications);
+    return [];
+  }
+
+  if (!username) {
+    console.warn('🛡️ DEFENSE: No username provided for filtering');
+    return notifications.filter(additionalFilter || (() => true));
+  }
+
+  const normalizedUsername = username.toLowerCase().replace(/^@/, '').trim();
+
+  return notifications.filter((notif: any) => {
+    // Skip invalid notifications
+    if (!notif || typeof notif !== 'object') return false;
+
+    // Check if notification is from current user (multiple defensive layers)
+    const normalizedNotifUsername = (notif.username || '').toLowerCase().replace(/^@/, '').trim();
+    
+    const isOwnMessage = 
+      // Direct username match
+      normalizedNotifUsername === normalizedUsername ||
+      // Platform-specific sender matching
+      (platform === 'instagram' && notif.sender_id === username) ||
+      (platform === 'twitter' && notif.twitter_user_id === username) ||
+      (platform === 'facebook' && (notif.facebook_user_id === username || notif.sender_id === username)) ||
+      // Message text patterns that indicate own replies
+      (notif.text && typeof notif.text === 'string' && 
+       (notif.text.includes('This message was sent by you') || 
+        notif.text.includes('You replied:') ||
+        notif.text.startsWith('Reply from you:'))) ||
+      // Check if notification is marked as own reply
+      notif.is_own_reply === true ||
+      notif.from_self === true ||
+      // Additional defensive checks for reply patterns
+      (notif.type === 'reply' && normalizedNotifUsername === normalizedUsername);
+
+    if (isOwnMessage) {
+      console.log(`🛡️ DEFENSE: Filtered out own message in utility:`, {
+        platform,
+        username: normalizedUsername,
+        notifUsername: normalizedNotifUsername,
+        messageId: notif.message_id || notif.comment_id
+      });
+      return false;
+    }
+
+    // Apply additional filter if provided
+    if (additionalFilter && !additionalFilter(notif)) {
+      return false;
+    }
+
+    return true;
+  });
 } 

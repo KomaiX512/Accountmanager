@@ -7,6 +7,12 @@ module.exports = defineConfig({
   server: {
     port: 5173,
     host: '127.0.0.1',
+    allowedHosts: [
+      'localhost',
+      '127.0.0.1',
+      '.ngrok-free.app', // Allow all ngrok-free.app subdomains
+      '78291997257a.ngrok-free.app' // Specific ngrok host
+    ],
     proxy: {
       // Proxy R2 image endpoints to the proxy server (port 3002)
       '/api/r2-image': {

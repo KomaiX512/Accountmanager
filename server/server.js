@@ -14219,6 +14219,28 @@ app.delete(['/platform-reset/:userId', '/api/platform-reset/:userId'], async (re
       console.log(`[${new Date().toISOString()}] Cleared cache for ${platform}/${userId}`);
     }
     
+    // Also delete backend processing status so all devices stop showing "Acquiring"
+    try {
+      const processingStatusKey = `ProcessingStatus/${userId}/${platform}.json`;
+      await s3Client.send(new DeleteObjectCommand({ Bucket: 'tasks', Key: processingStatusKey }));
+      console.log(`[${new Date().toISOString()}] Deleted processing status for ${platform}/${userId}`);
+    } catch (err) {
+      if (err.name !== 'NoSuchKey' && err.$metadata?.httpStatusCode !== 404) {
+        console.warn(`[${new Date().toISOString()}] Warning deleting processing status for ${platform}/${userId}:`, err.message || err);
+      }
+    }
+
+    // ✅ CRITICAL FIX: Also delete platform access status so all devices stop showing "Acquired"
+    try {
+      const platformAccessKey = `PlatformAccessStatus/${userId}/${platform}.json`;
+      await s3Client.send(new DeleteObjectCommand({ Bucket: 'tasks', Key: platformAccessKey }));
+      console.log(`[${new Date().toISOString()}] Deleted platform access status for ${platform}/${userId}`);
+    } catch (err) {
+      if (err.name !== 'NoSuchKey' && err.$metadata?.httpStatusCode !== 404) {
+        console.warn(`[${new Date().toISOString()}] Warning deleting platform access status for ${platform}/${userId}:`, err.message || err);
+      }
+    }
+
     console.log(`[${new Date().toISOString()}] Successfully reset ${platform} dashboard for user ${userId}`);
     
     res.json({ 
@@ -14232,6 +14254,342 @@ app.delete(['/platform-reset/:userId', '/api/platform-reset/:userId'], async (re
     res.status(500).json({ 
       success: false, 
       error: `Failed to reset ${platform} dashboard` 
+    });
+  }
+});
+
+// ===============================================================
+// PROCESSING STATUS ENDPOINTS (cross-device sync)
+// Persist per-user, per-platform processing timers in R2 so all devices see the same state
+// Path: ProcessingStatus/<userId>/<platform>.json
+// ===============================================================
+
+app.options(['/processing-status/:userId', '/api/processing-status/:userId'], (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+
+// ===============================================================
+// PLATFORM ACCESS (CLAIMED) ENDPOINTS (cross-device sync)
+// Persist per-user, per-platform acquired/claimed status so all devices reflect the same context
+// Path: PlatformAccessStatus/<userId>/<platform>.json
+// ===============================================================
+
+app.options(['/platform-access/:userId', '/api/platform-access/:userId'], (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+
+app.get(['/platform-access/:userId', '/api/platform-access/:userId'], async (req, res) => {
+  setCorsHeaders(res);
+  try {
+    const { userId } = req.params;
+    const platform = (req.query.platform || '').toString();
+    const allowed = ['instagram', 'twitter', 'facebook', 'linkedin'];
+
+    if (platform) {
+      if (!allowed.includes(platform)) {
+        return res.status(400).json({ success: false, error: 'Invalid platform' });
+      }
+      const key = `PlatformAccessStatus/${userId}/${platform}.json`;
+      try {
+        const resp = await s3Client.send(new GetObjectCommand({ Bucket: 'tasks', Key: key }));
+        const body = await streamToString(resp.Body);
+        const data = JSON.parse(body || '{}');
+        return res.json({ success: true, data });
+      } catch (err) {
+        if (err.name === 'NoSuchKey' || err.$metadata?.httpStatusCode === 404) {
+          return res.json({ success: true, data: null });
+        }
+        throw err;
+      }
+    }
+
+    const prefix = `PlatformAccessStatus/${userId}/`;
+    const list = await s3Client.send(new ListObjectsV2Command({ Bucket: 'tasks', Prefix: prefix }));
+    const items = list.Contents || [];
+    const results = {};
+    for (const obj of items) {
+      if (!obj.Key) continue;
+      try {
+        const get = await s3Client.send(new GetObjectCommand({ Bucket: 'tasks', Key: obj.Key }));
+        const body = await streamToString(get.Body);
+        const data = JSON.parse(body || '{}');
+        const filePlatform = obj.Key.replace(prefix, '').replace('.json', '');
+        results[filePlatform] = data;
+      } catch {}
+    }
+    return res.json({ success: true, data: results });
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error fetching platform access status:`, error);
+    res.status(500).json({ success: false, error: 'Failed to fetch platform access status' });
+  }
+});
+
+app.post(['/platform-access/:userId', '/api/platform-access/:userId'], async (req, res) => {
+  setCorsHeaders(res);
+  try {
+    const { userId } = req.params;
+    const { platform, claimed, username } = req.body || {};
+    const allowed = ['instagram', 'twitter', 'facebook', 'linkedin'];
+    if (!platform || !allowed.includes(platform)) {
+      return res.status(400).json({ success: false, error: 'Valid platform is required' });
+    }
+    if (typeof claimed !== 'boolean') {
+      return res.status(400).json({ success: false, error: 'claimed must be boolean' });
+    }
+
+    const payload = {
+      userId,
+      platform,
+      claimed,
+      username: typeof username === 'string' ? username : undefined,
+      updatedAt: Date.now(),
+    };
+
+    const key = `PlatformAccessStatus/${userId}/${platform}.json`;
+    await s3Client.send(new PutObjectCommand({ Bucket: 'tasks', Key: key, Body: JSON.stringify(payload), ContentType: 'application/json' }));
+    console.log(`[${new Date().toISOString()}] Saved platform access for ${platform}/${userId}: claimed=${claimed}`);
+    return res.json({ success: true, data: payload });
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error saving platform access status:`, error);
+    res.status(500).json({ success: false, error: 'Failed to save platform access status' });
+  }
+});
+
+app.delete(['/platform-access/:userId', '/api/platform-access/:userId'], async (req, res) => {
+  setCorsHeaders(res);
+  try {
+    const { userId } = req.params;
+    const { platform } = req.body || {};
+    const allowed = ['instagram', 'twitter', 'facebook', 'linkedin'];
+    if (!platform || !allowed.includes(platform)) {
+      return res.status(400).json({ success: false, error: 'Valid platform is required' });
+    }
+
+    const key = `PlatformAccessStatus/${userId}/${platform}.json`;
+    try {
+      await s3Client.send(new DeleteObjectCommand({ Bucket: 'tasks', Key: key }));
+    } catch (err) {
+      if (err.name !== 'NoSuchKey' && err.$metadata?.httpStatusCode !== 404) throw err;
+    }
+    console.log(`[${new Date().toISOString()}] Deleted platform access for ${platform}/${userId}`);
+    return res.json({ success: true });
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error deleting platform access status:`, error);
+    res.status(500).json({ success: false, error: 'Failed to delete platform access status' });
+  }
+});
+
+app.get(['/processing-status/:userId', '/api/processing-status/:userId'], async (req, res) => {
+  setCorsHeaders(res);
+  try {
+    const { userId } = req.params;
+    const platform = (req.query.platform || '').toString();
+
+    const allowed = ['instagram', 'twitter', 'facebook', 'linkedin'];
+
+    // If specific platform requested, return single status
+    if (platform) {
+      if (!allowed.includes(platform)) {
+        return res.status(400).json({ success: false, error: 'Invalid platform' });
+      }
+
+      const key = `ProcessingStatus/${userId}/${platform}.json`;
+      try {
+        const getCommand = new GetObjectCommand({ Bucket: 'tasks', Key: key });
+        const response = await s3Client.send(getCommand);
+        const body = await streamToString(response.Body);
+        const data = JSON.parse(body || '{}');
+        return res.json({ success: true, data });
+      } catch (err) {
+        if (err.name === 'NoSuchKey' || err.$metadata?.httpStatusCode === 404) {
+          return res.json({ success: true, data: null });
+        }
+        throw err;
+      }
+    }
+
+    // Otherwise, list all platforms for this user
+    const prefix = `ProcessingStatus/${userId}/`;
+    const list = await s3Client.send(new ListObjectsV2Command({ Bucket: 'tasks', Prefix: prefix }));
+    const items = list.Contents || [];
+    const results = {};
+
+    for (const obj of items) {
+      if (!obj.Key) continue;
+      try {
+        const get = await s3Client.send(new GetObjectCommand({ Bucket: 'tasks', Key: obj.Key }));
+        const body = await streamToString(get.Body);
+        const data = JSON.parse(body || '{}');
+        const filePlatform = obj.Key.replace(prefix, '').replace('.json', '');
+        results[filePlatform] = data;
+      } catch (err) {
+        // Skip corrupted entries
+      }
+    }
+
+    return res.json({ success: true, data: results });
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error fetching processing status:`, error);
+    res.status(500).json({ success: false, error: 'Failed to fetch processing status' });
+  }
+});
+
+app.post(['/processing-status/:userId', '/api/processing-status/:userId'], async (req, res) => {
+  setCorsHeaders(res);
+  try {
+    const { userId } = req.params;
+    const { platform, startTime, endTime, totalDuration, username } = req.body || {};
+
+    const allowed = ['instagram', 'twitter', 'facebook', 'linkedin'];
+    if (!platform || !allowed.includes(platform)) {
+      return res.status(400).json({ success: false, error: 'Valid platform is required' });
+    }
+    if (!startTime || !endTime || !totalDuration) {
+      return res.status(400).json({ success: false, error: 'startTime, endTime, totalDuration are required' });
+    }
+
+    const payload = {
+      userId,
+      platform,
+      startTime: Number(startTime),
+      endTime: Number(endTime),
+      totalDuration: Number(totalDuration),
+      username: typeof username === 'string' ? username : undefined,
+      active: Date.now() < Number(endTime),
+      updatedAt: Date.now(),
+      createdAt: Date.now(),
+    };
+
+    const key = `ProcessingStatus/${userId}/${platform}.json`;
+    await s3Client.send(new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: key,
+      Body: JSON.stringify(payload),
+      ContentType: 'application/json',
+    }));
+
+    console.log(`[${new Date().toISOString()}] Saved processing status for ${platform}/${userId} (ends ${endTime})`);
+    return res.json({ success: true, data: payload });
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error saving processing status:`, error);
+    res.status(500).json({ success: false, error: 'Failed to save processing status' });
+  }
+});
+
+app.delete(['/processing-status/:userId', '/api/processing-status/:userId'], async (req, res) => {
+  setCorsHeaders(res);
+  try {
+    const { userId } = req.params;
+    const { platform } = req.body || {};
+    const allowed = ['instagram', 'twitter', 'facebook', 'linkedin'];
+    if (!platform || !allowed.includes(platform)) {
+      return res.status(400).json({ success: false, error: 'Valid platform is required' });
+    }
+
+    const key = `ProcessingStatus/${userId}/${platform}.json`;
+    try {
+      await s3Client.send(new DeleteObjectCommand({ Bucket: 'tasks', Key: key }));
+    } catch (err) {
+      if (err.name !== 'NoSuchKey' && err.$metadata?.httpStatusCode !== 404) {
+        throw err;
+      }
+    }
+
+    console.log(`[${new Date().toISOString()}] Deleted processing status for ${platform}/${userId}`);
+    return res.json({ success: true });
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error deleting processing status:`, error);
+    res.status(500).json({ success: false, error: 'Failed to delete processing status' });
+  }
+});
+
+// ===============================================================
+// CROSS-DEVICE PROCESSING STATE VALIDATION (bulletproof protection)
+// Validates that a user cannot access platform dashboards while loading states exist
+// ===============================================================
+
+app.options(['/validate-dashboard-access/:userId', '/api/validate-dashboard-access/:userId'], (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+
+app.post(['/validate-dashboard-access/:userId', '/api/validate-dashboard-access/:userId'], async (req, res) => {
+  setCorsHeaders(res);
+  try {
+    const { userId } = req.params;
+    const { platform } = req.body || {};
+    
+    const allowed = ['instagram', 'twitter', 'facebook', 'linkedin'];
+    if (!platform || !allowed.includes(platform)) {
+      return res.status(400).json({ success: false, error: 'Valid platform is required' });
+    }
+
+    console.log(`[${new Date().toISOString()}] [VALIDATION] Checking dashboard access for ${platform}/${userId}`);
+
+    // Check if there's an active processing status for this platform
+    const key = `ProcessingStatus/${userId}/${platform}.json`;
+    try {
+      const getCommand = new GetObjectCommand({ Bucket: 'tasks', Key: key });
+      const response = await s3Client.send(getCommand);
+      const body = await streamToString(response.Body);
+      const data = JSON.parse(body || '{}');
+      
+      const now = Date.now();
+      const endTime = data.endTime;
+      
+      if (typeof endTime === 'number' && now < endTime) {
+        const remainingMs = endTime - now;
+        const remainingMinutes = Math.ceil(remainingMs / 1000 / 60);
+        
+        console.log(`[${new Date().toISOString()}] [VALIDATION] ❌ Dashboard access DENIED for ${platform}/${userId} - processing active (${remainingMinutes}min remaining)`);
+        
+        return res.json({
+          success: true,
+          accessAllowed: false,
+          reason: 'processing_active',
+          processingData: {
+            platform,
+            remainingMinutes,
+            startTime: data.startTime,
+            endTime: data.endTime,
+            username: data.username
+          },
+          redirectTo: `/processing/${platform}`
+        });
+      } else if (typeof endTime === 'number' && now >= endTime) {
+        // Processing expired - clean it up
+        console.log(`[${new Date().toISOString()}] [VALIDATION] 🧹 Cleaning up expired processing status for ${platform}/${userId}`);
+        try {
+          await s3Client.send(new DeleteObjectCommand({ Bucket: 'tasks', Key: key }));
+        } catch (deleteErr) {
+          console.warn(`[${new Date().toISOString()}] [VALIDATION] Warning cleaning up expired status:`, deleteErr.message);
+        }
+      }
+    } catch (err) {
+      if (err.name !== 'NoSuchKey' && err.$metadata?.httpStatusCode !== 404) {
+        console.warn(`[${new Date().toISOString()}] [VALIDATION] Error checking processing status:`, err.message);
+      }
+    }
+
+    // Check if platform is already completed (should allow access)
+    // This is a backend validation, but we trust the frontend completed status
+    console.log(`[${new Date().toISOString()}] [VALIDATION] ✅ Dashboard access ALLOWED for ${platform}/${userId} - no active processing`);
+    
+    return res.json({
+      success: true,
+      accessAllowed: true,
+      reason: 'no_active_processing',
+      platform
+    });
+
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [VALIDATION] Error validating dashboard access:`, error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to validate dashboard access',
+      accessAllowed: false 
     });
   }
 });

@@ -441,18 +441,6 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ scale: 1.01 }}
     >
-      {/* Header showing Top 4 Latest News */}
-      <div className="news4u-header">
-        <div className="news4u-header-content">
-          <FaRss className="header-icon" />
-          <span className="header-title">Top 4 Latest News</span>
-          <span className="header-subtitle">for {platform}</span>
-        </div>
-        <div className="news4u-count">
-          <span>{items.length} items</span>
-        </div>
-      </div>
-
       <div className="news4u-scrollable">
         <div className="news4u-content">
           {items.map((item, idx) => {

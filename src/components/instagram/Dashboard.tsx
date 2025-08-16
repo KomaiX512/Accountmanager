@@ -2186,7 +2186,7 @@ Image Description: ${response.post.image_prompt}
                       className="dashboard-btn schedule-btn"
                     >
                       <FaCalendarAlt className="btn-icon" />
-                      <span>Schedule</span>
+                      <span>Compose</span>
                     </InstagramRequiredButton>
                     
                     <button
@@ -2268,14 +2268,14 @@ Image Description: ${response.post.image_prompt}
               <InstagramRequiredButton
                 isConnected={!!igBusinessId}
                 onClick={() => {
-                  console.log('Mobile Schedule clicked');
+                  console.log('Mobile Compose clicked');
                   handleOpenScheduler();
                   setIsMobileProfileMenuOpen(false);
                 }}
                 className="dashboard-btn schedule-btn"
               >
                 <FaCalendarAlt className="btn-icon" />
-                <span>Schedule</span>
+                <span>Compose</span>
               </InstagramRequiredButton>
               
               <button

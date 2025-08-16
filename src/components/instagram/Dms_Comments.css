@@ -17,6 +17,7 @@
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 4px;
+  padding-bottom: 40px; /* Critical: Extra bottom padding to ensure last item action buttons are visible */
   margin-right: -4px;
   /* IMPROVED HEIGHT CALCULATION: Ensure all items are visible */
   max-height: calc(100vh - 200px); /* Adjusted for better space allocation */
@@ -26,7 +27,7 @@
   position: relative;
   scroll-behavior: smooth;
   /* ENHANCED SCROLL PADDING: Ensure last item is fully visible */
-  scroll-padding-bottom: 20px;
+  scroll-padding-bottom: 40px; /* Increased for action buttons visibility */
   scroll-padding-top: 10px;
   /* IMPROVED SCROLL SNAP: Better item alignment */
   scroll-snap-type: y proximity;
@@ -447,8 +448,9 @@
 
 /* LAST ITEM ENHANCEMENT: Ensure perfect visibility */
 .notification-item:last-child {
-  margin-bottom: 20px; /* Extra margin for last item */
-  scroll-margin-bottom: 20px; /* Ensure last item is fully visible */
+  margin-bottom: 60px; /* Generous margin for last item to ensure full visibility of action buttons */
+  scroll-margin-bottom: 60px; /* Ensure last item is fully visible including all action buttons */
+  padding-bottom: 20px; /* Extra padding for action buttons area */
 }
 
 /* First DM item - More prominent */
@@ -549,6 +551,7 @@
   border-radius: 8px;
   padding: 12px;
   margin-top: 8px;
+  margin-bottom: 12px; /* Extra bottom margin for visibility */
 }
 
 .ai-reply-content {
@@ -568,6 +571,7 @@
 /* Reply Input Container */
 .reply-input-container {
   margin-top: 8px;
+  margin-bottom: 12px; /* Extra bottom margin for visibility */
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -606,6 +610,9 @@
   gap: 6px;
   flex-wrap: wrap;
   align-items: center;
+  margin-top: 8px; /* Ensure proper spacing above action buttons */
+  margin-bottom: 8px; /* Ensure proper spacing below action buttons for visibility */
+  padding-bottom: 4px; /* Extra padding for last item visibility */
 }
 
 /* Base Button Style - Minimalist */

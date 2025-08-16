@@ -85,16 +85,13 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
       // Show scroll to top button when scrolled down
       setShowScrollTop(scrollTop > 100);
       
-      // Show scroll to bottom button when not at bottom
-      setShowScrollBottom(scrollTop + clientHeight < scrollHeight - 50);
+      // More precise bottom detection - account for action buttons area
+      const isAtBottom = scrollTop + clientHeight >= scrollHeight - 10; // Very precise threshold
+      setShowScrollBottom(!isAtBottom);
       
-      // ENHANCED: Detect if user is near bottom but not at the very end
-      const isNearBottom = scrollTop + clientHeight >= scrollHeight - 100;
-      const isAtBottom = scrollTop + clientHeight >= scrollHeight - 10;
-      
-      // If user is near bottom but not at the very end, and we have new items
-      if (isNearBottom && !isAtBottom && hasNewItemsAtBottom) {
-        setShowScrollBottom(true);
+      // Clear new items indicator if we're truly at bottom
+      if (isAtBottom) {
+        setHasNewItemsAtBottom(false);
       }
     }
   };
@@ -111,28 +108,32 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
 
 
 
-  // ENHANCED SCROLL TO BOTTOM: Ensure perfect visibility of last item
+  // ENHANCED SCROLL TO BOTTOM: Ensure perfect visibility of last item including action buttons
   const scrollToBottom = () => {
     if (scrollContainerRef.current) {
       const container = scrollContainerRef.current;
-      const lastItem = container.lastElementChild as HTMLElement;
       
-      if (lastItem) {
-        // Calculate position to show complete last item
-        const lastItemBottom = lastItem.offsetTop + lastItem.offsetHeight;
-        const containerBottom = container.offsetTop + container.offsetHeight;
-        
+      // Use multiple attempts to ensure we reach the absolute bottom
+      const scrollToAbsoluteBottom = () => {
+        const maxScroll = container.scrollHeight - container.clientHeight + 100; // Extra 100px for action buttons
+        container.scrollTop = Math.max(0, maxScroll);
+      };
+      
+      // Immediate scroll
+      scrollToAbsoluteBottom();
+      
+      // Double-check with timeout to ensure DOM is fully rendered
+      setTimeout(() => {
+        scrollToAbsoluteBottom();
+      }, 100);
+      
+      // Final check with smooth behavior
+      setTimeout(() => {
         container.scrollTo({
-          top: Math.max(0, lastItemBottom - containerBottom + 30), // 30px padding
+          top: container.scrollHeight + 150, // More generous padding
           behavior: 'smooth'
         });
-      } else {
-        // Fallback
-        container.scrollTo({
-          top: container.scrollHeight,
-          behavior: 'smooth'
-        });
-      }
+      }, 200);
       
       // Clear the new items indicator
       setHasNewItemsAtBottom(false);
@@ -254,48 +255,30 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
         
         // Check if user is at bottom
         const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
-        const isAtBottom = scrollTop + clientHeight >= scrollHeight - 50;
+        const isAtBottom = scrollTop + clientHeight >= scrollHeight - 10; // Precise threshold matching handleScroll
         
         if (!isAtBottom) {
           // User is not at bottom, set indicator for new items
           setHasNewItemsAtBottom(true);
-        }
-      }
-      
-      // Only auto-scroll if user is near the bottom
-      const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
-      const scrolledToBottom = scrollTop + clientHeight >= scrollHeight - 150; // Increased tolerance for better detection
-      
-      if (scrolledToBottom) {
-        // Enhanced delay to ensure DOM is fully updated
-        setTimeout(() => {
-          if (scrollContainerRef.current) {
-            // ENHANCED SCROLL: Ensure last item is fully visible
-            const container = scrollContainerRef.current;
-            const lastItem = container.lastElementChild as HTMLElement;
-            
-            if (lastItem) {
-              // Scroll to show the complete last item
-              const lastItemBottom = lastItem.offsetTop + lastItem.offsetHeight;
-              const containerBottom = container.offsetTop + container.offsetHeight;
+        } else {
+          // User is at bottom, auto-scroll to show new items completely with enhanced scrolling
+          setTimeout(() => {
+            if (scrollContainerRef.current) {
+              const container = scrollContainerRef.current;
+              // Multiple scroll attempts for better reliability
+              const maxScroll = container.scrollHeight - container.clientHeight + 120; // Extra 120px for action buttons
+              container.scrollTop = Math.max(0, maxScroll);
               
-              // Ensure we scroll to show the complete last item with some padding
-              container.scrollTo({
-                top: Math.max(0, lastItemBottom - containerBottom + 30), // 30px padding
-                behavior: 'smooth'
-              });
-            } else {
-              // Fallback to scroll to bottom
-              container.scrollTo({
-                top: container.scrollHeight,
-                behavior: 'smooth'
-              });
+              // Follow up with smooth scroll
+              setTimeout(() => {
+                container.scrollTo({
+                  top: container.scrollHeight + 150,
+                  behavior: 'smooth'
+                });
+              }, 100);
             }
-            
-            // Clear the new items indicator since we've scrolled to bottom
-            setHasNewItemsAtBottom(false);
-          }
-        }, 150); // Increased delay for better DOM update
+          }, 200); // Increased delay for DOM updates
+        }
       }
     }
   }, [validNotifications, lastNotificationCount]);

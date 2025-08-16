@@ -2442,7 +2442,7 @@ Image Description: ${response.post.image_prompt}
                           className="dashboard-btn schedule-btn"
                         >
                           <FaCalendarAlt className="btn-icon" />
-                          <span>Schedule</span>
+                          <span>Compose</span>
                         </InstagramRequiredButton>
                       </>
                     ) : platform === 'twitter' ? (
@@ -2484,7 +2484,7 @@ Image Description: ${response.post.image_prompt}
                           className="dashboard-btn schedule-btn facebook"
                         >
                           <FaCalendarAlt className="btn-icon" />
-                          <span>Schedule</span>
+                          <span>Compose</span>
                         </FacebookRequiredButton>
                       </>
                     ) : null}
@@ -2578,14 +2578,14 @@ Image Description: ${response.post.image_prompt}
                   <InstagramRequiredButton
                     isConnected={isConnected}
                     onClick={() => {
-                      console.log('Mobile Schedule clicked');
+                      console.log('Mobile Compose clicked');
                       handleOpenScheduler();
                       setIsMobileProfileMenuOpen(false);
                     }}
                     className="dashboard-btn schedule-btn"
                   >
                     <FaCalendarAlt className="btn-icon" />
-                    <span>Schedule</span>
+                    <span>Compose</span>
                   </InstagramRequiredButton>
                 </>
               ) : platform === 'twitter' ? (
@@ -2636,14 +2636,14 @@ Image Description: ${response.post.image_prompt}
                   <FacebookRequiredButton
                     isConnected={isConnected}
                     onClick={() => {
-                      console.log('Mobile Schedule clicked');
+                      console.log('Mobile Compose clicked');
                       handleOpenFacebookScheduler();
                       setIsMobileProfileMenuOpen(false);
                     }}
                     className="dashboard-btn schedule-btn facebook"
                   >
                     <FaCalendarAlt className="btn-icon" />
-                    <span>Schedule</span>
+                    <span>Compose</span>
                   </FacebookRequiredButton>
                 </>
               ) : null}

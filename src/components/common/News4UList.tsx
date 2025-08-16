@@ -115,7 +115,15 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
   const formatTimestamp = (ts: string) => {
     try {
       const date = new Date(ts);
+      // Validate that the date is reasonable (not too far in future or past)
       const now = new Date();
+      const timeDiff = Math.abs(now.getTime() - date.getTime());
+      const maxReasonableDiff = 365 * 24 * 60 * 60 * 1000; // 1 year in milliseconds
+      
+      if (timeDiff > maxReasonableDiff) {
+        return 'Recently'; // Fallback for invalid dates
+      }
+      
       const hrs = Math.floor((now.getTime() - date.getTime()) / 3.6e6);
       if (hrs < 1) return 'Just now';
       if (hrs < 24) return `${hrs}h ago`;
@@ -326,13 +334,65 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
             deduped.push(n);
           }
         });
-        
-        console.log(`[News4U] Final normalized items:`, normalized);
-        console.log(`[News4U] Final deduped items:`, deduped);
 
-        setItems(deduped);
+        // 🚀 ROBUST TOP 4 LATEST NEWS LOGIC
+        // Sort by timestamp to get the most recent news first
+        const sortedByTimestamp = deduped.sort((a, b) => {
+          try {
+            const timeA = new Date(a.timestamp || a.fetched_at || 0).getTime();
+            const timeB = new Date(b.timestamp || b.fetched_at || 0).getTime();
+            return timeB - timeA; // Most recent first
+          } catch {
+            return 0; // Keep original order if timestamp parsing fails
+          }
+        });
+
+        // Log timestamp information for debugging
+        console.log(`[News4U] 📊 Timestamp analysis:`, sortedByTimestamp.slice(0, 4).map((item, idx) => ({
+          rank: idx + 1,
+          title: item.title?.substring(0, 50) + '...',
+          timestamp: item.timestamp || item.fetched_at,
+          parsed: new Date(item.timestamp || item.fetched_at || 0).toISOString()
+        })));
+
+        // Take only the top 4 latest news items
+        const top4Latest = sortedByTimestamp.slice(0, 4);
+
+        // 🛡️ ROBUST FALLBACK SYSTEM: Ensure we always have news when available
+        let finalItems: NewsItem[] = [];
+        
+        if (top4Latest.length > 0) {
+          // ✅ Primary: Use timestamp-sorted top 4
+          finalItems = top4Latest;
+          console.log(`[News4U] ✅ Successfully fetched top ${top4Latest.length} latest news items by timestamp`);
+        } else if (deduped.length > 0) {
+          // ⚠️ Fallback 1: Use first 4 items if timestamp sorting fails
+          finalItems = deduped.slice(0, 4);
+          console.warn(`[News4U] ⚠️ Timestamp sorting failed, using first 4 items as fallback`);
+        } else {
+          // ❌ No items available
+          finalItems = [];
+          console.warn(`[News4U] ⚠️ No news items available after processing`);
+        }
+
+        // Additional validation: ensure we have meaningful content
+        const validItems = finalItems.filter(item => 
+          item.title && item.title.trim().length > 0 && 
+          item.description && item.description.trim().length > 0
+        );
+
+        if (validItems.length === 0 && finalItems.length > 0) {
+          console.warn(`[News4U] ⚠️ Filtered out items with empty content, using original items`);
+          setItems(finalItems);
+        } else {
+          setItems(validItems);
+        }
+        
+        console.log(`[News4U] Final processed items:`, validItems);
+        console.log(`[News4U] Total items processed: ${deduped.length}, Selected: ${validItems.length}, Platform: ${platform}`);
+
       } catch (err: any) {
-        console.error(err);
+        console.error(`[News4U] ❌ Error fetching news:`, err);
         setError(err.response?.status === 404 ? 'No news available yet' : 'Failed to load news');
       } finally {
         setLoading(false);
@@ -346,7 +406,7 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       <motion.div className="news4u-container" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
         <div className="news4u-loading">
           <div className="loading-spinner" />
-          <span>Loading news...</span>
+          <span>Fetching top 4 latest news...</span>
         </div>
       </motion.div>
     );
@@ -381,6 +441,18 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ scale: 1.01 }}
     >
+      {/* Header showing Top 4 Latest News */}
+      <div className="news4u-header">
+        <div className="news4u-header-content">
+          <FaRss className="header-icon" />
+          <span className="header-title">Top 4 Latest News</span>
+          <span className="header-subtitle">for {platform}</span>
+        </div>
+        <div className="news4u-count">
+          <span>{items.length} items</span>
+        </div>
+      </div>
+
       <div className="news4u-scrollable">
         <div className="news4u-content">
           {items.map((item, idx) => {
@@ -394,6 +466,9 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
                 transition={{ duration: 0.3, delay: idx * 0.05 }}
               >
                 <div className="news4u-item-header">
+                  <div className="news4u-rank">
+                    <span className="rank-number">#{idx + 1}</span>
+                  </div>
                   <FaClock className="timestamp-icon" />
                   <span>{formatTimestamp(item.timestamp)}</span>
                 </div>

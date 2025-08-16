@@ -2536,9 +2536,7 @@ h2 {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    touch-action: manipulation;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    -webkit-backdrop-filter: blur(20px);
     backdrop-filter: blur(20px);
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
   }
@@ -2601,19 +2599,6 @@ h2 {
   .competitor-analysis::-webkit-scrollbar-thumb:hover,
   .news4u::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.3);
-  }
-  
-  /* Firefox scrollbar and scroll containment */
-  .notifications,
-  .post-cooked,
-  .strategies,
-  .competitor-analysis,
-  .news4u,
-  .module-content {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.05);
-    scrollbar-gutter: stable both-edges;
-    overscroll-behavior: contain;
   }
   
   /* ✨ COMPACT INPUT STYLING FOR MOBILE */
@@ -2717,9 +2702,8 @@ h2 {
 
   /* Mobile floating buttons adjustments */
   .mobile-floating-actions {
-    bottom: calc(16px + var(--chatbar-safe, 0px) + env(safe-area-inset-bottom, 0px));
+    bottom: 16px;
     right: 16px;
-    left: auto;
     gap: 10px;
   }
 
@@ -2892,7 +2876,6 @@ h2 {
   box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
   font-size: 12px;
   font-weight: 500;
-  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.2);
   position: relative;
@@ -2995,7 +2978,6 @@ h2 {
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.8);
-  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   z-index: 999999;
   display: flex;
@@ -3007,7 +2989,6 @@ h2 {
 .mobile-image-editor-content,
 .mobile-profile-popup-content {
   background: rgba(26, 26, 46, 0.95);
-  -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 16px;
@@ -3104,41 +3085,6 @@ h2 {
   cursor: not-allowed;
   background: rgba(142, 142, 147, 0.1);
   border-color: rgba(142, 142, 147, 0.3);
-}
-
-/* Keyboard focus styles for accessibility */
-.dashboard-btn:focus-visible,
-.mobile-floating-btn:focus-visible,
-.close-mobile-image-editor:focus-visible,
-.close-mobile-profile-popup:focus-visible {
-  outline: 2px solid rgba(0, 255, 204, 0.7);
-  outline-offset: 2px;
-  box-shadow: 0 0 0 4px rgba(0, 255, 204, 0.2);
-}
-
-.dashboard-btn:active,
-.mobile-floating-btn:active {
-  transform: translateY(0); /* minimize jump on tap */
-}
-
-@media (prefers-reduced-motion: reduce) {
-  * { scroll-behavior: auto !important; }
-  .mobile-floating-btn,
-  .dashboard-btn,
-  .autopilot-indicator,
-  .mobile-image-editor-content {
-    transition: none !important;
-    animation: none !important;
-  }
-  .mobile-floating-btn:hover,
-  .dashboard-btn.autopilot-btn:hover {
-    transform: none !important;
-    box-shadow: none !important;
-  }
-  .autopilot-rocket,
-  .autopilot-pulse {
-    animation: none !important;
-  }
 }
 
 /* ✨ CRITICAL FIX: Ensure modules remain visible in grid areas */

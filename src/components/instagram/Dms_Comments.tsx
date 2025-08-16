@@ -38,6 +38,9 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
   onReplyWithAI, 
   username, // 🛡️ DEFENSIVE FILTER: Use username to filter out own replies
   // refreshKey, // Handled by parent
+  igBusinessId, // 🛡️ DEFENSIVE FILTER: Instagram Business ID for filtering
+  twitterId: propTwitterId, // 🛡️ DEFENSIVE FILTER: Twitter ID for filtering (renamed to avoid conflict)
+  facebookPageId, // 🛡️ DEFENSIVE FILTER: Facebook Page ID for filtering
   // aiRepliesRefreshKey = 0, // Handled by parent 
   // onAIRefresh, // Handled by parent
   aiProcessingNotifications = {},
@@ -153,7 +156,35 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
       return [];
     }
 
+    // 🛡️ CRITICAL: Get connected account identifiers for filtering
+    const connectedUsername = username;
+    const connectedBusinessId = platform === 'instagram' ? igBusinessId : 
+                               platform === 'twitter' ? (propTwitterId || twitterId) : 
+                               platform === 'facebook' ? facebookPageId : null;
+
+    console.log(`[${new Date().toISOString()}] [${platform.toUpperCase()}] 🛡️ DEFENSIVE FILTER INFO:`, {
+      connectedUsername,
+      connectedBusinessId,
+      platform,
+      igBusinessId,
+      contextTwitterId: twitterId,
+      propTwitterId,
+      facebookPageId
+    });
+
     return notifications.filter((notif: any, index: number) => {
+      // 🛡️ CRITICAL: Log notification details for debugging
+      console.log(`[${new Date().toISOString()}] [${platform.toUpperCase()}] Processing notification:`, {
+        index,
+        username: notif.username,
+        connectedUsername,
+        sender_id: notif.sender_id,
+        instagram_user_id: notif.instagram_user_id,
+        connectedBusinessId,
+        text: notif.text?.substring(0, 50) + '...',
+        type: notif.type
+      });
+
       // Basic validation
       if (!notif || typeof notif !== 'object') {
         console.warn(`[${new Date().toISOString()}] [${platform.toUpperCase()}] Invalid notification at index ${index}:`, notif);
@@ -171,29 +202,61 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
       }
 
       // 🛡️ DEFENSIVE FILTER: Exclude own replies/comments to prevent infinite loop
-      // Multiple defensive checks to catch all possible scenarios where own content appears
-      if (username && notif.username) {
+      // CRITICAL: Multiple aggressive checks to catch ALL scenarios where own content appears
+      if (connectedUsername && notif.username) {
         // Primary check: exact username match (case insensitive for safety)
-        if (notif.username.toLowerCase() === username.toLowerCase()) {
-          console.log(`[${new Date().toISOString()}] [${platform.toUpperCase()}] 🛡️ FILTERED OUT own reply/comment from ${notif.username} (matches ${username})`);
+        if (notif.username.toLowerCase() === connectedUsername.toLowerCase()) {
+          console.log(`[${new Date().toISOString()}] [${platform.toUpperCase()}] 🛡️ FILTERED OUT own reply/comment from ${notif.username} (matches ${connectedUsername})`);
           return false;
         }
         
         // Additional safety: remove @ symbol if present and compare
         const cleanNotifUsername = notif.username.replace(/^@/, '').toLowerCase();
-        const cleanOwnUsername = username.replace(/^@/, '').toLowerCase();
+        const cleanOwnUsername = connectedUsername.replace(/^@/, '').toLowerCase();
         if (cleanNotifUsername === cleanOwnUsername) {
           console.log(`[${new Date().toISOString()}] [${platform.toUpperCase()}] 🛡️ FILTERED OUT own reply/comment (cleaned usernames match): ${cleanNotifUsername} === ${cleanOwnUsername}`);
           return false;
         }
+        
+        // AGGRESSIVE: Also check if username contains our connected username
+        if (cleanNotifUsername.includes(cleanOwnUsername) || cleanOwnUsername.includes(cleanNotifUsername)) {
+          console.log(`[${new Date().toISOString()}] [${platform.toUpperCase()}] 🛡️ FILTERED OUT own reply/comment (username contains match): ${cleanNotifUsername} ~ ${cleanOwnUsername}`);
+          return false;
+        }
       }
 
-      // 🛡️ DEFENSIVE FILTER: Additional platform-specific filtering
-      if (platform === 'instagram' && username) {
+      // 🛡️ SUPER AGGRESSIVE: Also filter by connected business/user ID
+      if (connectedBusinessId && (notif.instagram_user_id || notif.sender_id || notif.twitter_user_id || notif.facebook_user_id)) {
+        const notifIds = [notif.instagram_user_id, notif.sender_id, notif.twitter_user_id, notif.facebook_user_id].filter(Boolean);
+        for (const notifId of notifIds) {
+          if (notifId && notifId.toString() === connectedBusinessId.toString()) {
+            console.log(`[${new Date().toISOString()}] [${platform.toUpperCase()}] 🛡️ FILTERED OUT own reply by business/user ID: ${notifId} matches ${connectedBusinessId}`);
+            return false;
+          }
+        }
+      }
+
+      // 🛡️ DEFENSIVE FILTER: Additional platform-specific filtering with Instagram Business ID
+      if (platform === 'instagram' && connectedUsername) {
         // For Instagram, also check sender_id or instagram_user_id if available
-        if (notif.sender_id && notif.sender_id === username) {
+        if (notif.sender_id && notif.sender_id === connectedUsername) {
           console.log(`[${new Date().toISOString()}] [INSTAGRAM] 🛡️ FILTERED OUT own reply by sender_id: ${notif.sender_id}`);
           return false;
+        }
+        
+        // CRITICAL: Check instagram_user_id against username
+        if (notif.instagram_user_id && notif.instagram_user_id === connectedUsername) {
+          console.log(`[${new Date().toISOString()}] [INSTAGRAM] 🛡️ FILTERED OUT own reply by instagram_user_id: ${notif.instagram_user_id}`);
+          return false;
+        }
+        
+        // AGGRESSIVE: Check if any ID field matches our username pattern
+        const idsToCheck = [notif.sender_id, notif.instagram_user_id, notif.from_id, notif.user_id];
+        for (const id of idsToCheck) {
+          if (id && (id === connectedUsername || id.toString() === connectedUsername)) {
+            console.log(`[${new Date().toISOString()}] [INSTAGRAM] 🛡️ FILTERED OUT own reply by ID field: ${id}`);
+            return false;
+          }
         }
       }
       
@@ -219,9 +282,9 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
         }
       }
 
-      // 🛡️ DEFENSIVE FILTER: Text-based filtering as final safety net
+      // 🛡️ DEFENSIVE FILTER: Enhanced text-based filtering as final safety net
       // If we detect patterns that suggest this is our own reply coming back
-      if (username && notif.text) {
+      if (connectedUsername && notif.text) {
         // Check if the notification text contains patterns that suggest it's our own automated reply
         const suspiciousPatterns = [
           /^Thanks for your message/i,
@@ -229,11 +292,15 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
           /^I appreciate your comment/i,
           /^Auto-reply:/i,
           /^Automated response:/i,
-          /^\[AI Reply\]/i
+          /^\[AI Reply\]/i,
+          /^Hi there!/i,
+          /^Hello!/i,
+          /We appreciate/i,
+          /Thank you for contacting/i
         ];
         
         const containsSuspiciousPattern = suspiciousPatterns.some(pattern => pattern.test(notif.text));
-        if (containsSuspiciousPattern && notif.username && notif.username.toLowerCase() === username.toLowerCase()) {
+        if (containsSuspiciousPattern && notif.username && notif.username.toLowerCase() === connectedUsername.toLowerCase()) {
           console.log(`[${new Date().toISOString()}] [${platform.toUpperCase()}] 🛡️ FILTERED OUT suspected own auto-reply by text pattern: "${notif.text.substring(0, 50)}..."`);
           return false;
         }
@@ -241,7 +308,7 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
 
       return true;
     });
-  }, [notifications, platform, username]);
+  }, [notifications, platform, username, igBusinessId, propTwitterId, twitterId, facebookPageId]);
 
   // Auto-scroll to bottom when new notifications arrive - ENHANCED: Improved DM arrival detection and visibility
   useEffect(() => {

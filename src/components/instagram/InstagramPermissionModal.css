@@ -11,6 +11,8 @@
   z-index: 1000;
   padding: 20px 20px 40px;
   overflow-y: auto;
+  /* Ensure modal never closes except via close button */
+  pointer-events: auto;
 }
 
 .ig-permission-modal {
@@ -24,6 +26,11 @@
   position: relative;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
   margin-top: 20px;
+  /* Ensure modal content is isolated from global event handlers */
+  pointer-events: auto;
+  z-index: 1001;
+  /* Prevent any click events from bubbling */
+  isolation: isolate;
 }
 
 .ig-modal-close {
@@ -200,5 +207,12 @@
   
   .ig-permission-actions {
     padding: 14px 16px 18px;
+  }
+
+  /* Simple mobile checkbox fix */
+  .ig-permission-option input[type="checkbox"],
+  .ig-accept-option input[type="checkbox"] {
+    min-width: 20px;
+    min-height: 20px;
   }
 }

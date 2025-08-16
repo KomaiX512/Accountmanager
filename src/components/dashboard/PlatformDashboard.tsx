@@ -2313,7 +2313,7 @@ Image Description: ${response.post.image_prompt}
           <h1 className="welcome-text">
             Welcome {profileInfo?.fullName || accountHolder}!
           </h1>
-          <div className="welcome-subtext-container" style={{ position: 'relative', minHeight: '24px' }}>
+          <div className="welcome-subtext-container" style={{ position: 'relative', minHeight: '48px' }}>
             <motion.p 
               className="welcome-subtext"
               animate={{ 
@@ -2321,16 +2321,6 @@ Image Description: ${response.post.image_prompt}
                 y: showInitialText ? 0 : -10
               }}
               transition={{ duration: 0.5, ease: 'easeInOut' }}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                margin: 0,
-                fontSize: '14px',
-                color: '#888',
-                textAlign: 'center'
-              }}
             >
               Congrats! You are listed on top initial users of Sentient Marketing AI-powered Management!
             </motion.p>
@@ -2343,25 +2333,6 @@ Image Description: ${response.post.image_prompt}
                   y: showBio ? 0 : 10
                 }}
                 transition={{ duration: 0.5, ease: 'easeInOut', delay: showBio ? 0.2 : 0 }}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  margin: 0,
-                  fontSize: '16px', // 🎯 ENHANCED: Increased font size for better visibility
-                  fontWeight: '500', // 🎯 ENHANCED: Added font weight for prominence
-                  color: '#2d2d2d', // 🎯 ENHANCED: Darker color for better readability
-                  textAlign: 'center',
-                  lineHeight: '1.5', // 🎯 ENHANCED: Better line height for readability
-                  whiteSpace: 'pre-wrap',
-                  fontStyle: 'italic',
-                  padding: '8px 16px', // 🎯 ENHANCED: Added padding for better spacing
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)', // 🎯 ENHANCED: Subtle background
-                  borderRadius: '8px', // 🎯 ENHANCED: Rounded corners
-                  border: '1px solid rgba(0, 255, 204, 0.2)', // 🎯 ENHANCED: Subtle accent border
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)' // 🎯 ENHANCED: Subtle shadow
-                }}
               >
                 {typedBio}
                 {showBio && !bioAnimationComplete && (
@@ -2375,7 +2346,7 @@ Image Description: ${response.post.image_prompt}
                     style={{ 
                       display: 'inline-block',
                       width: '2px',
-                      height: '20px', // 🎯 ENHANCED: Increased cursor height
+                      height: '16px',
                       backgroundColor: '#00ffcc',
                       marginLeft: '2px',
                       verticalAlign: 'text-bottom'

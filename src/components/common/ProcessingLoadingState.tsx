@@ -136,36 +136,43 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
 
   // ✅ BULLETPROOF TIMER SYSTEM - Real-time calculation based approach
   
-  // ✅ FIX: Proper username initialization to prevent lexical declaration error
-  const getUsernameFromStorage = (platformId: string): string => {
+  // ✅ NO FALLBACKS: Username must be preserved exactly as stored
+  const getUsernameFromStorage = (platformId: string): string | null => {
     try {
       const processingInfo = localStorage.getItem(`${platformId}_processing_info`);
       if (processingInfo) {
         const info = JSON.parse(processingInfo);
-        return info.username || 'User';
+        if (info.username && typeof info.username === 'string' && info.username.trim()) {
+          return info.username.trim();
+        }
       }
     } catch (error) {
       console.error('Error reading username from localStorage:', error);
     }
-    return 'User';
+    return null; // NO FALLBACKS - return null if no valid username
   };
 
-  // Get username from props or localStorage (fixed lexical scoping)
+  // ✅ NO FALLBACKS: Get username with absolute priority preservation
   const username = (() => {
-    // Prefer prop if it is a meaningful username (not the generic fallback)
+    // Priority 1: ALWAYS check stored username first (NEVER overwrite existing processing username)
+    const stored = getUsernameFromStorage(platform);
+    if (stored) {
+      console.log(`🔒 LOCKED USERNAME: Using stored username '${stored}' for ${platform}`);
+      return stored;
+    }
+    
+    // Priority 2: Only if no stored username, use prop username
     if (propUsername && typeof propUsername === 'string') {
       const trimmed = propUsername.trim();
-      if (trimmed && trimmed.toLowerCase() !== 'user') {
+      if (trimmed) {
+        console.log(`🔑 PROP USERNAME: Using prop username '${trimmed}' for ${platform}`);
         return trimmed;
       }
     }
-    // Otherwise, use stored username (never overwrite with 'User')
-    const stored = getUsernameFromStorage(platform);
-    if (stored && stored.trim() && stored.toLowerCase() !== 'user') {
-      return stored.trim();
-    }
-    // As an absolute last resort only, return 'User'
-    return 'User';
+    
+    // ❌ CRITICAL ERROR: No username available - this should NEVER happen
+    console.error(`🚨 FATAL: No username available for platform ${platform}. This will cause RunStatus to fail!`);
+    throw new Error(`FATAL: No username available for platform ${platform}`);
   })();
 
   // ✅ PLATFORM-SPECIFIC TIMING LOGIC
@@ -230,7 +237,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
         endTime,
         startTime: processingInfo.startTime,
         totalDuration: processingInfo.totalDuration || (finalCountdownMinutes * 60 * 1000),
-        username: processingInfo.username || username
+        username: processingInfo.username // NO FALLBACKS - use exact username from storage
       };
     } catch (error) {
       console.error('Error reading timer data:', error);
@@ -253,8 +260,8 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
       const durationMs = finalCountdownMinutes * 60 * 1000;
       const endTime = now + durationMs;
       
-      // ✅ CRITICAL FIX: Check if there's already a username in localStorage and preserve it
-      // This prevents overwriting the crucial inter-username form username
+      // ✅ CRITICAL: NEVER overwrite existing username - check if username already exists
+      // This prevents overwriting the crucial primary username from initial form
       let finalUsername = username;
       try {
         const existingProcessingInfo = localStorage.getItem(`${platform}_processing_info`);
@@ -262,10 +269,8 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
           const existingInfo = JSON.parse(existingProcessingInfo);
           if (existingInfo.username && typeof existingInfo.username === 'string' && existingInfo.username.trim()) {
             const preserved = existingInfo.username.trim();
-            if (preserved.toLowerCase() !== 'user') {
-              console.log(`🔒 PRESERVING USERNAME: Keeping existing username '${preserved}' for ${platform} (not overwriting with '${username}')`);
-              finalUsername = preserved;
-            }
+            console.log(`🔒 PRESERVING EXISTING USERNAME: Keeping existing username '${preserved}' for ${platform} (not overwriting with '${username}')`);
+            finalUsername = preserved; // ALWAYS preserve existing username
           }
         }
       } catch (err) {
@@ -641,7 +646,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
 
   // Keyboard navigation for tips
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
+    const handleKeyDown = (event: React.KeyboardEvent) => {
       if (!timerCompleted) {
         switch (event.key) {
           case 'ArrowLeft':
@@ -822,7 +827,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
           aria-label="Exit setup process"
           role="button"
           tabIndex={0}
-          onKeyDown={(e) => {
+          onKeyDown={(e: React.KeyboardEvent) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
               handleExitClick();
@@ -1140,4 +1145,4 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   );
 };
 
-export default ProcessingLoadingState; 
+export default ProcessingLoadingState;

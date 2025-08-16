@@ -49,6 +49,7 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
     resets: 0
   });
   const [isLoading, setIsLoading] = useState(false);
+  const isIncrementInProgress = React.useRef(false);
 
   // Load usage from backend on mount and user change
   const refreshUsage = useCallback(async () => {
@@ -111,13 +112,16 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
     refreshUsage();
   }, [refreshUsage]);
 
-  // Auto-refresh usage every 30 seconds for real-time updates
+  // Auto-refresh usage every 60 seconds for real-time updates (increased to reduce conflicts)
   useEffect(() => {
     if (!currentUser?.uid) return;
     
     const interval = setInterval(() => {
-      refreshUsage();
-    }, 30000); // 30 seconds
+      // Only refresh if we're not in the middle of an increment operation
+      if (!isIncrementInProgress.current) {
+        refreshUsage();
+      }
+    }, 60000); // 60 seconds - increased from 30 to reduce race conditions
     
     return () => clearInterval(interval);
   }, [currentUser?.uid, refreshUsage]);
@@ -198,40 +202,27 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
       return;
     }
 
+    // Prevent concurrent increment operations
+    if (isIncrementInProgress.current) {
+      console.warn(`[UsageContext] ⚠️ Increment already in progress, skipping ${feature}`);
+      return;
+    }
+
+    isIncrementInProgress.current = true;
+
     try {
       console.log(`[UsageContext] 🚀 INCREMENT STARTED: ${feature} usage for ${platform || 'unknown'} platform`);
       console.log(`[UsageContext] 📊 Current usage before increment: ${feature} = ${usage[feature]}`);
       
-      // Optimistically update local state first for immediate UI feedback
-      const previousUsage = usage[feature];
-      setUsage(prev => {
-        const newUsage = {
-          ...prev,
-          [feature]: prev[feature] + 1
-        };
-        
-        // Update localStorage immediately
-        localStorage.setItem(`usage_${currentUser.uid}`, JSON.stringify(newUsage));
-        
-        // Broadcast to other tabs
-        window.dispatchEvent(new CustomEvent('usageUpdated', { 
-          detail: { userId: currentUser.uid, usage: newUsage } 
-        }));
-        
-        console.log(`[UsageContext] ⚡ Optimistic update: ${feature} ${previousUsage} -> ${newUsage[feature]}`);
-        return newUsage;
-      });
-
-      // Call backend to persist the change
+      // Call backend FIRST to persist the change (no optimistic update to avoid race conditions)
       console.log(`[UsageContext] 🌐 Calling backend UserService.incrementUsage...`);
       await UserService.incrementUsage(currentUser.uid, feature);
       console.log(`[UsageContext] ✅ Backend increment successful for ${feature}`);
       
-      // Refresh from backend to ensure consistency
-      setTimeout(() => {
-        console.log(`[UsageContext] 🔄 Refreshing usage from backend for consistency...`);
-        refreshUsage();
-      }, 1000);
+      // Now refresh to get the authoritative backend state
+      console.log(`[UsageContext] 🔄 Refreshing usage from backend after increment...`);
+      await refreshUsage();
+      console.log(`[UsageContext] ✅ INCREMENT COMPLETED: ${feature} usage successfully updated`);
       
     } catch (error) {
       console.error(`[UsageContext] ❌ Error incrementing ${feature} usage:`, error);
@@ -242,22 +233,12 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
         error: error instanceof Error ? error.message : String(error)
       });
       
-      // Revert optimistic update on error
-      setUsage(prev => {
-        const revertedUsage = {
-          ...prev,
-          [feature]: Math.max(0, prev[feature] - 1)
-        };
-        
-        localStorage.setItem(`usage_${currentUser.uid}`, JSON.stringify(revertedUsage));
-        console.log(`[UsageContext] ↩️ Reverted optimistic update for ${feature}`);
-        return revertedUsage;
-      });
-      
       // Re-throw the error so calling code knows it failed
       throw error;
+    } finally {
+      isIncrementInProgress.current = false;
     }
-  }, [currentUser?.uid, usage, refreshUsage]);
+  }, [currentUser?.uid, refreshUsage]);
 
   const trackFeatureUsage = useCallback(async (feature: keyof UsageStats, platform: string, action: string) => {
     if (!currentUser?.uid) {

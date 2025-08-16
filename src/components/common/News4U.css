@@ -62,7 +62,7 @@
   }
 
   .news4u-scrollable {
-    padding: 0 12px 16px;
+    padding: 0 4px 8px; /* CRITICAL FIX: Minimal padding to eliminate gaps */
     max-height: 180px;
     min-height: 150px;
   }
@@ -160,7 +160,7 @@
 .news4u-content {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px; /* CRITICAL FIX: Reduced gap between items to eliminate spaces */
 }
 
 /* News Item - Apple's card design */
@@ -168,7 +168,7 @@
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 10px;
-  padding: 10px;
+  padding: 6px; /* CRITICAL FIX: Reduced padding to eliminate gaps */
   transition: all 0.3s ease;
   cursor: pointer;
   position: relative;

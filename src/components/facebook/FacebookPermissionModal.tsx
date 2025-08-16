@@ -97,18 +97,23 @@ const FacebookPermissionModal: React.FC<FacebookPermissionModalProps> = ({
     <AnimatePresence>
       <motion.div
         key="overlay"
-        className="fb-permission-overlay"
+        className="modal-overlay"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
+        style={{ zIndex: 999999 }}
       >
         <motion.div
           key="modal"
-          className="fb-permission-modal"
+          className="modal-content"
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.8, opacity: 0 }}
           transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          style={{ zIndex: 1000000 }}
         >
           <button className="fb-modal-close" onClick={onClose} aria-label="Close" />
           <h2 className="fb-modal-title">Facebook Permissions</h2>

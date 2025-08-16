@@ -58,24 +58,29 @@ const InstagramPermissionModal: React.FC<InstagramPermissionModalProps> = ({
     <AnimatePresence>
       <motion.div
         key="overlay"
-        className="ig-permission-overlay"
+        className="modal-overlay"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
+        style={{ zIndex: 999999 }}
       >
         <motion.div
           key="modal"
-          className="ig-permission-modal"
+          className="modal-content"
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.8, opacity: 0 }}
           transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          style={{ zIndex: 1000000 }}
         >
           <button className="ig-modal-close" onClick={onClose} aria-label="Close" />
           <h2 className="ig-modal-title">Instagram Permissions</h2>
 
           {/* Permission checklist */}
-          <div className="ig-permission-list">
+          <div className="ig-permission-list" onClick={(e) => e.stopPropagation()}>
             {[
               { key: 'instagram_business_basic', label: 'Basic profile (required)', default: true },
               { key: 'instagram_business_manage_messages', label: 'Manage and access messages' },
@@ -83,12 +88,17 @@ const InstagramPermissionModal: React.FC<InstagramPermissionModalProps> = ({
               { key: 'instagram_business_content_publish', label: 'Create and publish content' },
               { key: 'instagram_business_manage_insights', label: 'View insights and analytics' },
             ].map(opt => (
-              <label key={opt.key} className="ig-permission-option">
+              <label key={opt.key} className="ig-permission-option" onClick={(e) => e.stopPropagation()}>
                 <input
                   type="checkbox"
                   checked={selectedPermissions.includes(opt.key)}
                   disabled={opt.default}
-                  onChange={() => togglePermission(opt.key)}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    togglePermission(opt.key);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
                 />
                 {opt.label}
               </label>
@@ -96,7 +106,7 @@ const InstagramPermissionModal: React.FC<InstagramPermissionModalProps> = ({
           </div>
 
           {/* Privacy policy */}
-          <div className="ig-policy-container" ref={policyRef}>
+          <div className="ig-policy-container" ref={policyRef} onClick={(e) => e.stopPropagation()}>
             <div className="ig-policy-content">
               <h3>Privacy Policy</h3>
               <div className="ig-policy-scrollable">
@@ -240,16 +250,20 @@ const InstagramPermissionModal: React.FC<InstagramPermissionModalProps> = ({
           </div>
 
           {/* Accept */}
-          <label className="ig-accept-option">
+          <label className="ig-accept-option" onClick={(e) => e.stopPropagation()}>
             <input
               type="checkbox"
               checked={acceptPrivacy}
-              onChange={e => setAcceptPrivacy(e.target.checked)}
+              onChange={(e) => {
+                e.stopPropagation();
+                setAcceptPrivacy(e.target.checked);
+              }}
+              onClick={(e) => e.stopPropagation()}
             />
             I have read and accept the Privacy Policy
           </label>
 
-          <div className="ig-permission-actions">
+          <div className="ig-permission-actions" onClick={(e) => e.stopPropagation()}>
             <button className="ig-cancel-button" onClick={onClose}>Cancel</button>
             <button
               className="ig-continue-button"

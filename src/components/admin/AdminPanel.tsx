@@ -260,7 +260,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                   </div>
                   <div className="info-item">
                     <span className="info-label">Environment:</span>
-                    <span className="info-value">{process.env.NODE_ENV || 'development'}</span>
+                    <span className="info-value">{import.meta.env.MODE || 'development'}</span>
                   </div>
                 </div>
               </div>

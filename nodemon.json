@@ -17,7 +17,7 @@
     "data/",
     ".git/",
     "*.md",
-    "vite.config.ts",
+    "vite.config.js",
     "package.json",
     "package-lock.json",
     "yarn.lock"

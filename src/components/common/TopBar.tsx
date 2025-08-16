@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './TopBar.css';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -18,6 +18,20 @@ const TopBar: React.FC = () => {
 
   // ✅ SIMPLE LOGIC: Get acquired platforms directly from MainDashboard logic
   const acquiredPlatforms = getAcquiredPlatforms();
+
+  // ✅ REAL-TIME PLATFORM STATUS SYNC: Force re-render every 5 seconds to catch status changes
+  const [forceUpdate, setForceUpdate] = useState(0);
+  
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+
+    const syncInterval = setInterval(() => {
+      // Force re-render to catch any platform status changes
+      setForceUpdate(prev => prev + 1);
+    }, 5000);
+
+    return () => clearInterval(syncInterval);
+  }, [currentUser?.uid]);
 
   // Platform configuration (EXACT same as MainDashboard)
   const platformConfig = [

@@ -2064,25 +2064,15 @@ Image Description: ${response.post.image_prompt}
         <h1 className="welcome-text">
           Welcome {profileInfo?.fullName || accountHolder}!
         </h1>
-        <div className="welcome-subtext-container" style={{ position: 'relative', minHeight: '24px' }}>
-          <motion.p 
-            className="welcome-subtext"
-            animate={{ 
-              opacity: showInitialText ? 1 : 0,
-              y: showInitialText ? 0 : -10
-            }}
-            transition={{ duration: 0.5, ease: 'easeInOut' }}
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              margin: 0,
-              fontSize: '14px',
-              color: '#888',
-              textAlign: 'center'
-            }}
-          >
+                  <div className="welcome-subtext-container" style={{ position: 'relative', minHeight: '48px' }}>
+                      <motion.p 
+              className="welcome-subtext"
+              animate={{ 
+                opacity: showInitialText ? 1 : 0,
+                y: showInitialText ? 0 : -10
+              }}
+              transition={{ duration: 0.5, ease: 'easeInOut' }}
+            >
             Congrats! You are listed as a top initial user of AI powered Account Management!
           </motion.p>
           
@@ -2094,19 +2084,6 @@ Image Description: ${response.post.image_prompt}
                 y: showBio ? 0 : 10
               }}
               transition={{ duration: 0.5, ease: 'easeInOut', delay: showBio ? 0.2 : 0 }}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                margin: 0,
-                fontSize: '14px',
-                color: '#666',
-                textAlign: 'center',
-                lineHeight: '1.4',
-                whiteSpace: 'pre-wrap',
-                fontStyle: 'italic'
-              }}
             >
               {typedBio}
               {showBio && !bioAnimationComplete && (

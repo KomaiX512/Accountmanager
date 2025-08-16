@@ -1,2 +1,0 @@
-data: {"type":"connection","message":"Connected to events for 612940588580162","timestamp":1749661765775,"connectionId":"c232d8c0-d2d6-4c3f-a765-ed5bcb14b478"}
-

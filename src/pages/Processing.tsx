@@ -29,9 +29,9 @@ const Processing: React.FC = () => {
 
   const targetPlatform = platform || stateData?.platform || 'instagram';
   
-  // Get username from state or localStorage (STRICT: never fall back to any other username source)
+  // Get username from state or localStorage (NO FALLBACKS TO 'User')
   const username = (() => {
-    // Strong source of truth order: stateData.username -> processing_info.username -> fallback 'User'
+    // Strong source of truth order: stateData.username -> processing_info.username -> NO FALLBACK
     if (stateData?.username && typeof stateData.username === 'string' && stateData.username.trim()) {
       return stateData.username.trim();
     }
@@ -46,15 +46,20 @@ const Processing: React.FC = () => {
     } catch (error) {
       console.error('Error reading username from localStorage:', error);
     }
-    return 'User';
+    // ❌ REMOVED: No fallback to 'User' - this causes system disruption
+    console.error(`🚨 CRITICAL: No username available for platform ${targetPlatform}. This should never happen.`);
+    return ''; // Return empty to avoid system disruption
   })();
   
   const remainingMinutes = stateData?.remainingMinutes;
   const forcedRedirect = stateData?.forcedRedirect || false;
 
-  // ✅ USERNAME NORMALIZATION: Ensure username is properly formatted for API calls
+  // ✅ USERNAME NORMALIZATION: Ensure username is properly formatted for API calls (NO FALLBACKS)
   const normalizeUsername = (username: string): string => {
-    if (!username || typeof username !== 'string') return 'User';
+    if (!username || typeof username !== 'string') {
+      console.error(`🚨 NORMALIZE: Cannot normalize empty username`);
+      return username; // Return as-is to avoid fallbacks
+    }
     
     // Remove leading/trailing whitespace
     let normalized = username.trim();
@@ -62,8 +67,11 @@ const Processing: React.FC = () => {
     // Remove any special characters that might cause API issues
     normalized = normalized.replace(/[^\w\s-]/g, '');
     
-    // Ensure it's not empty after normalization
-    if (!normalized) return 'User';
+    // Ensure it's not empty after normalization - but don't fallback to 'User'
+    if (!normalized) {
+      console.error(`🚨 NORMALIZE: Username became empty after normalization: "${username}"`);
+      return username; // Return original to preserve user input
+    }
     
     console.log(`🔧 USERNAME NORMALIZATION: "${username}" -> "${normalized}"`);
     return normalized;
@@ -187,19 +195,35 @@ const Processing: React.FC = () => {
 
   // Helper: finalize and navigate to dashboard consistently
   const finalizeAndNavigate = (plat: string) => {
+    console.log(`🎯 FINALIZE_AND_NAVIGATE: Starting finalization for platform ${plat}`);
+    
     try {
+      console.log(`🎯 FINALIZE: Clearing localStorage for ${plat}`);
       localStorage.removeItem(`${plat}_processing_countdown`);
       localStorage.removeItem(`${plat}_processing_info`);
+      
+      console.log(`🎯 FINALIZE: Updating completed platforms`);
       const completedPlatforms = localStorage.getItem('completedPlatforms');
       const completed = completedPlatforms ? JSON.parse(completedPlatforms) : [];
       if (!completed.includes(plat)) {
         completed.push(plat);
         localStorage.setItem('completedPlatforms', JSON.stringify(completed));
+        console.log(`🎯 FINALIZE: Added ${plat} to completed platforms: [${completed.join(', ')}]`);
+      } else {
+        console.log(`🎯 FINALIZE: ${plat} was already in completed platforms: [${completed.join(', ')}]`);
       }
-    } catch {}
+    } catch (err) {
+      console.error(`🎯 FINALIZE: Error during localStorage cleanup:`, err);
+    }
+    
+    console.log(`🎯 FINALIZE: Calling completeProcessing()`);
     completeProcessing();
+    
     const dashboardPath = getDashboardPath(plat);
+    console.log(`🎯 FINALIZE: Navigating to dashboard path: ${dashboardPath}`);
+    
     safeNavigate(navigate, dashboardPath, { replace: true }, 8);
+    console.log(`🎯 FINALIZE: Navigation initiated for ${plat} -> ${dashboardPath}`);
   };
 
   // Validate timer and check if platform is completed
@@ -292,7 +316,7 @@ const Processing: React.FC = () => {
             const safeInfo = {
               // Always preserve/ensure required fields
               platform: targetPlatform,
-              username: normalizeUsername(primaryUsername || username),
+              username: primaryUsername, // NO FALLBACKS - use exact primaryUsername
               // Preserve previous startTime if present; otherwise, approximate to maintain continuity
               startTime: info.startTime || Date.now(),
               // Preserve totalDuration if present (represents initial 15/20 minutes)
@@ -330,13 +354,28 @@ const Processing: React.FC = () => {
 
   // Helper function to get dashboard path
   const getDashboardPath = (platform: string): string => {
+    let path: string;
     switch (platform) {
-      case 'instagram': return '/dashboard';
-      case 'twitter': return '/twitter-dashboard';
-      case 'facebook': return '/facebook-dashboard';
-      case 'linkedin': return '/linkedin-dashboard';
-      default: return '/dashboard';
+      case 'instagram': 
+        path = '/dashboard';
+        break;
+      case 'twitter': 
+        path = '/twitter-dashboard';
+        break;
+      case 'facebook': 
+        path = '/facebook-dashboard';
+        break;
+      case 'linkedin': 
+        path = '/linkedin-dashboard';
+        break;
+      default: 
+        path = '/dashboard';
+        console.warn(`🎯 DASHBOARD PATH: Unknown platform '${platform}', defaulting to /dashboard`);
+        break;
     }
+    
+    console.log(`🎯 DASHBOARD PATH: Platform '${platform}' maps to '${path}'`);
+    return path;
   };
 
   // ANTI-REFRESH protection - continuously validate timer
@@ -344,9 +383,12 @@ const Processing: React.FC = () => {
     if (!shouldRender) return;
 
     const interval = setInterval(async () => {
+      console.log(`🔥 TIMER_INTERVAL: Checking timer validity for ${targetPlatform}`);
       const timer = validateTimer();
       
       if (!timer.isValid) {
+        console.log(`🔥 TIMER_INVALID: Timer invalid for ${targetPlatform}, reason: ${timer.reason}`);
+        
         // On any expiry, perform R2 check
         const infoRaw = localStorage.getItem(`${targetPlatform}_processing_info`);
         let primaryUsername = username;
@@ -365,42 +407,65 @@ const Processing: React.FC = () => {
           }
         } catch {}
 
+        console.log(`🔍 STARTING RUNSTATUS CHECK: ${targetPlatform}/${primaryUsername}`);
         const status = await checkRunStatus(targetPlatform, primaryUsername);
-        console.log(`🔍 RUNSTATUS CHECK: ${targetPlatform}/${primaryUsername} - exists: ${status.exists}, status: ${status.status}`);
+        console.log(`🔍 RUNSTATUS CHECK RESULT: ${targetPlatform}/${primaryUsername} - exists: ${status.exists}, status: ${status.status}`);
+        
         if (status.exists) {
           // 🚨 CRITICAL FIX: Clear interval and navigate immediately
-          console.log(`✅ RUNSTATUS FOUND: Navigating to dashboard for ${targetPlatform}`);
+          console.log(`🎉 RUNSTATUS SUCCESS: Data found for ${targetPlatform}/${primaryUsername}, completing processing!`);
+          console.log(`🎉 RUNSTATUS COMPLETION: About to clear interval and call finalizeAndNavigate`);
           clearInterval(interval);
           finalizeAndNavigate(targetPlatform);
           return;
+        } else {
+          console.log(`⏳ RUNSTATUS NOT_FOUND: Data not ready yet for ${targetPlatform}/${primaryUsername}, extending timer`);
         }
 
         // Treat ANY interval completion (missing or expired countdown) as a 5-minute extension
         const countdownRaw = localStorage.getItem(`${targetPlatform}_processing_countdown`);
         const currentEnd = countdownRaw ? parseInt(countdownRaw, 10) : NaN;
         const intervalCompleted = !currentEnd || Number.isNaN(currentEnd) || Date.now() >= currentEnd;
+        
+        console.log(`🔥 EXTENSION CHECK: countdownRaw=${countdownRaw}, currentEnd=${currentEnd}, now=${Date.now()}, intervalCompleted=${intervalCompleted}`);
+        
         if (intervalCompleted) {
+          console.log(`🔥 TIMER_EXPIRED: Extending ${targetPlatform} by 5 minutes due to timer expiry`);
           const newEnd = Date.now() + 5 * 60 * 1000;
           localStorage.setItem(`${targetPlatform}_processing_countdown`, newEnd.toString());
+          console.log(`🔥 EXTENSION: New timer end set to ${new Date(newEnd).toLocaleTimeString()}`);
+          
           try {
             const info = infoRaw ? JSON.parse(infoRaw) : {};
             const safeInfo = {
               platform: targetPlatform,
-              username: normalizeUsername(primaryUsername || username),
+              username: primaryUsername, // NO FALLBACKS - use exact primaryUsername
               startTime: info.startTime || Date.now(),
               totalDuration: info.totalDuration || undefined,
               isExtension: true,
               endTime: newEnd,
             } as any;
             localStorage.setItem(`${targetPlatform}_processing_info`, JSON.stringify(safeInfo));
-          } catch {}
+            console.log(`🔥 EXTENSION: Updated processing info with extension data`);
+          } catch (extErr) {
+            console.error(`🔥 EXTENSION: Error updating processing info:`, extErr);
+          }
           setExtensionMessage('We are facing a bit of difficulty while fetching your data. Please allow 5 more minutes while we finalize your dashboard.');
+          console.log(`🔥 EXTENSION: Set extension message and returning to continue timer`);
           return;
+        } else {
+          console.log(`🔥 TIMER_VALID: Timer still active, continuing checks`);
         }
+      } else {
+        console.log(`🔥 TIMER_VALID: Timer is valid for ${targetPlatform}, continuing`);
       }
     }, 1000); // Check every second to sync finish
 
-    return () => clearInterval(interval);
+    console.log(`🔥 TIMER_INTERVAL: Started interval monitoring for ${targetPlatform}`);
+    return () => {
+      console.log(`🔥 TIMER_INTERVAL: Cleaning up interval for ${targetPlatform}`);
+      clearInterval(interval);
+    };
   }, [shouldRender, targetPlatform, navigate, completeProcessing, username]);
 
   // FORCED REDIRECT protection - prevent users from staying on processing if they shouldn't be
@@ -463,25 +528,42 @@ const Processing: React.FC = () => {
   }, [shouldRender, targetPlatform]);
 
   const handleComplete = () => {
-    console.log(`🛡️ PROCESSING PAGE: Timer completed for ${targetPlatform}`);
+    console.log(`🎯 PROCESSING COMPLETION: Starting completion flow for ${targetPlatform}`);
+    console.log(`🎯 PROCESSING COMPLETION: Username used: ${username}`);
+    console.log(`🎯 PROCESSING COMPLETION: Timer was: ${remainingMinutes} minutes`);
     
     // Clean up storage & reset context
+    console.log(`🎯 PROCESSING COMPLETION: Cleaning up localStorage keys:`);
+    console.log(`  - Removing: ${targetPlatform}_processing_countdown`);
+    console.log(`  - Removing: ${targetPlatform}_processing_info`);
+    
     localStorage.removeItem(`${targetPlatform}_processing_countdown`);
     localStorage.removeItem(`${targetPlatform}_processing_info`);
     
     // Mark platform as completed
     const completedPlatforms = localStorage.getItem('completedPlatforms');
     const completed = completedPlatforms ? JSON.parse(completedPlatforms) : [];
+    console.log(`🎯 PROCESSING COMPLETION: Current completed platforms:`, completed);
+    
     if (!completed.includes(targetPlatform)) {
       completed.push(targetPlatform);
       localStorage.setItem('completedPlatforms', JSON.stringify(completed));
+      console.log(`🎯 PROCESSING COMPLETION: Added ${targetPlatform} to completed platforms:`, completed);
+    } else {
+      console.log(`🎯 PROCESSING COMPLETION: ${targetPlatform} was already in completed platforms`);
     }
     
+    console.log(`🎯 PROCESSING COMPLETION: Calling completeProcessing() context method`);
     completeProcessing();
     
     // Navigate to appropriate dashboard
     const dashboardPath = getDashboardPath(targetPlatform);
+    console.log(`🎯 PROCESSING COMPLETION: Navigating to dashboard: ${dashboardPath}`);
+    console.log(`🎯 PROCESSING COMPLETION: Using safeNavigate with replace:true, fallback level 8`);
+    
     safeNavigate(navigate, dashboardPath, { replace: true }, 8);
+    
+    console.log(`🎯 PROCESSING COMPLETION: Navigation command issued successfully`);
   };
 
   // Handle exit from loading state
@@ -508,15 +590,20 @@ const Processing: React.FC = () => {
         localStorage.removeItem(key);
       });
       
+      // ✅ CRITICAL: Clear platform access status so user sees entry form again
+      const accessedKey = `${targetPlatform}_accessed_${currentUser.uid}`;
+      localStorage.removeItem(accessedKey);
+      console.log(`🔥 EXIT: Cleared platform access status: ${accessedKey}`);
+      
       // Clear any platform-specific username/account data
       const allKeys = Object.keys(localStorage);
       const platformLower = targetPlatform.toLowerCase();
-      const usernameLower = username.toLowerCase();
+      const usernameLower = username ? username.toLowerCase() : '';
       
       allKeys.forEach(key => {
         const keyLower = key.toLowerCase();
-        if (keyLower.includes(platformLower) || keyLower.includes(usernameLower)) {
-          if (key.includes('processing') || key.includes('username') || key.includes('account')) {
+        if (keyLower.includes(platformLower) || (usernameLower && keyLower.includes(usernameLower))) {
+          if (key.includes('processing') || key.includes('username') || key.includes('account') || key.includes('accessed')) {
             localStorage.removeItem(key);
             console.log(`🔥 EXIT: Cleared localStorage key: ${key}`);
           }
@@ -542,6 +629,15 @@ const Processing: React.FC = () => {
 
       // Step 3: Reset processing context
       completeProcessing();
+      
+      // ✅ CRITICAL: Fire custom event to notify MainDashboard of platform reset
+      window.dispatchEvent(new CustomEvent('platformReset', {
+        detail: {
+          platform: targetPlatform,
+          reason: 'setup_exited',
+          timestamp: Date.now()
+        }
+      }));
       
       // Step 4: Navigate to main dashboard with reset state
       console.log(`🛡️ PROCESSING PAGE: Navigating to main dashboard after exit`);

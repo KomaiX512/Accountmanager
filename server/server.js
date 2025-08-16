@@ -630,25 +630,9 @@ app.get(['/api/user/:userId/usage', '/user/:userId/usage'], async (req, res) => 
       console.log(`[${new Date().toISOString()}] [R2-OPERATION] Error performing R2 operation: ${r2Error.message}`);
       
       if (r2Error.code === 'NoSuchKey' || r2Error.message.includes('does not exist')) {
-        console.log(`[${new Date().toISOString()}] [USER-API] R2 failed for usage stats, trying fallbacks: ${r2Error.message}`);
+        console.log(`[${new Date().toISOString()}] [USER-API] R2 key doesn't exist, creating new usage stats in R2: ${r2Error.message}`);
         
-        // Try local storage fallback
-        const localStorageDir = path.join(process.cwd(), 'local_storage', 'usage', userId);
-        const localStorageFile = path.join(localStorageDir, `${currentPeriod}.json`);
-        
-        if (fs.existsSync(localStorageFile)) {
-          try {
-            console.log(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Found usage in local storage: ${localStorageFile}`);
-            const localData = JSON.parse(fs.readFileSync(localStorageFile, 'utf8'));
-            res.json(localData);
-            return;
-          } catch (localError) {
-            console.error(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Error reading local usage stats:`, localError);
-          }
-        }
-        
-        // If both R2 and local storage fail, create default stats
-        console.log(`[${new Date().toISOString()}] [USER-API] Using default usage stats for ${userId}/${currentPeriod}`);
+        // Create default stats
         const defaultStats = {
           userId,
           period: currentPeriod,
@@ -656,21 +640,39 @@ app.get(['/api/user/:userId/usage', '/user/:userId/usage'], async (req, res) => 
           discussionsUsed: 0,
           aiRepliesUsed: 0,
           campaignsUsed: 0,
+          resetsUsed: 0,
           lastUpdated: new Date().toISOString()
         };
         
-        // Save default stats to local storage
+        // Save immediately to R2 to establish the key
         try {
+          const createParams = {
+            Bucket: 'admin',
+            Key: `usage/${userId}/${currentPeriod}.json`,
+            Body: JSON.stringify(defaultStats, null, 2),
+            ContentType: 'application/json'
+          };
+          const putCommand = new PutObjectCommand(createParams);
+          await s3Client.send(putCommand);
+          console.log(`[${new Date().toISOString()}] [USER-API] Successfully created new usage stats in R2 for ${userId}/${currentPeriod}`);
+        } catch (createError) {
+          console.error(`[${new Date().toISOString()}] [USER-API] Failed to create new usage stats in R2:`, createError);
+        }
+        
+        // Also save to local storage as backup
+        try {
+          const localStorageDir = path.join(process.cwd(), 'local_storage', 'usage', userId);
+          const localStorageFile = path.join(localStorageDir, `${currentPeriod}.json`);
           if (!fs.existsSync(localStorageDir)) {
             fs.mkdirSync(localStorageDir, { recursive: true });
           }
           fs.writeFileSync(localStorageFile, JSON.stringify(defaultStats, null, 2));
-          console.log(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Saved usage to local storage: ${localStorageFile}`);
+          console.log(`[${new Date().toISOString()}] [USER-API] Also saved usage stats to local storage: ${localStorageFile}`);
         } catch (saveError) {
-          console.error(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Error saving to local storage:`, saveError);
+          console.error(`[${new Date().toISOString()}] [USER-API] Error saving to local storage:`, saveError);
         }
         
-        console.log(`[${new Date().toISOString()}] [USER-API] Creating default usage stats for ${userId}/${currentPeriod}`);
+        console.log(`[${new Date().toISOString()}] [USER-API] Returning newly created usage stats for ${userId}/${currentPeriod}`);
         res.json(defaultStats);
         return;
       } else {
@@ -703,6 +705,7 @@ app.get(['/api/user/:userId/usage', '/user/:userId/usage'], async (req, res) => 
       discussionsUsed: 0,
       aiRepliesUsed: 0,
       campaignsUsed: 0,
+          resetsUsed: 0,
       lastUpdated: new Date().toISOString()
     };
     
@@ -740,6 +743,7 @@ app.get(['/api/user/:userId/usage/:period', '/user/:userId/usage/:period'], asyn
         discussionsUsed: 0,
         aiRepliesUsed: 0,
         campaignsUsed: 0,
+          resetsUsed: 0,
         lastUpdated: new Date().toISOString()
       };
       
@@ -760,9 +764,12 @@ app.patch(['/api/user/:userId/usage', '/user/:userId/usage'], async (req, res) =
   try {
     console.log(`[${new Date().toISOString()}] [USER-API] Updating usage stats for ${userId}/${currentPeriod}`);
     
-    // Get current stats or create default
+    // Get current stats from R2 or local storage fallback
     let currentStats;
+    let source = 'unknown';
+    
     try {
+      // Try R2 first
       const params = {
         Bucket: 'admin',
         Key: `usage/${userId}/${currentPeriod}.json`
@@ -770,8 +777,28 @@ app.patch(['/api/user/:userId/usage', '/user/:userId/usage'], async (req, res) =
       const getCommand = new GetObjectCommand(params);
       const data = await s3Client.send(getCommand);
       currentStats = JSON.parse(await streamToString(data.Body));
-    } catch (error) {
-      if (error.code === 'NoSuchKey') {
+      source = 'R2';
+      console.log(`[${new Date().toISOString()}] [USER-API] Retrieved usage stats from R2 for ${userId}/${currentPeriod}`);
+    } catch (r2Error) {
+      console.log(`[${new Date().toISOString()}] [USER-API] R2 failed for usage stats update, trying local storage: ${r2Error.message}`);
+      
+      // Try local storage fallback
+      const localStorageDir = path.join(process.cwd(), 'local_storage', 'usage', userId);
+      const localStorageFile = path.join(localStorageDir, `${currentPeriod}.json`);
+      
+      if (fs.existsSync(localStorageFile)) {
+        try {
+          const localData = JSON.parse(fs.readFileSync(localStorageFile, 'utf8'));
+          currentStats = localData;
+          source = 'local_storage';
+          console.log(`[${new Date().toISOString()}] [USER-API] Retrieved usage stats from local storage for ${userId}/${currentPeriod}`);
+        } catch (localError) {
+          console.error(`[${new Date().toISOString()}] [USER-API] Error reading local usage stats:`, localError);
+        }
+      }
+      
+      // Only create defaults if both R2 and local storage fail
+      if (!currentStats) {
         currentStats = {
           userId,
           period: currentPeriod,
@@ -779,10 +806,11 @@ app.patch(['/api/user/:userId/usage', '/user/:userId/usage'], async (req, res) =
           discussionsUsed: 0,
           aiRepliesUsed: 0,
           campaignsUsed: 0,
+          resetsUsed: 0,
           lastUpdated: new Date().toISOString()
         };
-      } else {
-        throw error;
+        source = 'default';
+        console.log(`[${new Date().toISOString()}] [USER-API] Created default usage stats for ${userId}/${currentPeriod}`);
       }
     }
     
@@ -793,19 +821,59 @@ app.patch(['/api/user/:userId/usage', '/user/:userId/usage'], async (req, res) =
       lastUpdated: new Date().toISOString()
     };
     
-    // Save updated stats
-    const params = {
-      Bucket: 'admin',
-      Key: `usage/${userId}/${currentPeriod}.json`,
-      Body: JSON.stringify(updatedStats, null, 2),
-      ContentType: 'application/json'
-    };
+    console.log(`[${new Date().toISOString()}] [USER-API] Updating usage stats for ${userId}/${currentPeriod}`);
+    console.log(`[${new Date().toISOString()}] [USER-API] Source: ${source}, Current: ${JSON.stringify(currentStats)}, Update: ${JSON.stringify(statsUpdate)}`);
     
-    const putCommand = new PutObjectCommand(params);
-    await s3Client.send(putCommand);
-    
-    console.log(`[${new Date().toISOString()}] [USER-API] Updated usage stats for ${userId}/${currentPeriod}`);
-    res.json({ success: true });
+    // Save updated stats to R2
+    try {
+      const params = {
+        Bucket: 'admin',
+        Key: `usage/${userId}/${currentPeriod}.json`,
+        Body: JSON.stringify(updatedStats, null, 2),
+        ContentType: 'application/json'
+      };
+      
+      const putCommand = new PutObjectCommand(params);
+      await s3Client.send(putCommand);
+      
+      console.log(`[${new Date().toISOString()}] [USER-API] Successfully saved updated usage stats to R2 for ${userId}/${currentPeriod}`);
+      
+      // Also save to local storage as backup
+      try {
+        const localStorageDir = path.join(process.cwd(), 'local_storage', 'usage', userId);
+        const localStorageFile = path.join(localStorageDir, `${currentPeriod}.json`);
+        
+        if (!fs.existsSync(localStorageDir)) {
+          fs.mkdirSync(localStorageDir, { recursive: true });
+        }
+        fs.writeFileSync(localStorageFile, JSON.stringify(updatedStats, null, 2));
+        console.log(`[${new Date().toISOString()}] [USER-API] Also saved updated usage stats to local storage: ${localStorageFile}`);
+      } catch (localSaveError) {
+        console.warn(`[${new Date().toISOString()}] [USER-API] Warning: Could not save to local storage:`, localSaveError.message);
+      }
+      
+      res.json({ success: true, source, newStats: updatedStats });
+      
+    } catch (r2SaveError) {
+      console.error(`[${new Date().toISOString()}] [USER-API] Failed to save to R2, saving to local storage only:`, r2SaveError.message);
+      
+      // Fallback to local storage only
+      try {
+        const localStorageDir = path.join(process.cwd(), 'local_storage', 'usage', userId);
+        const localStorageFile = path.join(localStorageDir, `${currentPeriod}.json`);
+        
+        if (!fs.existsSync(localStorageDir)) {
+          fs.mkdirSync(localStorageDir, { recursive: true });
+        }
+        fs.writeFileSync(localStorageFile, JSON.stringify(updatedStats, null, 2));
+        console.log(`[${new Date().toISOString()}] [USER-API] Saved updated usage stats to local storage: ${localStorageFile}`);
+        
+        res.json({ success: true, source: 'local_storage_only', newStats: updatedStats });
+      } catch (localSaveError) {
+        console.error(`[${new Date().toISOString()}] [USER-API] Failed to save to both R2 and local storage:`, localSaveError.message);
+        res.status(500).json({ error: 'Failed to save usage stats to any storage' });
+      }
+    }
     
   } catch (error) {
     console.error(`[${new Date().toISOString()}] [USER-API] Error updating usage stats:`, error);
@@ -824,7 +892,7 @@ app.post(['/api/access-check/:userId', '/access-check/:userId'], async (req, res
     // Get user data and usage stats
     const [userResponse, usageResponse] = await Promise.allSettled([
       fetch(`http://localhost:3000/api/user/${userId}`),
-      fetch(`http://localhost:3000/api/user/${userId}/usage`)
+      fetch(`http://127.0.0.1:3000/api/user/${userId}/usage`)
     ]);
     
     let userData = null;
@@ -880,6 +948,7 @@ app.post(['/api/access-check/:userId', '/access-check/:userId'], async (req, res
         discussionsUsed: 0,
         aiRepliesUsed: 0,
         campaignsUsed: 0,
+          resetsUsed: 0,
         lastUpdated: new Date().toISOString()
       };
     }
@@ -1028,12 +1097,17 @@ app.post(['/api/usage/increment/:userId', '/usage/increment/:userId'], async (re
     console.log(`[${new Date().toISOString()}] [USAGE-INCREMENT] Incrementing ${feature} usage for ${userId}`);
     
     // Get current usage stats
-    const response = await fetch(`http://localhost:3000/api/user/${userId}/usage`);
+    const response = await fetch(`http://127.0.0.1:3000/api/user/${userId}/usage`);
     let usageStats;
     
     if (response.ok) {
       usageStats = await response.json();
+      console.log(`[${new Date().toISOString()}] [USAGE-INCREMENT] Retrieved current usage stats:`, usageStats);
     } else {
+      console.warn(`[${new Date().toISOString()}] [USAGE-INCREMENT] Failed to get current usage stats, response: ${response.status} ${response.statusText}`);
+      
+      // Don't create default stats here - let the PATCH endpoint handle it
+      // Just use empty stats so the increment will work
       const currentPeriod = new Date().toISOString().substring(0, 7);
       usageStats = {
         userId,
@@ -1042,8 +1116,10 @@ app.post(['/api/usage/increment/:userId', '/usage/increment/:userId'], async (re
         discussionsUsed: 0,
         aiRepliesUsed: 0,
         campaignsUsed: 0,
+        resetsUsed: 0,
         lastUpdated: new Date().toISOString()
       };
+      console.log(`[${new Date().toISOString()}] [USAGE-INCREMENT] Using fallback stats for increment`);
     }
     
     // Increment the appropriate counter
@@ -1062,13 +1138,16 @@ app.post(['/api/usage/increment/:userId', '/usage/increment/:userId'], async (re
       case 'campaigns':
         update.campaignsUsed = usageStats.campaignsUsed + 1;
         break;
+      case 'resets':
+        update.resetsUsed = (usageStats.resetsUsed || 0) + 1;
+        break;
       default:
         console.warn(`[${new Date().toISOString()}] [USAGE-INCREMENT] Unknown feature: ${feature}`);
         return res.json({ success: true, message: 'Unknown feature, no increment performed' });
     }
     
     // Update usage stats
-    const updateResponse = await fetch(`http://localhost:3000/api/user/${userId}/usage`, {
+    const updateResponse = await fetch(`http://127.0.0.1:3000/api/user/${userId}/usage`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(update)
@@ -1079,7 +1158,8 @@ app.post(['/api/usage/increment/:userId', '/usage/increment/:userId'], async (re
     }
     
     console.log(`[${new Date().toISOString()}] [USAGE-INCREMENT] Successfully incremented ${feature} usage for ${userId}`);
-    res.json({ success: true, newCount: usageStats[feature + 'Used'] + 1 });
+    const updatedCount = feature === 'resets' ? update.resetsUsed : update[feature + 'Used'];
+    res.json({ success: true, newCount: updatedCount });
     
   } catch (error) {
     console.error(`[${new Date().toISOString()}] [USAGE-INCREMENT] Error incrementing usage:`, error);
@@ -8696,7 +8776,7 @@ class PlatformSchemaManager {
 // Twitter OAuth 2.0 credentials
 const TWITTER_CLIENT_ID = 'cVNYR3UxVm5jQ3d5UWw0UHFqUTI6MTpjaQ';
 const TWITTER_CLIENT_SECRET = 'Wr8Kewh92NVB-035hAvpQeQ1Azc7chre3PUTgDoEltjO57mxzO';
-const TWITTER_REDIRECT_URI = 'https:/www.sentientm.com/twitter/callback';
+const TWITTER_REDIRECT_URI = 'https://www.sentientm.com/twitter/callback';
 
 // Debug logging for OAuth 2.0
 console.log(`[${new Date().toISOString()}] Twitter OAuth 2.0 Configuration:`);

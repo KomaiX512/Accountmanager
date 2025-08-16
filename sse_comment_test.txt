@@ -1,4 +1,0 @@
-data: {"type":"connection","message":"Connected to events for 612940588580162","timestamp":1749662290288,"connectionId":"a96c8f6a-f538-400f-9e32-1177b76a0d92"}
-
-data: {"type":"heartbeat","timestamp":1749662292477}
-

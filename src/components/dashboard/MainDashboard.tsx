@@ -217,13 +217,34 @@ const MainDashboard: React.FC = () => {
 
     // ✅ BULLETPROOF PERSISTENCE: Store both countdown and processing info
     localStorage.setItem(getProcessingCountdownKey(platformId), endTime.toString());
-    localStorage.setItem(`${platformId}_processing_info`, JSON.stringify({ 
-      platform: platformId, 
-      username: currentUser?.displayName || 'User', 
-      startTime: now, 
-      endTime: endTime,
-      totalDuration: durationMs
-    }));
+    // ✅ PRESERVE EXISTING USERNAME: Never overwrite existing username with fallbacks
+    let finalUsername = currentUser?.displayName || '';
+    try {
+      const existingProcessingInfo = localStorage.getItem(`${platformId}_processing_info`);
+      if (existingProcessingInfo) {
+        const existingInfo = JSON.parse(existingProcessingInfo);
+        if (existingInfo.username && typeof existingInfo.username === 'string' && existingInfo.username.trim()) {
+          const preserved = existingInfo.username.trim();
+          console.log(`🔒 PRESERVING USERNAME: Keeping existing username '${preserved}' for ${platformId} (not overwriting)`);
+          finalUsername = preserved;
+        }
+      }
+    } catch (err) {
+      console.error('Error checking existing username in localStorage:', err);
+    }
+    
+    const infoPayload: any = {
+      platform: platformId,
+      startTime: now,
+      endTime,
+      totalDuration: durationMs,
+    };
+
+    if (finalUsername && finalUsername.trim()) {
+      infoPayload.username = finalUsername.trim();
+    }
+
+    localStorage.setItem(`${platformId}_processing_info`, JSON.stringify(infoPayload));
     
     console.log(`🔥 TIMER START: ${platformId} timer set for ${durationMinutes} minutes (${endTime})`);
   };
@@ -697,6 +718,64 @@ const MainDashboard: React.FC = () => {
     );
   }, [realTimeNotifications]);
 
+  // ✅ PLATFORM RESET LISTENER: Handle platform reset events from exit setup
+  useEffect(() => {
+    const handlePlatformReset = (event: CustomEvent) => {
+      const { platform, reason, timestamp } = event.detail;
+      console.log(`[MainDashboard] 🔥 Platform reset event received: ${platform} (${reason})`);
+      
+      if (currentUser?.uid) {
+        // ✅ CRITICAL FIX: Immediately clear platform access status from localStorage
+        // This ensures both MainDashboard and TopBar show "not acquired" status
+        const accessKey = `${platform}_accessed_${currentUser.uid}`;
+        localStorage.removeItem(accessKey);
+        console.log(`[MainDashboard] 🔥 Cleared platform access status: ${accessKey}`);
+        
+        // Remove platform from completed platforms
+        setCompletedPlatforms(prev => {
+          const newCompleted = new Set(prev);
+          newCompleted.delete(platform);
+          console.log(`[MainDashboard] 🔥 Removed ${platform} from completed platforms`);
+          return newCompleted;
+        });
+        
+        // Clear any loading state
+        setPlatformLoadingStates(prev => {
+          const newStates = { ...prev };
+          delete newStates[platform];
+          console.log(`[MainDashboard] 🔥 Cleared loading state for ${platform}`);
+          return newStates;
+        });
+        
+        // Force platform status refresh
+        setPlatforms(prev => 
+          prev.map(p => {
+            if (p.id === platform) {
+              console.log(`[MainDashboard] 🔥 Reset platform status for ${platform}: claimed=false, connected=false`);
+              return { 
+                ...p, 
+                claimed: false,
+                connected: false
+              };
+            }
+            return p;
+          })
+        );
+        
+        // Refresh notifications to clear any counts
+        fetchRealTimeNotifications();
+        
+        // ✅ CRITICAL: Force immediate re-render to update UI
+        console.log(`[MainDashboard] 🔥 Platform ${platform} fully reset - UI will show "not acquired" status`);
+      }
+    };
+    
+    window.addEventListener('platformReset', handlePlatformReset as EventListener);
+    return () => {
+      window.removeEventListener('platformReset', handlePlatformReset as EventListener);
+    };
+  }, [currentUser?.uid, fetchRealTimeNotifications]);
+
   // ✅ PLATFORM STATUS MONITORING: Effect to monitor and refresh platform status
   useEffect(() => {
     let lastFocusTime = 0;
@@ -739,6 +818,51 @@ const MainDashboard: React.FC = () => {
       window.removeEventListener('focus', handleFocus);
     };
   }, [currentUser?.uid, refreshTwitterConnection, twitterUserId, refreshUsage, fetchRealTimeNotifications, getPlatformAccessStatus, platforms]);
+
+  // ✅ REAL-TIME PLATFORM STATUS SYNC: Monitor platform access status changes every 5 seconds
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+
+    const syncPlatformStatus = () => {
+      let hasStatusChange = false;
+      
+      platforms.forEach(platform => {
+        const currentClaimed = getPlatformAccessStatus(platform.id);
+        const currentConnected = getPlatformConnectionStatus(platform.id);
+        
+        // Check if status has changed from what we have in state
+        if (platform.claimed !== currentClaimed || platform.connected !== currentConnected) {
+          console.log(`[MainDashboard] 🔄 Platform ${platform.id} status change detected: claimed=${currentClaimed}, connected=${currentConnected}`);
+          hasStatusChange = true;
+        }
+      });
+      
+      // If any status changed, force platform refresh
+      if (hasStatusChange) {
+        console.log('[MainDashboard] 🔄 Platform status changes detected, refreshing platform list');
+        setPlatforms(prev => 
+          prev.map(platform => {
+            const newClaimed = getPlatformAccessStatus(platform.id);
+            const newConnected = getPlatformConnectionStatus(platform.id);
+            
+            return { 
+              ...platform, 
+              claimed: newClaimed,
+              connected: newConnected
+            };
+          })
+        );
+      }
+    };
+
+    // Sync immediately
+    syncPlatformStatus();
+
+    // Check every 5 seconds for status changes
+    const statusSyncInterval = setInterval(syncPlatformStatus, 5000);
+    
+    return () => clearInterval(statusSyncInterval);
+  }, [currentUser?.uid, platforms, getPlatformAccessStatus, getPlatformConnectionStatus]);
 
   // Sort platforms so claimed ones appear first
   const sortedPlatforms = [...platforms].sort((a, b) => {

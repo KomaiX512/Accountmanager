@@ -1,7 +1,7 @@
 import { User, UsageStats, AccessControlResult, PricingPlan } from '../types/user';
 
 class UserService {
-  private readonly API_BASE_URL = process.env.NODE_ENV === 'production' 
+  private readonly API_BASE_URL = import.meta.env.MODE === 'production' 
     ? 'https://sentientm.com/api' 
     : '/api';
 

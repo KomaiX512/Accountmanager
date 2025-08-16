@@ -1,2 +1,0 @@
-data: {"type":"connection","message":"Connected to events for shakira","timestamp":1749661720426,"connectionId":"f6cd01ce-932d-4ebb-815a-65cc94e3ca90"}
-

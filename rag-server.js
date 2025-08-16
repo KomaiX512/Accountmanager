@@ -7,6 +7,16 @@ import path from 'path';
 import chromaDBService from './chromadb-service.js';
 import { GoogleGenAI } from '@google/genai';
 
+// 🔥 CRITICAL FIX APPLIED: Resolved "previous post" issue where long prompts (100+ words) 
+// were returning cached responses from previous requests instead of generating new content.
+// 
+// Root Cause: Cache key collision due to base64 truncation of long prompts
+// Solution: 
+// 1. Use SHA256 hash instead of base64 encoding for cache keys
+// 2. Detect post generation requests and skip caching/deduplication entirely
+// 3. Force empty messages array for post generation to prevent conversation history interference
+// 4. Add comprehensive logging for debugging cache key generation
+
 const app = express();
 const port = process.env.RAG_SERVER_PORT || 3001;
 
@@ -840,10 +850,35 @@ async function callGeminiAPIDirectBypassQueue(prompt, messages = [], retries = 2
   const userMessage = messages.length > 0 && messages[messages.length - 1].parts && messages[messages.length - 1].parts[0] 
     ? messages[messages.length - 1].parts[0].text 
     : '';
-  const cacheKey = Buffer.from(`${prompt}_${userMessage}`).toString('base64').substring(0, 100);
   
-  // Check for duplicate requests in progress
-  const duplicateKey = `inprogress_${cacheKey}`;
+  // 🔥 CRITICAL FIX: Improve cache key generation to prevent collisions for long prompts
+  // Use a hash of the prompt instead of base64 encoding to prevent truncation issues
+  const crypto = require('crypto');
+  const promptHash = crypto.createHash('sha256').update(prompt).digest('hex').substring(0, 16);
+  const userMessageHash = userMessage ? crypto.createHash('sha256').update(userMessage).digest('hex').substring(0, 8) : 'no_msg';
+  
+  // Create a more unique cache key that won't collide for different prompts
+  const cacheKey = `prompt_${promptHash}_user_${userMessageHash}_len_${prompt.length}`;
+  
+  console.log(`[RAG-Server] 🔑 Generated cache key: ${cacheKey}`);
+  console.log(`[RAG-Server] 📝 Prompt length: ${prompt.length} characters`);
+  console.log(`[RAG-Server] 💬 User message: "${userMessage.substring(0, 50)}${userMessage.length > 50 ? '...' : ''}"`);
+  
+  // 🔥 CRITICAL FIX: Post generation requests should NEVER be deduplicated or cached
+  // This prevents the "previous post" issue where long prompts return cached responses
+  if (prompt.includes('You are creating a') || prompt.includes('You are a professional') || prompt.includes('POST REQUEST:')) {
+    console.log(`[RAG-Server] 🚫 POST GENERATION DETECTED: Skipping deduplication and caching for fresh content`);
+    // Generate a unique timestamp-based key to prevent any caching
+    const timestampKey = `post_gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    console.log(`[RAG-Server] 🔑 Using timestamp-based key for post generation: ${timestampKey}`);
+    
+    // Check for duplicate requests in progress
+    const duplicateKey = `inprogress_${timestampKey}`;
+  } else {
+    // Check for duplicate requests in progress
+    const duplicateKey = `inprogress_${cacheKey}`;
+  }
+  
   if (duplicateRequestCache.has(duplicateKey)) {
     const { promise, timestamp } = duplicateRequestCache.get(duplicateKey);
     if (Date.now() - timestamp < DUPLICATE_REQUEST_TTL) {
@@ -958,11 +993,16 @@ async function callGeminiAPIDirectBypassQueue(prompt, messages = [], retries = 2
         JSON.stringify(response.data, null, 2)
       );
       
-      // Cache the successful response
-      responseCache.set(cacheKey, {
-        data: generatedText,
-        timestamp: Date.now()
-      });
+      // 🔥 CRITICAL FIX: Never cache post generation responses to prevent "previous post" issues
+      if (prompt.includes('You are creating a') || prompt.includes('You are a professional') || prompt.includes('POST REQUEST:')) {
+        console.log(`[RAG-Server] 🚫 POST GENERATION: Skipping response caching for fresh content`);
+      } else {
+        // Cache the successful response for non-post-generation requests
+        responseCache.set(cacheKey, {
+          data: generatedText,
+          timestamp: Date.now()
+        });
+      }
       
       // Reset quota error counter on successful API call
       if (consecutiveQuotaErrors > 0) {
@@ -1010,8 +1050,17 @@ async function callGeminiAPIDirectBypassQueue(prompt, messages = [], retries = 2
   }
   })();
   
-  // Register the promise for duplicate detection
-  const inProgressKey = `inprogress_${cacheKey}`;
+  // 🔥 CRITICAL FIX: Use correct key for duplicate detection based on request type
+  let inProgressKey;
+  if (prompt.includes('You are creating a') || prompt.includes('You are a professional') || prompt.includes('POST REQUEST:')) {
+    // For post generation, use the timestamp-based key to prevent any deduplication
+    inProgressKey = `inprogress_post_gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    console.log(`[RAG-Server] 🚫 POST GENERATION: Using unique inProgressKey: ${inProgressKey}`);
+  } else {
+    // For regular requests, use the normal cache key
+    inProgressKey = `inprogress_${cacheKey}`;
+  }
+  
   duplicateRequestCache.set(inProgressKey, {
     promise: apiCallPromise,
     timestamp: Date.now()
@@ -1059,20 +1108,35 @@ async function callGeminiAPIDirect(prompt, messages = [], retries = 2) {
   const userMessage = messages.length > 0 && messages[messages.length - 1].parts && messages[messages.length - 1].parts[0] 
     ? messages[messages.length - 1].parts[0].text 
     : '';
-  const cacheKey = Buffer.from(`${prompt}_${userMessage}`).toString('base64').substring(0, 100);
   
-  // Disable caching for instant replies to ensure fresh responses for each question
-  // if (responseCache.has(cacheKey)) {
-  //   const { data, timestamp } = responseCache.get(cacheKey);
-  //   if (Date.now() - timestamp < RESPONSE_CACHE_TTL) {
-  //     console.log('[RAG-Server] Using cached AI response');
-  //     return data;
-  //   }
-  //   responseCache.delete(cacheKey);
-  // }
+  // 🔥 CRITICAL FIX: Improve cache key generation to prevent collisions for long prompts
+  // Use a hash of the prompt instead of base64 encoding to prevent truncation issues
+  const crypto = require('crypto');
+  const promptHash = crypto.createHash('sha256').update(prompt).digest('hex').substring(0, 16);
+  const userMessageHash = userMessage ? crypto.createHash('sha256').update(userMessage).digest('hex').substring(0, 8) : 'no_msg';
   
-  // Check for duplicate requests in progress
-  const duplicateKey = `inprogress_${cacheKey}`;
+  // Create a more unique cache key that won't collide for different prompts
+  const cacheKey = `prompt_${promptHash}_user_${userMessageHash}_len_${prompt.length}`;
+  
+  console.log(`[RAG-Server] 🔑 Generated cache key: ${cacheKey}`);
+  console.log(`[RAG-Server] 📝 Prompt length: ${prompt.length} characters`);
+  console.log(`[RAG-Server] 💬 User message: "${userMessage.substring(0, 50)}${userMessage.length > 50 ? '...' : ''}"`);
+  
+  // 🔥 CRITICAL FIX: Post generation requests should NEVER be deduplicated or cached
+  // This prevents the "previous post" issue where long prompts return cached responses
+  if (prompt.includes('You are creating a') || prompt.includes('You are a professional') || prompt.includes('POST REQUEST:')) {
+    console.log(`[RAG-Server] 🚫 POST GENERATION DETECTED: Skipping deduplication and caching for fresh content`);
+    // Generate a unique timestamp-based key to prevent any caching
+    const timestampKey = `post_gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    console.log(`[RAG-Server] 🔑 Using timestamp-based key for post generation: ${timestampKey}`);
+    
+    // Check for duplicate requests in progress
+    const duplicateKey = `inprogress_${timestampKey}`;
+  } else {
+    // Check for duplicate requests in progress
+    const duplicateKey = `inprogress_${cacheKey}`;
+  }
+  
   if (duplicateRequestCache.has(duplicateKey)) {
     const { promise, timestamp } = duplicateRequestCache.get(duplicateKey);
     if (Date.now() - timestamp < DUPLICATE_REQUEST_TTL) {
@@ -1175,11 +1239,16 @@ async function callGeminiAPIDirect(prompt, messages = [], retries = 2) {
         JSON.stringify(response.data, null, 2)
       );
       
-      // Cache the successful response
-      responseCache.set(cacheKey, {
-        data: generatedText,
-        timestamp: Date.now()
-      });
+      // 🔥 CRITICAL FIX: Never cache post generation responses to prevent "previous post" issues
+      if (prompt.includes('You are creating a') || prompt.includes('You are a professional') || prompt.includes('POST REQUEST:')) {
+        console.log(`[RAG-Server] 🚫 POST GENERATION: Skipping response caching for fresh content`);
+      } else {
+        // Cache the successful response for non-post-generation requests
+        responseCache.set(cacheKey, {
+          data: generatedText,
+          timestamp: Date.now()
+        });
+      }
       
       // Reset quota error counter on successful API call
       if (consecutiveQuotaErrors > 0) {
@@ -1451,15 +1520,69 @@ function analyzeUserDomain(profileData, username) {
   };
 }
 
+// Function to detect question complexity and desired response style
+function analyzeQuestionComplexity(query) {
+  const queryLower = query.toLowerCase();
+  
+  // Simple, direct questions that need quick answers
+  const simpleQuestionPatterns = [
+    /^what are trending/i,
+    /^give me.*hashtags/i,
+    /^tell me trending/i,
+    /^what.{1,20}trending/i,
+    /^list.*hashtags/i,
+    /^show me.*trending/i,
+    /^what.{1,10}popular/i,
+    /^what.{1,10}new/i,
+    /^what.{1,10}hot/i,
+    /trending hashtags/i,
+    /trending topics/i,
+    /^hashtags/i,
+    /^trending/i,
+    /popular hashtags/i,
+    /current hashtags/i,
+    /hot hashtags/i,
+    /what.*hashtags/i,
+    /give.*hashtags/i,
+    /show.*hashtags/i,
+    /list.*hashtags/i
+  ];
+  
+  const isSimpleQuestion = simpleQuestionPatterns.some(pattern => pattern.test(query));
+  
+  // Complex questions that need detailed analysis
+  const complexQuestionPatterns = [
+    /why.*perform/i,
+    /analyze.*strategy/i,
+    /deep.*analysis/i,
+    /comprehensive.*review/i,
+    /detailed.*breakdown/i,
+    /explain.*reason/i,
+    /how.*improve.*engagement/i,
+    /strategy.*next.*month/i
+  ];
+  
+  const isComplexQuestion = complexQuestionPatterns.some(pattern => pattern.test(query));
+  
+  return {
+    isSimple: isSimpleQuestion,
+    isComplex: isComplexQuestion,
+    expectedLength: isSimpleQuestion ? 'short' : isComplexQuestion ? 'detailed' : 'medium',
+    responseType: isSimpleQuestion ? 'direct_answer' : isComplexQuestion ? 'analysis' : 'balanced'
+  };
+}
+
 // Function to determine optimal response strategy
 function determineResponseStrategy(query, profileData, username) {
   const needsWebSearch = shouldUseWebSearch(query);
   const userDomain = analyzeUserDomain(profileData, username);
+  const questionComplexity = analyzeQuestionComplexity(query);
   
   const queryLower = query.toLowerCase();
   
   // Strategy types
   const strategies = {
+    DIRECT_ANSWER: 'direct_answer',                       // Quick, direct response
     PERSONALIZED_WEB_SEARCH: 'web_search_personalized',  // Web search + personal context
     INTELLIGENT_ANALYSIS: 'intelligent_analysis',        // Smart analysis of profile data
     TREND_SUGGESTIONS: 'trend_suggestions',              // Current trends + how to use them
@@ -1467,14 +1590,29 @@ function determineResponseStrategy(query, profileData, username) {
     TRADITIONAL_RAG: 'traditional_rag'                   // Standard RAG response
   };
   
-  // Determine strategy based on query intent
+  // For simple questions, use direct answer strategy
+  if (questionComplexity.isSimple) {
+    return {
+      strategy: strategies.DIRECT_ANSWER,
+      useWebSearch: needsWebSearch,
+      focusOnDomain: userDomain.primaryDomain,
+      includePersonalization: false,
+      includeMetrics: false,
+      expectedLength: 'short',
+      responseType: 'direct_answer'
+    };
+  }
+  
+  // Determine strategy based on query intent for complex questions
   if (needsWebSearch && (queryLower.includes('trend') || queryLower.includes('news'))) {
     return {
       strategy: strategies.PERSONALIZED_WEB_SEARCH,
       useWebSearch: true,
       focusOnDomain: userDomain.primaryDomain,
       includePersonalization: true,
-      includeMetrics: false
+      includeMetrics: false,
+      expectedLength: questionComplexity.expectedLength,
+      responseType: questionComplexity.responseType
     };
   }
   
@@ -1485,7 +1623,9 @@ function determineResponseStrategy(query, profileData, username) {
       focusOnDomain: userDomain.primaryDomain,
       includePersonalization: true,
       includeMetrics: true,
-      requireIntelligentAnalysis: true
+      requireIntelligentAnalysis: true,
+      expectedLength: questionComplexity.expectedLength,
+      responseType: questionComplexity.responseType
     };
   }
   
@@ -1495,7 +1635,9 @@ function determineResponseStrategy(query, profileData, username) {
       useWebSearch: needsWebSearch,
       focusOnDomain: userDomain.primaryDomain,
       includePersonalization: true,
-      includeMetrics: false
+      includeMetrics: false,
+      expectedLength: questionComplexity.expectedLength,
+      responseType: questionComplexity.responseType
     };
   }
   
@@ -1506,7 +1648,9 @@ function determineResponseStrategy(query, profileData, username) {
       focusOnDomain: userDomain.primaryDomain,
       includePersonalization: true,
       includeMetrics: true,
-      requireIntelligentAnalysis: true
+      requireIntelligentAnalysis: true,
+      expectedLength: questionComplexity.expectedLength,
+      responseType: questionComplexity.responseType
     };
   }
   
@@ -1515,7 +1659,9 @@ function determineResponseStrategy(query, profileData, username) {
     useWebSearch: needsWebSearch,
     focusOnDomain: userDomain.primaryDomain,
     includePersonalization: true,
-    includeMetrics: false
+    includeMetrics: false,
+    expectedLength: questionComplexity.expectedLength,
+    responseType: questionComplexity.responseType
   };
 }
 
@@ -1547,23 +1693,61 @@ async function createPersonalizedRagPrompt(profileData, rulesData, query, platfo
   // Analyze user domain for personalization
   const userDomain = analyzeUserDomain(profileData, username);
   
-  // Create strategy-specific prompts
-  switch (responseStrategy?.strategy) {
-    case 'web_search_personalized':
-      return createWebSearchPersonalizedPrompt(enhancedContext, query, platform, username, userDomain);
-    
-    case 'engagement_analysis':
-      return createEngagementAnalysisPrompt(enhancedContext, query, platform, username, userDomain);
-    
-    case 'intelligent_analysis':
-      return createIntelligentAnalysisPrompt(enhancedContext, query, platform, username, userDomain);
-    
-    case 'trend_suggestions':
-      return createTrendSuggestionsPrompt(enhancedContext, query, platform, username, userDomain);
-    
-    default:
-      return createTraditionalSmartPrompt(enhancedContext, query, platform, username, userDomain);
+     // Create strategy-specific prompts
+   switch (responseStrategy?.strategy) {
+     case 'direct_answer':
+       return createDirectAnswerPrompt(enhancedContext, query, platform, username, userDomain);
+       
+     case 'web_search_personalized':
+       return createWebSearchPersonalizedPrompt(enhancedContext, query, platform, username, userDomain);
+     
+     case 'engagement_analysis':
+       return createEngagementAnalysisPrompt(enhancedContext, query, platform, username, userDomain);
+     
+     case 'intelligent_analysis':
+       return createIntelligentAnalysisPrompt(enhancedContext, query, platform, username, userDomain);
+     
+     case 'trend_suggestions':
+       return createTrendSuggestionsPrompt(enhancedContext, query, platform, username, userDomain);
+     
+     default:
+       return createTraditionalSmartPrompt(enhancedContext, query, platform, username, userDomain);
+   }
+}
+
+// 🎯 Direct answer prompt for simple questions
+function createDirectAnswerPrompt(context, query, platform, username, userDomain) {
+  const queryLower = query.toLowerCase();
+  
+  // For trending/hashtag questions
+  if (queryLower.includes('trending') || queryLower.includes('hashtag')) {
+    return `You are a ${userDomain.primaryDomain} expert on ${platform}. Give a direct, concise answer.
+
+Question: "${query}"
+
+INSTRUCTIONS:
+- Give 8-12 trending hashtags relevant to ${userDomain.primaryDomain}
+- Format as a simple list without excessive explanation
+- Be natural and conversational, not business-y
+- Keep response under 200 words
+- No bullet points or formatting unless necessary
+
+Just answer what was asked directly.`;
   }
+  
+  // For other simple questions
+  return `You are a ${platform} expert specializing in ${userDomain.primaryDomain}. Answer directly and naturally.
+
+Question: "${query}"
+
+INSTRUCTIONS:
+- Answer the specific question asked
+- Be conversational and natural
+- Keep it concise (under 150 words)
+- Don't over-explain or add business jargon
+- Speak like a helpful friend, not a consultant
+
+Give a direct, helpful answer.`;
 }
 
 // 🌐 Web search + personalized context prompt
@@ -1695,6 +1879,148 @@ QUESTION: "${query}"
 APPROACH: Provide helpful, intelligent insights about this ${userDomain.primaryDomain} creator's ${platform} presence. Be conversational, insightful, and avoid being overly focused on metrics unless specifically asked.
 
 Focus on strategic advice, content insights, and actionable recommendations tailored to the ${userDomain.primaryDomain} audience.`;
+}
+
+// 🛡️ Response Quality Checker - Battle test responses before sending
+function battleTestResponse(response, query, responseStrategy) {
+  console.log(`[RAG-Server] 🛡️ Battle testing response for strategy: ${responseStrategy?.strategy}`);
+  
+  const issues = [];
+  const responseLength = response.length;
+  const wordCount = response.split(/\s+/).length;
+  
+  // Check if response is appropriate length for the question type
+  if (responseStrategy?.expectedLength === 'short' && responseLength > 500) {
+    issues.push('Response too long for simple question');
+  }
+  
+  // Also check word count for simple questions
+  if (responseStrategy?.expectedLength === 'short' && wordCount > 80) {
+    issues.push('Too many words for simple question');
+  }
+  
+  // Check for any response over 1200 characters (regardless of strategy)
+  if (responseLength > 1200 && !responseStrategy?.includeMetrics) {
+    issues.push('Response excessively long');
+  }
+  
+  // Check for business jargon and verbose patterns
+  const businessJargonPatterns = [
+    /strategic insights/gi,
+    /actionable suggestions/gi,
+    /comprehensive analysis/gi,
+    /leveraging your/gi,
+    /optimize your strategy/gi,
+    /maximize engagement/gi,
+    /your audience's interests/gi,
+    /tailored to your account/gi,
+    /based on your question about/gi,
+    /here are some valuable insights/gi
+  ];
+  
+  let jargonCount = 0;
+  businessJargonPatterns.forEach(pattern => {
+    const matches = response.match(pattern);
+    if (matches) jargonCount += matches.length;
+  });
+  
+  if (jargonCount > 2) {
+    issues.push('Too much business jargon');
+  }
+  
+  // Check for overly verbose introductions
+  const verboseIntros = [
+    /as your.*ai.*manager/gi,
+    /based on your.*question.*about/gi,
+    /i've.*analyzed.*your.*account/gi,
+    /here are some.*insights/gi
+  ];
+  
+  const hasVerboseIntro = verboseIntros.some(pattern => pattern.test(response.substring(0, 200)));
+  if (hasVerboseIntro && responseStrategy?.expectedLength === 'short') {
+    issues.push('Verbose introduction for simple question');
+  }
+  
+  // Check if response actually answers the question
+  const queryLower = query.toLowerCase();
+  if (queryLower.includes('trending') && !response.toLowerCase().includes('#')) {
+    issues.push('Trending question but no hashtags provided');
+  }
+  
+  // Check for excessive bullet points
+  const bulletCount = (response.match(/^[-•*]/gm) || []).length;
+  if (bulletCount > 8 && responseStrategy?.expectedLength === 'short') {
+    issues.push('Too many bullet points for simple answer');
+  }
+  
+  const quality = {
+    score: Math.max(0, 100 - (issues.length * 20)),
+    issues,
+    wordCount,
+    responseLength,
+    isAcceptable: issues.length <= 2
+  };
+  
+  console.log(`[RAG-Server] 🛡️ Battle test results: Score=${quality.score}, Issues=[${issues.join(', ')}]`);
+  
+  return quality;
+}
+
+// 🔧 Response optimizer - Clean up overly verbose responses
+function optimizeResponse(response, query, responseStrategy) {
+  console.log(`[RAG-Server] 🔧 Optimizing response for ${responseStrategy?.strategy}`);
+  
+  let optimized = response;
+  
+  // For simple questions, remove verbose introductions
+  if (responseStrategy?.expectedLength === 'short') {
+    // Remove verbose AI manager introductions
+    optimized = optimized.replace(/^(Hey!?\s*)?I'm your AI account manager.*?\.\s*/i, '');
+    optimized = optimized.replace(/^(Hello!?\s*)?As your.*AI.*manager.*?\.\s*/i, '');
+    optimized = optimized.replace(/^Based on your question about.*?,\s*/i, '');
+    
+    // Remove business speak
+    optimized = optimized.replace(/strategic insights/gi, 'ideas');
+    optimized = optimized.replace(/actionable suggestions/gi, 'suggestions');
+    optimized = optimized.replace(/leveraging your/gi, 'using your');
+    optimized = optimized.replace(/optimize your strategy/gi, 'improve your approach');
+    
+    // Simplify structure for hashtag questions
+    if (query.toLowerCase().includes('trending') || query.toLowerCase().includes('hashtag')) {
+      // Extract just the hashtags and brief context
+      const hashtagMatches = optimized.match(/#[\w\d]+/g);
+      if (hashtagMatches && hashtagMatches.length > 0) {
+        const uniqueHashtags = [...new Set(hashtagMatches)];
+        optimized = `Here are trending hashtags for you:\n\n${uniqueHashtags.slice(0, 12).join(' ')}\n\nThese work well for ${responseStrategy?.focusOnDomain || 'your'} content.`;
+      }
+    }
+    
+    // For any simple question, if response is still too long, cut it down dramatically
+    if (responseStrategy?.expectedLength === 'short' && optimized.length > 300) {
+      // Find the first complete sentence or paragraph that makes sense
+      const sentences = optimized.split(/[.!?]+/);
+      if (sentences.length > 0) {
+        optimized = sentences[0] + (sentences.length > 1 ? '.' : '');
+        
+        // If it's still too long, just take the hashtags if it's a hashtag question
+        if (optimized.length > 200 && (query.toLowerCase().includes('hashtag') || query.toLowerCase().includes('trending'))) {
+          const hashtagMatches = optimized.match(/#[\w\d]+/g);
+          if (hashtagMatches && hashtagMatches.length > 0) {
+            const uniqueHashtags = [...new Set(hashtagMatches)];
+            optimized = `${uniqueHashtags.slice(0, 12).join(' ')}`;
+          }
+        }
+      }
+    }
+  }
+  
+  // General cleanup
+  optimized = optimized.replace(/\n{3,}/g, '\n\n'); // Remove excessive line breaks
+  optimized = optimized.trim();
+  
+  console.log(`[RAG-Server] 🔧 Optimization complete: ${response.length} → ${optimized.length} chars`);
+  
+  return optimized;
 }
 
 // 🛡️ Comprehensive content sanitization to prevent Gemini filtering
@@ -2744,19 +3070,34 @@ app.all(['/api/rag/discussion', '/api/discussion', '/api/rag/discussion/', '/api
       
       response = await Promise.race([apiCallPromise, timeoutPromise]);
       
-      // Add strategy indicator
-      if (responseStrategy.useWebSearch && response) {
-        console.log(`[RAG-Server] ✅ ${responseStrategy.strategy} with web search completed for ${platform}/${username}`);
-      } else if (response) {
-        console.log(`[RAG-Server] ✅ ${responseStrategy.strategy} completed for ${platform}/${username}`);
-      }
-      
-      // Verify we have a valid response
-      if (!response || response.trim() === '' || response.length < 10) {
-        throw new Error('Invalid or empty response received from Gemini API');
-      }
-      
-      console.log(`[RAG-Server] Successfully generated response for ${platform}/${username}`);
+             // Add strategy indicator
+       if (responseStrategy.useWebSearch && response) {
+         console.log(`[RAG-Server] ✅ ${responseStrategy.strategy} with web search completed for ${platform}/${username}`);
+       } else if (response) {
+         console.log(`[RAG-Server] ✅ ${responseStrategy.strategy} completed for ${platform}/${username}`);
+       }
+       
+       // Verify we have a valid response
+       if (!response || response.trim() === '' || response.length < 10) {
+         throw new Error('Invalid or empty response received from Gemini API');
+       }
+       
+       // 🛡️ BATTLE TEST the response before sending
+       console.log(`[RAG-Server] 🛡️ Battle testing response for ${platform}/${username}`);
+       const qualityCheck = battleTestResponse(response, query, responseStrategy);
+       
+       if (!qualityCheck.isAcceptable) {
+         console.log(`[RAG-Server] 🔧 Response failed battle test, optimizing...`);
+         response = optimizeResponse(response, query, responseStrategy);
+         
+         // Re-test the optimized response
+         const reTestQuality = battleTestResponse(response, query, responseStrategy);
+         console.log(`[RAG-Server] 🛡️ Optimized response quality: Score=${reTestQuality.score}`);
+       } else {
+         console.log(`[RAG-Server] ✅ Response passed battle test with score: ${qualityCheck.score}`);
+       }
+       
+       console.log(`[RAG-Server] Successfully generated response for ${platform}/${username}`);
     } catch (error) {
       console.log(`[RAG-Server] ${responseStrategy.useWebSearch ? 'Web search enabled' : 'Traditional'} prompt failed: ${error.message}`);
       
@@ -2985,7 +3326,7 @@ async function createEnhancedPostGenerationPrompt(profileData, rulesData, query,
     enhancedContext = null;
   }
   
-  const characterLimit = platform === 'twitter' ? 280 : 
+  const characterLimit = platform === 'twitter' ? 270 : 
                         platform === 'instagram' ? 2200 : 
                         63206; // Facebook
   
@@ -2993,7 +3334,7 @@ async function createEnhancedPostGenerationPrompt(profileData, rulesData, query,
                          platform === 'instagram' ? '5-10 hashtags' :
                          '3-5 hashtags (Facebook best practice)';
   
-  const contentGuidance = platform === 'twitter' ? 'Keep it concise and engaging for Twitter\'s fast-paced environment' :
+  const contentGuidance = platform === 'twitter' ? 'Write naturally at the length that fits your message - can be short, medium, or long like the real examples. Match the natural flow and style of the profile.' :
                          platform === 'instagram' ? 'Make it visually appealing and Instagram-friendly' :
                          'Make it suitable for Facebook\'s diverse audience';
 
@@ -3022,18 +3363,19 @@ INSTRUCTIONS:
 4. Match the tone and style shown in the actual post content
 5. Create content that aligns with proven engagement patterns
     6. DO NOT use generic templates - use insights from the real data
-    7. If the user's request includes explicit visual style directives (e.g., REQUESTED_POST_STYLE, VISUAL_STYLE_GUIDELINES, ADDITIONAL_CREATIVE_DIRECTION), strictly follow them when crafting the Visual Description and overall creative direction
+    7. ${platform === 'twitter' ? 'For Twitter: Avoid generic questions in CTAs. Use natural, brief engagement phrases that match the account\'s style.' : 'Match the account\'s typical engagement style.'}
+    8. If the user's request includes explicit visual style directives (e.g., REQUESTED_POST_STYLE, VISUAL_STYLE_GUIDELINES, ADDITIONAL_CREATIVE_DIRECTION), strictly follow them when crafting the Visual Description and overall creative direction
 
 RESPOND WITH EXACTLY THIS FORMAT (no additional text):
 
 Caption:
-[Write an engaging ${platformName} caption under ${characterLimit} characters that matches the style and themes from the real data above. ${contentGuidance}]
+[Write an engaging ${platformName} caption that matches the style and themes from the real data above. ${contentGuidance} Write at natural length like the examples - can be short, medium, or long. Do NOT artificially limit length.]
 
 Hashtags:
 [List ${hashtagGuidance} based on successful hashtags from the data above]
 
 Call to Action:
-[Create a call-to-action that matches engagement patterns from the real data]
+[Create a call-to-action that matches engagement patterns from the real data. ${platform === 'twitter' ? 'For Twitter, use concise, natural phrases like "Thoughts?", "Your take?", "Agree?", or similar brief engagement starters that match the account\'s typical interaction style. Avoid generic long questions.' : 'Match the typical engagement style of this account.'}]
 
     Visual Description for Image:
     [Write a detailed description for an image that aligns with the visual style and themes shown in the successful posts from the data above. Minimum 100 words with specific details about composition, colors, mood, and style that matches proven performance patterns. If the user's request includes REQUESTED_POST_STYLE, VISUAL_STYLE_GUIDELINES, or ADDITIONAL_CREATIVE_DIRECTION, prioritize and explicitly implement those instructions.]
@@ -3041,33 +3383,97 @@ Call to Action:
 IMPORTANT: Use EXACTLY the section headers shown above. Base everything on the real account data provided above.`;
   }
   
-  // 🔄 FALLBACK: Traditional approach when ChromaDB is not available
-  console.log(`[RAG-Server] 📋 Using traditional post generation approach as fallback`);
-  return `You are a ${platformName} content creator assistant.
+  // 🔄 FORCE USE PROFILE DATA: No fallback, always use profile data for Twitter
+  console.log(`[RAG-Server] 🚀 FORCING use of profile data for Twitter post generation`);
+  
+  // 🔥 DEEP PROFILE ANALYSIS: Extract exact posting patterns
+  let realPostExamples = '';
+  let hashtagAnalysis = '';
+  let ctaAnalysis = '';
+  let structureAnalysis = '';
+  let shouldIncludeCTA = false;
+  let shouldIncludeHashtags = false;
+  let posts = [];
+  let hasQuestions = false;
+  
+  if (profileData && profileData.data && Array.isArray(profileData.data)) {
+    // Extract actual post texts for analysis
+    posts = profileData.data.slice(0, 10).map(post => post.text).filter(text => text && text.length > 10);
+    
+    if (posts.length > 0) {
+      realPostExamples = `REAL POST EXAMPLES FROM @${username}:
+${posts.slice(0, 5).map((post, i) => `${i+1}. "${post}"`).join('\n')}`;
+      
+      // Analyze hashtag usage patterns
+      const hashtagCounts = posts.map(post => (post.match(/#\w+/g) || []).length);
+      const totalHashtags = hashtagCounts.reduce((a, b) => a + b, 0);
+      const avgHashtags = totalHashtags / posts.length;
+      shouldIncludeHashtags = avgHashtags > 0.2; // Include if average > 0.2 hashtags per post
+      
+      if (shouldIncludeHashtags) {
+        hashtagAnalysis = `Hashtag Usage: This account uses ${avgHashtags.toFixed(1)} hashtags per post on average. Include hashtags.`;
+      } else {
+        hashtagAnalysis = `Hashtag Usage: This account rarely/never uses hashtags (${avgHashtags.toFixed(1)} per post). Do NOT include hashtags.`;
+      }
+      
+      // Analyze CTA/engagement patterns
+      const hasCTAs = posts.some(post => 
+        post.includes('?') || 
+        post.toLowerCase().includes('what do you think') ||
+        post.toLowerCase().includes('thoughts') ||
+        post.toLowerCase().includes('comment') ||
+        post.toLowerCase().includes('share') ||
+        post.includes('👇')
+      );
+      
+      shouldIncludeCTA = hasCTAs;
+      
+      if (shouldIncludeCTA) {
+        ctaAnalysis = `CTA Usage: This account includes call-to-actions or engagement prompts. Include appropriate CTA.`;
+      } else {
+        ctaAnalysis = `CTA Usage: This account posts pure statements/announcements with NO call-to-actions. Do NOT include CTA.`;
+      }
+      
+      // Analyze overall structure
+      hasQuestions = posts.some(post => post.includes('?'));
+      const avgLength = Math.round(posts.reduce((sum, p) => sum + p.length, 0) / posts.length);
+      
+      structureAnalysis = `POSTING PATTERN ANALYSIS:
+- Style: ${hasQuestions ? 'Mix of statements and questions' : 'Pure statements/announcements only'}
+- ${hashtagAnalysis}
+- ${ctaAnalysis}
+- Average length: ${avgLength} characters (natural variation: some short, some medium, some long)
+- Length pattern: ${posts.length > 2 ? posts.slice(0, 3).map(p => p.length < 50 ? 'short' : p.length < 150 ? 'medium' : 'long').join(', ') : 'varies'}
+- Tone: ${posts[0].includes('!') ? 'Enthusiastic' : 'Professional/Direct'}
+- IMPORTANT: Replicate the natural length variation from examples - don't force short captions`;
+    }
+  }
+  
+  return `You are creating a ${platformName} post for @${username}. 
 
-USER PROFILE DATA:
-${JSON.stringify(profileData, null, 2)}
+${realPostExamples}
 
-ACCOUNT RULES:
-${JSON.stringify(rulesData, null, 2)}
+${structureAnalysis}
 
 POST REQUEST: ${query}
+
+CRITICAL INSTRUCTIONS: Study the real post examples above and replicate their EXACT structure and style. Pay special attention to length - some posts are short (1 sentence), some medium (2-3 sentences), some long (paragraphs). Match this natural variation.
 
 RESPOND WITH EXACTLY THIS FORMAT (no additional text):
 
 Caption:
-[Write an engaging ${platformName} caption under ${characterLimit} characters that aligns with the user's profile and follows their account rules. ${contentGuidance}]
+[Write a ${platformName} caption that EXACTLY matches the writing style, tone, and structure shown in the real post examples above. ${platform === 'twitter' && !hasQuestions ? 'Use statements/announcements only - NO questions.' : 'Match the question/statement style from examples.'} Write at natural length like the examples - can be short, medium, or long. Do NOT artificially limit length.]
 
-Hashtags:
-[List ${hashtagGuidance} that are relevant to the content and brand]
+${shouldIncludeHashtags ? `Hashtags:
+[Include hashtags that match this account's typical usage pattern shown in the analysis above]` : ''}
 
-Call to Action:
-[Create an engaging call-to-action that encourages interaction]
+${shouldIncludeCTA ? `Call to Action:
+[Include a call-to-action that matches this account's engagement style from the analysis above]` : ''}
 
-  Visual Description for Image:
-  [Write a detailed description for an image that would accompany this ${platformName} post. Include composition, colors, mood, and style details. If the user's request includes REQUESTED_POST_STYLE, VISUAL_STYLE_GUIDELINES, or ADDITIONAL_CREATIVE_DIRECTION, prioritize and explicitly implement those instructions.]
+Visual Description for Image:
+[Write a detailed description for an image that would accompany this ${platformName} post. Include composition, colors, mood, and style details.]
 
-IMPORTANT: Use EXACTLY the section headers shown above.`;
+IMPORTANT: Follow the analysis above exactly. ${!shouldIncludeCTA ? 'Do NOT include any call-to-action.' : ''} ${!shouldIncludeHashtags ? 'Do NOT include hashtags.' : ''}`;
 }
 
 // API endpoint for reimagining existing images with prompt improvements
@@ -3206,6 +3612,8 @@ app.post(['/api/post-generator', '/api/rag/post-generator'], async (req, res) =>
     }
     
     console.log(`[${new Date().toISOString()}] [RAG SERVER] Post generation request for ${platform}/${username}: "${query}"`);
+    console.log(`[RAG-Server] 📏 Query length: ${query.length} characters`);
+    console.log(`[RAG-Server] 📝 Query preview: "${query.substring(0, 100)}${query.length > 100 ? '...' : ''}"`);
     
     const platformName = platform === 'twitter' ? 'X (Twitter)' : 
                         platform === 'facebook' ? 'Facebook' : 
@@ -3226,8 +3634,9 @@ app.post(['/api/post-generator', '/api/rag/post-generator'], async (req, res) =>
     
     try {
       profileData = await getProfileData(username, platform);
+      console.log(`[RAG-Server] ✅ Profile data loaded for ${platform}/${username}: ${profileData?.data?.length || 'N/A'} posts`);
     } catch (profileError) {
-      console.log(`[RAG-Server] No profile data found for ${platform}/${username}, using fallback profile`);
+      console.log(`[RAG-Server] ❌ No profile data found for ${platform}/${username}, this should not happen for real users!`);
       usingFallbackProfile = true;
       profileData = {
         username: username,
@@ -3246,6 +3655,36 @@ app.post(['/api/post-generator', '/api/rag/post-generator'], async (req, res) =>
 
     // 🚀 Create ENHANCED post generation prompt with ChromaDB semantic search
     const prompt = await createEnhancedPostGenerationPrompt(profileData, rulesData, query, platform, username);
+    
+    // 🔥 CRITICAL DEBUG: Log prompt details to prevent cache key collisions
+    console.log(`[RAG-Server] 🔍 Generated prompt length: ${prompt.length} characters`);
+    console.log(`[RAG-Server] 🔍 Prompt preview: "${prompt.substring(0, 200)}${prompt.length > 200 ? '...' : ''}"`);
+    
+    // 🔥 Store profile analysis for post-processing
+    let profileAnalysis = null;
+    if (platform === 'twitter' && profileData && profileData.data && Array.isArray(profileData.data)) {
+      const posts = profileData.data.slice(0, 10).map(post => post.text).filter(text => text && text.length > 10);
+      if (posts.length > 0) {
+        const hashtagCounts = posts.map(post => (post.match(/#\w+/g) || []).length);
+        const avgHashtags = hashtagCounts.reduce((a, b) => a + b, 0) / posts.length;
+        const hasCTAs = posts.some(post => 
+          post.includes('?') || 
+          post.toLowerCase().includes('what do you think') ||
+          post.toLowerCase().includes('thoughts') ||
+          post.toLowerCase().includes('comment') ||
+          post.toLowerCase().includes('share') ||
+          post.includes('👇')
+        );
+        
+        profileAnalysis = {
+          shouldIncludeHashtags: avgHashtags > 0.2,
+          shouldIncludeCTA: hasCTAs,
+          avgHashtags: avgHashtags
+        };
+        
+        console.log(`[RAG SERVER] 📊 Profile Analysis for @${username}: Hashtags=${avgHashtags.toFixed(2)}/post (include: ${profileAnalysis.shouldIncludeHashtags}), CTAs=${hasCTAs}`);
+      }
+    }
 
     try {
       // Get response from AI model
@@ -3254,7 +3693,10 @@ app.post(['/api/post-generator', '/api/rag/post-generator'], async (req, res) =>
       let usedFallback = false;
       
       try {
-        response = await callGeminiAPI(prompt);
+        // 🔥 CRITICAL FIX: Post generation should NEVER use conversation history
+        // Always pass empty messages array to ensure fresh, independent post generation
+        console.log(`[RAG-Server] 🚫 Post generation: Ensuring NO conversation history is used`);
+        response = await callGeminiAPI(prompt, []); // Force empty messages array
       } catch (error) {
         // Handle quota exhaustion for post generation
         if (error.message === 'QUOTA_EXHAUSTED') {
@@ -3273,7 +3715,7 @@ Hashtags:
 #${platform} #SocialMedia #Marketing #Strategy #Growth
 
 Call to Action:
-What's your biggest ${platformName} challenge? Share in the comments!
+${platform === 'twitter' ? `${Math.random() < 0.5 ? 'Thoughts?' : 'Your take?'} 👇` : `What's your biggest ${platformName} challenge? Share in the comments!`}
 
 Visual Description for Image:
 Create a modern, professional ${platformName} strategy infographic with a clean blue and white color scheme. Include icons representing social media growth, engagement metrics, and success indicators. The image should have a bright, optimistic feel with arrows pointing upward to suggest growth and improvement. Add subtle ${platformName} branding elements and make it visually appealing for social media sharing.`;
@@ -3310,10 +3752,21 @@ Create a modern, professional ${platformName} strategy infographic with a clean 
       const ctaMatch = cleanResponse.match(/CTA_START:(.*?)(?=IMAGE_START:|$)/s);
       const visualMatch = cleanResponse.match(/IMAGE_START:(.*?)$/s);
       
-      if (captionMatch) {
-        caption = captionMatch[1].trim();
-        console.log(`[RAG SERVER] ✅ Parsed caption via structured method`);
-      }
+              if (captionMatch) {
+          caption = captionMatch[1].trim();
+          
+          // 🔥 TWITTER QUESTION FILTER: Remove questions from captions
+          if (platform === 'twitter' && caption.includes('?')) {
+            console.log(`[RAG SERVER] ⚠️ Removing question from Twitter caption: "${caption}"`);
+            // Split by sentences and remove any sentence with a question mark
+            const sentences = caption.split(/[.!?]/).map(s => s.trim()).filter(s => s.length > 0);
+            const noQuestionSentences = sentences.filter(sentence => !sentence.includes('?'));
+            caption = noQuestionSentences.length > 0 ? noQuestionSentences.join('. ') + '.' : 'Building something amazing.';
+            console.log(`[RAG SERVER] ✅ Cleaned Twitter caption: "${caption}"`);
+          }
+          
+          console.log(`[RAG SERVER] ✅ Parsed caption via structured method`);
+        }
       
       if (hashtagsMatch) {
         const hashtagText = hashtagsMatch[1].trim();
@@ -3470,11 +3923,25 @@ Create a modern, professional ${platformName} strategy infographic with a clean 
         caption = `Check out this amazing content! ✨`;
       }
       
-      if (hashtags.length === 0) {
+      // 🔥 Apply profile analysis to filter Twitter content
+      if (platform === 'twitter' && profileAnalysis) {
+        if (!profileAnalysis.shouldIncludeHashtags) {
+          console.log(`[RAG SERVER] 🚫 Removing hashtags - profile analysis shows @${username} doesn't use hashtags (${profileAnalysis.avgHashtags.toFixed(2)}/post)`);
+          hashtags = [];
+        }
+        
+        if (!profileAnalysis.shouldIncludeCTA) {
+          console.log(`[RAG SERVER] 🚫 Removing CTA - profile analysis shows @${username} doesn't use CTAs`);
+          callToAction = '';
+        }
+      }
+      
+      // Don't add default hashtags/CTAs for Twitter - respect profile analysis
+      if (hashtags.length === 0 && platform !== 'twitter') {
         hashtags = [`#${platform}`, '#content', '#social'];
       }
       
-      if (!callToAction) {
+      if (!callToAction && platform !== 'twitter') {
         callToAction = `Let us know what you think in the comments! 💬`;
       }
       

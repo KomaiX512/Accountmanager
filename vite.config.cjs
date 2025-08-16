@@ -1,0 +1,45 @@
+const { defineConfig } = require('vite')
+const react = require('@vitejs/plugin-react-swc')
+
+// https://vitejs.dev/config/
+module.exports = defineConfig({
+  plugins: [react()],
+  server: {
+    port: 5173,
+    host: '127.0.0.1',
+    proxy: {
+      // Proxy R2 image endpoints to the proxy server (port 3002)
+      '/api/r2-image': {
+        target: 'http://127.0.0.1:3002',
+        changeOrigin: true,
+        secure: false
+      },
+      // Proxy all other /api/* requests to the main server
+      '/api': {
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+        secure: false
+      },
+      // Proxy webhook routes
+      '/webhook': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false
+      },
+      // Proxy events for SSE
+      '/events': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false
+      }
+    }
+  },
+  build: {
+    outDir: 'dist',
+    sourcemap: true
+  },
+  define: {
+    // Expose environment variables to the client
+    'process.env': {}
+  }
+})

@@ -27,6 +27,20 @@
   overflow-y: auto !important;
 }
 
+/* Mobile-specific modal overlay fixes */
+@media (max-width: 768px) {
+  .popup-overlay,
+  .modal-overlay,
+  .insights-modal-overlay,
+  .canvas-editor-overlay,
+  .messages-popup-overlay,
+  .twitter-compose-overlay,
+  .profile-popup-overlay {
+    touch-action: pan-y !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+}
+
 /* CHAT MODAL SPECIFIC OVERRIDES - MAXIMIZED DESIGN */
 .chat-modal-overlay {
   position: fixed !important;

@@ -1,6 +1,0 @@
-data: {"type":"connection","message":"Connected to events for 612940588580162","timestamp":1749662265123,"connectionId":"75542796-0a2f-4245-b4d8-53fcdd375458"}
-
-data: {"event":"facebook_message","data":{"type":"message","platform":"facebook","page_id":"612940588580162","facebook_page_id":"612940588580162","sender_id":"BATTLE_USER_789","message_id":"battle_dm_real_time_001","text":"⚡ REAL-TIME BATTLE TEST DM - should appear instantly!","timestamp":1749663300,"received_at":"2025-06-11T17:17:54.488Z","username":"Unknown User","status":"pending"},"timestamp":1749662276370}
-
-data: {"type":"heartbeat","timestamp":1749662277477}
-

@@ -75,7 +75,19 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const loadingCheckRef = useRef(false);
   const { processingState } = useProcessing();
 
-
+  // 🔒 PLATFORM SWITCH EVENT DISPATCHER: Ensure News4U components refresh
+  useEffect(() => {
+    // Dispatch platform switch event when component mounts or platform changes
+    const platformSwitchEvent = new CustomEvent('platformDashboardSwitch', {
+      detail: {
+        platform,
+        accountHolder,
+        timestamp: Date.now()
+      }
+    });
+    window.dispatchEvent(platformSwitchEvent);
+    console.log(`[PlatformDashboard] 🔄 Dispatched platform switch event for ${platform} - ${accountHolder}`);
+  }, [platform, accountHolder]);
 
   // ALL CONTEXT HOOKS MUST BE CALLED FIRST - Rules of Hooks
   const { currentUser } = useAuth();

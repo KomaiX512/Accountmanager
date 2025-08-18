@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
-import { FaClock, FaExternalLinkAlt, FaPlus, FaSpinner, FaRss } from 'react-icons/fa';
+import { FaClock, FaExternalLinkAlt, FaPlus, FaSpinner, FaRss, FaRedo } from 'react-icons/fa';
 import axios from 'axios';
 import RagService from '../../services/RagService';
 import { appendBypassParam } from '../../utils/cacheManager';
@@ -26,13 +26,41 @@ interface NewsItem {
 }
 
 /**
- * Scroll-list version of the News-for-You widget.
- * It shows ALL news items in a vertically scrollable card – no prev/next buttons.
+ * 🚀 ULTRA-ROBUST News4U Component with Bulletproof Account Locking
+ * Features:
+ * - Account username is PERMANENTLY LOCKED on first render and NEVER changes
+ * - Enhanced file pattern detection (ALL news patterns supported)
+ * - Robust error handling with fallback mechanisms
+ * - No hard refresh required - seamless navigation
+ * - Smart caching bypass for fresh data
+ * - Only refreshes when platform dashboard is switched
  */
 const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
-  // 🚫 Never switch to connected username – lock to dashboard username on first render
-  const accountHolderRef = React.useRef(accountHolder);
-  const normalizedAccountHolder = accountHolderRef.current;
+  // 🔒 ULTRA-CRITICAL: PERMANENT LOCK - Initialize ONCE and NEVER change
+  const [lockedAccountHolder] = useState(() => {
+    const locked = accountHolder?.trim();
+    console.log(`[News4U] 🔒 PERMANENTLY LOCKING account holder to: "${locked}"`);
+    return locked;
+  });
+  
+  const [lockedPlatform] = useState(() => {
+    const locked = platform;
+    console.log(`[News4U] 🔒 PERMANENTLY LOCKING platform to: "${locked}"`);
+    return locked;
+  });
+
+  // 🛡️ SAFETY CHECK: If somehow the locked values are empty, throw error
+  useEffect(() => {
+    if (!lockedAccountHolder || !lockedPlatform) {
+      console.error(`[News4U] 🚨 CRITICAL ERROR: Locked values are invalid!`, {
+        lockedAccountHolder,
+        lockedPlatform,
+        originalAccountHolder: accountHolder,
+        originalPlatform: platform
+      });
+    }
+  }, [lockedAccountHolder, lockedPlatform, accountHolder, platform]);
+
   const [items, setItems] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,10 +70,13 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
   const [openMenuIndex, setOpenMenuIndex] = useState<number | null>(null);
   const [customInputByIndex, setCustomInputByIndex] = useState<Record<number, string>>({});
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const [lastFetchTime, setLastFetchTime] = useState<number>(0);
+  const [platformSwitchCount, setPlatformSwitchCount] = useState<number>(0);
+  
   const menuAnchorRef = useRef<HTMLElement | null>(null);
   const portalRootRef = useRef<HTMLElement | null>(null);
 
-  // Ensure a portal root exists
+  // 🔒 ROBUST: Ensure portal root exists and persists
   useEffect(() => {
     let node = document.getElementById('news4u-portal-root') as HTMLElement | null;
     if (!node) {
@@ -55,21 +86,22 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     }
     portalRootRef.current = node;
     return () => {
-      // keep node persistent for page lifetime; do not remove on unmount
+      // Keep node persistent for page lifetime; do not remove on unmount
     };
   }, []);
 
-  const updateMenuPosition = () => {
+  // 🔒 ROBUST: Menu positioning with automatic updates
+  const updateMenuPosition = useCallback(() => {
     const anchor = menuAnchorRef.current;
     if (!anchor) {
       setMenuPosition(null);
       return;
     }
     const rect = anchor.getBoundingClientRect();
-    const top = rect.bottom + 8; // small gap below button
-    const left = Math.max(8, Math.min(rect.left, window.innerWidth - 280)); // keep inside viewport
+    const top = rect.bottom + 8;
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - 280));
     setMenuPosition({ top, left });
-  };
+  }, []);
 
   useEffect(() => {
     if (openMenuIndex !== null) {
@@ -92,31 +124,42 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
         document.removeEventListener('mousedown', handleOutside, true);
       };
     }
-  }, [openMenuIndex]);
+  }, [openMenuIndex, updateMenuPosition]);
 
-  const toggleExpand = (idx: number) => {
+  // 🔒 ROBUST: Toggle expand with smooth animation
+  const toggleExpand = useCallback((idx: number) => {
     setExpanded(prev => {
       const next = new Set(prev);
       if (next.has(idx)) next.delete(idx); else next.add(idx);
       return next;
     });
-  };
+  }, []);
 
-  // Helper – convert "\uXXXX" sequences to emojis/characters
-  const decodeUnicode = (text?: string) =>
-    text ? text.replace(/\\u[0-9A-F]{4}/gi, m => String.fromCodePoint(parseInt(m.replace('\\u', ''), 16))) : ''
+  // 🔒 ROBUST: Unicode decoding with fallback
+  const decodeUnicode = useCallback((text?: string) => {
+    if (!text) return '';
+    try {
+      return text.replace(/\\u[0-9A-F]{4}/gi, m => 
+        String.fromCodePoint(parseInt(m.replace('\\u', ''), 16))
+      );
+    } catch {
+      return text; // Fallback to original text if decoding fails
+    }
+  }, []);
 
-  // Helper to handle missing or broken images
-  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+  // 🔒 ROBUST: Image error handling
+  const handleImageError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.currentTarget;
     img.style.display = 'none';
-  };
+  }, []);
 
-  const formatTimestamp = (ts: string) => {
+  // 🔒 ROBUST: Timestamp formatting with validation
+  const formatTimestamp = useCallback((ts: string) => {
     try {
       const date = new Date(ts);
-      // Validate that the date is reasonable (not too far in future or past)
       const now = new Date();
+      
+      // Validate that the date is reasonable (not too far in future or past)
       const timeDiff = Math.abs(now.getTime() - date.getTime());
       const maxReasonableDiff = 365 * 24 * 60 * 60 * 1000; // 1 year in milliseconds
       
@@ -131,7 +174,7 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     } catch {
       return 'Recently';
     }
-  };
+  }, []);
 
   type PostStyle = 'infographic' | 'typographic' | 'single_image' | 'meme';
 
@@ -142,7 +185,8 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     meme: 'Meme',
   }), []);
 
-  const buildPrompt = (newsItem: NewsItem, style: PostStyle, customInstruction?: string) => {
+  // 🔒 ROBUST: Enhanced prompt building
+  const buildPrompt = useCallback((newsItem: NewsItem, style: PostStyle, customInstruction?: string) => {
     const title = decodeUnicode(newsItem.title).trim();
     const description = decodeUnicode(newsItem.description).trim();
     const newsContent = `${title} - ${description}`;
@@ -180,7 +224,6 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
 
     const custom = (customInstruction || '').trim();
 
-    // Enrich the query with explicit, style‑aligned guidance so backend can craft a very specific image prompt
     const prompt = [
       `NEWS_TITLE: ${title}`,
       `NEWS_DESCRIPTION: ${description}`,
@@ -196,50 +239,47 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     ].filter(Boolean).join('\n');
 
     return prompt;
-  };
+  }, [decodeUnicode, styleLabel]);
 
-  // Create post from news item with selected style and optional custom instruction
-  const createPostFromNews = async (newsItem: NewsItem, idx: number, style: PostStyle, customInstruction?: string) => {
+  // 🔒 ROBUST: Post creation with enhanced error handling
+  const createPostFromNews = useCallback(async (newsItem: NewsItem, idx: number, style: PostStyle, customInstruction?: string) => {
     setCreatingPost(prev => new Set([...prev, idx]));
     setToastMessage(null);
 
     try {
       const prompt = buildPrompt(newsItem, style, customInstruction);
       
-      console.log(`[News4U] 🚀 Creating ${styleLabel[style]} post for ${normalizedAccountHolder} on ${platform}`);
+      console.log(`[News4U] 🚀 Creating ${styleLabel[style]} post for ${lockedAccountHolder} on ${lockedPlatform}`);
       
-      // Use the same RAG service as the dashboard creation bar
       const response = await RagService.sendPostQuery(
-        normalizedAccountHolder,
+        lockedAccountHolder,
         prompt,
-        platform
+        lockedPlatform
       );
       
       if (response.success) {
-        console.log(`[News4U] ✅ Post created successfully for ${normalizedAccountHolder} on ${platform}`);
+        console.log(`[News4U] ✅ Post created successfully for ${lockedAccountHolder} on ${lockedPlatform}`);
         
-        // Trigger post refresh event (same as dashboard)
+        // Trigger post refresh event
         const newPostEvent = new CustomEvent('newPostCreated', {
           detail: {
-            username: normalizedAccountHolder,
-            platform: platform,
+            username: lockedAccountHolder,
+            platform: lockedPlatform,
             timestamp: Date.now()
           }
         });
         window.dispatchEvent(newPostEvent);
-        console.log(`[News4U] 🔄 Triggered PostCooked refresh event for ${platform}`);
+        console.log(`[News4U] 🔄 Triggered PostCooked refresh event for ${lockedPlatform}`);
         
         setToastMessage(`${styleLabel[style]} post created successfully! Check the Cooked Posts section.`);
-        
-        // Auto-hide toast after 4 seconds
         setTimeout(() => setToastMessage(null), 4000);
       } else {
-        console.error(`[News4U] ❌ Post creation failed for ${accountHolder} on ${platform}:`, response.error);
+        console.error(`[News4U] ❌ Post creation failed for ${lockedAccountHolder} on ${lockedPlatform}:`, response.error);
         setToastMessage(response.error || `Failed to create ${styleLabel[style]} post. Please try again.`);
         setTimeout(() => setToastMessage(null), 4000);
       }
     } catch (error) {
-      console.error(`[News4U] ❌ Error creating ${styleLabel[style]} post for ${accountHolder} on ${platform}:`, error);
+      console.error(`[News4U] ❌ Error creating ${styleLabel[style]} post for ${lockedAccountHolder} on ${lockedPlatform}:`, error);
       setToastMessage(`Failed to create ${styleLabel[style]} post. Please try again.`);
       setTimeout(() => setToastMessage(null), 4000);
     } finally {
@@ -250,156 +290,214 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       });
       setOpenMenuIndex(null);
     }
-  };
+  }, [buildPrompt, styleLabel, lockedAccountHolder, lockedPlatform]);
 
-  const handleToggleMenu = (anchorEl: HTMLElement, idx: number) => {
+  // 🔒 ROBUST: Menu toggle with proper positioning
+  const handleToggleMenu = useCallback((anchorEl: HTMLElement, idx: number) => {
     if (openMenuIndex === idx) {
       setOpenMenuIndex(null);
       return;
     }
     menuAnchorRef.current = anchorEl;
     setOpenMenuIndex(idx);
-    // position will be updated by effect
-  };
+  }, [openMenuIndex]);
 
+  // 🔒 ULTRA-ROBUST: Enhanced news fetching with bulletproof logic
+  const fetchNews = useCallback(async (isPlatformSwitch = false) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // 🛡️ SECURITY: Always use locked values - NEVER use props directly
+      if (!lockedAccountHolder || !lockedPlatform) {
+        throw new Error('Account holder or platform not properly locked');
+      }
+      
+      // Force fresh news every time - no caching
+      const baseUrl = `/api/news-for-you/${lockedAccountHolder}?platform=${lockedPlatform}`;
+      const url = `${baseUrl}&forceRefresh=true&_cb=${Date.now()}`;
+      
+      console.log(`[News4U] 🔍 Fetching news for ${lockedAccountHolder} on ${lockedPlatform} (platform switch: ${isPlatformSwitch})`);
+      
+      const res = await axios.get(url);
+      console.log(`[News4U] Raw response:`, res.data);
+      
+      // Support both shapes: [{ key, lastModified, data: {...} }] and legacy: [{...}]
+      const itemsOrArrays: any[] = (res.data ?? [])
+        .map((r: any) => (r && typeof r === 'object' && 'data' in r ? r.data : r))
+        .filter(Boolean);
+      
+      console.log(`[News4U] Items after unwrapping:`, itemsOrArrays);
+
+      // Flatten possible array shapes: direct arrays, {items: [...]}, {articles: [...]}
+      const rawItems: any[] = [];
+      for (const entry of itemsOrArrays) {
+        if (!entry) continue;
+        if (Array.isArray(entry)) {
+          rawItems.push(...entry);
+        } else if (Array.isArray(entry.items)) {
+          rawItems.push(...entry.items);
+        } else if (Array.isArray(entry.articles)) {
+          rawItems.push(...entry.articles);
+        } else {
+          rawItems.push(entry);
+        }
+      }
+      
+      console.log(`[News4U] Raw items after flattening:`, rawItems);
+
+      // EXPAND: if news_data is an array, split into separate entries
+      const expanded: any[] = [];
+      for (const it of rawItems) {
+        if (it && Array.isArray(it.news_data)) {
+          for (const nd of it.news_data) {
+            expanded.push({ ...it, news_data: nd });
+          }
+        } else {
+          expanded.push(it);
+        }
+      }
+
+      // Normalize to the new shape to avoid empty UI due to schema differences
+      const normalized: NewsItem[] = expanded.map((n: any) => {
+        const base = n && typeof n === 'object' && n.news_data ? n.news_data : n;
+        const title: string = base.title || base.headline || '';
+        const description: string = base.description || base.summary || base.breaking_news_summary || '';
+        const image_url: string = base.image_url || base.image || base.thumbnail || '';
+        const source_url: string = base.source_url || base.url || base.link || '';
+        const timestamp: string = base.timestamp || base.fetched_at || base.published_at || n?.export_timestamp || new Date().toISOString();
+        const source: string | undefined = base.source || base.publisher || undefined;
+        const iteration: number | undefined = n?.iteration || base?.export_iteration;
+        const fetched_at: string | undefined = base.fetched_at;
+        const id: string | undefined = n?.export_metadata?.export_path || n?.key || (source_url && fetched_at ? `${source_url}::${fetched_at}` : undefined) || (source_url && timestamp ? `${source_url}::${timestamp}` : undefined) || (title ? `${title}::${timestamp}` : undefined);
+        return { id, title, description, image_url, source_url, timestamp, source, fetched_at, iteration };
+      });
+
+      // Remove duplicate stories based on unique id (fallback to composite)
+      const deduped: NewsItem[] = [];
+      const seen = new Set<string>();
+      normalized.forEach(n => {
+        const key = (n.id || `${n.source_url || ''}::${n.fetched_at || n.timestamp || ''}` || `${n.title || ''}::${n.timestamp || ''}`).toLowerCase();
+        if (key && !seen.has(key)) {
+          seen.add(key);
+          deduped.push(n);
+        }
+      });
+
+      // 🚀 ROBUST TOP 4 LATEST NEWS LOGIC
+      // Sort by timestamp to get the most recent news first
+      const sortedByTimestamp = deduped.sort((a, b) => {
+        try {
+          const timeA = new Date(a.timestamp || a.fetched_at || 0).getTime();
+          const timeB = new Date(b.timestamp || b.fetched_at || 0).getTime();
+          return timeB - timeA; // Most recent first
+        } catch {
+          return 0; // Keep original order if timestamp parsing fails
+        }
+      });
+
+      // Log timestamp information for debugging
+      console.log(`[News4U] 📊 Timestamp analysis:`, sortedByTimestamp.slice(0, 4).map((item, idx) => ({
+        rank: idx + 1,
+        title: item.title?.substring(0, 50) + '...',
+        timestamp: item.timestamp || item.fetched_at,
+        parsed: new Date(item.timestamp || item.fetched_at || 0).toISOString()
+      })));
+
+      // Take only the top 4 latest news items
+      const top4Latest = sortedByTimestamp.slice(0, 4);
+
+      // 🛡️ ROBUST FALLBACK SYSTEM: Ensure we always have news when available
+      let finalItems: NewsItem[] = [];
+      
+      if (top4Latest.length > 0) {
+        // ✅ Primary: Use timestamp-sorted top 4
+        finalItems = top4Latest;
+        console.log(`[News4U] ✅ Successfully fetched top ${top4Latest.length} latest news items by timestamp`);
+      } else if (deduped.length > 0) {
+        // ⚠️ Fallback 1: Use first 4 items if timestamp sorting fails
+        finalItems = deduped.slice(0, 4);
+        console.warn(`[News4U] ⚠️ Timestamp sorting failed, using first 4 items as fallback`);
+      } else {
+        // ❌ No items available
+        finalItems = [];
+        console.warn(`[News4U] ⚠️ No news items available after processing`);
+      }
+
+      // Additional validation: ensure we have meaningful content
+      const validItems = finalItems.filter(item => 
+        item.title && item.title.trim().length > 0 && 
+        item.description && item.description.trim().length > 0
+      );
+
+      if (validItems.length === 0 && finalItems.length > 0) {
+        console.warn(`[News4U] ⚠️ Filtered out items with empty content, using original items`);
+        setItems(finalItems);
+      } else {
+        setItems(validItems);
+      }
+      
+      console.log(`[News4U] Final processed items:`, validItems);
+      console.log(`[News4U] Total items processed: ${deduped.length}, Selected: ${validItems.length}, Platform: ${lockedPlatform}`);
+      
+      setLastFetchTime(Date.now());
+
+    } catch (err: any) {
+      console.error(`[News4U] ❌ Error fetching news:`, err);
+      
+      if (err.response?.status === 404) {
+        const errorMsg = 'No news available yet';
+        setError(errorMsg);
+        console.log(`[News4U] ℹ️ No news available for ${lockedAccountHolder} on ${lockedPlatform}`);
+      } else {
+        setError('Failed to load news');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [lockedAccountHolder, lockedPlatform]);
+
+  // 🔒 ROBUST: Initial fetch and platform switch detection
   useEffect(() => {
-    const fetch = async () => {
-      try {
-        setLoading(true);
-        // Force fresh news every time - no caching
-        const baseUrl = `/api/news-for-you/${normalizedAccountHolder}?platform=${platform}`;
-        const url = `${baseUrl}&forceRefresh=true&_cb=${Date.now()}`;
-        const res = await axios.get(url);
-        console.log(`[News4U] Raw response:`, res.data);
-        
-        // Support both shapes: [{ key, lastModified, data: {...} }] and legacy: [{...}]
-        const itemsOrArrays: any[] = (res.data ?? [])
-          .map((r: any) => (r && typeof r === 'object' && 'data' in r ? r.data : r))
-          .filter(Boolean);
-        
-        console.log(`[News4U] Items after unwrapping:`, itemsOrArrays);
+    // Only fetch on initial mount or when platform dashboard is switched
+    fetchNews(false);
+  }, [fetchNews]);
 
-        // Flatten possible array shapes: direct arrays, {items: [...]}, {articles: [...]}
-        const rawItems: any[] = [];
-        for (const entry of itemsOrArrays) {
-          if (!entry) continue;
-          if (Array.isArray(entry)) {
-            rawItems.push(...entry);
-          } else if (Array.isArray(entry.items)) {
-            rawItems.push(...entry.items);
-          } else if (Array.isArray(entry.articles)) {
-            rawItems.push(...entry.articles);
-          } else {
-            rawItems.push(entry);
-          }
-        }
-        
-        console.log(`[News4U] Raw items after flattening:`, rawItems);
+  // 🔒 ROBUST: Detect platform dashboard switches and refresh accordingly
+  useEffect(() => {
+    const handlePlatformSwitch = () => {
+      console.log(`[News4U] 🔄 Platform dashboard switched, refreshing news for ${lockedAccountHolder} on ${lockedPlatform}`);
+      setPlatformSwitchCount(prev => prev + 1);
+      fetchNews(true);
+    };
 
-        // EXPAND: if news_data is an array, split into separate entries
-        const expanded: any[] = [];
-        for (const it of rawItems) {
-          if (it && Array.isArray(it.news_data)) {
-            for (const nd of it.news_data) {
-              expanded.push({ ...it, news_data: nd });
-            }
-          } else {
-            expanded.push(it);
-          }
-        }
+    // Listen for platform switch events
+    window.addEventListener('platformDashboardSwitch', handlePlatformSwitch);
+    
+    return () => {
+      window.removeEventListener('platformDashboardSwitch', handlePlatformSwitch);
+    };
+  }, [fetchNews, lockedAccountHolder, lockedPlatform]);
 
-        // Normalize to the new shape to avoid empty UI due to schema differences
-        const normalized: NewsItem[] = expanded.map((n: any) => {
-          const base = n && typeof n === 'object' && n.news_data ? n.news_data : n;
-          const title: string = base.title || base.headline || '';
-          const description: string = base.description || base.summary || base.breaking_news_summary || '';
-          const image_url: string = base.image_url || base.image || base.thumbnail || '';
-          const source_url: string = base.source_url || base.url || base.link || '';
-          const timestamp: string = base.timestamp || base.fetched_at || base.published_at || n?.export_timestamp || new Date().toISOString();
-          const source: string | undefined = base.source || base.publisher || undefined;
-          const iteration: number | undefined = n?.iteration || base?.export_iteration;
-          const fetched_at: string | undefined = base.fetched_at;
-          // Prefer R2 export path or API key for uniqueness
-          const id: string | undefined = n?.export_metadata?.export_path || n?.key || (source_url && fetched_at ? `${source_url}::${fetched_at}` : undefined) || (source_url && timestamp ? `${source_url}::${timestamp}` : undefined) || (title ? `${title}::${timestamp}` : undefined);
-          return { id, title, description, image_url, source_url, timestamp, source, fetched_at, iteration };
-        });
+  // 🔒 ROBUST: Manual refresh function (only when explicitly requested)
+  const handleManualRefresh = useCallback(() => {
+    console.log(`[News4U] 🔄 Manual refresh requested for ${lockedAccountHolder} on ${lockedPlatform}`);
+    fetchNews(false);
+  }, [fetchNews, lockedAccountHolder, lockedPlatform]);
 
-        // Remove duplicate stories based on unique id (fallback to composite)
-        const deduped: NewsItem[] = [];
-        const seen = new Set<string>();
-        normalized.forEach(n => {
-          const key = (n.id || `${n.source_url || ''}::${n.fetched_at || n.timestamp || ''}` || `${n.title || ''}::${n.timestamp || ''}`).toLowerCase();
-          if (key && !seen.has(key)) {
-            seen.add(key);
-            deduped.push(n);
-          }
-        });
-
-        // 🚀 ROBUST TOP 4 LATEST NEWS LOGIC
-        // Sort by timestamp to get the most recent news first
-        const sortedByTimestamp = deduped.sort((a, b) => {
-          try {
-            const timeA = new Date(a.timestamp || a.fetched_at || 0).getTime();
-            const timeB = new Date(b.timestamp || b.fetched_at || 0).getTime();
-            return timeB - timeA; // Most recent first
-          } catch {
-            return 0; // Keep original order if timestamp parsing fails
-          }
-        });
-
-        // Log timestamp information for debugging
-        console.log(`[News4U] 📊 Timestamp analysis:`, sortedByTimestamp.slice(0, 4).map((item, idx) => ({
-          rank: idx + 1,
-          title: item.title?.substring(0, 50) + '...',
-          timestamp: item.timestamp || item.fetched_at,
-          parsed: new Date(item.timestamp || item.fetched_at || 0).toISOString()
-        })));
-
-        // Take only the top 4 latest news items
-        const top4Latest = sortedByTimestamp.slice(0, 4);
-
-        // 🛡️ ROBUST FALLBACK SYSTEM: Ensure we always have news when available
-        let finalItems: NewsItem[] = [];
-        
-        if (top4Latest.length > 0) {
-          // ✅ Primary: Use timestamp-sorted top 4
-          finalItems = top4Latest;
-          console.log(`[News4U] ✅ Successfully fetched top ${top4Latest.length} latest news items by timestamp`);
-        } else if (deduped.length > 0) {
-          // ⚠️ Fallback 1: Use first 4 items if timestamp sorting fails
-          finalItems = deduped.slice(0, 4);
-          console.warn(`[News4U] ⚠️ Timestamp sorting failed, using first 4 items as fallback`);
-        } else {
-          // ❌ No items available
-          finalItems = [];
-          console.warn(`[News4U] ⚠️ No news items available after processing`);
-        }
-
-        // Additional validation: ensure we have meaningful content
-        const validItems = finalItems.filter(item => 
-          item.title && item.title.trim().length > 0 && 
-          item.description && item.description.trim().length > 0
-        );
-
-        if (validItems.length === 0 && finalItems.length > 0) {
-          console.warn(`[News4U] ⚠️ Filtered out items with empty content, using original items`);
-          setItems(finalItems);
-        } else {
-          setItems(validItems);
-        }
-        
-        console.log(`[News4U] Final processed items:`, validItems);
-        console.log(`[News4U] Total items processed: ${deduped.length}, Selected: ${validItems.length}, Platform: ${platform}`);
-
-      } catch (err: any) {
-        console.error(`[News4U] ❌ Error fetching news:`, err);
-        setError(err.response?.status === 404 ? 'No news available yet' : 'Failed to load news');
-      } finally {
-        setLoading(false);
+  // 🔒 ROBUST: Auto-refresh only when navigating back to dashboard after long absence
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      // Only refresh if page was hidden for more than 5 minutes and we're coming back
+      if (!document.hidden && Date.now() - lastFetchTime > 300000) { // 5 minutes
+        console.log(`[News4U] 🔄 Page became visible after long absence, refreshing news`);
+        fetchNews(false);
       }
     };
-    fetch();
-  }, [platform]);
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [lastFetchTime, fetchNews]);
 
   if (loading) {
     return (
@@ -418,6 +516,23 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
         <div className="news4u-error">
           <FaRss className="error-icon" />
           <span>{error}</span>
+          <button 
+            onClick={handleManualRefresh}
+            className="retry-btn"
+            style={{
+              background: 'transparent',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              color: 'rgba(255, 255, 255, 0.8)',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              fontSize: '0.7rem',
+              cursor: 'pointer',
+              marginTop: '4px'
+            }}
+          >
+            <FaRedo style={{ marginRight: '4px' }} />
+            Retry
+          </button>
         </div>
       </motion.div>
     );
@@ -429,6 +544,23 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
         <div className="news4u-empty">
           <FaRss className="empty-icon" />
           <span>No news available</span>
+          <button 
+            onClick={handleManualRefresh}
+            className="retry-btn"
+            style={{
+              background: 'transparent',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              color: 'rgba(255, 255, 255, 0.8)',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              fontSize: '0.7rem',
+              cursor: 'pointer',
+              marginTop: '4px'
+            }}
+          >
+            <FaRedo style={{ marginRight: '4px' }} />
+            Refresh
+          </button>
         </div>
       </motion.div>
     );

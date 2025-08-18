@@ -11,7 +11,7 @@ import FacebookRequiredButton from '../common/FacebookRequiredButton';
 import { useInstagram } from '../../context/InstagramContext';
 import { useTwitter } from '../../context/TwitterContext';
 import { useFacebook } from '../../context/FacebookContext';
-import { schedulePost, fetchImageFromR2, extractImageKey } from '../../utils/scheduleHelpers';
+import { schedulePost, fetchImageFromR2 } from '../../utils/scheduleHelpers';
 import axios from 'axios';
 import { safeFilter } from '../../utils/safeArrayUtils';
 import { BsLightbulb } from 'react-icons/bs';
@@ -42,8 +42,6 @@ interface ImageErrorState {
 // An empty string forces every fetch to be relative to window.location.origin.
 const API_BASE_URL = '';
 
-// Debug flag - set to true to enable verbose logging
-const DEBUG_LOGGING = false;
 
 const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts = [], userId: propUserId, platform = 'instagram' }) => {
   const { isConnected: isInstagramConnected, userId: instagramUserId } = useInstagram();
@@ -89,10 +87,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   const [selectedPostForPosting, setSelectedPostForPosting] = useState<any>(null);
   const [isPosting, setIsPosting] = useState(false);
   
-  // ✨ NEW: Schedule loading state and timer mechanism
+  // ✨ NEW: Schedule loading state
   const [isScheduling, setIsScheduling] = useState(false);
-  const [scheduleButtonTimers, setScheduleButtonTimers] = useState<{ [key: string]: number }>({});
-  const SCHEDULE_COOLDOWN_MS = 3 * 60 * 1000; // 3 minutes cooldown
   
   // NEW: State for scroll position
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -110,10 +106,6 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   // Add preview modal state
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
-  // Request deduplication to prevent multiple simultaneous API calls
-  const requestCache = useRef<Map<string, { promise: Promise<any>; timestamp: number }>>(new Map());
-  const CACHE_DURATION = 30000;
-  
   // Handle scroll events to show/hide scroll-to-top button
   const handleScroll = () => {
     if (scrollContainerRef.current) {
@@ -131,43 +123,6 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       });
     }
   }; // 30 seconds
-  
-  // Debounced request function to prevent duplicate API calls
-  const deduplicatedRequest = useCallback(async (
-    cacheKey: string,
-    requestFn: () => Promise<any>,
-    useCache: boolean = true
-  ): Promise<any> => {
-    // Check cache first if enabled
-    if (useCache && requestCache.current.has(cacheKey)) {
-      const { promise, timestamp } = requestCache.current.get(cacheKey)!;
-      if (Date.now() - timestamp < CACHE_DURATION) {
-        // Only log cache hits if needed for debugging (comment out to reduce spam)
-        // console.log(`[PostCooked] Using cached request for ${cacheKey}`);
-        return await promise;
-      }
-      requestCache.current.delete(cacheKey);
-    }
-    
-    // Create new request
-    const requestPromise = (async () => {
-      try {
-        const result = await requestFn();
-        return result;
-      } finally {
-        // Clean up cache entry after completion
-        requestCache.current.delete(cacheKey);
-      }
-    })();
-    
-    // Store the promise in cache
-    requestCache.current.set(cacheKey, {
-      promise: requestPromise,
-      timestamp: Date.now()
-    });
-    
-    return await requestPromise;
-  }, []);
 
   // ✨ BULLETPROOF: Comprehensive processed posts tracking
   const getProcessedStorageKey = () => `${platform}_processed_posts_${username}`;
@@ -307,8 +262,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     // Clear any existing image errors when new posts are loaded to prevent white images
     if (posts && posts.length > 0) {
       setImageErrors({});
-      setImageRefreshKey(prev => prev + 1); // Force image refresh
-      console.log(`[PostCooked] Cleared image errors and refreshed images for ${posts.length} fresh posts`);
+      // setImageRefreshKey(prev => prev + 1); // REMOVED: This was forcing re-renders on every post load
+      console.log(`[PostCooked] Cleared image errors for ${posts.length} fresh posts`);
     }
     
     // REAL-TIME INITIALIZATION: Auto-refresh on mount to ensure fresh data
@@ -321,44 +276,6 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   // AUTO-REFRESH: Set up periodic refresh for new posts created in post mode
   useEffect(() => {
     if (!username) return;
-
-         let refreshInterval: number;
-     let lastPostCount = localPosts.length;
-
-     // Check for new posts every 30 seconds (increased from 10s to reduce API spam)
-     const checkForNewPosts = async () => {
-       const cacheKey = `check_posts_${username}_${platform}`;
-       
-       try {
-         const response = await deduplicatedRequest(
-           cacheKey,
-           () => axios.get(`${API_BASE_URL}/posts/${username}?platform=${platform}&nocache=${Date.now()}`, {
-             headers: {
-               'Cache-Control': 'no-cache, no-store, must-revalidate',
-               'Pragma': 'no-cache'
-             },
-             timeout: 8000 // Increased timeout for better reliability
-           }),
-           false // Don't cache background checks
-         );
-
-         const newPostCount = response.data.length;
-         
-         // If we have new posts, update immediately
-         if (newPostCount > lastPostCount) {
-           if (DEBUG_LOGGING) {
-             console.log(`[PostCooked] NEW POSTS: ${lastPostCount} → ${newPostCount}`);
-           }
-           setLocalPosts(response.data);
-           lastPostCount = newPostCount;
-         }
-       } catch (error: any) {
-         // Silently handle errors for background refresh to avoid spam (no logging)
-       }
-     };
-
-     // Start periodic checking with reduced frequency (30 seconds to minimize API spam)
-     refreshInterval = window.setInterval(checkForNewPosts, 30000);
 
     // Also listen for custom events from post creation
     const handleNewPostEvent = (event: CustomEvent) => {
@@ -375,13 +292,12 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
 
          // Cleanup
      return () => {
-       if (refreshInterval) window.clearInterval(refreshInterval);
-       window.removeEventListener('newPostCreated', handleNewPostEvent as EventListener);
+        window.removeEventListener('newPostCreated', handleNewPostEvent as EventListener);
      };
   }, [username, platform, localPosts.length]);
 
-  // State for forcing image refresh
-  const [imageRefreshKey, setImageRefreshKey] = useState(0);
+  // Ref for forcing image refresh - persists across re-renders
+  const imageRefreshKey = useRef(Date.now());
 
   // Listen for post updates from Canvas Editor
   useEffect(() => {
@@ -426,7 +342,9 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
           });
           
           // Force React re-render
-          setImageRefreshKey(now);
+          imageRefreshKey.current = now;
+          // Force a re-render by updating a state
+          setLocalPosts(prev => [...prev]);
           
           // console.log(`[PostCooked] ⚡ INSTANT REFRESH: ${freshUrl}`); // Uncomment for debugging
         }
@@ -582,15 +500,15 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       return `${API_BASE_URL}/placeholder.jpg?post=${encodeURIComponent(postKey)}&reason=no_pattern`;
     }
     
-    // Create timestamp for cache busting
-    const timestamp = forceRefresh ? Date.now() : Math.floor(Date.now() / 60000); // 1-minute cache
-    
+    // Create timestamp for cache busting ONLY when explicitly forced
+    const timestamp = forceRefresh ? `&t=${Date.now()}` : '';
+
     // 🎯 FIXED: Use the R2 image endpoint to avoid CORS issues
-    const reliableUrl = `${API_BASE_URL}/api/r2-image/${username}/${imageFilename}?platform=${platform}&t=${timestamp}&v=${imageRefreshKey}&post=${encodeURIComponent(postKey)}`;
+    const reliableUrl = `${API_BASE_URL}/api/r2-image/${username}/${imageFilename}?platform=${platform}&v=${imageRefreshKey.current}&post=${encodeURIComponent(postKey)}${timestamp}`;
     
     console.log(`[ImageURL] Final URL: ${reliableUrl}`);
     return reliableUrl;
-  }, [username, platform, imageRefreshKey]);
+  }, [username, platform]);
 
   // Simplified and more reliable image error handling
   const handleImageError = useCallback((key: string, imgElement: HTMLImageElement) => {
@@ -845,17 +763,6 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   };
 
   const handleScheduleClick = (key: string) => {
-    // ✨ BULLETPROOF: Check if button is in cooldown
-    const nowMs = Date.now();
-    const lastClickTime = scheduleButtonTimers[key] || 0;
-    const timeSinceLastClick = nowMs - lastClickTime;
-    
-    if (timeSinceLastClick < SCHEDULE_COOLDOWN_MS) {
-      const remainingTime = Math.ceil((SCHEDULE_COOLDOWN_MS - timeSinceLastClick) / 1000 / 60);
-      setToastMessage(`Please wait ${remainingTime} minute(s) before scheduling this post again.`);
-      return;
-    }
-    
     const now = new Date();
     // Add 3 minutes so that, after seconds are stripped, we are guaranteed to be > 3-minute ahead
     const defaultTime = new Date(now.getTime() + 3 * 60 * 1000);
@@ -1389,8 +1296,6 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     console.log(`[PostCooked] 🔄 Starting manual refresh for ${username} on ${platform}`);
     setIsRefreshing(true);
     
-    // 🔥 ENHANCED: Temporarily disable background refresh to prevent interference
-    const wasBackgroundRefreshEnabled = !isRefreshing;
     
     try {
       // 🔥 ENHANCED: Force fresh data with multiple cache-busting parameters
@@ -1414,18 +1319,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       // Clear all caches and force fresh data
       setLocalPosts(response.data);
       setImageErrors({});
-      setImageRefreshKey(timestamp); // Use timestamp for unique refresh
+      imageRefreshKey.current = timestamp; // Use timestamp for unique refresh
       
-      // Clear any request cache for this user to ensure fresh data
-      if (requestCache.current) {
-        const keysToDelete = Array.from(requestCache.current.keys()).filter(key => 
-          key.includes(username) || key.includes(platform) || key.includes('posts') || key.includes('check_posts')
-        );
-        keysToDelete.forEach(key => {
-          requestCache.current.delete(key);
-          console.log(`[PostCooked] 🗑️ Cleared request cache: ${key}`);
-        });
-      }
       
       console.log(`[PostCooked] ✅ Successfully refreshed ${response.data.length} posts with fresh data`);
       
@@ -1434,7 +1329,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     } finally {
       setIsRefreshing(false);
     }
-  }, [username, platform, isRefreshing]);
+  }, [username, platform, isRefreshing, localPosts, imageRefreshKey]);
 
   const handleAutoSchedule = async (intervalOverride?: number) => {
     if (!userId || !localPosts.length) {
@@ -1618,7 +1513,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             if (!imageBlob) {
               console.error(`[AutoSchedule] ❌ Image fetch failed for post ${postNumber}`);
               failureCount++;
-              setToastMessage(`❌ Post ${postNumber}: Image fetch failed`);
+              setToastMessage(`❌ Post ${postNumber} failed: Image fetch failed`);
               continue;
             }
 
@@ -1798,13 +1693,6 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     });
   }, []);
   
-  const handleReimagineClick = useCallback((postKey: string) => {
-    setReimaginePostKey(postKey);
-    setReimagineExtraPrompt('');
-    setShowReimagineModal(true);
-    setShowContextMenu(null);
-  }, []);
-  
   const handleDownloadImage = useCallback(async (postKey: string) => {
     try {
       const post = localPosts.find(p => p.key === postKey);
@@ -1894,7 +1782,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         });
         
         // Force image refresh
-        setImageRefreshKey(Date.now());
+        imageRefreshKey.current = Date.now();
         
         setTimeout(() => {
           setReimagineToastMessage(null);
@@ -1923,7 +1811,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     } finally {
       setIsReimagining(false);
     }
-  }, [reimaginePostKey, reimagineExtraPrompt, username, platform, setImageRefreshKey]);
+  }, [reimaginePostKey, reimagineExtraPrompt, username, platform, imageRefreshKey]);
   
   // Close context menu when clicking outside
   useEffect(() => {

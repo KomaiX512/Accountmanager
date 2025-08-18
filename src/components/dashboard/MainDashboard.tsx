@@ -150,8 +150,16 @@ const MainDashboard: React.FC = () => {
     if (!currentUser?.uid) return;
 
     const platformsList = ['instagram', 'twitter', 'facebook', 'linkedin'];
+    let lastSyncTime = 0;
+    const SYNC_COOLDOWN = 3000; // 3 second cooldown between syncs
 
     const mirrorFromServer = async () => {
+      const now = Date.now();
+      if (now - lastSyncTime < SYNC_COOLDOWN) {
+        return; // Skip if too soon
+      }
+      lastSyncTime = now;
+
       try {
         const resp = await fetch(`/api/processing-status/${currentUser.uid}`);
         if (!resp.ok) return;
@@ -245,17 +253,95 @@ const MainDashboard: React.FC = () => {
       }
     };
 
-    // Initial and periodic sync (tight loop to avoid first-second race across devices)
-    mirrorFromServer();
-    const id = setInterval(mirrorFromServer, 1000);
-    return () => clearInterval(id);
+    // Initial sync with delay to allow local timer to initialize and persist to backend
+    const initialSyncDelay = setTimeout(() => {
+      mirrorFromServer();
+    }, 2000); // 2 second delay for initial sync
+    
+    // ✅ OPTIMIZED SYNC: Reduced frequency from 1 second to 5 seconds for better performance
+    const id = setInterval(mirrorFromServer, 5000); // Increased from 1 second to 5 seconds
+    return () => { 
+      clearTimeout(initialSyncDelay);
+      clearInterval(id); 
+    };
   }, [currentUser?.uid, platformLoadingStates]);
+
+  // ✅ BULLETPROOF TIMER SYSTEM - Synchronized with ProcessingLoadingState
+  const getProcessingCountdownKey = (platformId: string) => `${platformId}_processing_countdown`;
+
+  // Function to complete platform loading - MOVED HERE to fix dependency order
+  const completePlatformLoading = useCallback((platformId: string) => {
+    console.log(`🔥 TIMER COMPLETE: Completing ${platformId} processing`);
+    
+    // Mark platform as completed
+    setCompletedPlatforms(prev => new Set([...prev, platformId]));
+
+    // Clean up all loading state data
+    setPlatformLoadingStates(prev => ({
+      ...prev,
+      [platformId]: {
+        ...prev[platformId],
+        isComplete: true
+      }
+    }));
+
+    // Clean up localStorage
+    localStorage.removeItem(getProcessingCountdownKey(platformId));
+    localStorage.removeItem(`${platformId}_processing_info`);
+    
+    // ✅ CRITICAL FIX: Mark platform as claimed in backend when loading completes
+    // This ensures cross-device synchronization
+    if (currentUser?.uid) {
+      // Get the username that was used during processing
+      let username = '';
+      try {
+        const infoKey = `${platformId}_processing_info`;
+        const infoRaw = localStorage.getItem(infoKey);
+        if (infoRaw) {
+          const info = JSON.parse(infoRaw);
+          username = info.username || '';
+        }
+      } catch {}
+      
+      // Mark platform as claimed in backend
+      fetch(`/api/platform-access/${currentUser.uid}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          platform: platformId,
+          claimed: true, // NOW claimed after completion
+          username: username
+        })
+      }).then(response => {
+        if (response.ok) {
+          console.log(`🔥 BACKEND SYNC: Platform ${platformId} marked as CLAIMED after completion for cross-device sync`);
+          // Also update localStorage for immediate consistency
+          localStorage.setItem(`${platformId}_accessed_${currentUser.uid}`, 'true');
+        } else {
+          console.warn(`🔥 BACKEND SYNC: Failed to mark platform ${platformId} as claimed after completion`);
+        }
+      }).catch(error => {
+        console.error(`🔥 BACKEND SYNC: Error marking platform ${platformId} as claimed after completion:`, error);
+      });
+    }
+    
+    console.log(`🔥 TIMER CLEANUP: ${platformId} processing completed and cleaned up`);
+  }, [completedPlatforms, currentUser?.uid]);
 
   // ✅ CROSS-DEVICE CLAIMED STATUS MIRROR: Periodically fetch backend claimed state and mirror to localStorage
   useEffect(() => {
     if (!currentUser?.uid) return;
 
+    let lastClaimedSyncTime = 0;
+    const CLAIMED_SYNC_COOLDOWN = 3000; // Reduced from 5 seconds to 3 seconds for faster sync
+
     const mirrorClaimed = async () => {
+      const now = Date.now();
+      if (now - lastClaimedSyncTime < CLAIMED_SYNC_COOLDOWN) {
+        return; // Skip if too soon
+      }
+      lastClaimedSyncTime = now;
+
       try {
         const resp = await fetch(`/api/platform-access/${currentUser.uid}`);
         if (!resp.ok) return;
@@ -292,10 +378,18 @@ const MainDashboard: React.FC = () => {
               console.log(`[MainDashboard] 🔥 CRITICAL: Platform ${pid} in loading state - forced clear claimed status`);
             }
           } else if (isNowClaimed && !wasClaimed) {
+            // ✅ CRITICAL FIX: Platform is now claimed on backend but not locally
             localStorage.setItem(key, 'true');
             hasChanges = true;
-            console.log(`[MainDashboard] 🔄 Platform ${pid} now claimed (was not claimed)`);
+            console.log(`[MainDashboard] 🔄 Platform ${pid} now claimed (was not claimed) - CROSS-DEVICE SYNC SUCCESS`);
+            
+            // ✅ ENHANCED SYNC: Also check if this platform was in loading state and complete it
+            if (platformLoadingStates[pid] && !platformLoadingStates[pid].isComplete) {
+              console.log(`[MainDashboard] 🔥 AUTO-COMPLETE: Platform ${pid} completed on another device, marking as completed locally`);
+              completePlatformLoading(pid);
+            }
           } else if (!isNowClaimed && wasClaimed) {
+            // Platform no longer claimed on backend
             localStorage.removeItem(key);
             hasChanges = true;
             console.log(`[MainDashboard] 🔄 Platform ${pid} no longer claimed (was claimed)`);
@@ -319,12 +413,47 @@ const MainDashboard: React.FC = () => {
     };
 
     mirrorClaimed();
-    const id = setInterval(mirrorClaimed, 1000); // Increased frequency for immediate sync
+    // ✅ OPTIMIZED SYNC: Reduced frequency from 5 seconds to 3 seconds for faster cross-device sync
+    const id = setInterval(mirrorClaimed, 3000); // Increased from 5 seconds to 3 seconds
     return () => clearInterval(id);
-  }, [currentUser?.uid, platformLoadingStates]);
+  }, [currentUser?.uid, platformLoadingStates, completePlatformLoading]);
 
-  // ✅ BULLETPROOF TIMER SYSTEM - Synchronized with ProcessingLoadingState
-  const getProcessingCountdownKey = (platformId: string) => `${platformId}_processing_countdown`;
+  // ✅ CRITICAL PLATFORM COMPLETION MONITOR: Monitor for platform completion and update UI
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+
+    const checkForCompletedPlatforms = () => {
+      const platforms = ['instagram', 'twitter', 'facebook', 'linkedin'];
+      let hasCompletion = false;
+
+      platforms.forEach(platformId => {
+        // Check if platform was in loading state but is now complete
+        const loadingState = platformLoadingStates[platformId];
+        if (loadingState && !loadingState.isComplete) {
+          const remainingMs = Math.max(0, loadingState.endTime - Date.now());
+          if (remainingMs === 0) {
+            console.log(`🔥 PLATFORM COMPLETION DETECTED: ${platformId} has finished loading, marking as completed`);
+            completePlatformLoading(platformId);
+            hasCompletion = true;
+          }
+        }
+      });
+
+      // Force platform refresh if any platform completed
+      if (hasCompletion) {
+        console.log(`🔥 FORCING PLATFORM REFRESH after completion detection`);
+        setPlatforms(prev => [...prev]);
+      }
+    };
+
+    // Check immediately
+    checkForCompletedPlatforms();
+
+    // Check every 2 seconds for platform completion
+    const completionInterval = setInterval(checkForCompletedPlatforms, 2000);
+    
+    return () => clearInterval(completionInterval);
+  }, [currentUser?.uid, platformLoadingStates, completePlatformLoading]);
 
   const getProcessingRemainingMs = useCallback((platformId: string): number => {
     // Never show timer for completed platforms
@@ -491,30 +620,6 @@ const MainDashboard: React.FC = () => {
     console.log(`🔥 TIMER START: ${platformId} timer set for ${durationMinutes} minutes (${endTime})`);
   };
 
-  // Function to complete platform loading
-  const completePlatformLoading = useCallback((platformId: string) => {
-    console.log(`🔥 TIMER COMPLETE: Completing ${platformId} processing`);
-    
-    // Mark platform as completed
-    setCompletedPlatforms(prev => new Set([...prev, platformId]));
-
-    // Clean up all loading state data
-    setPlatformLoadingStates(prev => ({
-      ...prev,
-      [platformId]: {
-        ...prev[platformId],
-        isComplete: true
-      }
-    }));
-
-    // Clean up localStorage
-    localStorage.removeItem(getProcessingCountdownKey(platformId));
-    localStorage.removeItem(`${platformId}_processing_info`);
-    // Backend cleanup is handled by finalize flow or by server upon expiry; avoid deleting here to prevent cross-device races
-    
-    console.log(`🔥 TIMER CLEANUP: ${platformId} processing completed and cleaned up`);
-  }, [completedPlatforms, currentUser?.uid]);
-
   // ✅ PLATFORM STATUS SYNC FIX: Improved platform access tracking
   const getPlatformAccessStatus = useCallback((platformId: string): boolean => {
     if (!currentUser?.uid) return false;
@@ -525,6 +630,34 @@ const MainDashboard: React.FC = () => {
       return false;
     }
     
+    // ✅ ENHANCED BACKEND-FIRST CHECK: Always check backend first for cross-device consistency
+    // This ensures that if device B completed the platform, device A will see it as claimed
+    const checkBackendStatus = async () => {
+      try {
+        const resp = await fetch(`/api/platform-access/${currentUser.uid}`);
+        if (resp.ok) {
+          const json = await resp.json();
+          const data = json?.data || {};
+          const backendClaimed = data[platformId]?.claimed === true;
+          
+          if (backendClaimed) {
+            // Backend says claimed - sync to localStorage for consistency
+            localStorage.setItem(`${platformId}_accessed_${currentUser.uid}`, 'true');
+            console.log(`🔥 BACKEND SYNC: ${platformId} marked as claimed from backend`);
+            return true;
+          } else {
+            // Backend says not claimed - clear localStorage
+            localStorage.removeItem(`${platformId}_accessed_${currentUser.uid}`);
+            console.log(`🔥 BACKEND SYNC: ${platformId} marked as not claimed from backend`);
+            return false;
+          }
+        }
+      } catch (error) {
+        console.warn(`Failed to check backend status for ${platformId}:`, error);
+      }
+      return null; // Backend check failed
+    };
+    
     // Check localStorage for platform access (fallback)
     const accessedFromStorage = localStorage.getItem(`${platformId}_accessed_${currentUser.uid}`) === 'true';
     
@@ -534,9 +667,27 @@ const MainDashboard: React.FC = () => {
     if (platformId === 'twitter') accessedFromContext = hasAccessedTwitter;
     if (platformId === 'facebook') accessedFromContext = hasAccessedFacebook;
     
-    // If either localStorage or context shows accessed, return true
-    // This ensures that once a user has submitted the entry form, they won't see it again
-    return accessedFromStorage || accessedFromContext;
+    // ✅ CRITICAL FIX: If localStorage or context shows accessed, verify with backend
+    // This prevents stale local data from overriding backend truth
+    if (accessedFromStorage || accessedFromContext) {
+      // Run backend check in background to sync status
+      checkBackendStatus().then(backendStatus => {
+        if (backendStatus !== null) {
+          // Backend check completed - force platform refresh if status changed
+          const currentStatus = accessedFromStorage || accessedFromContext;
+          if (backendStatus !== currentStatus) {
+            console.log(`🔥 STATUS MISMATCH: ${platformId} local=${currentStatus} backend=${backendStatus}, forcing refresh`);
+            setPlatforms(prev => [...prev]);
+          }
+        }
+      });
+      
+      // Return current local status while backend syncs
+      return accessedFromStorage || accessedFromContext;
+    }
+    
+    // If neither localStorage nor context shows accessed, definitely not claimed
+    return false;
   }, [currentUser?.uid, hasAccessedInstagram, hasAccessedTwitter, hasAccessedFacebook, isPlatformLoading]);
 
   // ✅ PLATFORM CONNECTION SYNC FIX: Improved connection status tracking
@@ -948,12 +1099,21 @@ const MainDashboard: React.FC = () => {
         const newConnected = getPlatformConnectionStatus(platform.id);
         const isCurrentlyLoading = isPlatformLoading(platform.id);
         
-        // CRITICAL FIX: If platform is loading, it's NEVER claimed
+        // ✅ CRITICAL FIX: If platform is loading, it's NEVER claimed
         const finalClaimed = isCurrentlyLoading ? false : newClaimed;
+        
+        // ✅ ENHANCED LOGGING: More detailed status information
+        if (platform.claimed !== finalClaimed || platform.connected !== newConnected) {
+          console.log(`[MainDashboard] 🔄 Platform ${platform.id} status update:`, {
+            claimed: `${platform.claimed} -> ${finalClaimed}`,
+            connected: `${platform.connected} -> ${newConnected}`,
+            loading: isCurrentlyLoading,
+            reason: isCurrentlyLoading ? 'PLATFORM IN LOADING STATE' : 'status change'
+          });
+        }
         
         // Only update if status actually changed
         if (platform.claimed !== finalClaimed || platform.connected !== newConnected) {
-          console.log(`[MainDashboard] 🔄 Platform ${platform.id} status update: claimed=${finalClaimed} (was ${platform.claimed}, loading=${isCurrentlyLoading}), connected=${newConnected}`);
           return { 
             ...platform, 
             claimed: finalClaimed,
@@ -1105,6 +1265,53 @@ const MainDashboard: React.FC = () => {
         // Refresh usage data
         refreshUsage();
         
+        // ✅ CRITICAL FIX: Force refresh platform access status from backend
+        // This ensures cross-device synchronization when returning to dashboard
+        const forceRefreshPlatformStatus = async () => {
+          try {
+            console.log(`[MainDashboard] 🔄 FORCE REFRESH: Checking platform status from backend on focus`);
+            const resp = await fetch(`/api/platform-access/${currentUser.uid}`);
+            if (resp.ok) {
+              const json = await resp.json();
+              const data = json?.data || {};
+              
+              let hasChanges = false;
+              ['instagram', 'twitter', 'facebook', 'linkedin'].forEach(pid => {
+                const entry = data[pid];
+                const key = `${pid}_accessed_${currentUser.uid}`;
+                const wasClaimed = localStorage.getItem(key) === 'true';
+                const isNowClaimed = entry && entry.claimed === true;
+                
+                if (isNowClaimed && !wasClaimed) {
+                  // Platform is now claimed on backend but not locally
+                  localStorage.setItem(key, 'true');
+                  hasChanges = true;
+                  console.log(`[MainDashboard] 🔄 FORCE REFRESH: ${pid} now claimed from backend`);
+                } else if (!isNowClaimed && wasClaimed) {
+                  // Platform no longer claimed on backend
+                  localStorage.removeItem(key);
+                  hasChanges = true;
+                  console.log(`[MainDashboard] 🔄 FORCE REFRESH: ${pid} no longer claimed from backend`);
+                }
+              });
+              
+              if (hasChanges) {
+                console.log(`[MainDashboard] 🔄 FORCE REFRESH: Platform status changes detected, forcing platform refresh`);
+                setPlatforms(prev => [...prev]);
+                
+                // Force immediate re-render
+                setTimeout(() => {
+                  setPlatforms(prev => [...prev]);
+                }, 100);
+              }
+            }
+          } catch (error) {
+            console.warn(`[MainDashboard] Failed to force refresh platform status:`, error);
+          }
+        };
+        
+        forceRefreshPlatformStatus();
+        
         // Refresh notification counts for newly claimed platforms
         const hasNewClaims = platforms.some(platform => {
           const currentClaimed = getPlatformAccessStatus(platform.id);
@@ -1216,6 +1423,20 @@ const MainDashboard: React.FC = () => {
   const navigateToPlatform = (platform: PlatformData) => {
     const remainingMs = getProcessingRemainingMs(platform.id);
     
+    // ✅ CRITICAL SAFETY CHECK: Ensure platform is actually claimed
+    if (!platform.claimed) {
+      console.error(`🔥 NAVIGATION ERROR: Attempted to navigate to platform ${platform.id} but it's not claimed!`);
+      console.error(`🔥 PLATFORM STATE:`, {
+        id: platform.id,
+        claimed: platform.claimed,
+        connected: platform.connected,
+        loading: isPlatformLoading(platform.id)
+      });
+      // Fallback to setup instead of crashing
+      navigateToSetup(platform.id);
+      return;
+    }
+    
     // ✅ SELECTIVE BLOCKING: Only block access to THIS specific platform if it's processing
     if (remainingMs > 0) {
       const remainingTime = Math.ceil(remainingMs / 1000 / 60);
@@ -1236,9 +1457,9 @@ const MainDashboard: React.FC = () => {
     // ✅ NAVIGATION FLEXIBILITY: Allow access to all other areas normally
     console.log(`🔥 NAVIGATION: Allowing access to ${platform.id} (no active processing)`);
     
-    // If platform is claimed but not connected and has no active timer, navigate normally
-    if (platform.claimed && !platform.connected && remainingMs === 0) {
-      // Navigate to the appropriate dashboard
+    // ✅ CRITICAL FIX: Improved navigation logic for claimed platforms
+    if (platform.claimed) {
+      // Platform is claimed - navigate to appropriate dashboard
       if (platform.id === 'instagram') {
         safeNavigate(navigate, '/dashboard', {}, 6); // Instagram dashboard
       } else if (platform.id === 'twitter') {
@@ -1253,46 +1474,29 @@ const MainDashboard: React.FC = () => {
       return;
     }
     
-    // If this is first access and not claimed, go to entry form (do NOT start timer yet)
-    if (!isPlatformLoading(platform.id) && !platform.claimed) {
-      console.log(`🧭 FIRST-TIME SETUP: Navigating to ${platform.id} entry form without starting timer`);
-      navigateToSetup(platform.id);
-      return;
-    }
-    
-    // Normal navigation if loading is complete or not required
-    // Handle Instagram routing specifically
-    if (platform.id === 'instagram') {
-      if (platform.claimed) {
-        safeNavigate(navigate, '/dashboard', {}, 6); // Instagram dashboard
-      } else {
-        safeNavigate(navigate, '/instagram', {}, 6); // Instagram entry form
-      }
-    } else if (platform.id === 'twitter') {
-      if (platform.claimed) {
-        safeNavigate(navigate, '/twitter-dashboard', {}, 6); // Twitter dashboard - explicit path
-      } else {
-        safeNavigate(navigate, '/twitter', {}, 6); // Twitter entry form
-      }
-    } else if (platform.id === 'facebook') {
-      if (platform.claimed) {
-        safeNavigate(navigate, '/facebook-dashboard', {}, 6); // Facebook dashboard - explicit path
-      } else {
-        safeNavigate(navigate, '/facebook', {}, 6); // Facebook entry form
-      }
-    } else if (platform.id === 'linkedin') {
-      if (platform.claimed) {
-        safeNavigate(navigate, '/linkedin-dashboard', {}, 6); // LinkedIn dashboard - explicit path
-      } else {
-        safeNavigate(navigate, '/linkedin', {}, 6); // LinkedIn entry form
-      }
-    } else {
-      // Fallback for any other platforms: add leading slash to route
-      safeNavigate(navigate, `/${platform.route}`, {}, 6);
-    }
+    // ✅ CRITICAL FIX: Remove redundant navigation logic that was causing confusion
+    // The above logic should handle all cases properly
+    console.warn(`🔥 NAVIGATION FALLBACK: Unexpected navigation case for ${platform.id} - claimed=${platform.claimed}, loading=${isPlatformLoading(platform.id)}`);
   };
 
   const navigateToSetup = (platformId: string) => {
+    // ✅ CRITICAL FIX: Check if platform is currently in loading state BEFORE navigating to setup
+    if (isPlatformLoading(platformId)) {
+      const remainingMs = getProcessingRemainingMs(platformId);
+      const remainingMinutes = Math.ceil(remainingMs / 1000 / 60);
+      
+      console.log(`🔥 PLATFORM CLICK: ${platformId} is currently in loading state (${remainingMinutes}min remaining), redirecting to processing`);
+      
+      // Redirect to processing page instead of entry form
+      safeNavigate(navigate, `/processing/${platformId}`, {
+        state: {
+          platform: platformId,
+          remainingMinutes
+        }
+      }, 6);
+      return; // Exit early - don't proceed to entry form
+    }
+
     // Set a flag in localStorage to indicate that this platform should be marked as acquired upon successful submission
     if (currentUser?.uid) {
       localStorage.setItem(`mark_${platformId}_pending_${currentUser.uid}`, 'true');
@@ -1696,7 +1900,33 @@ const MainDashboard: React.FC = () => {
                 >
                   <div 
                     className="clickable-area"
-                    onClick={() => platform.claimed ? navigateToPlatform(platform) : navigateToSetup(platform.id)}
+                    onClick={() => {
+                      // ✅ CRITICAL FIX: Always check loading state first before any navigation
+                      if (isPlatformLoading(platform.id)) {
+                        const remainingMs = getProcessingRemainingMs(platform.id);
+                        const remainingMinutes = Math.ceil(remainingMs / 1000 / 60);
+                        
+                        console.log(`🔥 PLATFORM CLICK INTERCEPT: ${platform.id} is in loading state (${remainingMinutes}min remaining), redirecting to processing`);
+                        
+                        // Redirect to processing page instead of any other action
+                        safeNavigate(navigate, `/processing/${platform.id}`, {
+                          state: {
+                            platform: platform.id,
+                            remainingMinutes
+                          }
+                        }, 6);
+                        return; // Exit early - don't proceed to any other navigation
+                      }
+                      
+                      // Normal navigation logic
+                      if (platform.claimed) {
+                        console.log(`🔥 PLATFORM NAVIGATION: ${platform.id} is claimed, navigating to platform dashboard`);
+                        navigateToPlatform(platform);
+                      } else {
+                        console.log(`🔥 PLATFORM NAVIGATION: ${platform.id} is not claimed, navigating to setup`);
+                        navigateToSetup(platform.id);
+                      }
+                    }}
                   >
                     <div className="platform-icon">
                       <img 
@@ -1742,7 +1972,27 @@ const MainDashboard: React.FC = () => {
                               ? (platform.connected ? 'connected' : 'disconnected')
                               : 'not-applicable'
                         }`}
-                        onClick={() => platform.claimed && !platform.connected && platform.id !== 'linkedin' && handleConnectionButtonClick(platform)}
+                        onClick={() => {
+                          // ✅ CRITICAL FIX: Always check loading state first before any connection action
+                          if (isPlatformLoading(platform.id)) {
+                            const remainingMs = getProcessingRemainingMs(platform.id);
+                            const remainingMinutes = Math.ceil(remainingMs / 1000 / 60);
+                            
+                            console.log(`🔥 CONNECTION CLICK INTERCEPT: ${platform.id} is in loading state (${remainingMinutes}min remaining), redirecting to processing`);
+                            
+                            // Redirect to processing page instead of connection action
+                            safeNavigate(navigate, `/processing/${platform.id}`, {
+                              state: {
+                                platform: platform.id,
+                                remainingMinutes
+                              }
+                            }, 6);
+                            return; // Exit early - don't proceed to connection action
+                          }
+                          
+                          // Normal connection logic
+                          platform.claimed && !platform.connected && platform.id !== 'linkedin' && handleConnectionButtonClick(platform);
+                        }}
                         style={{ cursor: platform.claimed && !platform.connected && platform.id !== 'linkedin' ? 'pointer' : 'default' }}
                       >
                         {platform.id === 'linkedin' && !platform.connected 
@@ -1757,10 +2007,31 @@ const MainDashboard: React.FC = () => {
                   </div>
                   
                   {platform.claimed && platform.notifications.total > 0 && (
-                    <div className="notification-badge-container">
+                    <div className="notification-badge-container"
+                      onClick={() => {
+                        // ✅ CRITICAL FIX: Always check loading state first before any notification action
+                        if (isPlatformLoading(platform.id)) {
+                          const remainingMs = getProcessingRemainingMs(platform.id);
+                          const remainingMinutes = Math.ceil(remainingMs / 1000 / 60);
+                          
+                          console.log(`🔥 NOTIFICATION CLICK INTERCEPT: ${platform.id} is in loading state (${remainingMinutes}min remaining), redirecting to processing`);
+                          
+                          // Redirect to processing page instead of notification action
+                          safeNavigate(navigate, `/processing/${platform.id}`, {
+                            state: {
+                              platform: platform.id,
+                              remainingMinutes
+                            }
+                          }, 6);
+                          return; // Exit early - don't proceed to notification action
+                        }
+                        
+                        // Normal notification logic
+                        handleNotificationClick(platform.id);
+                      }}
+                    >
                       <div 
                         className="notification-badge"
-                        onClick={() => handleNotificationClick(platform.id)}
                       >
                         <svg className="notification-bell-icon" viewBox="0 0 24 24" width="16" height="16" style={{marginRight: '4px'}}>
                           <path d="M12 22c1.1 0 2-.9 2-2h-4a2 2 0 0 0 2 2zm6-6V11c0-3.07-1.63-5.64-5-6.32V4a1 1 0 1 0-2 0v.68C7.63 5.36 6 7.92 6 11v5l-1.29 1.29A1 1 0 0 0 6 19h12a1 1 0 0 0 .71-1.71L18 16zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z" fill="#fff"/>

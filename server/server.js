@@ -1286,8 +1286,8 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
     // Generate standardized prefix using centralized schema manager
     const prefix = PlatformSchemaManager.buildPath(module, platform, username, additional);
     
-    // 🔥 HOTFIX: Some uploads use alternative prefixes for the same module name.
-    // If we are fetching the news module, pull from ALL known prefixes and merge.
+    // 🔥 ENHANCED HOTFIX: Support ALL news file patterns including timestamped files
+    // If we are fetching the news module, pull from ALL known patterns and merge.
     const altPrefixes = [];
     if (module === 'news_for_you') {
       const dashed = prefix.replace('news_for_you', 'news-for-you');
@@ -1299,6 +1299,13 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
       const newForYou = prefix.replace('news_for_you', 'NewForYou');
       if (newForYou !== prefix && newForYou !== dashed) {
         altPrefixes.push(newForYou);
+      }
+
+      // 🚀 NEW: Support timestamped news files with pattern: news_YYYYMMDD_HHMMSS_USERNAME.json
+      // This covers files like: news_20250809_120145_KOMAIL.json
+      const timestampedPrefix = `news_`;
+      if (timestampedPrefix !== prefix) {
+        altPrefixes.push(timestampedPrefix);
       }
     }
  
@@ -1334,13 +1341,43 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
       }
     }
 
+    // 🚀 ENHANCED: Special handling for news files with timestamped patterns
+    if (module === 'news_for_you') {
+      // Filter files to match the username specifically for timestamped news files
+      // Pattern: news_YYYYMMDD_HHMMSS_USERNAME.json
+      const userSpecificFiles = files.filter(file => {
+        const fileName = file.Key.split('/').pop() || file.Key;
+        
+        // Match standard prefixes OR timestamped patterns containing the username
+        const standardMatch = fileName.startsWith('news_for_you') || 
+                            fileName.startsWith('news-for-you') || 
+                            fileName.startsWith('NewForYou');
+        
+        const timestampedMatch = fileName.startsWith('news_') && 
+                               fileName.includes(`_${username.toUpperCase()}`) &&
+                               fileName.endsWith('.json');
+        
+        return standardMatch || timestampedMatch;
+      });
+      
+      // If we found user-specific files, use those; otherwise fall back to all files
+      if (userSpecificFiles.length > 0) {
+        files = userSpecificFiles;
+        console.log(`[${new Date().toISOString()}] Found ${userSpecificFiles.length} user-specific news files for ${username}`);
+      } else {
+        console.log(`[${new Date().toISOString()}] No user-specific news files found for ${username}, using all ${files.length} files`);
+      }
+    }
+
     // Sort and process as before
     // ✅ NEW: Sort files by LastModified date to get most recent items
     const sortedFiles = files
       .sort((a, b) => new Date(b.LastModified).getTime() - new Date(a.LastModified).getTime());
     
-    // ✅ NEW: Limit to most recent 3 items for strategies and competitor analysis
-    const maxItems = (module === 'recommendations' || module === 'competitor_analysis') ? 3 : sortedFiles.length;
+    // ✅ ENHANCED: For news, limit to most recent 4 items; for other modules use existing logic
+    const maxItems = module === 'news_for_you' ? 4 : 
+                    (module === 'recommendations' || module === 'competitor_analysis') ? 3 : 
+                    sortedFiles.length;
     const limitedFiles = sortedFiles.slice(0, maxItems);
     
     if (maxItems < sortedFiles.length) {

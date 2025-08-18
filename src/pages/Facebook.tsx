@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import FB_EntryUsernames from '../components/facebook/FB_EntryUsernames';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 
 const Facebook: React.FC = () => {
   const { currentUser } = useAuth();
@@ -26,10 +26,12 @@ const Facebook: React.FC = () => {
     }
 
     // Check if user has already completed Facebook setup
-    const checkFacebookStatus = async () => {
+    const checkFacebookStatus = async (attempt: number = 1) => {
       try {
         // Always consult backend first for canonical state to ensure cross-device sync
-        const response = await axios.get(`/api/user-facebook-status/${currentUser.uid}`);
+        // Add cache-buster to avoid any CDN/browser caching that may cause stale data
+        const cacheBuster = `?cb=${Date.now()}`;
+        const response = await axios.get(`/api/user-facebook-status/${currentUser.uid}${cacheBuster}`);
 
         if (response.data.hasEnteredFacebookUsername) {
           const savedUsername = response.data.facebook_username;
@@ -70,6 +72,15 @@ const Facebook: React.FC = () => {
       } catch (error) {
         // If backend fails, fall back to local cache
         console.error('Error checking Facebook status from backend, falling back to cache:', error);
+      }
+
+      // If backend says setup not completed AND this is the first attempt, retry once after short delay
+      if (attempt === 1) {
+        console.log('ℹ️ Facebook status not yet updated on backend. Retrying in 1500ms…');
+        setTimeout(() => {
+          checkFacebookStatus(2);
+        }, 1500);
+        return;
       }
 
       // Fallback: use localStorage as secondary source of truth

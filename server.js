@@ -758,10 +758,11 @@ function generatePlaceholderImage(text = 'Image Not Available', width = 512, hei
 
 // Enhanced image retrieval with multi-level fallbacks
 async function fetchImageWithFallbacks(key, fallbackImagePath = null, username = null, filename = null) {
-  // ENHANCED CACHE-BUSTING: Check for any cache-busting parameters in the key
-  const cacheBustMatch = key.match(/[?&](nuclear|reimagined|force|no-cache|bypass|t|v|refresh|refreshKey|nocache|bust|_t|timestamp|cacheBuster)=([^&]*)/);
-  const hasQueryParams = key.includes('?');
-  const shouldBypassCache = cacheBustMatch || hasQueryParams || key.includes('nuclear') || key.includes('reimagined') || key.includes('force');
+  // OPTIMIZED CACHE-BUSTING: Only bypass on *explicit* bust flags – **not** on every query param.
+  // This dramatically reduces unnecessary R2 fetches while still allowing on-demand invalidation.
+  const cacheBustMatch = key.match(/[?&](nuclear|reimagined|force|no-cache|nocache|bypass|edited|instant|cachebuster|bust)=([^&]*)/i);
+  const hasQueryParams = key.includes('?'); // used only for verbose logging
+  const shouldBypassCache = Boolean(cacheBustMatch) || key.toLowerCase().includes('nuclear') || key.toLowerCase().includes('reimagined') || key.toLowerCase().includes('force');
   
   // DEBUG: Log cache-busting detection
   console.log(`[${new Date().toISOString()}] [IMAGE] 🔍 Cache-busting check for key: ${key}`);

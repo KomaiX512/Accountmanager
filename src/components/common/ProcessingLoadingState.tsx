@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 /**
  * PLATFORM TIMING CONFIGURATION:
- * - Facebook: 1 minute initial setup
+ * - Facebook: 20 minutes initial setup
  * - Instagram: 15 minutes initial setup  
  * - Twitter: 15 minutes initial setup
  * - All platforms: 5 minutes extension when running statistics not found
@@ -87,7 +87,7 @@ const PLATFORM_CONFIGS: Record<string, PlatformConfigType> = {
     primaryColor: '#1877f2',
     secondaryColor: '#42a5f5',
     icon: <FaFacebook />,
-    initialMinutes: 1, // Facebook gets 1 minute initially (testing)
+    initialMinutes: 20, // Facebook gets 20 minutes initially
     extensionMinutes: 5  // 5 minutes extension for all platforms
   }
 };
@@ -106,9 +106,6 @@ interface ProcessingLoadingStateProps {
   platform: 'instagram' | 'twitter' | 'facebook' | 'linkedin';
   username: string;
   onComplete?: () => void;
-  // Fired exactly when the current countdown interval reaches zero.
-  // Parent can use this to perform run-status validation and extend time.
-  onIntervalComplete?: () => void;
   countdownMinutes?: number;
   remainingMinutes?: number;
   extensionMessage?: string;
@@ -120,7 +117,6 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   platform,
   username: propUsername,
   onComplete,
-  onIntervalComplete,
   countdownMinutes, // Remove default value - we'll use platform-specific timing
   remainingMinutes,
   extensionMessage,
@@ -211,17 +207,11 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     return `This ${platformConfig.initialMinutes}-minute initialization creates your custom analytics engine, competitor analysis, and automation tools. You'll never have to wait again!`;
   };
 
-  // Debug flag to enable verbose timer logs
-  const DEBUG_TIMER = !import.meta.env.PROD && window.localStorage.getItem('DEBUG_TIMER') === '1';
-  const debugLog = (...args: any[]) => { if (DEBUG_TIMER) console.log(...args); };
-
   // State to trigger re-renders for real-time updates
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [isTabVisible, setIsTabVisible] = useState(!document.hidden);
   const [timerCompleted, setTimerCompleted] = useState(false);
   const [timerJustCreated, setTimerJustCreated] = useState(false);
-  const [intervalCompletionSignalled, setIntervalCompletionSignalled] = useState(false);
-  const [lastKnownEndTime, setLastKnownEndTime] = useState<number | null>(null);
 
   // Get timer data from localStorage with bulletproof error handling
   const getTimerData = () => {
@@ -229,21 +219,21 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
       const endTimeRaw = localStorage.getItem(`${platform}_processing_countdown`);
       const processingInfoRaw = localStorage.getItem(`${platform}_processing_info`);
       
-      debugLog(`🔍 TIMER DEBUG: Reading timer data for ${platform}:`, {
+      console.log(`🔍 TIMER DEBUG: Reading timer data for ${platform}:`, {
         endTimeRaw,
         processingInfoRaw: processingInfoRaw ? 'exists' : 'missing',
         currentTime: new Date().toISOString()
       });
       
       if (!endTimeRaw || !processingInfoRaw) {
-        debugLog(`🔍 TIMER DEBUG: Missing timer data for ${platform} - endTimeRaw: ${endTimeRaw}, processingInfoRaw: ${processingInfoRaw}`);
+        console.log(`🔍 TIMER DEBUG: Missing timer data for ${platform} - endTimeRaw: ${endTimeRaw}, processingInfoRaw: ${processingInfoRaw}`);
         return null;
       }
       
       const endTime = parseInt(endTimeRaw);
       const processingInfo = JSON.parse(processingInfoRaw);
       
-      debugLog(`🔍 TIMER DEBUG: Parsed timer data for ${platform}:`, {
+      console.log(`🔍 TIMER DEBUG: Parsed timer data for ${platform}:`, {
         endTime,
         startTime: processingInfo.startTime,
         totalDuration: processingInfo.totalDuration,
@@ -251,7 +241,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
       });
       
       if (Number.isNaN(endTime) || !processingInfo.startTime) {
-        debugLog(`🔍 TIMER DEBUG: Invalid timer data for ${platform} - endTime: ${endTime}, startTime: ${processingInfo.startTime}`);
+        console.log(`🔍 TIMER DEBUG: Invalid timer data for ${platform} - endTime: ${endTime}, startTime: ${processingInfo.startTime}`);
         return null;
       }
       
@@ -262,7 +252,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
         username: processingInfo.username // NO FALLBACKS - use exact username from storage
       };
       
-      debugLog(`🔍 TIMER DEBUG: Returning timer data for ${platform}:`, result);
+      console.log(`🔍 TIMER DEBUG: Returning timer data for ${platform}:`, result);
       return result;
     } catch (error) {
       console.error(`🔍 TIMER DEBUG: Error reading timer data for ${platform}:`, error);
@@ -405,7 +395,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
       
       const remaining = getRemainingMs();
       
-      debugLog(`🔍 TIMER UPDATE: ${platform} - remaining: ${remaining}ms, timerCompleted: ${timerCompleted}`);
+      console.log(`🔍 TIMER UPDATE: ${platform} - remaining: ${remaining}ms, timerCompleted: ${timerCompleted}`);
       
       if (remaining <= 0 && !timerCompleted) {
         if (allowAutoComplete) {
@@ -462,16 +452,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
             console.error('Error cleaning up timer:', error);
           }
         } else {
-          // Do not mark as completed; parent orchestrates. Signal once per interval end.
-          if (!intervalCompletionSignalled) {
-            setIntervalCompletionSignalled(true);
-            try {
-              console.log(`🎯 TIMER INTERVAL COMPLETE: Signalling parent for ${platform}`);
-              onIntervalComplete && onIntervalComplete();
-            } catch (e) {
-              console.warn('onIntervalComplete threw an error', e);
-            }
-          }
+          // Do not mark as completed; parent may extend time and continue updates
           // Keep interval running so UI can reflect extended endTime written by parent
         }
       }
@@ -481,28 +462,10 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     updateTimer();
     
     // Use different intervals based on tab visibility for optimal performance
-    const interval = setInterval(updateTimer, isTabVisible ? 1000 : 2000);
+    const interval = setInterval(updateTimer, isTabVisible ? 100 : 1000);
     
     return () => clearInterval(interval);
-  }, [platform, currentTime, isTabVisible, timerCompleted, onIntervalComplete, intervalCompletionSignalled]);
-
-  // Reset the signalling flag whenever a new endTime is set (i.e., extension)
-  useEffect(() => {
-    try {
-      const infoRaw = localStorage.getItem(`${platform}_processing_info`);
-      if (!infoRaw) return;
-      const info = JSON.parse(infoRaw);
-      if (info && typeof info.endTime === 'number') {
-        if (lastKnownEndTime === null) {
-          setLastKnownEndTime(info.endTime);
-        } else if (info.endTime > lastKnownEndTime) {
-          // End time advanced (extension/new interval) → allow signalling again
-          setIntervalCompletionSignalled(false);
-          setLastKnownEndTime(info.endTime);
-        }
-      }
-    } catch {}
-  }, [platform, currentTime, lastKnownEndTime]);
+  }, [platform, currentTime, isTabVisible, timerCompleted]);
 
   // ✅ PAGE VISIBILITY API - Perfect tab switching synchronization
   useEffect(() => {
@@ -541,7 +504,16 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   useEffect(() => {
     if (!currentUser?.uid) return;
     let cancelled = false;
+    let lastSyncTime = 0;
+    const SYNC_COOLDOWN = 2000; // 2 second cooldown between syncs
+
     const syncFromServer = async () => {
+      const now = Date.now();
+      if (now - lastSyncTime < SYNC_COOLDOWN) {
+        return; // Skip if too soon
+      }
+      lastSyncTime = now;
+
       try {
         const resp = await fetch(`/api/processing-status/${currentUser.uid}?platform=${platform}`);
         if (!resp.ok) return;
@@ -591,6 +563,28 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
                   localStorage.removeItem(`${platform}_processing_info`);
                 } else {
                   console.log(`🔍 BACKEND SYNC: ${platform} - keeping active local timer (${Math.ceil((localEndTimeNum - nowTs) / 1000 / 60)}min remaining)`);
+                  
+                  // ✅ ENHANCED SYNC: If local timer is still active but not on server, sync it back
+                  if (!data || !data.endTime) {
+                    console.log(`🔍 BACKEND SYNC: ${platform} - local timer active but missing on server, syncing back`);
+                    try {
+                      const localInfo = JSON.parse(localProcessingInfo);
+                      await fetch(`/api/processing-status/${currentUser.uid}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          platform,
+                          username: localInfo.username || '',
+                          startTime: localInfo.startTime || nowTs,
+                          endTime: localEndTimeNum,
+                          totalDuration: localInfo.totalDuration || (localEndTimeNum - (localInfo.startTime || nowTs))
+                        })
+                      });
+                      console.log(`🔍 BACKEND SYNC: ${platform} - successfully synced local timer back to server`);
+                    } catch (syncError) {
+                      console.warn(`🔍 BACKEND SYNC: ${platform} - failed to sync local timer back to server:`, syncError);
+                    }
+                  }
                 }
               } catch (error) {
                 console.warn(`🔍 BACKEND SYNC: ${platform} - error parsing local timer data:`, error);
@@ -612,9 +606,10 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
         console.log(`🔍 BACKEND SYNC: ${platform} - initial sync after delay`);
         syncFromServer();
       }
-    }, 2000); // 2 second delay
+    }, 2000); // 2 second delay for initial sync
     
-    const id = setInterval(syncFromServer, 1000);
+    // ✅ OPTIMIZED SYNC FREQUENCY: Reduced from 500ms to 3 seconds for better performance
+    const id = setInterval(syncFromServer, 3000); // Increased from 500ms to 3 seconds
     return () => { 
       cancelled = true; 
       clearTimeout(initialSyncDelay);

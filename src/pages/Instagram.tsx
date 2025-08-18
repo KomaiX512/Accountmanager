@@ -130,17 +130,19 @@ const Instagram: React.FC = () => {
   };
 
   if (isLoading) {
+    // ✅ NO BLOCKING LOADING SCREEN - Show content immediately while checking status in background
+    // This prevents the frustrating loading screen during navigation
     return (
-      <div className="instagram-page loading">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="loading-container"
-        >
-          <div className="spinner"></div>
-          <p>Loading your Instagram account...</p>
-        </motion.div>
+      <div className="instagram-page">
+        <AnimatePresence mode="wait">
+          <IG_EntryUsernames
+            key="entry"
+            onSubmitSuccess={handleSubmitSuccess}
+            redirectIfCompleted={false}
+            markPlatformAccessed={(id) => markPlatformAsAcquired(id)}
+            onComplete={() => {}}
+          />
+        </AnimatePresence>
       </div>
     );
   }

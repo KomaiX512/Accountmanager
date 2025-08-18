@@ -412,8 +412,20 @@ const MainDashboard: React.FC = () => {
 
     // ✅ BULLETPROOF PERSISTENCE: Store both countdown and processing info
     localStorage.setItem(getProcessingCountdownKey(platformId), endTime.toString());
-    // ✅ PRESERVE EXISTING USERNAME: Never overwrite existing username with fallbacks
-    let finalUsername = currentUser?.displayName || '';
+    // ✅ USERNAME SOURCE OF TRUTH: Prefer the platform dashboard username stored per-user
+    let finalUsername = '';
+    try {
+      if (currentUser?.uid) {
+        const platformUsername = localStorage.getItem(`${platformId}_username_${currentUser.uid}`);
+        if (platformUsername && platformUsername.trim()) {
+          finalUsername = platformUsername.trim();
+        }
+      }
+    } catch {}
+    // Fallback only if nothing found (avoid using displayName if we have the canonical key)
+    if (!finalUsername && currentUser?.displayName) {
+      finalUsername = currentUser.displayName;
+    }
     try {
       const existingProcessingInfo = localStorage.getItem(`${platformId}_processing_info`);
       if (existingProcessingInfo) {

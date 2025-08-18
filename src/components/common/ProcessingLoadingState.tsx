@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 /**
  * PLATFORM TIMING CONFIGURATION:
- * - Facebook: 20 minutes initial setup
+ * - Facebook: 1 minute initial setup
  * - Instagram: 15 minutes initial setup  
  * - Twitter: 15 minutes initial setup
  * - All platforms: 5 minutes extension when running statistics not found
@@ -87,7 +87,7 @@ const PLATFORM_CONFIGS: Record<string, PlatformConfigType> = {
     primaryColor: '#1877f2',
     secondaryColor: '#42a5f5',
     icon: <FaFacebook />,
-    initialMinutes: 20, // Facebook gets 20 minutes initially
+    initialMinutes: 1, // Facebook gets 1 minute initially (testing)
     extensionMinutes: 5  // 5 minutes extension for all platforms
   }
 };
@@ -106,6 +106,9 @@ interface ProcessingLoadingStateProps {
   platform: 'instagram' | 'twitter' | 'facebook' | 'linkedin';
   username: string;
   onComplete?: () => void;
+  // Fired exactly when the current countdown interval reaches zero.
+  // Parent can use this to perform run-status validation and extend time.
+  onIntervalComplete?: () => void;
   countdownMinutes?: number;
   remainingMinutes?: number;
   extensionMessage?: string;
@@ -117,6 +120,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   platform,
   username: propUsername,
   onComplete,
+  onIntervalComplete,
   countdownMinutes, // Remove default value - we'll use platform-specific timing
   remainingMinutes,
   extensionMessage,
@@ -207,11 +211,17 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     return `This ${platformConfig.initialMinutes}-minute initialization creates your custom analytics engine, competitor analysis, and automation tools. You'll never have to wait again!`;
   };
 
+  // Debug flag to enable verbose timer logs
+  const DEBUG_TIMER = !import.meta.env.PROD && window.localStorage.getItem('DEBUG_TIMER') === '1';
+  const debugLog = (...args: any[]) => { if (DEBUG_TIMER) console.log(...args); };
+
   // State to trigger re-renders for real-time updates
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [isTabVisible, setIsTabVisible] = useState(!document.hidden);
   const [timerCompleted, setTimerCompleted] = useState(false);
   const [timerJustCreated, setTimerJustCreated] = useState(false);
+  const [intervalCompletionSignalled, setIntervalCompletionSignalled] = useState(false);
+  const [lastKnownEndTime, setLastKnownEndTime] = useState<number | null>(null);
 
   // Get timer data from localStorage with bulletproof error handling
   const getTimerData = () => {
@@ -219,21 +229,21 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
       const endTimeRaw = localStorage.getItem(`${platform}_processing_countdown`);
       const processingInfoRaw = localStorage.getItem(`${platform}_processing_info`);
       
-      console.log(`🔍 TIMER DEBUG: Reading timer data for ${platform}:`, {
+      debugLog(`🔍 TIMER DEBUG: Reading timer data for ${platform}:`, {
         endTimeRaw,
         processingInfoRaw: processingInfoRaw ? 'exists' : 'missing',
         currentTime: new Date().toISOString()
       });
       
       if (!endTimeRaw || !processingInfoRaw) {
-        console.log(`🔍 TIMER DEBUG: Missing timer data for ${platform} - endTimeRaw: ${endTimeRaw}, processingInfoRaw: ${processingInfoRaw}`);
+        debugLog(`🔍 TIMER DEBUG: Missing timer data for ${platform} - endTimeRaw: ${endTimeRaw}, processingInfoRaw: ${processingInfoRaw}`);
         return null;
       }
       
       const endTime = parseInt(endTimeRaw);
       const processingInfo = JSON.parse(processingInfoRaw);
       
-      console.log(`🔍 TIMER DEBUG: Parsed timer data for ${platform}:`, {
+      debugLog(`🔍 TIMER DEBUG: Parsed timer data for ${platform}:`, {
         endTime,
         startTime: processingInfo.startTime,
         totalDuration: processingInfo.totalDuration,
@@ -241,7 +251,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
       });
       
       if (Number.isNaN(endTime) || !processingInfo.startTime) {
-        console.log(`🔍 TIMER DEBUG: Invalid timer data for ${platform} - endTime: ${endTime}, startTime: ${processingInfo.startTime}`);
+        debugLog(`🔍 TIMER DEBUG: Invalid timer data for ${platform} - endTime: ${endTime}, startTime: ${processingInfo.startTime}`);
         return null;
       }
       
@@ -252,7 +262,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
         username: processingInfo.username // NO FALLBACKS - use exact username from storage
       };
       
-      console.log(`🔍 TIMER DEBUG: Returning timer data for ${platform}:`, result);
+      debugLog(`🔍 TIMER DEBUG: Returning timer data for ${platform}:`, result);
       return result;
     } catch (error) {
       console.error(`🔍 TIMER DEBUG: Error reading timer data for ${platform}:`, error);
@@ -395,7 +405,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
       
       const remaining = getRemainingMs();
       
-      console.log(`🔍 TIMER UPDATE: ${platform} - remaining: ${remaining}ms, timerCompleted: ${timerCompleted}`);
+      debugLog(`🔍 TIMER UPDATE: ${platform} - remaining: ${remaining}ms, timerCompleted: ${timerCompleted}`);
       
       if (remaining <= 0 && !timerCompleted) {
         if (allowAutoComplete) {
@@ -452,7 +462,16 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
             console.error('Error cleaning up timer:', error);
           }
         } else {
-          // Do not mark as completed; parent may extend time and continue updates
+          // Do not mark as completed; parent orchestrates. Signal once per interval end.
+          if (!intervalCompletionSignalled) {
+            setIntervalCompletionSignalled(true);
+            try {
+              console.log(`🎯 TIMER INTERVAL COMPLETE: Signalling parent for ${platform}`);
+              onIntervalComplete && onIntervalComplete();
+            } catch (e) {
+              console.warn('onIntervalComplete threw an error', e);
+            }
+          }
           // Keep interval running so UI can reflect extended endTime written by parent
         }
       }
@@ -462,10 +481,28 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     updateTimer();
     
     // Use different intervals based on tab visibility for optimal performance
-    const interval = setInterval(updateTimer, isTabVisible ? 100 : 1000);
+    const interval = setInterval(updateTimer, isTabVisible ? 1000 : 2000);
     
     return () => clearInterval(interval);
-  }, [platform, currentTime, isTabVisible, timerCompleted]);
+  }, [platform, currentTime, isTabVisible, timerCompleted, onIntervalComplete, intervalCompletionSignalled]);
+
+  // Reset the signalling flag whenever a new endTime is set (i.e., extension)
+  useEffect(() => {
+    try {
+      const infoRaw = localStorage.getItem(`${platform}_processing_info`);
+      if (!infoRaw) return;
+      const info = JSON.parse(infoRaw);
+      if (info && typeof info.endTime === 'number') {
+        if (lastKnownEndTime === null) {
+          setLastKnownEndTime(info.endTime);
+        } else if (info.endTime > lastKnownEndTime) {
+          // End time advanced (extension/new interval) → allow signalling again
+          setIntervalCompletionSignalled(false);
+          setLastKnownEndTime(info.endTime);
+        }
+      }
+    } catch {}
+  }, [platform, currentTime, lastKnownEndTime]);
 
   // ✅ PAGE VISIBILITY API - Perfect tab switching synchronization
   useEffect(() => {

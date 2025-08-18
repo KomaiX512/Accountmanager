@@ -72,7 +72,11 @@ export const API_CONFIG = {
 // Helper function to get full URL with enhanced error handling
 export const getApiUrl = (endpoint: string, params?: string): string => {
   try {
-    const baseUrl = API_CONFIG.BASE_URL;
+    // Use VPS backend only for cross-device run-status endpoint; otherwise stay relative
+    const isRunStatus = endpoint.startsWith(API_CONFIG.ENDPOINTS.RUN_STATUS);
+    const isHealth = endpoint.startsWith('/api/health');
+    const useRemote = isRunStatus || isHealth;
+    const baseUrl = useRemote ? API_CONFIG.BASE_URL : '';
     const fullEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     const url = `${baseUrl}${fullEndpoint}`;
     const finalUrl = params ? `${url}${params}` : url;

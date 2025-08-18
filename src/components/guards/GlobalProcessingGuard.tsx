@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { safeNavigate, safeHistoryManipulation } from '../../utils/navigationGuard';
 
@@ -42,17 +42,7 @@ const hasActiveTimer = (platform: string): { active: boolean; remainingMs: numbe
   }
 };
 
-// Get username for platform
-const getPlatformUsername = (platform: string): string => {
-  try {
-    const processingInfo = localStorage.getItem(`${platform}_processing_info`);
-    if (processingInfo) {
-      const info = JSON.parse(processingInfo);
-      return info.username || 'User';
-    }
-  } catch {}
-  return 'User';
-};
+// Username not required for redirect; keep logic minimal
 
 /**
  * 🛡️ BULLETPROOF GLOBAL PROCESSING GUARD
@@ -72,7 +62,8 @@ const getPlatformUsername = (platform: string): string => {
 const GlobalProcessingGuard: React.FC<GlobalProcessingGuardProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [isBlocked, setIsBlocked] = useState(false);
+  // Avoid UI blocking overlays; keep for potential future use but unused
+  // const [isBlocked, setIsBlocked] = useState(false);
   const blockingRef = useRef(false);
   const historyBlockRef = useRef<any>(null);
 
@@ -81,12 +72,12 @@ const GlobalProcessingGuard: React.FC<GlobalProcessingGuardProps> = ({ children 
     if (blockingRef.current) return; // Prevent double redirects
     blockingRef.current = true;
     
-    const username = getPlatformUsername(platform);
+    // const username = getPlatformUsername(platform);
     const remainingMinutes = Math.ceil(remainingMs / 1000 / 60);
     
     console.log(`🚫 BULLETPROOF GUARD: Blocking ${platform} dashboard - ${remainingMinutes} minutes remaining`);
     
-    setIsBlocked(true);
+    // Do not set blocked overlay; we will navigate silently
     
     // Use safe navigation to prevent rapid API calls
     safeNavigate(navigate, `/processing/${platform}`, {
@@ -102,7 +93,6 @@ const GlobalProcessingGuard: React.FC<GlobalProcessingGuardProps> = ({ children 
     // Reset blocking flag after redirect
     setTimeout(() => {
       blockingRef.current = false;
-      setIsBlocked(false);
     }, 100);
   };
 
@@ -286,30 +276,8 @@ const GlobalProcessingGuard: React.FC<GlobalProcessingGuardProps> = ({ children 
     }
   }, [location.pathname]);
 
-  // Block rendering if protection is active
-  if (isBlocked) {
-    return (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        backgroundColor: '#000',
-        color: '#fff',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 99999,
-        fontFamily: 'Inter, sans-serif'
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '24px', marginBottom: '16px' }}>🛡️ Protection Active</div>
-          <div>Redirecting to processing page...</div>
-        </div>
-      </div>
-    );
-  }
+  // Do not display a blocking overlay; allow children to render while guard navigates
+  // If a redirect is triggered, navigation will replace the view quickly.
 
   return <>{children}</>;
 };

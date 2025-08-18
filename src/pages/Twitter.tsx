@@ -144,17 +144,18 @@ const Twitter: React.FC = () => {
   };
 
   if (isLoading) {
+    // ✅ NO BLOCKING LOADING SCREEN - Show content immediately while checking status in background
+    // This prevents the frustrating loading screen during navigation
     return (
-      <div className="twitter-page loading">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="loading-container"
-        >
-          <div className="spinner"></div>
-          <p>Loading your Twitter account...</p>
-        </motion.div>
+      <div className="twitter-page">
+        <AnimatePresence mode="wait">
+          <TW_EntryUsernames
+            key="entry"
+            onSubmitSuccess={handleSubmitSuccess}
+            redirectIfCompleted={false}
+            markPlatformAccessed={markPlatformAccessed}
+          />
+        </AnimatePresence>
       </div>
     );
   }

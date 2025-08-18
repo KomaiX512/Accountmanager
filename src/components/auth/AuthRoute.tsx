@@ -10,7 +10,7 @@ interface AuthRouteProps {
 const AuthRoute: React.FC<AuthRouteProps> = ({ children }) => {
   const { currentUser, loading } = useAuth();
   const location = useLocation();
-  const [isChecking, setIsChecking] = useState(true);
+  const [isChecking, setIsChecking] = useState(false);
   const [hasCompletedSetup, setHasCompletedSetup] = useState(false);
   const [instagramData, setInstagramData] = useState<{
     accountHolder: string;
@@ -22,7 +22,6 @@ const AuthRoute: React.FC<AuthRouteProps> = ({ children }) => {
     // Only check if user has completed Instagram setup if they're logged in
     const checkInstagramStatus = async () => {
       if (!currentUser || !currentUser.uid) {
-        setIsChecking(false);
         return;
       }
 
@@ -41,24 +40,27 @@ const AuthRoute: React.FC<AuthRouteProps> = ({ children }) => {
       } catch (error) {
         console.error('Error checking Instagram status:', error);
         setHasCompletedSetup(false);
-      } finally {
-        setIsChecking(false);
       }
     };
 
     if (!loading && currentUser) {
-      checkInstagramStatus();
-    } else if (!loading) {
-      setIsChecking(false);
+      // ✅ BACKGROUND VALIDATION - Start validation but don't block UI
+      setIsChecking(true);
+      checkInstagramStatus().finally(() => {
+        setIsChecking(false);
+      });
     }
   }, [currentUser, loading]);
 
-  if (loading || isChecking) {
-    // Show loading indicator while checking auth and Instagram status
+  // ✅ NO LOADING SCREEN - Show content immediately while validating in background
+  // Only show loading for initial auth loading, not for Instagram status checks
+  
+  if (loading) {
+    // Show loading indicator only for initial authentication
     return (
       <div className="auth-loading">
         <div className="spinner"></div>
-        <p>Loading your account...</p>
+        <p>Authenticating...</p>
       </div>
     );
   }
@@ -69,7 +71,7 @@ const AuthRoute: React.FC<AuthRouteProps> = ({ children }) => {
   }
 
   // Always render children (MainDashboard) after successful login
-  // This bypasses the Instagram setup form and shows the dashboard first
+  // Instagram status validation happens in background without blocking UI
   return <>{children}</>;
 };
 

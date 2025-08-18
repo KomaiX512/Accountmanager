@@ -37,7 +37,7 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
   const [success, setSuccess] = useState(false);
   const [showCampaignButton, setShowCampaignButton] = useState(false);
   const [campaignStatus, setCampaignStatus] = useState<CampaignStatus | null>(null);
-  const [isCheckingStatus, setIsCheckingStatus] = useState(true);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
 
   useEffect(() => {
     checkCampaignStatus();
@@ -80,6 +80,7 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
   }, [username, platform]);
 
   const checkCampaignStatus = async () => {
+    // ✅ BACKGROUND VALIDATION - Start validation but don't block UI
     setIsCheckingStatus(true);
     try {
       console.log(`[GoalModal] Checking campaign status for ${username} on ${platform}`);
@@ -216,31 +217,8 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
     window.dispatchEvent(new CustomEvent('openCampaignModal', { detail: { username, platform } }));
   };
 
-  if (isCheckingStatus) {
-    return (
-      <motion.div
-        className="post-scheduler-modal"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-      >
-        <motion.div
-          className="post-scheduler-content"
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.9, opacity: 0 }}
-          transition={{ type: "spring", damping: 25, stiffness: 300 }}
-          onClick={(e) => e.stopPropagation()}
-          style={{ maxWidth: 500, width: '100%' }}
-        >
-          <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-            <div className="loading-spinner" style={{ margin: '0 auto 20px' }}></div>
-            <p style={{ color: '#a0a0cc' }}>Checking campaign status...</p>
-          </div>
-        </motion.div>
-      </motion.div>
-    );
-  }
+  // ✅ NO LOADING SCREEN - Show content immediately while validating in background
+  // Campaign status validation happens seamlessly without blocking the user interface
 
   return (
     <motion.div

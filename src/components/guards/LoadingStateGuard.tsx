@@ -7,7 +7,7 @@ interface LoadingStateGuardProps {
 }
 
 /**
- * ✅ BULLETPROOF CROSS-DEVICE LOADING STATE GUARD
+ * ✅ BULLETPROOF CROSS-DEVICE LOADING STATE GUARD - BACKGROUND VALIDATION
  * 
  * This guard ensures that ANY device attempting to access platform dashboards
  * will be redirected to the processing page if a loading state exists.
@@ -18,14 +18,17 @@ interface LoadingStateGuardProps {
  * 3. Prevents dashboard access during processing
  * 4. Handles expired timers automatically
  * 5. Works at authentication level for maximum security
+ * 6. ✅ NEW: Background validation - no black loading screen for users
  */
 const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { currentUser, checkLoadingStateForPlatform } = useAuth();
-  const [isChecking, setIsChecking] = useState(true);
+  const [isValidating, setIsValidating] = useState(false);
+  const [validationComplete, setValidationComplete] = useState(false);
   const inFlightRef = useRef(false);
   const lastRedirectRef = useRef<string | null>(null);
+  const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Platform route mappings
   const platformRoutes: Record<string, string> = {
@@ -98,13 +101,23 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
     }
   };
 
-  // Performs authoritative check: if ANY platform is in active processing, redirect accordingly
-  const hardCheck = async () => {
+  // ✅ BACKGROUND VALIDATION - No blocking UI, seamless user experience
+  const backgroundValidate = async () => {
     if (inFlightRef.current) return; // prevent overlap
     inFlightRef.current = true;
+    
     try {
-      if (!currentUser?.uid || !isProtectedRoute()) return;
+      if (!isProtectedRoute()) { 
+        setValidationComplete(true);
+        return; 
+      }
+      if (!currentUser?.uid) { 
+        setValidationComplete(true);
+        return; 
+      }
+      
       const platform = getCurrentPlatform();
+      
       // 0. GLOBAL processing validation – block access if ANY platform still in processing state
       if (currentUser?.uid) {
         try {
@@ -116,16 +129,27 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
             for (const p of platforms) {
               const st = states[p];
               if (st && typeof st.endTime === 'number' && Date.now() < st.endTime) {
-                // Found active processing – redirect to proper processing route
-                const processingRoute = `/processing/${p}`;
-                if (lastRedirectRef.current !== processingRoute) {
-                  lastRedirectRef.current = processingRoute;
-                  navigate(processingRoute, {
-                    replace: true,
-                    state: { platform: p, remainingMinutes: Math.ceil((st.endTime - Date.now())/60000), fromGuardGlobal: true }
-                  });
+                // Only redirect if the user is trying to access *that* platform's dashboard
+                const currentRoutePlatform = platform;
+                if (currentRoutePlatform && currentRoutePlatform === p) {
+                  const processingRoute = `/processing/${p}`;
+                  if (lastRedirectRef.current !== processingRoute) {
+                    lastRedirectRef.current = processingRoute;
+                    console.log(`🔄 BACKGROUND VALIDATION: Redirecting to processing for ${p}`);
+                    // Seamless redirect without loading screen
+                    navigate(processingRoute, {
+                      replace: true,
+                      state: { 
+                        platform: p, 
+                        remainingMinutes: Math.ceil((st.endTime - Date.now())/60000), 
+                        fromGuardGlobal: true 
+                      }
+                    });
+                  }
+                  return; // stop further checks, we're redirecting
                 }
-                return; // stop further checks, we're redirecting
+                // If the current page is unrelated to the processing platform, just allow navigation
+                continue;
               }
             }
           }
@@ -135,7 +159,11 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
       }
 
       // If no global active processing, fall back to per-route logic
-      if (!platform) return;
+      if (!platform) {
+        setValidationComplete(true);
+        return;
+      }
+      
       // If override flag set very recently (<15s), note it but DO NOT skip backend validation
       try {
         const overrideKey = `processing_override_${platform}`;
@@ -144,7 +172,6 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
           console.log('⏳ GUARD: Override active; still performing backend validation.');
         }
       } catch {}
-      setIsChecking(true);
 
       // 1. Backend authoritative check
       const backend = await backendValidate(platform);
@@ -152,22 +179,24 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
         if (backend.data.accessAllowed === false && backend.data.reason === 'processing_active') {
           const processingRoute = backend.data.redirectTo || `/processing/${platform}`;
           // Avoid redirect loops
-            if (lastRedirectRef.current !== processingRoute) {
-              lastRedirectRef.current = processingRoute;
-              navigate(processingRoute, {
-                state: {
-                  platform,
-                  remainingMinutes: backend.data.processingData?.remainingMinutes,
-                  fromGuard: true,
-                  backendAuthoritative: true
-                },
-                replace: true
-              });
-            }
+          if (lastRedirectRef.current !== processingRoute) {
+            lastRedirectRef.current = processingRoute;
+            console.log(`🔄 BACKGROUND VALIDATION: Backend redirecting to processing for ${platform}`);
+            // Seamless redirect without loading screen
+            navigate(processingRoute, {
+              state: {
+                platform,
+                remainingMinutes: backend.data.processingData?.remainingMinutes,
+                fromGuard: true,
+                backendAuthoritative: true
+              },
+              replace: true
+            });
+          }
           return;
         } else if (backend.data.accessAllowed === true) {
           // Allowed, proceed; also clear any stale local storage for this platform if timer expired
-          setIsChecking(false);
+          setValidationComplete(true);
           return;
         }
       }
@@ -177,6 +206,8 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
       if (fallback.hasLoadingState && fallback.redirectTo) {
         if (lastRedirectRef.current !== fallback.redirectTo) {
           lastRedirectRef.current = fallback.redirectTo;
+          console.log(`🔄 BACKGROUND VALIDATION: Fallback redirecting to processing for ${platform}`);
+          // Seamless redirect without loading screen
           navigate(fallback.redirectTo, {
             state: {
               platform,
@@ -188,18 +219,57 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
           return;
         }
       }
-      setIsChecking(false);
+      
+      // All validations passed - allow access
+      setValidationComplete(true);
+      
     } finally {
       inFlightRef.current = false;
     }
   };
 
-  // Check loading state on mount and route changes
+  // ✅ BACKGROUND VALIDATION TRIGGER - Start validation immediately but don't block UI
   useEffect(() => {
-    if (!currentUser?.uid) { setIsChecking(false); return; }
-    hardCheck();
+    if (!currentUser?.uid) { 
+      setValidationComplete(true);
+      return; 
+    }
+    
+    // Start background validation immediately
+    setIsValidating(true);
+    
+    // Perform validation in background with timeout protection
+    const performValidation = async () => {
+      try {
+        await backgroundValidate();
+      } catch (error) {
+        console.error('Background validation error:', error);
+        setValidationComplete(true); // Allow access on error
+      }
+    };
+    
+    // Start validation immediately
+    performValidation();
+    
+    // Set a timeout to ensure validation completes (max 15 seconds)
+    validationTimeoutRef.current = setTimeout(() => {
+      if (!validationComplete) {
+        console.warn('Background validation timeout - allowing access');
+        setValidationComplete(true);
+      }
+    }, 15000);
+    
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.uid, location.pathname]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (validationTimeoutRef.current) {
+        clearTimeout(validationTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Handle storage events for cross-tab synchronization
   useEffect(() => {
@@ -210,7 +280,11 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
         const currentPlatform = getCurrentPlatform();
         if (platform === currentPlatform && isProtectedRoute()) {
           // Re-run authoritative check shortly after storage event
-          setTimeout(() => { hardCheck(); }, 400);
+          setTimeout(() => { 
+            if (!inFlightRef.current) {
+              backgroundValidate(); 
+            }
+          }, 400);
         }
       }
     };
@@ -218,36 +292,10 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [location.pathname]);
 
-  // Show minimal loading state while checking
-  if (isChecking) {
-    return (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 99999,
-        fontFamily: 'Inter, sans-serif'
-      }}>
-        <div style={{ 
-          textAlign: 'center',
-          color: 'white',
-          fontSize: '16px'
-        }}>
-          <div style={{ marginBottom: '12px' }}>🔍 Validating Processing Status</div>
-          <div style={{ fontSize: '14px', opacity: 0.8 }}>
-            Checking for active loading states...
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+  // ✅ NO LOADING SCREEN - Show content immediately while validating in background
+  // The validation happens seamlessly without blocking the user interface
+  
+  // Show children immediately - validation happens in background
   return <>{children}</>;
 };
 

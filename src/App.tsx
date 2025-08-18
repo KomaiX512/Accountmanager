@@ -471,12 +471,104 @@ const AppContent: React.FC = () => {
                 replace: true
               }, 5); // Medium priority for user data loading
             } else {
-              // User hasn't set up the platform yet, redirect to setup page
-              console.log(`[App] ⚠️ User hasn't set up ${isTwitterDashboard ? 'Twitter' : isFacebookDashboard ? 'Facebook' : 'Instagram'} yet, redirecting to setup`);
+              // Backend says not set up; fall back to local cache before redirecting
+              const platformKey = isTwitterDashboard ? 'twitter' : isFacebookDashboard ? 'facebook' : 'instagram';
+              const uid = currentUser.uid;
+              try {
+                const hasAccessed = localStorage.getItem(`${platformKey}_accessed_${uid}`) === 'true';
+                let cachedUsername = localStorage.getItem(`${platformKey}_username_${uid}`) || '';
+                const cachedCompetitors = JSON.parse(localStorage.getItem(`${platformKey}_competitors_${uid}`) || '[]');
+                const cachedAccountType = (localStorage.getItem(`${platformKey}_account_type_${uid}`) as 'branding' | 'non-branding') || 'branding';
+                // Additional backfill for Facebook/Twitter if username missing but accessed
+                if (hasAccessed && !cachedUsername) {
+                  try {
+                    const accountDataRaw = localStorage.getItem(`${platformKey}_account_data_${uid}`);
+                    if (accountDataRaw) {
+                      const accountData = JSON.parse(accountDataRaw);
+                      if (accountData && typeof accountData.name === 'string' && accountData.name.trim()) {
+                        cachedUsername = accountData.name.trim();
+                        localStorage.setItem(`${platformKey}_username_${uid}`, cachedUsername);
+                      }
+                    }
+                  } catch {}
+                  // As a last resort, try processing_info username
+                  if (!cachedUsername) {
+                    try {
+                      const infoRaw = localStorage.getItem(`${platformKey}_processing_info`);
+                      if (infoRaw) {
+                        const info = JSON.parse(infoRaw);
+                        if (info && typeof info.username === 'string' && info.username.trim()) {
+                          cachedUsername = info.username.trim();
+                        }
+                      }
+                    } catch {}
+                  }
+                }
+                if (hasAccessed || (cachedUsername && cachedUsername.trim())) {
+                  console.log(`[App] ⚠️ Backend reported not set up for ${platformKey}, but local cache indicates setup completed – proceeding to dashboard using cache.`);
+                  safeNavigate(navigate, location.pathname, {
+                    state: {
+                      accountHolder: cachedUsername,
+                      competitors: Array.isArray(cachedCompetitors) ? cachedCompetitors : [],
+                      accountType: cachedAccountType,
+                      platform: platformKey
+                    },
+                    replace: true
+                  }, 5);
+                  return;
+                }
+              } catch {}
+              console.log(`[App] ⚠️ User hasn't set up ${isTwitterDashboard ? 'Twitter' : isFacebookDashboard ? 'Facebook' : 'Instagram'} yet (no valid cache), redirecting to setup`);
               safeNavigate(navigate, isTwitterDashboard ? '/twitter' : isFacebookDashboard ? '/facebook' : '/instagram', {}, 5);
             }
           } catch (error) {
             console.error(`[App] ❌ Error fetching user status:`, error);
+            // Network or server error; fall back to cached platform state before redirecting
+            const platformKey = location.pathname.includes('twitter') ? 'twitter' : location.pathname.includes('facebook') ? 'facebook' : 'instagram';
+            const uid = currentUser.uid;
+            try {
+              const hasAccessed = localStorage.getItem(`${platformKey}_accessed_${uid}`) === 'true';
+              let cachedUsername = localStorage.getItem(`${platformKey}_username_${uid}`) || '';
+              const cachedCompetitors = JSON.parse(localStorage.getItem(`${platformKey}_competitors_${uid}`) || '[]');
+              const cachedAccountType = (localStorage.getItem(`${platformKey}_account_type_${uid}`) as 'branding' | 'non-branding') || 'branding';
+              if (hasAccessed && !cachedUsername) {
+                try {
+                  const accountDataRaw = localStorage.getItem(`${platformKey}_account_data_${uid}`);
+                  if (accountDataRaw) {
+                    const accountData = JSON.parse(accountDataRaw);
+                    if (accountData && typeof accountData.name === 'string' && accountData.name.trim()) {
+                      cachedUsername = accountData.name.trim();
+                      localStorage.setItem(`${platformKey}_username_${uid}`, cachedUsername);
+                    }
+                  }
+                } catch {}
+                if (!cachedUsername) {
+                  try {
+                    const infoRaw = localStorage.getItem(`${platformKey}_processing_info`);
+                    if (infoRaw) {
+                      const info = JSON.parse(infoRaw);
+                      if (info && typeof info.username === 'string' && info.username.trim()) {
+                        cachedUsername = info.username.trim();
+                      }
+                    }
+                  } catch {}
+                }
+              }
+              if (hasAccessed || (cachedUsername && cachedUsername.trim())) {
+                console.log(`[App] 🌐 Using cached ${platformKey} setup to continue despite status error`);
+                safeNavigate(navigate, location.pathname, {
+                  state: {
+                    accountHolder: cachedUsername,
+                    competitors: Array.isArray(cachedCompetitors) ? cachedCompetitors : [],
+                    accountType: cachedAccountType,
+                    platform: platformKey
+                  },
+                  replace: true
+                }, 5);
+                return;
+              }
+            } catch {}
+            // No viable cache; redirect to setup
             safeNavigate(navigate, location.pathname.includes('twitter') ? '/twitter' : location.pathname.includes('facebook') ? '/facebook' : '/instagram', {}, 5);
           } finally {
             setIsLoadingUserData(false);

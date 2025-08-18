@@ -139,17 +139,18 @@ const Facebook: React.FC = () => {
   };
 
   if (isLoading) {
+    // ✅ NO BLOCKING LOADING SCREEN - Show content immediately while checking status in background
+    // This prevents the frustrating loading screen during navigation
     return (
-      <div className="facebook-page loading">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="loading-container"
-        >
-          <div className="spinner"></div>
-          <p>Loading your Facebook account...</p>
-        </motion.div>
+      <div className="facebook-page">
+        <AnimatePresence mode="wait">
+          <FB_EntryUsernames
+            key="entry"
+            onSubmitSuccess={handleSubmitSuccess}
+            redirectIfCompleted={false}
+            markPlatformAccessed={markPlatformAccessed}
+          />
+        </AnimatePresence>
       </div>
     );
   }

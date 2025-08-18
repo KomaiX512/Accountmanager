@@ -306,12 +306,162 @@ const usernameCheckUrl = '/api/check-username-availability';
   };
 
   if (isInitializing) {
+    // ✅ NO BLOCKING LOADING SCREEN - Show content immediately while checking processing state in background
+    // This prevents the frustrating loading screen during navigation
     return (
-      <div className="dashboard-container">
-        <div className="card loading">
-          <h1 className="title">Loading...</h1>
+      <motion.div
+        className="twitter-entry-container"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -20 }}
+        transition={{ duration: 0.5 }}
+      >
+        <div className="twitter-entry-wrapper">
+          <div className="twitter-entry-header">
+            <h1>Setup Your Twitter Account</h1>
+            <div className="importance-notice">
+              <div className="importance-icon">⚠️</div>
+              <p><strong>Critical Setup:</strong> This information initiates a 15-minute AI analysis process. Please ensure all details are accurate before submission.</p>
+            </div>
+          </div>
+
+          <form className="twitter-entry-form" onSubmit={(e) => { e.preventDefault(); submitData(); }}>
+            <div className="form-section">
+              <h2>Account Information</h2>
+              
+              <div className="form-group">
+                <label htmlFor="twitter-username">
+                  Your Twitter Username * 
+                  <span className="critical-field">CRITICAL</span>
+                </label>
+                <input
+                  type="text"
+                  id="twitter-username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="e.g., YourBrandName (no @ symbol)"
+                  className="form-input"
+                  disabled={isLoading}
+                />
+                <div className="username-counter">
+                  Characters: {username.length} / 15
+                  {username.length > 12 && (
+                    <span className="counter-warning"> (Username getting long)</span>
+                  )}
+                </div>
+                <div className="field-description">
+                  <p><strong>Twitter Username:</strong> This is your Twitter handle without the @ symbol.</p>
+                  <ul>
+                    <li>✓ Must be a valid Twitter username</li>
+                    <li>✓ No spaces or special characters (except underscores)</li>
+                    <li>✓ Used for AI analysis and competitor research</li>
+                    <li>✓ This will be used for 15 minutes of AI processing</li>
+                  </ul>
+                  <div className="format-example">
+                    <strong>Examples:</strong> "YourBrandName", "YourName", "Brand_123"
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="form-section">
+              <h2>Competitor Analysis</h2>
+              <div className="competitors-section">
+                <div className="competitors-header">
+                  <h3>Add Your Competitors</h3>
+                  <p>Add up to 5 competitors for AI-powered analysis and insights</p>
+                </div>
+                
+                {competitors.map((competitor, index) => (
+                  <div key={index} className="competitor-input-group">
+                    <input
+                      type="text"
+                      value={competitor}
+                      onChange={(e) => handleCompetitorChange(index, e.target.value)}
+                      placeholder={`Competitor ${index + 1} username`}
+                      className="form-input"
+                      disabled={isLoading}
+                    />
+                    {competitors.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeCompetitor(index)}
+                        className="remove-competitor-btn"
+                        disabled={isLoading}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                ))}
+                
+                {competitors.length < 5 && (
+                  <button
+                    type="button"
+                    onClick={addCompetitor}
+                    className="add-competitor-btn"
+                    disabled={isLoading}
+                  >
+                    + Add Competitor
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="form-section">
+              <h2>Account Type</h2>
+              <div className="account-type-selection">
+                <label className="radio-label">
+                  <input
+                    type="radio"
+                    name="accountType"
+                    value="branding"
+                    checked={accountType === 'branding'}
+                    onChange={(e) => setAccountType(e.target.value as 'branding' | 'non-branding')}
+                    disabled={isLoading}
+                  />
+                  <span className="radio-text">
+                    <strong>Branding Account</strong>
+                    <span className="radio-description">Business, brand, or public figure account</span>
+                  </span>
+                </label>
+                
+                <label className="radio-label">
+                  <input
+                    type="radio"
+                    name="accountType"
+                    value="non-branding"
+                    checked={accountType === 'non-branding'}
+                    onChange={(e) => setAccountType(e.target.value as 'branding' | 'non-branding')}
+                    disabled={isLoading}
+                  />
+                  <span className="radio-text">
+                    <strong>Non-Branding Account</strong>
+                    <span className="radio-description">Personal, private, or non-business account</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div className="form-actions">
+              <button
+                type="submit"
+                className="submit-btn"
+                disabled={isLoading || !isValidForSubmission()}
+              >
+                {isLoading ? (
+                  <>
+                    <span className="spinner"></span>
+                    Setting Up Your Account...
+                  </>
+                ) : (
+                  'Start Twitter Setup'
+                )}
+              </button>
+            </div>
+          </form>
         </div>
-      </div>
+      </motion.div>
     );
   }
 

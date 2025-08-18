@@ -6,7 +6,7 @@ import { useProcessing } from '../context/ProcessingContext';
 import { useAuth } from '../context/AuthContext';
 import { safeNavigate, safeHistoryManipulation } from '../utils/navigationGuard';
 import axios from 'axios';
-import { API_CONFIG, getApiUrl } from '../config/api';
+import { getApiUrl } from '../config/api';
 
 const Processing: React.FC = () => {
   const navigate = useNavigate();
@@ -14,8 +14,8 @@ const Processing: React.FC = () => {
   const location = useLocation();
   const { completeProcessing } = useProcessing();
   const { currentUser } = useAuth();
-  const [isValidating, setIsValidating] = useState(true);
-  const [shouldRender, setShouldRender] = useState(false);
+  // Validation runs in background; render immediately to avoid blocking UX
+  const [shouldRender, setShouldRender] = useState(true);
   const validationRef = useRef(false);
   const finalizeTriggeredRef = useRef(false); // prevent multiple finalize navigations
   const [extensionMessage, setExtensionMessage] = useState<string | null>(null);
@@ -30,9 +30,9 @@ const Processing: React.FC = () => {
 
   const targetPlatform = platform || stateData?.platform || 'instagram';
   
-  // Get username from state or localStorage (NO FALLBACKS TO 'User')
+  // Get username from state or storage (prefer canonical per-platform key before giving up)
   const username = (() => {
-    // Strong source of truth order: stateData.username -> processing_info.username -> NO FALLBACK
+    // Source of truth order: stateData.username -> processing_info.username -> canonical platform key -> ''
     if (stateData?.username && typeof stateData.username === 'string' && stateData.username.trim()) {
       return stateData.username.trim();
     }
@@ -47,155 +47,207 @@ const Processing: React.FC = () => {
     } catch (error) {
       console.error('Error reading username from localStorage:', error);
     }
-    // ❌ REMOVED: No fallback to 'User' - this causes system disruption
+    // Canonical per-platform username (saved at setup time)
+    try {
+      if (currentUser?.uid) {
+        const canonical = localStorage.getItem(`${targetPlatform}_username_${currentUser.uid}`);
+        if (canonical && canonical.trim()) {
+          return canonical.trim();
+        }
+      }
+    } catch {}
     console.error(`🚨 CRITICAL: No username available for platform ${targetPlatform}. This should never happen.`);
-    return ''; // Return empty to avoid system disruption
+    return '';
   })();
   
   const remainingMinutes = stateData?.remainingMinutes;
   const forcedRedirect = stateData?.forcedRedirect || false;
 
-  // ✅ USERNAME NORMALIZATION: Ensure username is properly formatted for API calls (NO FALLBACKS)
-  const normalizeUsername = (username: string): string => {
-    if (!username || typeof username !== 'string') {
-      console.error(`🚨 NORMALIZE: Cannot normalize empty username`);
-      return username; // Return as-is to avoid fallbacks
-    }
-    
-    // Remove leading/trailing whitespace
-    let normalized = username.trim();
-    
-    // Remove any special characters that might cause API issues
-    normalized = normalized.replace(/[^\w\s-]/g, '');
-    
-    // Ensure it's not empty after normalization - but don't fallback to 'User'
-    if (!normalized) {
-      console.error(`🚨 NORMALIZE: Username became empty after normalization: "${username}"`);
-      return username; // Return original to preserve user input
-    }
-    
-    console.log(`🔧 USERNAME NORMALIZATION: "${username}" -> "${normalized}"`);
-    return normalized;
-  };
+  // Username normalization not needed here; we keep exact primary username
 
-  // ✅ API HEALTH CHECK: Verify if the server endpoint is working
-  const checkApiHealth = async (): Promise<boolean> => {
-    try {
-      const healthUrl = getApiUrl('/api/health');
-      console.log(`🏥 API HEALTH CHECK: Testing endpoint ${healthUrl}`);
-      const response = await axios.get(healthUrl, { timeout: 5000 });
-      console.log(`🏥 API HEALTH CHECK: Status ${response.status}`);
-      return response.status === 200;
-    } catch (error) {
-      console.warn(`🏥 API HEALTH CHECK: Failed - ${error instanceof Error ? error.message : 'Unknown error'}`);
-      return false;
-    }
-  };
+  // Health check removed; direct run-status checks are authoritative
 
   // Helper: check R2 run status existence for platform/username
-  const checkRunStatus = async (platformId: string, primaryUsername: string): Promise<{ exists: boolean; status?: string | null }> => {
-    // Add cache-buster to avoid any stale 404 caching at the proxy/browser layer
-    const cacheBuster = `?cb=${Date.now()}`;
+  const checkRunStatus = async (platformId: string, primaryUsername: string): Promise<{ exists: boolean; status?: any }> => {
+    console.log(`🔍 CHECKRUNSTATUS START: platform=${platformId}, primaryUsername="${primaryUsername}"`);
     
+    // Build robust candidate list to avoid case/encoding mismatches
+    const trimmed = (primaryUsername || '').trim();
+    const candidates: string[] = [];
+    if (trimmed) candidates.push(trimmed); // original case
+    const lower = trimmed.toLowerCase();
+    if (lower && !candidates.includes(lower)) candidates.push(lower);
     try {
-      // ✅ API HEALTH CHECK: Verify server is working before main request
-      const isApiHealthy = await checkApiHealth();
-      if (!isApiHealthy) {
-        console.warn(`🔍 RUNSTATUS: API health check failed, proceeding with main request anyway`);
-      }
-      
-      // ✅ NORMALIZE USERNAME: Ensure username is properly formatted for API
-      const normalizedUsername = normalizeUsername(primaryUsername);
-      
-      const url = getApiUrl(`${API_CONFIG.ENDPOINTS.RUN_STATUS}/${platformId}/${encodeURIComponent(normalizedUsername)}${cacheBuster}`);
-      
-      // ✅ ENHANCED DEBUGGING: Log all details to diagnose username mismatch
-      console.log(`🔍 RUNSTATUS DEBUG INFO:`);
-      console.log(`  - Platform: ${platformId}`);
-      console.log(`  - Username (raw): "${primaryUsername}"`);
-      console.log(`  - Username (normalized): "${normalizedUsername}"`);
-      console.log(`  - Username (length): ${normalizedUsername.length}`);
-      console.log(`  - Username (encoded): ${encodeURIComponent(normalizedUsername)}`);
-      console.log(`  - Full URL: ${url}`);
-      console.log(`  - Expected R2 path: RunStatus/${platformId}/${normalizedUsername}/status.json`);
-      console.log(`  - API Health: ${isApiHealthy ? 'OK' : 'FAILED'}`);
-      
-      const res = await axios.get(url, { timeout: 10000 });
-      console.log(`🔍 RUNSTATUS RESPONSE:`, res.status, res.data);
-      
-      // Enhanced response validation
-      if (res.status === 200 && res.data) {
-        const exists = !!res.data.exists;
-        const status = res.data.status || null;
-        console.log(`🔍 RUNSTATUS PARSED: exists=${exists}, status=${status}`);
-        return { exists, status };
-      } else {
-        console.warn(`🔍 RUNSTATUS UNEXPECTED: status=${res.status}, data=`, res.data);
-        return { exists: false };
-      }
-    } catch (e: any) {
-      console.error(`🔍 RUNSTATUS ERROR:`, e.message, e.response?.status, e.response?.data);
-      
-      // ✅ ENHANCED ERROR DEBUGGING: Log more details about the error
-      if (e.response) {
-        console.error(`  - Response status: ${e.response.status}`);
-        console.error(`  - Response data:`, e.response.data);
-        console.error(`  - Response headers:`, e.response.headers);
-        console.error(`  - Response URL: ${e.response.config?.url}`);
-        console.error(`  - Request method: ${e.response.config?.method}`);
-      } else if (e.request) {
-        console.error(`  - Request was made but no response received`);
-        console.error(`  - Request URL: ${e.request.url}`);
-        console.error(`  - Request method: ${e.request.method}`);
-      } else {
-        console.error(`  - Error setting up request:`, e.message);
-      }
-      
-      // ✅ FALLBACK: Try alternative username formats if the first attempt fails
-      if (e.response?.status === 404) {
-        console.log(`🔄 RUNSTATUS FALLBACK: 404 error, trying alternative username formats...`);
-        
-        // Try lowercase version
-        const lowerUsername = primaryUsername.toLowerCase();
-        if (lowerUsername !== primaryUsername) {
-          try {
-            const fallbackUrl = getApiUrl(`${API_CONFIG.ENDPOINTS.RUN_STATUS}/${platformId}/${encodeURIComponent(lowerUsername)}${cacheBuster}`);
-            console.log(`🔄 FALLBACK ATTEMPT 1: Trying lowercase username "${lowerUsername}"`);
-            const fallbackRes = await axios.get(fallbackUrl, { timeout: 5000 });
-            if (fallbackRes.status === 200 && fallbackRes.data) {
-              console.log(`✅ FALLBACK SUCCESS: Found with lowercase username "${lowerUsername}"`);
-              return { exists: !!fallbackRes.data.exists, status: fallbackRes.data.status || null };
-            }
-          } catch (fallbackError: any) {
-            console.log(`🔄 FALLBACK ATTEMPT 1 failed:`, fallbackError.message);
-          }
+      const decoded = decodeURIComponent(trimmed);
+      if (decoded && !candidates.includes(decoded)) candidates.push(decoded);
+    } catch {}
+    const cleaned = trimmed.replace(/[^\w\s-]/g, '');
+    if (cleaned && !candidates.includes(cleaned)) candidates.push(cleaned);
+
+    // Augment with canonical per-user username if available
+    try {
+      if (currentUser?.uid) {
+        const canonical = localStorage.getItem(`${platformId}_username_${currentUser.uid}`);
+        if (canonical) {
+          const canonTrim = canonical.trim();
+          if (canonTrim && !candidates.includes(canonTrim)) candidates.push(canonTrim);
+          const canonLower = canonTrim.toLowerCase();
+          if (canonLower && !candidates.includes(canonLower)) candidates.push(canonLower);
         }
-        
-        // Try removing any extra spaces or special characters
-        const cleanUsername = primaryUsername.replace(/\s+/g, '').replace(/[^\w-]/g, '');
-        if (cleanUsername !== primaryUsername && cleanUsername.length > 0) {
-          try {
-            const fallbackUrl = getApiUrl(`${API_CONFIG.ENDPOINTS.RUN_STATUS}/${platformId}/${encodeURIComponent(cleanUsername)}${cacheBuster}`);
-            console.log(`🔄 FALLBACK ATTEMPT 2: Trying cleaned username "${cleanUsername}"`);
-            const fallbackRes = await axios.get(fallbackUrl, { timeout: 5000 });
-            if (fallbackRes.status === 200 && fallbackRes.data) {
-              console.log(`✅ FALLBACK SUCCESS: Found with cleaned username "${cleanUsername}"`);
-              return { exists: !!fallbackRes.data.exists, status: fallbackRes.data.status || null };
+        // Also pull current platform-access mapping from backend (authoritative)
+        try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 2000);
+          const resp = await fetch(`/api/platform-access/${currentUser.uid}`, { signal: controller.signal });
+          clearTimeout(timeout);
+          if (resp.ok) {
+            const data = await resp.json();
+            const access = data?.data || data; // accept either shape
+            const platKey = platformId.toLowerCase();
+            const accessUsername = access?.[platKey]?.username || access?.username || null;
+            if (typeof accessUsername === 'string') {
+              const at = accessUsername.trim();
+              if (at && !candidates.includes(at)) candidates.push(at);
+              const atl = at.toLowerCase();
+              if (atl && !candidates.includes(atl)) candidates.push(atl);
             }
-          } catch (fallbackError: any) {
-            console.log(`🔄 FALLBACK ATTEMPT 2 failed:`, fallbackError.message);
           }
-        }
-        
-        console.log(`🔄 FALLBACK EXHAUSTED: All username variations failed`);
+        } catch {}
       }
-      
+    } catch {}
+
+    console.log(`🔍 CHECKRUNSTATUS: Generated username candidates: [${candidates.join(', ')}]`);
+
+    const runProbeBase = {
+      ts: Date.now(),
+      platform: platformId,
+      usernames: candidates,
+      context: 'checkRunStatus'
+    } as const;
+    try { localStorage.setItem('runstatus_probe', JSON.stringify(runProbeBase)); } catch {}
+    console.log(`🔍 RUNSTATUS CHECK: platform=${platformId}, usernames=[${candidates.join(', ')}]`);
+
+    if (candidates.length === 0) {
+      console.warn(`❗ RUNSTATUS SKIP: No username candidates available for platform=${platformId}`);
+      try { localStorage.setItem('runstatus_probe_error', JSON.stringify({ ...runProbeBase, candidate: null, httpStatus: 'SKIP_NO_USERNAME', resultTs: Date.now() })); } catch {}
       return { exists: false };
     }
+
+    // Helper: optional direct R2 fallback using configurable base URL
+    const tryDirectR2 = async (cand: string) => {
+      console.log(`🔍 DIRECT R2 ATTEMPT: Trying direct R2 for candidate "${cand}"`);
+      try {
+        const r2Base = (import.meta as any)?.env?.VITE_R2_PUBLIC_BASE_URL || window.localStorage.getItem('R2_PUBLIC_BASE_URL');
+        if (!r2Base) {
+          console.log(`🔍 DIRECT R2 SKIP: No R2_PUBLIC_BASE_URL configured`);
+          return { exists: false };
+        }
+        const directUrl = `${r2Base.replace(/\/$/, '')}/RunStatus/${platformId}/${encodeURIComponent(cand)}/status.json`;
+        console.log(`🔍 DIRECT R2 URL: ${directUrl}`);
+        
+        try { localStorage.setItem('runstatus_probe_attempt', JSON.stringify({ ...runProbeBase, candidate: cand, url: directUrl, attemptTs: Date.now(), transport: 'direct-r2' })); } catch {}
+        const res = await fetch(directUrl, { method: 'GET' });
+        console.log(`🔍 DIRECT R2 RESPONSE: status=${res.status}, ok=${res.ok}`);
+        
+        if (res.ok) {
+          let statusVal: any = null;
+          try { 
+            const j = await res.json(); 
+            statusVal = j?.status ?? null; 
+            console.log(`🔍 DIRECT R2 JSON: ${JSON.stringify(j)}`);
+          } catch (jsonErr) {
+            console.log(`🔍 DIRECT R2 JSON PARSE ERROR: ${jsonErr}`);
+          }
+          try { localStorage.setItem('runstatus_probe_result', JSON.stringify({ ...runProbeBase, candidate: cand, httpStatus: res.status, exists: true, status: statusVal, resultTs: Date.now(), transport: 'direct-r2' })); } catch {}
+          console.log(`✅ RUNSTATUS FOUND (direct R2): candidate="${cand}", status=${statusVal}`);
+          return { exists: true, status: statusVal };
+        }
+        try { localStorage.setItem('runstatus_probe_error', JSON.stringify({ ...runProbeBase, candidate: cand, httpStatus: res.status, resultTs: Date.now(), transport: 'direct-r2' })); } catch {}
+        console.log(`❌ DIRECT R2 FAILED: status=${res.status} for candidate "${cand}"`);
+        return { exists: false };
+      } catch (e: any) {
+        console.log(`❌ DIRECT R2 ERROR: ${e?.message || String(e)} for candidate "${cand}"`);
+        try { localStorage.setItem('runstatus_probe_error', JSON.stringify({ ...runProbeBase, candidate: cand, httpStatus: 'ERR', error: e?.message || String(e), resultTs: Date.now(), transport: 'direct-r2' })); } catch {}
+        return { exists: false };
+      }
+    };
+
+    for (const candidate of candidates) {
+      console.log(`🔍 TRYING CANDIDATE: "${candidate}" (${candidates.indexOf(candidate) + 1}/${candidates.length})`);
+      
+      // Prefer direct R2 when configured, to avoid proxy issues; if found, short-circuit
+      const directPref = await tryDirectR2(candidate);
+      if (directPref.exists) {
+        console.log(`✅ DIRECT-FIRST SUCCESS: Found run-status via direct R2 for candidate "${candidate}"`);
+        return directPref;
+      }
+
+      const cb = `?cb=${Date.now()}`;
+      const url = getApiUrl(`/api/run-status/${platformId}/${encodeURIComponent(candidate)}${cb}`);
+      console.log(`🔍 API URL: ${url}`);
+      
+      try {
+        try { localStorage.setItem('runstatus_probe_attempt', JSON.stringify({ ...runProbeBase, candidate, url, attemptTs: Date.now() })); } catch {}
+        console.log(`🔍 MAKING API REQUEST: ${url}`);
+        const res = await axios.get(url, { timeout: 10000 });
+        console.log(`🔍 API RESPONSE: status=${res.status}, data=`, res.data);
+        
+        if (res.status === 200) {
+          // Accept two server behaviors:
+          // 1) Proxy returns wrapper { exists: boolean, status?: string }
+          // 2) Proxy (or direct R2) returns the file JSON, e.g. { status: 'completed' }
+          let exists = false;
+          let statusVal: any = null;
+          if (res.data && typeof res.data === 'object') {
+            if (Object.prototype.hasOwnProperty.call(res.data, 'exists')) {
+              exists = !!res.data.exists;
+              statusVal = res.data.status ?? null;
+              console.log(`🔍 PARSED EXISTS: exists=${exists}, status=${statusVal}`);
+            } else if (Object.prototype.hasOwnProperty.call(res.data, 'status')) {
+              // If we received the actual file content, treat 200 as exists
+              exists = true;
+              statusVal = res.data.status;
+              console.log(`🔍 PARSED FILE CONTENT: exists=${exists}, status=${statusVal}`);
+            } else {
+              // Any 200 with an object body implies the object exists
+              exists = true;
+              console.log(`🔍 PARSED OBJECT: exists=${exists} (200 with object body)`);
+            }
+          } else {
+            // 200 with non-object still implies object exists at path
+            exists = true;
+            console.log(`🔍 PARSED NON-OBJECT: exists=${exists} (200 with non-object body)`);
+          }
+
+          try { localStorage.setItem('runstatus_probe_result', JSON.stringify({ ...runProbeBase, candidate, httpStatus: res.status, exists, status: statusVal, resultTs: Date.now() })); } catch {}
+          if (exists) {
+            console.log(`✅ RUNSTATUS FOUND: candidate="${candidate}", status=${statusVal}`);
+            return { exists: true, status: statusVal };
+          }
+          // If proxy returned 200 but indicates not exists, try direct R2 as secondary truth source
+          console.log(`🔍 PROXY SAID NOT EXISTS: Trying direct R2 as backup for candidate "${candidate}"`);
+          const direct200 = await tryDirectR2(candidate);
+          if (direct200.exists) return direct200;
+          continue;
+        }
+      } catch (e: any) {
+        const code = e?.response?.status;
+        console.log(`🔄 RUNSTATUS TRY FAILED: candidate="${candidate}", status=${code || 'ERR'}, error=${e?.message || String(e)}`);
+        try { localStorage.setItem('runstatus_probe_error', JSON.stringify({ ...runProbeBase, candidate, httpStatus: code || 'ERR', resultTs: Date.now(), error: e?.message || String(e) })); } catch {}
+        // Fallback: try direct R2 if configured
+        console.log(`🔍 TRYING DIRECT R2 FALLBACK: for candidate "${candidate}"`);
+        const direct = await tryDirectR2(candidate);
+        if (direct.exists) return direct;
+        // else try next candidate
+      }
+    }
+
+    console.log(`❌ RUNSTATUS NOT FOUND: All candidates failed for platform=${platformId}`);
+    return { exists: false };
   };
 
   // Helper: finalize and navigate to dashboard consistently
-  const finalizeAndNavigate = async (plat: string) => {
+  const finalizeAndNavigate = async (plat: string, primaryUsernameParam?: string) => {
     if (finalizeTriggeredRef.current) {
       console.log(`🎯 FINALIZE_AND_NAVIGATE: Skipped duplicate finalization for ${plat}`);
       return;
@@ -203,7 +255,67 @@ const Processing: React.FC = () => {
     finalizeTriggeredRef.current = true;
     console.log(`🎯 FINALIZE_AND_NAVIGATE: Starting finalization for platform ${plat}`);
 
-    // Backend authority: Recheck before any cleanup; if backend still active, abort finalization
+    // 🚦 RUN STATUS SAFEGUARD: Verify R2 run status file exists before allowing completion
+    let primaryUsername = primaryUsernameParam;
+    try {
+      const infoRaw = localStorage.getItem(`${plat}_processing_info`);
+      if (!primaryUsername && infoRaw) {
+        const info = JSON.parse(infoRaw);
+        if (info.username && typeof info.username === 'string' && info.username.trim()) {
+          primaryUsername = info.username.trim();
+        }
+      }
+    } catch {}
+
+    let runStatusVerified = false;
+    if (primaryUsername) {
+      try {
+        const runStatus = await checkRunStatus(plat, primaryUsername);
+        if (!runStatus.exists) {
+          console.log(`🚦 RUN STATUS MISSING: Extending timer by 5 minutes for ${plat}/${primaryUsername} before finalization`);
+          const fiveMinutesMs = 5 * 60 * 1000;
+          const newEnd = Date.now() + fiveMinutesMs;
+          localStorage.setItem(`${plat}_processing_countdown`, String(newEnd));
+          try {
+            const infoRaw2 = localStorage.getItem(`${plat}_processing_info`);
+            if (infoRaw2) {
+              const info2 = JSON.parse(infoRaw2);
+              info2.endTime = newEnd;
+              info2.totalDuration = (info2.totalDuration || 0) + fiveMinutesMs;
+              info2.isExtension = true;
+              localStorage.setItem(`${plat}_processing_info`, JSON.stringify(info2));
+            }
+          } catch {}
+          finalizeTriggeredRef.current = false;
+          safeNavigate(navigate, `/processing/${plat}`, { replace: true }, 8);
+          return;
+        } else {
+          runStatusVerified = true;
+        }
+      } catch (runErr) {
+        console.warn('🚦 RUN STATUS SAFEGUARD: Error while checking run status', runErr);
+      }
+    } else {
+      console.warn(`🚦 RUN STATUS SAFEGUARD: Username unavailable for ${plat}. Extending timer by 5 minutes and aborting finalization.`);
+      try {
+        const fiveMinutesMs = 5 * 60 * 1000;
+        const newEnd = Date.now() + fiveMinutesMs;
+        localStorage.setItem(`${plat}_processing_countdown`, String(newEnd));
+        const infoRaw = localStorage.getItem(`${plat}_processing_info`);
+        const info = infoRaw ? JSON.parse(infoRaw) : {};
+        info.platform = plat;
+        if (!info.startTime) info.startTime = Date.now();
+        info.endTime = newEnd;
+        info.totalDuration = (typeof info.totalDuration === 'number' ? info.totalDuration : 0) + fiveMinutesMs;
+        info.isExtension = true;
+        localStorage.setItem(`${plat}_processing_info`, JSON.stringify(info));
+      } catch {}
+      finalizeTriggeredRef.current = false;
+      safeNavigate(navigate, `/processing/${plat}`, { replace: true }, 8);
+      return;
+    }
+
+    // Backend authority: Recheck before cleanup; if backend still active, we proceed if run-status is verified
     if (currentUser?.uid) {
       try {
         const statusResp = await fetch(`/api/processing-status/${currentUser.uid}?platform=${plat}`);
@@ -211,22 +323,38 @@ const Processing: React.FC = () => {
           const json = await statusResp.json();
           const data = json?.data;
           const nowTs = Date.now();
-          if (data && typeof data.endTime === 'number' && nowTs < data.endTime) {
-            console.log(`🎯 FINALIZE ABORTED: Backend indicates active processing for ${plat}, returning to processing page`);
+          if (!runStatusVerified && data && typeof data.endTime === 'number' && nowTs < data.endTime) {
+            console.log(`🎯 FINALIZE ABORTED: Backend indicates active processing for ${plat} and run-status not yet verified. Extending timer by 5 minutes and returning to processing page`);
+            // Extend local timer by 5 minutes as graceful fallback
+            try {
+              const fiveMinutesMs = 5 * 60 * 1000;
+              const newEnd = Date.now() + fiveMinutesMs;
+              localStorage.setItem(`${plat}_processing_countdown`, String(newEnd));
+              const infoRaw = localStorage.getItem(`${plat}_processing_info`);
+              if (infoRaw) {
+                const info = JSON.parse(infoRaw);
+                info.endTime = newEnd;
+                info.totalDuration = (info.totalDuration || 0) + fiveMinutesMs;
+                localStorage.setItem(`${plat}_processing_info`, JSON.stringify(info));
+              }
+            } catch {}
+
             finalizeTriggeredRef.current = false;
             safeNavigate(navigate, `/processing/${plat}`, { replace: true }, 8);
             return;
           }
         }
       } catch (e) {
-        console.warn('🎯 FINALIZE: Backend recheck error, aborting finalization to avoid cross-device races', e);
-        finalizeTriggeredRef.current = false;
-        safeNavigate(navigate, `/processing/${plat}`, { replace: true }, 8);
-        return;
+        console.warn('🎯 FINALIZE: Backend recheck error; proceeding if run-status was verified, otherwise aborting', e);
+        if (!runStatusVerified) {
+          finalizeTriggeredRef.current = false;
+          safeNavigate(navigate, `/processing/${plat}`, { replace: true }, 8);
+          return;
+        }
       }
     }
 
-    // Proceed with backend cleanup now that backend confirmed inactive
+    // Proceed with backend cleanup; if run-status verified, deletion is best-effort
     if (currentUser?.uid) {
       let deleteOk = false;
       try {
@@ -237,16 +365,14 @@ const Processing: React.FC = () => {
         });
         // Treat 2xx as success; 404 means nothing to delete -> acceptable
         deleteOk = resp.ok || resp.status === 404;
-        if (!deleteOk) {
-          console.warn(`🎯 FINALIZE: Backend delete not successful (status=${resp.status}). Aborting finalization.`);
-        }
+        if (!deleteOk) console.warn(`🎯 FINALIZE: Backend delete not successful (status=${resp.status}).`);
       } catch (e) {
-        console.warn('🎯 FINALIZE: Backend delete error. Aborting finalization to avoid bypass.', e);
+        console.warn('🎯 FINALIZE: Backend delete error.', e);
         deleteOk = false;
       }
 
-      if (!deleteOk) {
-        // Reset guard and return user to processing route
+      if (!deleteOk && !runStatusVerified) {
+        // If we do not have run-status assurance, do not finalize
         finalizeTriggeredRef.current = false;
         safeNavigate(navigate, `/processing/${plat}`, { replace: true }, 8);
         return;
@@ -277,6 +403,26 @@ const Processing: React.FC = () => {
       
       console.log(`🎯 FINALIZE: Calling completeProcessing()`);
       completeProcessing();
+      // Best-effort: Mark platform as claimed
+      try {
+        if (currentUser?.uid) {
+          const infoRaw = localStorage.getItem(`${plat}_processing_info`);
+          let usernameToUse = primaryUsername || '';
+          try {
+            if (infoRaw) {
+              const info = JSON.parse(infoRaw);
+              if (info.username && typeof info.username === 'string' && info.username.trim()) {
+                usernameToUse = info.username.trim();
+              }
+            }
+          } catch {}
+          await fetch(`/api/platform-access/${currentUser.uid}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ platform: plat, claimed: true, username: usernameToUse })
+          });
+        }
+      } catch {}
       
       const dashboardPath = getDashboardPath(plat);
       console.log(`🎯 FINALIZE: Navigating to dashboard path: ${dashboardPath}`);
@@ -339,6 +485,9 @@ const Processing: React.FC = () => {
 
     try {
       console.log(`🔍 BACKEND VALIDATION: Validating processing state for ${targetPlatform} with backend`);
+      // Add defensive timeout to avoid UI getting stuck on slow networks
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
       const response = await fetch(`/api/validate-dashboard-access/${currentUser.uid}`, {
         method: 'POST',
         headers: {
@@ -346,8 +495,10 @@ const Processing: React.FC = () => {
         },
         body: JSON.stringify({
           platform: targetPlatform
-        })
+        }),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         console.warn(`🔍 BACKEND VALIDATION: Request failed with status ${response.status}`);
@@ -420,7 +571,9 @@ const Processing: React.FC = () => {
       if (!backendCheck.isValid) {
         if (backendCheck.shouldRedirect || backendCheck.reason === 'completed_by_backend') {
           console.log(`🔍 BACKEND COMPLETION: Using finalizeAndNavigate for ${targetPlatform}`);
-          finalizeAndNavigate(targetPlatform);
+          // Ensure UI renders and does not stick on overlay while finalize decides
+          setShouldRender(true);
+          finalizeAndNavigate(targetPlatform, username);
           return;
         }
         console.warn(`🔍 BACKEND FALLBACK: Backend validation failed (${backendCheck.reason}), checking local state`);
@@ -439,7 +592,6 @@ const Processing: React.FC = () => {
             getOrInitLocalTimer(targetPlatform);
             await ensureBackendProcessingStatus(targetPlatform);
             setShouldRender(true);
-            setIsValidating(false);
             return;
         }
         if (timer.reason === 'expired') {
@@ -455,7 +607,7 @@ const Processing: React.FC = () => {
           } catch {}
           const status = await checkRunStatus(targetPlatform, primaryUsername);
           if (status.exists) {
-            finalizeAndNavigate(targetPlatform);
+            finalizeAndNavigate(targetPlatform, primaryUsername);
             return;
           }
           // If still not exists, extend 5 minutes but DO NOT finalize
@@ -470,7 +622,6 @@ const Processing: React.FC = () => {
           await ensureBackendProcessingStatus(targetPlatform);
           setExtensionMessage('We are facing a bit of difficulty while fetching your data. Please allow 5 more minutes while we finalize your dashboard.');
           setShouldRender(true);
-          setIsValidating(false);
           return;
         }
         finalizeAndNavigate(targetPlatform);
@@ -478,7 +629,6 @@ const Processing: React.FC = () => {
       }
 
       setShouldRender(true);
-      setIsValidating(false);
     };
 
     setTimeout(() => { void validate(); }, 100);
@@ -522,23 +672,7 @@ const Processing: React.FC = () => {
 
       if (!timer.isValid) {
         console.log(`🔥 TIMER_INVALID: Timer invalid for ${targetPlatform}, reason: ${timer.reason}`);
-        if (!backendRecheckInFlight) {
-          backendRecheckInFlight = true;
-          const backendCheck = await validateWithBackend();
-          backendRecheckInFlight = false;
-          if (!backendCheck.isValid && (backendCheck.shouldRedirect || backendCheck.reason === 'completed_by_backend')) {
-            console.log(`🔥 BACKEND RECHECK COMPLETION: Finalizing for ${targetPlatform}`);
-            clearInterval(interval);
-            finalizeAndNavigate(targetPlatform);
-            return;
-          }
-          if (backendCheck.isValid) {
-            // backend repaired; ensure local timer present
-            getOrInitLocalTimer(targetPlatform);
-          }
-        }
-
-        // On any expiry, perform R2 check
+        // FIRST: Run-status check immediately at expiry
         const infoRaw = localStorage.getItem(`${targetPlatform}_processing_info`);
         let primaryUsername = username;
         try {
@@ -565,10 +699,25 @@ const Processing: React.FC = () => {
           console.log(`🎉 RUNSTATUS SUCCESS: Data found for ${targetPlatform}/${primaryUsername}, completing processing!`);
           console.log(`🎉 RUNSTATUS COMPLETION: About to clear interval and call finalizeAndNavigate`);
           clearInterval(interval);
-          finalizeAndNavigate(targetPlatform);
+          finalizeAndNavigate(targetPlatform, primaryUsername);
           return;
-        } else {
-          console.log(`⏳ RUNSTATUS NOT_FOUND: Data not ready yet for ${targetPlatform}/${primaryUsername}, extending timer`);
+        }
+
+        // SECOND: Backend authoritative recheck
+        if (!backendRecheckInFlight) {
+          backendRecheckInFlight = true;
+          const backendCheck = await validateWithBackend();
+          backendRecheckInFlight = false;
+          if (!backendCheck.isValid && (backendCheck.shouldRedirect || backendCheck.reason === 'completed_by_backend')) {
+            console.log(`🔥 BACKEND RECHECK COMPLETION: Finalizing for ${targetPlatform}`);
+            clearInterval(interval);
+            finalizeAndNavigate(targetPlatform, username);
+            return;
+          }
+          if (backendCheck.isValid) {
+            // backend repaired; ensure local timer present
+            getOrInitLocalTimer(targetPlatform);
+          }
         }
 
         // Treat ANY interval completion (missing or expired countdown) as a 5-minute extension
@@ -579,7 +728,7 @@ const Processing: React.FC = () => {
         console.log(`🔥 EXTENSION CHECK: countdownRaw=${countdownRaw}, currentEnd=${currentEnd}, now=${Date.now()}, intervalCompleted=${intervalCompleted}`);
         
         if (intervalCompleted) {
-          console.log(`🔥 TIMER_EXPIRED: Extending ${targetPlatform} by 5 minutes due to timer expiry`);
+          console.log(`⏳ RUNSTATUS NOT_FOUND: Extending ${targetPlatform} by 5 minutes due to missing run-status after expiry`);
           const newEnd = Date.now() + 5 * 60 * 1000;
           localStorage.setItem(`${targetPlatform}_processing_countdown`, newEnd.toString());
           console.log(`🔥 EXTENSION: New timer end set to ${new Date(newEnd).toLocaleTimeString()}`);
@@ -616,6 +765,47 @@ const Processing: React.FC = () => {
       clearInterval(interval);
     };
   }, [shouldRender, targetPlatform, navigate, completeProcessing, username]);
+
+  // EXACT END-TIME SCHEDULER: Fire run-status check precisely at countdown completion
+  useEffect(() => {
+    // Read current endTime from storage
+    const countdownKey = `${targetPlatform}_processing_countdown`;
+    const endRaw = localStorage.getItem(countdownKey);
+    const endTs = endRaw ? parseInt(endRaw, 10) : NaN;
+    if (!endTs || Number.isNaN(endTs)) {
+      console.log(`⏱️ SCHEDULER: No valid endTime found for ${targetPlatform}, skipping scheduler`);
+      return;
+    }
+    
+    const delay = Math.max(0, endTs - Date.now());
+    console.log(`⏱️ SCHEDULER: Scheduling interval-complete check for ${targetPlatform} in ${Math.ceil(delay/1000)}s (endTime: ${new Date(endTs).toLocaleTimeString()})`);
+
+    const id = setTimeout(async () => {
+      try {
+        console.log(`⏱️ SCHEDULER TIMEOUT FIRED: Checking if we should run interval-complete for ${targetPlatform}`);
+        
+        // Guard against races: ensure still expired or at threshold
+        const latestRaw = localStorage.getItem(countdownKey);
+        const latestEnd = latestRaw ? parseInt(latestRaw, 10) : NaN;
+        if (latestEnd && Date.now() < latestEnd - 250) {
+          console.log(`⏱️ SCHEDULER ABORT: endTime moved forward for ${targetPlatform} (${new Date(latestEnd).toLocaleTimeString()}), skipping immediate check`);
+          return;
+        }
+        
+        console.log(`⏱️ SCHEDULER FIRE: Running interval-complete handler for ${targetPlatform}`);
+        await handleIntervalComplete();
+        console.log(`⏱️ SCHEDULER COMPLETE: handleIntervalComplete finished for ${targetPlatform}`);
+      } catch (e) {
+        console.error('⏱️ SCHEDULER ERROR:', e);
+      }
+    }, delay + 50); // slight buffer
+
+    console.log(`⏱️ SCHEDULER: Set timeout ID ${id} for ${targetPlatform}`);
+    return () => {
+      console.log(`⏱️ SCHEDULER: Clearing timeout ID ${id} for ${targetPlatform}`);
+      clearTimeout(id);
+    };
+  }, [shouldRender, targetPlatform]);
 
   // FORCED REDIRECT protection - prevent users from staying on processing if they shouldn't be
   useEffect(() => {
@@ -680,6 +870,73 @@ const Processing: React.FC = () => {
     console.log(`🎯 PROCESSING COMPLETION: Delegating to finalizeAndNavigate for ${targetPlatform}`);
     // Delegate to centralized, backend-authoritative finalization flow
     finalizeAndNavigate(targetPlatform);
+  };
+
+  // Fired exactly when the countdown interval reaches zero from the child component
+  const handleIntervalComplete = async () => {
+    console.log(`🚨 INTERVAL COMPLETE TRIGGERED: ${targetPlatform} - Starting run-status check`);
+    
+    try {
+      // Resolve primary username (prefer localStorage info)
+      let primaryUsername = username;
+      try {
+        const infoRaw = localStorage.getItem(`${targetPlatform}_processing_info`);
+        if (infoRaw) {
+          const info = JSON.parse(infoRaw);
+          if (info && typeof info.username === 'string' && info.username.trim()) {
+            primaryUsername = info.username.trim();
+          }
+        }
+      } catch {}
+
+      console.log(`🚨 INTERVAL COMPLETE: Username resolved as "${primaryUsername}" for ${targetPlatform}`);
+      
+      try { localStorage.setItem('interval_complete_probe', JSON.stringify({ ts: Date.now(), platform: targetPlatform, username: primaryUsername })); } catch {}
+      
+      console.log(`🚨 INTERVAL COMPLETE: About to call checkRunStatus for ${targetPlatform}/${primaryUsername}`);
+      const status = await checkRunStatus(targetPlatform, primaryUsername);
+      
+      console.log(`🚨 INTERVAL COMPLETE: checkRunStatus returned:`, status);
+      console.log(`🚨 INTERVAL COMPLETE: status.exists = ${status.exists}, status.status = ${status.status}`);
+      
+      if (status.exists) {
+        console.log(`🎉 INTERVAL COMPLETE: Run status FOUND! Finalizing ${targetPlatform} and navigating to dashboard.`);
+        await finalizeAndNavigate(targetPlatform, primaryUsername);
+        return;
+      }
+
+      // Not found → extend by 5 minutes and repair backend status
+      console.log(`⏳ INTERVAL COMPLETE: Run status NOT FOUND. Extending ${targetPlatform} by 5 minutes.`);
+      const fiveMinutesMs = 5 * 60 * 1000;
+      const newEnd = Date.now() + fiveMinutesMs;
+      
+      console.log(`⏳ INTERVAL COMPLETE: Setting new end time to ${new Date(newEnd).toLocaleTimeString()}`);
+      localStorage.setItem(`${targetPlatform}_processing_countdown`, String(newEnd));
+      
+      try {
+        const infoRaw = localStorage.getItem(`${targetPlatform}_processing_info`);
+        const info = infoRaw ? JSON.parse(infoRaw) : {};
+        info.platform = targetPlatform;
+        if (!info.startTime) info.startTime = Date.now();
+        info.username = primaryUsername || info.username || '';
+        info.endTime = newEnd;
+        info.totalDuration = (typeof info.totalDuration === 'number' ? info.totalDuration : 0) + fiveMinutesMs;
+        info.isExtension = true;
+        localStorage.setItem(`${targetPlatform}_processing_info`, JSON.stringify(info));
+        console.log(`⏳ INTERVAL COMPLETE: Updated processing info with extension data`);
+      } catch {}
+
+      console.log(`⏳ INTERVAL COMPLETE: Calling ensureBackendProcessingStatus for ${targetPlatform}`);
+      await ensureBackendProcessingStatus(targetPlatform);
+      
+      console.log(`⏳ INTERVAL COMPLETE: Setting extension message`);
+      setExtensionMessage('We are facing a bit of difficulty while fetching your data. Please allow 5 more minutes while we finalize your dashboard.');
+      
+      console.log(`⏳ INTERVAL COMPLETE: Extension complete. Timer extended by 5 minutes.`);
+    } catch (e) {
+      console.error('🚨 INTERVAL COMPLETE: Error while handling completion:', e);
+      console.log('🚨 INTERVAL COMPLETE: Leaving timer to parent interval check due to error.');
+    }
   };
 
   // Handle exit from loading state
@@ -853,30 +1110,7 @@ const ensureBackendProcessingStatus = async (plat: string) => {
   }
 };
 
-  // Show loading while validating
-  if (isValidating || !shouldRender) {
-    return (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        backgroundColor: '#000',
-        color: '#fff',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 99999,
-        fontFamily: 'Inter, sans-serif'
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '24px', marginBottom: '16px' }}>🛡️ Validating Timer</div>
-          <div>Checking processing status...</div>
-        </div>
-      </div>
-    );
-  }
+  // Do not block UI with an overlay; validation continues in background
 
   return (
     <ProcessingErrorBoundary 
@@ -888,6 +1122,7 @@ const ensureBackendProcessingStatus = async (plat: string) => {
         platform={targetPlatform as 'instagram' | 'twitter' | 'facebook'}
         username={username}
         onComplete={handleComplete}
+        onIntervalComplete={handleIntervalComplete}
         remainingMinutes={remainingMinutes}
         // Expose extension state to child for messaging (prop not required in child typings)
         // @ts-ignore

@@ -127,6 +127,7 @@ export const ProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   ) => {
     const startTime = Date.now();
     const duration = durationMinutes * 60 * 1000;
+    const endTime = startTime + duration;
 
     // ✅ CRITICAL FIX: Check if there's already a username in localStorage and preserve it
     // This prevents overwriting the crucial inter-username form username
@@ -165,7 +166,6 @@ export const ProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
 
     // Persist BULLETPROOF countdown keys so that guards/processing page can validate immediately
-    const endTime = startTime + duration;
     try {
       localStorage.setItem(`${platform}_processing_countdown`, endTime.toString());
       localStorage.setItem(`${platform}_processing_info`, JSON.stringify({ platform, username: finalUsername, startTime, endTime }));
@@ -176,11 +176,34 @@ export const ProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     // Persist immediately to avoid race conditions
     localStorage.setItem('processingState', JSON.stringify(newState));
 
+    // After localStorage persistence but before navigation, persist to backend for cross-device sync
+    if (currentUser?.uid) {
+      const payload = {
+        platform,
+        startTime,
+        endTime,
+        totalDuration: duration,
+        username: finalUsername
+      } as any;
+      // Fire-and-forget backend POST to create processing status
+      fetch(`/api/processing-status/${currentUser.uid}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).catch(e => console.warn('startProcessing backend status create failed', e));
+      // Ensure claimed flag false while processing
+      fetch(`/api/platform-access/${currentUser.uid}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform, claimed: false, username: finalUsername })
+      }).catch(e => console.warn('startProcessing backend claimed=false failed', e));
+    }
+
     setProcessingState(newState);
     if (!preventNavigation) {
       safeNavigate(navigate, `/processing/${platform}`, { replace: true }, 9); // High priority for processing context
     }
-  }, [navigate]);
+  }, [navigate, currentUser?.uid]);
 
   const resetDashboard = useCallback(async (
     platform: 'instagram' | 'twitter' | 'facebook',
@@ -291,4 +314,4 @@ export const ProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   );
 };
 
-export default ProcessingContext; 
+export default ProcessingContext;

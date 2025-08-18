@@ -14339,10 +14339,31 @@ app.post(['/platform-access/:userId', '/api/platform-access/:userId'], async (re
       return res.status(400).json({ success: false, error: 'claimed must be boolean' });
     }
 
+    // Guard: If processing is active, force claimed=false regardless of requested value
+    try {
+      const processingKey = `ProcessingStatus/${userId}/${platform}.json`;
+      const getProcessing = new GetObjectCommand({ Bucket: 'tasks', Key: processingKey });
+      try {
+        const resp = await s3Client.send(getProcessing);
+        const body = await streamToString(resp.Body);
+        const proc = JSON.parse(body || '{}');
+        if (proc && typeof proc.endTime === 'number' && Date.now() < Number(proc.endTime)) {
+          // Active processing: do not allow claimed=true
+          if (claimed === true) {
+            console.log(`[${new Date().toISOString()}] BLOCK claimed=true while processing active for ${platform}/${userId}`);
+          }
+          // Enforce false
+          req.body.claimed = false;
+        }
+      } catch (err) {
+        // No processing entry or error; ignore and proceed
+      }
+    } catch {}
+
     const payload = {
       userId,
       platform,
-      claimed,
+      claimed: req.body.claimed === true,
       username: typeof username === 'string' ? username : undefined,
       updatedAt: Date.now(),
     };
@@ -14401,6 +14422,10 @@ app.get(['/processing-status/:userId', '/api/processing-status/:userId'], async 
         const response = await s3Client.send(getCommand);
         const body = await streamToString(response.Body);
         const data = JSON.parse(body || '{}');
+        // Dynamically compute active status on every read to avoid stale flags
+        if (data && typeof data.endTime === 'number') {
+          data.active = Date.now() < Number(data.endTime);
+        }
         return res.json({ success: true, data });
       } catch (err) {
         if (err.name === 'NoSuchKey' || err.$metadata?.httpStatusCode === 404) {
@@ -14422,6 +14447,9 @@ app.get(['/processing-status/:userId', '/api/processing-status/:userId'], async 
         const get = await s3Client.send(new GetObjectCommand({ Bucket: 'tasks', Key: obj.Key }));
         const body = await streamToString(get.Body);
         const data = JSON.parse(body || '{}');
+        if (data && typeof data.endTime === 'number') {
+          data.active = Date.now() < Number(data.endTime);
+        }
         const filePlatform = obj.Key.replace(prefix, '').replace('.json', '');
         results[filePlatform] = data;
       } catch (err) {
@@ -14489,6 +14517,24 @@ app.delete(['/processing-status/:userId', '/api/processing-status/:userId'], asy
     }
 
     const key = `ProcessingStatus/${userId}/${platform}.json`;
+    // Guard: do not delete if still active
+    try {
+      const getCmd = new GetObjectCommand({ Bucket: 'tasks', Key: key });
+      const resp = await s3Client.send(getCmd);
+      const body = await streamToString(resp.Body);
+      const data = JSON.parse(body || '{}');
+      if (data && typeof data.endTime === 'number' && Date.now() < Number(data.endTime)) {
+        console.log(`[${new Date().toISOString()}] DENY delete of active processing for ${platform}/${userId}`);
+        return res.status(409).json({ success: false, error: 'processing_active', data: { platform, endTime: data.endTime } });
+      }
+    } catch (err) {
+      // If not found, treat as already deleted
+      if (err.name === 'NoSuchKey' || err.$metadata?.httpStatusCode === 404) {
+        return res.json({ success: true });
+      }
+      // Other errors propagate
+    }
+
     try {
       await s3Client.send(new DeleteObjectCommand({ Bucket: 'tasks', Key: key }));
     } catch (err) {
@@ -14502,6 +14548,91 @@ app.delete(['/processing-status/:userId', '/api/processing-status/:userId'], asy
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Error deleting processing status:`, error);
     res.status(500).json({ success: false, error: 'Failed to delete processing status' });
+  }
+});
+
+// ✅ CRITICAL: Dashboard Access Validation Endpoint
+app.post(['/validate-dashboard-access/:userId', '/api/validate-dashboard-access/:userId'], async (req, res) => {
+  setCorsHeaders(res);
+  try {
+    const { userId } = req.params;
+    const { platform } = req.body || {};
+    
+    const allowed = ['instagram', 'twitter', 'facebook', 'linkedin'];
+    if (!platform || !allowed.includes(platform)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Valid platform is required' 
+      });
+    }
+
+    console.log(`[${new Date().toISOString()}] Validating dashboard access for ${platform}/${userId}`);
+
+    // Check if there's an active processing status for this platform
+    const processingKey = `ProcessingStatus/${userId}/${platform}.json`;
+    try {
+      const getCommand = new GetObjectCommand({ Bucket: 'tasks', Key: processingKey });
+      const response = await s3Client.send(getCommand);
+      const body = await streamToString(response.Body);
+      const processingData = JSON.parse(body || '{}');
+      
+      if (processingData && typeof processingData.endTime === 'number') {
+        const now = Date.now();
+        const remainingMs = processingData.endTime - now;
+        
+        if (remainingMs > 0) {
+          // Active processing state - deny dashboard access
+          const remainingMinutes = Math.ceil(remainingMs / 1000 / 60);
+          console.log(`[${new Date().toISOString()}] Access denied for ${platform}/${userId}: processing active (${remainingMinutes}min remaining)`);
+          
+          return res.json({
+            success: true,
+            accessAllowed: false,
+            reason: 'processing_active',
+            processingData: {
+              platform,
+              remainingMinutes,
+              startTime: processingData.startTime,
+              endTime: processingData.endTime,
+              username: processingData.username
+            },
+            redirectTo: `/processing/${platform}`
+          });
+        } else {
+          // Expired processing state - clean it up and allow access
+          console.log(`[${new Date().toISOString()}] Cleaning up expired processing state for ${platform}/${userId}`);
+          try {
+            await s3Client.send(new DeleteObjectCommand({ Bucket: 'tasks', Key: processingKey }));
+          } catch (deleteError) {
+            console.warn(`[${new Date().toISOString()}] Warning cleaning up expired processing state:`, deleteError.message);
+          }
+        }
+      }
+    } catch (err) {
+      if (err.name !== 'NoSuchKey' && err.$metadata?.httpStatusCode !== 404) {
+        console.error(`[${new Date().toISOString()}] Error checking processing status:`, err);
+        return res.status(500).json({ 
+          success: false, 
+          error: 'Error checking processing status' 
+        });
+      }
+      // NoSuchKey means no processing status - allow access
+    }
+
+    // No active processing state - allow dashboard access
+    console.log(`[${new Date().toISOString()}] Access allowed for ${platform}/${userId}: no active processing`);
+    return res.json({
+      success: true,
+      accessAllowed: true,
+      reason: 'no_processing_active'
+    });
+
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error validating dashboard access:`, error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to validate dashboard access' 
+    });
   }
 });
 

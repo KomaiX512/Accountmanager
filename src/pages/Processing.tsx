@@ -17,6 +17,7 @@ const Processing: React.FC = () => {
   const [isValidating, setIsValidating] = useState(true);
   const [shouldRender, setShouldRender] = useState(false);
   const validationRef = useRef(false);
+  const finalizeTriggeredRef = useRef(false); // prevent multiple finalize navigations
   const [extensionMessage, setExtensionMessage] = useState<string | null>(null);
 
   // Get data from navigation state or defaults
@@ -194,36 +195,96 @@ const Processing: React.FC = () => {
   };
 
   // Helper: finalize and navigate to dashboard consistently
-  const finalizeAndNavigate = (plat: string) => {
-    console.log(`🎯 FINALIZE_AND_NAVIGATE: Starting finalization for platform ${plat}`);
-    
-    try {
-      console.log(`🎯 FINALIZE: Clearing localStorage for ${plat}`);
-      localStorage.removeItem(`${plat}_processing_countdown`);
-      localStorage.removeItem(`${plat}_processing_info`);
-      
-      console.log(`🎯 FINALIZE: Updating completed platforms`);
-      const completedPlatforms = localStorage.getItem('completedPlatforms');
-      const completed = completedPlatforms ? JSON.parse(completedPlatforms) : [];
-      if (!completed.includes(plat)) {
-        completed.push(plat);
-        localStorage.setItem('completedPlatforms', JSON.stringify(completed));
-        console.log(`🎯 FINALIZE: Added ${plat} to completed platforms: [${completed.join(', ')}]`);
-      } else {
-        console.log(`🎯 FINALIZE: ${plat} was already in completed platforms: [${completed.join(', ')}]`);
-      }
-    } catch (err) {
-      console.error(`🎯 FINALIZE: Error during localStorage cleanup:`, err);
+  const finalizeAndNavigate = async (plat: string) => {
+    if (finalizeTriggeredRef.current) {
+      console.log(`🎯 FINALIZE_AND_NAVIGATE: Skipped duplicate finalization for ${plat}`);
+      return;
     }
-    
-    console.log(`🎯 FINALIZE: Calling completeProcessing()`);
-    completeProcessing();
-    
-    const dashboardPath = getDashboardPath(plat);
-    console.log(`🎯 FINALIZE: Navigating to dashboard path: ${dashboardPath}`);
-    
-    safeNavigate(navigate, dashboardPath, { replace: true }, 8);
-    console.log(`🎯 FINALIZE: Navigation initiated for ${plat} -> ${dashboardPath}`);
+    finalizeTriggeredRef.current = true;
+    console.log(`🎯 FINALIZE_AND_NAVIGATE: Starting finalization for platform ${plat}`);
+
+    // Backend authority: Recheck before any cleanup; if backend still active, abort finalization
+    if (currentUser?.uid) {
+      try {
+        const statusResp = await fetch(`/api/processing-status/${currentUser.uid}?platform=${plat}`);
+        if (statusResp.ok) {
+          const json = await statusResp.json();
+          const data = json?.data;
+          const nowTs = Date.now();
+          if (data && typeof data.endTime === 'number' && nowTs < data.endTime) {
+            console.log(`🎯 FINALIZE ABORTED: Backend indicates active processing for ${plat}, returning to processing page`);
+            finalizeTriggeredRef.current = false;
+            safeNavigate(navigate, `/processing/${plat}`, { replace: true }, 8);
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('🎯 FINALIZE: Backend recheck error, aborting finalization to avoid cross-device races', e);
+        finalizeTriggeredRef.current = false;
+        safeNavigate(navigate, `/processing/${plat}`, { replace: true }, 8);
+        return;
+      }
+    }
+
+    // Proceed with backend cleanup now that backend confirmed inactive
+    if (currentUser?.uid) {
+      let deleteOk = false;
+      try {
+        const resp = await fetch(`/api/processing-status/${currentUser.uid}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ platform: plat })
+        });
+        // Treat 2xx as success; 404 means nothing to delete -> acceptable
+        deleteOk = resp.ok || resp.status === 404;
+        if (!deleteOk) {
+          console.warn(`🎯 FINALIZE: Backend delete not successful (status=${resp.status}). Aborting finalization.`);
+        }
+      } catch (e) {
+        console.warn('🎯 FINALIZE: Backend delete error. Aborting finalization to avoid bypass.', e);
+        deleteOk = false;
+      }
+
+      if (!deleteOk) {
+        // Reset guard and return user to processing route
+        finalizeTriggeredRef.current = false;
+        safeNavigate(navigate, `/processing/${plat}`, { replace: true }, 8);
+        return;
+      }
+
+      // Only after successful delete (or 404 already gone) set override and perform local cleanup
+      try { localStorage.setItem(`processing_override_${plat}`, Date.now().toString()); } catch {}
+
+      try {
+        console.log(`🎯 FINALIZE: Clearing localStorage for ${plat}`);
+        // Clear local copies; backend remains authoritative for other devices
+        localStorage.removeItem(`${plat}_processing_countdown`);
+        localStorage.removeItem(`${plat}_processing_info`);
+        
+        console.log(`🎯 FINALIZE: Updating completed platforms`);
+        const completedPlatforms = localStorage.getItem('completedPlatforms');
+        const completed = completedPlatforms ? JSON.parse(completedPlatforms) : [];
+        if (!completed.includes(plat)) {
+          completed.push(plat);
+          localStorage.setItem('completedPlatforms', JSON.stringify(completed));
+          console.log(`🎯 FINALIZE: Added ${plat} to completed platforms: [${completed.join(', ')}]`);
+        } else {
+          console.log(`🎯 FINALIZE: ${plat} was already in completed platforms: [${completed.join(', ')}]`);
+        }
+      } catch (err) {
+        console.error(`🎯 FINALIZE: Error during localStorage cleanup:`, err);
+      }
+      
+      console.log(`🎯 FINALIZE: Calling completeProcessing()`);
+      completeProcessing();
+      
+      const dashboardPath = getDashboardPath(plat);
+      console.log(`🎯 FINALIZE: Navigating to dashboard path: ${dashboardPath}`);
+      
+      safeNavigate(navigate, dashboardPath, { replace: true }, 8);
+      console.log(`🎯 FINALIZE: Navigation initiated for ${plat} -> ${dashboardPath}`);
+      return;
+    }
   };
 
   // Validate timer and check if platform is completed
@@ -278,7 +339,6 @@ const Processing: React.FC = () => {
 
     try {
       console.log(`🔍 BACKEND VALIDATION: Validating processing state for ${targetPlatform} with backend`);
-      
       const response = await fetch(`/api/validate-dashboard-access/${currentUser.uid}`, {
         method: 'POST',
         headers: {
@@ -299,10 +359,8 @@ const Processing: React.FC = () => {
 
       if (data.success) {
         if (data.accessAllowed === false && data.reason === 'processing_active') {
-          // Backend confirms processing is active - valid to stay on processing page
-          console.log(`🔍 BACKEND VALIDATION: ✅ Processing state confirmed by backend for ${targetPlatform}`);
-          
-          // Sync backend state to localStorage to ensure consistency
+          // Backend confirms processing is active
+          console.log(`🔍 BACKEND VALIDATION: ✅ Active (authoritative)`);
           if (data.processingData) {
             localStorage.setItem(`${targetPlatform}_processing_countdown`, data.processingData.endTime.toString());
             localStorage.setItem(`${targetPlatform}_processing_info`, JSON.stringify({
@@ -310,14 +368,25 @@ const Processing: React.FC = () => {
               username: data.processingData.username || '',
               startTime: data.processingData.startTime,
               endTime: data.processingData.endTime,
+              totalDuration: data.processingData.endTime - data.processingData.startTime,
               syncedFromBackend: true
             }));
           }
-          
           return { isValid: true };
         } else if (data.accessAllowed === true) {
-          // Backend says processing is complete - should redirect to dashboard
-          console.log(`🔍 BACKEND VALIDATION: ❌ Backend says processing complete for ${targetPlatform}, redirecting to dashboard`);
+          // Backend believes no processing active. Double-check local timer; if active (> now) we must REPAIR.
+          const localCountdownRaw = localStorage.getItem(`${targetPlatform}_processing_countdown`);
+          const localInfoRaw = localStorage.getItem(`${targetPlatform}_processing_info`);
+          const now = Date.now();
+          if (localCountdownRaw && localInfoRaw) {
+            const localEnd = parseInt(localCountdownRaw, 10);
+            if (localEnd && localEnd > now) {
+              console.log('⚠️ BACKEND DESYNC: Local timer active but backend says complete. Repairing backend status.');
+              await ensureBackendProcessingStatus(targetPlatform);
+              return { isValid: true, reason: 'repaired_backend' };
+            }
+          }
+          console.log(`🔍 BACKEND VALIDATION: ❌ Complete (no active processing)`);
           return { 
             isValid: false, 
             reason: 'completed_by_backend',
@@ -331,7 +400,10 @@ const Processing: React.FC = () => {
 
     } catch (error) {
       console.error(`🔍 BACKEND VALIDATION: Error validating with backend:`, error);
-      return { isValid: false, reason: 'network_error' };
+      // On network errors, ensure at least local timer exists
+      getOrInitLocalTimer(targetPlatform);
+      await ensureBackendProcessingStatus(targetPlatform);
+      return { isValid: true, reason: 'network_assumed_active' }; // assume active to avoid skipping
     }
   };
 
@@ -344,29 +416,32 @@ const Processing: React.FC = () => {
       // Step 1: Backend validation first (source of truth)
       console.log(`🔍 PROCESSING VALIDATION: Starting backend validation for ${targetPlatform}`);
       const backendCheck = await validateWithBackend();
-      
+
       if (!backendCheck.isValid) {
-        if (backendCheck.shouldRedirect) {
-          console.log(`🔍 BACKEND REDIRECT: Backend says redirect to ${backendCheck.shouldRedirect}`);
-          safeNavigate(navigate, backendCheck.shouldRedirect, { replace: true }, 8);
-          return;
-        } else if (backendCheck.reason === 'completed_by_backend') {
-          console.log(`🔍 BACKEND COMPLETION: Processing completed according to backend`);
-          const dashboardPath = getDashboardPath(targetPlatform);
-          safeNavigate(navigate, dashboardPath, { replace: true }, 8);
+        if (backendCheck.shouldRedirect || backendCheck.reason === 'completed_by_backend') {
+          console.log(`🔍 BACKEND COMPLETION: Using finalizeAndNavigate for ${targetPlatform}`);
+          finalizeAndNavigate(targetPlatform);
           return;
         }
-        // For other backend errors, fall back to local validation
         console.warn(`🔍 BACKEND FALLBACK: Backend validation failed (${backendCheck.reason}), checking local state`);
       } else {
-        console.log(`🔍 BACKEND CONFIRMED: Processing state valid according to backend`);
+        console.log(`🔍 BACKEND CONFIRMED: Processing state valid according to backend (${backendCheck.reason || 'authoritative'})`);
       }
+
+      // Ensure local timer exists (repair if missing)
+      getOrInitLocalTimer(targetPlatform);
 
       // Step 2: Local timer validation (fallback or confirmation)
       const timer = validateTimer();
-      
       if (!timer.isValid) {
-        // Timer is not valid. If it's expired, perform R2 RunStatus check before redirecting
+        if (timer.reason === 'no_data') {
+          // Force creation again for robustness
+            getOrInitLocalTimer(targetPlatform);
+            await ensureBackendProcessingStatus(targetPlatform);
+            setShouldRender(true);
+            setIsValidating(false);
+            return;
+        }
         if (timer.reason === 'expired') {
           const infoRaw = localStorage.getItem(`${targetPlatform}_processing_info`);
           let primaryUsername = username;
@@ -375,67 +450,37 @@ const Processing: React.FC = () => {
               const info = JSON.parse(infoRaw);
               if (info.username && typeof info.username === 'string' && info.username.trim()) {
                 primaryUsername = info.username.trim();
-                // ✅ DEBUGGING: Log username source for run status check
-                console.log(`🔍 USERNAME SOURCE DEBUG:`);
-                console.log(`  - Initial username: "${username}"`);
-                console.log(`  - localStorage username: "${info.username}"`);
-                console.log(`  - Final primaryUsername: "${primaryUsername}"`);
-                console.log(`  - Username match: ${username === primaryUsername ? 'YES' : 'NO'}`);
               }
             }
           } catch {}
-
           const status = await checkRunStatus(targetPlatform, primaryUsername);
-          console.log(`🔍 INITIAL RUNSTATUS CHECK: ${targetPlatform}/${primaryUsername} - exists: ${status.exists}, status: ${status.status}`);
           if (status.exists) {
-            // If file exists (completed or failed), allow dashboard immediately
-            console.log(`✅ INITIAL RUNSTATUS FOUND: Navigating to dashboard for ${targetPlatform}`);
             finalizeAndNavigate(targetPlatform);
             return;
           }
-
-          // No status file yet → grant +5 minutes grace and show message
+          // If still not exists, extend 5 minutes but DO NOT finalize
           const newEnd = Date.now() + 5 * 60 * 1000;
           localStorage.setItem(`${targetPlatform}_processing_countdown`, newEnd.toString());
-          // keep original info; update endTime & ensure mandatory fields exist
           try {
             const info = infoRaw ? JSON.parse(infoRaw) : {};
-            const safeInfo = {
-              // Always preserve/ensure required fields
-              platform: targetPlatform,
-              username: primaryUsername, // NO FALLBACKS - use exact primaryUsername
-              // Preserve previous startTime if present; otherwise, approximate to maintain continuity
-              startTime: info.startTime || Date.now(),
-              // Preserve totalDuration if present (represents initial 15/20 minutes)
-              totalDuration: info.totalDuration || undefined,
-              // Flags
-              isExtension: true,
-              // Updated endTime
-              endTime: newEnd,
-            } as any;
-            localStorage.setItem(`${targetPlatform}_processing_info`, JSON.stringify(safeInfo));
+            info.endTime = newEnd;
+            info.isExtension = true;
+            localStorage.setItem(`${targetPlatform}_processing_info`, JSON.stringify(info));
           } catch {}
+          await ensureBackendProcessingStatus(targetPlatform);
           setExtensionMessage('We are facing a bit of difficulty while fetching your data. Please allow 5 more minutes while we finalize your dashboard.');
-
-          // Allow render in processing page with extension
           setShouldRender(true);
           setIsValidating(false);
           return;
         }
-
-        // For other invalid reasons, redirect to dashboard
-        console.log(`🛡️ PROCESSING PAGE: No valid timer for ${targetPlatform}, redirecting to dashboard`);
         finalizeAndNavigate(targetPlatform);
         return;
       }
 
-      // Valid timer found - allow processing page to render
-      console.log(`🛡️ PROCESSING PAGE: Valid timer for ${targetPlatform} - ${timer.remainingMs ? Math.ceil(timer.remainingMs / 1000 / 60) : 'unknown'} minutes remaining`);
       setShouldRender(true);
       setIsValidating(false);
     };
 
-    // Add slight delay to prevent flash
     setTimeout(() => { void validate(); }, 100);
   }, [targetPlatform, navigate, completeProcessing]);
 
@@ -469,13 +514,30 @@ const Processing: React.FC = () => {
   useEffect(() => {
     if (!shouldRender) return;
 
+    let backendRecheckInFlight = false;
     const interval = setInterval(async () => {
+      if (finalizeTriggeredRef.current) return; // already finalizing
       console.log(`🔥 TIMER_INTERVAL: Checking timer validity for ${targetPlatform}`);
       const timer = validateTimer();
-      
+
       if (!timer.isValid) {
         console.log(`🔥 TIMER_INVALID: Timer invalid for ${targetPlatform}, reason: ${timer.reason}`);
-        
+        if (!backendRecheckInFlight) {
+          backendRecheckInFlight = true;
+          const backendCheck = await validateWithBackend();
+          backendRecheckInFlight = false;
+          if (!backendCheck.isValid && (backendCheck.shouldRedirect || backendCheck.reason === 'completed_by_backend')) {
+            console.log(`🔥 BACKEND RECHECK COMPLETION: Finalizing for ${targetPlatform}`);
+            clearInterval(interval);
+            finalizeAndNavigate(targetPlatform);
+            return;
+          }
+          if (backendCheck.isValid) {
+            // backend repaired; ensure local timer present
+            getOrInitLocalTimer(targetPlatform);
+          }
+        }
+
         // On any expiry, perform R2 check
         const infoRaw = localStorage.getItem(`${targetPlatform}_processing_info`);
         let primaryUsername = username;
@@ -546,7 +608,7 @@ const Processing: React.FC = () => {
       } else {
         console.log(`🔥 TIMER_VALID: Timer is valid for ${targetPlatform}, continuing`);
       }
-    }, 1000); // Check every second to sync finish
+    }, 10000); // throttled from 5000ms to 10000ms for stability
 
     console.log(`🔥 TIMER_INTERVAL: Started interval monitoring for ${targetPlatform}`);
     return () => {
@@ -615,42 +677,9 @@ const Processing: React.FC = () => {
   }, [shouldRender, targetPlatform]);
 
   const handleComplete = () => {
-    console.log(`🎯 PROCESSING COMPLETION: Starting completion flow for ${targetPlatform}`);
-    console.log(`🎯 PROCESSING COMPLETION: Username used: ${username}`);
-    console.log(`🎯 PROCESSING COMPLETION: Timer was: ${remainingMinutes} minutes`);
-    
-    // Clean up storage & reset context
-    console.log(`🎯 PROCESSING COMPLETION: Cleaning up localStorage keys:`);
-    console.log(`  - Removing: ${targetPlatform}_processing_countdown`);
-    console.log(`  - Removing: ${targetPlatform}_processing_info`);
-    
-    localStorage.removeItem(`${targetPlatform}_processing_countdown`);
-    localStorage.removeItem(`${targetPlatform}_processing_info`);
-    
-    // Mark platform as completed
-    const completedPlatforms = localStorage.getItem('completedPlatforms');
-    const completed = completedPlatforms ? JSON.parse(completedPlatforms) : [];
-    console.log(`🎯 PROCESSING COMPLETION: Current completed platforms:`, completed);
-    
-    if (!completed.includes(targetPlatform)) {
-      completed.push(targetPlatform);
-      localStorage.setItem('completedPlatforms', JSON.stringify(completed));
-      console.log(`🎯 PROCESSING COMPLETION: Added ${targetPlatform} to completed platforms:`, completed);
-    } else {
-      console.log(`🎯 PROCESSING COMPLETION: ${targetPlatform} was already in completed platforms`);
-    }
-    
-    console.log(`🎯 PROCESSING COMPLETION: Calling completeProcessing() context method`);
-    completeProcessing();
-    
-    // Navigate to appropriate dashboard
-    const dashboardPath = getDashboardPath(targetPlatform);
-    console.log(`🎯 PROCESSING COMPLETION: Navigating to dashboard: ${dashboardPath}`);
-    console.log(`🎯 PROCESSING COMPLETION: Using safeNavigate with replace:true, fallback level 8`);
-    
-    safeNavigate(navigate, dashboardPath, { replace: true }, 8);
-    
-    console.log(`🎯 PROCESSING COMPLETION: Navigation command issued successfully`);
+    console.log(`🎯 PROCESSING COMPLETION: Delegating to finalizeAndNavigate for ${targetPlatform}`);
+    // Delegate to centralized, backend-authoritative finalization flow
+    finalizeAndNavigate(targetPlatform);
   };
 
   // Handle exit from loading state
@@ -758,6 +787,72 @@ const Processing: React.FC = () => {
     }
   };
 
+  // Helper to initialize or read local timer (15 min default) and ensure storage consistency
+const getOrInitLocalTimer = (plat: string) => {
+  const countdownKey = `${plat}_processing_countdown`;
+  const infoKey = `${plat}_processing_info`;
+  const now = Date.now();
+  let endTimeRaw = localStorage.getItem(countdownKey);
+  let infoRaw = localStorage.getItem(infoKey);
+  let endTime = endTimeRaw ? parseInt(endTimeRaw, 10) : NaN;
+  if (!endTime || Number.isNaN(endTime) || endTime < now) {
+    // Initialize new 15 minute window
+    endTime = now + 15 * 60 * 1000;
+    localStorage.setItem(countdownKey, endTime.toString());
+  }
+  if (!infoRaw) {
+    const info = {
+      platform: plat,
+      username: username || '',
+      startTime: now,
+      endTime,
+      totalDuration: endTime - now,
+      initializedAt: now,
+      source: 'processing_page_repair'
+    } as any;
+    localStorage.setItem(infoKey, JSON.stringify(info));
+  } else {
+    try {
+      const parsed = JSON.parse(infoRaw);
+      if (!parsed.endTime || parsed.endTime !== endTime) {
+        parsed.endTime = endTime;
+        localStorage.setItem(infoKey, JSON.stringify(parsed));
+      }
+    } catch {}
+  }
+  return { endTime };
+};
+
+// Repair / create backend status if missing but local timer active
+const ensureBackendProcessingStatus = async (plat: string) => {
+  if (!currentUser?.uid) return;
+  try {
+    const countdown = localStorage.getItem(`${plat}_processing_countdown`);
+    const infoRaw = localStorage.getItem(`${plat}_processing_info`);
+    if (!countdown || !infoRaw) return; // nothing to repair
+    const endTime = parseInt(countdown, 10);
+    if (!endTime || Date.now() >= endTime) return; // expired
+    const info = JSON.parse(infoRaw);
+    // POST create/update
+    await fetch(`/api/processing-status/${currentUser.uid}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        platform: plat,
+        username: info.username || '',
+        startTime: info.startTime || Date.now(),
+        endTime,
+        totalDuration: (typeof info.totalDuration === 'number' && info.totalDuration > 0)
+          ? info.totalDuration
+          : (endTime - (info.startTime || Date.now()))
+      })
+    });
+    console.log(`🛠 BACKEND REPAIR: Ensured backend processing status for ${plat}`);
+  } catch (e) {
+    console.warn('🛠 BACKEND REPAIR: Failed ensuring backend status', e);
+  }
+};
+
   // Show loading while validating
   if (isValidating || !shouldRender) {
     return (
@@ -806,4 +901,4 @@ const Processing: React.FC = () => {
   );
 };
 
-export default Processing; 
+export default Processing;

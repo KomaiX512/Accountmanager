@@ -1,7 +1,30 @@
+// ✅ CROSS-DEVICE SYNC: Smart backend selection for processing status synchronization
+function getBaseUrl(): string {
+  // For processing status and cross-device sync, always use the production VPS backend
+  // This ensures Device A (local) and Device B (VPS) share the same processing states
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
+    
+    // For critical cross-device features (processing status), always use VPS backend
+    const urlParams = new URLSearchParams(window.location.search);
+    const forceLocal = urlParams.get('localBackend') === 'true';
+    
+    if (isLocal && !forceLocal) {
+      // Local frontend connecting to VPS backend for cross-device sync
+      console.log('[API CONFIG] 🔗 Local frontend using VPS backend for cross-device sync');
+      return 'https://www.sentientm.com';
+    }
+  }
+  
+  // Default: relative URLs for same-environment requests
+  return '';
+}
+
 // API Configuration for unified hosting
 export const API_CONFIG = {
-  // Use relative base URL for all environments
-  BASE_URL: '',
+  // ✅ CROSS-DEVICE SYNC FIX: Use VPS backend for processing status to ensure cross-device synchronization
+  BASE_URL: getBaseUrl(),
   // API endpoints
   ENDPOINTS: {
     // Main API routes (through reverse proxy /api/*)

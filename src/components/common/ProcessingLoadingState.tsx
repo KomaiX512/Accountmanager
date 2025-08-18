@@ -153,15 +153,12 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   };
 
   // ✅ NO FALLBACKS: Get username with absolute priority preservation
-  const username = (() => {
-    // Priority 1: ALWAYS check stored username first (NEVER overwrite existing processing username)
+  const username = React.useMemo(() => {
     const stored = getUsernameFromStorage(platform);
     if (stored) {
       console.log(`🔒 LOCKED USERNAME: Using stored username '${stored}' for ${platform}`);
       return stored;
     }
-    
-    // Priority 2: Only if no stored username, use prop username
     if (propUsername && typeof propUsername === 'string') {
       const trimmed = propUsername.trim();
       if (trimmed) {
@@ -169,11 +166,10 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
         return trimmed;
       }
     }
-    
-    // ❌ CRITICAL ERROR: No username available - this should NEVER happen
-    console.error(`🚨 FATAL: No username available for platform ${platform}. This will cause RunStatus to fail!`);
-    throw new Error(`FATAL: No username available for platform ${platform}`);
-  })();
+    // Do NOT throw here. Allow backend sync effect to repair username from server.
+    console.error(`🚨 FATAL: No username available for platform ${platform}. Deferring to backend sync to repair.`);
+    return '';
+  }, [platform, propUsername]);
 
   // ✅ PLATFORM-SPECIFIC TIMING LOGIC
   // Determine the appropriate countdown duration based on platform and context
@@ -274,6 +270,12 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     const existingTimer = getTimerData();
     
     if (!existingTimer) {
+      // If username is missing, do not initialize a fresh timer locally.
+      // Wait for backend sync to mirror authoritative state and username.
+      if (!username) {
+        console.log(`⏳ TIMER INIT DEFERRED: Missing username for ${platform}. Awaiting backend sync before creating timer.`);
+        return;
+      }
       // First time setup - create new timer with platform-specific timing
       const now = Date.now();
       const durationMs = finalCountdownMinutes * 60 * 1000;
@@ -402,14 +404,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
           try {
             localStorage.removeItem(`${platform}_processing_countdown`);
             localStorage.removeItem(`${platform}_processing_info`);
-            // Also delete backend status for cross-device sync
-            if (currentUser?.uid) {
-              fetch(`/api/processing-status/${currentUser.uid}`, {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ platform })
-              }).catch(() => {});
-            }
+            // Backend authoritative cleanup happens via finalize or server expiry; avoid extra DELETEs here to reduce race surface
             
             // Mark platform as completed
             const completedPlatforms = localStorage.getItem('completedPlatforms');
@@ -543,7 +538,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
             if (localEndTime && localProcessingInfo) {
               try {
                 const localEndTimeNum = parseInt(localEndTime);
-                const localInfo = JSON.parse(localProcessingInfo);
+                JSON.parse(localProcessingInfo); // parsed for validation only
                 
                 // CRITICAL SAFEGUARD: Don't clear timer if it was just created
                 if (timerJustCreated) {
@@ -912,96 +907,99 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
 
     console.log(`🔥 EXIT LOADING STATE: User confirmed exit for ${platform} (user: ${currentUser.uid})`);
     setIsExiting(true);
-    
+    const userId = currentUser.uid;
+    const broadcastKey = `processing_exit_broadcast_${platform}_${userId}`;
+    const nowTs = Date.now();
     try {
+      // Step 0: Optimistic broadcast so other tabs stop any guard redirects immediately
+      try {
+        localStorage.setItem(broadcastKey, nowTs.toString());
+      } catch {}
+
       // Step 1: Clear frontend caches first (immediate feedback)
       console.log(`🔥 EXIT: Clearing frontend caches for ${platform}`);
-      
-      // Clear all processing-related localStorage data
       const keysToRemove = [
         `${platform}_processing_countdown`,
         `${platform}_processing_info`,
-        'completedPlatforms',
         'processingState'
       ];
-      
-      keysToRemove.forEach(key => {
-        localStorage.removeItem(key);
-      });
-      
-      // Clear any platform-specific username/account data
-      const allKeys = Object.keys(localStorage);
-      const platformLower = platform.toLowerCase();
-      const usernameLower = username.toLowerCase();
-      
-      allKeys.forEach(key => {
-        const keyLower = key.toLowerCase();
-        if (keyLower.includes(platformLower) || keyLower.includes(usernameLower)) {
-          if (key.includes('processing') || key.includes('username') || key.includes('account')) {
-            localStorage.removeItem(key);
-            console.log(`🔥 EXIT: Cleared localStorage key: ${key}`);
-          }
+      keysToRemove.forEach(key => { localStorage.removeItem(key); });
+
+      // Preserve completedPlatforms (do NOT blanket remove here) but ensure platform not marked completed prematurely
+      try {
+        const completedRaw = localStorage.getItem('completedPlatforms');
+        if (completedRaw) {
+          const arr = JSON.parse(completedRaw).filter((p: string) => p !== platform);
+          localStorage.setItem('completedPlatforms', JSON.stringify(arr));
         }
-      });
+      } catch {}
 
-      // Step 2: Call backend reset API (same as reset button)
-      console.log(`🔥 EXIT: Calling backend reset API for ${platform}`);
-      const response = await fetch(`/api/platform-reset/${currentUser.uid}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ platform })
-      });
-
-      if (!response.ok) {
-        console.warn(`🔥 EXIT: Backend reset failed: ${response.statusText}, but continuing with frontend reset`);
-      } else {
-        const result = await response.json();
-        console.log(`🔥 EXIT: Backend reset successful:`, result);
+      // Step 2: Backend explicit delete of processing status BEFORE reset so guard sees cleared state
+      try {
+        const delResp = await fetch(`/api/processing-status/${userId}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ platform })
+        });
+        if (!delResp.ok) console.warn('🔥 EXIT: Backend processing-status delete failed');
+      } catch (e) {
+        console.warn('🔥 EXIT: Error deleting backend processing status', e);
       }
 
-      // Step 3: Reset processing context
-      completeProcessing();
-      // ✅ CRITICAL: Clear claimed status globally on backend
+      // Step 3: Call backend reset API (same as reset button)
+      console.log(`🔥 EXIT: Calling backend reset API for ${platform}`);
       try {
-        await fetch(`/api/platform-access/${currentUser.uid}`, {
+        const response = await fetch(`/api/platform-reset/${userId}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ platform })
+        });
+        if (!response.ok) {
+          console.warn(`🔥 EXIT: Backend reset failed: ${response.statusText}`);
+        } else {
+          const result = await response.json();
+          console.log(`🔥 EXIT: Backend reset successful:`, result);
+        }
+      } catch (e) {
+        console.warn('🔥 EXIT: platform-reset request error', e);
+      }
+
+      // Step 4: Processing context reset & claimed false
+      completeProcessing();
+      try {
+        await fetch(`/api/platform-access/${userId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ platform, claimed: false })
         });
-        console.log(`🔥 EXIT: Cleared claimed status for ${platform} on backend`);
-      } catch (error) {
-        console.warn(`🔥 EXIT: Failed to clear claimed status for ${platform} on backend:`, error);
+      } catch (e) {
+        console.warn('🔥 EXIT: Failed clearing platform-access claimed flag', e);
       }
-      
-      // Step 4: Call onExit callback if provided, otherwise navigate to main dashboard
+
+      // Step 5: Broadcast finalization (second write to trigger storage event even if same second)
+      try { localStorage.setItem(broadcastKey, (nowTs + 1).toString()); } catch {}
+      window.dispatchEvent(new CustomEvent('processingExit', { detail: { platform, userId, ts: Date.now() }}));
+
+      // Step 6: Navigate out
       if (onExit) {
         onExit();
       } else {
-        // Navigate to main dashboard with reset state
-        safeNavigate(navigate, '/account', { 
+        safeNavigate(navigate, '/account', {
           replace: true,
-          state: { 
+          state: {
             resetPlatform: platform,
             resetTimestamp: Date.now(),
             exitReason: 'setup_exited'
           }
         }, 8);
       }
-      
+
       console.log(`🔥 EXIT: Successfully exited loading state for ${platform}`);
-      
+
     } catch (error) {
       console.error('🔥 EXIT: Error during exit cleanup:', error);
-      
-      // Fallback: still clear frontend and navigate
       completeProcessing();
-      if (onExit) {
-        onExit();
-      } else {
-        safeNavigate(navigate, '/account', { replace: true }, 8);
-      }
+      if (onExit) { onExit(); } else { safeNavigate(navigate, '/account', { replace: true }, 8); }
     } finally {
       setIsExiting(false);
     }

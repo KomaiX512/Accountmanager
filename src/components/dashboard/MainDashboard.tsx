@@ -245,7 +245,7 @@ const MainDashboard: React.FC = () => {
       }
     };
 
-    // Initial and periodic sync
+    // Initial and periodic sync (tight loop to avoid first-second race across devices)
     mirrorFromServer();
     const id = setInterval(mirrorFromServer, 1000);
     return () => clearInterval(id);
@@ -273,7 +273,16 @@ const MainDashboard: React.FC = () => {
           const isNowClaimed = entry && entry.claimed === true;
           
           // CRITICAL FIX: Check if platform is currently in loading state
-          const isCurrentlyLoading = platformLoadingStates[pid] && !platformLoadingStates[pid].isComplete && Date.now() < platformLoadingStates[pid].endTime;
+          // Consider both backend-synced state and localStorage fallback to avoid first-paint races
+          const nowTs = Date.now();
+          const stateActive = platformLoadingStates[pid] && !platformLoadingStates[pid].isComplete && nowTs < platformLoadingStates[pid].endTime;
+          let lsActive = false;
+          try {
+            const raw = localStorage.getItem(getProcessingCountdownKey(pid));
+            const end = raw ? parseInt(raw, 10) : 0;
+            lsActive = end > nowTs;
+          } catch {}
+          const isCurrentlyLoading = stateActive || lsActive;
           
           if (isCurrentlyLoading) {
             // Platform is in loading state - force clear claimed status
@@ -489,14 +498,7 @@ const MainDashboard: React.FC = () => {
     // Clean up localStorage
     localStorage.removeItem(getProcessingCountdownKey(platformId));
     localStorage.removeItem(`${platformId}_processing_info`);
-    // Clean up backend persisted status
-    if (currentUser?.uid) {
-      fetch(`/api/processing-status/${currentUser.uid}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platform: platformId })
-      }).catch(() => {});
-    }
+    // Backend cleanup is handled by finalize flow or by server upon expiry; avoid deleting here to prevent cross-device races
     
     console.log(`🔥 TIMER CLEANUP: ${platformId} processing completed and cleaned up`);
   }, [completedPlatforms, currentUser?.uid]);
@@ -598,20 +600,34 @@ const MainDashboard: React.FC = () => {
   useEffect(() => {
     if (!currentUser?.uid) return;
 
-    const syncTimers = () => {
+    const syncTimers = async () => {
       const platforms = ['instagram', 'twitter', 'facebook', 'linkedin'];
       let hasExpiredTimer = false;
 
-      platforms.forEach(platformId => {
+      for (const platformId of platforms) {
         const remaining = getProcessingRemainingMs(platformId);
-        
-        // If timer expired, complete the processing
-        if (remaining === 0 && isPlatformLoading(platformId)) {
-          console.log(`🔥 TIMER EXPIRED: ${platformId} processing completed automatically`);
-          completePlatformLoading(platformId);
-          hasExpiredTimer = true;
+        // Only consider completion if local says 0; confirm with backend first to avoid cross-device race
+        if (remaining === 0) {
+          try {
+            if (currentUser?.uid) {
+              const resp = await fetch(`/api/processing-status/${currentUser.uid}?platform=${platformId}`);
+              if (resp.ok) {
+                const json = await resp.json();
+                const data = json?.data;
+                const nowTs = Date.now();
+                if (data && typeof data.endTime === 'number' && nowTs < data.endTime) {
+                  // Backend still active; skip completion
+                  console.log(`🔥 TIMER BACKEND SAYS ACTIVE: Skipping auto-complete for ${platformId}`);
+                } else if (isPlatformLoading(platformId)) {
+                  console.log(`🔥 TIMER EXPIRED: ${platformId} processing completed automatically (backend confirmed inactive)`);
+                  completePlatformLoading(platformId);
+                  hasExpiredTimer = true;
+                }
+              }
+            }
+          } catch {}
         }
-      });
+      }
 
       // Force platform status refresh if any timer expired
       if (hasExpiredTimer) {
@@ -940,17 +956,41 @@ const MainDashboard: React.FC = () => {
 
   // ✅ AUTO-COMPLETE CLAIMED PLATFORMS: Mark claimed platforms as completed to prevent timer
   useEffect(() => {
-    platforms.forEach(platform => {
-      // Only mark as completed if platform is claimed AND has no active timer
-      if (platform.claimed && !completedPlatforms.has(platform.id)) {
-        const remainingMs = getProcessingRemainingMs(platform.id);
-        if (remainingMs === 0) {
-          console.log(`[MainDashboard] ✅ Auto-marking claimed platform ${platform.id} as completed (no active timer)`);
-          completePlatformLoading(platform.id);
+    if (!currentUser?.uid) return;
+    // Verify with backend before auto-completing to avoid deleting an active timer from another device
+    const checkAndComplete = async () => {
+      const checks: Promise<void>[] = [];
+      platforms.forEach((platform) => {
+        if (platform.claimed && !completedPlatforms.has(platform.id)) {
+          const remainingMs = getProcessingRemainingMs(platform.id);
+          if (remainingMs === 0) {
+            checks.push(
+              (async () => {
+                try {
+                  const resp = await fetch(`/api/processing-status/${currentUser.uid}?platform=${platform.id}`);
+                  if (!resp.ok) return;
+                  const json = await resp.json();
+                  const data = json?.data;
+                  const nowTs = Date.now();
+                  if (data && typeof data.endTime === 'number' && nowTs < data.endTime) {
+                    // Active on server; DO NOT complete
+                    console.log(`[MainDashboard] ⛔ Skipping auto-complete for ${platform.id} - active on server`);
+                    return;
+                  }
+                  console.log(`[MainDashboard] ✅ Auto-marking claimed platform ${platform.id} as completed (confirmed no active timer)`);
+                  completePlatformLoading(platform.id);
+                } catch {}
+              })()
+            );
+          }
         }
+      });
+      if (checks.length > 0) {
+        await Promise.all(checks);
       }
-    });
-  }, [platforms, completedPlatforms]);
+    };
+    checkAndComplete();
+  }, [platforms, completedPlatforms, currentUser?.uid, getProcessingRemainingMs, completePlatformLoading]);
 
   // ✅ NOTIFICATION COUNT UPDATE: Separate effect for notification updates
   useEffect(() => {
@@ -1201,21 +1241,10 @@ const MainDashboard: React.FC = () => {
       return;
     }
     
-    // If this is first access and not claimed, start loading state
+    // If this is first access and not claimed, go to entry form (do NOT start timer yet)
     if (!isPlatformLoading(platform.id) && !platform.claimed) {
-      // Get platform-specific timing
-      const platformTiming = platform.id === 'facebook' ? 20 : 15;
-      console.log(`🔥 TIMER START: Starting ${platformTiming}-minute processing for ${platform.id}`);
-      startPlatformLoading(platform.id);
-      
-      // ✅ FIRST TIME SETUP: Only pass username for first-time setup, never for re-navigation
-      safeNavigate(navigate, `/processing/${platform.id}`, {
-        state: {
-          platform: platform.id,
-          username: currentUser?.displayName || '', // This is OK for first-time setup only
-          remainingMinutes: platformTiming
-        }
-      }, 7);
+      console.log(`🧭 FIRST-TIME SETUP: Navigating to ${platform.id} entry form without starting timer`);
+      navigateToSetup(platform.id);
       return;
     }
     

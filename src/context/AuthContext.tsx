@@ -227,7 +227,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
   };
 
-  // ✅ CROSS-DEVICE LOADING STATE VALIDATION - SPECIFIC PLATFORM ONLY
+  // ✅ CROSS-DEVICE LOADING STATE VALIDATION - Core authentication-level protection
   const checkLoadingStateForPlatform = async (platform: string): Promise<{ hasLoadingState: boolean; redirectTo?: string; remainingMinutes?: number }> => {
     if (!currentUser?.uid) {
       return { hasLoadingState: false };
@@ -239,7 +239,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      console.log(`[AUTH GUARD] 🔍 Checking loading state for SPECIFIC platform: ${platform} (user: ${currentUser.uid})`);
+      console.log(`[AUTH GUARD] 🔍 Checking loading state for ${platform} (user: ${currentUser.uid})`);
 
       // Step 1: Check backend processing status first (source of truth)
       const backendResponse = await fetch(`/api/processing-status/${currentUser.uid}?platform=${platform}`);
@@ -253,7 +253,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           if (remainingMs > 0) {
             const remainingMinutes = Math.ceil(remainingMs / 1000 / 60);
-            console.log(`[AUTH GUARD] ⚠️ Backend loading state found for ${platform}: ${remainingMinutes}min remaining - BLOCKING ONLY ${platform} dashboard`);
+            console.log(`[AUTH GUARD] ⚠️ Backend loading state found for ${platform}: ${remainingMinutes}min remaining`);
             
             // Sync backend state to localStorage for consistency
             localStorage.setItem(`${platform}_processing_countdown`, processingData.endTime.toString());
@@ -300,7 +300,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           if (remainingMs > 0 && info.platform === platform) {
             const remainingMinutes = Math.ceil(remainingMs / 1000 / 60);
-            console.log(`[AUTH GUARD] ⚠️ Local loading state found for ${platform}: ${remainingMinutes}min remaining - BLOCKING ONLY ${platform} dashboard`);
+            console.log(`[AUTH GUARD] ⚠️ Local loading state found for ${platform}: ${remainingMinutes}min remaining`);
             
             // Persist local state to backend for cross-device sync
             try {
@@ -351,7 +351,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      console.log(`[AUTH GUARD] ✅ No active loading state found for ${platform} - allowing access to ${platform} dashboard`);
+      console.log(`[AUTH GUARD] ✅ No active loading state found for ${platform}`);
       return { hasLoadingState: false };
 
     } catch (error) {
@@ -397,20 +397,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }));
             console.log(`[AUTH SYNC] ✅ Synced active loading state for ${platform}: ${Math.ceil(remainingMs / 1000 / 60)}min remaining`);
           } else {
-            // Expired state - clear both backend and local
-            console.log(`[AUTH SYNC] 🧹 Clearing expired loading state for ${platform}`);
+            // Expired state - clear local only; let server handle backend cleanup authoritatively
+            console.log(`[AUTH SYNC] 🧹 Clearing expired LOCAL loading state for ${platform} (no backend DELETE to avoid cross-device races)`);
             localStorage.removeItem(`${platform}_processing_countdown`);
             localStorage.removeItem(`${platform}_processing_info`);
-            
-            try {
-              await fetch(`/api/processing-status/${currentUser.uid}`, {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ platform })
-              });
-            } catch (e) {
-              console.warn(`[AUTH SYNC] Failed to clear expired backend state for ${platform}:`, e);
-            }
           }
         } else {
           // No backend state - check if we have stale local state to clear

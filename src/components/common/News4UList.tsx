@@ -468,9 +468,11 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       }
 
       // Additional validation: ensure we have meaningful content
+      // ✅ FIX: Relax validation - require title OR description, not both.
+      // This prevents items from being filtered out if one field is missing.
       const validItems = finalItems.filter(item => 
-        item.title && item.title.trim().length > 0 && 
-        item.description && item.description.trim().length > 0
+        (item.title && item.title.trim().length > 0) || 
+        (item.description && item.description.trim().length > 0)
       );
 
       console.log(`[News4U] Final items before validation:`, finalItems);

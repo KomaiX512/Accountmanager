@@ -1329,7 +1329,7 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
     };
 
     let files = await listJsonObjects(prefix);
-    // If alt prefixes exist, fetch and merge
+    // If alt prefixes exist, fetch and merge with deduplication
     for (const alt of altPrefixes) {
       try {
         const altFiles = await listJsonObjects(alt);
@@ -1338,6 +1338,17 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
         // Ignore missing alt prefix
       }
     }
+
+    // ✅ FIX: Remove duplicate files by Key to prevent duplicate processing
+    const uniqueFiles = [];
+    const seenKeys = new Set();
+    for (const file of files) {
+      if (!seenKeys.has(file.Key)) {
+        seenKeys.add(file.Key);
+        uniqueFiles.push(file);
+      }
+    }
+    files = uniqueFiles;
 
     // 🚀 Strict user scoping for news files (no global fallback)
     if (module === 'news_for_you') {
@@ -1404,11 +1415,22 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
           }
 
           const parsedData = JSON.parse(body);
+
+          // ✅ FIX: Flatten the data structure to match frontend expectations
+          let finalData = parsedData;
+          if (parsedData.news_data && typeof parsedData.news_data === 'object') {
+            finalData = {
+              ...parsedData, // Keep top-level fields like username, platform, etc.
+              ...parsedData.news_data, // Lift nested fields to the top level
+              news_data: undefined, // Optional: remove the nested object to clean up
+            };
+          }
+
           return { 
             key: file.Key, 
             lastModified: file.LastModified,
             data: {
-              ...parsedData,
+              ...finalData,
               platform: platform
             }
           };
@@ -1901,6 +1923,50 @@ app.get(['/retrieve-multiple/:accountHolder', '/api/retrieve-multiple/:accountHo
       error: `Error retrieving ${req.query.platform || 'instagram'} data for multiple competitors`, 
       details: error.message 
     });
+  }
+});
+
+// List available competitors by scanning R2 directory structure
+app.get(['/list-competitors/:accountHolder', '/api/list-competitors/:accountHolder'], async (req, res) => {
+  try {
+    const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
+    const basePrefix = PlatformSchemaManager.buildPath('competitor_analysis', platform, username);
+
+    console.log(`[${new Date().toISOString()}] Listing competitors for ${platform}/${username} at ${basePrefix}/`);
+
+    const competitorsSet = new Set();
+    let ContinuationToken = undefined;
+
+    do {
+      const listCommand = new ListObjectsV2Command({
+        Bucket: 'tasks',
+        Prefix: `${basePrefix}/`,
+        ContinuationToken
+      });
+      const data = await s3Client.send(listCommand);
+
+      if (Array.isArray(data.Contents)) {
+        for (const obj of data.Contents) {
+          const key = obj.Key || '';
+          if (!key.startsWith(`${basePrefix}/`)) continue;
+          const rest = key.substring(`${basePrefix}/`.length);
+          const parts = rest.split('/');
+          const comp = parts[0];
+          if (comp && comp.trim()) {
+            competitorsSet.add(comp.trim());
+          }
+        }
+      }
+
+      ContinuationToken = data.IsTruncated ? data.NextContinuationToken : undefined;
+    } while (ContinuationToken);
+
+    const competitors = Array.from(competitorsSet);
+    console.log(`[${new Date().toISOString()}] Found ${competitors.length} competitors for ${platform}/${username}`);
+    res.json({ competitors });
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error listing competitors:`, error);
+    res.status(500).json({ error: 'Failed to list competitors', details: error.message });
   }
 });
 

@@ -241,11 +241,20 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
         if (info.accountType) setAccountType(info.accountType);
         if (info.postingStyle) setPostingStyle(info.postingStyle);
         
-        // Update competitors from saved data (normalize). Fallback to competitor_data for Facebook
+        // Update competitors from saved data (normalize).
         const namesFromInfo = normalizeCompetitorNames(info.competitors);
         if (namesFromInfo.length > 0) {
           console.log(`[Cs_Analysis] ✅ Using competitors from account info:`, namesFromInfo);
           setLocalCompetitors(namesFromInfo);
+        } else if (info.competitor_data && Array.isArray(info.competitor_data)) {
+          // Generic fallback for all platforms: derive names from competitor_data if present
+          const namesFromData: string[] = info.competitor_data
+            .map((c: any) => (c && typeof c.name === 'string' ? c.name : ''))
+            .filter((n: string) => n && n.trim() !== '');
+          if (namesFromData.length > 0) {
+            console.log(`[Cs_Analysis] ✅ Using competitors from competitor_data fallback:`, namesFromData);
+            setLocalCompetitors(namesFromData);
+          }
         }
 
         // Facebook-specific: load primary accountData and competitor_data map (name+url)
@@ -436,22 +445,46 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
   useEffect(() => {
     const syncInitialState = async () => {
       console.log(`[Cs_Analysis] 🔄 Syncing initial competitors state for ${normalizedAccountHolder} on ${platform}`);
+      console.log(`[Cs_Analysis] 🔍 Props competitors received:`, competitors);
       
-      // First try to get competitors from the saved account info
+      // ✅ CRITICAL FIX: Always use props competitors first if available
+      // This ensures the component uses the competitors passed from the dashboard
+      const normalized = normalizeCompetitorNames(competitors);
+      if (normalized && normalized.length > 0) {
+        console.log(`[Cs_Analysis] ✅ Using competitors from props (${normalized.length}):`, normalized);
+        setLocalCompetitors(normalized);
+        setError(null); // Clear any existing error
+        // Force refresh of competitor data when competitors are loaded
+        setRefreshKey(prev => prev + 1);
+        return; // Exit early - props take priority
+      }
+      
+      // Fallback: Try to get competitors from the saved account info only if props are empty
+      console.log(`[Cs_Analysis] ⚠️ No competitors in props, trying AccountInfo API fallback`);
       const serverCompetitors = await fetchAccountInfoWithRetry();
-        if (serverCompetitors && serverCompetitors.length > 0) {
+      if (serverCompetitors && serverCompetitors.length > 0) {
         console.log(`[Cs_Analysis] ✅ Loaded ${serverCompetitors.length} competitors from AccountInfo API:`, serverCompetitors);
         setLocalCompetitors(serverCompetitors);
+        setError(null); // Clear any existing error
         // Force refresh of competitor data when competitors are loaded
         setRefreshKey(prev => prev + 1);
       } else {
-        console.log(`[Cs_Analysis] ⚠️ No competitors found in AccountInfo, using fallback from props:`, competitors);
-        // Use competitors from props (usually from dashboard state)
-          const normalized = normalizeCompetitorNames(competitors);
-          if (normalized && normalized.length > 0) {
-            setLocalCompetitors(normalized);
-        } else {
-          console.log(`[Cs_Analysis] ❌ No competitors available from props either - account holder needs to set up competitors`);
+        // Final fallback: scan R2 for competitor directories if AccountInfo lacks competitors
+        try {
+          console.log(`[Cs_Analysis] 🔎 Scanning R2 for competitors as last-resort fallback`);
+          const listResp = await axios.get(`/api/list-competitors/${normalizedAccountHolder}?platform=${platform}`);
+          const listed = Array.isArray(listResp.data?.competitors) ? listResp.data.competitors : [];
+          if (listed.length > 0) {
+            console.log(`[Cs_Analysis] ✅ Fallback discovered ${listed.length} competitors from R2`, listed);
+            setLocalCompetitors(listed);
+            setError(null);
+            setRefreshKey(prev => prev + 1);
+          } else {
+            console.log(`[Cs_Analysis] ❌ No competitors available from props, AccountInfo, or R2 list`);
+            setError(`No competitors configured for ${normalizedAccountHolder}. Please add competitors to enable analysis.`);
+          }
+        } catch (e) {
+          console.warn(`[Cs_Analysis] ⚠️ Failed to list competitors from R2:`, (e as any)?.message);
           setError(`No competitors configured for ${normalizedAccountHolder}. Please add competitors to enable analysis.`);
         }
       }

@@ -3046,7 +3046,7 @@ Image Description: ${response.post.image_prompt}
       {isResetConfirmOpen && (
         <div className="modal-overlay" onClick={handleCloseResetConfirm}>
           <motion.div 
-            className="reset-confirm-modal"
+            className="modal-content reset-confirm-modal"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}

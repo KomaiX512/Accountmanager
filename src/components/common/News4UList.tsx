@@ -90,14 +90,38 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       return;
     }
     const rect = anchor.getBoundingClientRect();
-    const top = rect.bottom + 8;
-    const left = Math.max(8, Math.min(rect.left, window.innerWidth - 280));
+
+    // Measure current dropdown (if already rendered) to calculate precise clamping
+    const dropdownEl = document.getElementById('news4u-dropdown-portal') as HTMLElement | null;
+    const measuredWidth = dropdownEl?.offsetWidth || 280; // sensible default close to CSS min-width
+    const measuredHeight = dropdownEl?.offsetHeight || 260; // approximate height for clamping
+
+    // On mobile, center the dropdown to avoid uneven alignment and overflow
+    let left: number;
+    if (window.innerWidth <= 767) {
+      left = Math.max(8, (window.innerWidth - measuredWidth) / 2);
+    } else {
+      // Prefer left-align with the button but keep within viewport bounds
+      left = Math.max(8, Math.min(rect.left, window.innerWidth - measuredWidth - 8));
+    }
+
+    // Position below the button by default; if it overflows bottom, flip above
+    let top = rect.bottom + 8;
+    if (top + measuredHeight > window.innerHeight - 8) {
+      top = Math.max(8, rect.top - measuredHeight - 8);
+    }
+
     setMenuPosition({ top, left });
   }, []);
 
   useEffect(() => {
     if (openMenuIndex !== null) {
+      // Initial position
       updateMenuPosition();
+      // Recalculate after portal mounts to get accurate size measurements
+      const raf = requestAnimationFrame(() => updateMenuPosition());
+      const timeout = setTimeout(() => updateMenuPosition(), 0);
+
       const handleWindow = () => updateMenuPosition();
       const handleOutside = (e: MouseEvent) => {
         const anchor = menuAnchorRef.current;
@@ -111,6 +135,8 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       window.addEventListener('scroll', handleWindow, { passive: true });
       document.addEventListener('mousedown', handleOutside, true);
       return () => {
+        cancelAnimationFrame(raf);
+        clearTimeout(timeout);
         window.removeEventListener('resize', handleWindow);
         window.removeEventListener('scroll', handleWindow);
         document.removeEventListener('mousedown', handleOutside, true);
@@ -779,7 +805,7 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
                         id="news4u-dropdown-portal"
                         className="news4u-dropdown news4u-dropdown-portal"
                         role="menu"
-                        style={{ position: 'fixed', top: menuPosition.top, left: menuPosition.left }}
+                        style={{ position: 'fixed', top: menuPosition.top, left: menuPosition.left, zIndex: 2000, maxWidth: 'calc(100vw - 16px)' }}
                       >
                         <button
                           className="dropdown-item"

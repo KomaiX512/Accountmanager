@@ -121,14 +121,6 @@ export const FacebookProvider: React.FC<FacebookProviderProps> = ({ children }) 
     const hasUserAccessed = localStorage.getItem(`facebook_accessed_${currentUser.uid}`) === 'true';
     setHasAccessed(hasUserAccessed);
 
-    // ✅ REAL-TIME POLLING: Monitor localStorage changes for cross-device sync
-    const pollForAccessChanges = () => {
-      const currentAccessed = localStorage.getItem(`facebook_accessed_${currentUser.uid}`) === 'true';
-      if (currentAccessed !== hasAccessed) {
-        console.log(`[FacebookContext] 🔄 CROSS-DEVICE SYNC: hasAccessed changed from ${hasAccessed} to ${currentAccessed}`);
-        setHasAccessed(currentAccessed);
-      }
-    };
 
     // ✅ AGGRESSIVE BACKEND SYNC: Check backend more frequently for Facebook
     const checkFacebookStatusAggressively = async () => {
@@ -183,16 +175,15 @@ export const FacebookProvider: React.FC<FacebookProviderProps> = ({ children }) 
       checkFacebookStatusAggressively();
     }
 
-    // ✅ AGGRESSIVE POLLING: Check every 2 seconds for localStorage changes + every 5 seconds for backend
-    const localPollInterval = setInterval(pollForAccessChanges, 2000);
-    const backendSyncInterval = setInterval(checkFacebookStatusAggressively, 5000);
+    // ✅ AGGRESSIVE POLLING DISABLED: Polling was causing race conditions with the processing timer.
+    // The storage event listener is sufficient for cross-tab/window sync.
+    // const localPollInterval = setInterval(pollForAccessChanges, 2000);
+    // const backendSyncInterval = setInterval(checkFacebookStatusAggressively, 5000);
 
     // ✅ LISTEN FOR STORAGE EVENTS: Immediate response to localStorage changes
     window.addEventListener('storage', handleStorageChange);
 
     return () => {
-      clearInterval(localPollInterval);
-      clearInterval(backendSyncInterval);
       window.removeEventListener('storage', handleStorageChange);
     };
   }, [currentUser?.uid, hasAccessed]); // Include hasAccessed to track changes

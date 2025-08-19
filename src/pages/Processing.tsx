@@ -203,6 +203,43 @@ const Processing: React.FC = () => {
     finalizeTriggeredRef.current = true;
     console.log(`🎯 FINALIZE_AND_NAVIGATE: Starting finalization for platform ${plat}`);
 
+    // ✅ CRITICAL FIX: Always verify run status exists before finalizing
+    const infoRaw = localStorage.getItem(`${plat}_processing_info`);
+    let primaryUsername = username;
+    try {
+      if (infoRaw) {
+        const info = JSON.parse(infoRaw);
+        if (info.username && typeof info.username === 'string' && info.username.trim()) {
+          primaryUsername = info.username.trim();
+        }
+      }
+    } catch {}
+
+    console.log(`🎯 FINALIZE: Checking run status for ${plat}/${primaryUsername} before finalizing`);
+    const runStatusCheck = await checkRunStatus(plat, primaryUsername);
+    
+    if (!runStatusCheck.exists) {
+      console.log(`🎯 FINALIZE BLOCKED: Run status data does not exist for ${plat}/${primaryUsername}, extending 5 minutes instead`);
+      finalizeTriggeredRef.current = false;
+      
+      // Extend timer by 5 minutes and continue processing
+      const newEnd = Date.now() + 5 * 60 * 1000;
+      localStorage.setItem(`${plat}_processing_countdown`, newEnd.toString());
+      
+      try {
+        const info = infoRaw ? JSON.parse(infoRaw) : {};
+        info.endTime = newEnd;
+        info.isExtension = true;
+        localStorage.setItem(`${plat}_processing_info`, JSON.stringify(info));
+      } catch {}
+      
+      setExtensionMessage('We are facing a bit of difficulty while fetching your data. Please allow 5 more minutes while we finalize your dashboard.');
+      console.log(`🎯 FINALIZE: Extended ${plat} by 5 minutes due to missing run status data`);
+      return;
+    }
+
+    console.log(`🎯 FINALIZE: Run status verified for ${plat}/${primaryUsername}, proceeding with finalization`);
+
     // Backend authority: Recheck before any cleanup; if backend still active, abort finalization
     if (currentUser?.uid) {
       try {

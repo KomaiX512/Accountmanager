@@ -1319,7 +1319,10 @@ body:has(.dashboard-wrapper) {
   transition: all 0.3s ease;
   height: 100%; /* Fill the grid cell exactly */
   max-height: 100%; /* Never exceed grid cell height */
-  overflow-y: auto; /* Use scrolling if content overflows */
+  /* Ensure ONLY the inner list scrolls; keep module header fixed */
+  overflow-y: visible; /* allow inner scrollbar to render fully at the right edge */
+  overflow-x: hidden; /* avoid lateral bleed */
+  overscroll-behavior: contain; /* stop scroll chaining */
   box-sizing: border-box;
 }
 
@@ -3099,8 +3102,10 @@ h2 {
     opacity: 1 !important;
     height: 100% !important;
     max-height: 100% !important; /* Constrain to grid row height */
-    overflow-y: auto !important;  /* Internal scrolling */
+    /* Ensure ONLY the inner component handles vertical scrolling */
+    overflow-y: hidden !important;
     overflow-x: hidden !important; /* No horizontal bleed */
+    overscroll-behavior: contain !important;
   }
   
   /* Ensure grid areas are properly assigned */

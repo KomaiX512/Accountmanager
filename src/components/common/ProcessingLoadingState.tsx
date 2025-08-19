@@ -770,7 +770,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
                   setCurrentTime(Date.now());
                   return;
                 }
-                
+
                 // Only clear if local timer has actually expired
                 if (nowTs >= localEndTimeNum) {
                   console.log(`🔍 BACKEND SYNC: ${platform} - clearing expired local timer`);

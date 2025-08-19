@@ -328,7 +328,7 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
         showMessage('Submission successful', 'success');
         
         // Start the processing phase using unified ProcessingContext
-        startProcessing('facebook', confirmationData.accountData.name, 1); // 1 minute duration (testing)
+        startProcessing('facebook', confirmationData.accountData.name, 20); // 20 minutes duration
       }
     } catch (error: any) {
       console.error('Error submitting Facebook data:', error);
@@ -409,7 +409,7 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
           <h1>Setup Your Facebook Account</h1>
                       <div className="importance-notice">
               <div className="importance-icon">⚠️</div>
-              <p><strong>Critical Setup:</strong> This information initiates a 1-minute AI analysis process. Please ensure all details are accurate before submission.</p>
+              <p><strong>Critical Setup:</strong> This information initiates a 20-minute AI analysis process. Please ensure all details are accurate before submission.</p>
             </div>
         </div>
 
@@ -449,7 +449,7 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
                   <li>✓ Only letters, numbers, dots, underscores, and hyphens allowed</li>
                   <li>✓ Spaces will be automatically removed</li>
                   <li>✓ This name will be mapped to your Facebook URL</li>
-                  <li>✓ Used for 1 minute of AI processing</li>
+                  <li>✓ Used for 20 minutes of AI processing</li>
                 </ul>
                 <div className="format-example">
                   <strong>Examples:</strong> "YourBrandName", "YourName", "Brand_123", "Company-Name"
@@ -480,7 +480,7 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
                     <li>✓ Must be a valid Facebook page or profile URL</li>
                     <li>✓ Format: https://facebook.com/yourpage or https://facebook.com/profile.php?id=123456789</li>
                     <li>✓ Profile must not be locked/private</li>
-                    <li>✓ This URL will be scraped for 1 minute</li>
+                    <li>✓ This URL will be scraped for 20 minutes</li>
                   </ul>
                 </div>
             </div>
@@ -671,7 +671,7 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
           >
             <div className="confirmation-header">
               <h3>🔍 Final Review Required</h3>
-                              <p><strong>Please verify your information before starting the 1-minute AI analysis:</strong></p>
+                              <p><strong>Please verify your information before starting the 20-minute AI analysis:</strong></p>
             </div>
             
             <div className="confirmation-content">
@@ -686,7 +686,7 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
                 </div>
                 <div className="confirmation-item">
                   <strong>Facebook URL:</strong> {confirmationData.accountData.url}
-                  <div className="critical-warning">⚠️ This URL will be scraped for 1 minute!</div>
+                  <div className="critical-warning">⚠️ This URL will be scraped for 20 minutes!</div>
                 </div>
                 <div className="confirmation-item">
                   <strong>Account Type:</strong> {confirmationData.accountType}
@@ -711,7 +711,7 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
               </div>
               
               <div className="confirmation-warning">
-                <p><strong>⚠️ Important:</strong> Once submitted, this will initiate a 1-minute AI analysis process. Make sure all information is correct!</p>
+                <p><strong>⚠️ Important:</strong> Once submitted, this will initiate a 20-minute AI analysis process. Make sure all information is correct!</p>
               </div>
             </div>
             

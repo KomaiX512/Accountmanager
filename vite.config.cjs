@@ -14,6 +14,12 @@ module.exports = defineConfig({
       '78291997257a.ngrok-free.app' // Specific ngrok host
     ],
     proxy: {
+      // Proxy posts endpoint to the main server (port 3000)
+      '/posts': {
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+        secure: false
+      },
       // Proxy R2 image endpoints to the proxy server (port 3002)
       '/api/r2-image': {
         target: 'http://127.0.0.1:3002',

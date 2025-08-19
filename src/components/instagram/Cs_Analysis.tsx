@@ -481,11 +481,13 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
             setRefreshKey(prev => prev + 1);
           } else {
             console.log(`[Cs_Analysis] ❌ No competitors available from props, AccountInfo, or R2 list`);
-            setError(`No competitors configured for ${normalizedAccountHolder}. Please add competitors to enable analysis.`);
+            // Silent on UI: don't show error banner
+            setLocalCompetitors([]);
           }
         } catch (e) {
           console.warn(`[Cs_Analysis] ⚠️ Failed to list competitors from R2:`, (e as any)?.message);
-          setError(`No competitors configured for ${normalizedAccountHolder}. Please add competitors to enable analysis.`);
+          // Silent on UI: don't show error banner
+          setLocalCompetitors([]);
         }
       }
     };

@@ -4,6 +4,7 @@ import { S3Client, GetObjectCommand, PutObjectCommand, ListObjectsV2Command } fr
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import chromaDBService from './chromadb-service.js';
 import { GoogleGenAI } from '@google/genai';
 
@@ -853,7 +854,6 @@ async function callGeminiAPIDirectBypassQueue(prompt, messages = [], retries = 2
   
   // 🔥 CRITICAL FIX: Improve cache key generation to prevent collisions for long prompts
   // Use a hash of the prompt instead of base64 encoding to prevent truncation issues
-  const crypto = require('crypto');
   const promptHash = crypto.createHash('sha256').update(prompt).digest('hex').substring(0, 16);
   const userMessageHash = userMessage ? crypto.createHash('sha256').update(userMessage).digest('hex').substring(0, 8) : 'no_msg';
   
@@ -866,6 +866,7 @@ async function callGeminiAPIDirectBypassQueue(prompt, messages = [], retries = 2
   
   // 🔥 CRITICAL FIX: Post generation requests should NEVER be deduplicated or cached
   // This prevents the "previous post" issue where long prompts return cached responses
+  let duplicateKey;
   if (prompt.includes('You are creating a') || prompt.includes('You are a professional') || prompt.includes('POST REQUEST:')) {
     console.log(`[RAG-Server] 🚫 POST GENERATION DETECTED: Skipping deduplication and caching for fresh content`);
     // Generate a unique timestamp-based key to prevent any caching
@@ -873,10 +874,10 @@ async function callGeminiAPIDirectBypassQueue(prompt, messages = [], retries = 2
     console.log(`[RAG-Server] 🔑 Using timestamp-based key for post generation: ${timestampKey}`);
     
     // Check for duplicate requests in progress
-    const duplicateKey = `inprogress_${timestampKey}`;
+    duplicateKey = `inprogress_${timestampKey}`;
   } else {
     // Check for duplicate requests in progress
-    const duplicateKey = `inprogress_${cacheKey}`;
+    duplicateKey = `inprogress_${cacheKey}`;
   }
   
   if (duplicateRequestCache.has(duplicateKey)) {
@@ -1111,7 +1112,6 @@ async function callGeminiAPIDirect(prompt, messages = [], retries = 2) {
   
   // 🔥 CRITICAL FIX: Improve cache key generation to prevent collisions for long prompts
   // Use a hash of the prompt instead of base64 encoding to prevent truncation issues
-  const crypto = require('crypto');
   const promptHash = crypto.createHash('sha256').update(prompt).digest('hex').substring(0, 16);
   const userMessageHash = userMessage ? crypto.createHash('sha256').update(userMessage).digest('hex').substring(0, 8) : 'no_msg';
   
@@ -1124,6 +1124,7 @@ async function callGeminiAPIDirect(prompt, messages = [], retries = 2) {
   
   // 🔥 CRITICAL FIX: Post generation requests should NEVER be deduplicated or cached
   // This prevents the "previous post" issue where long prompts return cached responses
+  let duplicateKey;
   if (prompt.includes('You are creating a') || prompt.includes('You are a professional') || prompt.includes('POST REQUEST:')) {
     console.log(`[RAG-Server] 🚫 POST GENERATION DETECTED: Skipping deduplication and caching for fresh content`);
     // Generate a unique timestamp-based key to prevent any caching
@@ -1131,10 +1132,10 @@ async function callGeminiAPIDirect(prompt, messages = [], retries = 2) {
     console.log(`[RAG-Server] 🔑 Using timestamp-based key for post generation: ${timestampKey}`);
     
     // Check for duplicate requests in progress
-    const duplicateKey = `inprogress_${timestampKey}`;
+    duplicateKey = `inprogress_${timestampKey}`;
   } else {
     // Check for duplicate requests in progress
-    const duplicateKey = `inprogress_${cacheKey}`;
+    duplicateKey = `inprogress_${cacheKey}`;
   }
   
   if (duplicateRequestCache.has(duplicateKey)) {

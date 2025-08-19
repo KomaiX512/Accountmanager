@@ -46,18 +46,11 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
 
   useEffect(() => {
     document.body.classList.add('instagram-dashboard-active');
-    
-    // 🔒 PLATFORM SWITCH EVENT DISPATCHER: Ensure News4U components refresh
-    const platformSwitchEvent = new CustomEvent('platformDashboardSwitch', {
-      detail: {
-        platform: 'instagram',
-        accountHolder,
-        timestamp: Date.now()
-      }
-    });
-    window.dispatchEvent(platformSwitchEvent);
-    console.log(`[InstagramDashboard] 🔄 Dispatched platform switch event for instagram - ${accountHolder}`);
-  }, [accountHolder]);
+    // Cleanup function to remove the class when the component unmounts
+    return () => {
+      document.body.classList.remove('instagram-dashboard-active');
+    };
+  }, []); // Empty dependency array ensures this runs only once on mount and cleanup on unmount
 
   const { currentUser } = useAuth();
   const { isFeatureBlocked, trackRealDiscussion, trackRealAIReply, trackRealPostCreation, canUseFeature } = useFeatureTracking();
@@ -135,14 +128,14 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   });
 
   const eventSourceRef = useRef<EventSource | null>(null);
-  const maxImageRetryAttempts = 3;
+  const maxImageRetryAttempts = useRef(3);
   const imageRetryAttemptsRef = useRef(0);
   const firstLoadRef = useRef(true);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
   const baseReconnectDelay = 1000;
   const lastProfilePicRenderTimeRef = useRef<number>(0);
-  const [aiProcessingNotifications, setAiProcessingNotifications] = useState<Record<string, boolean>>({});
+  const [aiProcessingNotifications, setAiProcessingNotifications] = useState<string[]>([]);
   const [linkedAccounts, setLinkedAccounts] = useState<LinkedAccount[]>([]);
 
   const [showInitialText, setShowInitialText] = useState(true);
@@ -926,12 +919,15 @@ Image Description: ${response.post.image_prompt}
           aiReply: {
             ...n.aiReply!,
             reply: editedReply,
-            sendStatus: 'ready'
+            timestamp: Date.now(),
+            generated_at: new Date().toISOString()
           }
         };
       }
       return n;
     }));
+    
+    setToast('AI reply updated successfully!');
   };
 
   const handleIgnoreAIReply = async (notification: Notification) => {
@@ -2126,12 +2122,12 @@ Image Description: ${response.post.image_prompt}
                       alt={`${accountHolder}'s profile picture`}
                       className="profile-pic-bar"
                       onError={(e) => {
-                        console.error(`Failed to load profile picture for ${accountHolder} ${(imageRetryAttemptsRef.current || 0) + 1}`);
-                        if ((imageRetryAttemptsRef.current || 0) < maxImageRetryAttempts) {
-                          imageRetryAttemptsRef.current = (imageRetryAttemptsRef.current || 0) + 1;
+                        console.error(`Failed to load profile picture for ${accountHolder} ${imageRetryAttemptsRef.current + 1}`);
+                        if (imageRetryAttemptsRef.current < maxImageRetryAttempts) {
+                          imageRetryAttemptsRef.current++;
                           const imgElement = e.target as HTMLImageElement;
                           
-                          if ((imageRetryAttemptsRef.current || 0) === 1) {
+                          if (imageRetryAttemptsRef.current === 1) {
                             // First retry: try direct URL without proxy
                             console.log(`Trying direct URL for profile picture, attempt ${imageRetryAttemptsRef.current}`);
                             setTimeout(() => {

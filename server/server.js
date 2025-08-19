@@ -1290,23 +1290,35 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
     // If we are fetching the news module, pull from ALL known patterns and merge.
     const altPrefixes = [];
     if (module === 'news_for_you') {
-      const dashed = prefix.replace('news_for_you', 'news-for-you');
-      if (dashed !== prefix) {
-        altPrefixes.push(dashed);
-      }
-
-      // Also support historical/camel-cased prefix used by older pipelines
-      const newForYou = prefix.replace('news_for_you', 'NewForYou');
+      // Support multiple news file patterns
+      const newForYou = 'news_for_you';
+      const dashed = 'news-for-you';
+      const newForYouAlt = 'NewForYou';
+      
       if (newForYou !== prefix && newForYou !== dashed) {
         altPrefixes.push(newForYou);
       }
+      if (dashed !== prefix && dashed !== newForYou) {
+        altPrefixes.push(dashed);
+      }
+      if (newForYouAlt !== prefix && newForYouAlt !== dashed && newForYouAlt !== newForYou) {
+        altPrefixes.push(newForYouAlt);
+      }
 
-      // 🚀 NEW: Support timestamped news files with pattern: news_YYYYMMDD_HHMMSS_USERNAME.json
+      // 🚀 ENHANCED: Support timestamped news files with pattern: news_YYYYMMDD_HHMMSS_USERNAME.json
       // This covers files like: news_20250809_120145_KOMAIL.json
       const timestampedPrefix = `news_`;
       if (timestampedPrefix !== prefix) {
         altPrefixes.push(timestampedPrefix);
       }
+      
+      // 🚀 NEW: Support additional news patterns that might exist
+      const additionalPatterns = ['news', 'News', 'NEWS'];
+      additionalPatterns.forEach(pattern => {
+        if (pattern !== prefix && !altPrefixes.includes(pattern)) {
+          altPrefixes.push(pattern);
+        }
+      });
     }
  
     // Check if we should use cache based on the enhanced caching rules
@@ -1353,9 +1365,14 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
                             fileName.startsWith('news-for-you') || 
                             fileName.startsWith('NewForYou');
         
+        // 🚀 FIXED: Handle both uppercase and lowercase username matching
+        // Files like: news_20250809_120145_KOMAIL.json
+        // Username might be: komail, KOMAIL, or Komail
         const timestampedMatch = fileName.startsWith('news_') && 
-                               fileName.includes(`_${username.toUpperCase()}`) &&
-                               fileName.endsWith('.json');
+                               fileName.endsWith('.json') &&
+                               (fileName.includes(`_${username.toUpperCase()}`) || 
+                                fileName.includes(`_${username.toLowerCase()}`) ||
+                                fileName.includes(`_${username}`));
         
         return standardMatch || timestampedMatch;
       });
@@ -7318,7 +7335,6 @@ scheduleConnectionHealthCheck();
 app.get(['/events-missed/:username', '/api/events-missed/:username'], async (req, res) => {
   const { username } = req.params;
   const { since } = req.query;
-  let sinceTimestamp = 0;
   
   // Validate 'since' timestamp
   if (since) {

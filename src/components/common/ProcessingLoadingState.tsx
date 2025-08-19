@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 /**
@@ -146,9 +146,9 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
           return info.username.trim();
         }
       }
-    } catch (error) {
-      console.error('Error reading username from localStorage:', error);
-    }
+            } catch (error) {
+          console.error('Error reading username from localStorage:', error instanceof Error ? error.message : 'Unknown error');
+        }
     return null; // NO FALLBACKS - return null if no valid username
   };
 
@@ -170,6 +170,48 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     console.error(`🚨 FATAL: No username available for platform ${platform}. Deferring to backend sync to repair.`);
     return '';
   }, [platform, propUsername]);
+
+  // ✅ CRITICAL FIX: Check if platform is already completed on mount to prevent dual timer issue
+  useEffect(() => {
+    if (!currentUser?.uid || !username) return;
+    
+    const checkPlatformCompletion = async () => {
+      try {
+        const accessResp = await fetch(`/api/platform-access/${currentUser.uid}`);
+        if (accessResp.ok) {
+          const accessJson = await accessResp.json();
+          const accessData = accessJson?.data || accessJson;
+          let isClaimed = false;
+          
+          if (platform === 'instagram') {
+            isClaimed = accessData.hasEnteredInstagramUsername === true;
+          } else if (platform === 'twitter') {
+            isClaimed = accessData.hasEnteredTwitterUsername === true;
+          } else if (platform === 'facebook') {
+            isClaimed = accessData.hasEnteredFacebookUsername === true;
+          } else {
+            isClaimed = accessData[platform]?.claimed === true;
+          }
+          
+          if (isClaimed) {
+            console.log(`🔥 PLATFORM COMPLETION DETECTED ON MOUNT: ${platform} is already completed, completing immediately`);
+            // Clear any existing timers
+            localStorage.removeItem(`${platform}_processing_countdown`);
+            localStorage.removeItem(`${platform}_processing_info`);
+            setCachedTimerData(null);
+            setTimerCompleted(true);
+            return;
+          }
+        }
+              } catch (error) {
+          console.warn(`🔥 PLATFORM COMPLETION CHECK ERROR: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    };
+    
+    // Run completion check after a short delay to allow component to mount
+    const completionCheckDelay = setTimeout(checkPlatformCompletion, 1000);
+    return () => clearTimeout(completionCheckDelay);
+  }, [platform, currentUser?.uid, username]);
 
   // ✅ PLATFORM-SPECIFIC TIMING LOGIC
   // Determine the appropriate countdown duration based on platform and context
@@ -213,54 +255,78 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   const [timerCompleted, setTimerCompleted] = useState(false);
   const [timerJustCreated, setTimerJustCreated] = useState(false);
 
-  // Get timer data from localStorage with bulletproof error handling
-  const getTimerData = () => {
+  // ✅ OPTIMIZED TIMER CACHING: Cache timer data to avoid excessive localStorage reads
+  const [cachedTimerData, setCachedTimerData] = useState<{
+    endTime: number;
+    startTime: number;
+    totalDuration: number;
+    username: string;
+    lastCacheTime: number;
+  } | null>(null);
+
+  // ✅ SMART TIMER DATA CACHING: Only read from localStorage when necessary
+  const getTimerData = useCallback(() => {
+    const now = Date.now();
+    
+    // Use cached data if it's fresh (less than 1 second old)
+    if (cachedTimerData && (now - cachedTimerData.lastCacheTime) < 1000) {
+      return cachedTimerData;
+    }
+
     try {
       const endTimeRaw = localStorage.getItem(`${platform}_processing_countdown`);
       const processingInfoRaw = localStorage.getItem(`${platform}_processing_info`);
       
-      console.log(`🔍 TIMER DEBUG: Reading timer data for ${platform}:`, {
-        endTimeRaw,
-        processingInfoRaw: processingInfoRaw ? 'exists' : 'missing',
-        currentTime: new Date().toISOString()
-      });
+      // ✅ OPTIMIZED LOGGING: Only log when cache is refreshed, not every read
+      if (!cachedTimerData) {
+        console.log(`🔍 TIMER CACHE: Initializing timer cache for ${platform}`);
+      }
       
       if (!endTimeRaw || !processingInfoRaw) {
-        console.log(`🔍 TIMER DEBUG: Missing timer data for ${platform} - endTimeRaw: ${endTimeRaw}, processingInfoRaw: ${processingInfoRaw}`);
+        if (cachedTimerData) {
+          // Clear cache if data no longer exists
+          setCachedTimerData(null);
+        }
         return null;
       }
       
-      const endTime = parseInt(endTimeRaw);
+      const endTime = parseInt(endTimeRaw, 10);
       const processingInfo = JSON.parse(processingInfoRaw);
       
-      console.log(`🔍 TIMER DEBUG: Parsed timer data for ${platform}:`, {
-        endTime,
-        startTime: processingInfo.startTime,
-        totalDuration: processingInfo.totalDuration,
-        username: processingInfo.username
-      });
-      
       if (Number.isNaN(endTime) || !processingInfo.startTime) {
-        console.log(`🔍 TIMER DEBUG: Invalid timer data for ${platform} - endTime: ${endTime}, startTime: ${processingInfo.startTime}`);
+        if (cachedTimerData) {
+          setCachedTimerData(null);
+        }
         return null;
       }
       
-      const result = {
+      const newTimerData = {
         endTime,
         startTime: processingInfo.startTime,
         totalDuration: processingInfo.totalDuration || (finalCountdownMinutes * 60 * 1000),
-        username: processingInfo.username // NO FALLBACKS - use exact username from storage
+        username: processingInfo.username,
+        lastCacheTime: now
       };
       
-      console.log(`🔍 TIMER DEBUG: Returning timer data for ${platform}:`, result);
-      return result;
-    } catch (error) {
-      console.error(`🔍 TIMER DEBUG: Error reading timer data for ${platform}:`, error);
-      return null;
-    }
-  };
+      // Update cache
+      setCachedTimerData(newTimerData);
+      
+      // Only log cache refresh in development
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`🔍 TIMER CACHE: Refreshed timer cache for ${platform} - ${Math.ceil((endTime - now) / 60000)}min remaining`);
+      }
+      
+      return newTimerData;
+            } catch (error) {
+          console.error(`🔍 TIMER CACHE: Error reading timer data for ${platform}:`, error instanceof Error ? error.message : 'Unknown error');
+          if (cachedTimerData) {
+            setCachedTimerData(null);
+          }
+          return null;
+        }
+  }, [platform, finalCountdownMinutes, cachedTimerData]);
 
-  // Initialize timer data if not exists (first time setup)
+  // ✅ CRITICAL FIX: Initialize timer data if not exists (first time setup)
   useEffect(() => {
     // If the timer has already completed, do NOT create a new one
     if (timerCompleted) {
@@ -276,7 +342,55 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
         console.log(`⏳ TIMER INIT DEFERRED: Missing username for ${platform}. Awaiting backend sync before creating timer.`);
         return;
       }
-      // First time setup - create new timer with platform-specific timing
+      
+      // ✅ CRITICAL FIX: Check if processing is already complete before creating new timer
+      if (currentUser?.uid) {
+        // Check if platform is already claimed (completed)
+        fetch(`/api/platform-access/${currentUser.uid}`)
+          .then(response => {
+            if (response.ok) {
+              return response.json();
+            }
+            throw new Error('Failed to check platform access');
+          })
+          .then(data => {
+            const accessData = data?.data || data;
+            let isClaimed = false;
+            
+            if (platform === 'instagram') {
+              isClaimed = accessData.hasEnteredInstagramUsername === true;
+            } else if (platform === 'twitter') {
+              isClaimed = accessData.hasEnteredTwitterUsername === true;
+            } else if (platform === 'facebook') {
+              isClaimed = accessData.hasEnteredFacebookUsername === true;
+            } else {
+              isClaimed = accessData[platform]?.claimed === true;
+            }
+            
+            if (isClaimed) {
+              console.log(`🔥 PLATFORM COMPLETION DETECTED: ${platform} is already completed, not creating new timer`);
+              // Mark as completed locally and trigger completion
+              setTimerCompleted(true);
+              return;
+            }
+            
+            // Platform not claimed, proceed with timer creation
+            createNewTimer();
+          })
+          .catch(error => {
+            console.warn(`🔥 PLATFORM CHECK ERROR: ${error instanceof Error ? error.message : 'Unknown error'}, proceeding with timer creation`);
+            createNewTimer();
+          });
+      } else {
+        // No user context, proceed with timer creation
+        createNewTimer();
+      }
+    } else {
+      console.log(`🔥 BULLETPROOF TIMER: Resumed existing ${platform} timer with username '${existingTimer.username}'`);
+    }
+    
+    // ✅ CRITICAL FIX: Extract timer creation logic to prevent infinite loops
+    function createNewTimer() {
       const now = Date.now();
       const durationMs = finalCountdownMinutes * 60 * 1000;
       const endTime = now + durationMs;
@@ -284,7 +398,6 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
       console.log(`🔥 TIMER INIT: Creating new timer for ${platform} - duration: ${finalCountdownMinutes}min, endTime: ${new Date(endTime).toISOString()}`);
       
       // ✅ CRITICAL: NEVER overwrite existing username - check if username already exists
-      // This prevents overwriting the crucial primary username from initial form
       let finalUsername = username;
       try {
         const existingProcessingInfo = localStorage.getItem(`${platform}_processing_info`);
@@ -296,19 +409,29 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
             finalUsername = preserved; // ALWAYS preserve existing username
           }
         }
-      } catch (err) {
-        console.error('Error checking existing username in localStorage:', err);
-      }
+              } catch (err) {
+          console.error('Error checking existing username in localStorage:', err instanceof Error ? err.message : 'Unknown error');
+        }
       
       localStorage.setItem(`${platform}_processing_countdown`, endTime.toString());
       localStorage.setItem(`${platform}_processing_info`, JSON.stringify({
         platform,
-        username: finalUsername, // Use the preserved username
+        username: finalUsername,
         startTime: now,
         endTime,
         totalDuration: durationMs,
-        isExtension: remainingMinutes !== undefined // Track if this is an extension
+        isExtension: remainingMinutes !== undefined
       }));
+      
+      // Update cache immediately
+      setCachedTimerData({
+        endTime,
+        startTime: now,
+        totalDuration: durationMs,
+        username: finalUsername,
+        lastCacheTime: now
+      });
+      
       // ✅ CRITICAL: Persist to backend for cross-device sync
       if (currentUser?.uid) {
         // Step 1: Save processing status (timer data)
@@ -332,13 +455,13 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
           console.error(`🔥 BACKEND SYNC: Error saving processing status for ${platform}:`, error);
         });
         
-        // Step 2: CRITICAL FIX - Mark platform as NOT claimed (in loading state) for cross-device sync
+        // Step 2: Mark platform as NOT claimed (in loading state) for cross-device sync
         fetch(`/api/platform-access/${currentUser.uid}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             platform,
-            claimed: false, // NOT claimed while in loading state
+            claimed: false,
             username: finalUsername
           })
         }).then(response => {
@@ -356,12 +479,9 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
       
       // Set flag to prevent backend sync from clearing the timer immediately
       setTimerJustCreated(true);
-      setTimeout(() => setTimerJustCreated(false), 5000); // Clear flag after 5 seconds
-    } else {
-      console.log(`🔥 BULLETPROOF TIMER: Resumed existing ${platform} timer with username '${existingTimer.username}'`);
+      setTimeout(() => setTimerJustCreated(false), 5000);
     }
-  // Added finalCountdownMinutes to dependencies to ensure effect re-runs correctly
-  }, [platform, username, finalCountdownMinutes, remainingMinutes, timerCompleted]);
+  }, [platform, username, finalCountdownMinutes, remainingMinutes, timerCompleted, currentUser?.uid]); // ✅ REMOVED getTimerData from dependencies to prevent infinite loops
 
   // Real-time calculation functions
   const getRemainingMs = (): number => {
@@ -385,7 +505,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     return progress;
   };
 
-  // ✅ BULLETPROOF REAL-TIME TIMER - Updates based on actual time, not intervals
+  // ✅ OPTIMIZED REAL-TIME TIMER - Smart update intervals based on remaining time
   useEffect(() => {
     if (timerCompleted) return;
     
@@ -395,8 +515,6 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
       
       const remaining = getRemainingMs();
       
-      console.log(`🔍 TIMER UPDATE: ${platform} - remaining: ${remaining}ms, timerCompleted: ${timerCompleted}`);
-      
       if (remaining <= 0 && !timerCompleted) {
         if (allowAutoComplete) {
           setTimerCompleted(true);
@@ -404,7 +522,8 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
           try {
             localStorage.removeItem(`${platform}_processing_countdown`);
             localStorage.removeItem(`${platform}_processing_info`);
-            // Backend authoritative cleanup happens via finalize or server expiry; avoid extra DELETEs here to reduce race surface
+            // Clear cache
+            setCachedTimerData(null);
             
             // Mark platform as completed
             const completedPlatforms = localStorage.getItem('completedPlatforms');
@@ -427,7 +546,8 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
                   }
                 }
               } catch {}
-              
+
+              // (1) Update platform-access endpoint (used by MainDashboard)
               fetch(`/api/platform-access/${currentUser.uid}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -445,12 +565,50 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
               }).catch(error => {
                 console.error(`🔥 BACKEND SYNC: Error marking platform ${platform} as claimed:`, error);
               });
+
+              // (2) Update user-status endpoint (used by App/pages) to ensure cross-device Facebook claimed sync
+              try {
+                let userStatusEndpoint = '';
+                let payload: any = {};
+                if (platform === 'instagram') {
+                  userStatusEndpoint = `/api/user-instagram-status/${currentUser.uid}`;
+                  payload = { instagram_username: usernameToUse };
+                } else if (platform === 'twitter') {
+                  userStatusEndpoint = `/api/user-twitter-status/${currentUser.uid}`;
+                  payload = { twitter_username: usernameToUse };
+                } else if (platform === 'facebook') {
+                  userStatusEndpoint = `/api/user-facebook-status/${currentUser.uid}`;
+                  payload = { facebook_username: usernameToUse };
+                }
+                if (userStatusEndpoint) {
+                  fetch(userStatusEndpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                  }).then(res => {
+                    if (res.ok) {
+                      console.log(`🔥 BACKEND SYNC: ${platform} user-status updated for cross-device claimed sync`);
+                      // Mirror to localStorage for instant recognition on other tabs/devices sharing storage
+                      try {
+                        localStorage.setItem(`${platform}_accessed_${currentUser.uid}`, 'true');
+                        if (usernameToUse && usernameToUse.trim()) {
+                          localStorage.setItem(`${platform}_username_${currentUser.uid}`, usernameToUse.trim());
+                        }
+                      } catch {}
+                    } else {
+                      console.warn(`🔥 BACKEND SYNC: Failed to update ${platform} user-status endpoint`);
+                    }
+                  }).catch(err => {
+                    console.warn(`🔥 BACKEND SYNC: Error updating ${platform} user-status endpoint:`, err);
+                  });
+                }
+              } catch {}
             }
             
             console.log(`🔥 BULLETPROOF TIMER: Completed ${platform} processing`);
-          } catch (error) {
-            console.error('Error cleaning up timer:', error);
-          }
+                  } catch (error) {
+          console.error('Error cleaning up timer:', error instanceof Error ? error.message : 'Unknown error');
+        }
         } else {
           // Do not mark as completed; parent may extend time and continue updates
           // Keep interval running so UI can reflect extended endTime written by parent
@@ -461,11 +619,30 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     // Update immediately
     updateTimer();
     
-    // Use different intervals based on tab visibility for optimal performance
-    const interval = setInterval(updateTimer, isTabVisible ? 100 : 1000);
+    // ✅ SMART UPDATE INTERVALS: Use different intervals based on remaining time and tab visibility
+    const getUpdateInterval = () => {
+      const remaining = getRemainingMs();
+      const remainingMinutes = Math.ceil(remaining / 60000);
+      
+      if (remainingMinutes <= 1) {
+        // Last minute: update every 100ms for smooth countdown
+        return isTabVisible ? 100 : 500;
+      } else if (remainingMinutes <= 5) {
+        // Last 5 minutes: update every 500ms
+        return isTabVisible ? 500 : 1000;
+      } else if (remainingMinutes <= 10) {
+        // Last 10 minutes: update every 1 second
+        return isTabVisible ? 1000 : 2000;
+      } else {
+        // More than 10 minutes: update every 2 seconds
+        return isTabVisible ? 2000 : 5000;
+      }
+    };
+    
+    const interval = setInterval(updateTimer, getUpdateInterval());
     
     return () => clearInterval(interval);
-  }, [platform, currentTime, isTabVisible, timerCompleted]);
+  }, [platform, isTabVisible, timerCompleted, allowAutoComplete, currentUser?.uid, username]); // ✅ REMOVED currentTime and getRemainingMs from dependencies to prevent infinite loops
 
   // ✅ PAGE VISIBILITY API - Perfect tab switching synchronization
   useEffect(() => {
@@ -505,7 +682,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     if (!currentUser?.uid) return;
     let cancelled = false;
     let lastSyncTime = 0;
-    const SYNC_COOLDOWN = 2000; // 2 second cooldown between syncs
+    const SYNC_COOLDOWN = 8000; // ✅ OPTIMIZED: Increased to 8 seconds for better performance
 
     const syncFromServer = async () => {
       const now = Date.now();
@@ -520,8 +697,6 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
         const json = await resp.json();
         const data = json?.data;
         const nowTs = Date.now();
-        
-        console.log(`🔍 BACKEND SYNC: ${platform} - server data:`, data);
         
         if (!cancelled) {
           if (data && typeof data.endTime === 'number' && nowTs < data.endTime) {
@@ -540,7 +715,38 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
             } catch {}
             setCurrentTime(Date.now());
           } else {
-            // No active status on server - but check if we have a local timer first
+            // ✅ CRITICAL FIX: Check if platform is completed on server before clearing local timer
+            try {
+              const accessResp = await fetch(`/api/platform-access/${currentUser.uid}`);
+              if (accessResp.ok) {
+                const accessJson = await accessResp.json();
+                const accessData = accessJson?.data || accessJson;
+                let isClaimed = false;
+                
+                if (platform === 'instagram') {
+                  isClaimed = accessData.hasEnteredInstagramUsername === true;
+                } else if (platform === 'twitter') {
+                  isClaimed = accessData.hasEnteredTwitterUsername === true;
+                } else if (platform === 'facebook') {
+                  isClaimed = accessData.hasEnteredFacebookUsername === true;
+                } else {
+                  isClaimed = accessData[platform]?.claimed === true;
+                }
+                
+                if (isClaimed) {
+                  console.log(`🔍 BACKEND SYNC: ${platform} - platform completed on server, clearing local timer and completing`);
+                  localStorage.removeItem(`${platform}_processing_countdown`);
+                  localStorage.removeItem(`${platform}_processing_info`);
+                  setCachedTimerData(null);
+                  setTimerCompleted(true);
+                  return;
+                }
+              }
+                    } catch (accessError) {
+          console.warn(`🔍 BACKEND SYNC: ${platform} - error checking platform access:`, accessError instanceof Error ? accessError.message : 'Unknown error');
+        }
+            
+            // No active status on server and platform not completed - check local timer
             const localEndTime = localStorage.getItem(`${platform}_processing_countdown`);
             const localProcessingInfo = localStorage.getItem(`${platform}_processing_info`);
             
@@ -561,10 +767,9 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
                   console.log(`🔍 BACKEND SYNC: ${platform} - clearing expired local timer`);
                   localStorage.removeItem(`${platform}_processing_countdown`);
                   localStorage.removeItem(`${platform}_processing_info`);
+                  setCachedTimerData(null);
                 } else {
-                  console.log(`🔍 BACKEND SYNC: ${platform} - keeping active local timer (${Math.ceil((localEndTimeNum - nowTs) / 1000 / 60)}min remaining)`);
-                  
-                  // ✅ ENHANCED SYNC: If local timer is still active but not on server, sync it back
+                  // Local timer still active - sync back to server if missing
                   if (!data || !data.endTime) {
                     console.log(`🔍 BACKEND SYNC: ${platform} - local timer active but missing on server, syncing back`);
                     try {
@@ -581,23 +786,21 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
                         })
                       });
                       console.log(`🔍 BACKEND SYNC: ${platform} - successfully synced local timer back to server`);
-                    } catch (syncError) {
-                      console.warn(`🔍 BACKEND SYNC: ${platform} - failed to sync local timer back to server:`, syncError);
-                    }
+                            } catch (syncError) {
+          console.warn(`🔍 BACKEND SYNC: ${platform} - failed to sync local timer back to server:`, syncError instanceof Error ? syncError.message : 'Unknown error');
+        }
                   }
                 }
-              } catch (error) {
-                console.warn(`🔍 BACKEND SYNC: ${platform} - error parsing local timer data:`, error);
-              }
-            } else {
-              console.log(`🔍 BACKEND SYNC: ${platform} - no local timer to check`);
+                      } catch (error) {
+          console.warn(`🔍 BACKEND SYNC: ${platform} - error parsing local timer data:`, error instanceof Error ? error.message : 'Unknown error');
+        }
             }
             setCurrentTime(Date.now());
           }
         }
-      } catch (error) {
-        console.warn(`🔍 BACKEND SYNC: ${platform} - error:`, error);
-      }
+              } catch (error) {
+          console.warn(`🔍 BACKEND SYNC: ${platform} - error:`, error instanceof Error ? error.message : 'Unknown error');
+        }
     };
     
     // Initial sync with delay to allow local timer to initialize and persist to backend
@@ -606,10 +809,10 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
         console.log(`🔍 BACKEND SYNC: ${platform} - initial sync after delay`);
         syncFromServer();
       }
-    }, 2000); // 2 second delay for initial sync
+    }, 5000); // ✅ OPTIMIZED: Increased to 5 seconds for better performance
     
-    // ✅ OPTIMIZED SYNC FREQUENCY: Reduced from 500ms to 3 seconds for better performance
-    const id = setInterval(syncFromServer, 3000); // Increased from 500ms to 3 seconds
+    // ✅ OPTIMIZED SYNC FREQUENCY: Increased to 10 seconds for better performance
+    const id = setInterval(syncFromServer, 10000); // Increased to 10 seconds
     return () => { 
       cancelled = true; 
       clearTimeout(initialSyncDelay);
@@ -1029,7 +1232,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
       console.log(`🔥 EXIT: Successfully exited loading state for ${platform}`);
 
     } catch (error) {
-      console.error('🔥 EXIT: Error during exit cleanup:', error);
+      console.error('🔥 EXIT: Error during exit cleanup:', error instanceof Error ? error.message : 'Unknown error');
       completeProcessing();
       if (onExit) { onExit(); } else { safeNavigate(navigate, '/account', { replace: true }, 8); }
     } finally {

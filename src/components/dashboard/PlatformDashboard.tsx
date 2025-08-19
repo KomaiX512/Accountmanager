@@ -75,19 +75,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const loadingCheckRef = useRef(false);
   const { processingState } = useProcessing();
 
-  // 🔒 PLATFORM SWITCH EVENT DISPATCHER: Ensure News4U components refresh
-  useEffect(() => {
-    // Dispatch platform switch event when component mounts or platform changes
-    const platformSwitchEvent = new CustomEvent('platformDashboardSwitch', {
-      detail: {
-        platform,
-        accountHolder,
-        timestamp: Date.now()
-      }
-    });
-    window.dispatchEvent(platformSwitchEvent);
-    console.log(`[PlatformDashboard] 🔄 Dispatched platform switch event for ${platform} - ${accountHolder}`);
-  }, [platform, accountHolder]);
+
 
   // ALL CONTEXT HOOKS MUST BE CALLED FIRST - Rules of Hooks
   const { currentUser } = useAuth();
@@ -215,6 +203,8 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const reconnectAttempts = useRef(0);
   const lastProfilePicRenderTimeRef = useRef<number>(0);
   const imageRetryAttemptsRef = useRef(0);
+  // Prevent redundant Facebook fallback attempts & log spam
+  const facebookProfileFallbackTriedRef = useRef(false);
 
   // CONSTANTS
   const maxReconnectAttempts = 5;
@@ -343,6 +333,40 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
             console.warn(`[${platform.toUpperCase()}] Primary profile endpoint failed, trying fallback...`);
           }
           profileData = null;
+          // 🔁 MINIMAL FACEBOOK FALLBACK: try forced refresh & cache endpoints once
+          if (platform === 'facebook' && !facebookProfileFallbackTriedRef.current) {
+            facebookProfileFallbackTriedRef.current = true;
+            const fbAttempts: { label: string; url: string }[] = [
+              { label: 'forceRefresh platform endpoint', url: `/api/profile-info/${accountHolder}?platform=facebook&forceRefresh=true` },
+              { label: 'forceRefresh generic endpoint', url: `/api/profile-info/${accountHolder}?forceRefresh=true&platform=facebook` },
+            ];
+            for (const attempt of fbAttempts) {
+              try {
+                console.log(`[FACEBOOK] Fallback attempt (${attempt.label}) → ${attempt.url}`);
+                const resp = await axios.get(appendBypassParam(attempt.url, platform, accountHolder, 'profile-fallback'));
+                if (resp?.data && typeof resp.data === 'object') {
+                  const d = resp.data;
+                  const hasFields = d.fullName || d.followersCount !== undefined || d.biography || d.profilePicUrl || d.profilePicUrlHD;
+                  if (hasFields) {
+                    profileData = d;
+                    console.log('[FACEBOOK] ✅ Fallback profile fetch succeeded via', attempt.label);
+                    break;
+                  } else {
+                    console.log('[FACEBOOK] Fallback response lacked profile fields via', attempt.label);
+                  }
+                }
+              } catch (fbErr: any) {
+                if (fbErr?.response?.status === 404) {
+                  console.log(`[FACEBOOK] Fallback (${attempt.label}) 404 – will try next if available`);
+                } else {
+                  console.warn(`[FACEBOOK] Fallback (${attempt.label}) failed:`, fbErr?.message);
+                }
+              }
+            }
+            if (!profileData) {
+              console.warn('[FACEBOOK] All fallback profile attempts failed');
+            }
+          }
         }
       }
       

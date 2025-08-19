@@ -499,6 +499,19 @@ const AppContent: React.FC = () => {
               ? response.data.facebook_username
               : response.data.instagram_username;
             
+            // ✅ CRITICAL FIX: Immediately sync backend claimed status to localStorage for cross-device sync
+            // This prevents the issue where Device B shows entry form while Device A shows dashboard
+            const platformKey = isTwitterDashboard ? 'twitter' : isFacebookDashboard ? 'facebook' : 'instagram';
+            const uid = currentUser.uid;
+            localStorage.setItem(`${platformKey}_accessed_${uid}`, 'true');
+            console.log(`[App] 🔄 CROSS-DEVICE SYNC: Platform ${platformKey} marked as accessed in localStorage for user ${uid}`);
+            
+            // ✅ CRITICAL FIX: Also sync username to localStorage if missing
+            if (savedUsername && !localStorage.getItem(`${platformKey}_username_${uid}`)) {
+              localStorage.setItem(`${platformKey}_username_${uid}`, savedUsername);
+              console.log(`[App] 🔄 CROSS-DEVICE SYNC: Username ${savedUsername} synced to localStorage for ${platformKey}`);
+            }
+            
             // ✅ ENHANCED: Get competitors from AccountInfo for all platforms
             let savedCompetitors: string[] = [];
             try {
@@ -506,12 +519,20 @@ const AppContent: React.FC = () => {
               const accountInfoResponse = await axios.get(`/api/retrieve-account-info/${savedUsername}?platform=${platform}`);
               savedCompetitors = accountInfoResponse.data.competitors || [];
               console.log(`[App] ✅ Retrieved competitors for ${savedUsername} on ${platform}:`, savedCompetitors);
+              
+              // ✅ CRITICAL FIX: Sync competitors to localStorage for cross-device sync
+              localStorage.setItem(`${platformKey}_competitors_${uid}`, JSON.stringify(savedCompetitors));
+              console.log(`[App] 🔄 CROSS-DEVICE SYNC: Competitors synced to localStorage for ${platformKey}`);
             } catch (error) {
               console.error(`[App] ⚠️ Failed to fetch competitors from AccountInfo:`, error);
               savedCompetitors = [];
             }
             
             const savedAccountType = response.data.accountType || 'branding';
+            
+            // ✅ CRITICAL FIX: Sync account type to localStorage for cross-device sync
+            localStorage.setItem(`${platformKey}_account_type_${uid}`, savedAccountType);
+            console.log(`[App] 🔄 CROSS-DEVICE SYNC: Account type ${savedAccountType} synced to localStorage for ${platformKey}`);
             
             console.log(`[App] ✅ Retrieved saved ${isTwitterDashboard ? 'Twitter' : isFacebookDashboard ? 'Facebook' : 'Instagram'} data for ${currentUser.uid}:`, {
               username: savedUsername,
@@ -538,7 +559,8 @@ const AppContent: React.FC = () => {
               let cachedUsername = localStorage.getItem(`${platformKey}_username_${uid}`) || '';
               const cachedCompetitors = JSON.parse(localStorage.getItem(`${platformKey}_competitors_${uid}`) || '[]');
               const cachedAccountType = (localStorage.getItem(`${platformKey}_account_type_${uid}`) as 'branding' | 'non-branding') || 'branding';
-              // Additional backfill for Facebook/Twitter if username missing but accessed
+              
+              // ✅ CRITICAL FIX: Additional backfill for Facebook/Twitter if username missing but accessed
               if (hasAccessed && !cachedUsername) {
                 try {
                   const accountDataRaw = localStorage.getItem(`${platformKey}_account_data_${uid}`);
@@ -550,7 +572,8 @@ const AppContent: React.FC = () => {
                     }
                   }
                 } catch {}
-                // As a last resort, try processing_info username
+                
+                // ✅ CRITICAL FIX: As a last resort, try processing_info username
                 if (!cachedUsername) {
                   try {
                     const infoRaw = localStorage.getItem(`${platformKey}_processing_info`);
@@ -565,8 +588,16 @@ const AppContent: React.FC = () => {
                 }
               }
               
-              if (hasAccessed && cachedUsername) {
+              // ✅ CRITICAL FIX: If we have any indication the platform was accessed, proceed to dashboard
+              // This prevents the cross-device sync issue where Device B shows entry form
+              if (hasAccessed || (cachedUsername && cachedUsername.trim())) {
                 console.log(`[App] ⚠️ Backend reported not set up for ${platformKey}, but local cache indicates setup completed – proceeding to dashboard using cache.`);
+                
+                // ✅ CRITICAL FIX: Ensure the accessed flag is set for future cross-device sync
+                if (!hasAccessed) {
+                  localStorage.setItem(`${platformKey}_accessed_${uid}`, 'true');
+                  console.log(`[App] 🔄 CROSS-DEVICE SYNC: Setting ${platformKey} as accessed in localStorage for user ${uid}`);
+                }
                 
                 // Use cached data to navigate to dashboard
                 if (cachedAccountType === 'branding') {
@@ -593,7 +624,10 @@ const AppContent: React.FC = () => {
                 return; // Exit early to prevent further processing
               }
             } catch {}
-            // No viable cache; redirect to setup
+            
+            // ✅ CRITICAL FIX: If we reach here, the platform is truly not set up
+            // Redirect to setup page
+            console.log(`[App] 🚫 Platform ${platformKey} not set up on backend or in local cache - redirecting to setup`);
             safeNavigate(navigate, location.pathname.includes('twitter') ? '/twitter' : location.pathname.includes('facebook') ? '/facebook' : '/instagram', {}, 5);
           }
         } catch (error) {
@@ -606,6 +640,8 @@ const AppContent: React.FC = () => {
             let cachedUsername = localStorage.getItem(`${platformKey}_username_${uid}`) || '';
             const cachedCompetitors = JSON.parse(localStorage.getItem(`${platformKey}_competitors_${uid}`) || '[]');
             const cachedAccountType = (localStorage.getItem(`${platformKey}_account_type_${uid}`) as 'branding' | 'non-branding') || 'branding';
+            
+            // ✅ CRITICAL FIX: Additional backfill for Facebook/Twitter if username missing but accessed
             if (hasAccessed && !cachedUsername) {
               try {
                 const accountDataRaw = localStorage.getItem(`${platformKey}_account_data_${uid}`);
@@ -617,6 +653,8 @@ const AppContent: React.FC = () => {
                   }
                 }
               } catch {}
+              
+              // ✅ CRITICAL FIX: As a last resort, try processing_info username
               if (!cachedUsername) {
                 try {
                   const infoRaw = localStorage.getItem(`${platformKey}_processing_info`);
@@ -629,8 +667,18 @@ const AppContent: React.FC = () => {
                 } catch {}
               }
             }
+            
+            // ✅ CRITICAL FIX: If we have any indication the platform was accessed, proceed to dashboard
+            // This prevents the cross-device sync issue where Device B shows entry form
             if (hasAccessed || (cachedUsername && cachedUsername.trim())) {
               console.log(`[App] 🌐 Using cached ${platformKey} setup to continue despite status error`);
+              
+              // ✅ CRITICAL FIX: Ensure the accessed flag is set for future cross-device sync
+              if (!hasAccessed) {
+                localStorage.setItem(`${platformKey}_accessed_${uid}`, 'true');
+                console.log(`[App] 🔄 CROSS-DEVICE SYNC: Setting ${platformKey} as accessed in localStorage for user ${uid}`);
+              }
+              
               safeNavigate(navigate, location.pathname, {
                 state: {
                   accountHolder: cachedUsername,
@@ -643,7 +691,10 @@ const AppContent: React.FC = () => {
               return;
             }
           } catch {}
-          // No viable cache; redirect to setup
+          
+          // ✅ CRITICAL FIX: If we reach here, the platform is truly not set up
+          // Redirect to setup page
+          console.log(`[App] 🚫 Platform ${platformKey} not set up in local cache - redirecting to setup`);
           safeNavigate(navigate, location.pathname.includes('twitter') ? '/twitter' : location.pathname.includes('facebook') ? '/facebook' : '/instagram', {}, 5);
         } finally {
           setIsLoadingUserData(false);

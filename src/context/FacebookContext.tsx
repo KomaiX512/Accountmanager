@@ -110,37 +110,92 @@ export const FacebookProvider: React.FC<FacebookProviderProps> = ({ children }) 
     }
   }, [currentUser?.uid]);
 
-    // Optimized Facebook access checking
+  // ✅ CROSS-DEVICE SYNC FIX: Real-time Facebook access monitoring with aggressive backend sync
   useEffect(() => {
-    if (currentUser?.uid) {
-      // Fast localStorage check first
-      const hasUserAccessed = localStorage.getItem(`facebook_accessed_${currentUser.uid}`) === 'true';
-      setHasAccessed(hasUserAccessed);
-
-      // Background API status check if not cached
-      if (!hasUserAccessed) {
-        const checkFacebookStatus = async () => {
-          try {
-            const response = await fetch(`/api/user-facebook-status/${currentUser.uid}`);
-            const data = await response.json();
-            
-            const apiHasAccessed = data.hasEnteredFacebookUsername;
-            
-            if (apiHasAccessed) {
-              setHasAccessed(true);
-              localStorage.setItem(`facebook_accessed_${currentUser.uid}`, 'true');
-            }
-          } catch (error) {
-            console.error(`[${new Date().toISOString()}] Error checking Facebook status:`, error);
-          }
-        };
-        
-        checkFacebookStatus();
-      }
-    } else {
+    if (!currentUser?.uid) {
       setHasAccessed(false);
+      return;
     }
-  }, [currentUser?.uid]);
+
+    // ✅ IMMEDIATE CHECK: Fast localStorage check first
+    const hasUserAccessed = localStorage.getItem(`facebook_accessed_${currentUser.uid}`) === 'true';
+    setHasAccessed(hasUserAccessed);
+
+    // ✅ REAL-TIME POLLING: Monitor localStorage changes for cross-device sync
+    const pollForAccessChanges = () => {
+      const currentAccessed = localStorage.getItem(`facebook_accessed_${currentUser.uid}`) === 'true';
+      if (currentAccessed !== hasAccessed) {
+        console.log(`[FacebookContext] 🔄 CROSS-DEVICE SYNC: hasAccessed changed from ${hasAccessed} to ${currentAccessed}`);
+        setHasAccessed(currentAccessed);
+      }
+    };
+
+    // ✅ AGGRESSIVE BACKEND SYNC: Check backend more frequently for Facebook
+    const checkFacebookStatusAggressively = async () => {
+      try {
+        console.log(`[FacebookContext] 🔍 Aggressive backend check for user ${currentUser.uid}`);
+        const response = await fetch(`/api/user-facebook-status/${currentUser.uid}`);
+        const data = await response.json();
+        
+        const apiHasAccessed = data.hasEnteredFacebookUsername;
+        const localHasAccessed = localStorage.getItem(`facebook_accessed_${currentUser.uid}`) === 'true';
+        
+        if (apiHasAccessed && !localHasAccessed) {
+          console.log(`[FacebookContext] ✅ BACKEND SYNC: User has accessed Facebook on another device, updating localStorage`);
+          setHasAccessed(true);
+          localStorage.setItem(`facebook_accessed_${currentUser.uid}`, 'true');
+          
+          // Also sync username and other data
+          if (data.facebook_username) {
+            localStorage.setItem(`facebook_username_${currentUser.uid}`, data.facebook_username);
+          }
+          if (data.accountType) {
+            localStorage.setItem(`facebook_account_type_${currentUser.uid}`, data.accountType);
+          }
+          if (data.competitors) {
+            localStorage.setItem(`facebook_competitors_${currentUser.uid}`, JSON.stringify(data.competitors));
+          }
+          
+        } else if (!apiHasAccessed && localHasAccessed) {
+          console.log(`[FacebookContext] 🔄 BACKEND MISMATCH: Backend shows not accessed but localStorage shows accessed - PRESERVING localStorage (backend may be incomplete)`);
+          // ❌ REMOVED: Don't aggressively clear localStorage when backend might be incomplete  
+          // setHasAccessed(false);
+          // localStorage.removeItem(`facebook_accessed_${currentUser.uid}`);
+        }
+        
+        console.log(`[FacebookContext] 🔍 Backend check complete: backend=${apiHasAccessed} local=${localHasAccessed}`);
+      } catch (error) {
+        console.error(`[FacebookContext] ❌ Error checking Facebook status:`, error);
+      }
+    };
+
+    // ✅ STORAGE EVENT LISTENER: Listen for localStorage changes from other tabs/devices
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === `facebook_accessed_${currentUser.uid}`) {
+        const newValue = event.newValue === 'true';
+        console.log(`[FacebookContext] 🚀 STORAGE EVENT: Facebook access changed to ${newValue} from another tab/device!`);
+        setHasAccessed(newValue);
+      }
+    };
+
+    // ✅ INITIAL BACKEND CHECK: Check backend if not cached
+    if (!hasUserAccessed) {
+      checkFacebookStatusAggressively();
+    }
+
+    // ✅ AGGRESSIVE POLLING: Check every 2 seconds for localStorage changes + every 5 seconds for backend
+    const localPollInterval = setInterval(pollForAccessChanges, 2000);
+    const backendSyncInterval = setInterval(checkFacebookStatusAggressively, 5000);
+
+    // ✅ LISTEN FOR STORAGE EVENTS: Immediate response to localStorage changes
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      clearInterval(localPollInterval);
+      clearInterval(backendSyncInterval);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [currentUser?.uid, hasAccessed]); // Include hasAccessed to track changes
 
   useEffect(() => {
     // Check for existing Facebook connection when auth state changes

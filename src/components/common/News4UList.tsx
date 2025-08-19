@@ -4,7 +4,6 @@ import { motion } from 'framer-motion';
 import { FaClock, FaExternalLinkAlt, FaPlus, FaSpinner, FaRss, FaRedo } from 'react-icons/fa';
 import axios from 'axios';
 import RagService from '../../services/RagService';
-import { appendBypassParam } from '../../utils/cacheManager';
 import './News4U.css';
 
 interface News4UProps {
@@ -26,40 +25,34 @@ interface NewsItem {
 }
 
 /**
- * 🚀 ULTRA-ROBUST News4U Component with Bulletproof Account Locking
+ * 🚀 ULTRA-ROBUST News4U Component with Bulletproof Account Locking & Auto-Retry
  * Features:
  * - Account username is PERMANENTLY LOCKED on first render and NEVER changes
+ * - Automatic retry when "no news available" appears with exponential backoff
  * - Enhanced file pattern detection (ALL news patterns supported)
  * - Robust error handling with fallback mechanisms
  * - No hard refresh required - seamless navigation
  * - Smart caching bypass for fresh data
- * - Only refreshes when platform dashboard is switched
  */
 const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
-  // 🔒 ULTRA-CRITICAL: PERMANENT LOCK - Initialize ONCE and NEVER change
-  const [lockedAccountHolder] = useState(() => {
-    const locked = accountHolder?.trim();
-    console.log(`[News4U] 🔒 PERMANENTLY LOCKING account holder to: "${locked}"`);
-    return locked;
-  });
+  // 🔒 ULTRA-CRITICAL: PERMANENT LOCK - Use useRef for bulletproof locking
+  const lockedAccountHolderRef = useRef<string>('');
+  const lockedPlatformRef = useRef<string>('');
   
-  const [lockedPlatform] = useState(() => {
-    const locked = platform;
-    console.log(`[News4U] 🔒 PERMANENTLY LOCKING platform to: "${locked}"`);
-    return locked;
-  });
+  // Initialize locks only once
+  if (!lockedAccountHolderRef.current && accountHolder) {
+    lockedAccountHolderRef.current = accountHolder.trim();
+    console.log(`[News4U] 🔒 PERMANENTLY LOCKING account holder to: "${lockedAccountHolderRef.current}"`);
+  }
+  
+  if (!lockedPlatformRef.current && platform) {
+    lockedPlatformRef.current = platform;
+    console.log(`[News4U] 🔒 PERMANENTLY LOCKING platform to: "${lockedPlatformRef.current}"`);
+  }
 
-  // 🛡️ SAFETY CHECK: If somehow the locked values are empty, throw error
-  useEffect(() => {
-    if (!lockedAccountHolder || !lockedPlatform) {
-      console.error(`[News4U] 🚨 CRITICAL ERROR: Locked values are invalid!`, {
-        lockedAccountHolder,
-        lockedPlatform,
-        originalAccountHolder: accountHolder,
-        originalPlatform: platform
-      });
-    }
-  }, [lockedAccountHolder, lockedPlatform, accountHolder, platform]);
+  // 🛡️ SAFETY CHECK: Validate locked values
+  const lockedAccountHolder = lockedAccountHolderRef.current;
+  const lockedPlatform = lockedPlatformRef.current;
 
   const [items, setItems] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,13 +63,15 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
   const [openMenuIndex, setOpenMenuIndex] = useState<number | null>(null);
   const [customInputByIndex, setCustomInputByIndex] = useState<Record<number, string>>({});
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [lastFetchTime, setLastFetchTime] = useState<number>(0);
-  const [platformSwitchCount, setPlatformSwitchCount] = useState<number>(0);
+  const [forceRefreshKey, setForceRefreshKey] = useState(0);
   
   const menuAnchorRef = useRef<HTMLElement | null>(null);
   const portalRootRef = useRef<HTMLElement | null>(null);
+  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 🔒 ROBUST: Ensure portal root exists and persists
+  // 🚀 ROBUST: Ensure portal root exists and persists
   useEffect(() => {
     let node = document.getElementById('news4u-portal-root') as HTMLElement | null;
     if (!node) {
@@ -85,12 +80,9 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       document.body.appendChild(node);
     }
     portalRootRef.current = node;
-    return () => {
-      // Keep node persistent for page lifetime; do not remove on unmount
-    };
   }, []);
 
-  // 🔒 ROBUST: Menu positioning with automatic updates
+  // 🚀 ROBUST: Menu positioning with automatic updates
   const updateMenuPosition = useCallback(() => {
     const anchor = menuAnchorRef.current;
     if (!anchor) {
@@ -126,7 +118,7 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     }
   }, [openMenuIndex, updateMenuPosition]);
 
-  // 🔒 ROBUST: Toggle expand with smooth animation
+  // 🚀 ROBUST: Toggle expand with smooth animation
   const toggleExpand = useCallback((idx: number) => {
     setExpanded(prev => {
       const next = new Set(prev);
@@ -135,7 +127,7 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     });
   }, []);
 
-  // 🔒 ROBUST: Unicode decoding with fallback
+  // 🚀 ROBUST: Unicode decoding with fallback
   const decodeUnicode = useCallback((text?: string) => {
     if (!text) return '';
     try {
@@ -147,13 +139,13 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     }
   }, []);
 
-  // 🔒 ROBUST: Image error handling
+  // 🚀 ROBUST: Image error handling
   const handleImageError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.currentTarget;
     img.style.display = 'none';
   }, []);
 
-  // 🔒 ROBUST: Timestamp formatting with validation
+  // 🚀 ROBUST: Timestamp formatting with validation
   const formatTimestamp = useCallback((ts: string) => {
     try {
       const date = new Date(ts);
@@ -185,7 +177,7 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     meme: 'Meme',
   }), []);
 
-  // 🔒 ROBUST: Enhanced prompt building
+  // 🚀 ROBUST: Enhanced prompt building
   const buildPrompt = useCallback((newsItem: NewsItem, style: PostStyle, customInstruction?: string) => {
     const title = decodeUnicode(newsItem.title).trim();
     const description = decodeUnicode(newsItem.description).trim();
@@ -241,7 +233,7 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     return prompt;
   }, [decodeUnicode, styleLabel]);
 
-  // 🔒 ROBUST: Post creation with enhanced error handling
+  // 🚀 ROBUST: Post creation with enhanced error handling
   const createPostFromNews = useCallback(async (newsItem: NewsItem, idx: number, style: PostStyle, customInstruction?: string) => {
     setCreatingPost(prev => new Set([...prev, idx]));
     setToastMessage(null);
@@ -292,7 +284,7 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     }
   }, [buildPrompt, styleLabel, lockedAccountHolder, lockedPlatform]);
 
-  // 🔒 ROBUST: Menu toggle with proper positioning
+  // 🚀 ROBUST: Menu toggle with proper positioning
   const handleToggleMenu = useCallback((anchorEl: HTMLElement, idx: number) => {
     if (openMenuIndex === idx) {
       setOpenMenuIndex(null);
@@ -302,8 +294,8 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     setOpenMenuIndex(idx);
   }, [openMenuIndex]);
 
-  // 🔒 ULTRA-ROBUST: Enhanced news fetching with bulletproof logic
-  const fetchNews = useCallback(async (isPlatformSwitch = false) => {
+  // 🚀 ULTRA-ROBUST: Enhanced news fetching with bulletproof retry logic
+  const fetchNews = useCallback(async (isRetry = false) => {
     try {
       setLoading(true);
       setError(null);
@@ -315,12 +307,25 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       
       // Force fresh news every time - no caching
       const baseUrl = `/api/news-for-you/${lockedAccountHolder}?platform=${lockedPlatform}`;
-      const url = `${baseUrl}&forceRefresh=true&_cb=${Date.now()}`;
+      const url = `${baseUrl}&forceRefresh=true&_cb=${Date.now()}&_key=${forceRefreshKey}`;
       
-      console.log(`[News4U] 🔍 Fetching news for ${lockedAccountHolder} on ${lockedPlatform} (platform switch: ${isPlatformSwitch})`);
+      console.log(`[News4U] 🔍 Fetching news for ${lockedAccountHolder} on ${lockedPlatform} (retry: ${isRetry}, key: ${forceRefreshKey})`);
+      console.log(`[News4U] 🔍 API URL: ${url}`);
       
       const res = await axios.get(url);
-      console.log(`[News4U] Raw response:`, res.data);
+      console.log(`[News4U] Raw response status:`, res.status);
+      console.log(`[News4U] Raw response headers:`, res.headers);
+      console.log(`[News4U] Raw response data:`, res.data);
+      console.log(`[News4U] Raw response data type:`, typeof res.data);
+      console.log(`[News4U] Raw response data length:`, Array.isArray(res.data) ? res.data.length : 'Not an array');
+      
+      // 🚀 TEST: Check if we have any data at all
+      if (!res.data || (Array.isArray(res.data) && res.data.length === 0)) {
+        console.warn(`[News4U] ⚠️ API returned empty data for ${lockedAccountHolder} on ${lockedPlatform}`);
+        setError('API returned empty data - no news files found');
+        setLoading(false);
+        return;
+      }
       
       // Support both shapes: [{ key, lastModified, data: {...} }] and legacy: [{...}]
       const itemsOrArrays: any[] = (res.data ?? [])
@@ -328,6 +333,7 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
         .filter(Boolean);
       
       console.log(`[News4U] Items after unwrapping:`, itemsOrArrays);
+      console.log(`[News4U] Items count after unwrapping:`, itemsOrArrays.length);
 
       // Flatten possible array shapes: direct arrays, {items: [...]}, {articles: [...]}
       const rawItems: any[] = [];
@@ -339,12 +345,16 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
           rawItems.push(...entry.items);
         } else if (Array.isArray(entry.articles)) {
           rawItems.push(...entry.articles);
+        } else if (Array.isArray(entry.news_items)) {
+          // 🚀 FIXED: Handle the actual API response structure
+          rawItems.push(...entry.news_items);
         } else {
           rawItems.push(entry);
         }
       }
       
       console.log(`[News4U] Raw items after flattening:`, rawItems);
+      console.log(`[News4U] Raw items count after flattening:`, rawItems.length);
 
       // EXPAND: if news_data is an array, split into separate entries
       const expanded: any[] = [];
@@ -358,20 +368,41 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
         }
       }
 
-      // Normalize to the new shape to avoid empty UI due to schema differences
-      const normalized: NewsItem[] = expanded.map((n: any) => {
-        const base = n && typeof n === 'object' && n.news_data ? n.news_data : n;
-        const title: string = base.title || base.headline || '';
-        const description: string = base.description || base.summary || base.breaking_news_summary || '';
-        const image_url: string = base.image_url || base.image || base.thumbnail || '';
-        const source_url: string = base.source_url || base.url || base.link || '';
-        const timestamp: string = base.timestamp || base.fetched_at || base.published_at || n?.export_timestamp || new Date().toISOString();
-        const source: string | undefined = base.source || base.publisher || undefined;
+      console.log(`[News4U] Expanded items:`, expanded);
+      console.log(`[News4U] Expanded items count:`, expanded.length);
+
+      // 🚀 ENHANCED: More flexible data extraction for different news formats
+      const normalized: NewsItem[] = expanded.map((n: any, index: number) => {
+        console.log(`[News4U] Processing item ${index}:`, n);
+        
+        // Try multiple possible data structures
+        let base = n;
+        if (n && typeof n === 'object' && n.news_data) {
+          base = n.news_data;
+        } else if (n && typeof n === 'object' && n.data) {
+          base = n.data;
+        } else if (n && typeof n === 'object' && n.content) {
+          base = n.content;
+        }
+        
+        // Extract fields with multiple fallbacks - handle the actual API structure
+        const title: string = base?.title || base?.headline || base?.name || base?.subject || '';
+        const description: string = base?.description || base?.summary || base?.breaking_news_summary || base?.body || base?.text || '';
+        const image_url: string = base?.image_url || base?.image || base?.thumbnail || base?.picture || '';
+        const source_url: string = base?.source_url || base?.url || base?.link || base?.source || '';
+        const timestamp: string = base?.timestamp || base?.fetched_at || base?.published_at || base?.created_at || n?.export_timestamp || new Date().toISOString();
+        const source: string | undefined = base?.source || base?.publisher || base?.author || undefined;
         const iteration: number | undefined = n?.iteration || base?.export_iteration;
-        const fetched_at: string | undefined = base.fetched_at;
+        const fetched_at: string | undefined = base?.fetched_at || base?.created_at;
         const id: string | undefined = n?.export_metadata?.export_path || n?.key || (source_url && fetched_at ? `${source_url}::${fetched_at}` : undefined) || (source_url && timestamp ? `${source_url}::${timestamp}` : undefined) || (title ? `${title}::${timestamp}` : undefined);
-        return { id, title, description, image_url, source_url, timestamp, source, fetched_at, iteration };
+        
+        const item: NewsItem = { id, title, description, image_url, source_url, timestamp, source, fetched_at, iteration };
+        console.log(`[News4U] Normalized item ${index}:`, item);
+        return item;
       });
+
+      console.log(`[News4U] Normalized items:`, normalized);
+      console.log(`[News4U] Normalized items count:`, normalized.length);
 
       // Remove duplicate stories based on unique id (fallback to composite)
       const deduped: NewsItem[] = [];
@@ -383,6 +414,9 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
           deduped.push(n);
         }
       });
+
+      console.log(`[News4U] Deduped items:`, deduped);
+      console.log(`[News4U] Deduped items count:`, deduped.length);
 
       // 🚀 ROBUST TOP 4 LATEST NEWS LOGIC
       // Sort by timestamp to get the most recent news first
@@ -430,6 +464,11 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
         item.description && item.description.trim().length > 0
       );
 
+      console.log(`[News4U] Final items before validation:`, finalItems);
+      console.log(`[News4U] Valid items after validation:`, validItems);
+      console.log(`[News4U] Final items count:`, finalItems.length);
+      console.log(`[News4U] Valid items count:`, validItems.length);
+
       if (validItems.length === 0 && finalItems.length > 0) {
         console.warn(`[News4U] ⚠️ Filtered out items with empty content, using original items`);
         setItems(finalItems);
@@ -440,64 +479,83 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       console.log(`[News4U] Final processed items:`, validItems);
       console.log(`[News4U] Total items processed: ${deduped.length}, Selected: ${validItems.length}, Platform: ${lockedPlatform}`);
       
+      // Reset retry count on successful fetch
+      setRetryCount(0);
       setLastFetchTime(Date.now());
 
     } catch (err: any) {
       console.error(`[News4U] ❌ Error fetching news:`, err);
+      console.error(`[News4U] ❌ Error details:`, err.response?.data || err.message);
+      console.error(`[News4U] ❌ Error status:`, err.response?.status);
       
       if (err.response?.status === 404) {
         const errorMsg = 'No news available yet';
         setError(errorMsg);
-        console.log(`[News4U] ℹ️ No news available for ${lockedAccountHolder} on ${lockedPlatform}`);
+        
+        // 🚀 ENHANCED AUTOMATIC RETRY: Exponential backoff with max retries
+        if (!isRetry && retryCount < 3) {
+          const delayMs = Math.min(2000 * Math.pow(2, retryCount), 10000); // 2s, 4s, 8s, max 10s
+          console.log(`[News4U] 🔄 No news available for ${lockedAccountHolder}, attempting automatic retry ${retryCount + 1}/3 in ${delayMs}ms`);
+          setRetryCount(prev => prev + 1);
+          
+          // Wait before retry with exponential backoff
+          fetchTimeoutRef.current = setTimeout(() => {
+            fetchNews(true);
+          }, delayMs);
+        } else if (retryCount >= 3) {
+          console.warn(`[News4U] ⚠️ Max retries (3) reached for ${lockedAccountHolder} on ${lockedPlatform}. News may not be available yet.`);
+        }
       } else {
         setError('Failed to load news');
       }
     } finally {
       setLoading(false);
     }
-  }, [lockedAccountHolder, lockedPlatform]);
+  }, [lockedAccountHolder, lockedPlatform, retryCount, forceRefreshKey]);
 
-  // 🔒 ROBUST: Initial fetch and platform switch detection
+  // 🚀 ROBUST: Initial fetch and cleanup
   useEffect(() => {
-    // Only fetch on initial mount or when platform dashboard is switched
-    fetchNews(false);
-  }, [fetchNews]);
-
-  // 🔒 ROBUST: Detect platform dashboard switches and refresh accordingly
-  useEffect(() => {
-    const handlePlatformSwitch = () => {
-      console.log(`[News4U] 🔄 Platform dashboard switched, refreshing news for ${lockedAccountHolder} on ${lockedPlatform}`);
-      setPlatformSwitchCount(prev => prev + 1);
-      fetchNews(true);
-    };
-
-    // Listen for platform switch events
-    window.addEventListener('platformDashboardSwitch', handlePlatformSwitch);
+    fetchNews();
     
     return () => {
-      window.removeEventListener('platformDashboardSwitch', handlePlatformSwitch);
+      // Cleanup timeout on unmount
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
     };
-  }, [fetchNews, lockedAccountHolder, lockedPlatform]);
+  }, [fetchNews]);
 
-  // 🔒 ROBUST: Manual refresh function (only when explicitly requested)
+  // 🚀 ROBUST: Manual refresh function
   const handleManualRefresh = useCallback(() => {
-    console.log(`[News4U] 🔄 Manual refresh requested for ${lockedAccountHolder} on ${lockedPlatform}`);
-    fetchNews(false);
-  }, [fetchNews, lockedAccountHolder, lockedPlatform]);
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+    setRetryCount(0);
+    setForceRefreshKey(prev => prev + 1); // Force new fetch
+    fetchNews();
+  }, [fetchNews]);
 
-  // 🔒 ROBUST: Auto-refresh only when navigating back to dashboard after long absence
+  // 🚀 ROBUST: Auto-refresh when navigating back to dashboard
   useEffect(() => {
     const handleVisibilityChange = () => {
-      // Only refresh if page was hidden for more than 5 minutes and we're coming back
-      if (!document.hidden && Date.now() - lastFetchTime > 300000) { // 5 minutes
-        console.log(`[News4U] 🔄 Page became visible after long absence, refreshing news`);
-        fetchNews(false);
+      if (!document.hidden && Date.now() - lastFetchTime > 30000) { // 30 seconds
+        console.log(`[News4U] 🔄 Page became visible, refreshing news if stale`);
+        handleManualRefresh();
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [lastFetchTime, fetchNews]);
+  }, [lastFetchTime, handleManualRefresh]);
+
+  // 🚀 ROBUST: Force refresh when platform changes (navigation)
+  useEffect(() => {
+    // If platform changes, force refresh
+    if (platform !== lockedPlatform) {
+      console.log(`[News4U] 🔄 Platform changed from ${lockedPlatform} to ${platform}, forcing refresh`);
+      setForceRefreshKey(prev => prev + 1);
+    }
+  }, [platform, lockedPlatform]);
 
   if (loading) {
     return (
@@ -516,23 +574,25 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
         <div className="news4u-error">
           <FaRss className="error-icon" />
           <span>{error}</span>
-          <button 
-            onClick={handleManualRefresh}
-            className="retry-btn"
-            style={{
-              background: 'transparent',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              color: 'rgba(255, 255, 255, 0.8)',
-              padding: '4px 8px',
-              borderRadius: '4px',
-              fontSize: '0.7rem',
-              cursor: 'pointer',
-              marginTop: '4px'
-            }}
-          >
-            <FaRedo style={{ marginRight: '4px' }} />
-            Retry
-          </button>
+          {retryCount > 0 && (
+            <button 
+              onClick={handleManualRefresh}
+              className="retry-btn"
+              style={{
+                background: 'transparent',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                color: 'rgba(255, 255, 255, 0.8)',
+                padding: '4px 8px',
+                borderRadius: '4px',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+                marginTop: '4px'
+              }}
+            >
+              <FaRedo style={{ marginRight: '4px' }} />
+              Retry
+            </button>
+          )}
         </div>
       </motion.div>
     );
@@ -549,7 +609,7 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
             className="retry-btn"
             style={{
               background: 'transparent',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
+              border: 'none',
               color: 'rgba(255, 255, 255, 0.8)',
               padding: '4px 8px',
               borderRadius: '4px',
@@ -561,6 +621,72 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
             <FaRedo style={{ marginRight: '4px' }} />
             Refresh
           </button>
+          
+          {/* 🚀 DEBUG: Show raw data for troubleshooting */}
+          <div style={{ 
+            marginTop: '16px', 
+            padding: '12px', 
+            background: 'rgba(255, 255, 255, 0.05)', 
+            borderRadius: '8px',
+            fontSize: '0.7rem',
+            color: 'rgba(255, 255, 255, 0.6)',
+            textAlign: 'left',
+            maxHeight: '200px',
+            overflow: 'auto'
+          }}>
+            <div style={{ marginBottom: '8px', fontWeight: 'bold', color: '#00ffcc' }}>
+              🔍 Debug Info:
+            </div>
+            <div>Account: <strong>{lockedAccountHolder}</strong></div>
+            <div>Platform: <strong>{lockedPlatform}</strong></div>
+            <div>Retry Count: <strong>{retryCount}</strong></div>
+            <div>Last Fetch: <strong>{lastFetchTime ? new Date(lastFetchTime).toLocaleTimeString() : 'Never'}</strong></div>
+            
+            {/* 🚀 TEST: Manual API test button */}
+            <button 
+              onClick={async () => {
+                try {
+                  console.log(`[News4U] 🧪 Manual API test for ${lockedAccountHolder} on ${lockedPlatform}`);
+                  const testUrl = `/api/news-for-you/${lockedAccountHolder}?platform=${lockedPlatform}&forceRefresh=true&_cb=${Date.now()}`;
+                  console.log(`[News4U] 🧪 Test URL:`, testUrl);
+                  
+                  const testRes = await axios.get(testUrl);
+                  console.log(`[News4U] 🧪 Test response:`, testRes);
+                  
+                  // Show test results in alert for quick debugging
+                  const dataSummary = {
+                    status: testRes.status,
+                    dataType: typeof testRes.data,
+                    dataLength: Array.isArray(testRes.data) ? testRes.data.length : 'Not array',
+                    sampleData: testRes.data ? JSON.stringify(testRes.data).substring(0, 500) + '...' : 'No data'
+                  };
+                  
+                  alert(`API Test Results:\nStatus: ${dataSummary.status}\nData Type: ${dataSummary.dataType}\nData Length: ${dataSummary.dataLength}\nSample: ${dataSummary.sampleData}\n\nCheck console for full details.`);
+                  
+                } catch (testErr: any) {
+                  console.error(`[News4U] 🧪 Test failed:`, testErr);
+                  alert(`API Test Failed:\n${testErr.message}\n\nCheck console for details.`);
+                }
+              }}
+              style={{
+                background: 'linear-gradient(135deg, #00ffcc, #00d4aa)',
+                border: 'none',
+                color: '#000',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                fontSize: '0.65rem',
+                cursor: 'pointer',
+                marginTop: '8px',
+                fontWeight: '600'
+              }}
+            >
+              🧪 Test API Endpoint
+            </button>
+            
+            <div style={{ marginTop: '8px', fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.5)' }}>
+              Check browser console for detailed data processing logs
+            </div>
+          </div>
         </div>
       </motion.div>
     );

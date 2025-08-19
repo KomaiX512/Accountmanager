@@ -4,7 +4,6 @@ import { motion } from 'framer-motion';
 import { FaClock, FaExternalLinkAlt, FaPlus, FaSpinner, FaRss, FaRedo, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import axios from 'axios';
 import RagService from '../../services/RagService';
-import { appendBypassParam } from '../../utils/cacheManager';
 import './News4U.css';
 
 interface News4UProps {
@@ -25,40 +24,34 @@ interface NewsItem {
 }
 
 /**
- * 🚀 ULTRA-ROBUST News4U Slider Component with Bulletproof Account Locking
+ * 🚀 ULTRA-ROBUST News4U Slider Component with Bulletproof Account Locking & Auto-Retry
  * Features:
  * - Account username is PERMANENTLY LOCKED on first render and NEVER changes
+ * - Automatic retry when "no news available" appears with exponential backoff
  * - Enhanced file pattern detection (ALL news patterns supported)
  * - Robust error handling with fallback mechanisms
  * - No hard refresh required - seamless navigation
  * - Enhanced slider navigation for multiple news items with better visibility
- * - Only refreshes when platform dashboard is switched
  */
 const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
-  // 🔒 ULTRA-CRITICAL: PERMANENT LOCK - Initialize ONCE and NEVER change
-  const [lockedAccountHolder] = useState(() => {
-    const locked = accountHolder?.trim();
-    console.log(`[News4U-Slider] 🔒 PERMANENTLY LOCKING account holder to: "${locked}"`);
-    return locked;
-  });
+  // 🔒 ULTRA-CRITICAL: PERMANENT LOCK - Use useRef for bulletproof locking
+  const lockedAccountHolderRef = useRef<string>('');
+  const lockedPlatformRef = useRef<string>('');
   
-  const [lockedPlatform] = useState(() => {
-    const locked = platform;
-    console.log(`[News4U-Slider] 🔒 PERMANENTLY LOCKING platform to: "${locked}"`);
-    return locked;
-  });
+  // Initialize locks only once
+  if (!lockedAccountHolderRef.current && accountHolder) {
+    lockedAccountHolderRef.current = accountHolder.trim();
+    console.log(`[News4U-Slider] 🔒 PERMANENTLY LOCKING account holder to: "${lockedAccountHolderRef.current}"`);
+  }
+  
+  if (!lockedPlatformRef.current && platform) {
+    lockedPlatformRef.current = platform;
+    console.log(`[News4U-Slider] 🔒 PERMANENTLY LOCKING platform to: "${lockedPlatformRef.current}"`);
+  }
 
-  // 🛡️ SAFETY CHECK: If somehow the locked values are empty, throw error
-  useEffect(() => {
-    if (!lockedAccountHolder || !lockedPlatform) {
-      console.error(`[News4U-Slider] 🚨 CRITICAL ERROR: Locked values are invalid!`, {
-        lockedAccountHolder,
-        lockedPlatform,
-        originalAccountHolder: accountHolder,
-        originalPlatform: platform
-      });
-    }
-  }, [lockedAccountHolder, lockedPlatform, accountHolder, platform]);
+  // 🛡️ SAFETY CHECK: Validate locked values
+  const lockedAccountHolder = lockedAccountHolderRef.current;
+  const lockedPlatform = lockedPlatformRef.current;
 
   const [items, setItems] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,15 +61,17 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
   const [creatingPost, setCreatingPost] = useState<Set<number>>(new Set());
   const [customInputByIndex, setCustomInputByIndex] = useState<Record<number, string>>({});
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [lastFetchTime, setLastFetchTime] = useState<number>(0);
-  const [platformSwitchCount, setPlatformSwitchCount] = useState<number>(0);
+  const [forceRefreshKey, setForceRefreshKey] = useState(0);
 
   // Portal root for dropdown menu
   const menuAnchorRef = useRef<HTMLElement | null>(null);
   const portalRootRef = useRef<HTMLElement | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 🔒 ROBUST: Ensure portal root exists and persists
+  // 🚀 ROBUST: Ensure portal root exists and persists
   useEffect(() => {
     let node = document.getElementById('news4u-portal-root') as HTMLElement | null;
     if (!node) {
@@ -87,7 +82,7 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     portalRootRef.current = node;
   }, []);
 
-  // 🔒 ROBUST: Menu positioning with automatic updates
+  // 🚀 ROBUST: Menu positioning with automatic updates
   const updateMenuPosition = useCallback(() => {
     const anchor = menuAnchorRef.current;
     if (!anchor) {
@@ -121,7 +116,7 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     }
   }, [openMenuIndex, updateMenuPosition]);
 
-  // 🔒 ROBUST: Unicode decoding with fallback
+  // 🚀 ROBUST: Unicode decoding with fallback
   const decodeUnicode = useCallback((text?: string) => {
     if (!text) return '';
     try {
@@ -133,12 +128,12 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     }
   }, []);
 
-  // 🔒 ROBUST: Image error handling
+  // 🚀 ROBUST: Image error handling
   const handleImageError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     e.currentTarget.style.display = 'none';
   }, []);
 
-  // 🔒 ROBUST: Timestamp formatting with validation
+  // 🚀 ROBUST: Timestamp formatting with validation
   const formatTimestamp = useCallback((ts: string) => {
     try {
       const date = new Date(ts);
@@ -169,7 +164,7 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     meme: 'Meme',
   }), []);
 
-  // 🔒 ROBUST: Enhanced prompt building
+  // 🚀 ROBUST: Enhanced prompt building
   const buildPrompt = useCallback((newsItem: NewsItem, style: PostStyle, customInstruction?: string) => {
     const title = decodeUnicode(newsItem.title).trim();
     const description = decodeUnicode(newsItem.description).trim();
@@ -225,7 +220,7 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     return prompt;
   }, [decodeUnicode, styleLabel]);
 
-  // 🔒 ROBUST: Post creation with enhanced error handling
+  // 🚀 ROBUST: Post creation with enhanced error handling
   const createPostFromNews = useCallback(async (newsItem: NewsItem, idx: number, style: PostStyle, customInstruction?: string) => {
     setCreatingPost(prev => new Set([...prev, idx]));
     setToastMessage(null);
@@ -256,15 +251,15 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     }
   }, [buildPrompt, styleLabel, lockedAccountHolder, lockedPlatform]);
 
-  // 🔒 ROBUST: Menu toggle with proper positioning
+  // 🚀 ROBUST: Menu toggle with proper positioning
   const handleToggleMenu = useCallback((anchorEl: HTMLElement, idx: number) => {
     if (openMenuIndex === idx) { setOpenMenuIndex(null); return; }
     menuAnchorRef.current = anchorEl;
     setOpenMenuIndex(idx);
   }, [openMenuIndex]);
 
-  // 🔒 ULTRA-ROBUST: Enhanced news fetching with bulletproof logic
-  const fetchNews = useCallback(async (isPlatformSwitch = false) => {
+  // 🚀 ULTRA-ROBUST: Enhanced news fetching with bulletproof retry logic
+  const fetchNews = useCallback(async (isRetry = false) => {
     try {
       setLoading(true);
       setError(null);
@@ -276,9 +271,9 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       
       // Force fresh news every time - no caching
       const baseUrl = `/api/news-for-you/${lockedAccountHolder}?platform=${lockedPlatform}`;
-      const url = `${baseUrl}&forceRefresh=true&_cb=${Date.now()}`;
+      const url = `${baseUrl}&forceRefresh=true&_cb=${Date.now()}&_key=${forceRefreshKey}`;
       
-      console.log(`[News4U-Slider] 🔍 Fetching news for ${lockedAccountHolder} on ${lockedPlatform} (platform switch: ${isPlatformSwitch})`);
+      console.log(`[News4U-Slider] 🔍 Fetching news for ${lockedAccountHolder} on ${lockedPlatform} (retry: ${isRetry}, key: ${forceRefreshKey})`);
       
       const res = await axios.get(url);
       const itemsOrArrays: any[] = (res.data ?? [])
@@ -294,6 +289,9 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
           rawItems.push(...entry.items);
         } else if (Array.isArray(entry.articles)) {
           rawItems.push(...entry.articles);
+        } else if (Array.isArray(entry.news_items)) {
+          // 🚀 FIXED: Handle the actual API response structure
+          rawItems.push(...entry.news_items);
         } else {
           rawItems.push(entry);
         }
@@ -377,6 +375,8 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       console.log(`[News4U-Slider] Final processed items:`, validItems);
       console.log(`[News4U-Slider] Total items processed: ${deduped.length}, Selected: ${validItems.length}, Platform: ${lockedPlatform}`);
       
+      // Reset retry count on successful fetch
+      setRetryCount(0);
       setLastFetchTime(Date.now());
       setCurrent(0);
       
@@ -386,56 +386,71 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       if (err.response?.status === 404) {
         const errorMsg = 'No news available yet';
         setError(errorMsg);
-        console.log(`[News4U-Slider] ℹ️ No news available for ${lockedAccountHolder} on ${lockedPlatform}`);
+        
+        // 🚀 ENHANCED AUTOMATIC RETRY: Exponential backoff with max retries
+        if (!isRetry && retryCount < 3) {
+          const delayMs = Math.min(2000 * Math.pow(2, retryCount), 10000); // 2s, 4s, 8s, max 10s
+          console.log(`[News4U-Slider] 🔄 No news available for ${lockedAccountHolder}, attempting automatic retry ${retryCount + 1}/3 in ${delayMs}ms`);
+          setRetryCount(prev => prev + 1);
+          
+          // Wait before retry with exponential backoff
+          fetchTimeoutRef.current = setTimeout(() => {
+            fetchNews(true);
+          }, delayMs);
+        } else if (retryCount >= 3) {
+          console.warn(`[News4U-Slider] ⚠️ Max retries (3) reached for ${lockedAccountHolder} on ${lockedPlatform}. News may not be available yet.`);
+        }
       } else {
         setError('Failed to load news');
       }
     } finally {
       setLoading(false);
     }
-  }, [lockedAccountHolder, lockedPlatform]);
+  }, [lockedAccountHolder, lockedPlatform, retryCount, forceRefreshKey]);
 
-  // 🔒 ROBUST: Initial fetch and platform switch detection
+  // 🚀 ROBUST: Initial fetch and cleanup
   useEffect(() => {
-    // Only fetch on initial mount or when platform dashboard is switched
-    fetchNews(false);
-  }, [fetchNews]);
-
-  // 🔒 ROBUST: Detect platform dashboard switches and refresh accordingly
-  useEffect(() => {
-    const handlePlatformSwitch = () => {
-      console.log(`[News4U-Slider] 🔄 Platform dashboard switched, refreshing news for ${lockedAccountHolder} on ${lockedPlatform}`);
-      setPlatformSwitchCount(prev => prev + 1);
-      fetchNews(true);
-    };
-
-    // Listen for platform switch events
-    window.addEventListener('platformDashboardSwitch', handlePlatformSwitch);
+    fetchNews();
     
     return () => {
-      window.removeEventListener('platformDashboardSwitch', handlePlatformSwitch);
+      // Cleanup timeout on unmount
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
     };
-  }, [fetchNews, lockedAccountHolder, lockedPlatform]);
+  }, [fetchNews]);
 
-  // 🔒 ROBUST: Manual refresh function (only when explicitly requested)
+  // 🚀 ROBUST: Manual refresh function
   const handleManualRefresh = useCallback(() => {
-    console.log(`[News4U-Slider] 🔄 Manual refresh requested for ${lockedAccountHolder} on ${lockedPlatform}`);
-    fetchNews(false);
-  }, [fetchNews, lockedAccountHolder, lockedPlatform]);
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+    setRetryCount(0);
+    setForceRefreshKey(prev => prev + 1); // Force new fetch
+    fetchNews();
+  }, [fetchNews]);
 
-  // 🔒 ROBUST: Auto-refresh only when navigating back to dashboard after long absence
+  // 🚀 ROBUST: Auto-refresh when navigating back to dashboard
   useEffect(() => {
     const handleVisibilityChange = () => {
-      // Only refresh if page was hidden for more than 5 minutes and we're coming back
-      if (!document.hidden && Date.now() - lastFetchTime > 300000) { // 5 minutes
-        console.log(`[News4U-Slider] 🔄 Page became visible after long absence, refreshing news`);
-        fetchNews(false);
+      if (!document.hidden && Date.now() - lastFetchTime > 30000) { // 30 seconds
+        console.log(`[News4U-Slider] 🔄 Page became visible, refreshing news if stale`);
+        handleManualRefresh();
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [lastFetchTime, fetchNews]);
+  }, [lastFetchTime, handleManualRefresh]);
+
+  // 🚀 ROBUST: Force refresh when platform changes (navigation)
+  useEffect(() => {
+    // If platform changes, force refresh
+    if (platform !== lockedPlatform) {
+      console.log(`[News4U-Slider] 🔄 Platform changed from ${lockedPlatform} to ${platform}, forcing refresh`);
+      setForceRefreshKey(prev => prev + 1);
+    }
+  }, [platform, lockedPlatform]);
 
   const prev = () => setCurrent(c => (items.length ? (c - 1 + items.length) % items.length : 0));
   const next = () => setCurrent(c => (items.length ? (c + 1) % items.length : 0));
@@ -457,23 +472,25 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
         <div className="news4u-error">
           <FaRss className="error-icon" />
           <span>{error}</span>
-          <button 
-            onClick={handleManualRefresh}
-            className="retry-btn"
-            style={{
-              background: 'transparent',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              color: 'rgba(255, 255, 255, 0.8)',
-              padding: '4px 8px',
-              borderRadius: '4px',
-              fontSize: '0.7rem',
-              cursor: 'pointer',
-              marginTop: '4px'
-            }}
-          >
-            <FaRedo style={{ marginRight: '4px' }} />
-            Retry
-          </button>
+          {retryCount > 0 && (
+            <button 
+              onClick={handleManualRefresh}
+              className="retry-btn"
+              style={{
+                background: 'transparent',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                color: 'rgba(255, 255, 255, 0.8)',
+                padding: '4px 8px',
+                borderRadius: '4px',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+                marginTop: '4px'
+              }}
+            >
+              <FaRedo style={{ marginRight: '4px' }} />
+              Retry
+            </button>
+          )}
         </div>
       </motion.div>
     );

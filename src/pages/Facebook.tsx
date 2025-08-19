@@ -1,135 +1,179 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import FB_EntryUsernames from '../components/facebook/FB_EntryUsernames';
 import { useAuth } from '../context/AuthContext';
+import { useAcquiredPlatforms } from '../context/AcquiredPlatformsContext';
 import axios from 'axios';
 import { AnimatePresence } from 'framer-motion';
 
 const Facebook: React.FC = () => {
   const { currentUser } = useAuth();
+  const { markPlatformAsAcquired } = useAcquiredPlatforms();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isLoading, setIsLoading] = useState(true);
   const [hasChecked, setHasChecked] = useState(false);
 
-  // Create a markPlatformAccessed function that uses localStorage
-  const markPlatformAccessed = (platformId: string) => {
-    if (currentUser?.uid) {
-      localStorage.setItem(`${platformId}_accessed_${currentUser.uid}`, 'true');
-    }
-  };
+  // Get platformId from navigation state (instead of markPlatformAccessed function)
+  const platformId = location.state?.platformId;
 
+  // ✅ CROSS-DEVICE SYNC FIX: Real-time localStorage monitoring for Facebook access
   useEffect(() => {
-    // Prevent multiple API calls
-    if (hasChecked || !currentUser?.uid) {
+    if (!currentUser?.uid) {
       setIsLoading(false);
       return;
     }
 
-    // Check if user has already completed Facebook setup
-    const checkFacebookStatus = async (attempt: number = 1) => {
+    let intervalId: NodeJS.Timeout;
+    let isChecking = false;
+
+    // ✅ ENHANCED: Real-time cross-device sync check
+    const checkFacebookStatusRealTime = async () => {
+      if (isChecking) return; // Prevent concurrent checks
+      isChecking = true;
+
       try {
-        // Always consult backend first for canonical state to ensure cross-device sync
-        // Add cache-buster to avoid any CDN/browser caching that may cause stale data
-        const cacheBuster = `?cb=${Date.now()}`;
-        const response = await axios.get(`/api/user-facebook-status/${currentUser.uid}${cacheBuster}`);
-
-        if (response.data.hasEnteredFacebookUsername) {
-          const savedUsername = response.data.facebook_username;
-          const savedCompetitors = response.data.competitors || [];
-          const savedAccountType = response.data.accountType || 'branding';
-
-          // Persist to localStorage for subsequent fast loads
-          localStorage.setItem(`facebook_accessed_${currentUser.uid}`, 'true');
-          localStorage.setItem(`facebook_username_${currentUser.uid}`, savedUsername);
-          localStorage.setItem(`facebook_account_type_${currentUser.uid}`, savedAccountType);
-          localStorage.setItem(`facebook_competitors_${currentUser.uid}`, JSON.stringify(savedCompetitors));
-
-          if (savedAccountType === 'branding') {
-            navigate('/facebook-dashboard', {
-              state: {
-                accountHolder: savedUsername,
-                competitors: savedCompetitors,
-                accountType: 'branding',
-                platform: 'facebook'
-              },
-              replace: true
+        // ✅ CRITICAL FIX: Check localStorage first for immediate cross-device sync
+        const hasAccessedInStorage = localStorage.getItem(`facebook_accessed_${currentUser.uid}`) === 'true';
+        
+        console.log(`[Facebook] 🔍 Real-time check: localStorage hasAccessed=${hasAccessedInStorage}`);
+        
+        if (hasAccessedInStorage) {
+          // User has already accessed, try to get saved data from localStorage
+          const savedUsername = localStorage.getItem(`facebook_username_${currentUser.uid}`);
+          const savedAccountType = localStorage.getItem(`facebook_account_type_${currentUser.uid}`) as 'branding' | 'non-branding' || 'branding';
+          const savedCompetitors = JSON.parse(localStorage.getItem(`facebook_competitors_${currentUser.uid}`) || '[]');
+          
+          if (savedUsername) {
+            console.log(`[Facebook] ✅ CROSS-DEVICE SYNC SUCCESS: Navigating to dashboard with saved data`, {
+              username: savedUsername,
+              accountType: savedAccountType,
+              competitors: savedCompetitors
             });
-          } else {
-            navigate('/facebook-non-branding-dashboard', {
-              state: {
-                accountHolder: savedUsername,
-                competitors: savedCompetitors,
-                accountType: 'non-branding',
-                platform: 'facebook'
-              },
-              replace: true
-            });
+            
+            clearInterval(intervalId); // Stop checking once we navigate
+            
+            if (savedAccountType === 'branding') {
+              navigate('/facebook-dashboard', { 
+                state: { 
+                  accountHolder: savedUsername, 
+                  competitors: savedCompetitors,
+                  accountType: 'branding',
+                  platform: 'facebook'
+                },
+                replace: true 
+              });
+            } else {
+              navigate('/facebook-non-branding-dashboard', { 
+                state: { 
+                  accountHolder: savedUsername,
+                  competitors: savedCompetitors,
+                  accountType: 'non-branding',
+                  platform: 'facebook'
+                },
+                replace: true
+              });
+            }
+            return;
           }
-
-          setHasChecked(true);
-          return;
         }
-      } catch (error) {
-        // If backend fails, fall back to local cache
-        console.error('Error checking Facebook status from backend, falling back to cache:', error);
-      }
-
-      // If backend says setup not completed AND this is the first attempt, retry once after short delay
-      if (attempt === 1) {
-        console.log('ℹ️ Facebook status not yet updated on backend. Retrying in 1500ms…');
-        setTimeout(() => {
-          checkFacebookStatus(2);
-        }, 1500);
-        return;
-      }
-
-      // Fallback: use localStorage as secondary source of truth
-      const hasAccessed = localStorage.getItem(`facebook_accessed_${currentUser.uid}`) === 'true';
-      if (hasAccessed) {
-        const savedUsername = localStorage.getItem(`facebook_username_${currentUser.uid}`);
-        const savedAccountType = localStorage.getItem(`facebook_account_type_${currentUser.uid}`) as 'branding' | 'non-branding' || 'branding';
-        const savedCompetitors = JSON.parse(localStorage.getItem(`facebook_competitors_${currentUser.uid}`) || '[]');
-
-        if (savedUsername) {
-          if (savedAccountType === 'branding') {
-            navigate('/facebook-dashboard', {
-              state: {
-                accountHolder: savedUsername,
-                competitors: savedCompetitors,
-                accountType: 'branding',
-                platform: 'facebook'
-              },
-              replace: true
-            });
-          } else {
-            navigate('/facebook-non-branding-dashboard', {
-              state: {
-                accountHolder: savedUsername,
-                competitors: savedCompetitors,
-                accountType: 'non-branding',
-                platform: 'facebook'
-              },
-              replace: true
-            });
+        
+        // ✅ BACKEND FALLBACK: If not in localStorage, check backend API
+        if (!hasChecked) {
+          try {
+            console.log(`[Facebook] 🔍 Checking backend API for user ${currentUser.uid}`);
+            const response = await axios.get(`/api/user-facebook-status/${currentUser.uid}`);
+            
+            if (response.data.hasEnteredFacebookUsername) {
+              // User has already entered username, redirect to dashboard
+              const savedUsername = response.data.facebook_username;
+              const savedCompetitors = response.data.competitors || [];
+              const savedAccountType = response.data.accountType || 'branding';
+              
+              // ✅ CRITICAL FIX: Immediately sync to localStorage for cross-device sync
+              localStorage.setItem(`facebook_accessed_${currentUser.uid}`, 'true');
+              localStorage.setItem(`facebook_username_${currentUser.uid}`, savedUsername);
+              localStorage.setItem(`facebook_account_type_${currentUser.uid}`, savedAccountType);
+              localStorage.setItem(`facebook_competitors_${currentUser.uid}`, JSON.stringify(savedCompetitors));
+              
+              console.log(`[Facebook] ✅ BACKEND SYNC: Data synced to localStorage for cross-device access`);
+              
+              clearInterval(intervalId); // Stop checking once we navigate
+              
+              if (savedAccountType === 'branding') {
+                navigate('/facebook-dashboard', { 
+                  state: { 
+                    accountHolder: savedUsername, 
+                    competitors: savedCompetitors,
+                    accountType: 'branding',
+                    platform: 'facebook'
+                  },
+                  replace: true 
+                });
+              } else {
+                navigate('/facebook-non-branding-dashboard', { 
+                  state: { 
+                    accountHolder: savedUsername,
+                    competitors: savedCompetitors,
+                    accountType: 'non-branding',
+                    platform: 'facebook'
+                  },
+                  replace: true
+                });
+              }
+              return;
+            } else {
+              // No Facebook setup found, allow user to complete it
+              setIsLoading(false);
+              setHasChecked(true);
+            }
+          } catch (error) {
+            console.error('Error checking Facebook status:', error);
+            // If backend fails, just show the form
+            setIsLoading(false);
+            setHasChecked(true);
           }
-          setHasChecked(true);
-          return;
+        } else {
+          // Already checked backend, just wait for localStorage updates
+          setIsLoading(false);
         }
+      } finally {
+        isChecking = false;
       }
-
-      // If neither backend nor cache indicates setup completion, show the form
-      setIsLoading(false);
-      setHasChecked(true);
     };
 
-    checkFacebookStatus();
-  }, [currentUser?.uid, hasChecked]); // Removed navigate from dependencies
+    // ✅ STORAGE EVENT LISTENER: Listen for localStorage changes from other tabs/devices
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === `facebook_accessed_${currentUser.uid}` && event.newValue === 'true') {
+        console.log(`[Facebook] 🚀 STORAGE EVENT: Facebook access detected from another tab/device!`);
+        checkFacebookStatusRealTime();
+      }
+    };
+
+    // ✅ IMMEDIATE CHECK: Check immediately on mount
+    checkFacebookStatusRealTime();
+    
+    // ✅ REAL-TIME POLLING: Check every 2 seconds for cross-device sync
+    // This ensures Device B and C pick up changes from Device A quickly
+    intervalId = setInterval(checkFacebookStatusRealTime, 2000);
+
+    // ✅ LISTEN FOR STORAGE EVENTS: Immediate response to localStorage changes
+    window.addEventListener('storage', handleStorageChange);
+
+    // Cleanup interval and storage listener on unmount
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [currentUser?.uid, navigate]); // Include navigate in dependencies
 
   const handleSubmitSuccess = (username: string, competitors: string[], accountType: 'branding' | 'non-branding') => {
     if (accountType === 'branding') {
-      navigate('/facebook-dashboard', {
-        state: {
-          accountHolder: username,
+      navigate('/facebook-dashboard', { 
+        state: { 
+          accountHolder: username, 
           competitors: competitors,
           accountType: 'branding',
           platform: 'facebook'
@@ -137,8 +181,8 @@ const Facebook: React.FC = () => {
         replace: true
       });
     } else {
-      navigate('/facebook-non-branding-dashboard', {
-        state: {
+      navigate('/facebook-non-branding-dashboard', { 
+        state: { 
           accountHolder: username,
           competitors: competitors,
           accountType: 'non-branding',
@@ -151,7 +195,7 @@ const Facebook: React.FC = () => {
 
   if (isLoading) {
     // ✅ NO BLOCKING LOADING SCREEN - Show content immediately while checking status in background
-    // This prevents the frustrating loading screen during navigation
+    // This prevents the frustrating loading screen during navigation and enables cross-device sync
     return (
       <div className="facebook-page">
         <AnimatePresence mode="wait">
@@ -159,7 +203,7 @@ const Facebook: React.FC = () => {
             key="entry"
             onSubmitSuccess={handleSubmitSuccess}
             redirectIfCompleted={false}
-            markPlatformAccessed={markPlatformAccessed}
+            markPlatformAccessed={(id) => markPlatformAsAcquired(id)}
           />
         </AnimatePresence>
       </div>
@@ -173,7 +217,7 @@ const Facebook: React.FC = () => {
           key="entry"
           onSubmitSuccess={handleSubmitSuccess}
           redirectIfCompleted={false}
-          markPlatformAccessed={markPlatformAccessed}
+          markPlatformAccessed={(id) => markPlatformAsAcquired(id)}
         />
       </AnimatePresence>
     </div>

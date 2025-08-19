@@ -145,6 +145,32 @@ const MainDashboard: React.FC = () => {
     localStorage.setItem('completedPlatforms', JSON.stringify(Array.from(completedPlatforms)));
   }, [completedPlatforms]);
 
+  // 🔍 FACEBOOK DEBUG: Monitor localStorage changes for debugging
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+    
+    const monitorLocalStorage = () => {
+      const facebookKeys = Object.keys(localStorage).filter(key => 
+        key.includes('facebook') && key.includes(currentUser.uid)
+      );
+      
+      if (facebookKeys.length === 0) {
+        console.log(`🔍 FACEBOOK LOCALSTORAGE MONITOR: No Facebook keys found for user ${currentUser.uid}`);
+      } else {
+        console.log(`🔍 FACEBOOK LOCALSTORAGE MONITOR: Found keys:`, facebookKeys.map(key => ({
+          key,
+          value: localStorage.getItem(key)
+        })));
+      }
+    };
+    
+    // Monitor immediately and every 10 seconds
+    monitorLocalStorage();
+    const interval = setInterval(monitorLocalStorage, 10000);
+    
+    return () => clearInterval(interval);
+  }, [currentUser?.uid]);
+
   // ✅ CROSS-DEVICE PROCESSING STATUS MIRROR: Periodically fetch backend status and mirror locally
   useEffect(() => {
     if (!currentUser?.uid) return;
@@ -161,6 +187,54 @@ const MainDashboard: React.FC = () => {
       lastSyncTime = now;
 
       try {
+        // ✅ FACEBOOK PRIORITY SYNC: Check Facebook first for faster cross-device sync
+        const facebookPriorityCheck = async () => {
+          try {
+            const resp = await fetch(`/api/user-facebook-status/${currentUser.uid}`);
+            if (resp.ok) {
+              const json = await resp.json();
+              const isFacebookClaimed = json.hasEnteredFacebookUsername === true;
+              
+              const facebookKey = `facebook_accessed_${currentUser.uid}`;
+              const wasFacebookClaimed = localStorage.getItem(facebookKey) === 'true';
+              
+              if (isFacebookClaimed && !wasFacebookClaimed) {
+                console.log(`[MainDashboard] 🚀 FACEBOOK PRIORITY SYNC: Facebook claimed on backend, syncing to localStorage immediately`);
+                localStorage.setItem(facebookKey, 'true');
+                
+                // Also sync username data if available
+                if (json.facebook_username) {
+                  localStorage.setItem(`facebook_username_${currentUser.uid}`, json.facebook_username);
+                }
+                if (json.accountType) {
+                  localStorage.setItem(`facebook_account_type_${currentUser.uid}`, json.accountType);
+                }
+                if (json.competitors) {
+                  localStorage.setItem(`facebook_competitors_${currentUser.uid}`, JSON.stringify(json.competitors));
+                }
+                
+                console.log(`[MainDashboard] ✅ FACEBOOK CROSS-DEVICE SYNC COMPLETE: All data synced to localStorage`);
+              } else if (!isFacebookClaimed && wasFacebookClaimed) {
+                // Backend says not claimed but localStorage says claimed - check loading state
+                const nowTs = Date.now();
+                const facebookLoading = platformLoadingStates.facebook;
+                const isStillLoading = facebookLoading && !facebookLoading.isComplete && nowTs < facebookLoading.endTime;
+                
+                if (!isStillLoading) {
+                  console.log(`[MainDashboard] 🔄 FACEBOOK SYNC: Backend not claimed and not loading - PRESERVING localStorage (backend may be incomplete)`);
+                  // ❌ REMOVED: Don't aggressively clear localStorage when backend might be incomplete
+                  // localStorage.removeItem(facebookKey);
+                }
+              }
+            }
+          } catch (error) {
+            console.warn(`[MainDashboard] Failed Facebook priority check:`, error);
+          }
+        };
+        
+        // Execute Facebook priority check first
+        await facebookPriorityCheck();
+
         const resp = await fetch(`/api/processing-status/${currentUser.uid}`);
         if (!resp.ok) return;
         const json = await resp.json();
@@ -289,8 +363,8 @@ const MainDashboard: React.FC = () => {
     localStorage.removeItem(getProcessingCountdownKey(platformId));
     localStorage.removeItem(`${platformId}_processing_info`);
     
-    // ✅ CRITICAL FIX: Mark platform as claimed in backend when loading completes
-    // This ensures cross-device synchronization
+    // ✅ CRITICAL FIX: Mark platform as claimed in BOTH backend endpoints for complete cross-device sync
+    // This ensures both MainDashboard and App.tsx can see the platform as claimed
     if (currentUser?.uid) {
       // Get the username that was used during processing
       let username = '';
@@ -303,25 +377,84 @@ const MainDashboard: React.FC = () => {
         }
       } catch {}
       
-      // Mark platform as claimed in backend
-      fetch(`/api/platform-access/${currentUser.uid}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          platform: platformId,
-          claimed: true, // NOW claimed after completion
-          username: username
+      // ✅ CROSS-DEVICE SYNC FIX: Check if platform already acquired on another device
+      const localStorageKey = `${platformId}_accessed_${currentUser.uid}`;
+      const alreadyAcquiredElsewhere = localStorage.getItem(localStorageKey) === 'true';
+      
+      if (alreadyAcquiredElsewhere) {
+        console.log(`🔥 CROSS-DEVICE SYNC: Platform ${platformId} already acquired on another device - skipping backend sync to prevent override`);
+        // Just mark in localStorage and return - don't sync to backend
+        localStorage.setItem(localStorageKey, 'true');
+        return;
+      }
+      
+      // ✅ CRITICAL FIX: Update BOTH endpoints to ensure complete synchronization
+      
+      // Step 1: Update the user-status endpoint (used by App.tsx)
+      let userStatusEndpoint = '';
+      let userStatusPayload: any = {};
+      
+      if (platformId === 'instagram') {
+        userStatusEndpoint = `/api/user-instagram-status/${currentUser.uid}`;
+        userStatusPayload = { instagram_username: username };
+      } else if (platformId === 'twitter') {
+        userStatusEndpoint = `/api/user-twitter-status/${currentUser.uid}`;
+        userStatusPayload = { twitter_username: username };
+      } else if (platformId === 'facebook') {
+        userStatusEndpoint = `/api/user-facebook-status/${currentUser.uid}`;
+        userStatusPayload = { facebook_username: username };
+      }
+      
+      // Step 2: Update the platform-access endpoint (used by MainDashboard)
+      const platformAccessEndpoint = `/api/platform-access/${currentUser.uid}`;
+      const platformAccessPayload = {
+        platform: platformId,
+        claimed: true,
+        username: username
+      };
+      
+      // Update both endpoints simultaneously
+      const updatePromises = [];
+      
+      if (userStatusEndpoint) {
+        updatePromises.push(
+          fetch(userStatusEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(userStatusPayload)
+          }).then(response => {
+            if (response.ok) {
+              console.log(`🔥 BACKEND SYNC: Platform ${platformId} marked as CLAIMED in user-status endpoint for App.tsx compatibility`);
+            } else {
+              console.warn(`🔥 BACKEND SYNC: Failed to mark platform ${platformId} as claimed in user-status endpoint`);
+            }
+          }).catch(error => {
+            console.error(`🔥 BACKEND SYNC: Error marking platform ${platformId} as claimed in user-status endpoint:`, error);
+          })
+        );
+      }
+      
+      updatePromises.push(
+        fetch(platformAccessEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(platformAccessPayload)
+        }).then(response => {
+          if (response.ok) {
+            console.log(`🔥 BACKEND SYNC: Platform ${platformId} marked as CLAIMED in platform-access endpoint for MainDashboard compatibility`);
+          } else {
+            console.warn(`🔥 BACKEND SYNC: Failed to mark platform ${platformId} as claimed in platform-access endpoint`);
+          }
+        }).catch(error => {
+          console.error(`🔥 BACKEND SYNC: Error marking platform ${platformId} as claimed in platform-access endpoint:`, error);
         })
-      }).then(response => {
-        if (response.ok) {
-          console.log(`🔥 BACKEND SYNC: Platform ${platformId} marked as CLAIMED after completion for cross-device sync`);
-          // Also update localStorage for immediate consistency
-          localStorage.setItem(`${platformId}_accessed_${currentUser.uid}`, 'true');
-        } else {
-          console.warn(`🔥 BACKEND SYNC: Failed to mark platform ${platformId} as claimed after completion`);
-        }
-      }).catch(error => {
-        console.error(`🔥 BACKEND SYNC: Error marking platform ${platformId} as claimed after completion:`, error);
+      );
+      
+      // Wait for both updates to complete
+      Promise.all(updatePromises).then(() => {
+        console.log(`🔥 BACKEND SYNC: Platform ${platformId} successfully marked as CLAIMED in both endpoints for complete cross-device sync`);
+        // Also update localStorage for immediate consistency
+        localStorage.setItem(localStorageKey, 'true');
       });
     }
     
@@ -343,20 +476,58 @@ const MainDashboard: React.FC = () => {
       lastClaimedSyncTime = now;
 
       try {
-        const resp = await fetch(`/api/platform-access/${currentUser.uid}`);
-        if (!resp.ok) return;
-        const json = await resp.json();
-        const data = json?.data || {};
+        // ✅ CRITICAL FIX: Use the SAME endpoints as App.tsx for consistency
+        // This prevents the cross-device sync mismatch
+        const platforms = ['instagram', 'twitter', 'facebook', 'linkedin'];
+        const platformStatuses: Record<string, boolean> = {};
         
-        console.log(`[MainDashboard] 🔍 BACKEND SYNC: Received platform access data:`, data);
+        // Check each platform individually using the same endpoints as App.tsx
+        for (const platformId of platforms) {
+          try {
+            let endpoint = '';
+            if (platformId === 'instagram') {
+              endpoint = `/api/user-instagram-status/${currentUser.uid}`;
+            } else if (platformId === 'twitter') {
+              endpoint = `/api/user-twitter-status/${currentUser.uid}`;
+            } else if (platformId === 'facebook') {
+              endpoint = `/api/user-facebook-status/${currentUser.uid}`;
+            } else {
+              endpoint = `/api/platform-access/${currentUser.uid}`;
+            }
+            
+            const resp = await fetch(endpoint);
+            if (resp.ok) {
+              const json = await resp.json();
+              const data = json?.data || json;
+              
+              // Check the SAME fields as App.tsx
+              let isClaimed = false;
+              if (platformId === 'instagram') {
+                isClaimed = data.hasEnteredInstagramUsername === true;
+              } else if (platformId === 'twitter') {
+                isClaimed = data.hasEnteredTwitterUsername === true;
+              } else if (platformId === 'facebook') {
+                isClaimed = data.hasEnteredFacebookUsername === true;
+              } else {
+                isClaimed = data[platformId]?.claimed === true;
+              }
+              
+              platformStatuses[platformId] = isClaimed;
+            }
+          } catch (error) {
+            console.warn(`Failed to check ${platformId} status:`, error);
+            platformStatuses[platformId] = false;
+          }
+        }
+        
+        console.log(`[MainDashboard] 🔍 BACKEND SYNC: Received platform status data:`, platformStatuses);
         
         let hasChanges = false;
         
-        ['instagram', 'twitter', 'facebook', 'linkedin'].forEach(pid => {
-          const entry = data[pid];
+        platforms.forEach(pid => {
+          const isNowClaimed = platformStatuses[pid] || false;
           const key = `${pid}_accessed_${currentUser.uid}`;
           const wasClaimed = localStorage.getItem(key) === 'true';
-          const isNowClaimed = entry && entry.claimed === true;
           
           // CRITICAL FIX: Check if platform is currently in loading state
           // Consider both backend-synced state and localStorage fallback to avoid first-paint races
@@ -382,6 +553,52 @@ const MainDashboard: React.FC = () => {
             localStorage.setItem(key, 'true');
             hasChanges = true;
             console.log(`[MainDashboard] 🔄 Platform ${pid} now claimed (was not claimed) - CROSS-DEVICE SYNC SUCCESS`);
+            
+            // ✅ CRITICAL FIX: Also sync username and other data to localStorage for complete cross-device sync
+            // We need to fetch the platform data again to get username and account type
+            (async () => {
+              try {
+                let endpoint = '';
+                if (pid === 'instagram') {
+                  endpoint = `/api/user-instagram-status/${currentUser.uid}`;
+                } else if (pid === 'twitter') {
+                  endpoint = `/api/user-twitter-status/${currentUser.uid}`;
+                } else if (pid === 'facebook') {
+                  endpoint = `/api/user-facebook-status/${currentUser.uid}`;
+                } else {
+                  endpoint = `/api/platform-access/${currentUser.uid}`;
+                }
+                
+                const resp = await fetch(endpoint);
+                if (resp.ok) {
+                  const json = await resp.json();
+                  const platformData = json?.data || json;
+                  
+                  // Get username from backend response
+                  let username = '';
+                  if (pid === 'instagram' && platformData.instagram_username) {
+                    username = platformData.instagram_username;
+                  } else if (pid === 'twitter' && platformData.twitter_username) {
+                    username = platformData.twitter_username;
+                  } else if (pid === 'facebook' && platformData.facebook_username) {
+                    username = platformData.facebook_username;
+                  }
+                  
+                  if (username && username.trim()) {
+                    localStorage.setItem(`${pid}_username_${currentUser.uid}`, username.trim());
+                    console.log(`[MainDashboard] 🔄 CROSS-DEVICE SYNC: Username ${username} synced to localStorage for ${pid}`);
+                  }
+                  
+                  // Get account type if available
+                  if (platformData.accountType) {
+                    localStorage.setItem(`${pid}_account_type_${currentUser.uid}`, platformData.accountType);
+                    console.log(`[MainDashboard] 🔄 CROSS-DEVICE SYNC: Account type ${platformData.accountType} synced to localStorage for ${pid}`);
+                  }
+                }
+              } catch (error) {
+                console.warn(`[MainDashboard] Failed to sync additional data for ${pid}:`, error);
+              }
+            })();
             
             // ✅ ENHANCED SYNC: Also check if this platform was in loading state and complete it
             if (platformLoadingStates[pid] && !platformLoadingStates[pid].isComplete) {
@@ -412,10 +629,17 @@ const MainDashboard: React.FC = () => {
       }
     };
 
-    mirrorClaimed();
+    // ✅ DISABLED: Old conflicting sync that was overriding Facebook status
+    // This old sync was showing facebook: false and clearing localStorage
+    // The new dedicated platform sync system is more accurate
+    // mirrorClaimed();
+    console.log(`[MainDashboard] 🚫 DISABLED: Old conflicting sync system to prevent Facebook status override`);
+    
     // ✅ OPTIMIZED SYNC: Reduced frequency from 5 seconds to 3 seconds for faster cross-device sync
-    const id = setInterval(mirrorClaimed, 3000); // Increased from 5 seconds to 3 seconds
-    return () => clearInterval(id);
+    // const id = setInterval(mirrorClaimed, 3000); // DISABLED - conflicts with new sync
+    // return () => clearInterval(id);
+    
+    return () => {}; // Empty cleanup since we disabled the interval
   }, [currentUser?.uid, platformLoadingStates, completePlatformLoading]);
 
   // ✅ CRITICAL PLATFORM COMPLETION MONITOR: Monitor for platform completion and update UI
@@ -598,97 +822,257 @@ const MainDashboard: React.FC = () => {
       }).catch(() => {});
       
       // Step 2: CRITICAL FIX - Mark platform as NOT claimed (in loading state) for cross-device sync
-      fetch(`/api/platform-access/${currentUser.uid}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          platform: platformId,
-          claimed: false, // NOT claimed while in loading state
-          username: infoPayload.username
+      // ✅ CRITICAL FIX: Update BOTH endpoints to ensure complete synchronization
+      
+      // Step 2a: Update the user-status endpoint (used by App.tsx)
+      let userStatusEndpoint = '';
+      let userStatusPayload: any = {};
+      
+      if (platformId === 'instagram') {
+        userStatusEndpoint = `/api/user-instagram-status/${currentUser.uid}`;
+        userStatusPayload = { instagram_username: infoPayload.username };
+      } else if (platformId === 'twitter') {
+        userStatusEndpoint = `/api/user-twitter-status/${currentUser.uid}`;
+        userStatusPayload = { twitter_username: infoPayload.username };
+      } else if (platformId === 'facebook') {
+        userStatusEndpoint = `/api/user-facebook-status/${currentUser.uid}`;
+        userStatusPayload = { facebook_username: infoPayload.username };
+      }
+      
+      // Step 2b: Update the platform-access endpoint (used by MainDashboard)
+      const platformAccessEndpoint = `/api/platform-access/${currentUser.uid}`;
+      const platformAccessPayload = {
+        platform: platformId,
+        claimed: false, // NOT claimed while in loading state
+        username: infoPayload.username
+      };
+      
+      // Update both endpoints simultaneously
+      const updatePromises = [];
+      
+      if (userStatusEndpoint) {
+        updatePromises.push(
+          fetch(userStatusEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(userStatusPayload)
+          }).then(response => {
+            if (response.ok) {
+              console.log(`🔥 BACKEND SYNC: Platform ${platformId} marked as NOT claimed in user-status endpoint for App.tsx compatibility`);
+            } else {
+              console.warn(`🔥 BACKEND SYNC: Failed to mark platform ${platformId} as NOT claimed in user-status endpoint`);
+            }
+          }).catch(error => {
+            console.error(`🔥 BACKEND SYNC: Error marking platform ${platformId} as NOT claimed in user-status endpoint:`, error);
+          })
+        );
+      }
+      
+      updatePromises.push(
+        fetch(platformAccessEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(platformAccessPayload)
+        }).then(response => {
+          if (response.ok) {
+            console.log(`🔥 BACKEND SYNC: Platform ${platformId} marked as NOT claimed in platform-access endpoint for MainDashboard compatibility`);
+          } else {
+            console.warn(`🔥 BACKEND SYNC: Failed to mark platform ${platformId} as NOT claimed in platform-access endpoint`);
+          }
+        }).catch(error => {
+          console.error(`🔥 BACKEND SYNC: Error marking platform ${platformId} as NOT claimed in platform-access endpoint:`, error);
         })
-      }).then(response => {
-        if (response.ok) {
-          console.log(`🔥 BACKEND SYNC: Platform ${platformId} marked as NOT claimed (loading state) for cross-device sync`);
-        } else {
-          console.warn(`🔥 BACKEND SYNC: Failed to mark platform ${platformId} as NOT claimed`);
-        }
-      }).catch(error => {
-        console.error(`🔥 BACKEND SYNC: Error marking platform ${platformId} as NOT claimed:`, error);
+      );
+      
+      // Wait for both updates to complete
+      Promise.all(updatePromises).then(() => {
+        console.log(`🔥 BACKEND SYNC: Platform ${platformId} successfully marked as NOT claimed in both endpoints for complete cross-device sync`);
       });
     }
     
     console.log(`🔥 TIMER START: ${platformId} timer set for ${durationMinutes} minutes (${endTime})`);
   };
 
-  // ✅ PLATFORM STATUS SYNC FIX: Improved platform access tracking
+  // ✅ PLATFORM STATUS SYNC FIX: Improved platform access tracking with real-time backend sync
   const getPlatformAccessStatus = useCallback((platformId: string): boolean => {
     if (!currentUser?.uid) return false;
     
-    // CRITICAL FIX: If platform is in loading state, it's NOT acquired yet
-    if (isPlatformLoading(platformId)) {
-      console.log(`🔥 PLATFORM STATUS: ${platformId} is in loading state, showing as NOT acquired`);
-      return false;
-    }
-    
-    // ✅ ENHANCED BACKEND-FIRST CHECK: Always check backend first for cross-device consistency
-    // This ensures that if device B completed the platform, device A will see it as claimed
-    const checkBackendStatus = async () => {
-      try {
-        const resp = await fetch(`/api/platform-access/${currentUser.uid}`);
-        if (resp.ok) {
-          const json = await resp.json();
-          const data = json?.data || {};
-          const backendClaimed = data[platformId]?.claimed === true;
-          
-          if (backendClaimed) {
-            // Backend says claimed - sync to localStorage for consistency
-            localStorage.setItem(`${platformId}_accessed_${currentUser.uid}`, 'true');
-            console.log(`🔥 BACKEND SYNC: ${platformId} marked as claimed from backend`);
-            return true;
-          } else {
-            // Backend says not claimed - clear localStorage
-            localStorage.removeItem(`${platformId}_accessed_${currentUser.uid}`);
-            console.log(`🔥 BACKEND SYNC: ${platformId} marked as not claimed from backend`);
-            return false;
-          }
-        }
-      } catch (error) {
-        console.warn(`Failed to check backend status for ${platformId}:`, error);
-      }
-      return null; // Backend check failed
-    };
-    
-    // Check localStorage for platform access (fallback)
+    // ✅ PRIMARY SOURCE: Check localStorage for immediate response
     const accessedFromStorage = localStorage.getItem(`${platformId}_accessed_${currentUser.uid}`) === 'true';
     
-    // Check context status for platforms that have it (fallback)
+    // ✅ CONTEXT FALLBACK: Check context status for platforms that have it
     let accessedFromContext = false;
     if (platformId === 'instagram') accessedFromContext = hasAccessedInstagram;
     if (platformId === 'twitter') accessedFromContext = hasAccessedTwitter;
     if (platformId === 'facebook') accessedFromContext = hasAccessedFacebook;
     
-    // ✅ CRITICAL FIX: If localStorage or context shows accessed, verify with backend
-    // This prevents stale local data from overriding backend truth
-    if (accessedFromStorage || accessedFromContext) {
-      // Run backend check in background to sync status
-      checkBackendStatus().then(backendStatus => {
-        if (backendStatus !== null) {
-          // Backend check completed - force platform refresh if status changed
-          const currentStatus = accessedFromStorage || accessedFromContext;
-          if (backendStatus !== currentStatus) {
-            console.log(`🔥 STATUS MISMATCH: ${platformId} local=${currentStatus} backend=${backendStatus}, forcing refresh`);
-            setPlatforms(prev => [...prev]);
-          }
-        }
-      });
-      
-      // Return current local status while backend syncs
-      return accessedFromStorage || accessedFromContext;
+    // ✅ COMBINED STATUS: Use either localStorage or context (whichever is true)
+    const localStatus = accessedFromStorage || accessedFromContext;
+    
+    // ✅ CROSS-DEVICE SYNC FIX: If localStorage says accessed, trust it even if platform is loading
+    // This allows cross-device sync to work - another device might have completed acquisition
+    if (accessedFromStorage) {
+      console.log(`🔍 PLATFORM STATUS: ${platformId} - localStorage override (cross-device sync) - claimed despite loading state`);
+      return true;
     }
     
-    // If neither localStorage nor context shows accessed, definitely not claimed
-    return false;
+    // ✅ LOADING STATE CHECK: Only apply loading restriction if localStorage doesn't override
+    if (isPlatformLoading(platformId)) {
+      console.log(`🔥 PLATFORM STATUS: ${platformId} is in loading state, showing as NOT acquired`);
+      return false;
+    }
+    
+    console.log(`🔍 PLATFORM STATUS CHECK: ${platformId} - storage:${accessedFromStorage} context:${accessedFromContext} combined:${localStatus}`);
+    
+    return localStatus;
   }, [currentUser?.uid, hasAccessedInstagram, hasAccessedTwitter, hasAccessedFacebook, isPlatformLoading]);
+
+  // ✅ SEPARATE BACKEND SYNC: Dedicated effect for backend synchronization
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+
+    const syncPlatformStatusWithBackend = async (platformId: string) => {
+      try {
+        // Use the SAME endpoint as App.tsx for platform status consistency
+        let endpoint = '';
+        if (platformId === 'instagram') {
+          endpoint = `/api/user-instagram-status/${currentUser.uid}`;
+        } else if (platformId === 'twitter') {
+          endpoint = `/api/user-twitter-status/${currentUser.uid}`;
+        } else if (platformId === 'facebook') {
+          endpoint = `/api/user-facebook-status/${currentUser.uid}`;
+        } else {
+          endpoint = `/api/platform-access/${currentUser.uid}`;
+        }
+        
+        const resp = await fetch(endpoint);
+        if (resp.ok) {
+          const json = await resp.json();
+          const data = json?.data || json; // Handle both response formats
+          
+          // 🔍 FACEBOOK DEBUG: Log all Facebook API response data
+          if (platformId === 'facebook') {
+            console.log(`🔍 FACEBOOK API DEBUG - Full Response:`, {
+              endpoint,
+              status: resp.status,
+              json,
+              data,
+              hasEnteredFacebookUsername: data.hasEnteredFacebookUsername,
+              facebook_username: data.facebook_username,
+              uid: data.uid,
+              lastUpdated: data.lastUpdated
+            });
+          }
+          
+          // Check the SAME fields as App.tsx
+          let backendClaimed = false;
+          if (platformId === 'instagram') {
+            backendClaimed = data.hasEnteredInstagramUsername === true;
+          } else if (platformId === 'twitter') {
+            backendClaimed = data.hasEnteredTwitterUsername === true;
+          } else if (platformId === 'facebook') {
+            backendClaimed = data.hasEnteredFacebookUsername === true;
+          } else {
+            backendClaimed = data[platformId]?.claimed === true;
+          }
+          
+          const localClaimed = localStorage.getItem(`${platformId}_accessed_${currentUser.uid}`) === 'true';
+          
+          // 🔍 FACEBOOK DEBUG: Log comparison details
+          if (platformId === 'facebook') {
+            console.log(`🔍 FACEBOOK SYNC DEBUG:`, {
+              platformId,
+              backendClaimed,
+              localClaimed,
+              localStorageKey: `${platformId}_accessed_${currentUser.uid}`,
+              localStorageValue: localStorage.getItem(`${platformId}_accessed_${currentUser.uid}`),
+              syncNeeded: backendClaimed && !localClaimed
+            });
+            
+            // 🔍 FACEBOOK DEBUG: Check if there's any localStorage data at all
+            const allFacebookKeys = Object.keys(localStorage).filter(key => key.includes('facebook') && key.includes(currentUser.uid));
+            console.log(`🔍 FACEBOOK LOCALSTORAGE DEBUG:`, {
+              allFacebookKeys,
+              facebook_accessed: localStorage.getItem(`facebook_accessed_${currentUser.uid}`),
+              facebook_username: localStorage.getItem(`facebook_username_${currentUser.uid}`),
+              facebook_account_type: localStorage.getItem(`facebook_account_type_${currentUser.uid}`)
+            });
+          }
+          
+          // ✅ CRITICAL CROSS-DEVICE SYNC: Sync backend status to localStorage
+          if (backendClaimed && !localClaimed) {
+            console.log(`� CROSS-DEVICE SYNC: ${platformId} claimed on backend, syncing to localStorage`);
+            localStorage.setItem(`${platformId}_accessed_${currentUser.uid}`, 'true');
+            
+            // Also sync username and other data if available
+            if (platformId === 'facebook' && data.facebook_username) {
+              localStorage.setItem(`facebook_username_${currentUser.uid}`, data.facebook_username);
+              if (data.accountType) {
+                localStorage.setItem(`facebook_account_type_${currentUser.uid}`, data.accountType);
+              }
+              if (data.competitors) {
+                localStorage.setItem(`facebook_competitors_${currentUser.uid}`, JSON.stringify(data.competitors));
+              }
+            }
+            
+            // Force platform state refresh
+            setPlatforms(prev => prev.map(platform => {
+              if (platform.id === platformId) {
+                return { ...platform, claimed: true };
+              }
+              return platform;
+            }));
+            
+          } else if (!backendClaimed && localClaimed) {
+            // Check if platform is in loading state - if not, clear localStorage
+            if (!isPlatformLoading(platformId)) {
+              if (platformId === 'facebook') {
+                console.log(`🔄 FACEBOOK BACKEND MISMATCH: Backend not claimed but localStorage claimed - PRESERVING localStorage (backend may be incomplete)`);
+                // Don't clear Facebook localStorage aggressively since backend data might be incomplete
+              } else {
+                console.log(`🔄 BACKEND CLEANUP: ${platformId} not claimed on backend, clearing localStorage`);
+                localStorage.removeItem(`${platformId}_accessed_${currentUser.uid}`);
+              }
+              
+              // Force platform state refresh
+              setPlatforms(prev => prev.map(platform => {
+                if (platform.id === platformId) {
+                  return { ...platform, claimed: false };
+                }
+                return platform;
+              }));
+            }
+          }
+          
+          console.log(`� BACKEND SYNC COMPLETE: ${platformId} - backend:${backendClaimed} local:${localClaimed}`);
+        }
+      } catch (error) {
+        console.warn(`Failed to sync backend status for ${platformId}:`, error);
+      }
+    };
+
+    // ✅ FACEBOOK PRIORITY SYNC: Sync Facebook first, then other platforms
+    const performBackendSync = async () => {
+      const platforms = ['facebook', 'instagram', 'twitter', 'linkedin'];
+      
+      for (const platformId of platforms) {
+        await syncPlatformStatusWithBackend(platformId);
+        
+        // Small delay between platform checks to avoid overwhelming the server
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    };
+
+    // Initial sync
+    performBackendSync();
+
+    // ✅ REGULAR SYNC: Sync every 3 seconds for cross-device updates
+    const syncInterval = setInterval(performBackendSync, 3000);
+
+    return () => {
+      clearInterval(syncInterval);
+    };
+  }, [currentUser?.uid, isPlatformLoading]);
 
   // ✅ PLATFORM CONNECTION SYNC FIX: Improved connection status tracking
   const getPlatformConnectionStatus = useCallback((platformId: string): boolean => {
@@ -757,6 +1141,64 @@ const MainDashboard: React.FC = () => {
     }, 60000); // Update every minute
     
     return () => clearInterval(interval);
+  }, [currentUser?.uid, getPlatformAccessStatus]);
+
+  // ✅ INSTANT CROSS-DEVICE SYNC: Listen for localStorage changes from other tabs/devices
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+
+    const handleStorageChange = (event: StorageEvent) => {
+      if (!event.key || !event.newValue) return;
+
+      // Check if it's a Facebook access change
+      if (event.key === `facebook_accessed_${currentUser.uid}` && event.newValue === 'true') {
+        console.log(`[MainDashboard] 🚀 STORAGE EVENT: Facebook access detected from another tab/device!`);
+        
+        // Force immediate platform status refresh
+        setTimeout(() => {
+          setPlatforms(prev => prev.map(platform => {
+            if (platform.id === 'facebook') {
+              const newClaimed = getPlatformAccessStatus('facebook');
+              if (newClaimed !== platform.claimed) {
+                console.log(`[MainDashboard] ✅ INSTANT SYNC: Facebook platform updated from storage event`);
+                return { ...platform, claimed: newClaimed };
+              }
+            }
+            return platform;
+          }));
+        }, 100); // Small delay to allow localStorage to settle
+      }
+
+      // Also check for other platform access changes
+      const platformMatches = event.key.match(/^(instagram|twitter|facebook|linkedin)_accessed_(.+)$/);
+      if (platformMatches && platformMatches[2] === currentUser.uid) {
+        const platformId = platformMatches[1] as string;
+        const isNowAccessed = event.newValue === 'true';
+        
+        console.log(`[MainDashboard] 🚀 STORAGE EVENT: ${platformId} access changed to ${isNowAccessed} from another device`);
+        
+        // Force immediate platform status refresh for any platform
+        setTimeout(() => {
+          setPlatforms(prev => prev.map(platform => {
+            if (platform.id === platformId) {
+              const newClaimed = getPlatformAccessStatus(platformId);
+              if (newClaimed !== platform.claimed) {
+                console.log(`[MainDashboard] ✅ INSTANT SYNC: ${platformId} platform updated from storage event`);
+                return { ...platform, claimed: newClaimed };
+              }
+            }
+            return platform;
+          }));
+        }, 100);
+      }
+    };
+
+    // Listen for storage events
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, [currentUser?.uid, getPlatformAccessStatus]);
 
   // ✅ REAL-TIME TIMER SYNC: Update UI when processing timers complete
@@ -980,6 +1422,78 @@ const MainDashboard: React.FC = () => {
     if (currentUser?.uid) {
       refreshUsage();
       fetchRealTimeNotifications();
+      
+      // ✅ CRITICAL FIX: Immediate platform access status sync on mount
+      // This prevents the cross-device sync mismatch where MainDashboard and App.tsx show different statuses
+      const immediatePlatformSync = async () => {
+        try {
+          console.log(`[MainDashboard] 🔄 IMMEDIATE SYNC: Syncing platform access status on mount`);
+          
+          const platforms = ['instagram', 'twitter', 'facebook', 'linkedin'];
+          const platformStatuses: Record<string, boolean> = {};
+          
+          // Check each platform individually using the same endpoints as App.tsx
+          for (const platformId of platforms) {
+            try {
+              let endpoint = '';
+              if (platformId === 'instagram') {
+                endpoint = `/api/user-instagram-status/${currentUser.uid}`;
+              } else if (platformId === 'twitter') {
+                endpoint = `/api/user-twitter-status/${currentUser.uid}`;
+              } else if (platformId === 'facebook') {
+                endpoint = `/api/user-facebook-status/${currentUser.uid}`;
+              } else {
+                endpoint = `/api/platform-access/${currentUser.uid}`;
+              }
+              
+              const resp = await fetch(endpoint);
+              if (resp.ok) {
+                const json = await resp.json();
+                const data = json?.data || json;
+                
+                // Check the SAME fields as App.tsx
+                let isClaimed = false;
+                if (platformId === 'instagram') {
+                  isClaimed = data.hasEnteredInstagramUsername === true;
+                } else if (platformId === 'twitter') {
+                  isClaimed = data.hasEnteredTwitterUsername === true;
+                } else if (platformId === 'facebook') {
+                  isClaimed = data.hasEnteredFacebookUsername === true;
+                } else {
+                  isClaimed = data[platformId]?.claimed === true;
+                }
+                
+                platformStatuses[platformId] = isClaimed;
+                
+                // Immediately sync to localStorage for consistency
+                if (isClaimed) {
+                  localStorage.setItem(`${platformId}_accessed_${currentUser.uid}`, 'true');
+                } else {
+                  if (platformId === 'facebook') {
+                    console.log(`🔄 FACEBOOK MOUNT SYNC: Backend not claimed - PRESERVING localStorage (backend may be incomplete)`);
+                    // Don't clear Facebook localStorage on mount if backend doesn't show claimed
+                  } else {
+                    localStorage.removeItem(`${platformId}_accessed_${currentUser.uid}`);
+                  }
+                }
+              }
+            } catch (error) {
+              console.warn(`Failed to check ${platformId} status on mount:`, error);
+              platformStatuses[platformId] = false;
+            }
+          }
+          
+          console.log(`[MainDashboard] 🔄 IMMEDIATE SYNC: Platform statuses synced:`, platformStatuses);
+          
+          // Force platform refresh to show correct status immediately
+          setPlatforms(prev => [...prev]);
+          
+        } catch (error) {
+          console.warn(`[MainDashboard] Failed to sync platform status on mount:`, error);
+        }
+      };
+      
+      immediatePlatformSync();
     }
     
   }, [currentUser?.uid]); // Only trigger when user changes
@@ -1077,18 +1591,56 @@ const MainDashboard: React.FC = () => {
     const mirrorClaimedFromServer = async () => {
       if (!currentUser?.uid) return;
       try {
-        const resp = await fetch(`/api/platform-access/${currentUser.uid}`);
-        if (!resp.ok) return;
-        const json = await resp.json();
-        const data = json?.data || {};
-        ['instagram', 'twitter', 'facebook', 'linkedin'].forEach(pid => {
-          const entry = data[pid];
-          if (entry && entry.claimed === true) {
-            localStorage.setItem(`${pid}_accessed_${currentUser.uid}`, 'true');
-          } else if (entry && entry.claimed === false) {
-            localStorage.removeItem(`${pid}_accessed_${currentUser.uid}`);
+        // ✅ CRITICAL FIX: Use the SAME endpoints as App.tsx for consistency
+        const platforms = ['instagram', 'twitter', 'facebook', 'linkedin'];
+        const platformStatuses: Record<string, boolean> = {};
+        
+        // Check each platform individually using the same endpoints as App.tsx
+        for (const platformId of platforms) {
+          try {
+            let endpoint = '';
+            if (platformId === 'instagram') {
+              endpoint = `/api/user-instagram-status/${currentUser.uid}`;
+            } else if (platformId === 'twitter') {
+              endpoint = `/api/user-twitter-status/${currentUser.uid}`;
+            } else if (platformId === 'facebook') {
+              endpoint = `/api/user-facebook-status/${currentUser.uid}`;
+            } else {
+              endpoint = `/api/platform-access/${currentUser.uid}`;
+            }
+            
+            const resp = await fetch(endpoint);
+            if (resp.ok) {
+              const json = await resp.json();
+              const data = json?.data || json;
+              
+              // Check the SAME fields as App.tsx
+              let isClaimed = false;
+              if (platformId === 'instagram') {
+                isClaimed = data.hasEnteredInstagramUsername === true;
+              } else if (platformId === 'twitter') {
+                isClaimed = data.hasEnteredTwitterUsername === true;
+              } else if (platformId === 'facebook') {
+                isClaimed = data.hasEnteredFacebookUsername === true;
+              } else {
+                isClaimed = data[platformId]?.claimed === true;
+              }
+              
+              if (isClaimed) {
+                localStorage.setItem(`${platformId}_accessed_${currentUser.uid}`, 'true');
+              } else {
+                if (platformId === 'facebook') {
+                  console.log(`🔄 FACEBOOK PERIODIC SYNC: Backend not claimed - PRESERVING localStorage (backend may be incomplete)`);
+                  // Don't clear Facebook localStorage on periodic sync if backend doesn't show claimed
+                } else {
+                  localStorage.removeItem(`${platformId}_accessed_${currentUser.uid}`);
+                }
+              }
+            }
+          } catch (error) {
+            console.warn(`Failed to check ${platformId} status:`, error);
           }
-        });
+        }
       } catch {}
     };
     mirrorClaimedFromServer();
@@ -1099,8 +1651,9 @@ const MainDashboard: React.FC = () => {
         const newConnected = getPlatformConnectionStatus(platform.id);
         const isCurrentlyLoading = isPlatformLoading(platform.id);
         
-        // ✅ CRITICAL FIX: If platform is loading, it's NEVER claimed
-        const finalClaimed = isCurrentlyLoading ? false : newClaimed;
+        // ✅ CROSS-DEVICE SYNC FIX: Trust getPlatformAccessStatus result 
+        // (which already handles localStorage override for loading state)
+        const finalClaimed = newClaimed;
         
         // ✅ ENHANCED LOGGING: More detailed status information
         if (platform.claimed !== finalClaimed || platform.connected !== newConnected) {
@@ -1108,7 +1661,7 @@ const MainDashboard: React.FC = () => {
             claimed: `${platform.claimed} -> ${finalClaimed}`,
             connected: `${platform.connected} -> ${newConnected}`,
             loading: isCurrentlyLoading,
-            reason: isCurrentlyLoading ? 'PLATFORM IN LOADING STATE' : 'status change'
+            reason: 'status change from getPlatformAccessStatus'
           });
         }
         
@@ -1270,40 +1823,82 @@ const MainDashboard: React.FC = () => {
         const forceRefreshPlatformStatus = async () => {
           try {
             console.log(`[MainDashboard] 🔄 FORCE REFRESH: Checking platform status from backend on focus`);
-            const resp = await fetch(`/api/platform-access/${currentUser.uid}`);
-            if (resp.ok) {
-              const json = await resp.json();
-              const data = json?.data || {};
-              
-              let hasChanges = false;
-              ['instagram', 'twitter', 'facebook', 'linkedin'].forEach(pid => {
-                const entry = data[pid];
-                const key = `${pid}_accessed_${currentUser.uid}`;
-                const wasClaimed = localStorage.getItem(key) === 'true';
-                const isNowClaimed = entry && entry.claimed === true;
+            
+            // ✅ CRITICAL FIX: Use the SAME endpoints as App.tsx for consistency
+            const platforms = ['instagram', 'twitter', 'facebook', 'linkedin'];
+            const platformStatuses: Record<string, boolean> = {};
+            
+            // Check each platform individually using the same endpoints as App.tsx
+            for (const platformId of platforms) {
+              try {
+                let endpoint = '';
+                if (platformId === 'instagram') {
+                  endpoint = `/api/user-instagram-status/${currentUser.uid}`;
+                } else if (platformId === 'twitter') {
+                  endpoint = `/api/user-twitter-status/${currentUser.uid}`;
+                } else if (platformId === 'facebook') {
+                  endpoint = `/api/user-facebook-status/${currentUser.uid}`;
+                } else {
+                  endpoint = `/api/platform-access/${currentUser.uid}`;
+                }
                 
-                if (isNowClaimed && !wasClaimed) {
-                  // Platform is now claimed on backend but not locally
-                  localStorage.setItem(key, 'true');
-                  hasChanges = true;
-                  console.log(`[MainDashboard] 🔄 FORCE REFRESH: ${pid} now claimed from backend`);
-                } else if (!isNowClaimed && wasClaimed) {
-                  // Platform no longer claimed on backend
+                const resp = await fetch(endpoint);
+                if (resp.ok) {
+                  const json = await resp.json();
+                  const data = json?.data || json;
+                  
+                  // Check the SAME fields as App.tsx
+                  let isClaimed = false;
+                  if (platformId === 'instagram') {
+                    isClaimed = data.hasEnteredInstagramUsername === true;
+                  } else if (platformId === 'twitter') {
+                    isClaimed = data.hasEnteredTwitterUsername === true;
+                  } else if (platformId === 'facebook') {
+                    isClaimed = data.hasEnteredFacebookUsername === true;
+                  } else {
+                    isClaimed = data[platformId]?.claimed === true;
+                  }
+                  
+                  platformStatuses[platformId] = isClaimed;
+                }
+              } catch (error) {
+                console.warn(`Failed to check ${platformId} status:`, error);
+                platformStatuses[platformId] = false;
+              }
+            }
+            
+            let hasChanges = false;
+            platforms.forEach(pid => {
+              const key = `${pid}_accessed_${currentUser.uid}`;
+              const wasClaimed = localStorage.getItem(key) === 'true';
+              const isNowClaimed = platformStatuses[pid] || false;
+              
+              if (isNowClaimed && !wasClaimed) {
+                // Platform is now claimed on backend but not locally
+                localStorage.setItem(key, 'true');
+                hasChanges = true;
+                console.log(`[MainDashboard] 🔄 FORCE REFRESH: ${pid} now claimed from backend`);
+              } else if (!isNowClaimed && wasClaimed) {
+                // Platform reported as no longer claimed on backend
+                // Preserve Facebook local claim to avoid cross-device desync when backend lags
+                if (pid === 'facebook') {
+                  console.log(`[MainDashboard] 🔄 FORCE REFRESH: facebook backend not claimed; PRESERVING localStorage (awaiting cross-device sync)`);
+                } else {
                   localStorage.removeItem(key);
                   hasChanges = true;
                   console.log(`[MainDashboard] 🔄 FORCE REFRESH: ${pid} no longer claimed from backend`);
                 }
-              });
-              
-              if (hasChanges) {
-                console.log(`[MainDashboard] 🔄 FORCE REFRESH: Platform status changes detected, forcing platform refresh`);
-                setPlatforms(prev => [...prev]);
-                
-                // Force immediate re-render
-                setTimeout(() => {
-                  setPlatforms(prev => [...prev]);
-                }, 100);
               }
+            });
+            
+            if (hasChanges) {
+              console.log(`[MainDashboard] 🔄 FORCE REFRESH: Platform status changes detected, forcing platform refresh`);
+              setPlatforms(prev => [...prev]);
+              
+              // Force immediate re-render
+              setTimeout(() => {
+                setPlatforms(prev => [...prev]);
+              }, 100);
             }
           } catch (error) {
             console.warn(`[MainDashboard] Failed to force refresh platform status:`, error);

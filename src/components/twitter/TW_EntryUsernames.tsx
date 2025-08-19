@@ -1,6 +1,6 @@
 import React, { useState, ChangeEvent, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import '../instagram/IG_EntryUsernames.css'; // Reuse the same styles
+import '../facebook/FB_EntryUsernames.css'; // Use Facebook CSS for proper modal centering
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -293,7 +293,7 @@ const usernameCheckUrl = '/api/check-username-availability';
         showMessage('Submission successful', 'success');
         
         // Start the processing phase using unified ProcessingContext
-        startProcessing('twitter', confirmationData.username, 15); // 15 minutes duration
+        startProcessing('twitter', confirmationData.username, 1); // 1 minute duration (testing)
       }
     } catch (error: any) {
       console.error('Error submitting data:', error);
@@ -321,7 +321,7 @@ const usernameCheckUrl = '/api/check-username-availability';
             <h1>Setup Your Twitter Account</h1>
             <div className="importance-notice">
               <div className="importance-icon">⚠️</div>
-              <p><strong>Critical Setup:</strong> This information initiates a 15-minute AI analysis process. Please ensure all details are accurate before submission.</p>
+              <p><strong>Critical Setup:</strong> This information initiates a 1-minute AI analysis process. Please ensure all details are accurate before submission.</p>
             </div>
           </div>
 
@@ -355,7 +355,7 @@ const usernameCheckUrl = '/api/check-username-availability';
                     <li>✓ Must be a valid Twitter username</li>
                     <li>✓ No spaces or special characters (except underscores)</li>
                     <li>✓ Used for AI analysis and competitor research</li>
-                    <li>✓ This will be used for 15 minutes of AI processing</li>
+                    <li>✓ This will be used for 1 minute of AI processing</li>
                   </ul>
                   <div className="format-example">
                     <strong>Examples:</strong> "YourBrandName", "YourName", "Brand_123"
@@ -477,227 +477,214 @@ const usernameCheckUrl = '/api/check-username-availability';
 
   return (
     <motion.div
-      className="dashboard-container"
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.8 }}
-      transition={{ duration: 0.6, ease: 'easeOut' }}
+      className="fb-entry-container"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      transition={{ duration: 0.5 }}
     >
-      <motion.div
-        className="card"
-        whileHover={{ scale: 1.02 }}
-        transition={{ duration: 0.3 }}
-      >
-        <h1 className="title">Twitter Setup</h1>
-        
-        <div className="importance-notice">
-          <div className="importance-icon">⚠️</div>
-          <p><strong>Critical Setup:</strong> This information initiates a 15-minute AI analysis process. Please ensure all details are accurate before submission.</p>
-        </div>
-
-        <div className="section">
-          <h2 className="subtitle">
-            Username 
-            <span className="critical-field">CRITICAL</span>
-          </h2>
-          <motion.div className="input-group" whileHover={{ x: 5 }}>
-            <input
-              value={username}
-              onChange={handleUsernameChange}
-              type="text"
-              placeholder="Enter your Twitter username (without @)"
-              className={!usernameValid ? 'invalid-input' : ''}
-            />
-          </motion.div>
-          {usernameTouched && username.trim() && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`username-status ${
-                isCheckingUsername
-                  ? 'status-checking'
-                  : !usernameValid
-                  ? 'status-invalid'
-                  : usernameAvailable
-                  ? 'status-available'
-                  : 'status-taken'
-              }`}
-            >
-              {isCheckingUsername
-                ? 'Checking...'
-                : !usernameValid
-                ? 'Use only letters, numbers, and underscores'
-                : usernameAvailable
-                ? 'Username is available!'
-                : 'You can go ahead but this is already taken'}
-            </motion.div>
-          )}
-          <div className="field-description">
-            <p><strong>Why this matters:</strong> Your username is the foundation for all AI-generated content, competitor analysis, and strategic recommendations.</p>
-            <ul>
-              <li>✓ Must be your exact Twitter username (without @)</li>
-              <li>✓ Only letters, numbers, and underscores allowed</li>
-              <li>✓ No spaces or special characters</li>
-              <li>✓ This will be used for 15 minutes of AI processing</li>
-            </ul>
+      <div className="fb-entry-wrapper">
+        <div className="fb-entry-header">
+          <h1>Setup Your Twitter Account</h1>
+          <div className="importance-notice">
+            <div className="importance-icon">⚠️</div>
+            <p><strong>Critical Setup:</strong> This information initiates a 1-minute AI analysis process. Please ensure all details are accurate before submission.</p>
           </div>
         </div>
 
-        <div className="section">
-          <h2 className="subtitle">Account Type</h2>
-          <div className="radio-group">
-            <label className="radio-label">
+        <form className="fb-entry-form" onSubmit={(e) => { e.preventDefault(); submitData(); }}>
+          <div className="form-section">
+            <h2>Account Information</h2>
+            
+            <div className="form-group">
+              <label htmlFor="twitter-username">
+                Your Twitter Username * 
+                <span className="critical-field">CRITICAL</span>
+              </label>
               <input
-                type="radio"
-                value="branding"
-                checked={accountType === 'branding'}
-                onChange={() => setAccountType('branding')}
+                type="text"
+                id="twitter-username"
+                value={username}
+                onChange={handleUsernameChange}
+                placeholder="e.g., YourBrandName (no @ symbol)"
+                className="form-input"
+                disabled={isLoading}
               />
-              Branding
-            </label>
-            <label className="radio-label">
-              <input
-                type="radio"
-                value="non-branding"
-                checked={accountType === 'non-branding'}
-                onChange={() => setAccountType('non-branding')}
-              />
-              Non-Branding
-            </label>
+              <div className="username-counter">
+                Characters: {username.length} / 15
+                {username.length > 12 && (
+                  <span className="counter-warning"> (Username getting long)</span>
+                )}
+              </div>
+              <div className="field-description">
+                <p><strong>Twitter Username:</strong> This is your Twitter handle without the @ symbol.</p>
+                <ul>
+                  <li>✓ Must be a valid Twitter username</li>
+                  <li>✓ No spaces or special characters (except underscores)</li>
+                  <li>✓ Used for AI analysis and competitor research</li>
+                  <li>✓ This will be used for 1 minute of AI processing</li>
+                </ul>
+                <div className="format-example">
+                  <strong>Examples:</strong> "YourBrandName", "YourName", "Brand_123"
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="field-description">
-            <p><strong>Account Type Impact:</strong></p>
-            <ul>
-              <li><strong>Branding:</strong> Business promotion, product marketing, brand awareness</li>
-              <li><strong>Non-Branding:</strong> Personal content, lifestyle, entertainment focus</li>
-            </ul>
-          </div>
-        </div>
 
-        <div className="section">
-          <h2 className="subtitle">Posting Style</h2>
-          <motion.div className="input-group" whileHover={{ x: 5 }}>
-            <input
-              type="text"
-              value={postingStyle}
-              onChange={(e) => setPostingStyle(e.target.value)}
-              placeholder="Describe your posting style (e.g., casual, professional, informative)"
-            />
-          </motion.div>
-          <div className="field-description">
-            <p><strong>AI Training Data:</strong> This helps our AI understand your voice and create content that matches your style.</p>
-            <p><em>Examples:</em> "Professional and informative with occasional humor" or "Casual and relatable lifestyle content"</p>
-          </div>
-        </div>
-
-        <div className="section">
-          <h2 className="subtitle">Competitors (at least 3 required)</h2>
-          <div className="section-description">
-            <p><strong>Strategic Intelligence:</strong> These competitors will be analyzed to understand market trends, content strategies, and engagement patterns.</p>
-          </div>
-          
-          <div className="competitors-container">
-            {competitors.map((competitor, index) => (
-              <motion.div
-                key={index}
-                className="competitor-input-group"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: index * 0.1 }}
-              >
-                <div className="competitor-header">
-                  <label className="competitor-label">
-                    Competitor {index + 1} {index < 3 ? '*' : ''}
-                    {index < 3 && <span className="required-badge">Required</span>}
-                  </label>
-                  {index < 3 && (
-                    <div className="competitor-hint">
-                      Choose a Twitter account that represents your target market or content niche
+          <div className="form-section">
+            <h2>Competitor Analysis</h2>
+            <div className="section-description">
+              <p><strong>Strategic Intelligence:</strong> These competitors will be analyzed to understand market trends, content strategies, and engagement patterns.</p>
+            </div>
+            
+            <div className="competitors-container">
+              {competitors.map((competitor, index) => (
+                <div key={index} className="competitor-input-group">
+                  <div className="competitor-header">
+                    <label className="competitor-label">
+                      Competitor {index + 1} {index < 3 ? '*' : ''}
+                      {index < 3 && <span className="required-badge">Required</span>}
+                    </label>
+                    {index < 3 && (
+                      <div className="competitor-hint">
+                        Choose a Twitter account that represents your target market or content niche
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="competitor-input-wrapper">
+                    <input
+                      value={competitor}
+                      onChange={(e) => handleCompetitorChange(index, e.target.value)}
+                      type="text"
+                      placeholder={`Enter competitor ${index + 1} (without @)`}
+                      className={`competitor-input ${competitor && !validateCompetitorUsername(competitor) ? 'invalid-input' : ''}`}
+                      disabled={isLoading}
+                    />
+                    {competitors.length > 3 && (
+                      <button
+                        type="button"
+                        onClick={() => removeCompetitor(index)}
+                        className="remove-competitor"
+                        disabled={isLoading}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  
+                  {competitor && !validateCompetitorUsername(competitor) && (
+                    <div className="error-message">
+                      Invalid competitor username format
                     </div>
                   )}
                 </div>
-                
-                <div className="competitor-input-wrapper">
-                  <input
-                    value={competitor}
-                    onChange={(e) => handleCompetitorChange(index, e.target.value)}
-                    type="text"
-                    placeholder={`Enter competitor ${index + 1} (without @)`}
-                    className={`competitor-input ${competitor && !validateCompetitorUsername(competitor) ? 'invalid-input' : ''}`}
-                  />
-                  {competitors.length > 3 && (
-                    <motion.button
-                      className="remove-btn"
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={() => removeCompetitor(index)}
-                    >
-                      ×
-                    </motion.button>
-                  )}
-                </div>
-                
-                {competitor && !validateCompetitorUsername(competitor) && (
-                  <div className="validation-error">
-                    Invalid competitor username format
-                  </div>
-                )}
-              </motion.div>
-            ))}
-          </div>
-          
-          <motion.button
-            className="add-btn"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={addCompetitor}
-          >
-            Add Competitor
-          </motion.button>
-        </div>
-
-        {validationErrors().length > 0 && (
-          <motion.div
-            className="validation-errors"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3 }}
-          >
-            <ul>
-              {validationErrors().map((error, index) => (
-                <li key={index} className="error-message">{error}</li>
               ))}
-            </ul>
-          </motion.div>
-        )}
-
-        <div className="section submit-section">
-          <motion.button
-            className="submit-btn"
-            whileHover={{ scale: 1.05, boxShadow: '0 0 25px rgba(0, 255, 204, 0.7)' }}
-            whileTap={{ scale: 0.95 }}
-            onClick={submitData}
-            disabled={isLoading || validationErrors().length > 0}
-          >
-            {isLoading ? (
-              <div className="spinner"></div>
-            ) : (
-              <span>Review & Submit Setup</span>
+            </div>
+            
+            {competitors.length < 5 && (
+              <button
+                type="button"
+                onClick={addCompetitor}
+                className="add-competitor"
+                disabled={isLoading}
+              >
+                + Add Another Competitor
+              </button>
             )}
-          </motion.button>
-        </div>
+          </div>
 
-        {message && (
-          <motion.div
-            className={`message ${messageType}`}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            {message}
-          </motion.div>
-        )}
-      </motion.div>
+          <div className="form-section">
+            <h2>Account Type</h2>
+            <div className="form-group">
+              <label htmlFor="account-type">Account Type *</label>
+              <select
+                id="account-type"
+                value={accountType}
+                onChange={(e) => setAccountType(e.target.value as 'branding' | 'non-branding')}
+                className="form-select"
+                disabled={isLoading}
+              >
+                <option value="branding">Branding Account</option>
+                <option value="non-branding">Non-Branding Account</option>
+              </select>
+              <div className="field-description">
+                <p><strong>Account Type Impact:</strong></p>
+                <ul>
+                  <li><strong>Branding:</strong> Business promotion, product marketing, brand awareness</li>
+                  <li><strong>Non-Branding:</strong> Personal content, lifestyle, entertainment focus</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div className="form-section">
+            <h2>Posting Style</h2>
+            <div className="form-group">
+              <label htmlFor="posting-style">Posting Style *</label>
+              <textarea
+                id="posting-style"
+                value={postingStyle}
+                onChange={(e) => setPostingStyle(e.target.value)}
+                placeholder="Describe your typical posting style, tone, and content approach..."
+                className="form-textarea"
+                rows={4}
+                disabled={isLoading}
+              />
+              <div className="field-description">
+                <p><strong>AI Training Data:</strong> This helps our AI understand your voice and create content that matches your style.</p>
+                <p><em>Examples:</em> "Professional and informative with occasional humor" or "Casual and relatable lifestyle content"</p>
+              </div>
+            </div>
+          </div>
+
+          {validationErrors().length > 0 && (
+            <div className="validation-errors">
+              <ul>
+                {validationErrors().map((error, index) => (
+                  <li key={index} className="error-message">{error}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {message && (
+            <motion.div
+              className={`message ${messageType}`}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+            >
+              {message}
+            </motion.div>
+          )}
+
+          <div className="form-actions">
+            <button
+              type="button"
+              onClick={resetForm}
+              className="reset-button"
+              disabled={isLoading}
+            >
+              Reset Form
+            </button>
+            <button
+              type="submit"
+              className="submit-button"
+              disabled={isLoading || !isValidForSubmission()}
+            >
+              {isLoading ? (
+                <>
+                  <div className="button-spinner"></div>
+                  Setting up...
+                </>
+              ) : (
+                'Review & Submit Setup'
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
 
       {/* Pre-submission Confirmation Modal */}
       {showConfirmation && confirmationData && (
@@ -715,7 +702,7 @@ const usernameCheckUrl = '/api/check-username-availability';
           >
             <div className="confirmation-header">
               <h3>🔍 Final Review Required</h3>
-              <p><strong>Please verify your information before starting the 15-minute AI analysis:</strong></p>
+              <p><strong>Please verify your information before starting the 1-minute AI analysis:</strong></p>
             </div>
             
             <div className="confirmation-content">
@@ -743,7 +730,7 @@ const usernameCheckUrl = '/api/check-username-availability';
               </div>
               
               <div className="confirmation-warning">
-                <p><strong>⚠️ Important:</strong> Once submitted, this will initiate a 15-minute AI analysis process. Make sure all information is correct!</p>
+                <p><strong>⚠️ Important:</strong> Once submitted, this will initiate a 1-minute AI analysis process. Make sure all information is correct!</p>
               </div>
             </div>
             

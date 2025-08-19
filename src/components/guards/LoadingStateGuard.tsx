@@ -119,43 +119,68 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
       // ✅ ENHANCED GLOBAL PROCESSING VALIDATION - More aggressive checking
       if (currentUser?.uid) {
         try {
-          console.log(`🔍 BACKGROUND VALIDATION: Checking all platforms for active processing states`);
+          // ✅ OPTIMIZED LOGGING: Only log when there are active processing states
           const globalResp = await fetch(`/api/processing-status/${currentUser.uid}`);
           if (globalResp.ok) {
             const globalJson = await globalResp.json();
             const states = globalJson?.data || {};
             const platforms = Object.keys(states);
             
-            console.log(`🔍 BACKGROUND VALIDATION: Found ${platforms.length} platforms with status data:`, states);
+            // Only log if there are active processing states
+            const activePlatforms = platforms.filter(p => {
+              const st = states[p];
+              return st && typeof st.endTime === 'number' && Date.now() < st.endTime;
+            });
+            
+            if (activePlatforms.length > 0) {
+              console.log(`🔍 BACKGROUND VALIDATION: Found ${activePlatforms.length} active processing states`);
+            }
             
             for (const p of platforms) {
               const st = states[p];
               if (st && typeof st.endTime === 'number' && Date.now() < st.endTime) {
                 // Found active processing – redirect to proper processing route
                 const processingRoute = `/processing/${p}`;
-                const remainingMinutes = Math.ceil((st.endTime - Date.now()) / 60000);
+                const remainingMinutes = Math.ceil((st.endTime - now) / 60000);
                 
-                console.log(`🔍 BACKGROUND VALIDATION: Active processing found for ${p} - ${remainingMinutes}min remaining, redirecting to ${processingRoute}`);
+                // ✅ SMART REDIRECT: Only redirect if user is actually on a conflicting route
+                const currentPath = location.pathname;
+                const isConflictingRoute = (
+                  (p === 'instagram' && (currentPath.includes('/dashboard') || currentPath.includes('/instagram'))) ||
+                  (p === 'twitter' && (currentPath.includes('/twitter-dashboard') || currentPath.includes('/twitter'))) ||
+                  (p === 'facebook' && (currentPath.includes('/facebook-dashboard') || currentPath.includes('/facebook'))) ||
+                  (p === 'linkedin' && (currentPath.includes('/linkedin-dashboard') || currentPath.includes('/linkedin')))
+                );
                 
-                if (lastRedirectRef.current !== processingRoute) {
-                  lastRedirectRef.current = processingRoute;
-                  // ✅ SEAMLESS REDIRECT: Navigate without showing validation screen
-                  navigate(processingRoute, {
-                    replace: true,
-                    state: { 
-                      platform: p, 
-                      remainingMinutes,
-                      fromGuardGlobal: true,
-                      username: st.username || ''
-                    }
-                  });
+                if (isConflictingRoute) {
+                  console.log(`🔍 BACKGROUND VALIDATION: Active processing found for ${p} - ${remainingMinutes}min remaining, redirecting to ${processingRoute}`);
+                  
+                  if (lastRedirectRef.current !== processingRoute) {
+                    lastRedirectRef.current = processingRoute;
+                    // ✅ SEAMLESS REDIRECT: Navigate without showing validation screen
+                    navigate(processingRoute, {
+                      replace: true,
+                      state: { 
+                        platform: p, 
+                        remainingMinutes,
+                        fromGuardGlobal: true,
+                        username: st.username || ''
+                      }
+                    });
+                  }
+                  lastValidationRef.current = now; // Update validation timestamp
+                  return; // stop further checks, we're redirecting
+                } else {
+                  // User is not on a conflicting route, just log the active processing
+                  console.log(`🔍 BACKGROUND VALIDATION: Active processing for ${p} but user not on conflicting route - no redirect needed`);
                 }
-                lastValidationRef.current = now; // Update validation timestamp
-                return; // stop further checks, we're redirecting
               }
             }
             
-            console.log(`🔍 BACKGROUND VALIDATION: No active processing states found`);
+            // Only log if no active processing states found and we're on a protected route
+            if (platforms.length === 0 && isProtectedRoute()) {
+              console.log(`🔍 BACKGROUND VALIDATION: No active processing states found`);
+            }
           } else {
             console.warn(`🔍 BACKGROUND VALIDATION: Failed to fetch processing status: ${globalResp.status}`);
           }
@@ -167,13 +192,37 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
       // ✅ ENHANCED PLATFORM ACCESS CHECK: Check if platform is now claimed after completion
       if (platform && currentUser?.uid) {
         try {
-          const accessResp = await fetch(`/api/platform-access/${currentUser.uid}`);
+          // ✅ CRITICAL FIX: Use the SAME endpoints as App.tsx for consistency
+          // This prevents the cross-device sync mismatch where LoadingStateGuard and App.tsx use different data sources
+          let endpoint = '';
+          if (platform === 'instagram') {
+            endpoint = `/api/user-instagram-status/${currentUser.uid}`;
+          } else if (platform === 'twitter') {
+            endpoint = `/api/user-twitter-status/${currentUser.uid}`;
+          } else if (platform === 'facebook') {
+            endpoint = `/api/user-facebook-status/${currentUser.uid}`;
+          } else {
+            endpoint = `/api/platform-access/${currentUser.uid}`;
+          }
+          
+          const accessResp = await fetch(endpoint);
           if (accessResp.ok) {
             const accessJson = await accessResp.json();
-            const accessData = accessJson?.data || {};
-            const platformAccess = accessData[platform];
+            const accessData = accessJson?.data || accessJson; // Handle both response formats
             
-            if (platformAccess && platformAccess.claimed === true) {
+            // Check the SAME fields as App.tsx
+            let isClaimed = false;
+            if (platform === 'instagram') {
+              isClaimed = accessData.hasEnteredInstagramUsername === true;
+            } else if (platform === 'twitter') {
+              isClaimed = accessData.hasEnteredTwitterUsername === true;
+            } else if (platform === 'facebook') {
+              isClaimed = accessData.hasEnteredFacebookUsername === true;
+            } else {
+              isClaimed = accessData[platform]?.claimed === true;
+            }
+            
+            if (isClaimed) {
               // Platform is claimed on backend - check if we need to update localStorage
               const localAccessKey = `${platform}_accessed_${currentUser.uid}`;
               const localClaimed = localStorage.getItem(localAccessKey) === 'true';
@@ -181,6 +230,31 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
               if (!localClaimed) {
                 console.log(`🔍 BACKGROUND VALIDATION: Platform ${platform} is claimed on backend but not locally - syncing`);
                 localStorage.setItem(localAccessKey, 'true');
+                
+                // ✅ CRITICAL FIX: Also sync username and other data to localStorage for complete cross-device sync
+                try {
+                  let username = '';
+                  if (platform === 'instagram' && accessData.instagram_username) {
+                    username = accessData.instagram_username;
+                  } else if (platform === 'twitter' && accessData.twitter_username) {
+                    username = accessData.twitter_username;
+                  } else if (platform === 'facebook' && accessData.facebook_username) {
+                    username = accessData.facebook_username;
+                  }
+                  
+                  if (username && username.trim()) {
+                    localStorage.setItem(`${platform}_username_${currentUser.uid}`, username.trim());
+                    console.log(`🔍 BACKGROUND VALIDATION: Username ${username} synced to localStorage for ${platform}`);
+                  }
+                  
+                  // Get account type if available
+                  if (accessData.accountType) {
+                    localStorage.setItem(`${platform}_account_type_${currentUser.uid}`, accessData.accountType);
+                    console.log(`🔍 BACKGROUND VALIDATION: Account type ${accessData.accountType} synced to localStorage for ${platform}`);
+                  }
+                } catch (error) {
+                  console.warn(`🔍 BACKGROUND VALIDATION: Failed to sync additional data for ${platform}:`, error);
+                }
                 
                 // Force a page refresh to update the UI
                 console.log(`🔍 BACKGROUND VALIDATION: Forcing page refresh to sync platform status`);
@@ -215,25 +289,40 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
               
               if (!Number.isNaN(endTime) && endTime > now && info.platform === p) {
                 const remainingMinutes = Math.ceil((endTime - now) / 60000);
-                console.log(`🔍 BACKGROUND VALIDATION: Active timer found for ${p} - ${remainingMinutes}min remaining`);
                 
-                // Redirect to processing page for this platform
-                const processingRoute = `/processing/${p}`;
-                if (lastRedirectRef.current !== processingRoute) {
-                  lastRedirectRef.current = processingRoute;
-                  // ✅ SEAMLESS REDIRECT: Navigate without showing validation screen
-                  navigate(processingRoute, {
-                    replace: true,
-                    state: { 
-                      platform: p, 
-                      remainingMinutes,
-                      fromGuardLocalStorage: true,
-                      username: info.username || ''
-                    }
-                  });
+                // ✅ SMART REDIRECT: Only redirect if user is on a conflicting route
+                const currentPath = location.pathname;
+                const isConflictingRoute = (
+                  (p === 'instagram' && (currentPath.includes('/dashboard') || currentPath.includes('/instagram'))) ||
+                  (p === 'twitter' && (currentPath.includes('/twitter-dashboard') || currentPath.includes('/twitter'))) ||
+                  (p === 'facebook' && (currentPath.includes('/facebook-dashboard') || currentPath.includes('/facebook'))) ||
+                  (p === 'linkedin' && (currentPath.includes('/linkedin-dashboard') || currentPath.includes('/linkedin')))
+                );
+                
+                if (isConflictingRoute) {
+                  console.log(`🔍 BACKGROUND VALIDATION: Active timer found for ${p} - ${remainingMinutes}min remaining`);
+                  
+                  // Redirect to processing page for this platform
+                  const processingRoute = `/processing/${p}`;
+                  if (lastRedirectRef.current !== processingRoute) {
+                    lastRedirectRef.current = processingRoute;
+                    // ✅ SEAMLESS REDIRECT: Navigate without showing validation screen
+                    navigate(processingRoute, {
+                      replace: true,
+                      state: { 
+                        platform: p, 
+                        remainingMinutes,
+                        fromGuardLocalStorage: true,
+                        username: info.username || ''
+                      }
+                    });
+                  }
+                  lastValidationRef.current = now; // Update validation timestamp
+                  return; // stop further checks, we're redirecting
+                } else {
+                  // User is not on a conflicting route, just note the active timer
+                  console.log(`🔍 BACKGROUND VALIDATION: Active timer for ${p} but user not on conflicting route - no redirect needed`);
                 }
-                lastValidationRef.current = now; // Update validation timestamp
-                return; // stop further checks, we're redirecting
               }
             } catch (parseError) {
               console.warn(`🔍 BACKGROUND VALIDATION: Error parsing timer data for ${p}:`, parseError);
@@ -329,7 +418,7 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
             backgroundCheck();
           }
         }
-      }, 3000); // Check every 3 seconds (reduced from 2 seconds for efficiency)
+      }, 5000); // ✅ OPTIMIZED: Increased from 3 seconds to 5 seconds for better performance
     };
     
     startBackgroundMonitoring();
@@ -340,7 +429,7 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
       // Small delay to ensure route change is complete
       setTimeout(() => {
         backgroundCheck();
-      }, 100);
+      }, 200); // ✅ OPTIMIZED: Increased from 100ms to 200ms
     }
     
     return () => {
@@ -364,16 +453,15 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
         const platform = e.key.replace('_processing_countdown', '').replace('_processing_info', '');
         const currentPlatform = getCurrentPlatform();
         
-        console.log(`🔍 STORAGE EVENT: Processing-related change detected for key: ${e.key}, platform: ${platform}, current: ${currentPlatform}`);
-        
+        // ✅ OPTIMIZED LOGGING: Only log when there are actual cross-platform changes
         if (platform === currentPlatform && isProtectedRoute()) {
           // Re-run background validation shortly after storage event
           console.log(`🔍 STORAGE EVENT: Re-running background validation for ${platform}`);
-          setTimeout(() => { backgroundCheck(); }, 200);
+          setTimeout(() => { backgroundCheck(); }, 300); // ✅ OPTIMIZED: Increased from 200ms to 300ms
         } else if (isProtectedRoute()) {
           // Even if it's a different platform, check if we need to redirect
           console.log(`🔍 STORAGE EVENT: Cross-platform change detected, checking all platforms`);
-          setTimeout(() => { backgroundCheck(); }, 300);
+          setTimeout(() => { backgroundCheck(); }, 500); // ✅ OPTIMIZED: Increased from 300ms to 500ms
         }
       }
     };
@@ -388,7 +476,7 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
       if (!document.hidden && currentUser?.uid && isProtectedRoute()) {
         console.log(`🔍 VISIBILITY CHANGE: Tab became visible, running background validation`);
         // Small delay to ensure any background sync has completed
-        setTimeout(() => backgroundCheck(), 500);
+        setTimeout(() => backgroundCheck(), 800); // ✅ OPTIMIZED: Increased from 500ms to 800ms
       }
     };
     

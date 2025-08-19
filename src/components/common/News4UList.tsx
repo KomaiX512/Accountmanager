@@ -35,24 +35,9 @@ interface NewsItem {
  * - Smart caching bypass for fresh data
  */
 const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
-  // 🔒 ULTRA-CRITICAL: PERMANENT LOCK - Use useRef for bulletproof locking
-  const lockedAccountHolderRef = useRef<string>('');
-  const lockedPlatformRef = useRef<string>('');
-  
-  // Initialize locks only once
-  if (!lockedAccountHolderRef.current && accountHolder) {
-    lockedAccountHolderRef.current = accountHolder.trim();
-    console.log(`[News4U] 🔒 PERMANENTLY LOCKING account holder to: "${lockedAccountHolderRef.current}"`);
-  }
-  
-  if (!lockedPlatformRef.current && platform) {
-    lockedPlatformRef.current = platform;
-    console.log(`[News4U] 🔒 PERMANENTLY LOCKING platform to: "${lockedPlatformRef.current}"`);
-  }
-
-  // 🛡️ SAFETY CHECK: Validate locked values
-  const lockedAccountHolder = lockedAccountHolderRef.current;
-  const lockedPlatform = lockedPlatformRef.current;
+  // Use live props directly (no permanent locking)
+  const effectiveAccountHolder = useMemo(() => (accountHolder || '').trim(), [accountHolder]);
+  const effectivePlatform = useMemo(() => platform, [platform]);
 
   const [items, setItems] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,7 +48,6 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
   const [openMenuIndex, setOpenMenuIndex] = useState<number | null>(null);
   const [customInputByIndex, setCustomInputByIndex] = useState<Record<number, string>>({});
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
   const [lastFetchTime, setLastFetchTime] = useState<number>(0);
   const [forceRefreshKey, setForceRefreshKey] = useState(0);
   
@@ -267,37 +251,37 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     try {
       const prompt = buildPrompt(newsItem, style, customInstruction);
       
-      console.log(`[News4U] 🚀 Creating ${styleLabel[style]} post for ${lockedAccountHolder} on ${lockedPlatform}`);
+      console.log(`[News4U] 🚀 Creating ${styleLabel[style]} post for ${effectiveAccountHolder} on ${effectivePlatform}`);
       
       const response = await RagService.sendPostQuery(
-        lockedAccountHolder,
+        effectiveAccountHolder,
         prompt,
-        lockedPlatform
+        effectivePlatform
       );
       
       if (response.success) {
-        console.log(`[News4U] ✅ Post created successfully for ${lockedAccountHolder} on ${lockedPlatform}`);
+        console.log(`[News4U] ✅ Post created successfully for ${effectiveAccountHolder} on ${effectivePlatform}`);
         
         // Trigger post refresh event
         const newPostEvent = new CustomEvent('newPostCreated', {
           detail: {
-            username: lockedAccountHolder,
-            platform: lockedPlatform,
+            username: effectiveAccountHolder,
+            platform: effectivePlatform,
             timestamp: Date.now()
           }
         });
         window.dispatchEvent(newPostEvent);
-        console.log(`[News4U] 🔄 Triggered PostCooked refresh event for ${lockedPlatform}`);
+        console.log(`[News4U] 🔄 Triggered PostCooked refresh event for ${effectivePlatform}`);
         
         setToastMessage(`${styleLabel[style]} post created successfully! Check the Cooked Posts section.`);
         setTimeout(() => setToastMessage(null), 4000);
       } else {
-        console.error(`[News4U] ❌ Post creation failed for ${lockedAccountHolder} on ${lockedPlatform}:`, response.error);
+        console.error(`[News4U] ❌ Post creation failed for ${effectiveAccountHolder} on ${effectivePlatform}:`, response.error);
         setToastMessage(response.error || `Failed to create ${styleLabel[style]} post. Please try again.`);
         setTimeout(() => setToastMessage(null), 4000);
       }
     } catch (error) {
-      console.error(`[News4U] ❌ Error creating ${styleLabel[style]} post for ${lockedAccountHolder} on ${lockedPlatform}:`, error);
+      console.error(`[News4U] ❌ Error creating ${styleLabel[style]} post for ${effectiveAccountHolder} on ${effectivePlatform}:`, error);
       setToastMessage(`Failed to create ${styleLabel[style]} post. Please try again.`);
       setTimeout(() => setToastMessage(null), 4000);
     } finally {
@@ -308,7 +292,7 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       });
       setOpenMenuIndex(null);
     }
-  }, [buildPrompt, styleLabel, lockedAccountHolder, lockedPlatform]);
+  }, [buildPrompt, styleLabel, effectiveAccountHolder, effectivePlatform]);
 
   // 🚀 ROBUST: Menu toggle with proper positioning
   const handleToggleMenu = useCallback((anchorEl: HTMLElement, idx: number) => {
@@ -321,21 +305,20 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
   }, [openMenuIndex]);
 
   // 🚀 ULTRA-ROBUST: Enhanced news fetching with bulletproof retry logic
-  const fetchNews = useCallback(async (isRetry = false) => {
+  const fetchNews = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // 🛡️ SECURITY: Always use locked values - NEVER use props directly
-      if (!lockedAccountHolder || !lockedPlatform) {
-        throw new Error('Account holder or platform not properly locked');
+      if (!effectiveAccountHolder || !effectivePlatform) {
+        throw new Error('Account holder or platform missing');
       }
       
       // Force fresh news every time - no caching
-      const baseUrl = `/api/news-for-you/${lockedAccountHolder}?platform=${lockedPlatform}`;
+      const baseUrl = `/api/news-for-you/${effectiveAccountHolder}?platform=${effectivePlatform}`;
       const url = `${baseUrl}&forceRefresh=true&_cb=${Date.now()}&_key=${forceRefreshKey}`;
       
-      console.log(`[News4U] 🔍 Fetching news for ${lockedAccountHolder} on ${lockedPlatform} (retry: ${isRetry}, key: ${forceRefreshKey})`);
+      console.log(`[News4U] 🔍 Fetching news for ${effectiveAccountHolder} on ${effectivePlatform} (key: ${forceRefreshKey})`);
       console.log(`[News4U] 🔍 API URL: ${url}`);
       
       const res = await axios.get(url);
@@ -345,10 +328,10 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       console.log(`[News4U] Raw response data type:`, typeof res.data);
       console.log(`[News4U] Raw response data length:`, Array.isArray(res.data) ? res.data.length : 'Not an array');
       
-      // 🚀 TEST: Check if we have any data at all
+      // If no data, show empty state
       if (!res.data || (Array.isArray(res.data) && res.data.length === 0)) {
-        console.warn(`[News4U] ⚠️ API returned empty data for ${lockedAccountHolder} on ${lockedPlatform}`);
-        setError('API returned empty data - no news files found');
+        console.warn(`[News4U] ⚠️ API returned empty data for ${effectiveAccountHolder} on ${effectivePlatform}`);
+        setItems([]);
         setLoading(false);
         return;
       }
@@ -503,10 +486,7 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       }
       
       console.log(`[News4U] Final processed items:`, validItems);
-      console.log(`[News4U] Total items processed: ${deduped.length}, Selected: ${validItems.length}, Platform: ${lockedPlatform}`);
-      
-      // Reset retry count on successful fetch
-      setRetryCount(0);
+      console.log(`[News4U] Total items processed: ${deduped.length}, Selected: ${validItems.length}, Platform: ${effectivePlatform}`);
       setLastFetchTime(Date.now());
 
     } catch (err: any) {
@@ -515,73 +495,44 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       console.error(`[News4U] ❌ Error status:`, err.response?.status);
       
       if (err.response?.status === 404) {
-        const errorMsg = 'No news available yet';
-        setError(errorMsg);
-        
-        // 🚀 ENHANCED AUTOMATIC RETRY: Exponential backoff with max retries
-        if (!isRetry && retryCount < 3) {
-          const delayMs = Math.min(2000 * Math.pow(2, retryCount), 10000); // 2s, 4s, 8s, max 10s
-          console.log(`[News4U] 🔄 No news available for ${lockedAccountHolder}, attempting automatic retry ${retryCount + 1}/3 in ${delayMs}ms`);
-          setRetryCount(prev => prev + 1);
-          
-          // Wait before retry with exponential backoff
-          fetchTimeoutRef.current = setTimeout(() => {
-            fetchNews(true);
-          }, delayMs);
-        } else if (retryCount >= 3) {
-          console.warn(`[News4U] ⚠️ Max retries (3) reached for ${lockedAccountHolder} on ${lockedPlatform}. News may not be available yet.`);
-        }
+        // Strict: no fallback, just show empty
+        setItems([]);
+        setError('');
       } else {
         setError('Failed to load news');
       }
     } finally {
       setLoading(false);
     }
-  }, [lockedAccountHolder, lockedPlatform, retryCount, forceRefreshKey]);
+  }, [effectiveAccountHolder, effectivePlatform, forceRefreshKey]);
 
   // 🚀 ROBUST: Initial fetch and cleanup
   useEffect(() => {
+    // Clear current items and errors when user/platform changes
+    setItems([]);
+    setError(null);
     fetchNews();
-    
     return () => {
-      // Cleanup timeout on unmount
       if (fetchTimeoutRef.current) {
         clearTimeout(fetchTimeoutRef.current);
       }
     };
-  }, [fetchNews]);
+  }, [fetchNews, effectiveAccountHolder, effectivePlatform]);
 
   // 🚀 ROBUST: Manual refresh function
   const handleManualRefresh = useCallback(() => {
     if (fetchTimeoutRef.current) {
       clearTimeout(fetchTimeoutRef.current);
     }
-    setRetryCount(0);
-    setForceRefreshKey(prev => prev + 1); // Force new fetch
+    setForceRefreshKey(prev => prev + 1);
     fetchNews();
   }, [fetchNews]);
 
   // 🚀 ROBUST: Auto-refresh when navigating back to dashboard
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (!document.hidden && Date.now() - lastFetchTime > 30000) { // 30 seconds
-        console.log(`[News4U] 🔄 Page became visible, refreshing news if stale`);
-        handleManualRefresh();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [lastFetchTime, handleManualRefresh]);
+  // Removed auto-refresh on visibility to avoid unwanted re-fetches
 
   // 🚀 ROBUST: Force refresh when platform changes (navigation)
-  useEffect(() => {
-    // If platform changes, force refresh
-    if (platform !== lockedPlatform) {
-      console.log(`[News4U] 🔄 Platform changed from ${lockedPlatform} to ${platform}, forcing refresh`);
-      setForceRefreshKey(prev => prev + 1);
-    }
-  }, [platform, lockedPlatform]);
+  // On platform change, refetch is handled by dependency array above
 
   if (loading) {
     return (
@@ -600,25 +551,23 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
         <div className="news4u-error">
           <FaRss className="error-icon" />
           <span>{error}</span>
-          {retryCount > 0 && (
-            <button 
-              onClick={handleManualRefresh}
-              className="retry-btn"
-              style={{
-                background: 'transparent',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                color: 'rgba(255, 255, 255, 0.8)',
-                padding: '4px 8px',
-                borderRadius: '4px',
-                fontSize: '0.7rem',
-                cursor: 'pointer',
-                marginTop: '4px'
-              }}
-            >
-              <FaRedo style={{ marginRight: '4px' }} />
-              Retry
-            </button>
-          )}
+          <button 
+            onClick={handleManualRefresh}
+            className="retry-btn"
+            style={{
+              background: 'transparent',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              color: 'rgba(255, 255, 255, 0.8)',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              fontSize: '0.7rem',
+              cursor: 'pointer',
+              marginTop: '4px'
+            }}
+          >
+            <FaRedo style={{ marginRight: '4px' }} />
+            Retry
+          </button>
         </div>
       </motion.div>
     );
@@ -663,17 +612,16 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
             <div style={{ marginBottom: '8px', fontWeight: 'bold', color: '#00ffcc' }}>
               🔍 Debug Info:
             </div>
-            <div>Account: <strong>{lockedAccountHolder}</strong></div>
-            <div>Platform: <strong>{lockedPlatform}</strong></div>
-            <div>Retry Count: <strong>{retryCount}</strong></div>
+            <div>Account: <strong>{effectiveAccountHolder}</strong></div>
+            <div>Platform: <strong>{effectivePlatform}</strong></div>
             <div>Last Fetch: <strong>{lastFetchTime ? new Date(lastFetchTime).toLocaleTimeString() : 'Never'}</strong></div>
             
             {/* 🚀 TEST: Manual API test button */}
             <button 
               onClick={async () => {
                 try {
-                  console.log(`[News4U] 🧪 Manual API test for ${lockedAccountHolder} on ${lockedPlatform}`);
-                  const testUrl = `/api/news-for-you/${lockedAccountHolder}?platform=${lockedPlatform}&forceRefresh=true&_cb=${Date.now()}`;
+                  console.log(`[News4U] 🧪 Manual API test for ${effectiveAccountHolder} on ${effectivePlatform}`);
+                  const testUrl = `/api/news-for-you/${effectiveAccountHolder}?platform=${effectivePlatform}&forceRefresh=true&_cb=${Date.now()}`;
                   console.log(`[News4U] 🧪 Test URL:`, testUrl);
                   
                   const testRes = await axios.get(testUrl);

@@ -342,8 +342,8 @@ const MainDashboard: React.FC = () => {
   // ✅ BULLETPROOF TIMER SYSTEM - Synchronized with ProcessingLoadingState
   const getProcessingCountdownKey = (platformId: string) => `${platformId}_processing_countdown`;
 
-  // Function to complete platform loading - MOVED HERE to fix dependency order
-  const completePlatformLoading = useCallback((platformId: string) => {
+  // Function to complete platform loading - marks as completed
+  const completePlatformLoading = useCallback((platformId: string, reason?: string) => {
     console.log(`🔥 TIMER COMPLETE: Completing ${platformId} processing`);
     
     // Mark platform as completed
@@ -667,8 +667,10 @@ const MainDashboard: React.FC = () => {
         if (loadingState && !loadingState.isComplete) {
           const remainingMs = Math.max(0, loadingState.endTime - Date.now());
           if (remainingMs === 0) {
-            console.log(`🔥 PLATFORM COMPLETION DETECTED: ${platformId} has finished loading, marking as completed`);
-            completePlatformLoading(platformId);
+            console.log(`🔥 PLATFORM LOADING COMPLETED: ${platformId}`);
+      
+      // Mark as completed in state
+      setPlatformLoadingStates(prev => ({...prev, [platformId]: {...prev[platformId], isComplete: true}}));
             hasCompletion = true;
           }
         }
@@ -1793,6 +1795,49 @@ const MainDashboard: React.FC = () => {
     window.addEventListener('platformReset', handlePlatformReset as EventListener);
     return () => {
       window.removeEventListener('platformReset', handlePlatformReset as EventListener);
+    };
+  }, [currentUser?.uid, fetchRealTimeNotifications]);
+
+  // ✅ CRITICAL FIX: Handle processing exit events to prevent re-navigation glitch
+  useEffect(() => {
+    const handleProcessingExit = (event: CustomEvent) => {
+      const { platform, userId } = event.detail;
+      
+      if (userId !== currentUser?.uid) return;
+      
+      console.log(`[MainDashboard] 🔥 PROCESSING EXIT: Handling exit for ${platform}`);
+      
+      // Update platformLoadingStates to mark as completed/not loading
+      setPlatformLoadingStates(prev => {
+        const updated = { ...prev };
+        if (updated[platform]) {
+          updated[platform] = {
+            ...updated[platform],
+            isComplete: true
+          };
+        }
+        return updated;
+      });
+      
+      // Clear any remaining timer data from localStorage
+      try {
+        localStorage.removeItem(`${platform}_processing_countdown`);
+        localStorage.removeItem(`${platform}_processing_info`);
+        console.log(`[MainDashboard] 🔥 PROCESSING EXIT: Cleared timer data for ${platform}`);
+      } catch (error) {
+        console.warn(`[MainDashboard] ⚠️ PROCESSING EXIT: Error clearing timer data:`, error);
+      }
+      
+      // Force immediate platform status refresh to update UI
+      setTimeout(() => {
+        fetchRealTimeNotifications();
+        console.log(`[MainDashboard] 🔥 PROCESSING EXIT: Refreshed platform status for ${platform}`);
+      }, 100);
+    };
+    
+    window.addEventListener('processingExit', handleProcessingExit as EventListener);
+    return () => {
+      window.removeEventListener('processingExit', handleProcessingExit as EventListener);
     };
   }, [currentUser?.uid, fetchRealTimeNotifications]);
 

@@ -1286,39 +1286,25 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
     // Generate standardized prefix using centralized schema manager
     const prefix = PlatformSchemaManager.buildPath(module, platform, username, additional);
     
-    // 🔥 ENHANCED HOTFIX: Support ALL news file patterns including timestamped files
-    // If we are fetching the news module, pull from ALL known patterns and merge.
+    // 🔥 HOTFIX: For news module, support known module aliases but KEEP user scoping
+    // Always build alt prefixes via PlatformSchemaManager to scope to /platform/username/
     const altPrefixes = [];
     if (module === 'news_for_you') {
-      // Support multiple news file patterns
-      const newForYou = 'news_for_you';
-      const dashed = 'news-for-you';
-      const newForYouAlt = 'NewForYou';
-      
-      if (newForYou !== prefix && newForYou !== dashed) {
-        altPrefixes.push(newForYou);
-      }
-      if (dashed !== prefix && dashed !== newForYou) {
-        altPrefixes.push(dashed);
-      }
-      if (newForYouAlt !== prefix && newForYouAlt !== dashed && newForYouAlt !== newForYou) {
-        altPrefixes.push(newForYouAlt);
+      const moduleAliases = ['news_for_you', 'news-for-you', 'NewForYou'];
+      for (const alias of moduleAliases) {
+        try {
+          const built = PlatformSchemaManager.buildPath(alias, platform, username);
+          if (built !== prefix && !altPrefixes.includes(built)) {
+            altPrefixes.push(built);
+          }
+        } catch (_) {
+          // Ignore schema build issues for aliases
+        }
       }
 
-      // 🚀 ENHANCED: Support timestamped news files with pattern: news_YYYYMMDD_HHMMSS_USERNAME.json
-      // This covers files like: news_20250809_120145_KOMAIL.json
-      const timestampedPrefix = `news_`;
-      if (timestampedPrefix !== prefix) {
-        altPrefixes.push(timestampedPrefix);
-      }
-      
-      // 🚀 NEW: Support additional news patterns that might exist
-      const additionalPatterns = ['news', 'News', 'NEWS'];
-      additionalPatterns.forEach(pattern => {
-        if (pattern !== prefix && !altPrefixes.includes(pattern)) {
-          altPrefixes.push(pattern);
-        }
-      });
+      // Allow timestamped root files like: news_YYYYMMDD_HHMMSS_USERNAME.json (global)
+      // We'll fetch with the bare prefix but strictly filter by username later
+      altPrefixes.push('news_');
     }
  
     // Check if we should use cache based on the enhanced caching rules
@@ -1348,41 +1334,41 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
       try {
         const altFiles = await listJsonObjects(alt);
         files = files.concat(altFiles);
-      } catch (err) {
+      } catch (_) {
         // Ignore missing alt prefix
       }
     }
 
-    // 🚀 ENHANCED: Special handling for news files with timestamped patterns
+    // 🚀 Strict user scoping for news files (no global fallback)
     if (module === 'news_for_you') {
-      // Filter files to match the username specifically for timestamped news files
-      // Pattern: news_YYYYMMDD_HHMMSS_USERNAME.json
       const userSpecificFiles = files.filter(file => {
         const fileName = file.Key.split('/').pop() || file.Key;
-        
-        // Match standard prefixes OR timestamped patterns containing the username
-        const standardMatch = fileName.startsWith('news_for_you') || 
-                            fileName.startsWith('news-for-you') || 
-                            fileName.startsWith('NewForYou');
-        
-        // 🚀 FIXED: Handle both uppercase and lowercase username matching
-        // Files like: news_20250809_120145_KOMAIL.json
-        // Username might be: komail, KOMAIL, or Komail
-        const timestampedMatch = fileName.startsWith('news_') && 
-                               fileName.endsWith('.json') &&
-                               (fileName.includes(`_${username.toUpperCase()}`) || 
-                                fileName.includes(`_${username.toLowerCase()}`) ||
-                                fileName.includes(`_${username}`));
-        
+        const pathScoped = file.Key.includes(`/${platform}/${username}/`);
+
+        // Standard per-user news files live under user-scoped path
+        const standardMatch = pathScoped && (
+          fileName.startsWith('news_for_you') ||
+          fileName.startsWith('news-for-you') ||
+          fileName.startsWith('NewForYou')
+        );
+
+        // Timestamped global files: require username token in the filename
+        const usernameLower = String(username).toLowerCase();
+        const fileNameLower = fileName.toLowerCase();
+        const timestampedMatch = fileNameLower.startsWith('news_') &&
+          fileNameLower.endsWith('.json') &&
+          fileNameLower.includes(`_${usernameLower}`);
+
         return standardMatch || timestampedMatch;
       });
-      
-      // If we found user-specific files, use those; otherwise fall back to all files
+
       if (userSpecificFiles.length > 0) {
         files = userSpecificFiles;
         console.log(`[${new Date().toISOString()}] Found ${userSpecificFiles.length} user-specific news files for ${username}`);
       } else {
-        console.log(`[${new Date().toISOString()}] No user-specific news files found for ${username}, using all ${files.length} files`);
+        // No fallback to all files. Return none for this user.
+        console.log(`[${new Date().toISOString()}] No user-specific news files found for ${username}, returning none`);
+        files = [];
       }
     }
 

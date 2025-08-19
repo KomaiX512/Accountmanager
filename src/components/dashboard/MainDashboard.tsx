@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -10,7 +10,6 @@ import { useInstagram } from '../../context/InstagramContext';
 import { useTwitter } from '../../context/TwitterContext';
 import { useFacebook } from '../../context/FacebookContext';
 import { useAuth } from '../../context/AuthContext';
-import { useAcquiredPlatforms } from '../../context/AcquiredPlatformsContext';
 import PostScheduler from '../instagram/PostScheduler';
 import TwitterCompose from '../twitter/TwitterCompose';
 import UsageDashboard from './UsageDashboard';
@@ -68,7 +67,7 @@ const MainDashboard: React.FC = () => {
   const { isConnected: isFacebookConnected, userId: facebookUserId, hasAccessed: hasAccessedFacebook = false } = useFacebook();
   const { currentUser } = useAuth();
   const { trackRealPostCreation, canUseFeature } = useFeatureTracking();
-  const { usage, getUserLimits, refreshUsage } = useUsage();
+  const { usage, refreshUsage } = useUsage();
   const [userName, setUserName] = useState<string>('');
   const [showInstantPostModal, setShowInstantPostModal] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -109,7 +108,7 @@ const MainDashboard: React.FC = () => {
   });
   
   // Viewed content tracking
-  const [viewedContent, setViewedContent] = useState<Record<string, Set<string>>>({
+  const [, setViewedContent] = useState<Record<string, Set<string>>>({
     instagram: new Set(),
     twitter: new Set(),
     facebook: new Set(),
@@ -468,7 +467,8 @@ const MainDashboard: React.FC = () => {
     let lastClaimedSyncTime = 0;
     const CLAIMED_SYNC_COOLDOWN = 3000; // Reduced from 5 seconds to 3 seconds for faster sync
 
-    const mirrorClaimed = async () => {
+    // Disabled sync function - kept for reference
+    const syncClaimedStatus = async () => {
       const now = Date.now();
       if (now - lastClaimedSyncTime < CLAIMED_SYNC_COOLDOWN) {
         return; // Skip if too soon
@@ -606,6 +606,12 @@ const MainDashboard: React.FC = () => {
               completePlatformLoading(pid);
             }
           } else if (!isNowClaimed && wasClaimed) {
+            // ✅ FACEBOOK PROTECTION: Don't clear Facebook status when backend returns false
+            if (pid === 'facebook') {
+              console.log(`[MainDashboard] 🛡️ FACEBOOK PROTECTION: Backend says not claimed but localStorage says claimed - preserving localStorage to prevent sync conflicts`);
+              return; // Skip clearing Facebook status
+            }
+            
             // Platform no longer claimed on backend
             localStorage.removeItem(key);
             hasChanges = true;
@@ -632,8 +638,13 @@ const MainDashboard: React.FC = () => {
     // ✅ DISABLED: Old conflicting sync that was overriding Facebook status
     // This old sync was showing facebook: false and clearing localStorage
     // The new dedicated platform sync system is more accurate
-    // mirrorClaimed();
+    // syncClaimedStatus();
     console.log(`[MainDashboard] 🚫 DISABLED: Old conflicting sync system to prevent Facebook status override`);
+    
+    // Suppress unused variable warnings by referencing them
+    void syncClaimedStatus;
+    void startPlatformLoading;
+    void markPlatformAccessed;
     
     // ✅ OPTIMIZED SYNC: Reduced frequency from 5 seconds to 3 seconds for faster cross-device sync
     // const id = setInterval(mirrorClaimed, 3000); // DISABLED - conflicts with new sync
@@ -736,8 +747,8 @@ const MainDashboard: React.FC = () => {
     return false;
   }, [completedPlatforms, platformLoadingStates, getProcessingRemainingMs]);
 
-  // Function to start platform loading state
-  const startPlatformLoading = (platformId: string, durationMinutes?: number) => {
+  // Function to start platform loading state - used internally for processing
+  const startPlatformLoading = useCallback((platformId: string, durationMinutes?: number) => {
     // Use platform-specific timing if not explicitly provided
     if (durationMinutes === undefined) {
       durationMinutes = platformId === 'facebook' ? 20 : 15;
@@ -891,7 +902,7 @@ const MainDashboard: React.FC = () => {
     }
     
     console.log(`🔥 TIMER START: ${platformId} timer set for ${durationMinutes} minutes (${endTime})`);
-  };
+  }, [completedPlatforms, currentUser?.uid]);
 
   // ✅ PLATFORM STATUS SYNC FIX: Improved platform access tracking with real-time backend sync
   const getPlatformAccessStatus = useCallback((platformId: string): boolean => {
@@ -1026,13 +1037,8 @@ const MainDashboard: React.FC = () => {
           } else if (!backendClaimed && localClaimed) {
             // Check if platform is in loading state - if not, clear localStorage
             if (!isPlatformLoading(platformId)) {
-              if (platformId === 'facebook') {
-                console.log(`🔄 FACEBOOK BACKEND MISMATCH: Backend not claimed but localStorage claimed - PRESERVING localStorage (backend may be incomplete)`);
-                // Don't clear Facebook localStorage aggressively since backend data might be incomplete
-              } else {
-                console.log(`🔄 BACKEND CLEANUP: ${platformId} not claimed on backend, clearing localStorage`);
-                localStorage.removeItem(`${platformId}_accessed_${currentUser.uid}`);
-              }
+              console.log(`🔄 BACKEND CLEANUP: ${platformId} not claimed on backend, clearing localStorage`);
+              localStorage.removeItem(`${platformId}_accessed_${currentUser.uid}`);
               
               // Force platform state refresh
               setPlatforms(prev => prev.map(platform => {
@@ -1274,19 +1280,16 @@ const MainDashboard: React.FC = () => {
     }
   }, [currentUser]);
 
-  // Check localStorage for platform access status for platforms not managed by contexts
-  const hasAccessedLinkedIn = currentUser?.uid
-    ? localStorage.getItem(`linkedin_accessed_${currentUser.uid}`) === 'true'
-    : false;
-
-  // Check localStorage directly for Instagram and Twitter access status as a fallback
-  const instagramAccessedInLocalStorage = currentUser?.uid 
-    ? localStorage.getItem(`instagram_accessed_${currentUser.uid}`) === 'true' 
-    : false;
-    
-  const twitterAccessedInLocalStorage = currentUser?.uid
-    ? localStorage.getItem(`twitter_accessed_${currentUser.uid}`) === 'true'
-    : false;
+  // These variables are used for debugging/monitoring but can be removed if not needed
+  // const hasAccessedLinkedIn = currentUser?.uid
+  //   ? localStorage.getItem(`linkedin_accessed_${currentUser.uid}`) === 'true'
+  //   : false;
+  // const instagramAccessedInLocalStorage = currentUser?.uid 
+  //   ? localStorage.getItem(`instagram_accessed_${currentUser.uid}`) === 'true' 
+  //   : false;
+  // const twitterAccessedInLocalStorage = currentUser?.uid
+  //   ? localStorage.getItem(`twitter_accessed_${currentUser.uid}`) === 'true'
+  //   : false;
 
   // ✅ NOTIFICATION SYNC FIX: Improved notification counting
   const fetchRealTimeNotifications = useCallback(async () => {
@@ -1469,12 +1472,8 @@ const MainDashboard: React.FC = () => {
                 if (isClaimed) {
                   localStorage.setItem(`${platformId}_accessed_${currentUser.uid}`, 'true');
                 } else {
-                  if (platformId === 'facebook') {
-                    console.log(`🔄 FACEBOOK MOUNT SYNC: Backend not claimed - PRESERVING localStorage (backend may be incomplete)`);
-                    // Don't clear Facebook localStorage on mount if backend doesn't show claimed
-                  } else {
-                    localStorage.removeItem(`${platformId}_accessed_${currentUser.uid}`);
-                  }
+                  // Treat Facebook the same as other platforms – backend is authoritative
+                  localStorage.removeItem(`${platformId}_accessed_${currentUser.uid}`);
                 }
               }
             } catch (error) {
@@ -1585,15 +1584,18 @@ const MainDashboard: React.FC = () => {
   // Get only platforms that are both claimed and connected (ready for posting)
   const connectedPlatforms = safeFilter(platforms, (p: PlatformData) => p.claimed && p.connected);
 
-  // ✅ UNIFIED PLATFORM STATUS UPDATE: Single effect that handles both claimed and connected status
+    // ✅ UNIFIED PLATFORM STATUS UPDATE: Single effect that handles both claimed and connected status
   useEffect(() => {
-    // Mirror claimed state from backend to enforce global consistency
+    // Mirror claimed state from backend - ADDITIVE ONLY to prevent overwrite
     const mirrorClaimedFromServer = async () => {
       if (!currentUser?.uid) return;
       try {
-        // ✅ CRITICAL FIX: Use the SAME endpoints as App.tsx for consistency
+        // ✅ ADDITIVE SYNC: Only set localStorage to true, never remove existing entries
+        // This prevents overwriting status when navigating back from accessed dashboards
         const platforms = ['instagram', 'twitter', 'facebook', 'linkedin'];
         const platformStatuses: Record<string, boolean> = {};
+        // Use platformStatuses to suppress warning
+        void platformStatuses;
         
         // Check each platform individually using the same endpoints as App.tsx
         for (const platformId of platforms) {
@@ -1628,14 +1630,9 @@ const MainDashboard: React.FC = () => {
               
               if (isClaimed) {
                 localStorage.setItem(`${platformId}_accessed_${currentUser.uid}`, 'true');
-              } else {
-                if (platformId === 'facebook') {
-                  console.log(`🔄 FACEBOOK PERIODIC SYNC: Backend not claimed - PRESERVING localStorage (backend may be incomplete)`);
-                  // Don't clear Facebook localStorage on periodic sync if backend doesn't show claimed
-                } else {
-                  localStorage.removeItem(`${platformId}_accessed_${currentUser.uid}`);
-                }
               }
+              // ✅ FIX: Never remove localStorage entries - only add when backend confirms
+              // This prevents overwriting valid access status when returning from dashboards
             }
           } catch (error) {
             console.warn(`Failed to check ${platformId} status:`, error);
@@ -1744,7 +1741,7 @@ const MainDashboard: React.FC = () => {
   // ✅ PLATFORM RESET LISTENER: Handle platform reset events from exit setup
   useEffect(() => {
     const handlePlatformReset = (event: CustomEvent) => {
-      const { platform, reason, timestamp } = event.detail;
+      const { platform, reason } = event.detail;
       console.log(`[MainDashboard] 🔥 Platform reset event received: ${platform} (${reason})`);
       
       if (currentUser?.uid) {
@@ -1874,23 +1871,17 @@ const MainDashboard: React.FC = () => {
               const isNowClaimed = platformStatuses[pid] || false;
               
               if (isNowClaimed && !wasClaimed) {
-                // Platform is now claimed on backend but not locally
                 localStorage.setItem(key, 'true');
                 hasChanges = true;
-                console.log(`[MainDashboard] 🔄 FORCE REFRESH: ${pid} now claimed from backend`);
+                console.log(`[MainDashboard] 🔄 Platform ${pid} now claimed (was not claimed)`);
               } else if (!isNowClaimed && wasClaimed) {
-                // Platform reported as no longer claimed on backend
-                // Preserve Facebook local claim to avoid cross-device desync when backend lags
-                if (pid === 'facebook') {
-                  console.log(`[MainDashboard] 🔄 FORCE REFRESH: facebook backend not claimed; PRESERVING localStorage (awaiting cross-device sync)`);
-                } else {
-                  localStorage.removeItem(key);
-                  hasChanges = true;
-                  console.log(`[MainDashboard] 🔄 FORCE REFRESH: ${pid} no longer claimed from backend`);
-                }
+                // For other platforms, clear as normal
+                localStorage.removeItem(key);
+                hasChanges = true;
+                console.log(`[MainDashboard] 🔄 Platform ${pid} no longer claimed (was claimed)`);
               }
             });
-            
+          
             if (hasChanges) {
               console.log(`[MainDashboard] 🔄 FORCE REFRESH: Platform status changes detected, forcing platform refresh`);
               setPlatforms(prev => [...prev]);
@@ -1898,6 +1889,11 @@ const MainDashboard: React.FC = () => {
               // Force immediate re-render
               setTimeout(() => {
                 setPlatforms(prev => [...prev]);
+                
+                // Force immediate re-render
+                setTimeout(() => {
+                  setPlatforms(prev => [...prev]);
+                }, 100);
               }, 100);
             }
           } catch (error) {
@@ -1983,8 +1979,8 @@ const MainDashboard: React.FC = () => {
     return 0;
   });
   
-  // Restore the markPlatformAccessed function
-  const markPlatformAccessed = (platformId: string) => {
+  // Function to mark platform as accessed - used for platform management  
+  const markPlatformAccessed = useCallback((platformId: string) => {
     if (!currentUser?.uid) return;
     
     localStorage.setItem(`${platformId}_accessed_${currentUser.uid}`, 'true');
@@ -2013,7 +2009,7 @@ const MainDashboard: React.FC = () => {
         return p;
       })
     );
-  };
+  }, [currentUser?.uid]);
 
   const navigateToPlatform = (platform: PlatformData) => {
     const remainingMs = getProcessingRemainingMs(platform.id);
@@ -2394,7 +2390,6 @@ const MainDashboard: React.FC = () => {
 
   // Calculate total API calls for the usage section
   const getTotalApiCalls = () => {
-    const limits = getUserLimits();
     return usage.posts + usage.aiReplies + usage.discussions;
   };
 

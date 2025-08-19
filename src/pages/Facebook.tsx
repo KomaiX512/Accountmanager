@@ -170,6 +170,24 @@ const Facebook: React.FC = () => {
   }, [currentUser?.uid, navigate]); // Include navigate in dependencies
 
   const handleSubmitSuccess = (username: string, competitors: string[], accountType: 'branding' | 'non-branding') => {
+    // ✅ Immediately mark Facebook as claimed on backend for global cross-device sync
+    if (currentUser?.uid) {
+      try {
+        // Persist claimed status to user-status endpoint (source used by routes/guards)
+        axios.post(`/api/user-facebook-status/${currentUser.uid}`, {
+          facebook_username: username
+        }).then(() => {
+          // Mirror to localStorage for instant consistency on this device
+          try {
+            localStorage.setItem(`facebook_accessed_${currentUser.uid}`, 'true');
+            localStorage.setItem(`facebook_username_${currentUser.uid}`, username);
+            localStorage.setItem(`facebook_account_type_${currentUser.uid}`, accountType);
+            localStorage.setItem(`facebook_competitors_${currentUser.uid}`, JSON.stringify(competitors || []));
+          } catch {}
+        }).catch(() => {});
+      } catch {}
+    }
+
     if (accountType === 'branding') {
       navigate('/facebook-dashboard', { 
         state: { 

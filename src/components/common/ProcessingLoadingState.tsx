@@ -603,6 +603,15 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
                   });
                 }
               } catch {}
+
+              // (3) Proactively clear backend processing status (avoids any race on next reads)
+              try {
+                fetch(`/api/processing-status/${currentUser.uid}`, {
+                  method: 'DELETE',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ platform })
+                }).catch(() => {});
+              } catch {}
             }
             
             console.log(`🔥 BULLETPROOF TIMER: Completed ${platform} processing`);

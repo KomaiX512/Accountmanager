@@ -277,6 +277,16 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
         headers: { 'Content-Type': 'application/json' },
         timeout: 30000,
       });
+      
+      // ✅ CRITICAL FIX: Also save to user-facebook-status endpoint for MainDashboard sync
+      await axios.post(`/api/user-facebook-status/${currentUser.uid}`, {
+        facebook_username: confirmationData.accountData.name
+      }, {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 10000,
+      });
+      
+      console.log(`[FB_EntryUsernames] ✅ Facebook status persisted to backend for user ${currentUser.uid}`);
 
       if (response.status === 200) {
         console.log('Account info saved successfully to R2!');
@@ -314,6 +324,7 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
           confirmationData.accountData.name
         );
         
+        console.log(`[FB_EntryUsernames] ✅ COMPLETE: Account info + status both saved to backend`);
         showMessage('Submission successful', 'success');
         
         // Start the processing phase using unified ProcessingContext

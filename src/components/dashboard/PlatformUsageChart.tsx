@@ -42,11 +42,6 @@ const PlatformUsageChart: React.FC<PlatformUsageChartProps> = ({ className }) =>
       name: 'Twitter',
       color: '#1DA1F2', 
       icon: '/icons/twitter.svg'
-    },
-    account: {
-      name: 'Twitter',
-      color: '#1DA1F2',
-      icon: '/icons/twitter.svg'
     }
   };
 
@@ -60,10 +55,39 @@ const PlatformUsageChart: React.FC<PlatformUsageChartProps> = ({ className }) =>
       );
       
       const data = response.data;
-      setPlatformUsage(data.platforms || {});
-      setTotalActivity(data.totalActivity || 0);
       
-      console.log('[PlatformUsageChart] Fetched platform usage data:', data);
+      // Filter out 'account' platform since it represents general account activity, not actual Twitter usage
+      // Only show actual social media platform usage (instagram, facebook, twitter)
+      const filteredPlatforms = { ...data.platforms };
+      if (filteredPlatforms.account) {
+        delete filteredPlatforms.account;
+      }
+      
+      // Recalculate total activity and percentages without account platform
+      const filteredTotal = Object.values(filteredPlatforms).reduce((sum: number, platform: any) => sum + platform.count, 0);
+      
+      // Recalculate percentages based on filtered total
+      const recalculatedPlatforms: Record<string, PlatformUsageData> = {};
+      for (const [platform, data] of Object.entries(filteredPlatforms)) {
+        const platformData = data as PlatformUsageData;
+        recalculatedPlatforms[platform] = {
+          count: platformData.count,
+          percentage: filteredTotal > 0 ? Math.round((platformData.count / filteredTotal) * 100) : 0
+        };
+      }
+      
+      // Add Twitter with 0 usage if not present
+      if (!recalculatedPlatforms.twitter) {
+        recalculatedPlatforms.twitter = {
+          count: 0,
+          percentage: 0
+        };
+      }
+      
+      setPlatformUsage(recalculatedPlatforms);
+      setTotalActivity(filteredTotal);
+      
+      console.log('[PlatformUsageChart] Fetched platform usage data (filtered):', { platforms: recalculatedPlatforms, totalActivity: filteredTotal });
     } catch (error) {
       console.error('[PlatformUsageChart] Error fetching platform usage:', error);
       // Set empty data on error

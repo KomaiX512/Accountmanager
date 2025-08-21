@@ -1929,28 +1929,29 @@ h2 {
 .mobile-floating-actions {
   display: none;
   position: fixed;
-  bottom: 20px;
-  right: 20px;
+  bottom: 16px;
+  right: 16px;
   z-index: 999997;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+  opacity: 0.95;
 }
 
 .mobile-floating-btn {
-  width: 56px;
-  height: 56px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 255, 204, 0.1);
+  border: 1.5px solid rgba(0, 255, 204, 0.3);
   backdrop-filter: blur(15px);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   color: #00ffcc;
   font-size: 20px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
 
 .mobile-floating-btn:hover {
@@ -1960,30 +1961,18 @@ h2 {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
-.mobile-floating-btn:active {
-  transform: translateY(0);
-}
-
-.mobile-floating-btn.chat-btn {
-  color: #00ffcc;
-}
-
-.mobile-floating-btn.image-btn {
-  color: #ff6b6b;
-}
-
-.mobile-floating-btn.profile-btn {
-  color: #4CAF50;
-}
-
 /* ✨ DESKTOP - HIDE MOBILE MENU */
 @media (min-width: 768px) {
   .mobile-profile-menu {
     display: none !important;
   }
+  
+  .mobile-floating-actions {
+    display: none !important;
+  }
 }
 
-/* 🍎 APPLE-INSPIRED MOBILE UI - STUNNING & PROFESSIONAL */
+/* 🚀 OPTIMIZED MOBILE UI - MINIMAL SPACING */
 @media (max-width: 699px) and (orientation: portrait) {
   .dashboard-wrapper {
     padding: 0;
@@ -1996,18 +1985,21 @@ h2 {
   }
 
   .welcome-header {
-    padding: 20px 16px 16px;
+    padding: 12px 16px 8px;
     text-align: center;
-    background: rgba(255, 255, 255, 0.02);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(26, 26, 46, 0.9);
     backdrop-filter: blur(20px);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
   }
 
   .welcome-text {
-    font-size: 1.8rem;
-    font-weight: 800;
-    margin-bottom: 4px;
-    letter-spacing: -0.5px;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0;
+    line-height: 1.2;
+    letter-spacing: -0.3px;
   }
 
   .welcome-subtext {
@@ -2040,13 +2032,12 @@ h2 {
 
   /* 🍎 PROFILE SECTION - APPLE CARD STYLE */
   .profile-metadata {
-    background: rgba(255, 255, 255, 0.08);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    padding: 20px 16px;
+    background: rgba(30, 30, 50, 0.9);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 12px 16px;
     backdrop-filter: blur(20px);
-    position: sticky;
-    top: 0;
-    z-index: 100;
+    position: relative;
+    margin: 0;
   }
 
   .profile-bar {
@@ -2057,10 +2048,10 @@ h2 {
   }
 
   .profile-pic-bar {
-    width: 52px;
-    height: 52px;
+    width: 44px;
+    height: 44px;
     border: 2px solid rgba(0, 255, 204, 0.3);
-    box-shadow: 0 4px 12px rgba(0, 255, 204, 0.2);
+    box-shadow: 0 2px 8px rgba(0, 255, 204, 0.2);
   }
 
   .profile-pic-fallback {
@@ -2184,16 +2175,17 @@ h2 {
 
   /* 🍎 EXPANDABLE MODULES - APPLE CARD DESIGN */
   .notifications, .strategies, .competitor-analysis, .news4u {
-    background: rgba(255, 255, 255, 0.06);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 12px; /* Unify rounding across modules on mobile */
-    margin: 0;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: rgba(30, 30, 50, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    margin: 6px 12px;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
     position: relative;
     cursor: pointer;
-    /* CRITICAL FIX: Ultra-compact height to eliminate gaps */
-    height: 32px; /* tighter header height */
+    height: 44px;
   }
 
   /* Post-cooked module - always expanded, no cursor pointer */

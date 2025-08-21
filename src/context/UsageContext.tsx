@@ -1,26 +1,28 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
-import UserService from '../services/UserService';
 
 interface UsageStats {
   posts: number;
   discussions: number;
   aiReplies: number;
   campaigns: number;
+  views: number;
   resets: number;
 }
 
 interface UsageContextType {
   usage: UsageStats;
-  incrementUsage: (feature: keyof UsageStats, platform?: string) => Promise<void>;
+  incrementUsage: (feature: keyof UsageStats, platform?: string, count?: number) => Promise<void>;
   resetUsage: () => void;
   resetDashboard: () => void;
   getUsageForFeature: (feature: keyof UsageStats) => number;
-  trackFeatureUsage: (feature: keyof UsageStats, platform: string, action: string) => Promise<void>;
+  trackFeatureUsage: (feature: keyof UsageStats, platform: string, action: string, count?: number) => Promise<void>;
   isFeatureBlocked: (feature: keyof UsageStats) => boolean;
-  getUserLimits: () => { posts: number; discussions: number; aiReplies: number; campaigns: number; resets: number };
+  getUserLimits: () => { posts: number; discussions: number; aiReplies: number; campaigns: number; views: number; resets: number };
   refreshUsage: () => Promise<void>;
   isLoading: boolean;
+  currentPlatform?: string;
+  currentUsername?: string;
 }
 
 const UsageContext = createContext<UsageContextType | undefined>(undefined);
@@ -46,20 +48,93 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
     discussions: 0,
     aiReplies: 0,
     campaigns: 0,
+    views: 0,
     resets: 0
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [currentPlatform, setCurrentPlatform] = useState<string>('');
+  const [currentUsername, setCurrentUsername] = useState<string>('');
   const isIncrementInProgress = React.useRef(false);
+
+  // Get current platform and username from localStorage or URL
+  useEffect(() => {
+    const getPlatformAndUsername = () => {
+      // Try to get from localStorage (accountHolder pattern)
+      const accountHolder = localStorage.getItem('accountHolder');
+      if (accountHolder) {
+        try {
+          const parsed = JSON.parse(accountHolder);
+          if (parsed.platform && parsed.username) {
+            setCurrentPlatform(parsed.platform);
+            setCurrentUsername(parsed.username);
+            return;
+          }
+        } catch (error) {
+          console.warn('[UsageContext] Error parsing accountHolder:', error);
+        }
+      }
+
+      // Fallback: try to determine from URL or other sources
+      const path = window.location.pathname;
+      if (path.includes('/instagram')) {
+        setCurrentPlatform('instagram');
+        const instagramAccount = localStorage.getItem('instagramAccountInfo');
+        if (instagramAccount) {
+          try {
+            const parsed = JSON.parse(instagramAccount);
+            setCurrentUsername(parsed.username || '');
+          } catch (error) {
+            console.warn('[UsageContext] Error parsing Instagram account:', error);
+          }
+        }
+      } else if (path.includes('/facebook')) {
+        setCurrentPlatform('facebook');
+        const facebookAccount = localStorage.getItem('facebookAccountInfo');
+        if (facebookAccount) {
+          try {
+            const parsed = JSON.parse(facebookAccount);
+            setCurrentUsername(parsed.username || '');
+          } catch (error) {
+            console.warn('[UsageContext] Error parsing Facebook account:', error);
+          }
+        }
+      } else if (path.includes('/twitter')) {
+        setCurrentPlatform('twitter');
+        const twitterAccount = localStorage.getItem('twitterAccountInfo');
+        if (twitterAccount) {
+          try {
+            const parsed = JSON.parse(twitterAccount);
+            setCurrentUsername(parsed.username || '');
+          } catch (error) {
+            console.warn('[UsageContext] Error parsing Twitter account:', error);
+          }
+        }
+      }
+    };
+
+    getPlatformAndUsername();
+
+    // Listen for storage changes to update platform/username
+    const handleStorageChange = () => {
+      getPlatformAndUsername();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   // Load usage from backend on mount and user change
   const refreshUsage = useCallback(async () => {
-    if (!currentUser?.uid) return;
+    if (!currentUser?.uid) {
+      console.warn('[UsageContext] No current user, skipping usage refresh');
+      return;
+    }
     
     setIsLoading(true);
     try {
-      console.log(`[UsageContext] 🔄 Refreshing usage for user ${currentUser.uid}`);
+      console.log(`[UsageContext] 🔄 Refreshing usage for userId: ${currentUser.uid}`);
       
-      // Get usage from backend
+      // Get usage from userId-based backend API 
       const response = await fetch(`/api/user/${currentUser.uid}/usage`);
       
       if (response.ok) {
@@ -69,39 +144,37 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
           discussions: backendUsage.discussionsUsed || 0,
           aiReplies: backendUsage.aiRepliesUsed || 0,
           campaigns: backendUsage.campaignsUsed || 0,
+          views: backendUsage.viewsUsed || 0,
           resets: backendUsage.resetsUsed || 0
         };
         
         setUsage(normalizedUsage);
         console.log(`[UsageContext] ✅ Usage loaded from backend:`, normalizedUsage);
-        
-        // Also update localStorage for offline access
-        localStorage.setItem(`usage_${currentUser.uid}`, JSON.stringify(normalizedUsage));
       } else {
-        console.warn(`[UsageContext] ⚠️ Backend usage not found, using localStorage fallback`);
-        
-        // Fallback to localStorage
-        const savedUsage = localStorage.getItem(`usage_${currentUser.uid}`);
-        if (savedUsage) {
-          const parsedUsage = JSON.parse(savedUsage);
-          setUsage(parsedUsage);
-          console.log(`[UsageContext] 📱 Usage loaded from localStorage:`, parsedUsage);
-        }
+        console.warn(`[UsageContext] ⚠️ Backend usage not found, initializing empty stats`);
+        // Initialize with empty usage stats instead of localStorage fallback
+        setUsage({
+          posts: 0,
+          discussions: 0,
+          aiReplies: 0,
+          campaigns: 0,
+          views: 0,
+          resets: 0
+        });
       }
     } catch (error) {
       console.error(`[UsageContext] ❌ Error loading usage:`, error);
       
-      // Fallback to localStorage on error
-      const savedUsage = localStorage.getItem(`usage_${currentUser.uid}`);
-      if (savedUsage) {
-        try {
-          const parsedUsage = JSON.parse(savedUsage);
-          setUsage(parsedUsage);
-          console.log(`[UsageContext] 📱 Fallback to localStorage:`, parsedUsage);
-        } catch (parseError) {
-          console.error(`[UsageContext] ❌ Error parsing localStorage usage:`, parseError);
-        }
-      }
+      // Initialize with empty stats on error - no localStorage fallback
+      setUsage({
+        posts: 0,
+        discussions: 0,
+        aiReplies: 0,
+        campaigns: 0,
+        views: 0,
+        resets: 0
+      });
+      console.log(`[UsageContext] 🔄 Initialized empty usage stats due to backend error`);
     } finally {
       setIsLoading(false);
     }
@@ -109,8 +182,10 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
 
   // Load usage on mount and user change
   useEffect(() => {
-    refreshUsage();
-  }, [refreshUsage]);
+    if (currentUser?.uid) {
+      refreshUsage();
+    }
+  }, [refreshUsage, currentUser?.uid]);
 
   // Auto-refresh usage every 60 seconds for real-time updates (increased to reduce conflicts)
   useEffect(() => {
@@ -135,24 +210,10 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
       }
     };
 
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === `usage_${currentUser?.uid}` && event.newValue) {
-        try {
-          const newUsage = JSON.parse(event.newValue);
-          setUsage(newUsage);
-          console.log(`[UsageContext] 🔄 Storage change usage update:`, newUsage);
-        } catch (error) {
-          console.error(`[UsageContext] ❌ Error parsing storage change:`, error);
-        }
-      }
-    };
-
     window.addEventListener('usageUpdated', handleUsageUpdate as EventListener);
-    window.addEventListener('storage', handleStorageChange);
     
     return () => {
       window.removeEventListener('usageUpdated', handleUsageUpdate as EventListener);
-      window.removeEventListener('storage', handleStorageChange);
     };
   }, [currentUser?.uid]);
 
@@ -167,6 +228,7 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
           discussions: 200,
           aiReplies: -1,
           campaigns: 10,
+          views: -1,
           resets: -1
         };
       case 'admin':
@@ -175,6 +237,7 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
           discussions: -1,
           aiReplies: -1,
           campaigns: -1,
+          views: -1,
           resets: -1
         };
       case 'freemium':
@@ -183,6 +246,7 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
           discussions: 50,
           aiReplies: 50,
           campaigns: 3,
+          views: -1,
           resets: 3
         };
       default: // free
@@ -191,14 +255,15 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
           discussions: 10,
           aiReplies: 2,
           campaigns: 0,
+          views: -1,
           resets: 3
         };
     }
   }, [currentUser?.uid]);
 
-  const incrementUsage = useCallback(async (feature: keyof UsageStats, platform?: string) => {
+  const incrementUsage = useCallback(async (feature: keyof UsageStats, _platform?: string, count: number = 1) => {
     if (!currentUser?.uid) {
-      console.warn(`[UsageContext] ⚠️ No current user, skipping ${feature} increment`);
+      console.warn(`[UsageContext] ⚠️ No current user available, skipping ${feature} increment`);
       return;
     }
 
@@ -211,25 +276,45 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
     isIncrementInProgress.current = true;
 
     try {
-      console.log(`[UsageContext] 🚀 INCREMENT STARTED: ${feature} usage for ${platform || 'unknown'} platform`);
+      console.log(`[UsageContext] 🚀 INCREMENT STARTED: ${feature} usage by ${count} for userId: ${currentUser.uid}`);
       console.log(`[UsageContext] 📊 Current usage before increment: ${feature} = ${usage[feature]}`);
       
-      // Call backend FIRST to persist the change (no optimistic update to avoid race conditions)
-      console.log(`[UsageContext] 🌐 Calling backend UserService.incrementUsage...`);
-      await UserService.incrementUsage(currentUser.uid, feature);
-      console.log(`[UsageContext] ✅ Backend increment successful for ${feature}`);
+      // Call userId-based backend API
+      console.log(`[UsageContext] 🌐 Calling backend usage increment API...`);
+      const response = await fetch(`/api/usage/increment/${currentUser.uid}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ feature, count }),
+      });
       
-      // Now refresh to get the authoritative backend state
+      if (!response.ok) {
+        throw new Error(`Backend increment failed: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      console.log(`[UsageContext] ✅ Backend increment successful for ${feature}:`, result);
+      
+      // Refresh to get the authoritative backend state
       console.log(`[UsageContext] 🔄 Refreshing usage from backend after increment...`);
       await refreshUsage();
       console.log(`[UsageContext] ✅ INCREMENT COMPLETED: ${feature} usage successfully updated`);
+      
+      // Broadcast usage update to other tabs
+      window.dispatchEvent(new CustomEvent('usageUpdated', { 
+        detail: { 
+          userId: currentUser.uid, 
+          usage: usage // Use updated usage
+        } 
+      }));
       
     } catch (error) {
       console.error(`[UsageContext] ❌ Error incrementing ${feature} usage:`, error);
       console.error(`[UsageContext] ❌ Error details:`, {
         feature,
-        platform,
         userId: currentUser.uid,
+        count,
         error: error instanceof Error ? error.message : String(error)
       });
       
@@ -238,11 +323,12 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
     } finally {
       isIncrementInProgress.current = false;
     }
-  }, [currentUser?.uid, refreshUsage]);
+  }, [currentUser?.uid, usage, refreshUsage]);
 
-  const trackFeatureUsage = useCallback(async (feature: keyof UsageStats, platform: string, action: string) => {
+
+  const trackFeatureUsage = useCallback(async (feature: keyof UsageStats, platform: string, action: string, count: number = 1) => {
     if (!currentUser?.uid) {
-      console.warn(`[UsageContext] ⚠️ No current user, skipping ${feature} tracking`);
+      console.warn(`[UsageContext] ⚠️ No current user available, skipping ${feature} tracking`);
       return;
     }
 
@@ -252,34 +338,21 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
       timestamp,
       feature,
       platform,
-      action,
       userId: currentUser.uid,
+      action,
+      count,
       currentUsage: usage[feature]
     };
     
     console.log(`[UsageContext] 📊 TRACKING STARTED:`, logEntry);
     
-    // Store in usage history for analytics
-    try {
-      const historyKey = `usage_history_${currentUser.uid}`;
-      const existingHistory = JSON.parse(localStorage.getItem(historyKey) || '[]');
-      existingHistory.push(logEntry);
-      
-      // Keep only last 100 entries
-      if (existingHistory.length > 100) {
-        existingHistory.splice(0, existingHistory.length - 100);
-      }
-      
-      localStorage.setItem(historyKey, JSON.stringify(existingHistory));
-      console.log(`[UsageContext] 💾 Usage history stored successfully`);
-    } catch (error) {
-      console.warn(`[UsageContext] ⚠️ Error storing usage history:`, error);
-    }
+    // Log usage increment (no localStorage storage to prevent conflicts)
+    console.log(`[UsageContext] 📊 Usage increment logged:`, logEntry);
     
     // Increment the usage
     try {
       console.log(`[UsageContext] 🔄 Calling incrementUsage for ${feature}...`);
-      await incrementUsage(feature, platform);
+      await incrementUsage(feature, platform, count);
       console.log(`[UsageContext] ✅ TRACKING COMPLETED: ${feature} -> ${action} for ${platform}`);
     } catch (error) {
       console.error(`[UsageContext] ❌ TRACKING FAILED for ${feature}:`, error);
@@ -308,21 +381,19 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
   }, [usage]);
 
   const resetUsage = useCallback(() => {
-    const resetUsage = {
+    const resetUsageStats = {
       posts: 0,
       discussions: 0,
       aiReplies: 0,
       campaigns: 0,
+      views: 0,
       resets: 0
     };
     
-    setUsage(resetUsage);
+    setUsage(resetUsageStats);
     
-    if (currentUser?.uid) {
-      localStorage.setItem(`usage_${currentUser.uid}`, JSON.stringify(resetUsage));
-      console.log(`[UsageContext] 🔄 Usage reset for user ${currentUser.uid}`);
-    }
-  }, [currentUser?.uid]);
+    console.log(`[UsageContext] 🔄 Usage reset for ${currentPlatform}/${currentUsername}`);
+  }, [currentPlatform, currentUsername]);
 
   // Reset only dashboard usage counts (keep resets count)
   const resetDashboard = useCallback(() => {
@@ -332,12 +403,17 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
         posts: 0,
         discussions: 0,
         aiReplies: 0,
-        campaigns: 0
+        campaigns: 0,
+        views: 0
       };
       if (currentUser?.uid) {
-        localStorage.setItem(`usage_${currentUser.uid}`, JSON.stringify(newUsage));
-        window.dispatchEvent(new CustomEvent('usageUpdated', { detail: { userId: currentUser.uid, usage: newUsage } }));
-        console.log(`[UsageContext] 🔄 Dashboard reset for user ${currentUser.uid}`);
+        window.dispatchEvent(new CustomEvent('usageUpdated', { 
+          detail: { 
+            userId: currentUser.uid, 
+            usage: newUsage 
+          } 
+        }));
+        console.log(`[UsageContext] 🔄 Dashboard reset for userId: ${currentUser.uid}`);
       }
       return newUsage;
     });
@@ -353,7 +429,9 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
     getUserLimits,
     refreshUsage,
     resetDashboard,
-    isLoading
+    isLoading,
+    currentPlatform,
+    currentUsername
   };
 
   return (

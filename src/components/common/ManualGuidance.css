@@ -284,9 +284,14 @@
   
   .topics-sidebar {
     width: 100%;
-    max-height: 180px;
+    max-height: 110px;
     border-right: none;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  
+  .sidebar-title {
+    margin: 0 0 8px 16px;
+    font-size: 14px;
   }
   
   .topics-list {
@@ -296,10 +301,10 @@
   }
   
   .topic-item {
-    min-width: 160px;
+    min-width: 120px;
     flex-direction: column;
     text-align: center;
-    gap: 8px;
+    gap: 6px;
   }
   
   .content-panel {
@@ -328,6 +333,12 @@
   
   .topics-sidebar {
     padding: 12px 0;
+    max-height: 96px;
+  }
+  
+  .sidebar-title {
+    margin: 0 0 6px 12px;
+    font-size: 12px;
   }
   
   .topics-list {
@@ -335,17 +346,17 @@
   }
   
   .topic-item {
-    min-width: 140px;
-    padding: 10px 12px;
+    min-width: 110px;
+    padding: 8px 10px;
   }
   
   .topic-item-icon {
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
   }
   
   .topic-item-icon .topic-icon {
-    font-size: 14px;
+    font-size: 12px;
   }
   
   .content-panel {

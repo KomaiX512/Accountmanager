@@ -21,6 +21,8 @@ import useUpgradeHandler from '../../hooks/useUpgradeHandler';
 import AccessControlPopup from '../common/AccessControlPopup';
 import useResetPlatformState from '../../hooks/useResetPlatformState';
 import AutopilotPopup from '../common/AutopilotPopup';
+import ProfilePopup from '../common/ProfilePopup';
+import ManualGuidance from '../common/ManualGuidance';
 
 import ChatModal from './ChatModal';
 import RagService from '../../services/RagService';
@@ -53,7 +55,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   }, []); // Empty dependency array ensures this runs only once on mount and cleanup on unmount
 
   const { currentUser } = useAuth();
-  const { isFeatureBlocked, trackRealDiscussion, trackRealAIReply, trackRealPostCreation, canUseFeature } = useFeatureTracking();
+  const { isFeatureBlocked, trackRealAIReply, trackRealPostCreation, canUseFeature } = useFeatureTracking();
   const { showUpgradePopup, blockedFeature, handleFeatureAttempt, closeUpgradePopup, currentUsage } = useUpgradeHandler();
   const { resetAndAllowReconnection } = useResetPlatformState();
   const [query, setQuery] = useState('');
@@ -89,6 +91,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const [isMobileChatOpen, setIsMobileChatOpen] = useState(false);
   const [isMobileImageEditorOpen, setIsMobileImageEditorOpen] = useState(false);
   const [isMobileProfilePopupOpen, setIsMobileProfilePopupOpen] = useState(false);
+  const [isMobileManualOpen, setIsMobileManualOpen] = useState(false);
   const [isAutopilotPopupOpen, setIsAutopilotPopupOpen] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
@@ -582,17 +585,8 @@ Image Description: ${response.post.image_prompt}
 
     try {
       if (notification.type === 'message' && notification.sender_id && notification.message_id) {
-        // ✅ REAL USAGE TRACKING: Check limits BEFORE sending DM reply
-        const trackingSuccess = await trackRealDiscussion('instagram', {
-          messageCount: 1,
-          type: 'dm_reply'
-        });
-        
-        if (!trackingSuccess) {
-          console.warn(`[Dashboard] 🚫 DM reply blocked for Instagram - limit reached`);
-          setToast('Discussion limit reached - upgrade to continue');
-          return;
-        }
+        // ❌ REMOVED: Discussion tracking already handled by ChatModal
+        // Individual reply actions should not increment discussion count separately
         
         await axios.post(`/api/send-dm-reply/${igBusinessId}`, {
           sender_id: notification.sender_id,
@@ -628,17 +622,8 @@ Image Description: ${response.post.image_prompt}
         setNotifications(prev => safeFilter(prev, n => n.message_id !== notification.message_id));
         setToast('DM reply sent!');
       } else if (notification.type === 'comment' && notification.comment_id) {
-        // ✅ REAL USAGE TRACKING: Check limits BEFORE sending comment reply
-        const trackingSuccess = await trackRealDiscussion('instagram', {
-          messageCount: 1,
-          type: 'comment_reply'
-        });
-        
-        if (!trackingSuccess) {
-          console.warn(`[Dashboard] 🚫 Comment reply blocked for Instagram - limit reached`);
-          setToast('Discussion limit reached - upgrade to continue');
-          return;
-        }
+        // ❌ REMOVED: Discussion tracking already handled by ChatModal
+        // Individual reply actions should not increment discussion count separately
         
         await axios.post(`/api/send-comment-reply/${igBusinessId}`, {
           comment_id: notification.comment_id,
@@ -2649,6 +2634,13 @@ Image Description: ${response.post.image_prompt}
         >
           👤
         </button>
+        <button
+          className="mobile-floating-btn manual-btn"
+          onClick={() => setIsMobileManualOpen(true)}
+          title="Manual"
+        >
+          📘
+        </button>
       </div>
 
       {/* ✨ MOBILE CHAT MODAL */}
@@ -2707,24 +2699,18 @@ Image Description: ${response.post.image_prompt}
         </div>
       )}
 
-      {/* ✨ MOBILE PROFILE POPUP */}
+      {/* ✨ MOBILE PROFILE POPUP (Real) */}
       {isMobileProfilePopupOpen && (
-        <div className="mobile-profile-popup-overlay">
-          <div className="mobile-profile-popup-content">
-            <div className="mobile-profile-popup-header">
-              <h3>Profile</h3>
-              <button 
-                className="close-mobile-profile-popup"
-                onClick={() => setIsMobileProfilePopupOpen(false)}
-              >
-                ×
-              </button>
-            </div>
-            <div className="mobile-profile-popup-body">
-              <p>Profile management functionality coming soon...</p>
-            </div>
-          </div>
-        </div>
+        <ProfilePopup 
+          username={accountHolder}
+          onClose={() => setIsMobileProfilePopupOpen(false)}
+          platform="instagram"
+        />
+      )}
+
+      {/* ✨ MOBILE MANUAL GUIDANCE POPUP */}
+      {isMobileManualOpen && (
+        <ManualGuidance onClose={() => setIsMobileManualOpen(false)} />
       )}
     </motion.div>
   );

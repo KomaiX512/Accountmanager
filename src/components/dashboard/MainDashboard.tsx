@@ -13,6 +13,7 @@ import { useAuth } from '../../context/AuthContext';
 import PostScheduler from '../instagram/PostScheduler';
 import TwitterCompose from '../twitter/TwitterCompose';
 import UsageDashboard from './UsageDashboard';
+import PlatformUsageChart from './PlatformUsageChart';
 
 import { schedulePost } from '../../utils/scheduleHelpers';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
@@ -88,16 +89,6 @@ const MainDashboard: React.FC = () => {
   const [showMetaAdsModal, setShowMetaAdsModal] = useState<boolean>(false);
   const [isMetaAdsWishlisted, setIsMetaAdsWishlisted] = useState<boolean>(false);
   const [showMetaAdsWishlistConfirmation, setShowMetaAdsWishlistConfirmation] = useState<boolean>(false);
-  
-
-  
-  // Platform time tracking state
-  const [platformTimeData, setPlatformTimeData] = useState<Record<string, number>>({
-    instagram: 0,
-    twitter: 0,
-    facebook: 0,
-    linkedin: 0
-  });
   
   // Real-time notification counts
   const [realTimeNotifications, setRealTimeNotifications] = useState<Record<string, number>>({
@@ -1098,59 +1089,6 @@ const MainDashboard: React.FC = () => {
     }
   }, [isInstagramConnected, isTwitterConnected, isFacebookConnected, instagramUserId, twitterUserId, facebookUserId]);
 
-  // Simulate platform time tracking - in a real app, this would come from actual usage data
-  useEffect(() => {
-    if (!currentUser?.uid) return;
-    
-    const loadPlatformTimeData = () => {
-      const platforms = ['instagram', 'twitter', 'facebook', 'linkedin'];
-      const timeData: Record<string, number> = {};
-      
-      platforms.forEach(platform => {
-        // Get platform access status using improved function
-        const isAccessed = getPlatformAccessStatus(platform);
-        
-        if (isAccessed) {
-          // Simulate time spent based on platform activity
-          const baseTime = Math.floor(Math.random() * 120) + 30; // 30-150 minutes
-          const storageKey = `platform_time_${platform}_${currentUser.uid}`;
-          
-          // Check if we have stored time, otherwise generate new
-          const storedTime = localStorage.getItem(storageKey);
-          if (storedTime) {
-            timeData[platform] = parseInt(storedTime);
-          } else {
-            timeData[platform] = baseTime;
-            localStorage.setItem(storageKey, baseTime.toString());
-          }
-        } else {
-          timeData[platform] = 0;
-        }
-      });
-      
-      setPlatformTimeData(timeData);
-    };
-    
-    loadPlatformTimeData();
-    
-    // Update time data every minute when platforms are active
-    const interval = setInterval(() => {
-      const platforms = ['instagram', 'twitter', 'facebook', 'linkedin'];
-      platforms.forEach(platform => {
-        const isAccessed = getPlatformAccessStatus(platform);
-        if (isAccessed) {
-          const storageKey = `platform_time_${platform}_${currentUser.uid}`;
-          const currentTime = parseInt(localStorage.getItem(storageKey) || '0');
-          const newTime = currentTime + Math.floor(Math.random() * 3); // Add 0-2 minutes randomly
-          localStorage.setItem(storageKey, newTime.toString());
-          setPlatformTimeData(prev => ({ ...prev, [platform]: newTime }));
-        }
-      });
-    }, 60000); // Update every minute
-    
-    return () => clearInterval(interval);
-  }, [currentUser?.uid, getPlatformAccessStatus]);
-
   // ✅ INSTANT CROSS-DEVICE SYNC: Listen for localStorage changes from other tabs/devices
   useEffect(() => {
     if (!currentUser?.uid) return;
@@ -1202,10 +1140,9 @@ const MainDashboard: React.FC = () => {
     };
 
     // Listen for storage events
-    window.addEventListener('storage', handleStorageChange);
-    
+    window.addEventListener('storage', handleStorageChange as EventListener);
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('storage', handleStorageChange as EventListener);
     };
   }, [currentUser?.uid, getPlatformAccessStatus]);
 
@@ -1902,6 +1839,14 @@ const MainDashboard: React.FC = () => {
                   }
                   
                   platformStatuses[platformId] = isClaimed;
+                
+                  // Immediately sync to localStorage for consistency
+                  if (isClaimed) {
+                    localStorage.setItem(`${platformId}_accessed_${currentUser.uid}`, 'true');
+                  } else {
+                    // Treat Facebook the same as other platforms – backend is authoritative
+                    localStorage.removeItem(`${platformId}_accessed_${currentUser.uid}`);
+                  }
                 }
               } catch (error) {
                 console.warn(`Failed to check ${platformId} status:`, error);
@@ -2331,22 +2276,8 @@ const MainDashboard: React.FC = () => {
       try {
         console.log(`[MainDashboard] 📝 Processing post for ${platform.name}...`);
         
-        // ✅ REAL USAGE TRACKING: Check limits BEFORE creating the post
-        const trackingSuccess = await trackRealPostCreation(platform.id, {
-          scheduled: isScheduled,
-          immediate: !isScheduled,
-          type: 'multi_platform_post'
-        });
-        
-        if (!trackingSuccess) {
-          console.warn(`[MainDashboard] 🚫 Post creation blocked for ${platform.name} - limit reached`);
-          results.push({
-            platform: platform.name,
-            success: false,
-            message: 'Usage limit reached - upgrade to continue'
-          });
-          continue; // Skip this platform and continue with others
-        }
+        // ❌ REMOVED: Automatic post usage tracking - only counts on image generation
+        console.log(`[MainDashboard] ℹ️ Creating post for ${platform.name} - usage tracking disabled`);
         
         // Call the existing schedule functionality
         const result = await schedulePost({
@@ -2806,7 +2737,7 @@ const MainDashboard: React.FC = () => {
               <div className="usage-stat">
                 <div className="stat-icon connected">
                   <svg viewBox="0 0 24 24">
-                    <path d="M8,3A2,2 0 0,0 6,5V9A2,2 0 0,1 4,11H3V13H4A2,2 0 0,1 6,15V19A2,2 0 0,0 8,21H10V19H8V14A2,2 0 0,0 6,12A2,2 0 0,0 8,10V5H10V3M16,3A2,2 0 0,1 18,5V9A2,2 0 0,0 20,11H21V13H20A2,2 0 0,0 18,15V19A2,2 0 0,1 16,21H14V19H16V14A2,2 0 0,1 18,12A2,2 0 0,1 16,10V5H14V3H16Z" />
+                    <path d="M8,3A2,2 0 0,0 6,5V9A2,2 0 0,1 4,11H3V13H4A2,2 0 0,1 6,15V19A2,2 0 0,0 8,21H10V19H8V14A2,2 0 0,0 6,12A2,2 0 0,0 8,10V5H10V3H8ZM16,3A2,2 0 0,1 18,5V9A2,2 0 0,0 20,11H21V13H20A2,2 0 0,0 18,15V19A2,2 0 0,1 16,21H14V19H16V14A2,2 0 0,1 18,12A2,2 0 0,1 16,10V5H14V3H16Z" />
                   </svg>
                 </div>
                 <div className="stat-details">
@@ -2840,31 +2771,7 @@ const MainDashboard: React.FC = () => {
               </div>
             </div>
             
-            <div className="usage-chart-container">
-              <h3>Platform Activity Time</h3>
-              <div className="dynamic-chart">
-                <div className="chart-bars">
-                  {Object.entries(platformTimeData).map(([platform, time]) => (
-                    <div key={platform} className="chart-bar-container">
-                      <div className="chart-bar-wrapper">
-                        <div 
-                          className={`chart-bar ${platform}`}
-                          style={{ 
-                            height: `${Math.max((time / Math.max(...Object.values(platformTimeData), 1)) * 100, 2)}%` 
-                          }}
-                        >
-                          <div className="bar-value">{time}min</div>
-                        </div>
-                      </div>
-                      <div className="chart-label">{platform.charAt(0).toUpperCase() + platform.slice(1)}</div>
-                    </div>
-                  ))}
-                </div>
-                <div className="chart-y-axis">
-                  <span className="y-axis-label">Time (minutes)</span>
-                </div>
-              </div>
-            </div>
+            <PlatformUsageChart />
             </div>
           </div>
         )}
@@ -3127,4 +3034,4 @@ const MainDashboard: React.FC = () => {
   );
 };
 
-export default MainDashboard; 
+export default MainDashboard;

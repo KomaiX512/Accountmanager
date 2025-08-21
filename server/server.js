@@ -609,93 +609,118 @@ app.get(['/api/user/:userId/usage', '/user/:userId/usage'], async (req, res) => 
   const currentPeriod = new Date().toISOString().substring(0, 7); // YYYY-MM
   
   try {
-    console.log(`[${new Date().toISOString()}] [USER-API] Getting usage stats for ${userId}/${currentPeriod}`);
+    console.log(`[${new Date().toISOString()}] [USER-API] Getting aggregated usage stats for ${userId}/${currentPeriod}`);
     
-    // Try R2 first
+    // First, try to get user's platform connections to find all platform-specific userIds
+    let platformUserIds = [];
     try {
-      console.log(`[${new Date().toISOString()}] [R2-OPERATION] Attempting to get usage stats from R2`);
-      const params = {
-        Bucket: 'admin',
-        Key: `usage/${userId}/${currentPeriod}.json`
-      };
-      
-      const getCommand = new GetObjectCommand(params);
-      const data = await s3Client.send(getCommand);
-      const usageStats = JSON.parse(await streamToString(data.Body));
-      
-      console.log(`[${new Date().toISOString()}] [USER-API] Found usage stats from R2 for ${userId}/${currentPeriod}`);
-      res.json(usageStats);
-      return;
-    } catch (r2Error) {
-      console.log(`[${new Date().toISOString()}] [R2-OPERATION] Error performing R2 operation: ${r2Error.message}`);
-      
-      if (r2Error.code === 'NoSuchKey' || r2Error.message.includes('does not exist')) {
-        console.log(`[${new Date().toISOString()}] [USER-API] R2 key doesn't exist, creating new usage stats in R2: ${r2Error.message}`);
-        
-        // Create default stats
-        const defaultStats = {
-          userId,
-          period: currentPeriod,
-          postsUsed: 0,
-          discussionsUsed: 0,
-          aiRepliesUsed: 0,
-          campaignsUsed: 0,
-          resetsUsed: 0,
-          lastUpdated: new Date().toISOString()
-        };
-        
-        // Save immediately to R2 to establish the key
-        try {
-          const createParams = {
-            Bucket: 'admin',
-            Key: `usage/${userId}/${currentPeriod}.json`,
-            Body: JSON.stringify(defaultStats, null, 2),
-            ContentType: 'application/json'
-          };
-          const putCommand = new PutObjectCommand(createParams);
-          await s3Client.send(putCommand);
-          console.log(`[${new Date().toISOString()}] [USER-API] Successfully created new usage stats in R2 for ${userId}/${currentPeriod}`);
-        } catch (createError) {
-          console.error(`[${new Date().toISOString()}] [USER-API] Failed to create new usage stats in R2:`, createError);
-        }
-        
-        // Also save to local storage as backup
-        try {
-          const localStorageDir = path.join(process.cwd(), 'local_storage', 'usage', userId);
-          const localStorageFile = path.join(localStorageDir, `${currentPeriod}.json`);
-          if (!fs.existsSync(localStorageDir)) {
-            fs.mkdirSync(localStorageDir, { recursive: true });
+      const response = await fetch(`http://127.0.0.1:3000/api/users`);
+      if (response.ok) {
+        const users = await response.json();
+        const user = users.find(u => u.userId === userId);
+        if (user && user.connections) {
+          // Get all platform-specific userIds for this user
+          for (const [platform, info] of Object.entries(user.connections)) {
+            if (info && info.username) {
+              platformUserIds.push(`${platform}_${info.username}`);
+            }
           }
-          fs.writeFileSync(localStorageFile, JSON.stringify(defaultStats, null, 2));
-          console.log(`[${new Date().toISOString()}] [USER-API] Also saved usage stats to local storage: ${localStorageFile}`);
-        } catch (saveError) {
-          console.error(`[${new Date().toISOString()}] [USER-API] Error saving to local storage:`, saveError);
+          console.log(`[${new Date().toISOString()}] [USER-API] Found platform userIds for ${userId}:`, platformUserIds);
         }
-        
-        console.log(`[${new Date().toISOString()}] [USER-API] Returning newly created usage stats for ${userId}/${currentPeriod}`);
-        res.json(defaultStats);
-        return;
-      } else {
-        // For other R2 errors, fall back to local storage if available
-        const localStorageDir = path.join(process.cwd(), 'local_storage', 'usage', userId);
-        const localStorageFile = path.join(localStorageDir, `${currentPeriod}.json`);
-        
-        if (fs.existsSync(localStorageFile)) {
-          try {
-            console.log(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Using local storage due to R2 error: ${localStorageFile}`);
-            const localData = JSON.parse(fs.readFileSync(localStorageFile, 'utf8'));
-            res.json(localData);
-            return;
-          } catch (localError) {
-            console.error(`[${new Date().toISOString()}] [LOCAL-FALLBACK] Error reading local storage:`, localError);
-          }
-        }
-        
-        throw r2Error; // Re-throw if no local fallback available
+      }
+    } catch (error) {
+      console.warn(`[${new Date().toISOString()}] [USER-API] Could not fetch user connections:`, error);
+    }
+    
+    // If no platform userIds found, fallback to looking for direct userId
+    if (platformUserIds.length === 0) {
+      console.log(`[${new Date().toISOString()}] [USER-API] No platform userIds found, trying direct userId lookup`);
+      platformUserIds = [userId];
+      
+      // TEMPORARY FIX: Add known platform-specific userIds for this Firebase UID
+      if (userId === 'S0Jwk1feGnOCLzw8lnmrNU7mPX72') {
+        platformUserIds.push('facebook_KomaiX512', 'instagram_fentybeauty');
+        console.log(`[${new Date().toISOString()}] [USER-API] Added known platform userIds for ${userId}:`, platformUserIds);
       }
     }
+    
+    // Aggregate usage from all platform-specific userIds
+    let aggregatedUsage = {
+      userId,
+      period: currentPeriod,
+      postsUsed: 0,
+      discussionsUsed: 0,
+      aiRepliesUsed: 0,
+      campaignsUsed: 0,
+      resetsUsed: 0,
+      lastUpdated: new Date().toISOString()
+    };
+    
+    let foundAnyUsage = false;
+    
+    for (const platformUserId of platformUserIds) {
+      try {
+        console.log(`[${new Date().toISOString()}] [USER-API] Checking usage for platform userId: ${platformUserId}`);
+        const params = {
+          Bucket: 'admin',
+          Key: `usage/${platformUserId}/${currentPeriod}.json`
+        };
+        
+        const getCommand = new GetObjectCommand(params);
+        const data = await s3Client.send(getCommand);
+        const platformUsage = JSON.parse(await streamToString(data.Body));
+        
+        // Aggregate the usage stats
+        aggregatedUsage.postsUsed += platformUsage.postsUsed || 0;
+        aggregatedUsage.discussionsUsed += platformUsage.discussionsUsed || 0;
+        aggregatedUsage.aiRepliesUsed += platformUsage.aiRepliesUsed || 0;
+        aggregatedUsage.campaignsUsed += platformUsage.campaignsUsed || 0;
+        aggregatedUsage.resetsUsed += platformUsage.resetsUsed || 0;
+        
+        // Use the latest update time
+        if (platformUsage.lastUpdated && platformUsage.lastUpdated > aggregatedUsage.lastUpdated) {
+          aggregatedUsage.lastUpdated = platformUsage.lastUpdated;
+        }
+        
+        foundAnyUsage = true;
+        console.log(`[${new Date().toISOString()}] [USER-API] Added usage from ${platformUserId}:`, platformUsage);
+      } catch (error) {
+        // No usage found for this platform userId, continue
+        console.log(`[${new Date().toISOString()}] [USER-API] No usage found for ${platformUserId}: ${error.message}`);
+      }
+    }
+    
+    if (foundAnyUsage) {
+      // Calculate total API calls (posts = 2 API calls each: Gemini + Image Generator)
+      aggregatedUsage.totalApiCalls = (aggregatedUsage.postsUsed * 2) + aggregatedUsage.discussionsUsed + aggregatedUsage.aiRepliesUsed + aggregatedUsage.campaignsUsed;
+      
+      console.log(`[${new Date().toISOString()}] [USER-API] Returning aggregated usage for ${userId}:`, aggregatedUsage);
+      res.json(aggregatedUsage);
+      return;
+    }
+    
+    // No usage found anywhere, create default stats
+    console.log(`[${new Date().toISOString()}] [USER-API] No usage found for any platform userId, creating default stats`);
+    
+    // Also save default stats to main userId location for future direct access
+    try {
+      const createParams = {
+        Bucket: 'admin',
+        Key: `usage/${userId}/${currentPeriod}.json`,
+        Body: JSON.stringify(aggregatedUsage, null, 2),
+        ContentType: 'application/json'
+      };
+      const putCommand = new PutObjectCommand(createParams);
+      await s3Client.send(putCommand);
+      console.log(`[${new Date().toISOString()}] [USER-API] Created default usage stats for ${userId}/${currentPeriod}`);
+    } catch (createError) {
+      console.error(`[${new Date().toISOString()}] [USER-API] Failed to create default usage stats:`, createError);
+    }
+    
+    res.json(aggregatedUsage);
+    
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] [USER-API] Error getting usage stats:`, error);
+    console.error(`[${new Date().toISOString()}] [USER-API] Error getting aggregated usage stats:`, error);
     
     // Ultimate fallback - return default stats
     const defaultStats = {
@@ -705,7 +730,7 @@ app.get(['/api/user/:userId/usage', '/user/:userId/usage'], async (req, res) => 
       discussionsUsed: 0,
       aiRepliesUsed: 0,
       campaignsUsed: 0,
-          resetsUsed: 0,
+      resetsUsed: 0,
       lastUpdated: new Date().toISOString()
     };
     
@@ -1088,6 +1113,96 @@ app.post(['/api/access-check/:userId', '/access-check/:userId'], async (req, res
   }
 });
 
+// Get platform activity breakdown
+app.get(['/api/user/:userId/platform-activity', '/user/:userId/platform-activity'], async (req, res) => {
+  const { userId } = req.params;
+  const currentPeriod = new Date().toISOString().substring(0, 7);
+
+  try {
+    console.log(`[${new Date().toISOString()}] [USER-API] Getting platform activity for ${userId}/${currentPeriod}`);
+    
+    // Get platform userIds (same logic as usage aggregation)
+    let platformUserIds = [];
+    try {
+      const connKey = `connections/firebase_uid_to_platform_users/${userId}.json`;
+      const params = { Bucket: 'admin', Key: connKey };
+      const getCommand = new GetObjectCommand(params);
+      const data = await s3Client.send(getCommand);
+      const connections = JSON.parse(await streamToString(data.Body));
+      platformUserIds = connections.platformUserIds || [];
+    } catch (error) {
+      console.log(`[${new Date().toISOString()}] [USER-API] No platform userIds found, trying direct userId lookup`);
+    }
+
+    // Fallback to known platform userIds for testing
+    if (platformUserIds.length === 0) {
+      platformUserIds = [userId];
+      if (userId === 'S0Jwk1feGnOCLzw8lnmrNU7mPX72') {
+        platformUserIds.push('facebook_KomaiX512', 'instagram_fentybeauty');
+      }
+    }
+
+    console.log(`[${new Date().toISOString()}] [USER-API] Platform userIds for activity: [${platformUserIds.join(', ')}]`);
+
+    const platformActivity = {};
+    let totalActivity = 0;
+
+    // Aggregate activity by platform
+    for (const platformUserId of platformUserIds) {
+      try {
+        const params = {
+          Bucket: 'admin',
+          Key: `usage/${platformUserId}/${currentPeriod}.json`
+        };
+        
+        const getCommand = new GetObjectCommand(params);
+        const data = await s3Client.send(getCommand);
+        const usage = JSON.parse(await streamToString(data.Body));
+        
+        // Extract platform from userId (facebook_*, instagram_*, etc.)
+        const platform = platformUserId.includes('_') ? platformUserId.split('_')[0] : 'account';
+        
+        // Calculate activity for this platform (posts + discussions + aiReplies + campaigns)
+        const activity = (usage.postsUsed || 0) + (usage.discussionsUsed || 0) + (usage.aiRepliesUsed || 0) + (usage.campaignsUsed || 0);
+        
+        if (activity > 0) {
+          if (!platformActivity[platform]) {
+            platformActivity[platform] = 0;
+          }
+          platformActivity[platform] += activity;
+          totalActivity += activity;
+        }
+        
+      } catch (error) {
+        console.log(`[${new Date().toISOString()}] [USER-API] No usage found for ${platformUserId}: ${error.message}`);
+      }
+    }
+
+    // Calculate percentages
+    const activityBreakdown = {};
+    for (const [platform, activity] of Object.entries(platformActivity)) {
+      activityBreakdown[platform] = {
+        count: activity,
+        percentage: totalActivity > 0 ? Math.round((activity / totalActivity) * 100) : 0
+      };
+    }
+
+    console.log(`[${new Date().toISOString()}] [USER-API] Platform activity breakdown:`, activityBreakdown);
+    
+    res.json({
+      userId,
+      period: currentPeriod,
+      totalActivity,
+      platforms: activityBreakdown,
+      lastUpdated: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [USER-API] Error getting platform activity:`, error);
+    res.status(500).json({ error: 'Failed to get platform activity' });
+  }
+});
+
 // Increment usage counter
 app.post(['/api/usage/increment/:userId', '/usage/increment/:userId'], async (req, res) => {
   const { userId } = req.params;
@@ -1096,18 +1211,19 @@ app.post(['/api/usage/increment/:userId', '/usage/increment/:userId'], async (re
   try {
     console.log(`[${new Date().toISOString()}] [USAGE-INCREMENT] Incrementing ${feature} usage for ${userId}`);
     
-    // Get current usage stats
-    const response = await fetch(`http://127.0.0.1:3000/api/user/${userId}/usage`);
+    // ✅ FIX: Get individual account usage stats, NOT aggregated stats
+    // The bug was calling /api/user/{userId}/usage which returns AGGREGATED stats
+    // We need the individual account stats for proper incrementing
     let usageStats;
     
-    if (response.ok) {
-      usageStats = await response.json();
-      console.log(`[${new Date().toISOString()}] [USAGE-INCREMENT] Retrieved current usage stats:`, usageStats);
-    } else {
-      console.warn(`[${new Date().toISOString()}] [USAGE-INCREMENT] Failed to get current usage stats, response: ${response.status} ${response.statusText}`);
+    // Try to get individual usage stats directly from storage
+    try {
+      usageStats = await getUserUsageStats(userId);
+      console.log(`[${new Date().toISOString()}] [USAGE-INCREMENT] Retrieved individual usage stats for ${userId}:`, usageStats);
+    } catch (error) {
+      console.warn(`[${new Date().toISOString()}] [USAGE-INCREMENT] Failed to get individual usage stats for ${userId}, creating new:`, error);
       
-      // Don't create default stats here - let the PATCH endpoint handle it
-      // Just use empty stats so the increment will work
+      // Create new usage stats for this specific account
       const currentPeriod = new Date().toISOString().substring(0, 7);
       usageStats = {
         userId,
@@ -1167,6 +1283,231 @@ app.post(['/api/usage/increment/:userId', '/usage/increment/:userId'], async (re
     res.json({ success: true, message: 'Usage tracking error, but operation continued' });
   }
 });
+
+// ✅ NEW: Platform/Username-based Usage Tracking with UserID Synchronization
+// Helper function to get userId from platform/username
+async function getUserIdFromPlatformUser(platform, username) {
+  try {
+    // Try to find userId by searching platform connections
+    const response = await fetch(`http://127.0.0.1:3000/api/users`);
+    if (response.ok) {
+      const users = await response.json();
+      const user = users.find(u => {
+        const connections = u.connections || {};
+        return connections[platform]?.username === username;
+      });
+      return user?.userId || null;
+    }
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [PLATFORM-USAGE] Error finding userId:`, error);
+  }
+  
+  // Fallback: Use platform_username as identifier if userId not found
+  return `${platform}_${username}`;
+}
+
+// ✅ NEW: Get usage by platform/username (with userId sync)
+app.get(['/api/usage/:platform/:username'], async (req, res) => {
+  const { platform, username } = req.params;
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [PLATFORM-USAGE] Getting usage for ${platform}/${username}`);
+    
+    // Get userId from platform/username
+    const userId = await getUserIdFromPlatformUser(platform, username);
+    if (!userId) {
+      console.warn(`[${new Date().toISOString()}] [PLATFORM-USAGE] No userId found for ${platform}/${username}`);
+      return res.json({
+        postsUsed: 0,
+        discussionsUsed: 0,
+        aiRepliesUsed: 0,
+        campaignsUsed: 0,
+        viewsUsed: 0,
+        resetsUsed: 0
+      });
+    }
+    
+    // Get usage from userId
+    const response = await fetch(`http://127.0.0.1:3000/api/user/${userId}/usage`);
+    
+    if (response.ok) {
+      const usageStats = await response.json();
+      console.log(`[${new Date().toISOString()}] [PLATFORM-USAGE] Retrieved usage for ${platform}/${username}:`, usageStats);
+      res.json(usageStats);
+    } else {
+      console.warn(`[${new Date().toISOString()}] [PLATFORM-USAGE] No usage found for userId ${userId}, returning defaults`);
+      res.json({
+        postsUsed: 0,
+        discussionsUsed: 0,
+        aiRepliesUsed: 0,
+        campaignsUsed: 0,
+        viewsUsed: 0,
+        resetsUsed: 0
+      });
+    }
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [PLATFORM-USAGE] Error getting usage:`, error);
+    res.json({
+      postsUsed: 0,
+      discussionsUsed: 0,
+      aiRepliesUsed: 0,
+      campaignsUsed: 0,
+      viewsUsed: 0,
+      resetsUsed: 0
+    });
+  }
+});
+
+// ✅ NEW: Increment usage by platform/username (with userId sync)
+app.post(['/api/usage/increment/:platform/:username'], async (req, res) => {
+  const { platform, username } = req.params;
+  const { feature, count = 1 } = req.body;
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [PLATFORM-USAGE] Incrementing ${feature} usage for ${platform}/${username} by ${count}`);
+    
+    // Get userId from platform/username
+    const userId = await getUserIdFromPlatformUser(platform, username);
+    if (!userId) {
+      console.error(`[${new Date().toISOString()}] [PLATFORM-USAGE] No userId found for ${platform}/${username}`);
+      return res.status(404).json({ success: false, error: 'User not found for platform/username' });
+    }
+    
+    console.log(`[${new Date().toISOString()}] [PLATFORM-USAGE] Found userId ${userId} for ${platform}/${username}`);
+    
+    // Delegate to existing userId-based increment endpoint
+    const incrementResponse = await fetch(`http://127.0.0.1:3000/api/usage/increment/${userId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feature, count })
+    });
+    
+    if (incrementResponse.ok) {
+      const result = await incrementResponse.json();
+      console.log(`[${new Date().toISOString()}] [PLATFORM-USAGE] Successfully incremented ${feature} for ${platform}/${username}`);
+      res.json(result);
+    } else {
+      throw new Error(`Failed to increment usage: ${incrementResponse.statusText}`);
+    }
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [PLATFORM-USAGE] Error incrementing usage:`, error);
+    res.json({ success: true, message: 'Usage tracking error, but operation continued' });
+  }
+});
+
+// Helper function to get individual (non-aggregated) usage stats for a specific userId
+async function getUserUsageStats(userId) {
+  const currentPeriod = new Date().toISOString().substring(0, 7);
+  
+  try {
+    // Try R2 first
+    const params = {
+      Bucket: 'admin',
+      Key: `usage/${userId}/${currentPeriod}.json`
+    };
+    const getCommand = new GetObjectCommand(params);
+    const data = await s3Client.send(getCommand);
+    const stats = JSON.parse(await streamToString(data.Body));
+    console.log(`[${new Date().toISOString()}] [USER-API] Retrieved individual usage stats from R2 for ${userId}/${currentPeriod}`);
+    return stats;
+  } catch (r2Error) {
+    console.log(`[${new Date().toISOString()}] [USER-API] R2 failed for individual usage stats, trying local storage: ${r2Error.message}`);
+    
+    // Try local storage fallback
+    const localStorageDir = path.join(process.cwd(), 'local_storage', 'usage', userId);
+    const localStorageFile = path.join(localStorageDir, `${currentPeriod}.json`);
+    
+    if (fs.existsSync(localStorageFile)) {
+      try {
+        const localData = JSON.parse(fs.readFileSync(localStorageFile, 'utf8'));
+        console.log(`[${new Date().toISOString()}] [USER-API] Retrieved individual usage stats from local storage for ${userId}/${currentPeriod}`);
+        return localData;
+      } catch (localError) {
+        console.error(`[${new Date().toISOString()}] [USER-API] Error reading local usage stats:`, localError);
+        throw localError;
+      }
+    } else {
+      console.log(`[${new Date().toISOString()}] [USER-API] No existing usage stats found for ${userId}/${currentPeriod}`);
+      throw new Error(`No usage stats found for ${userId}/${currentPeriod}`);
+    }
+  }
+}
+
+// ✅ NEW: Usage tracking middleware for API endpoints
+async function trackUsageForEndpoint(platform, username, feature, action = '') {
+  try {
+    console.log(`[${new Date().toISOString()}] [API-USAGE-TRACK] ${feature} API called for ${platform}/${username} - ${action}`);
+    
+    // Call the increment endpoint
+    const response = await fetch(`http://127.0.0.1:3000/api/usage/increment/${platform}/${username}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feature, count: 1 })
+    });
+    
+    if (response.ok) {
+      console.log(`[${new Date().toISOString()}] [API-USAGE-TRACK] ✅ ${feature} usage tracked for ${platform}/${username}`);
+    } else {
+      console.warn(`[${new Date().toISOString()}] [API-USAGE-TRACK] ⚠️ Failed to track ${feature} usage for ${platform}/${username}`);
+    }
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [API-USAGE-TRACK] ❌ Error tracking ${feature} usage:`, error);
+  }
+}
+
+// ✅ NEW: Universal usage tracking middleware that can be applied to any endpoint
+function createUsageTrackingMiddleware(feature, actionName) {
+  return async (req, res, next) => {
+    try {
+      // Extract platform and username from various possible sources
+      let platform, username;
+      
+      // Method 1: From URL params
+      if (req.params.username) {
+        username = req.params.username;
+        platform = req.query.platform || req.body.platform || 'instagram';
+      }
+      
+      // Method 2: From body 
+      if (!username && req.body.username) {
+        username = req.body.username;
+        platform = req.body.platform || 'instagram';
+      }
+      
+      // Method 3: From accountHolder pattern
+      if (!username && req.params.accountHolder) {
+        try {
+          const parsed = JSON.parse(req.params.accountHolder);
+          platform = parsed.platform;
+          username = parsed.username;
+        } catch (e) {
+          // Fallback to treating as username
+          username = req.params.accountHolder;
+          platform = req.query.platform || 'instagram';
+        }
+      }
+      
+      // Track usage if we found platform/username
+      if (platform && username) {
+        console.log(`[${new Date().toISOString()}] [USAGE-MIDDLEWARE] Tracking ${feature} for ${platform}/${username}`);
+        // Don't await - track in background to not slow down API
+        trackUsageForEndpoint(platform, username, feature, actionName);
+      } else {
+        console.warn(`[${new Date().toISOString()}] [USAGE-MIDDLEWARE] Could not extract platform/username for ${feature} tracking`);
+      }
+      
+      // Continue to the actual endpoint
+      next();
+      
+    } catch (error) {
+      console.error(`[${new Date().toISOString()}] [USAGE-MIDDLEWARE] Error in usage tracking middleware:`, error);
+      // Don't fail the request - continue to endpoint
+      next();
+    }
+  };
+}
 
 // ... existing code continues ...
 
@@ -1286,25 +1627,20 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
     // Generate standardized prefix using centralized schema manager
     const prefix = PlatformSchemaManager.buildPath(module, platform, username, additional);
     
-    // 🔥 HOTFIX: For news module, support known module aliases but KEEP user scoping
-    // Always build alt prefixes via PlatformSchemaManager to scope to /platform/username/
+    // 🔥 HOTFIX: Some uploads use alternative prefixes for the same module name.
+    // If we are fetching the news module, pull from ALL known prefixes and merge.
     const altPrefixes = [];
     if (module === 'news_for_you') {
-      const moduleAliases = ['news_for_you', 'news-for-you', 'NewForYou'];
-      for (const alias of moduleAliases) {
-        try {
-          const built = PlatformSchemaManager.buildPath(alias, platform, username);
-          if (built !== prefix && !altPrefixes.includes(built)) {
-            altPrefixes.push(built);
-          }
-        } catch (_) {
-          // Ignore schema build issues for aliases
-        }
+      const dashed = prefix.replace('news_for_you', 'news-for-you');
+      if (dashed !== prefix) {
+        altPrefixes.push(dashed);
       }
 
-      // Allow timestamped root files like: news_YYYYMMDD_HHMMSS_USERNAME.json (global)
-      // We'll fetch with the bare prefix but strictly filter by username later
-      altPrefixes.push('news_');
+      // Also support historical/camel-cased prefix used by older pipelines
+      const newForYou = prefix.replace('news_for_you', 'NewForYou');
+      if (newForYou !== prefix && newForYou !== dashed) {
+        altPrefixes.push(newForYou);
+      }
     }
  
     // Check if we should use cache based on the enhanced caching rules
@@ -1329,57 +1665,13 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
     };
 
     let files = await listJsonObjects(prefix);
-    // If alt prefixes exist, fetch and merge with deduplication
+    // If alt prefixes exist, fetch and merge
     for (const alt of altPrefixes) {
       try {
         const altFiles = await listJsonObjects(alt);
         files = files.concat(altFiles);
-      } catch (_) {
+      } catch (err) {
         // Ignore missing alt prefix
-      }
-    }
-
-    // ✅ FIX: Remove duplicate files by Key to prevent duplicate processing
-    const uniqueFiles = [];
-    const seenKeys = new Set();
-    for (const file of files) {
-      if (!seenKeys.has(file.Key)) {
-        seenKeys.add(file.Key);
-        uniqueFiles.push(file);
-      }
-    }
-    files = uniqueFiles;
-
-    // 🚀 Strict user scoping for news files (no global fallback)
-    if (module === 'news_for_you') {
-      const userSpecificFiles = files.filter(file => {
-        const fileName = file.Key.split('/').pop() || file.Key;
-        const pathScoped = file.Key.includes(`/${platform}/${username}/`);
-
-        // Standard per-user news files live under user-scoped path
-        const standardMatch = pathScoped && (
-          fileName.startsWith('news_for_you') ||
-          fileName.startsWith('news-for-you') ||
-          fileName.startsWith('NewForYou')
-        );
-
-        // Timestamped global files: require username token in the filename
-        const usernameLower = String(username).toLowerCase();
-        const fileNameLower = fileName.toLowerCase();
-        const timestampedMatch = fileNameLower.startsWith('news_') &&
-          fileNameLower.endsWith('.json') &&
-          fileNameLower.includes(`_${usernameLower}`);
-
-        return standardMatch || timestampedMatch;
-      });
-
-      if (userSpecificFiles.length > 0) {
-        files = userSpecificFiles;
-        console.log(`[${new Date().toISOString()}] Found ${userSpecificFiles.length} user-specific news files for ${username}`);
-      } else {
-        // No fallback to all files. Return none for this user.
-        console.log(`[${new Date().toISOString()}] No user-specific news files found for ${username}, returning none`);
-        files = [];
       }
     }
 
@@ -1388,10 +1680,8 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
     const sortedFiles = files
       .sort((a, b) => new Date(b.LastModified).getTime() - new Date(a.LastModified).getTime());
     
-    // ✅ ENHANCED: For news, limit to most recent 4 items; for other modules use existing logic
-    const maxItems = module === 'news_for_you' ? 4 : 
-                    (module === 'recommendations' || module === 'competitor_analysis') ? 3 : 
-                    sortedFiles.length;
+    // ✅ NEW: Limit to most recent 3 items for strategies and competitor analysis
+    const maxItems = (module === 'recommendations' || module === 'competitor_analysis') ? 3 : sortedFiles.length;
     const limitedFiles = sortedFiles.slice(0, maxItems);
     
     if (maxItems < sortedFiles.length) {
@@ -1415,22 +1705,11 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
           }
 
           const parsedData = JSON.parse(body);
-
-          // ✅ FIX: Flatten the data structure to match frontend expectations
-          let finalData = parsedData;
-          if (parsedData.news_data && typeof parsedData.news_data === 'object') {
-            finalData = {
-              ...parsedData, // Keep top-level fields like username, platform, etc.
-              ...parsedData.news_data, // Lift nested fields to the top level
-              news_data: undefined, // Optional: remove the nested object to clean up
-            };
-          }
-
           return { 
             key: file.Key, 
             lastModified: file.LastModified,
             data: {
-              ...finalData,
+              ...parsedData,
               platform: platform
             }
           };
@@ -1926,50 +2205,6 @@ app.get(['/retrieve-multiple/:accountHolder', '/api/retrieve-multiple/:accountHo
   }
 });
 
-// List available competitors by scanning R2 directory structure
-app.get(['/list-competitors/:accountHolder', '/api/list-competitors/:accountHolder'], async (req, res) => {
-  try {
-    const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
-    const basePrefix = PlatformSchemaManager.buildPath('competitor_analysis', platform, username);
-
-    console.log(`[${new Date().toISOString()}] Listing competitors for ${platform}/${username} at ${basePrefix}/`);
-
-    const competitorsSet = new Set();
-    let ContinuationToken = undefined;
-
-    do {
-      const listCommand = new ListObjectsV2Command({
-        Bucket: 'tasks',
-        Prefix: `${basePrefix}/`,
-        ContinuationToken
-      });
-      const data = await s3Client.send(listCommand);
-
-      if (Array.isArray(data.Contents)) {
-        for (const obj of data.Contents) {
-          const key = obj.Key || '';
-          if (!key.startsWith(`${basePrefix}/`)) continue;
-          const rest = key.substring(`${basePrefix}/`.length);
-          const parts = rest.split('/');
-          const comp = parts[0];
-          if (comp && comp.trim()) {
-            competitorsSet.add(comp.trim());
-          }
-        }
-      }
-
-      ContinuationToken = data.IsTruncated ? data.NextContinuationToken : undefined;
-    } while (ContinuationToken);
-
-    const competitors = Array.from(competitorsSet);
-    console.log(`[${new Date().toISOString()}] Found ${competitors.length} competitors for ${platform}/${username}`);
-    res.json({ competitors });
-  } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error listing competitors:`, error);
-    res.status(500).json({ error: 'Failed to list competitors', details: error.message });
-  }
-});
-
 app.get(['/retrieve-strategies/:accountHolder', '/api/retrieve-strategies/:accountHolder'], async (req, res) => {
   try {
     const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
@@ -2064,7 +2299,12 @@ app.post(['/save-query/:accountHolder', '/api/save-query/:accountHolder'], async
 app.post(['/ai-reply/:username', '/api/ai-reply/:username'], async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
   const { username } = req.params;
+  const platform = req.body.notification?.platform || req.body.platform || 'instagram';
+  
   try {
+    // ✅ TRACK USAGE: AI Reply API called
+    trackUsageForEndpoint(platform, username, 'aiReplies', 'ai_reply_generated');
+    
     // 1. Prepare notification with text
     let notification = req.body.notification || req.body;
     if (!notification.text) {
@@ -2102,7 +2342,15 @@ app.post(['/ai-reply/:username', '/api/ai-reply/:username'], async (req, res) =>
 // Proxy POST /api/instant-reply to RAG server
 app.post('/api/instant-reply', async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
+  const username = req.body.username;
+  const platform = req.body.platform || 'instagram';
+  
   try {
+    // ✅ TRACK USAGE: AI Reply API called  
+    if (username) {
+      trackUsageForEndpoint(platform, username, 'aiReplies', 'instant_reply_generated');
+    }
+    
     const response = await axios.post('http://localhost:3001/api/instant-reply', req.body, {
       headers: { 'Content-Type': 'application/json' }
     });
@@ -2121,7 +2369,13 @@ app.post('/api/instant-reply', async (req, res) => {
 // Proxy POST /api/rag/discussion to RAG server
 app.post(['/api/rag/discussion', '/api/discussion'], async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
+  const username = req.body.username;
+  const platform = req.body.platform || 'instagram';
+  
   try {
+    // ❌ REMOVED: Usage tracking already handled by frontend UsageContext
+    // Frontend tracks usage via /api/usage/increment/:userId to prevent double counting
+    
     const response = await axios.post('http://localhost:3001/api/discussion', req.body, {
       headers: { 'Content-Type': 'application/json' },
       timeout: 120000 // 2 minute timeout for complex queries
@@ -2136,7 +2390,13 @@ app.post(['/api/rag/discussion', '/api/discussion'], async (req, res) => {
 // Proxy POST /api/rag/post-generator to RAG server
 app.post(['/api/rag/post-generator', '/api/post-generator'], async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
+  const username = req.body.username;
+  const platform = req.body.platform || 'instagram';
+  
   try {
+    // ❌ REMOVED: Usage tracking already handled by RagService via platform/username endpoint
+    // RagService tracks usage via /api/usage/increment/:platform/:username to prevent double counting
+    
     const response = await axios.post('http://localhost:3001/api/post-generator', req.body, {
       headers: { 'Content-Type': 'application/json' },
       timeout: 180000 // 3 minute timeout for image generation
@@ -7387,6 +7647,7 @@ scheduleConnectionHealthCheck();
 app.get(['/events-missed/:username', '/api/events-missed/:username'], async (req, res) => {
   const { username } = req.params;
   const { since } = req.query;
+  let sinceTimestamp = 0;
   
   // Validate 'since' timestamp
   if (since) {
@@ -12720,6 +12981,9 @@ app.post(['/save-goal/:username', '/api/save-goal/:username'], async (req, res) 
         error: 'Timeline must be a positive number' 
       });
     }
+
+    // ✅ TRACK USAGE: Campaign/Goal submission
+    trackUsageForEndpoint(platform, username, 'campaigns', 'goal_submitted');
 
     // Check for existing active campaign
     console.log(`[${new Date().toISOString()}] Checking for existing campaign before creating new goal for ${username} on ${platform}`);

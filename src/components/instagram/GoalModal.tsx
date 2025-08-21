@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
+import { useAccessControl } from '../../hooks/useAccessControl';
+import { useUpgradePopup } from '../../context/UpgradePopupContext';
 
 interface GoalModalProps {
   username: string;
@@ -24,20 +26,38 @@ interface CampaignStatus {
   goalFiles?: number;
 }
 
-interface PlatformSpecificStatus {
-  [key: string]: CampaignStatus;
-}
 
 // Platform-isolated Goal Modal - ensures each platform has independent campaign states
-const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram', onClose, onSuccess }) => {
+const GoalModal: React.FC<GoalModalProps> = ({ username, platform, onClose, onSuccess }) => {
   const { trackRealCampaign, canUseFeature } = useFeatureTracking();
+  const { isPremium } = useAccessControl();
+  const { showUpgradePopup } = useUpgradePopup();
   const [form, setForm] = useState<GoalForm>({ persona: '', timeline: '', goal: '', instruction: '' });
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [showCampaignButton, setShowCampaignButton] = useState(false);
   const [campaignStatus, setCampaignStatus] = useState<CampaignStatus | null>(null);
-  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const normalizedPlatform = (platform || 'instagram').toLowerCase();
+  const displayPlatform = platform || 'Instagram';
+
+  const MAX_TRIAL_DAYS = 3; // Non-premium cap
+
+  const goalSuggestions: string[] = [
+    'Run a brand awareness campaign tailored to my audience',
+    'Branding campaign to strengthen recognition and recall',
+    'Engage my audience with informative, value-rich posts',
+    'Share daily industry news with short, useful insights',
+    'Grow community affinity using light, human, relatable content'
+  ];
+
+  const instructionSuggestions: string[] = [
+    'Be informative and genuinely helpful',
+    'Keep tone respectful and on-brand',
+    'Add light humor when appropriate (never offensive)',
+    'Align with the visual and voice of my previous posts',
+    'Avoid controversial or polarizing topics'
+  ];
 
   useEffect(() => {
     checkCampaignStatus();
@@ -53,13 +73,13 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
   useEffect(() => {
     const handleCampaignStoppedEvent = (event: any) => {
       const { username: stoppedUsername, platform: stoppedPlatform } = event.detail;
-      console.log(`[GoalModal] Campaign stopped event received: ${stoppedUsername}/${stoppedPlatform.toLowerCase()} vs current ${username}/${platform.toLowerCase()}`);
+      console.log(`[GoalModal] Campaign stopped event received: ${stoppedUsername}/${String(stoppedPlatform).toLowerCase()} vs current ${username}/${normalizedPlatform}`);
       
-      if (stoppedUsername === username && stoppedPlatform.toLowerCase() === platform.toLowerCase()) {
+      if (stoppedUsername === username && String(stoppedPlatform).toLowerCase() === normalizedPlatform) {
         console.log(`[GoalModal] Campaign stopped event matched: Updating UI state`);
         setCampaignStatus({
           hasActiveCampaign: false,
-          platform: platform.toLowerCase(),
+          platform: normalizedPlatform,
           username,
           goalFiles: 0
         });
@@ -77,23 +97,22 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
     return () => {
       window.removeEventListener('campaignStopped', handleCampaignStoppedEvent);
     };
-  }, [username, platform]);
+  }, [username, platform, normalizedPlatform]);
 
   const checkCampaignStatus = async () => {
     // ✅ BACKGROUND VALIDATION - Start validation but don't block UI
-    setIsCheckingStatus(true);
     try {
-      console.log(`[GoalModal] Checking campaign status for ${username} on ${platform}`);
+      console.log(`[GoalModal] Checking campaign status for ${username} on ${normalizedPlatform}`);
       // Add bypass_cache=true to ensure we get fresh data from the server
-      const response = await axios.get(`/campaign-status/${username}?platform=${platform.toLowerCase()}&bypass_cache=true`);
+      const response = await axios.get(`/api/campaign-status/${username}?platform=${normalizedPlatform}&bypass_cache=true`);
       const statusData = response.data;
       
       console.log(`[GoalModal] Backend response:`, statusData);
       
       // Ensure platform isolation - only consider status for the current platform
       const platformSpecificStatus = {
-        hasActiveCampaign: statusData.hasActiveCampaign && statusData.platform === platform.toLowerCase(),
-        platform: platform.toLowerCase(),
+        hasActiveCampaign: statusData.hasActiveCampaign && statusData.platform === normalizedPlatform,
+        platform: normalizedPlatform,
         username,
         goalFiles: statusData.goalFiles
       };
@@ -114,39 +133,61 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
         setShowCampaignButton(false);
       }
     } catch (err: any) {
-      console.error(`[GoalModal] Error checking campaign status for ${platform}:`, err);
+      console.error(`[GoalModal] Error checking campaign status for ${normalizedPlatform}:`, err);
       // If there's an error checking status, assume no active campaign for this platform
       setCampaignStatus({ 
         hasActiveCampaign: false, 
-        platform: platform.toLowerCase(), 
+        platform: normalizedPlatform, 
         username,
         goalFiles: 0 
       });
       setShowCampaignButton(false);
     } finally {
-      setIsCheckingStatus(false);
+      // Status checking complete
     }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     if (name === 'timeline' && value && !/^\d*$/.test(value)) return; // Only allow numbers
+    // Enforce 3-day cap for non-premium users
+    if (name === 'timeline') {
+      const numeric = value ? parseInt(value, 10) : NaN;
+      if (!isPremium && !Number.isNaN(numeric) && numeric > MAX_TRIAL_DAYS) {
+        // Show upgrade popup and keep within cap
+        try {
+          showUpgradePopup('campaigns', numeric, MAX_TRIAL_DAYS);
+        } catch {}
+        setForm((prev) => ({ ...prev, [name]: String(MAX_TRIAL_DAYS) }));
+        return;
+      }
+    }
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   // Platform-specific validation - only check campaign status for current platform
   const isCurrentPlatformBlocked = campaignStatus?.hasActiveCampaign && 
-    campaignStatus?.platform === platform.toLowerCase();
+    campaignStatus?.platform === normalizedPlatform;
 
   const canSubmit =
     !!form.timeline &&
     !!form.goal.trim() &&
     !!form.instruction.trim() &&
     /^\d+$/.test(form.timeline) &&
+    // Restrict non-premium users to 3 days max
+    (isPremium || (!isPremium && Number(form.timeline) <= MAX_TRIAL_DAYS)) &&
     !isCurrentPlatformBlocked;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Guard timeline for non-premium users
+    if (!isPremium && Number(form.timeline) > MAX_TRIAL_DAYS) {
+      try {
+        showUpgradePopup('campaigns', Number(form.timeline), MAX_TRIAL_DAYS);
+      } catch {}
+      setError(`Trial limit is ${MAX_TRIAL_DAYS} days. Please upgrade to set longer timelines.`);
+      return;
+    }
     if (!canSubmit) return;
     
     // ✅ PRE-ACTION CHECK: Verify campaign limits before proceeding
@@ -158,51 +199,76 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
     
     setIsSubmitting(true);
     setError(null);
+    
     try {
-      await axios.post(`/save-goal/${username}?platform=${platform.toLowerCase()}`, {
+      console.log(`[GoalModal] 🚀 Saving goal for ${username} on ${normalizedPlatform}:`, {
         persona: form.persona,
         timeline: Number(form.timeline),
         goal: form.goal,
         instruction: form.instruction,
       });
       
-      // ✅ REAL USAGE TRACKING: Check limits BEFORE setting campaign goal
-      const trackingSuccess = await trackRealCampaign(platform.toLowerCase(), {
-        action: 'goal_set'
+      // First, save the goal to the server
+      const response = await axios.post(`/api/save-goal/${username}?platform=${normalizedPlatform}`, {
+        persona: form.persona,
+        timeline: Number(form.timeline),
+        goal: form.goal,
+        instruction: form.instruction,
       });
       
-      if (!trackingSuccess) {
-        console.warn(`[GoalModal] 🚫 Campaign goal blocked for ${platform} - limit reached`);
-        setError('Campaign limit reached - upgrade to continue');
-        setIsSubmitting(false);
-        return;
+      console.log(`[GoalModal] ✅ Goal saved successfully:`, response.data);
+      
+      // ✅ TRACKING: Try to track usage but don't block success if it fails
+      try {
+        const trackingSuccess = await trackRealCampaign(normalizedPlatform, {
+          action: 'goal_set'
+        });
+        
+        if (trackingSuccess) {
+          console.log(`[GoalModal] ✅ Campaign goal tracked successfully for ${normalizedPlatform}`);
+        } else {
+          console.warn(`[GoalModal] ⚠️ Campaign tracking failed but goal was saved`);
+        }
+      } catch (trackingError) {
+        console.warn(`[GoalModal] ⚠️ Campaign tracking error (non-blocking):`, trackingError);
+        // Don't block success - tracking is secondary to goal saving
       }
       
-      console.log(`[GoalModal] ✅ Campaign goal tracked: ${platform} goal submission`);
-      
+      // Goal saved successfully - show success state
       setSuccess(true);
+      
       // Show campaign button after successful submission
       setTimeout(() => {
         setSuccess(false);
         setShowCampaignButton(true);
-        setCampaignStatus({ hasActiveCampaign: true, platform: platform.toLowerCase(), username });
+        setCampaignStatus({ hasActiveCampaign: true, platform: normalizedPlatform, username });
       }, 1200);
+      
       if (onSuccess) {
         onSuccess();
       }
+      
     } catch (err: any) {
+      console.error(`[GoalModal] ❌ Error saving goal:`, err);
+      
       if (err.response?.status === 409) {
         // Campaign already active for this specific platform
-        setError(`You already have an active ${platform} campaign. Please stop the current ${platform} campaign before starting a new one.`);
+        setError(`You already have an active ${displayPlatform} campaign. Please stop the current ${displayPlatform} campaign before starting a new one.`);
         setCampaignStatus({ 
           hasActiveCampaign: true, 
-          platform: platform.toLowerCase(), 
+          platform: normalizedPlatform, 
           username,
           goalFiles: campaignStatus?.goalFiles || 0
         });
         setShowCampaignButton(true);
+      } else if (err.response?.status === 404) {
+        setError(`Server endpoint not found. Please check if the server is running.`);
+      } else if (err.response?.status >= 500) {
+        setError(`Server error (${err.response.status}). Please try again later.`);
+      } else if (err.code === 'NETWORK_ERROR' || err.message?.includes('Network Error')) {
+        setError(`Network error. Please check your connection and try again.`);
       } else {
-        setError(err.response?.data?.error || 'Failed to save goal.');
+        setError(err.response?.data?.error || err.message || 'Failed to save goal. Please try again.');
       }
     } finally {
       setIsSubmitting(false);
@@ -214,7 +280,7 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
     onClose();
     // The parent component should handle opening the campaign modal
     // We'll pass this information through an event or callback
-    window.dispatchEvent(new CustomEvent('openCampaignModal', { detail: { username, platform } }));
+    window.dispatchEvent(new CustomEvent('openCampaignModal', { detail: { username, platform: normalizedPlatform } }));
   };
 
   // ✅ NO LOADING SCREEN - Show content immediately while validating in background
@@ -249,7 +315,7 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
           borderBottom: '1px solid #333',
           marginBottom: '16px'
         }}>
-          Platform: {platform} | Status: {campaignStatus?.hasActiveCampaign ? 'Campaign Active' : 'No Campaign'} | Backend Platform: {campaignStatus?.platform}
+          Platform: {displayPlatform} | Status: {campaignStatus?.hasActiveCampaign ? 'Campaign Active' : 'No Campaign'} | Backend Platform: {campaignStatus?.platform}
         </div>
         
         {/* Platform-Specific Campaign Status Warning */}
@@ -268,7 +334,7 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
               fontSize: '14px',
               fontWeight: '500'
             }}>
-              ⚠️ Stop the {platform} campaign to enable the Goal Button.
+              ⚠️ Stop the {displayPlatform} campaign to enable the Goal Button.
             </p>
           </div>
         )}
@@ -283,7 +349,7 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
                 value={form.persona}
                 onChange={handleChange}
                 className="form-input"
-                placeholder="Whom should I mimic? (e.g. as Account holder)"
+                placeholder="Whose voice to emulate? (e.g., account holder, brand manager)"
                 disabled={isCurrentPlatformBlocked}
               />
             </div>
@@ -295,33 +361,84 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
                 value={form.timeline}
                 onChange={handleChange}
                 className="form-input"
-                placeholder="Days to accomplish (number only)"
+                placeholder={`Days to run (number only${isPremium ? '' : `, max ${MAX_TRIAL_DAYS} on trial`})`}
                 required
                 disabled={isCurrentPlatformBlocked}
               />
+              {!isPremium && (
+                <div style={{
+                  marginTop: 6,
+                  fontSize: 11,
+                  color: '#a0a0cc',
+                  borderLeft: '2px solid #555',
+                  paddingLeft: 8
+                }}>
+                  Trial users can run up to {MAX_TRIAL_DAYS} days. Upgrade for longer timelines.
+                </div>
+              )}
             </div>
             <div className="form-group">
               <label className="form-label">Goal <span style={{ color: '#ff4444' }}>*</span></label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                {goalSuggestions.map((s, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setForm(prev => ({ ...prev, goal: s }))}
+                    style={{
+                      background: '#1e1e1e',
+                      color: '#ccc',
+                      border: '1px solid #333',
+                      borderRadius: 14,
+                      padding: '4px 10px',
+                      fontSize: 11,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
               <textarea
                 name="goal"
                 value={form.goal}
                 onChange={handleChange}
                 className="form-input"
                 rows={3}
-                placeholder="What do you want to achieve? (e.g. engagement, reach, followers, etc.)"
+                placeholder="Choose or describe the goal: awareness, branding, engaging audience, daily news, product push..."
                 required
                 disabled={isCurrentPlatformBlocked}
               />
             </div>
             <div className="form-group">
               <label className="form-label">Instruction <span style={{ color: '#ff4444' }}>*</span></label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                {instructionSuggestions.map((s, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setForm(prev => ({ ...prev, instruction: prev.instruction ? `${prev.instruction}\n- ${s}` : `- ${s}` }))}
+                    style={{
+                      background: '#1e1e1e',
+                      color: '#ccc',
+                      border: '1px solid #333',
+                      borderRadius: 14,
+                      padding: '4px 10px',
+                      fontSize: 11,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
               <textarea
                 name="instruction"
                 value={form.instruction}
                 onChange={handleChange}
                 className="form-input"
                 rows={3}
-                placeholder="What should be the theme? What should be avoided?"
+                placeholder="Guidance: tone, do/don'ts (e.g., be informative, light humor, respectful, align with my past posts, avoid controversies)"
                 required
                 disabled={isCurrentPlatformBlocked}
               />
@@ -347,7 +464,7 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform = 'Instagram',
                   background: '#666' 
                 } : {}}
               >
-                {isSubmitting ? 'Saving...' : isCurrentPlatformBlocked ? `${platform} Campaign Active` : 'Save Goal'}
+                {isSubmitting ? 'Saving...' : isCurrentPlatformBlocked ? `${displayPlatform} Campaign Active` : 'Save Goal'}
               </button>
             </div>
           </form>

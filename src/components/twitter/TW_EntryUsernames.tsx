@@ -365,6 +365,61 @@ const usernameCheckUrl = '/api/check-username-availability';
             </div>
 
             <div className="form-section">
+              <h2>Account Type</h2>
+              <div className="account-type-selection">
+                <label className="radio-label">
+                  <input
+                    type="radio"
+                    name="accountType"
+                    value="branding"
+                    checked={accountType === 'branding'}
+                    onChange={(e) => setAccountType(e.target.value as 'branding' | 'non-branding')}
+                    disabled={isLoading}
+                  />
+                  <span className="radio-text">
+                    <strong>Branding Account</strong>
+                    <span className="radio-description">Business, brand, or public figure account</span>
+                  </span>
+                </label>
+                
+                <label className="radio-label">
+                  <input
+                    type="radio"
+                    name="accountType"
+                    value="non-branding"
+                    checked={accountType === 'non-branding'}
+                    onChange={(e) => setAccountType(e.target.value as 'branding' | 'non-branding')}
+                    disabled={isLoading}
+                  />
+                  <span className="radio-text">
+                    <strong>Non-Branding Account</strong>
+                    <span className="radio-description">Personal, private, or non-business account</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div className="form-section">
+              <h2>Posting Style</h2>
+              <div className="form-group">
+                <label htmlFor="posting-style">Posting Style *</label>
+                <textarea
+                  id="posting-style"
+                  value={postingStyle}
+                  onChange={(e) => setPostingStyle(e.target.value)}
+                  placeholder="Describe your typical posting style, tone, and content approach..."
+                  className="form-textarea"
+                  rows={4}
+                  disabled={isLoading}
+                />
+                <div className="field-description">
+                  <p><strong>AI Training Data:</strong> This helps our AI understand your voice and create content that matches your style.</p>
+                  <p><em>Examples:</em> "Professional and informative with occasional humor" or "Casual and relatable lifestyle content"</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="form-section">
               <h2>Competitor Analysis</h2>
               <div className="competitors-section">
                 <div className="competitors-header">
@@ -405,41 +460,6 @@ const usernameCheckUrl = '/api/check-username-availability';
                     + Add Competitor
                   </button>
                 )}
-              </div>
-            </div>
-
-            <div className="form-section">
-              <h2>Account Type</h2>
-              <div className="account-type-selection">
-                <label className="radio-label">
-                  <input
-                    type="radio"
-                    name="accountType"
-                    value="branding"
-                    checked={accountType === 'branding'}
-                    onChange={(e) => setAccountType(e.target.value as 'branding' | 'non-branding')}
-                    disabled={isLoading}
-                  />
-                  <span className="radio-text">
-                    <strong>Branding Account</strong>
-                    <span className="radio-description">Business, brand, or public figure account</span>
-                  </span>
-                </label>
-                
-                <label className="radio-label">
-                  <input
-                    type="radio"
-                    name="accountType"
-                    value="non-branding"
-                    checked={accountType === 'non-branding'}
-                    onChange={(e) => setAccountType(e.target.value as 'branding' | 'non-branding')}
-                    disabled={isLoading}
-                  />
-                  <span className="radio-text">
-                    <strong>Non-Branding Account</strong>
-                    <span className="radio-description">Personal, private, or non-business account</span>
-                  </span>
-                </label>
               </div>
             </div>
 
@@ -523,10 +543,54 @@ const usernameCheckUrl = '/api/check-username-availability';
                   <li>✓ No spaces or special characters (except underscores)</li>
                   <li>✓ Used for AI analysis and competitor research</li>
                   <li>✓ This will be used for 15 minutes of AI processing</li>
-                </ul>
+                  </ul>
                 <div className="format-example">
                   <strong>Examples:</strong> "YourBrandName", "YourName", "Brand_123"
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="form-section">
+            <h2>Account Type</h2>
+            <div className="form-group">
+              <label htmlFor="account-type">Account Type *</label>
+              <select
+                id="account-type"
+                value={accountType}
+                onChange={(e) => setAccountType(e.target.value as 'branding' | 'non-branding')}
+                className="form-select"
+                disabled={isLoading}
+              >
+                <option value="branding">Branding Account</option>
+                <option value="non-branding">Non-Branding Account</option>
+              </select>
+              <div className="field-description">
+                <p><strong>Account Type Impact:</strong></p>
+                <ul>
+                  <li><strong>Branding:</strong> Business promotion, product marketing, brand awareness</li>
+                  <li><strong>Non-Branding:</strong> Personal content, lifestyle, entertainment focus</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div className="form-section">
+            <h2>Posting Style</h2>
+            <div className="form-group">
+              <label htmlFor="posting-style">Posting Style *</label>
+              <textarea
+                id="posting-style"
+                value={postingStyle}
+                onChange={(e) => setPostingStyle(e.target.value)}
+                placeholder="Describe your typical posting style, tone, and content approach..."
+                className="form-textarea"
+                rows={4}
+                disabled={isLoading}
+              />
+              <div className="field-description">
+                <p><strong>AI Training Data:</strong> This helps our AI understand your voice and create content that matches your style.</p>
+                <p><em>Examples:</em> "Professional and informative with occasional humor" or "Casual and relatable lifestyle content"</p>
               </div>
             </div>
           </div>
@@ -592,50 +656,6 @@ const usernameCheckUrl = '/api/check-username-availability';
                 + Add Another Competitor
               </button>
             )}
-          </div>
-
-          <div className="form-section">
-            <h2>Account Type</h2>
-            <div className="form-group">
-              <label htmlFor="account-type">Account Type *</label>
-              <select
-                id="account-type"
-                value={accountType}
-                onChange={(e) => setAccountType(e.target.value as 'branding' | 'non-branding')}
-                className="form-select"
-                disabled={isLoading}
-              >
-                <option value="branding">Branding Account</option>
-                <option value="non-branding">Non-Branding Account</option>
-              </select>
-              <div className="field-description">
-                <p><strong>Account Type Impact:</strong></p>
-                <ul>
-                  <li><strong>Branding:</strong> Business promotion, product marketing, brand awareness</li>
-                  <li><strong>Non-Branding:</strong> Personal content, lifestyle, entertainment focus</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          <div className="form-section">
-            <h2>Posting Style</h2>
-            <div className="form-group">
-              <label htmlFor="posting-style">Posting Style *</label>
-              <textarea
-                id="posting-style"
-                value={postingStyle}
-                onChange={(e) => setPostingStyle(e.target.value)}
-                placeholder="Describe your typical posting style, tone, and content approach..."
-                className="form-textarea"
-                rows={4}
-                disabled={isLoading}
-              />
-              <div className="field-description">
-                <p><strong>AI Training Data:</strong> This helps our AI understand your voice and create content that matches your style.</p>
-                <p><em>Examples:</em> "Professional and informative with occasional humor" or "Casual and relatable lifestyle content"</p>
-              </div>
-            </div>
           </div>
 
           {validationErrors().length > 0 && (

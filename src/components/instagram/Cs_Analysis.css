@@ -1113,17 +1113,17 @@
 /* ✨ MOBILE PORTRAIT - COMPREHENSIVE MOBILE TRANSFORMATION */
 @media (max-width: 767px) and (orientation: portrait) {
   .cs-analysis-container {
-    gap: 6px;
-    min-height: 250px;
+    gap: 4px;
+    min-height: 220px;
   }
 
   .competitor-header {
-    margin-bottom: 1px;
+    margin-bottom: 0;
     min-height: 14px;
   }
 
   .competitor-header-row {
-    margin-bottom: 1px;
+    margin-bottom: 0;
   }
 
   .add-competitor-btn {
@@ -1134,9 +1134,10 @@
   }
 
   .competitor-list-scrollable {
-    max-height: 350px;
-    min-height: 200px;
-    margin-bottom: 6px;
+    max-height: 280px;
+    min-height: 0;
+    margin-bottom: 2px;
+    padding-right: 4px;
   }
 
   .competitor-list-heading {
@@ -1145,18 +1146,19 @@
   }
 
   .competitor-sub-container {
-    padding: 6px;
+    padding: 3px;
     border-radius: 10px;
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    gap: 3px;
+    gap: 1px;
     display: flex;
     flex-direction: column;
+    margin: 1px 0;
   }
 
   .preview-text {
     font-size: 0.7rem;
-    line-height: 1.2;
+    line-height: 1.15;
     margin: 0;
     color: rgba(255, 255, 255, 0.95);
     display: -webkit-box;
@@ -1165,7 +1167,7 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-height: 2.52em; /* Exactly 3 lines for mobile */
+    max-height: 2.4em; /* Tighter 3-line clamp */
   }
 
   .see-more-btn {
@@ -1180,8 +1182,8 @@
 /* ✨ ULTRA-SMALL MOBILE ADJUSTMENTS */
 @media (max-width: 480px) and (orientation: portrait) {
   .cs-analysis-container {
-    gap: 4px;
-    min-height: 200px;
+    gap: 3px;
+    min-height: 190px;
   }
 
   .competitor-header {
@@ -1197,9 +1199,10 @@
   }
 
   .competitor-list-scrollable {
-    max-height: 300px;
-    min-height: 180px;
-    margin-bottom: 4px;
+    max-height: 240px;
+    min-height: 0;
+    margin-bottom: 2px;
+    padding-right: 3px;
   }
 
   .competitor-list-heading {
@@ -1207,10 +1210,7 @@
     margin: 0 0 3px 0;
   }
 
-  .competitor-sub-container {
-    padding: 4px;
-    gap: 2px;
-  }
+  .competitor-sub-container { padding: 2px; gap: 1px; margin: 1px 0; }
 
   .preview-text {
     font-size: 0.65rem;

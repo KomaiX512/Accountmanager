@@ -191,12 +191,12 @@
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  height: 32px; /* Reduced height */
+  height: 32px;
   color: #e0e0ff;
   text-decoration: none;
-  font-size: clamp(0.7rem, 1.8vw, 0.9rem); /* Smaller font size */
+  font-size: clamp(0.7rem, 1.8vw, 0.9rem);
   font-weight: 700;
-  padding: 0 clamp(12px, 3vw, 16px); /* Reduced padding */
+  padding: 0 clamp(12px, 3vw, 16px);
   border-radius: clamp(6px, 1.5vw, 8px);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
@@ -206,6 +206,9 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .nav-link:hover {
@@ -267,6 +270,10 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .dashboard-button:hover {
@@ -299,11 +306,15 @@
   width: 18px;
   height: 18px;
   fill: currentColor;
+  flex-shrink: 0;
 }
 
 .dashboard-button span {
   font-size: inherit;
   font-weight: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Mobile Dashboard Button Container */
@@ -496,238 +507,236 @@
   border-left: 3px solid #00ffcc;
 }
 
-/* Responsive adjustments for smaller laptop screens */
-@media (max-width: 768px) {
+/* Improved responsive breakpoints */
+@media (max-width: 1440px) {
   .top-bar {
-    height: 55px !important;
-    padding-left: 55px !important;
-    padding-right: 15px !important;
-    min-height: 55px !important;
-    max-height: 55px !important;
+    height: 65px !important;
+    padding-left: 80px !important;
+    padding-right: 22px !important;
+    min-height: 65px !important;
+    max-height: 65px !important;
   }
 
   .social-icons {
-    height: 45px;
-    max-height: 45px;
-    gap: 5px;
+    gap: 6px;
+    height: 60px;
+    max-height: 60px;
   }
 
-  .nav-link {
-    width: 38px;
-    height: 38px;
-    font-size: 0.7rem;
-    padding: 6px;
+  .social-icon {
+    width: 22px;
+    height: 22px;
   }
 
-  .nav-link svg {
+  .social-icon svg {
     width: 16px;
     height: 16px;
   }
 
-  .color-mode-toggle {
-    width: 32px;
-    height: 32px;
-  }
-
-  .color-mode-toggle svg {
-    width: 15px;
-    height: 15px;
-  }
-}
-
-@media (max-width: 1440px) {
-  .top-bar {
-    height: clamp(50px, 5vh, 65px) !important;
-    padding-left: clamp(65px, 6.5vw, 80px) !important;
-    padding-right: clamp(18px, 2.2vw, 22px) !important;
-    min-height: clamp(50px, 5vh, 65px) !important;
-    max-height: clamp(50px, 5vh, 65px) !important;
-  }
-
-  .social-icons {
-    gap: clamp(2px, 0.4vw, 4px);
-    height: clamp(50px, 5vh, 65px);
-    max-height: clamp(50px, 5vh, 65px);
-  }
-
-  .social-icon {
-    width: clamp(16px, 1.6vw, 24px);
-    height: clamp(16px, 1.6vw, 24px);
-  }
-
-  .social-icon svg {
-    width: clamp(14px, 1.4vw, 18px);
-    height: clamp(14px, 1.4vw, 18px);
-  }
-
   .logo-image {
-    height: clamp(26px, 3vw, 30px);
-    max-width: clamp(90px, 11vw, 110px);
+    height: 28px;
+    max-width: 100px;
   }
 
   .nav-link,
   .dashboard-button {
-    font-size: clamp(0.6rem, 1.2vw, 0.75rem);
-    padding: clamp(5px, 1.3vw, 7px) clamp(8px, 2.2vw, 12px);
+    font-size: 0.75rem;
+    padding: 6px 12px;
   }
 }
 
 @media (max-width: 1366px) {
   .top-bar {
-    height: clamp(48px, 4.8vh, 60px) !important;
-    padding-left: clamp(60px, 6vw, 75px) !important;
-    padding-right: clamp(16px, 2vw, 20px) !important;
-    min-height: clamp(48px, 4.8vh, 60px) !important;
-    max-height: clamp(48px, 4.8vh, 60px) !important;
-  }
-
-  .social-icons {
-    gap: clamp(1px, 0.2vw, 2px);
-    height: clamp(48px, 4.8vh, 60px);
-    max-height: clamp(48px, 4.8vh, 60px);
-  }
-
-  .social-icon {
-    width: clamp(14px, 1.4vw, 20px);
-    height: clamp(14px, 1.4vw, 20px);
-  }
-
-  .social-icon svg {
-    width: clamp(12px, 1.2vw, 16px);
-    height: clamp(12px, 1.2vw, 16px);
-  }
-
-  .logo-image {
-    height: clamp(24px, 2.8vw, 28px);
-    max-width: clamp(80px, 10vw, 100px);
-  }
-
-  .nav-link,
-  .dashboard-button {
-    font-size: clamp(0.55rem, 1vw, 0.7rem);
-    padding: clamp(4px, 1.1vw, 6px) clamp(6px, 1.8vw, 10px);
-  }
-}
-
-@media (max-width: 1280px) {
-  .top-bar {
     height: 60px !important;
-    padding-left: 65px !important;
+    padding-left: 75px !important;
     padding-right: 20px !important;
     min-height: 60px !important;
     max-height: 60px !important;
   }
 
   .social-icons {
-    height: 50px;
-    max-height: 50px;
-    gap: 6px;
+    gap: 5px;
+    height: 55px;
+    max-height: 55px;
   }
 
-  .nav-link {
-    width: 42px;
-    height: 42px;
-    font-size: 0.75rem;
-    padding: 8px;
+  .social-icon {
+    width: 20px;
+    height: 20px;
   }
 
-  .nav-link svg {
+  .social-icon svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .logo-image {
+    height: 26px;
+    max-width: 90px;
+  }
+
+  .nav-link,
+  .dashboard-button {
+    font-size: 0.7rem;
+    padding: 5px 10px;
+  }
+}
+
+@media (max-width: 1280px) {
+  .top-bar {
+    height: 58px !important;
+    padding-left: 70px !important;
+    padding-right: 18px !important;
+    min-height: 58px !important;
+    max-height: 58px !important;
+  }
+
+  .social-icons {
+    height: 52px;
+    max-height: 52px;
+    gap: 4px;
+  }
+
+  .social-icon {
     width: 18px;
     height: 18px;
   }
 
-  .color-mode-toggle {
-    width: 34px;
-    height: 34px;
+  .social-icon svg {
+    width: 12px;
+    height: 12px;
   }
 
-  .color-mode-toggle svg {
-    width: 17px;
-    height: 17px;
+  .logo-image {
+    height: 24px;
+    max-width: 80px;
+  }
+
+  .nav-link,
+  .dashboard-button {
+    font-size: 0.65rem;
+    padding: 4px 8px;
   }
 }
 
 @media (max-width: 1200px) {
   .top-bar {
-    height: clamp(42px, 4.2vh, 52px) !important;
-    padding-left: clamp(50px, 5vw, 65px) !important;
-    padding-right: clamp(12px, 1.6vw, 16px) !important;
-    min-height: clamp(42px, 4.2vh, 52px) !important;
-    max-height: clamp(42px, 4.2vh, 52px) !important;
+    height: 55px !important;
+    padding-left: 65px !important;
+    padding-right: 16px !important;
+    min-height: 55px !important;
+    max-height: 55px !important;
   }
 
   .social-icons {
-    gap: clamp(0px, 0.05vw, 0px);
-    height: clamp(42px, 4.2vh, 52px);
-    max-height: clamp(42px, 4.2vh, 52px);
+    gap: 3px;
+    height: 50px;
+    max-height: 50px;
   }
 
   .social-icon {
-    width: clamp(10px, 1vw, 16px);
-    height: clamp(10px, 1vw, 16px);
+    width: 16px;
+    height: 16px;
   }
 
   .social-icon svg {
-    width: clamp(8px, 0.8vw, 12px);
-    height: clamp(8px, 0.8vw, 12px);
+    width: 10px;
+    height: 10px;
   }
 
   .logo-image {
-    height: clamp(20px, 2.4vw, 24px);
-    max-width: clamp(60px, 8vw, 80px);
+    height: 22px;
+    max-width: 70px;
   }
 
   .nav-link,
   .dashboard-button {
-    font-size: clamp(0.45rem, 0.8vw, 0.6rem);
-    padding: clamp(2px, 0.7vw, 4px) clamp(3px, 1.2vw, 6px);
+    font-size: 0.6rem;
+    padding: 3px 6px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .top-bar {
+    height: 52px !important;
+    padding-left: 60px !important;
+    padding-right: 14px !important;
+    min-height: 52px !important;
+    max-height: 52px !important;
+  }
+
+  .social-icons {
+    gap: 2px;
+    height: 48px;
+    max-height: 48px;
+  }
+
+  .social-icon {
+    width: 14px;
+    height: 14px;
+  }
+
+  .social-icon svg {
+    width: 8px;
+    height: 8px;
+  }
+
+  .logo-image {
+    height: 20px;
+    max-width: 60px;
+  }
+
+  .nav-link,
+  .dashboard-button {
+    font-size: 0.55rem;
+    padding: 2px 4px;
   }
 }
 
 @media (max-width: 1024px) {
   .top-bar {
-    height: clamp(40px, 4vh, 50px) !important;
-    padding-left: clamp(45px, 4.5vw, 60px) !important;
-    padding-right: clamp(10px, 1.4vw, 14px) !important;
-    min-height: clamp(40px, 4vh, 50px) !important;
-    max-height: clamp(40px, 4vh, 50px) !important;
+    height: 50px !important;
+    padding-left: 55px !important;
+    padding-right: 12px !important;
+    min-height: 50px !important;
+    max-height: 50px !important;
   }
 
   .social-icons {
-    gap: clamp(0px, 0.02vw, 0px);
-    height: clamp(40px, 4vh, 50px);
-    max-height: clamp(40px, 4vh, 50px);
+    gap: 1px;
+    height: 45px;
+    max-height: 45px;
   }
 
   .social-icon {
-    width: clamp(8px, 0.8vw, 14px);
-    height: clamp(8px, 0.8vw, 14px);
+    width: 12px;
+    height: 12px;
   }
 
   .social-icon svg {
-    width: clamp(6px, 0.6vw, 10px);
-    height: clamp(6px, 0.6vw, 10px);
+    width: 6px;
+    height: 6px;
   }
 
   .logo-image {
-    height: clamp(18px, 2.2vw, 22px);
-    max-width: clamp(50px, 7vw, 70px);
+    height: 18px;
+    max-width: 50px;
   }
 
   .nav-link,
   .dashboard-button {
-    font-size: clamp(0.4rem, 0.7vw, 0.55rem);
-    padding: clamp(1px, 0.5vw, 3px) clamp(2px, 0.8vw, 4px);
+    font-size: 0.5rem;
+    padding: 1px 3px;
   }
 }
 
 @media (max-width: 768px) {
   .top-bar {
-    height: clamp(35px, 3.5vh, 45px) !important;
-    padding-left: clamp(40px, 4vw, 55px) !important;
-    padding-right: clamp(8px, 1.2vw, 12px) !important;
-    min-height: clamp(35px, 3.5vh, 45px) !important;
-    max-height: clamp(35px, 3.5vh, 45px) !important;
+    height: 45px !important;
+    padding-left: 50px !important;
+    padding-right: 10px !important;
+    min-height: 45px !important;
+    max-height: 45px !important;
   }
 
   .desktop-nav {
@@ -739,24 +748,24 @@
   }
 
   .social-icons {
-    gap: clamp(0px, 0px, 0px);
-    height: clamp(35px, 3.5vh, 45px);
-    max-height: clamp(35px, 3.5vh, 45px);
+    gap: 0px;
+    height: 40px;
+    max-height: 40px;
   }
 
   .social-icon {
-    width: clamp(6px, 0.6vw, 12px);
-    height: clamp(6px, 0.6vw, 12px);
+    width: 10px;
+    height: 10px;
   }
 
   .social-icon svg {
-    width: clamp(4px, 0.4vw, 8px);
-    height: clamp(4px, 0.4vw, 8px);
+    width: 4px;
+    height: 4px;
   }
 
   .logo-image {
-    height: clamp(16px, 2vw, 20px);
-    max-width: clamp(40px, 6vw, 60px);
+    height: 16px;
+    max-width: 40px;
   }
 
   .nav-links {
@@ -782,36 +791,39 @@
 
   .mobile-dashboard-button-container .dashboard-button {
     display: flex !important;
-    font-size: clamp(0.55rem, 0.8vw, 0.7rem);
-    padding: clamp(2px, 0.8vw, 4px) clamp(3px, 1.2vw, 6px);
+    font-size: 0.6rem;
+    padding: 2px 4px;
   }
 }
 
 @media (max-width: 480px) {
   .top-bar {
-    height: 50px !important;
-    padding-left: 50px !important;
-    padding-right: 12px !important;
-    min-height: 50px !important;
-    max-height: 50px !important;
+    height: 42px !important;
+    padding-left: 45px !important;
+    padding-right: 8px !important;
+    min-height: 42px !important;
+    max-height: 42px !important;
   }
 
   .social-icons {
-    height: 40px;
-    max-height: 40px;
-    gap: 4px;
+    height: 35px;
+    max-height: 35px;
+    gap: 0px;
   }
 
-  .nav-link {
-    width: 34px;
-    height: 34px;
-    font-size: 0.65rem;
-    padding: 5px;
+  .social-icon {
+    width: 8px;
+    height: 8px;
   }
 
-  .nav-link svg {
-    width: 14px;
+  .social-icon svg {
+    width: 2px;
+    height: 2px;
+  }
+
+  .logo-image {
     height: 14px;
+    max-width: 35px;
   }
 
   .color-mode-toggle {
@@ -826,8 +838,8 @@
   }
   
   .dashboard-button svg {
-    width: clamp(12px, 1.2vw, 16px);
-    height: clamp(12px, 1.2vw, 16px);
+    width: 12px;
+    height: 12px;
   }
   
   .mobile-nav-menu {
@@ -835,8 +847,8 @@
   }
   
   .mobile-nav-item {
-    font-size: clamp(0.9rem, 2.2vw, 1.1rem) !important;
-    padding: clamp(12px, 3vw, 16px) clamp(16px, 4vw, 20px) !important;
+    font-size: 0.9rem !important;
+    padding: 12px 16px !important;
   }
   
   .mobile-dashboard-button-container {
@@ -845,25 +857,33 @@
   
   .mobile-dashboard-button-container .dashboard-button {
     display: flex !important;
-    font-size: clamp(0.5rem, 0.7vw, 0.65rem);
-    padding: clamp(1px, 0.6vw, 3px) clamp(2px, 0.8vw, 4px);
+    font-size: 0.5rem;
+    padding: 1px 2px;
   }
 }
 
 @media (max-width: 360px) {
+  .top-bar {
+    height: 38px !important;
+    padding-left: 40px !important;
+    padding-right: 6px !important;
+    min-height: 38px !important;
+    max-height: 38px !important;
+  }
+
   .social-icon {
-    width: clamp(2px, 0.2vw, 8px);
-    height: clamp(2px, 0.2vw, 8px);
+    width: 6px;
+    height: 6px;
   }
   
   .social-icon svg {
-    width: clamp(1px, 0.1vw, 4px);
-    height: clamp(1px, 0.1vw, 4px);
+    width: 1px;
+    height: 1px;
   }
   
   .logo-image {
-    height: clamp(12px, 1.6vw, 16px);
-    max-width: clamp(25px, 4vw, 45px);
+    height: 12px;
+    max-width: 30px;
   }
   
   .platform-title span {
@@ -875,8 +895,8 @@
   }
   
   .mobile-nav-item {
-    font-size: clamp(0.8rem, 2vw, 1rem) !important;
-    padding: clamp(10px, 2.8vw, 14px) clamp(14px, 3.8vw, 18px) !important;
+    font-size: 0.8rem !important;
+    padding: 10px 14px !important;
   }
   
   .mobile-dashboard-button-container {
@@ -885,7 +905,7 @@
   
   .mobile-dashboard-button-container .dashboard-button {
     display: flex !important;
-    font-size: clamp(0.45rem, 0.6vw, 0.6rem);
-    padding: clamp(1px, 0.5vw, 2px) clamp(1px, 0.6vw, 3px);
+    font-size: 0.45rem;
+    padding: 1px 1px;
   }
 }

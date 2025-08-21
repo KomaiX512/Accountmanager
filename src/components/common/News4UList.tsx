@@ -358,7 +358,21 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
           // 🚀 FIXED: Handle the actual API response structure
           rawItems.push(...entry.news_items);
         } else {
-          rawItems.push(entry);
+          // Only include if it looks like a real news item or has a direct news_data object
+          const looksLikeNews = Boolean(
+            (entry && typeof entry === 'object') && (
+              entry.title || entry.headline || entry.name || entry.subject ||
+              entry.description || entry.summary || entry.breaking_news_summary || entry.body || entry.text ||
+              entry.source_url || entry.url || entry.link || entry.source ||
+              entry.image_url || entry.image || entry.thumbnail || entry.picture ||
+              (entry.news_data && typeof entry.news_data === 'object')
+            )
+          );
+          if (looksLikeNews) {
+            rawItems.push(entry);
+          } else {
+            console.warn('[News4U] Skipping non-news container entry:', entry);
+          }
         }
       }
       
@@ -399,7 +413,8 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
         const description: string = base?.description || base?.summary || base?.breaking_news_summary || base?.body || base?.text || '';
         const image_url: string = base?.image_url || base?.image || base?.thumbnail || base?.picture || '';
         const source_url: string = base?.source_url || base?.url || base?.link || base?.source || '';
-        const timestamp: string = base?.timestamp || base?.fetched_at || base?.published_at || base?.created_at || n?.export_timestamp || new Date().toISOString();
+        // Do NOT default timestamp to now; leave undefined if missing so sorting places it last
+        const timestamp: string = base?.timestamp || base?.fetched_at || base?.published_at || base?.created_at || n?.export_timestamp;
         const source: string | undefined = base?.source || base?.publisher || base?.author || undefined;
         const iteration: number | undefined = n?.iteration || base?.export_iteration;
         const fetched_at: string | undefined = base?.fetched_at || base?.created_at;
@@ -413,23 +428,9 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       console.log(`[News4U] Normalized items:`, normalized);
       console.log(`[News4U] Normalized items count:`, normalized.length);
 
-      // Remove duplicate stories based on unique id (fallback to composite)
-      const deduped: NewsItem[] = [];
-      const seen = new Set<string>();
-      normalized.forEach(n => {
-        const key = (n.id || `${n.source_url || ''}::${n.fetched_at || n.timestamp || ''}` || `${n.title || ''}::${n.timestamp || ''}`).toLowerCase();
-        if (key && !seen.has(key)) {
-          seen.add(key);
-          deduped.push(n);
-        }
-      });
-
-      console.log(`[News4U] Deduped items:`, deduped);
-      console.log(`[News4U] Deduped items count:`, deduped.length);
-
-      // 🚀 ROBUST TOP 4 LATEST NEWS LOGIC
-      // Sort by timestamp to get the most recent news first
-      const sortedByTimestamp = deduped.sort((a, b) => {
+      // 🚀 Always show everything the backend returned (up to 4)
+      // Sort by timestamp to get the most recent news first, but DO NOT filter or dedupe
+      const sortedByTimestamp = [...normalized].sort((a, b) => {
         try {
           const timeA = new Date(a.timestamp || a.fetched_at || 0).getTime();
           const timeB = new Date(b.timestamp || b.fetched_at || 0).getTime();
@@ -446,49 +447,12 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
         timestamp: item.timestamp || item.fetched_at,
         parsed: new Date(item.timestamp || item.fetched_at || 0).toISOString()
       })));
+      // Take only the top 4 latest news items, with NO filtering or deduplication
+      const selectedItems = sortedByTimestamp.slice(0, 4);
+      setItems(selectedItems);
 
-      // Take only the top 4 latest news items
-      const top4Latest = sortedByTimestamp.slice(0, 4);
-
-      // 🛡️ ROBUST FALLBACK SYSTEM: Ensure we always have news when available
-      let finalItems: NewsItem[] = [];
-      
-      if (top4Latest.length > 0) {
-        // ✅ Primary: Use timestamp-sorted top 4
-        finalItems = top4Latest;
-        console.log(`[News4U] ✅ Successfully fetched top ${top4Latest.length} latest news items by timestamp`);
-      } else if (deduped.length > 0) {
-        // ⚠️ Fallback 1: Use first 4 items if timestamp sorting fails
-        finalItems = deduped.slice(0, 4);
-        console.warn(`[News4U] ⚠️ Timestamp sorting failed, using first 4 items as fallback`);
-      } else {
-        // ❌ No items available
-        finalItems = [];
-        console.warn(`[News4U] ⚠️ No news items available after processing`);
-      }
-
-      // Additional validation: ensure we have meaningful content
-      // ✅ FIX: Relax validation - require title OR description, not both.
-      // This prevents items from being filtered out if one field is missing.
-      const validItems = finalItems.filter(item => 
-        (item.title && item.title.trim().length > 0) || 
-        (item.description && item.description.trim().length > 0)
-      );
-
-      console.log(`[News4U] Final items before validation:`, finalItems);
-      console.log(`[News4U] Valid items after validation:`, validItems);
-      console.log(`[News4U] Final items count:`, finalItems.length);
-      console.log(`[News4U] Valid items count:`, validItems.length);
-
-      if (validItems.length === 0 && finalItems.length > 0) {
-        console.warn(`[News4U] ⚠️ Filtered out items with empty content, using original items`);
-        setItems(finalItems);
-      } else {
-        setItems(validItems);
-      }
-      
-      console.log(`[News4U] Final processed items:`, validItems);
-      console.log(`[News4U] Total items processed: ${deduped.length}, Selected: ${validItems.length}, Platform: ${effectivePlatform}`);
+      console.log(`[News4U] Final processed items (no filtering/dedup):`, selectedItems);
+      console.log(`[News4U] Total items processed: ${normalized.length}, Selected: ${selectedItems.length}, Platform: ${effectivePlatform}`);
       setLastFetchTime(Date.now());
 
     } catch (err: any) {

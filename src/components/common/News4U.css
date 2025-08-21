@@ -161,12 +161,12 @@
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
-  padding: 8px; /* Reduced padding to fit more content */
+  padding: 6px; /* Tighter padding */
   transition: all 0.2s ease;
   /* Ensure items don't shrink */
   flex-shrink: 0;
   /* 🚀 OPTIMIZED: Minimize item height to show more content */
-  margin-bottom: 4px; /* Reduced margin between items */
+  margin-bottom: 2px; /* Ultra-tight margin between items */
 }
 
 .news4u-item:hover {
@@ -179,15 +179,17 @@
 .news4u-item-header {
   display: flex;
   align-items: center;
-  gap: 6px; /* Reduced gap */
-  margin-bottom: 6px; /* Reduced margin */
-  padding-bottom: 4px; /* Reduced padding */
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  gap: 4px; /* Ultra-tight gap */
+  margin-bottom: 3px; /* Minimal margin */
+  padding-bottom: 2px; /* Minimal padding */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-wrap: nowrap; /* Keep everything in one line */
 }
 
 .news4u-rank {
   display: flex;
   align-items: center;
+  flex-shrink: 0; /* Prevent rank from shrinking */
 }
 
 .rank-number {
@@ -195,23 +197,35 @@
   color: #000;
   font-size: 0.7rem;
   font-weight: 700;
-  padding: 2px 6px;
+  padding: 1px 4px; /* Tighter padding */
   border-radius: 4px;
   min-width: 20px;
   text-align: center;
 }
 
+/* Timestamp styling - inline with rank */
+.news4u-timestamp {
+  display: flex;
+  align-items: center;
+  gap: 3px; /* Tight gap */
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.65rem;
+  flex-shrink: 0; /* Prevent shrinking */
+  margin-left: 4px; /* Small gap from rank */
+}
+
 /* News Item Content - Apple's content hierarchy - OPTIMIZED */
 .news4u-item-content {
   display: flex;
-  gap: 8px; /* Reduced gap to fit more content */
+  gap: 6px; /* Tighter gap */
   align-items: flex-start;
+  margin-top: 2px; /* Minimal top margin */
 }
 
 .news4u-image {
   flex-shrink: 0;
-  width: 50px; /* Reduced from 60px to save space */
-  height: 50px; /* Reduced from 60px to save space */
+  width: 42px; /* Smaller image for more text space */
+  height: 42px;
   border-radius: 6px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -237,7 +251,7 @@
   font-size: 0.8rem; /* Slightly reduced font size */
   font-weight: 600;
   color: #ffffff;
-  margin-bottom: 3px; /* Reduced margin */
+  margin-bottom: 2px; /* Minimal margin */
   line-height: 1.2; /* Reduced line height */
   /* Ensure long titles don't break layout */
   word-wrap: break-word;
@@ -251,10 +265,11 @@
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
+  margin-bottom: 0; /* Remove bottom margin */
 }
 
 .news4u-description.collapsed {
-  max-height: 2.6em; /* Reduced from 2.8em to save space */
+  max-height: 2.4em; /* Tighter collapsed height */
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -714,46 +729,50 @@
   }
   
   .news4u-item {
-    padding: 6px; /* REDUCED: Compact item padding */
+    padding: 4px; /* Ultra-compact padding */
   }
   
   .news4u-item-header {
-    margin-bottom: 4px; /* REDUCED: Compact header */
-    padding-bottom: 3px; /* REDUCED: Minimal header padding */
+    margin-bottom: 2px; /* Ultra-compact header */
+    padding-bottom: 1px; /* Minimal header padding */
+    gap: 3px; /* Tighter header spacing */
   }
   
   .news4u-image {
-    width: 45px; /* REDUCED: Smaller images for more text space */
-    height: 45px;
+    width: 38px; /* Smaller images for more text space */
+    height: 38px;
   }
   
   .news4u-title {
     font-size: 0.75rem;
     -webkit-line-clamp: 2;
     line-clamp: 2;
-    line-height: 1.1; /* TIGHTER: Compact line height */
+    line-height: 1.1; /* Ultra-tight line height */
+    margin-bottom: 1px; /* Minimal title margin */
   }
   
   .news4u-description {
     font-size: 0.65rem;
     line-height: 1.2; /* TIGHTER: Compact description */
+    margin-bottom: 0; /* Remove description margin */
   }
   
   .news4u-description.collapsed {
     -webkit-line-clamp: 2;
     line-clamp: 2;
+    max-height: 2.2em; /* Ultra-tight collapsed height */
   }
   
   .news4u-actions {
     flex-direction: column;
     align-items: stretch;
-    gap: 6px; /* REDUCED: Compact action spacing */
-    margin-top: 6px; /* REDUCED: Less top margin */
+    gap: 4px; /* Ultra-compact action spacing */
+    margin-top: 4px; /* Minimal top margin */
   }
   
   .create-post-btn {
     justify-content: center;
-    padding: 6px 10px; /* REDUCED: Compact button padding */
+    padding: 4px 8px; /* Ultra-compact button padding */
     font-size: 0.7rem;
   }
   
@@ -793,43 +812,48 @@
   }
   
   .news4u-item-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-    margin-bottom: 4px;
+    flex-direction: row; /* Keep horizontal layout */
+    align-items: center;
+    gap: 3px; /* Ultra-tight gap */
+    margin-bottom: 2px;
+    flex-wrap: nowrap; /* Prevent wrapping */
   }
   
   .news4u-item-content {
-    gap: 8px;
+    gap: 5px; /* Tighter content gap */
+    margin-top: 1px; /* Minimal top margin */
   }
   
   .news4u-image {
-    width: 45px;
-    height: 45px;
+    width: 36px; /* Smaller images for more text space */
+    height: 36px;
   }
   
   .news4u-title {
     font-size: 0.7rem;
     -webkit-line-clamp: 2;
     line-clamp: 2;
+    margin-bottom: 1px; /* Minimal title margin */
   }
   
   .news4u-description {
     font-size: 0.6rem;
+    margin-bottom: 0; /* Remove description margin */
   }
   
   .news4u-description.collapsed {
     -webkit-line-clamp: 2;
     line-clamp: 2;
+    max-height: 2.1em; /* Ultra-tight collapsed height */
   }
   
   .news4u-actions {
-    margin-top: 8px;
-    gap: 6px;
+    margin-top: 3px; /* Minimal top margin */
+    gap: 4px; /* Ultra-tight gap */
   }
   
   .create-post-btn {
-    padding: 6px 10px;
+    padding: 4px 8px; /* Ultra-compact padding */
     font-size: 0.65rem;
   }
   
@@ -904,11 +928,11 @@
   
   /* 🚀 MOBILE OPTIMIZATION: MAXIMIZE scrollable area */
   .news4u-scrollable {
-    /* Force a fixed, smaller height on mobile so the inner scrollbar is always visible */
-    max-height: 220px;
-    height: 220px;
-    min-height: 180px;
-    padding: 0 2px 2px; /* MINIMIZED: Remove all excess padding */
+    /* Increase visible area while keeping inner scrollbar responsible */
+    max-height: min(56vh, 360px);
+    height: auto;
+    min-height: 200px;
+    padding: 0 2px 2px; /* Minimal padding for scrollbar gutter */
   }
   
   .news4u-content {
@@ -919,6 +943,42 @@
   .news4u-item {
     padding: 4px; /* MINIMIZED: Ultra-compact padding */
     margin-bottom: 1px; /* MINIMIZED: Absolute minimal margin */
+  }
+
+  .news4u-item-header {
+    gap: 2px; /* Ultra-tight header spacing */
+    margin-bottom: 1px; /* Minimal header margin */
+    padding-bottom: 1px; /* Minimal header padding */
+  }
+
+  .news4u-timestamp {
+    font-size: 0.6rem; /* Smaller timestamp */
+    gap: 2px; /* Tighter timestamp spacing */
+    margin-left: 3px; /* Minimal left margin */
+  }
+
+  .news4u-image {
+    width: 32px; /* Ultra-small images */
+    height: 32px;
+  }
+
+  .news4u-item-content {
+    gap: 4px; /* Ultra-tight content gap */
+    margin-top: 1px; /* Minimal top margin */
+  }
+
+  .news4u-title {
+    margin-bottom: 1px; /* Minimal title margin */
+    line-height: 1.1; /* Ultra-tight line height */
+  }
+
+  .news4u-description.collapsed {
+    max-height: 2em; /* Ultra-tight collapsed height */
+  }
+
+  .news4u-actions {
+    margin-top: 2px; /* Minimal action margin */
+    gap: 3px; /* Ultra-tight action gap */
   }
 }
 
@@ -934,9 +994,10 @@
   }
 
   .news4u-scrollable {
-    padding: 0 2px 4px; /* MINIMIZED: Remove all excess padding */
-    max-height: 220px; /* INCREASED: More scrollable height */
-    min-height: 180px; /* INCREASED: Better minimum height */
+    padding: 0 2px 4px; /* Minimal padding only for scrollbar */
+    /* Use viewport height and respect sticky UI safe area */
+    max-height: calc(60vh - var(--chatbar-safe, 88px));
+    min-height: 220px;
     /* Ensure mobile scrolling works */
     -webkit-overflow-scrolling: touch;
   }
@@ -954,25 +1015,59 @@
   .news4u-item {
     padding: 4px; /* REDUCED: Compact item padding */
     margin-bottom: 2px; /* MINIMIZED: Tight item spacing */
+    animation: n4uFadeSlide 160ms cubic-bezier(0.22, 1, 0.36, 1) both; /* Subtle delight */
   }
   
   .news4u-item-header {
-    margin-bottom: 3px; /* REDUCED: Compact header spacing */
-    padding-bottom: 2px; /* REDUCED: Minimal header padding */
+    flex-direction: row; /* Keep horizontal layout */
+    align-items: center;
+    gap: 3px; /* Ultra-tight gap */
+    margin-bottom: 2px;
+    flex-wrap: nowrap; /* Prevent wrapping */
   }
   
   .news4u-item-content {
-    gap: 6px; /* OPTIMIZED: Balanced content spacing */
+    gap: 5px; /* Tighter content gap */
+    margin-top: 1px; /* Minimal top margin */
+  }
+  
+  .news4u-image {
+    width: 36px; /* Smaller images for more text space */
+    height: 36px;
+  }
+  
+  .news4u-title {
+    font-size: 0.7rem;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    margin-bottom: 1px; /* Minimal title margin */
+  }
+  
+  .news4u-description {
+    font-size: 0.6rem;
+    margin-bottom: 0; /* Remove description margin */
+  }
+  
+  .news4u-description.collapsed {
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    max-height: 2.1em; /* Ultra-tight collapsed height */
   }
   
   .news4u-actions {
-    margin-top: 4px; /* REDUCED: Compact action spacing */
-    gap: 4px; /* REDUCED: Tight action gap */
+    margin-top: 3px; /* Minimal top margin */
+    gap: 4px; /* Ultra-tight gap */
   }
   
   .news4u-summary {
     font-size: 0.75rem;
   }
+}
+
+/* Minimal entrance animation for better perceived responsiveness */
+@keyframes n4uFadeSlide {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* Premium Apple-style gradient accent */

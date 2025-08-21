@@ -31,6 +31,7 @@ const ChatModal: React.FC<ChatModalProps> = ({
   suggestedQuestions
 }) => {
   const [message, setMessage] = useState('');
+  const [conversationTracked, setConversationTracked] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { trackRealDiscussion, canUseFeature } = useFeatureTracking();
@@ -96,13 +97,24 @@ const ChatModal: React.FC<ChatModalProps> = ({
     setMessage('');
 
     try {
-      const trackingSuccess = await trackRealDiscussion(platform, {
-        messageCount: messages.length + 1,
-        type: 'chat'
-      });
-      if (!trackingSuccess) {
-        console.warn(`[ChatModal] 🚫 Tracking failed, aborting message send`);
-        return;
+      // ✅ TRACK ONLY ONCE PER CONVERSATION: Prevent multiple discussion increments for same chat session
+      const sessionId = Math.random().toString(36).substr(2, 9);
+      console.log(`[ChatModal] 🔍 TRACKING CHECK [${sessionId}]: conversationTracked=${conversationTracked}, platform=${platform}`);
+      
+      if (!conversationTracked) {
+        console.log(`[ChatModal] 🚀 STARTING DISCUSSION TRACKING [${sessionId}] for platform: ${platform}`);
+        const trackingSuccess = await trackRealDiscussion(platform, {
+          messageCount: 1, // Always count as 1 discussion, not per message
+          type: 'chat'
+        });
+        if (!trackingSuccess) {
+          console.warn(`[ChatModal] 🚫 Tracking failed [${sessionId}], aborting message send`);
+          return;
+        }
+        setConversationTracked(true);
+        console.log(`[ChatModal] ✅ Discussion tracked once [${sessionId}] for this conversation session`);
+      } else {
+        console.log(`[ChatModal] ℹ️ Conversation already tracked [${sessionId}], continuing without additional tracking`);
       }
     } catch (trackingError) {
       console.error(`[ChatModal] ❌ Discussion tracking error:`, trackingError);

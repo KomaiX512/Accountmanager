@@ -1,0 +1,417 @@
+/* Platform Usage Chart - Minimalist Design */
+.platform-usage-chart {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 24px;
+  margin: 16px 0;
+  color: white;
+  overflow: hidden;
+}
+
+/* Chart Header */
+.chart-header h3 {
+  margin: 0 0 24px 0;
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  text-align: center;
+}
+
+/* Loading and Empty States */
+.loading-state,
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top: 2px solid #00ffcc;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.empty-icon {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 16px;
+  opacity: 0.4;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.empty-state p {
+  margin: 0 0 8px 0;
+  font-size: 1rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.empty-subtitle {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.5);
+  max-width: 300px;
+  line-height: 1.4;
+}
+
+/* Chart Content */
+.chart-content {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* Chart Bars - Modern Minimalist */
+.chart-bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 180px;
+  padding: 20px;
+  gap: 32px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  position: relative;
+}
+
+.chart-bar-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  max-width: 80px;
+  min-width: 60px;
+}
+
+.chart-bar-wrapper {
+  height: 120px;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  position: relative;
+  margin-bottom: 16px;
+}
+
+.chart-bar {
+  width: 32px;
+  min-height: 8px;
+  border-radius: 4px;
+  position: relative;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  overflow: visible;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.chart-bar:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.bar-value {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: white;
+  font-weight: 600;
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.9);
+  padding: 6px 8px;
+  border-radius: 6px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  font-size: 0.75rem;
+}
+
+.chart-bar:hover .bar-value {
+  opacity: 1;
+}
+
+.usage-count {
+  font-size: 0.8rem;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.usage-percentage {
+  font-size: 0.7rem;
+  opacity: 0.8;
+}
+
+.chart-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.platform-icon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.platform-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: brightness(0.9);
+  transition: filter 0.3s ease;
+}
+
+.chart-bar-container:hover .platform-icon img {
+  filter: brightness(1.1);
+}
+
+.platform-name {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+  white-space: nowrap;
+}
+
+/* Chart Legend - Clean Design */
+.chart-legend {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.chart-legend h4 {
+  margin: 0 0 16px 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.legend-items {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  transition: opacity 0.3s ease;
+}
+
+.legend-item:hover {
+  opacity: 0.8;
+}
+
+.legend-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.legend-icon {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.legend-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: brightness(0.9);
+}
+
+.legend-label {
+  flex: 1;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.legend-stats {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 600;
+  min-width: 80px;
+  text-align: right;
+}
+
+/* Chart Footer */
+.chart-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.usage-explanation {
+  flex: 1;
+}
+
+.usage-explanation small {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.refresh-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 8px 16px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Platform-specific colors - Subtle gradients */
+.chart-bar.instagram {
+  background: linear-gradient(180deg, #E4405F, #d73653);
+}
+
+.chart-bar.facebook {
+  background: linear-gradient(180deg, #1877F2, #1666d9);
+}
+
+.chart-bar.twitter {
+  background: linear-gradient(180deg, #1DA1F2, #1991d9);
+}
+
+.chart-bar.firebase {
+  background: linear-gradient(180deg, #FF9800, #e68900);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .platform-usage-chart {
+    padding: 20px;
+    margin: 12px 0;
+  }
+
+  .chart-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .chart-info {
+    align-items: flex-start;
+  }
+
+  .chart-bars {
+    height: 150px;
+    gap: 24px;
+    padding: 16px;
+  }
+
+  .chart-bar-wrapper {
+    height: 100px;
+  }
+
+  .chart-bar {
+    width: 28px;
+  }
+
+  .chart-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .chart-header h3 {
+    font-size: 1.2rem;
+  }
+
+  .chart-bars {
+    height: 130px;
+    gap: 16px;
+  }
+
+  .chart-bar-wrapper {
+    height: 80px;
+  }
+
+  .chart-bar {
+    width: 24px;
+  }
+
+  .platform-name {
+    font-size: 0.75rem;
+  }
+
+  .legend-items {
+    gap: 8px;
+  }
+}
+
+/* Dark theme optimization */
+@media (prefers-color-scheme: dark) {
+  .platform-usage-chart {
+    background: rgba(0, 0, 0, 0.4);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .chart-bar,
+  .refresh-btn,
+  .loading-spinner,
+  .legend-item,
+  .platform-icon img {
+    transition: none;
+    animation: none;
+  }
+
+  .chart-bar:hover {
+    transform: none;
+  }
+}

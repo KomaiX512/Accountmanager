@@ -432,6 +432,23 @@ class RagService {
       console.log(`[RagService] Post generation completed successfully`);
       }
       
+      // ✅ INCREMENT USAGE: Only count when image generator API is actually called
+      try {
+        const usageResponse = await fetch(`/api/usage/increment/${platform}/${username}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ feature: 'posts', count: 1 })
+        });
+        
+        if (usageResponse.ok) {
+          console.log(`[RagService] ✅ Usage incremented for ${platform}/${username} - post generation`);
+        } else {
+          console.warn(`[RagService] ⚠️ Failed to increment usage:`, await usageResponse.text());
+        }
+      } catch (usageError) {
+        console.warn(`[RagService] ⚠️ Usage tracking failed:`, usageError);
+      }
+      
       // Format the response for easier use by the UI
       const postData: PostData = {
         ...response.data.post,

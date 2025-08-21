@@ -138,12 +138,34 @@ const useFeatureTracking = (): UseFeatureTrackingReturn => {
     discussionData: { messageCount?: number; type?: 'chat' | 'dm_reply' | 'comment_reply' }
   ): Promise<boolean> => {
     try {
-      console.log(`[FeatureTracking] 🚀 DISCUSSION TRACKING STARTED: ${platform}`, discussionData);
+      const callId = Math.random().toString(36).substr(2, 9);
+      console.log(`[FeatureTracking] 🚀 DISCUSSION TRACKING STARTED [${callId}]: ${platform}`, discussionData);
+      console.log(`[FeatureTracking] � CALLER [${callId}]:`, new Error().stack?.split('\n')[2]?.trim() || 'unknown');
+      
+      // Add a global tracking counter to detect multiple calls
+      if (!(window as any).__discussionTrackingCalls) {
+        (window as any).__discussionTrackingCalls = [];
+      }
+      (window as any).__discussionTrackingCalls.push({
+        callId,
+        timestamp: Date.now(),
+        platform,
+        caller: new Error().stack?.split('\n')[2]?.trim() || 'unknown',
+        discussionData
+      });
+      
+      // Log recent calls for debugging
+      const recentCalls = (window as any).__discussionTrackingCalls.filter((call: any) => 
+        Date.now() - call.timestamp < 5000 // Last 5 seconds
+      );
+      if (recentCalls.length > 1) {
+        console.warn(`[FeatureTracking] 🔥 MULTIPLE DISCUSSION CALLS [${callId}] in last 5sec:`, recentCalls);
+      }
       
       // ✅ PRE-ACTION CHECK: Always check before performing action
       const accessCheck = canUseFeature('discussions');
       if (!accessCheck.allowed) {
-        console.warn(`[FeatureTracking] 🚫 Discussion blocked for ${platform} - ${accessCheck.reason}`);
+        console.warn(`[FeatureTracking] 🚫 Discussion blocked [${callId}] for ${platform} - ${accessCheck.reason}`);
         
         // Trigger upgrade popup via custom event
         window.dispatchEvent(new CustomEvent('showUpgradePopup', {
@@ -161,9 +183,9 @@ const useFeatureTracking = (): UseFeatureTrackingReturn => {
       const action = discussionData.type ? `discussion_${discussionData.type}` : 'discussion_engaged';
       const messageInfo = discussionData.messageCount ? ` (${discussionData.messageCount} messages)` : '';
       
-      console.log(`[FeatureTracking] 🎯 Tracking discussions usage with action: ${action}`);
+      console.log(`[FeatureTracking] 🎯 Tracking discussions usage [${callId}] with action: ${action}`);
       await trackFeatureUsage('discussions', platform, action);
-      console.log(`[FeatureTracking] ✅ Real discussion tracked: ${platform} -> ${action}${messageInfo}`);
+      console.log(`[FeatureTracking] ✅ Real discussion tracked [${callId}]: ${platform} -> ${action}${messageInfo}`);
       return true;
     } catch (error) {
       console.error(`[FeatureTracking] ❌ Real discussion tracking failed:`, error);

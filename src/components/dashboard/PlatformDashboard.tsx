@@ -36,6 +36,7 @@ import { IoMdAnalytics } from 'react-icons/io';
 import { TbTargetArrow } from 'react-icons/tb';
 import { GiSpy } from 'react-icons/gi';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
+import useDefensiveUsageTracking from '../../hooks/useDefensiveUsageTracking';
 import useUpgradeHandler from '../../hooks/useUpgradeHandler';
 import AccessControlPopup from '../common/AccessControlPopup';
 import { useNavigate } from 'react-router-dom';
@@ -45,6 +46,8 @@ import { safeFilter, safeMap, safeLength } from '../../utils/safeArrayUtils';
 import useDashboardRefresh from '../../hooks/useDashboardRefresh';
 import useResetPlatformState from '../../hooks/useResetPlatformState';
 import AutopilotPopup from '../common/AutopilotPopup';
+import ProfilePopup from '../common/ProfilePopup';
+import ManualGuidance from '../common/ManualGuidance';
 import CacheManager, { appendBypassParam } from '../../utils/cacheManager';
 
 // Define RagService compatible ChatMessage
@@ -83,6 +86,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const { userId: twitterId, isConnected: isTwitterConnected } = useTwitter();
   const { userId: facebookPageId, isConnected: isFacebookConnected, connectFacebook } = useFacebook();
   const { trackRealAIReply, trackRealPostCreation, canUseFeature } = useFeatureTracking();
+  const { trackAIReply } = useDefensiveUsageTracking();
   const { showUpgradePopup, blockedFeature, closeUpgradePopup, currentUsage } = useUpgradeHandler();
   const { resetAndAllowReconnection } = useResetPlatformState();
 
@@ -176,6 +180,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const [isMobileChatOpen, setIsMobileChatOpen] = useState(false);
   const [isMobileImageEditorOpen, setIsMobileImageEditorOpen] = useState(false);
   const [isMobileProfilePopupOpen, setIsMobileProfilePopupOpen] = useState(false);
+  const [isMobileManualOpen, setIsMobileManualOpen] = useState(false);
 
   // 🍎 Mobile module click handler for expandable modules
   const handleMobileModuleClick = (moduleKey: keyof typeof expandedModules, e: React.MouseEvent) => {
@@ -1517,6 +1522,9 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         // Continue with AI reply generation even if tracking fails
       }
       
+      // 🤖 DEFENSIVE AI REPLY TRACKING: Track AI reply usage
+      await trackAIReply(`ai-reply-${platform.toLowerCase()}`);
+      
       try {
         console.log(`[${new Date().toISOString()}] Calling RAG service for instant ${platform} AI reply`);
         
@@ -1919,6 +1927,9 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
               failCount++;
               continue; // Skip to next notification
             }
+            
+            // 🤖 DEFENSIVE AUTO AI REPLY TRACKING: Track auto AI reply usage
+            await trackAIReply(`auto-ai-reply-${platform.toLowerCase()}`);
             
             console.log(`[PlatformDashboard] ✅ Auto AI Reply tracked: ${platform} ${notification.type}`);
 
@@ -3137,6 +3148,13 @@ Image Description: ${response.post.image_prompt}
         >
           👤
         </button>
+        <button
+          className="mobile-floating-btn manual-btn"
+          onClick={() => setIsMobileManualOpen(true)}
+          title="Manual"
+        >
+          📘
+        </button>
       </div>
 
       {/* ✨ MOBILE CHAT MODAL */}
@@ -3195,24 +3213,18 @@ Image Description: ${response.post.image_prompt}
         </div>
       )}
 
-      {/* ✨ MOBILE PROFILE POPUP */}
+      {/* ✨ MOBILE PROFILE POPUP (Real) */}
       {isMobileProfilePopupOpen && (
-        <div className="mobile-profile-popup-overlay">
-          <div className="mobile-profile-popup-content">
-            <div className="mobile-profile-popup-header">
-              <h3>Profile</h3>
-              <button 
-                className="close-mobile-profile-popup"
-                onClick={() => setIsMobileProfilePopupOpen(false)}
-              >
-                ×
-              </button>
-            </div>
-            <div className="mobile-profile-popup-body">
-              <p>Profile management functionality coming soon...</p>
-            </div>
-          </div>
-        </div>
+        <ProfilePopup 
+          username={accountHolder}
+          onClose={() => setIsMobileProfilePopupOpen(false)}
+          platform={platform}
+        />
+      )}
+
+      {/* ✨ MOBILE MANUAL GUIDANCE POPUP */}
+      {isMobileManualOpen && (
+        <ManualGuidance onClose={() => setIsMobileManualOpen(false)} />
       )}
     </>
   );

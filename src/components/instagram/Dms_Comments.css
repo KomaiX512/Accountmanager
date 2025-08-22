@@ -11,23 +11,22 @@
   overflow: hidden; /* Prevent container overflow */
 }
 
-/* Notifications Scroll Container - FIXED: Improved scroll behavior and DM arrival detection */
+/* Notifications Scroll Container - FIXED: Proper height calculation and scroll behavior */
 .notifications-scroll-container {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 4px;
-  padding-bottom: 40px; /* Critical: Extra bottom padding to ensure last item action buttons are visible */
+  padding-bottom: 80px; /* Increased bottom padding for better last item visibility */
   margin-right: -4px;
-  /* IMPROVED HEIGHT CALCULATION: Ensure all items are visible */
-  max-height: calc(100vh - 200px); /* Adjusted for better space allocation */
-  min-height: 450px; /* Increased minimum height for better visibility */
+  /* PROPER HEIGHT CALCULATION: Use flex-1 instead of fixed heights */
+  height: 100%; /* Use full available height */
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
   position: relative;
   scroll-behavior: smooth;
-  /* ENHANCED SCROLL PADDING: Ensure last item is fully visible */
-  scroll-padding-bottom: 40px; /* Increased for action buttons visibility */
+  /* OPTIMIZED SCROLL PADDING: Ensure last item is fully visible */
+  scroll-padding-bottom: 80px; /* Increased for action buttons visibility */
   scroll-padding-top: 10px;
   /* IMPROVED SCROLL SNAP: Better item alignment */
   scroll-snap-type: y proximity;
@@ -41,13 +40,13 @@
   bottom: 0;
   left: 0;
   right: 8px;
-  height: 30px; /* Increased height for better end visibility */
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.4), transparent);
+  height: 60px; /* Increased height for better end visibility and to not interfere with last item */
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.3), transparent);
   pointer-events: none;
   z-index: 1;
   transition: opacity 0.3s ease;
-  /* Ensure gradient doesn't interfere with last item */
-  opacity: 0.6;
+  /* Reduced opacity to not interfere with last item visibility */
+  opacity: 0.4;
 }
 
 /* Scroll fade indicators */
@@ -89,6 +88,8 @@
   scroll-behavior: smooth;
   /* Improved scroll snap for better DM visibility */
   scroll-snap-type: y proximity;
+  /* Ensure proper scroll behavior for last items */
+  scroll-snap-stop: always;
 }
 
 /* Hide scrollbar on mobile for cleaner look */
@@ -98,11 +99,24 @@
     -ms-overflow-style: none;
     padding-right: 0;
     margin-right: 0;
+    padding-bottom: 60px; /* Adjusted for mobile */
   }
   
   .notifications-scroll-container::-webkit-scrollbar {
     display: none;
   }
+}
+
+/* ENHANCED SCROLL DETECTION: Ensure proper scroll area calculation */
+.notifications-scroll-container {
+  /* Force proper scroll area calculation */
+  contain: layout style paint;
+  /* Ensure scroll area includes all content */
+  overflow-anchor: auto;
+  /* Force proper height calculation */
+  min-height: 0;
+  /* Ensure flex child behaves properly */
+  flex-shrink: 1;
 }
 
 /* Scroll to Top Button */
@@ -129,7 +143,7 @@
 /* Scroll to Bottom Button - ENHANCED: For perfect DM visibility */
 .scroll-to-bottom-btn {
   position: absolute;
-  bottom: 80px; /* Positioned above scroll to top */
+  bottom: 120px; /* Increased distance from bottom to avoid interfering with last item */
   right: 20px;
   width: 52px; /* Slightly larger for better visibility */
   height: 52px;
@@ -169,7 +183,7 @@
   .scroll-to-bottom-btn {
     width: 48px;
     height: 48px;
-    bottom: 70px; /* Adjusted position for mobile */
+    bottom: 100px; /* Increased distance for mobile to avoid interfering with last item */
     right: 16px;
   }
   
@@ -448,8 +462,8 @@
 
 /* LAST ITEM ENHANCEMENT: Ensure perfect visibility */
 .notification-item:last-child {
-  margin-bottom: 60px; /* Generous margin for last item to ensure full visibility of action buttons */
-  scroll-margin-bottom: 60px; /* Ensure last item is fully visible including all action buttons */
+  margin-bottom: 100px; /* Increased margin for last item to ensure full visibility of action buttons */
+  scroll-margin-bottom: 100px; /* Ensure last item is fully visible including all action buttons */
   padding-bottom: 20px; /* Extra padding for action buttons area */
 }
 

@@ -1166,16 +1166,33 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
     try {
       setIsProcessing(true);
       
-      // Get the edited image as blob
-      const editedImageDataUrl = tuiInstanceRef.current.toDataURL();
+      // ✅ PRESERVE ORIGINAL FORMAT: Detect format from original image URL
+      const originalImageUrl = initialImageUrl || '';
+      let originalFormat = 'jpeg'; // Default fallback
+      let quality = 0.95; // High quality for edited images
+      
+      // Extract format from original image URL or filename
+      const formatMatch = originalImageUrl.match(/\.(jpg|jpeg|png|webp)(?:\?|$)/i);
+      if (formatMatch) {
+        originalFormat = formatMatch[1].toLowerCase();
+        if (originalFormat === 'jpg') originalFormat = 'jpeg';
+      }
+      
+      // Use original format for canvas export
+      const mimeType = `image/${originalFormat}`;
+      const editedImageDataUrl = tuiInstanceRef.current.toDataURL(mimeType, quality);
       const editedImageBlob = await fetch(editedImageDataUrl).then(r => r.blob());
       
-      // Create form data to send to server
+      console.log(`[CanvasEditor] 🎨 Preserving original format: ${originalFormat} (MIME: ${mimeType})`);
+      
+      // Create form data to send to server with correct format
       const formData = new FormData();
-      formData.append('image', editedImageBlob, `edited_${postKey}.jpg`);
+      const filename = `edited_${postKey}.${originalFormat === 'jpeg' ? 'jpg' : originalFormat}`;
+      formData.append('image', editedImageBlob, filename);
       formData.append('postKey', postKey);
       formData.append('caption', caption || postCaption || '');
       formData.append('platform', detectedPlatform);
+      formData.append('originalFormat', originalFormat); // ✅ Send format info to server
       
       // Send to server to update the post
       const response = await fetch(`/api/save-edited-post/${username}`, {

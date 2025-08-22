@@ -34,13 +34,13 @@ module.exports = defineConfig({
       },
       // Proxy webhook routes
       '/webhook': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false
       },
       // Proxy events for SSE
       '/events': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false
       }

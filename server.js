@@ -2103,7 +2103,7 @@ async function handlePostsEndpoint(req, res) {
         
         if (imageKey) {
           // Use absolute URLs for proper image loading
-          const baseUrl = req.get('host') ? `${req.protocol}://${req.get('host')}` : 'https://www.sentientm.com';
+          const baseUrl = req.get('host') ? `${req.protocol}://${req.get('host')}` : 'https://b4bd9386ac7b.ngrok-free.app';
           imageUrl = `${baseUrl}/fix-image/${username}/${imageKey}?platform=${platform}`;
           r2ImageUrl = `${baseUrl}/api/r2-image/${username}/${imageKey}?platform=${platform}`;
         }
@@ -2178,6 +2178,7 @@ app.post('/api/save-edited-post/:username', upload.single('image'), async (req, 
     const postKey = req.body.postKey;
     const caption = req.body.caption;
     const platform = req.body.platform || 'instagram';
+    const originalFormat = req.body.originalFormat || 'jpeg'; // ✅ Get original format from client
     
     if (!imageData || !postKey) {
       return res.status(400).json({
@@ -2265,26 +2266,32 @@ app.post('/api/save-edited-post/:username', upload.single('image'), async (req, 
     
     if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Extracted imageKey: ${imageKey}`);
     
+    // ✅ PRESERVE ORIGINAL FORMAT: Use detected format for ContentType
+    const mimeType = originalFormat === 'jpeg' ? 'image/jpeg' : 
+                    originalFormat === 'png' ? 'image/png' : 
+                    originalFormat === 'webp' ? 'image/webp' : 'image/jpeg';
+    
     // Save the edited image to R2 with the EXACT same name and location
     const imageR2Key = `ready_post/${platform}/${username}/${imageKey}`;
     
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Saving edited image to R2: ${imageR2Key}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Saving edited image to R2: ${imageR2Key} with format: ${originalFormat} (${mimeType})`);
     
     const putImageParams = {
       Bucket: 'tasks',
       Key: imageR2Key,
       Body: imageData,
-      ContentType: 'image/jpeg',
-      CacheControl: 'no-cache, no-store, must-revalidate', // More aggressive cache control
+      ContentType: mimeType, // ✅ Use correct MIME type based on original format
+      CacheControl: 'no-cache, no-store, must-revalidate',
       Metadata: {
         'last-modified': new Date().toISOString(),
         'edited-timestamp': Date.now().toString(),
-        'cache-version': Date.now().toString() // Force cache invalidation
+        'cache-version': Date.now().toString(),
+        'original-format': originalFormat // ✅ Store format info in metadata
       }
     };
     
     await client.putObject(putImageParams).promise();
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Successfully saved edited image to R2: ${imageR2Key}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Successfully saved edited image to R2: ${imageR2Key} with preserved format: ${originalFormat}`);
     
     // Also save a local copy to the exact same location for caching
     const localImagePath = path.join(process.cwd(), 'ready_post', platform, username, imageKey);
@@ -2416,25 +2423,20 @@ app.post('/api/save-edited-post/:username', upload.single('image'), async (req, 
     
     if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Successfully saved edited post for ${username}/${imageKey}`);
     
-    // Set aggressive cache-busting headers
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    res.setHeader('Last-Modified', new Date().toUTCString());
-    
-    res.json({ 
-      success: true, 
-      message: 'Post edit saved successfully',
+    // Return success response with cache-busting info
+    res.status(200).json({
+      success: true,
+      message: 'Post updated successfully with preserved format',
       imageKey: imageKey,
-      postKey: postKey,
       r2Key: imageR2Key,
+      cacheBuster: Date.now(),
       timestamp: new Date().toISOString(),
-      cacheBuster: Date.now() // For frontend to use
+      preservedFormat: originalFormat // ✅ Inform client about format preservation
     });
     
   } catch (error) {
-    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Error saving edited post:`, error);
-    res.status(500).json({ 
+    console.error(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Error saving edited post:`, error);
+    res.status(500).json({
       success: false, 
       error: 'Failed to save edited post',
       details: error.message 

@@ -6,6 +6,66 @@ import { useFacebook } from '../../context/FacebookContext';
 import { Notification } from '../../types/notifications';
 import { safeFilter } from '../../utils/safeArrayUtils';
 
+// Hook to fetch and cache sender usernames
+const useSenderUsername = (senderId: string | undefined, platform: string) => {
+  const [senderUsername, setSenderUsername] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!senderId || platform !== 'instagram') {
+      setSenderUsername(null);
+      return;
+    }
+
+    const cachedUsername = localStorage.getItem(`sender_username_${senderId}`);
+    if (cachedUsername) {
+      setSenderUsername(cachedUsername);
+      return;
+    }
+
+    const fetchSenderUsername = async () => {
+      setLoading(true);
+      try {
+        const response = await fetch(`/api/instagram-sender-username/${senderId}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.username) {
+            setSenderUsername(data.username);
+            localStorage.setItem(`sender_username_${senderId}`, data.username);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching sender username:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSenderUsername();
+  }, [senderId, platform]);
+
+  return { senderUsername, loading };
+};
+
+// Component to display sender name with dynamic username fetching
+const SenderNameDisplay: React.FC<{ 
+  notification: Notification; 
+  platform: string; 
+}> = ({ notification, platform }) => {
+  const { senderUsername, loading } = useSenderUsername(notification.sender_id, platform);
+  
+  // For Instagram DMs, use sender username if available, otherwise fall back to notification username
+  if (platform === 'instagram' && notification.sender_id) {
+    if (loading) {
+      return <span className="sender-name loading">Loading...</span>;
+    }
+    return <span className="sender-name">{senderUsername || notification.username || 'Unknown User'}</span>;
+  }
+  
+  // For other platforms or when no sender_id, use original logic
+  return <span className="sender-name">{notification.username || 'Unknown User'}</span>;
+};
+
 interface DmsCommentsProps {
   notifications: Notification[];
   onReply: (notification: Notification, replyText: string) => void;
@@ -191,18 +251,23 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
         return false;
       }
 
-      // Check for required fields
+      // Check for required fields - MADE MORE PERMISSIVE to allow legitimate notifications
       const hasRequiredFields = notif.type && 
                               (notif.message_id || notif.comment_id) && 
-                              typeof notif.text === 'string' && 
-                              typeof notif.timestamp === 'number';
+                              notif.text && // Just check text exists, not strict type checking
+                              notif.timestamp; // Just check timestamp exists
       if (!hasRequiredFields) {
-        console.warn(`[${new Date().toISOString()}] [${platform.toUpperCase()}] Notification missing required fields at index ${index}:`, notif);
+        console.warn(`[${new Date().toISOString()}] [${platform.toUpperCase()}] Notification missing required fields at index ${index}:`, {
+          type: notif.type,
+          hasMessageOrCommentId: !!(notif.message_id || notif.comment_id),
+          hasText: !!notif.text,
+          hasTimestamp: !!notif.timestamp
+        });
         return false;
       }
 
       // 🛡️ DEFENSIVE FILTER: Exclude own replies/comments to prevent infinite loop
-      // CRITICAL: Multiple aggressive checks to catch ALL scenarios where own content appears
+      // FOCUSED: Only filter exact matches for our own account to avoid false positives
       if (connectedUsername && notif.username) {
         // Primary check: exact username match (case insensitive for safety)
         if (notif.username.toLowerCase() === connectedUsername.toLowerCase()) {
@@ -218,46 +283,21 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
           return false;
         }
         
-        // AGGRESSIVE: Also check if username contains our connected username
-        if (cleanNotifUsername.includes(cleanOwnUsername) || cleanOwnUsername.includes(cleanNotifUsername)) {
-          console.log(`[${new Date().toISOString()}] [${platform.toUpperCase()}] 🛡️ FILTERED OUT own reply/comment (username contains match): ${cleanNotifUsername} ~ ${cleanOwnUsername}`);
-          return false;
-        }
+        // REMOVED AGGRESSIVE PATTERN: Stop blocking notifications that contain our username
+        // This was causing false positives where legitimate messages were blocked
       }
 
-      // 🛡️ SUPER AGGRESSIVE: Also filter by connected business/user ID
-      if (connectedBusinessId && (notif.instagram_user_id || notif.sender_id || notif.twitter_user_id || notif.facebook_user_id)) {
-        const notifIds = [notif.instagram_user_id, notif.sender_id, notif.twitter_user_id, notif.facebook_user_id].filter(Boolean);
-        for (const notifId of notifIds) {
-          if (notifId && notifId.toString() === connectedBusinessId.toString()) {
-            console.log(`[${new Date().toISOString()}] [${platform.toUpperCase()}] 🛡️ FILTERED OUT own reply by business/user ID: ${notifId} matches ${connectedBusinessId}`);
-            return false;
-          }
-        }
-      }
-
-      // 🛡️ DEFENSIVE FILTER: Additional platform-specific filtering with Instagram Business ID
-      if (platform === 'instagram' && connectedUsername) {
-        // For Instagram, also check sender_id or instagram_user_id if available
-        if (notif.sender_id && notif.sender_id === connectedUsername) {
-          console.log(`[${new Date().toISOString()}] [INSTAGRAM] 🛡️ FILTERED OUT own reply by sender_id: ${notif.sender_id}`);
+      // 🛡️ BUSINESS ID FILTER: Only filter if we have a clear match (platform-specific)
+      if (platform === 'instagram' && connectedBusinessId && (notif.sender_id || notif.instagram_user_id)) {
+        const notifSenderId = notif.sender_id || notif.instagram_user_id;
+        if (notifSenderId === connectedBusinessId) {
+          console.log(`[${new Date().toISOString()}] [INSTAGRAM] 🛡️ FILTERED OUT own message by business ID: ${notifSenderId} === ${connectedBusinessId}`);
           return false;
+        } else {
+          console.log(`[${new Date().toISOString()}] [INSTAGRAM] ✅ BUSINESS ID CHECK PASSED: ${notifSenderId} !== ${connectedBusinessId}`);
         }
-        
-        // CRITICAL: Check instagram_user_id against username
-        if (notif.instagram_user_id && notif.instagram_user_id === connectedUsername) {
-          console.log(`[${new Date().toISOString()}] [INSTAGRAM] 🛡️ FILTERED OUT own reply by instagram_user_id: ${notif.instagram_user_id}`);
-          return false;
-        }
-        
-        // AGGRESSIVE: Check if any ID field matches our username pattern
-        const idsToCheck = [notif.sender_id, notif.instagram_user_id, notif.from_id, notif.user_id];
-        for (const id of idsToCheck) {
-          if (id && (id === connectedUsername || id.toString() === connectedUsername)) {
-            console.log(`[${new Date().toISOString()}] [INSTAGRAM] 🛡️ FILTERED OUT own reply by ID field: ${id}`);
-            return false;
-          }
-        }
+      } else {
+        console.log(`[${new Date().toISOString()}] [INSTAGRAM] ⏭️ BUSINESS ID CHECK SKIPPED: platform=${platform}, connectedBusinessId=${connectedBusinessId}, hasSenderId=${!!(notif.sender_id || notif.instagram_user_id)}`);
       }
       
       if (platform === 'twitter' && username) {
@@ -282,29 +322,15 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
         }
       }
 
-      // 🛡️ DEFENSIVE FILTER: Enhanced text-based filtering as final safety net
-      // If we detect patterns that suggest this is our own reply coming back
-      if (connectedUsername && notif.text) {
-        // Check if the notification text contains patterns that suggest it's our own automated reply
-        const suspiciousPatterns = [
-          /^Thanks for your message/i,
-          /^Thank you for reaching out/i,
-          /^I appreciate your comment/i,
-          /^Auto-reply:/i,
-          /^Automated response:/i,
-          /^\[AI Reply\]/i,
-          /^Hi there!/i,
-          /^Hello!/i,
-          /We appreciate/i,
-          /Thank you for contacting/i
-        ];
-        
-        const containsSuspiciousPattern = suspiciousPatterns.some(pattern => pattern.test(notif.text));
-        if (containsSuspiciousPattern && notif.username && notif.username.toLowerCase() === connectedUsername.toLowerCase()) {
-          console.log(`[${new Date().toISOString()}] [${platform.toUpperCase()}] 🛡️ FILTERED OUT suspected own auto-reply by text pattern: "${notif.text.substring(0, 50)}..."`);
-          return false;
-        }
-      }
+      // 🛡️ DISABLED AGGRESSIVE TEXT FILTERING: Allow all text patterns through
+      // Backend already handles filtering effectively (63→3), frontend should be permissive
+      // Only keeping basic own-username check above to prevent obvious self-replies
+      console.log(`[${new Date().toISOString()}] [${platform.toUpperCase()}] ✅ NOTIFICATION PASSED ALL FILTERS:`, {
+        username: notif.username,
+        type: notif.type,
+        sender_id: notif.sender_id,
+        text_preview: notif.text?.substring(0, 30) + '...'
+      });
 
       return true;
     });
@@ -638,11 +664,11 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
                     : 'Comment'} from {/* Enhanced Facebook sender display */}
                   {platform === 'facebook' && notif.page_name ? (
                     <span className="facebook-sender-info">
-                      <strong className="sender-name">{notif.username || 'Unknown User'}</strong>
+                      <strong><SenderNameDisplay notification={notif} platform={platform || 'instagram'} /></strong>
                       <span className="page-tag">via {notif.page_name}</span>
                     </span>
                   ) : (
-                    notif.username || 'Unknown'
+                    <strong><SenderNameDisplay notification={notif} platform={platform || 'instagram'} /></strong>
                   )}
                 </span>
                 <span className="notification-time">{formatTimestamp(notif.timestamp)}</span>

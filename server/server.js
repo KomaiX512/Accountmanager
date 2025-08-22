@@ -2960,15 +2960,14 @@ async function streamToBuffer(stream) {
 }
 
 // Instagram App Credentials
-const APP_ID = '576296982152813';
-const APP_SECRET = 'd48ddc9eaf0e5c4969d4ddc4e293178c';
-const REDIRECT_URI = 'https://www.sentientm.com/instagram/callback';
+const APP_ID = '1089716559763623';
+const APP_SECRET = '0733abf780036963e9f57f33a4b2fa6e';
+const REDIRECT_URI = 'https://b4bd9386ac7b.ngrok-free.app/instagram/callback';
 const VERIFY_TOKEN = 'myInstagramWebhook2025';
-
 // Facebook App Credentials  
 const FB_APP_ID = '581584257679639'; // Your ACTUAL Facebook App ID (NOT Configuration ID)
 const FB_APP_SECRET = 'cdd153955e347e194390333e48cb0480'; // Your actual App Secret
-const FB_REDIRECT_URI = 'https://www.sentientm.com/facebook/callback';
+const FB_REDIRECT_URI = 'https://b4bd9386ac7b.ngrok-free.app/facebook/callback';
 const FB_VERIFY_TOKEN = 'myFacebookWebhook2025';
 
 app.get([
@@ -3199,6 +3198,109 @@ app.post([
             console.log(`[${new Date().toISOString()}] ✅ DM from external user: ${msg.message.mid} from ${senderId} (account: ${accountOwnerId})`);
           }
 
+          // 🚀 DYNAMIC SENDER USERNAME MAPPING WITH CACHING
+          let senderUsername = 'unknown';
+          
+          // Check cache first
+          const cachedUsername = cache.get(`sender_username_${msg.sender.id}`);
+          if (cachedUsername) {
+            senderUsername = cachedUsername;
+            console.log(`[${new Date().toISOString()}] ✅ Using cached sender username: ${senderUsername} for sender ID: ${msg.sender.id}`);
+          } else {
+            // First check if sender is one of our connected accounts
+            try {
+              const listCommand = new ListObjectsV2Command({
+                Bucket: 'tasks',
+                Prefix: `InstagramTokens/`,
+              });
+              const { Contents } = await s3Client.send(listCommand);
+              
+              if (Contents) {
+                for (const obj of Contents) {
+                  if (obj.Key.endsWith('/token.json')) {
+                    const getCommand = new GetObjectCommand({
+                      Bucket: 'tasks',
+                      Key: obj.Key,
+                    });
+                    const data = await s3Client.send(getCommand);
+                    const json = await data.Body.transformToString();
+                    const token = JSON.parse(json);
+                    
+                    // Match sender ID to connected accounts - check ALL possible ID fields
+                    if (token.instagram_user_id === msg.sender.id || 
+                        token.instagram_graph_id === msg.sender.id ||
+                        token.user_id === msg.sender.id ||
+                        token.id === msg.sender.id ||
+                        token.instagram_id === msg.sender.id ||
+                        token.account_id === msg.sender.id) {
+                      senderUsername = token.username;
+                      console.log(`[${new Date().toISOString()}] ✅ Found connected sender: ${senderUsername} for sender ID: ${msg.sender.id}`);
+                      // Cache the result
+                      cache.set(`sender_username_${msg.sender.id}`, senderUsername, 3600000); // Cache for 1 hour
+                      break;
+                    }
+                  }
+                }
+              }
+              
+              // If not found in connected accounts, try to get username from R2 bucket mapping
+              if (senderUsername === 'unknown') {
+                try {
+                  // Check if we have a saved mapping for this sender ID
+                  const mappingKey = `InstagramSenderMappings/${msg.sender.id}.json`;
+                  const getCommand = new GetObjectCommand({
+                    Bucket: 'tasks',
+                    Key: mappingKey
+                  });
+                  const mappingData = await s3Client.send(getCommand);
+                  const mapping = JSON.parse(await mappingData.Body.transformToString());
+                  if (mapping.username) {
+                    senderUsername = mapping.username;
+                    console.log(`[${new Date().toISOString()}] ✅ Found sender username from mapping: ${senderUsername} for sender ID: ${msg.sender.id}`);
+                    // Cache the result
+                    cache.set(`sender_username_${msg.sender.id}`, senderUsername, 3600000);
+                  }
+                } catch (mappingErr) {
+                  // No mapping found, use sender ID as username fallback
+                  if (mappingErr.name === 'NoSuchKey' || mappingErr.name === 'NotFound') {
+                    // Generate a readable username from sender ID
+                    const shortId = msg.sender.id.slice(-8); // Last 8 digits
+                    senderUsername = `user_${shortId}`;
+                    console.log(`[${new Date().toISOString()}] 📝 Generated username for external sender: ${senderUsername} for sender ID: ${msg.sender.id}`);
+                    
+                    // Store this mapping for future use
+                    const mappingData = {
+                      sender_id: msg.sender.id,
+                      username: senderUsername,
+                      created_at: new Date().toISOString(),
+                      type: 'generated'
+                    };
+                    
+                    try {
+                      await s3Client.send(new PutObjectCommand({
+                        Bucket: 'tasks',
+                        Key: `InstagramSenderMappings/${msg.sender.id}.json`,
+                        Body: JSON.stringify(mappingData, null, 2),
+                        ContentType: 'application/json'
+                      }));
+                      console.log(`[${new Date().toISOString()}] 💾 Stored sender mapping: ${msg.sender.id} → ${senderUsername}`);
+                    } catch (storeErr) {
+                      console.error(`[${new Date().toISOString()}] ❌ Error storing sender mapping:`, storeErr.message);
+                    }
+                    
+                    // Cache the result
+                    cache.set(`sender_username_${msg.sender.id}`, senderUsername, 3600000);
+                  } else {
+                    console.error(`[${new Date().toISOString()}] ❌ Error checking sender mapping:`, mappingErr.message);
+                  }
+                }
+              }
+              
+            } catch (err) {
+              console.error(`[${new Date().toISOString()}] Error finding sender username:`, err.message);
+            }
+          }
+
           const eventData = {
             type: 'message',
             instagram_user_id: matchedToken ? matchedToken.instagram_user_id : webhookGraphId,
@@ -3207,7 +3309,7 @@ app.post([
             text: msg.message.text,
             timestamp: msg.timestamp,
             received_at: new Date().toISOString(),
-            username: matchedToken ? matchedToken.username : 'unknown',
+            username: senderUsername, // Now using sender's username instead of receiver's
             status: 'pending'
           };
 
@@ -9142,7 +9244,7 @@ class PlatformSchemaManager {
 // Twitter OAuth 2.0 credentials
 const TWITTER_CLIENT_ID = 'cVNYR3UxVm5jQ3d5UWw0UHFqUTI6MTpjaQ';
 const TWITTER_CLIENT_SECRET = 'Wr8Kewh92NVB-035hAvpQeQ1Azc7chre3PUTgDoEltjO57mxzO';
-const TWITTER_REDIRECT_URI = 'https://www.sentientm.com/twitter/callback';
+const TWITTER_REDIRECT_URI = 'https://b4bd9386ac7b.ngrok-free.app/twitter/callback';
 
 // Debug logging for OAuth 2.0
 console.log(`[${new Date().toISOString()}] Twitter OAuth 2.0 Configuration:`);

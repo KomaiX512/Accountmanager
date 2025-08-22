@@ -1367,29 +1367,32 @@ app.post(['/api/usage/increment/:platform/:username'], async (req, res) => {
   try {
     console.log(`[${new Date().toISOString()}] [PLATFORM-USAGE] Incrementing ${feature} usage for ${platform}/${username} by ${count}`);
     
-    // Get userId from platform/username
-    const userId = await getUserIdFromPlatformUser(platform, username);
-    if (!userId) {
-      console.error(`[${new Date().toISOString()}] [PLATFORM-USAGE] No userId found for ${platform}/${username}`);
-      return res.status(404).json({ success: false, error: 'User not found for platform/username' });
-    }
+    // Always store usage under platform_username to align with aggregation keys
+    const storageKey = `${platform}_${username}`;
+    console.log(`[${new Date().toISOString()}] [PLATFORM-USAGE] Using storage key ${storageKey} for increment`);
     
-    console.log(`[${new Date().toISOString()}] [PLATFORM-USAGE] Found userId ${userId} for ${platform}/${username}`);
-    
-    // Delegate to existing userId-based increment endpoint
-    const incrementResponse = await fetch(`http://127.0.0.1:3000/api/usage/increment/${userId}`, {
+    // Delegate to existing userId-based increment endpoint with platform_username key
+    const incrementResponse = await fetch(`http://127.0.0.1:3000/api/usage/increment/${storageKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ feature, count })
     });
     
-    if (incrementResponse.ok) {
-      const result = await incrementResponse.json();
-      console.log(`[${new Date().toISOString()}] [PLATFORM-USAGE] Successfully incremented ${feature} for ${platform}/${username}`);
-      res.json(result);
-    } else {
+    if (!incrementResponse.ok) {
       throw new Error(`Failed to increment usage: ${incrementResponse.statusText}`);
     }
+
+    // Fetch the updated usage stats for this platform/username
+    const usageResponse = await fetch(`http://127.0.0.1:3000/api/usage/${platform}/${username}`);
+    if (usageResponse.ok) {
+      const usageStats = await usageResponse.json();
+      console.log(`[${new Date().toISOString()}] [PLATFORM-USAGE] Successfully incremented and retrieved usage for ${platform}/${username}`);
+      return res.json(usageStats);
+    }
+
+    // Fallback: return simple success if usage retrieval fails
+    const result = await incrementResponse.json().catch(() => ({ success: true }));
+    return res.json(result);
     
   } catch (error) {
     console.error(`[${new Date().toISOString()}] [PLATFORM-USAGE] Error incrementing usage:`, error);
@@ -1557,7 +1560,6 @@ async function initializeCurrentUsername() {
     console.error('Error initializing currentUsername:', error);
   }
 }
-
 initializeCurrentUsername();
 
 // Enhanced webhook handler with improved event broadcast
@@ -2338,7 +2340,6 @@ app.post(['/ai-reply/:username', '/api/ai-reply/:username'], async (req, res) =>
     res.status(500).json({ error: 'Failed to get AI reply', details: error.message });
   }
 });
-
 // Proxy POST /api/instant-reply to RAG server
 app.post('/api/instant-reply', async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
@@ -3099,7 +3100,6 @@ app.get([
     res.status(500).send('Error connecting Instagram account');
   }
 });
-
 // Instagram Webhook POST Handler (for webhook events sent to callback URL)
 app.post([
   '/instagram/callback',
@@ -15004,7 +15004,6 @@ app.post(['/validate-dashboard-access/:userId', '/api/validate-dashboard-access/
     });
   }
 });
-
 // ===============================================================
 // CROSS-DEVICE PROCESSING STATE VALIDATION (bulletproof protection)
 // Validates that a user cannot access platform dashboards while loading states exist

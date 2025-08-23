@@ -26,6 +26,12 @@ module.exports = defineConfig({
         changeOrigin: true,
         secure: false
       },
+      // Proxy save-edited-post endpoint to the proxy server (port 3002)
+      '/api/save-edited-post': {
+        target: 'http://127.0.0.1:3002',
+        changeOrigin: true,
+        secure: false
+      },
       // Proxy all other /api/* requests to the main server
       '/api': {
         target: 'http://127.0.0.1:3000',

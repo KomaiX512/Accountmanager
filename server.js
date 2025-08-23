@@ -2168,17 +2168,17 @@ const upload = multer({
 app.post('/api/save-edited-post/:username', upload.single('image'), async (req, res) => {
   const { username } = req.params;
   
-  if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Received request for user: ${username}`);
-  if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Content-Type: ${req.get('Content-Type')}`);
-  if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] File:`, req.file ? `${req.file.size} bytes` : 'No file');
-  if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Body:`, req.body);
+  // Force logging for debugging save-edited-post issues
+  console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Received request for user: ${username}`);
+  console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Content-Type: ${req.get('Content-Type')}`);
+  console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] File:`, req.file ? `${req.file.size} bytes` : 'No file');
+  console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Body:`, req.body);
   
   try {
     const imageData = req.file ? req.file.buffer : null;
     const postKey = req.body.postKey;
     const caption = req.body.caption;
     const platform = req.body.platform || 'instagram';
-    const originalFormat = req.body.originalFormat || 'jpeg'; // ✅ Get original format from client
     
     if (!imageData || !postKey) {
       return res.status(400).json({
@@ -2195,65 +2195,23 @@ app.post('/api/save-edited-post/:username', upload.single('image'), async (req, 
     const client = getS3Client();
     
     if (postKey.includes('campaign_ready_post_') && postKey.endsWith('.json')) {
-      // Campaign pattern: campaign_ready_post_1752000987874_9c14f1fd.json -> campaign_ready_post_1752000987874_9c14f1fd.[ext]
+      // Campaign pattern: campaign_ready_post_1752000987874_9c14f1fd.json -> edited_campaign_ready_post_1752000987874_9c14f1fd.png
       const baseName = postKey.replace(/^.*\/([^\/]+)\.json$/, '$1');
-      const prefix = postKey.replace(/[^\/]+$/, ''); // Get directory path
-      const extensions = ['jpg', 'jpeg', 'png', 'webp'];
       
-      // Find the first existing image file with any of these extensions
-      for (const ext of extensions) {
-        const potentialKey = `${prefix}${baseName}.${ext}`;
-        try {
-          const headCommand = new HeadObjectCommand({
-            Bucket: 'tasks',
-            Key: potentialKey
-          });
-          await client.send(headCommand);
-          imageKey = `${baseName}.${ext}`;
-          if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Found existing image with extension .${ext}: ${imageKey}`);
-          break;
-        } catch (error) {
-          // Image doesn't exist with this extension, try next
-          continue;
-        }
-      }
-      
-      // If no image found with any extension, fallback to jpg (for backward compatibility)
-      if (!imageKey) {
-        imageKey = `${baseName}.jpg`;
-        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] No existing image found, using fallback: ${imageKey}`);
-      }
+      // ALWAYS save edited images as PNG with "edited_" prefix to avoid overwriting originals
+      imageKey = `edited_${baseName}.png`;
+      console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] ✅ FIXED: Saving edited campaign image as PNG: ${imageKey}`);
+      console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] ✅ Original preserved, edited version clearly marked`);
     } else if (postKey.includes('ready_post_') && postKey.endsWith('.json')) {
-      // Traditional pattern: ready_post_1234567890.json -> image_1234567890.[ext]
+      // Traditional pattern: ready_post_1234567890.json -> edited_image_1234567890.png
       const match = postKey.match(/ready_post_(\d+)\.json$/);
       if (match) {
         const fileId = match[1];
-        const prefix = postKey.replace(/[^\/]+$/, ''); // Get directory path
-        const extensions = ['jpg', 'jpeg', 'png', 'webp'];
         
-        // Find the first existing image file with any of these extensions
-        for (const ext of extensions) {
-          const potentialKey = `${prefix}image_${fileId}.${ext}`;
-          try {
-            const headCommand = new HeadObjectCommand({
-              Bucket: 'tasks',
-              Key: potentialKey
-            });
-            await client.send(headCommand);
-            imageKey = `image_${fileId}.${ext}`;
-            if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Found existing image with extension .${ext}: ${imageKey}`);
-            break;
-          } catch (error) {
-            // Image doesn't exist with this extension, try next
-            continue;
-          }
-        }
-        
-        // If no image found with any extension, fallback to jpg (for backward compatibility)
-        if (!imageKey) {
-          imageKey = `image_${fileId}.jpg`;
-          if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] No existing image found, using fallback: ${imageKey}`);
-        }
+        // ALWAYS save edited images as PNG with "edited_" prefix to avoid overwriting originals
+        imageKey = `edited_image_${fileId}.png`;
+        console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] ✅ FIXED: Saving edited regular image as PNG: ${imageKey}`);
+        console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] ✅ Original preserved, edited version clearly marked`);
       }
     }
     
@@ -2266,32 +2224,30 @@ app.post('/api/save-edited-post/:username', upload.single('image'), async (req, 
     
     if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Extracted imageKey: ${imageKey}`);
     
-    // ✅ PRESERVE ORIGINAL FORMAT: Use detected format for ContentType
-    const mimeType = originalFormat === 'jpeg' ? 'image/jpeg' : 
-                    originalFormat === 'png' ? 'image/png' : 
-                    originalFormat === 'webp' ? 'image/webp' : 'image/jpeg';
-    
     // Save the edited image to R2 with the EXACT same name and location
     const imageR2Key = `ready_post/${platform}/${username}/${imageKey}`;
     
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Saving edited image to R2: ${imageR2Key} with format: ${originalFormat} (${mimeType})`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Saving edited image to R2: ${imageR2Key}`);
+    
+    // Determine ContentType based on the image key extension - edited images are PNG
+    const contentType = imageKey.endsWith('.png') ? 'image/png' : 
+                       imageKey.endsWith('.webp') ? 'image/webp' : 'image/jpeg';
     
     const putImageParams = {
       Bucket: 'tasks',
       Key: imageR2Key,
       Body: imageData,
-      ContentType: mimeType, // ✅ Use correct MIME type based on original format
-      CacheControl: 'no-cache, no-store, must-revalidate',
+      ContentType: contentType,
+      CacheControl: 'no-cache, no-store, must-revalidate', // More aggressive cache control
       Metadata: {
         'last-modified': new Date().toISOString(),
         'edited-timestamp': Date.now().toString(),
-        'cache-version': Date.now().toString(),
-        'original-format': originalFormat // ✅ Store format info in metadata
+        'cache-version': Date.now().toString() // Force cache invalidation
       }
     };
     
     await client.putObject(putImageParams).promise();
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Successfully saved edited image to R2: ${imageR2Key} with preserved format: ${originalFormat}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Successfully saved edited image to R2: ${imageR2Key}`);
     
     // Also save a local copy to the exact same location for caching
     const localImagePath = path.join(process.cwd(), 'ready_post', platform, username, imageKey);
@@ -2423,20 +2379,26 @@ app.post('/api/save-edited-post/:username', upload.single('image'), async (req, 
     
     if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Successfully saved edited post for ${username}/${imageKey}`);
     
-    // Return success response with cache-busting info
-    res.status(200).json({
-      success: true,
-      message: 'Post updated successfully with preserved format',
+    // Set aggressive cache-busting headers
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Last-Modified', new Date().toUTCString());
+    
+    res.json({ 
+      success: true, 
+      message: 'Post edit saved successfully',
       imageKey: imageKey,
+      postKey: postKey,
       r2Key: imageR2Key,
-      cacheBuster: Date.now(),
       timestamp: new Date().toISOString(),
-      preservedFormat: originalFormat // ✅ Inform client about format preservation
+      cacheBuster: Date.now() // For frontend to use
     });
     
   } catch (error) {
+    // Force logging for debugging save-edited-post issues
     console.error(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Error saving edited post:`, error);
-    res.status(500).json({
+    res.status(500).json({ 
       success: false, 
       error: 'Failed to save edited post',
       details: error.message 

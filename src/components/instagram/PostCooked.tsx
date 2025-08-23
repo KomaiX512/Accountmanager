@@ -313,19 +313,28 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         const postIndex = localPosts.findIndex(p => p.key === postKey);
         
         if (postIndex >= 0) {
-          // Extract image identifier
-          let imageId = '';
-          const match = postKey.match(/ready_post_(\d+)\.json$/);
-          if (match) imageId = match[1];
+          // Extract image identifier for different post patterns
+          let imageKey = '';
           
-          // Create super cache-busted URL
+          // Handle campaign posts: campaign_ready_post_123_hash.json -> edited_campaign_ready_post_123_hash.png
+          if (postKey.includes('campaign_ready_post_') && postKey.endsWith('.json')) {
+            const baseName = postKey.replace(/^.*\/([^\/]+)\.json$/, '$1');
+            imageKey = `edited_${baseName}`;
+          }
+          // Handle regular posts: ready_post_123.json -> edited_image_123.png  
+          else {
+            const match = postKey.match(/ready_post_(\d+)\.json$/);
+            if (match && match[1]) {
+              imageKey = `edited_image_${match[1]}`;
+            } else {
+              console.error(`[handleSaveEditedPost] ❌ Could not extract image key from: ${postKey}`);
+              return; // Don't create malformed URLs
+            }
+          }
+          
+          // Create super cache-busted URL for edited PNG image
           const cacheBust = `?platform=${platform}&INSTANT=${now}&edited=true&v=${Math.random()}&force=1`;
-          // Detect real extension: if existing r2_image_url has .png/.webp/etc use that, otherwise default to jpg
-          const currentPost = localPosts[postIndex];
-          const currentUrl = currentPost?.data?.r2_image_url || currentPost?.data?.image_url || '';
-          const extMatch = currentUrl.match(/\.(jpg|jpeg|png|webp)(?:\?|$)/i);
-          const detectedExt = extMatch ? extMatch[1].replace('jpeg','jpg').toLowerCase() : 'jpg';
-          const freshUrl = `${API_BASE_URL}/api/r2-image/${username}/image_${imageId}.${detectedExt}${cacheBust}`;
+          const freshUrl = `${API_BASE_URL}/api/r2-image/${username}/${imageKey}.png${cacheBust}`;
           
           // Update ONLY the edited post instantly
           setLocalPosts(prev => {
@@ -1136,15 +1145,55 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         r2ImageUrl: post.data?.r2_image_url
       });
       
-      // Helper to detect original extension from URLs
+      // Helper to detect original extension from URLs - updated to prefer PNG for edited images
       const detectExt = () => {
         const url = post.data?.r2_image_url || post.data?.image_url || '';
         const m = url.match(/\.(jpg|jpeg|png|webp)(?:\?|$)/i);
+        
+        // If URL indicates edited image or we see PNG, prefer PNG (for edited images)
+        if (url.includes('edited=true') || (m && m[1].toLowerCase() === 'png')) {
+          return 'png';
+        }
+        
         return m ? m[1].replace('jpeg', 'jpg').toLowerCase() : 'jpg';
       };
 
-      // Method 1: Extract from post key (most reliable)
+      // Method 1: Check for edited images first (highest priority for Post Now after Canvas Editor)
       if (post.key) {
+        // Handle campaign posts: campaign_ready_post_123_hash.json -> edited_campaign_ready_post_123_hash.png
+        if (post.key.includes('campaign_ready_post_') && post.key.endsWith('.json')) {
+          const baseName = post.key.replace(/^.*\/([^\/]+)\.json$/, '$1');
+          const editedImageKey = `edited_${baseName}.png`;
+          
+          // Check if this looks like it could be an edited image
+          if (post.data?.r2_image_url && 
+              (post.data.r2_image_url.includes('edited=true') || 
+               post.data.r2_image_url.includes('.png') ||
+               post.data.r2_image_url.includes('edited_'))) {
+            imageKey = editedImageKey;
+            console.log(`[extractImageKey] ✅ Edited campaign image pattern detected: ${imageKey}`);
+          }
+        }
+        // Handle regular posts: ready_post_123.json -> edited_image_123.png
+        else if (post.key.includes('ready_post_') && post.key.endsWith('.json')) {
+          const postIdMatch = post.key.match(/ready_post_(\d+)\.json$/);
+          if (postIdMatch && postIdMatch[1]) {
+            const editedImageKey = `edited_image_${postIdMatch[1]}.png`;
+            
+            // Check if this looks like it could be an edited image
+            if (post.data?.r2_image_url && 
+                (post.data.r2_image_url.includes('edited=true') || 
+                 post.data.r2_image_url.includes('.png') ||
+                 post.data.r2_image_url.includes('edited_'))) {
+              imageKey = editedImageKey;
+              console.log(`[extractImageKey] ✅ Edited regular image pattern detected: ${imageKey}`);
+            }
+          }
+        }
+      }
+
+      // Method 2: Extract from post key (standard patterns)
+      if (!imageKey && post.key) {
         // Campaign pattern: campaign_ready_post_...json -> same basename with real ext
         if (post.key.includes('campaign_ready_post_') && post.key.endsWith('.json')) {
           const baseName = post.key.replace(/^.*\/([^\/]+)\.json$/, '$1');
@@ -1154,19 +1203,20 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         // Regular pattern: ready_post_<ts>.json -> image_<ts>.<ext>
         else if (post.key.match(/ready_post_\d+\.json$/)) {
           const postIdMatch = post.key.match(/ready_post_(\d+)\.json$/);
-          if (postIdMatch) {
+          if (postIdMatch && postIdMatch[1]) {
             imageKey = `image_${postIdMatch[1]}.${detectExt()}`;
             console.log(`[extractImageKey] ✅ Standard pattern match: ${imageKey}`);
           }
         }
       }
       
-      // Method 2: Extract from image URL if available (for both direct R2 URLs and API URLs)
+      // Method 3: Extract from image URL if available (for both direct R2 URLs and API URLs)
       if (!imageKey && (post.data?.image_url || post.data?.r2_image_url)) {
         const imageUrl = post.data.image_url || post.data.r2_image_url;
         
-        // Try to extract image filename from URL
+        // Try to extract image filename from URL including edited images
         const urlPatterns = [
+          /(edited_[^\/]+\.(?:jpg|jpeg|png|webp))/i,
           /(image_\d+\.(?:jpg|jpeg|png|webp))/i,
           /(campaign_ready_post_\d+_[a-f0-9]+\.(?:jpg|jpeg|png|webp))/i,
           /\/([^\/]+\.(?:jpg|jpeg|png|webp))(?:\?|$)/i
@@ -1174,7 +1224,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         
         for (const pattern of urlPatterns) {
           const urlMatch = imageUrl.match(pattern);
-          if (urlMatch) {
+          if (urlMatch && urlMatch[1]) {
             imageKey = urlMatch[1];
             console.log(`[extractImageKey] ✅ URL pattern match: ${imageKey} from ${imageUrl}`);
             break;
@@ -1182,15 +1232,17 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         }
       }
       
-      // Method 3: Fallback for Facebook/platform-specific patterns if still no key
+      // Method 4: Fallback for Facebook/platform-specific patterns if still no key
       if (!imageKey && post.key) {
         console.log(`[extractImageKey] ⚠️ No standard pattern found, trying fallbacks for ${platform}`);
         
-        // Try extracting any numeric ID and create a standard image key
+        // Try extracting any numeric ID and create a standard image key - FIXED: validate the extracted ID
         const idMatch = post.key.match(/(\d+)/);
-        if (idMatch) {
+        if (idMatch && idMatch[1] && idMatch[1].length > 0) {
           imageKey = `image_${idMatch[1]}.${detectExt()}`;
           console.log(`[extractImageKey] 🔄 Fallback pattern created: ${imageKey}`);
+        } else {
+          console.warn(`[extractImageKey] ⚠️ Could not extract valid numeric ID from post key: ${post.key}`);
         }
       }
       

@@ -1104,7 +1104,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
       
       if (imageLoaded && tuiInstanceRef.current) {
         try {
-          const imageDataUrl = tuiInstanceRef.current.toDataURL();
+          const imageDataUrl = tuiInstanceRef.current.toDataURL('image/png');
           imageBlob = await fetch(imageDataUrl).then(r => r.blob());
           console.log(`[CanvasEditor] Canvas image captured for ${detectedPlatform} scheduling`);
         } catch (imageError) {
@@ -1166,33 +1166,16 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
     try {
       setIsProcessing(true);
       
-      // ✅ PRESERVE ORIGINAL FORMAT: Detect format from original image URL
-      const originalImageUrl = initialImageUrl || '';
-      let originalFormat = 'jpeg'; // Default fallback
-      let quality = 0.95; // High quality for edited images
-      
-      // Extract format from original image URL or filename
-      const formatMatch = originalImageUrl.match(/\.(jpg|jpeg|png|webp)(?:\?|$)/i);
-      if (formatMatch) {
-        originalFormat = formatMatch[1].toLowerCase();
-        if (originalFormat === 'jpg') originalFormat = 'jpeg';
-      }
-      
-      // Use original format for canvas export
-      const mimeType = `image/${originalFormat}`;
-      const editedImageDataUrl = tuiInstanceRef.current.toDataURL(mimeType, quality);
+      // Get the edited image as blob in PNG format (lossless, better for edited content)
+      const editedImageDataUrl = tuiInstanceRef.current.toDataURL('image/png');
       const editedImageBlob = await fetch(editedImageDataUrl).then(r => r.blob());
       
-      console.log(`[CanvasEditor] 🎨 Preserving original format: ${originalFormat} (MIME: ${mimeType})`);
-      
-      // Create form data to send to server with correct format
+      // Create form data to send to server
       const formData = new FormData();
-      const filename = `edited_${postKey}.${originalFormat === 'jpeg' ? 'jpg' : originalFormat}`;
-      formData.append('image', editedImageBlob, filename);
+      formData.append('image', editedImageBlob, `edited_${postKey}.png`);
       formData.append('postKey', postKey);
       formData.append('caption', caption || postCaption || '');
       formData.append('platform', detectedPlatform);
-      formData.append('originalFormat', originalFormat); // ✅ Send format info to server
       
       // Send to server to update the post
       const response = await fetch(`/api/save-edited-post/${username}`, {
@@ -1202,7 +1185,9 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to save edited post');
+        const errorMessage = errorData.error || errorData.message || `HTTP ${response.status}: ${response.statusText}`;
+        console.error('[Canvas] Server error details:', errorData);
+        throw new Error(errorMessage);
       }
       
       const result = await response.json();

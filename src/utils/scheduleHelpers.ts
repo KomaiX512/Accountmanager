@@ -171,19 +171,64 @@ export const fetchImageFromR2 = async (
 ): Promise<Blob | null> => {
   try {
     console.log(`[ScheduleHelper] 📤 Fetching image: ${imageKey} for platform: ${platform}`);
-    // Try multiple endpoints with fallbacks similar to PostCooked.fetchImageBlob
+    
+    // Helper function to try fetching with different extensions
+    const tryFetchWithExtensions = async (baseKey: string): Promise<Blob | null> => {
+      const extensions = ['png', 'jpg', 'jpeg', 'webp'];
+      const baseName = baseKey.replace(/\.(jpg|jpeg|png|webp)$/i, '');
+      
+      for (const ext of extensions) {
+        const testKey = `${baseName}.${ext}`;
+        console.log(`[ScheduleHelper] 🔍 Trying extension: ${testKey}`);
+        
+        const endpoints = [
+          getApiUrl(API_CONFIG.ENDPOINTS.R2_IMAGE, `/${username}/${testKey}?platform=${platform}&t=${Date.now()}`),
+          getApiUrl(API_CONFIG.ENDPOINTS.PROXY_IMAGE, `/${username}/${testKey}?platform=${platform}`)
+        ];
+        
+        for (const url of endpoints) {
+          try {
+            const response = await fetch(url, {
+              method: 'GET',
+              headers: {
+                Accept: 'image/*,*/*',
+                'Cache-Control': 'no-cache'
+              }
+            });
+            
+            if (!response.ok) continue;
+            
+            const contentType = response.headers.get('content-type') || '';
+            if (!contentType.startsWith('image/') && !contentType.includes('octet-stream')) continue;
+            
+            const blob = await response.blob();
+            if (!blob || blob.size === 0) continue;
+            
+            // Check for placeholder image (7781 bytes = placeholder)
+            if (blob.size === 7781) {
+              console.warn(`[ScheduleHelper] ⚠️ Detected placeholder image (${blob.size} bytes) for ${testKey}, trying next extension`);
+              continue;
+            }
+            
+            console.log(`[ScheduleHelper] ✅ Successfully fetched ${testKey} (${blob.size} bytes)`);
+            return blob;
+            
+          } catch (err: any) {
+            console.warn(`[ScheduleHelper] ⚠️ Failed ${testKey}: ${err.message}`);
+            continue;
+          }
+        }
+      }
+      return null;
+    };
+    
+    // First try the exact key as provided
     const endpoints = [
-      // Primary: R2 image with cache busting
       getApiUrl(API_CONFIG.ENDPOINTS.R2_IMAGE, `/${username}/${imageKey}?platform=${platform}&t=${Date.now()}`),
-      // Fallback: proxy image endpoint
-      getApiUrl(API_CONFIG.ENDPOINTS.PROXY_IMAGE, `/${username}/${imageKey}?platform=${platform}`),
-      // Fallback: R2 image without cache busting
-      getApiUrl(API_CONFIG.ENDPOINTS.R2_IMAGE, `/${username}/${imageKey}?platform=${platform}`)
+      getApiUrl(API_CONFIG.ENDPOINTS.PROXY_IMAGE, `/${username}/${imageKey}?platform=${platform}`)
     ];
-    let lastError: Error | null = null;
-    for (let i = 0; i < endpoints.length; i++) {
-      const url = endpoints[i];
-      console.log(`[ScheduleHelper] 🎯 Trying endpoint ${i + 1}/${endpoints.length}: ${url}`);
+    
+    for (const url of endpoints) {
       try {
         const response = await fetch(url, {
           method: 'GET',
@@ -192,27 +237,34 @@ export const fetchImageFromR2 = async (
             'Cache-Control': 'no-cache'
           }
         });
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
+        
+        if (!response.ok) continue;
+        
         const contentType = response.headers.get('content-type') || '';
-        if (!contentType.startsWith('image/') && !contentType.includes('octet-stream')) {
-          throw new Error(`Invalid content type: ${contentType}`);
-        }
+        if (!contentType.startsWith('image/') && !contentType.includes('octet-stream')) continue;
+        
         const blob = await response.blob();
-        if (!blob || blob.size === 0) {
-          throw new Error('Empty image blob received');
+        if (!blob || blob.size === 0) continue;
+        
+        // Check for placeholder image - if found, try different extensions
+        if (blob.size === 7781) {
+          console.warn(`[ScheduleHelper] ⚠️ Detected placeholder (${blob.size} bytes) for ${imageKey}, trying different extensions`);
+          return await tryFetchWithExtensions(imageKey);
         }
+        
+        console.log(`[ScheduleHelper] ✅ Successfully fetched ${imageKey} (${blob.size} bytes)`);
         return blob;
+        
       } catch (err: any) {
-        console.warn(`[ScheduleHelper] ⚠️ Endpoint ${i + 1} failed: ${err.message}`);
-        lastError = err;
+        console.warn(`[ScheduleHelper] ⚠️ Failed ${imageKey}: ${err.message}`);
         continue;
       }
     }
-    // All endpoints failed
-    console.error(`[ScheduleHelper] ❌ All ${endpoints.length} endpoints failed. Last error: ${lastError?.message || 'Unknown error'}`);
-    return null;
+    
+    // If exact key failed, try with different extensions
+    console.log(`[ScheduleHelper] 🔄 Exact key failed, trying extension fallbacks for ${imageKey}`);
+    return await tryFetchWithExtensions(imageKey);
+    
   } catch (error) {
     console.error(`[ScheduleHelper] ❌ Unexpected error fetching image ${imageKey}:`, error);
     return null;

@@ -372,7 +372,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                 data: {
                   ...currentPost.data,
                   image_url: freshUrl,
-                  r2_image_url: freshUrl
+                  r2_image_url: freshUrl,
+                  isEdited: true // 🎯 PERMANENT FLAG: Mark as edited for consistent display
                 } as any // Temporary fix for edited properties
               };
               
@@ -487,9 +488,11 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       const editedFilename = `edited_image_${imageId}.png`;
       const editedUrl = `${API_BASE_URL}/api/r2-image/${username}/${editedFilename}?platform=${platform}&v=${imageRefreshKey.current}&post=${encodeURIComponent(postKey)}&edited=true`;
       
-      // For now, we'll assume edited version exists if we're in an update flow
-      // In a future enhancement, we could add a HEAD request to check existence
-      if (forceRefresh || post.data?.image_url?.includes('edited_') || post.data?.r2_image_url?.includes('edited_')) {
+      // 🔧 CONSISTENT DISPLAY FIX: Always show edited version if post is marked as edited
+      if (forceRefresh || 
+          post.data?.isEdited === true || 
+          post.data?.image_url?.includes('edited_') || 
+          post.data?.r2_image_url?.includes('edited_')) {
         console.log(`[ImageURL] 🎯 Using edited version: ${editedFilename}`);
         const timestamp = forceRefresh ? `&t=${Date.now()}` : '';
         return editedUrl + timestamp;
@@ -529,8 +532,11 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         const editedFilename = `edited_campaign_ready_post_${campaignId}.png`;
         const editedUrl = `${API_BASE_URL}/api/r2-image/${username}/${editedFilename}?platform=${platform}&v=${imageRefreshKey.current}&post=${encodeURIComponent(postKey)}&edited=true`;
         
-        // Check if this is an edited post update
-        if (forceRefresh || post.data?.image_url?.includes('edited_') || post.data?.r2_image_url?.includes('edited_')) {
+        // 🔧 CONSISTENT DISPLAY FIX: Always show edited version if post is marked as edited
+        if (forceRefresh || 
+            post.data?.isEdited === true || 
+            post.data?.image_url?.includes('edited_') || 
+            post.data?.r2_image_url?.includes('edited_')) {
           console.log(`[ImageURL] 🎯 Using edited campaign version: ${editedFilename}`);
           const timestamp = forceRefresh ? `&t=${Date.now()}` : '';
           return editedUrl + timestamp;

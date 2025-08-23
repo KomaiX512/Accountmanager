@@ -2103,7 +2103,7 @@ async function handlePostsEndpoint(req, res) {
         
         if (imageKey) {
           // Use absolute URLs for proper image loading
-          const baseUrl = req.get('host') ? `${req.protocol}://${req.get('host')}` : 'https://b4bd9386ac7b.ngrok-free.app';
+          const baseUrl = req.get('host') ? `${req.protocol}://${req.get('host')}` : 'https://www.sentientm.com';
           imageUrl = `${baseUrl}/fix-image/${username}/${imageKey}?platform=${platform}`;
           r2ImageUrl = `${baseUrl}/api/r2-image/${username}/${imageKey}?platform=${platform}`;
         }

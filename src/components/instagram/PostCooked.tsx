@@ -302,10 +302,11 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   // Listen for post updates from Canvas Editor
   useEffect(() => {
     const handlePostUpdate = (event: CustomEvent) => {
-      const { postKey, platform: updatedPlatform } = event.detail;
+      const { postKey, platform: updatedPlatform, imageKey, serverTimestamp } = event.detail;
       
       if (updatedPlatform === platform) {
-        // console.log(`[PostCooked] INSTANT UPDATE for ${postKey}`); // Uncomment for debugging
+        console.log(`[PostCooked] 🎯 INSTANT UPDATE received for ${postKey} on ${platform}`);
+        console.log(`[PostCooked] 🎯 Event details:`, event.detail);
         setToastMessage('✅ Image updated instantly!');
         
         // INSTANT METHOD: Force all images to reload with cache busting
@@ -313,49 +314,93 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         const postIndex = localPosts.findIndex(p => p.key === postKey);
         
         if (postIndex >= 0) {
-          // Extract image identifier for different post patterns
-          let imageKey = '';
+          // Use imageKey from server if available, otherwise extract from postKey
+          let finalImageKey = imageKey;
           
-          // Handle campaign posts: campaign_ready_post_123_hash.json -> edited_campaign_ready_post_123_hash.png
-          if (postKey.includes('campaign_ready_post_') && postKey.endsWith('.json')) {
-            const baseName = postKey.replace(/^.*\/([^\/]+)\.json$/, '$1');
-            imageKey = `edited_${baseName}`;
-          }
-          // Handle regular posts: ready_post_123.json -> edited_image_123.png  
-          else {
-            const match = postKey.match(/ready_post_(\d+)\.json$/);
-            if (match && match[1]) {
-              imageKey = `edited_image_${match[1]}`;
-            } else {
-              console.error(`[handleSaveEditedPost] ❌ Could not extract image key from: ${postKey}`);
-              return; // Don't create malformed URLs
+          if (!finalImageKey) {
+            // Handle campaign posts: campaign_ready_post_123_hash.json -> edited_campaign_ready_post_123_hash.png
+            if (postKey.includes('campaign_ready_post_') && postKey.endsWith('.json')) {
+              const baseName = postKey.replace(/^.*\/([^\/]+)\.json$/, '$1');
+              finalImageKey = `edited_${baseName}.png`;
+            }
+            // Handle regular posts: ready_post_123.json -> edited_image_123.png  
+            else {
+              const match = postKey.match(/ready_post_(\d+)\.json$/);
+              if (match && match[1]) {
+                finalImageKey = `edited_image_${match[1]}.png`;
+              } else {
+                console.error(`[handlePostUpdate] ❌ Could not extract image key from: ${postKey}`);
+                return; // Don't create malformed URLs
+              }
             }
           }
           
           // Create super cache-busted URL for edited PNG image
-          const cacheBust = `?platform=${platform}&INSTANT=${now}&edited=true&v=${Math.random()}&force=1`;
-          const freshUrl = `${API_BASE_URL}/api/r2-image/${username}/${imageKey}.png${cacheBust}`;
+          const cacheBustParams = [
+            `platform=${platform}`,
+            `INSTANT=${now}`,
+            `edited=true`,
+            `v=${Math.random()}`,
+            `force=1`,
+            `nuclear=1`,
+            `bypass=1`,
+            `nocache=1`,
+            `serverTS=${serverTimestamp || now}`,
+            `${Date.now()}` // Additional timestamp
+          ].join('&');
           
-          // Update ONLY the edited post instantly
-          setLocalPosts(prev => {
-            const updated = [...prev];
-            updated[postIndex] = {
-              ...updated[postIndex],
-              data: {
-                ...updated[postIndex].data,
-                image_url: freshUrl,
-                r2_image_url: freshUrl
+          const freshUrl = `${API_BASE_URL}/api/r2-image/${username}/${finalImageKey}?${cacheBustParams}`;
+          
+          console.log(`[PostCooked] 🔥 Generated fresh edited URL: ${freshUrl}`);
+          
+          // DELAY UPDATE: Give the server a moment to complete the save before updating the URL
+          // This prevents race conditions where the frontend updates before the backend finishes
+          setTimeout(() => {
+            // Update ONLY the edited post instantly with both URLs pointing to edited version
+            setLocalPosts(prev => {
+              const updated = [...prev];
+              const currentPost = updated[postIndex];
+              
+              // Double-check the post still exists (it might have been removed)
+              if (!currentPost) {
+                console.warn(`[PostCooked] ⚠️ Post disappeared during update: ${postKey}`);
+                return prev;
               }
-            };
-            return updated;
-          });
-          
-          // Force React re-render
-          imageRefreshKey.current = now;
-          // Force a re-render by updating a state
-          setLocalPosts(prev => [...prev]);
-          
-          // console.log(`[PostCooked] ⚡ INSTANT REFRESH: ${freshUrl}`); // Uncomment for debugging
+              
+              updated[postIndex] = {
+                ...currentPost,
+                data: {
+                  ...currentPost.data,
+                  image_url: freshUrl,
+                  r2_image_url: freshUrl
+                } as any // Temporary fix for edited properties
+              };
+              
+              console.log(`[PostCooked] 🎯 Updated post data for ${postKey}:`, updated[postIndex].data);
+              return updated;
+            });
+            
+            // Force React re-render by updating the refresh key
+            imageRefreshKey.current = now;
+            
+            // Clear any image errors for this post to prevent fallback to white image
+            setImageErrors(prev => {
+              const newErrors = { ...prev };
+              delete newErrors[postKey];
+              return newErrors;
+            });
+            
+            // Force clear any loading states
+            setLoadingImages(prev => {
+              const newLoading = new Set(prev);
+              newLoading.delete(postKey);
+              return newLoading;
+            });
+            
+            console.log(`[PostCooked] ⚡ INSTANT REFRESH completed for: ${postKey}`);
+          }, 500); // 500ms delay to ensure server processing is complete
+        } else {
+          console.warn(`[PostCooked] ⚠️ Post not found in localPosts: ${postKey}`);
         }
       }
     };
@@ -409,14 +454,48 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     
     console.log(`[ImageURL] Processing post key: ${postKey}`);
     
-    // 🔍 INTELLIGENT PATTERN DETECTION: Handle multiple file naming patterns
+    // � PRIORITY CHECK: Look for edited image URLs first (highest priority)
+    if (post.data?.image_url && post.data.image_url.includes('edited_')) {
+      console.log(`[ImageURL] 🎯 Found edited image URL in post data: ${post.data.image_url}`);
+      const timestamp = forceRefresh ? `&t=${Date.now()}` : '';
+      return post.data.image_url + timestamp;
+    }
     
-    // Pattern 1: Standard format - ready_post_<ID>.json → image_<ID>.(jpg|png|jpeg|webp)
+    if (post.data?.r2_image_url && post.data.r2_image_url.includes('edited_')) {
+      console.log(`[ImageURL] 🎯 Found edited R2 image URL in post data: ${post.data.r2_image_url}`);
+      const timestamp = forceRefresh ? `&t=${Date.now()}` : '';
+      return post.data.r2_image_url + timestamp;
+    }
+    
+    // 🔥 SECONDARY CHECK: Look for any edited_* filename in existing URLs and use that directly
+    const existingImageUrl = post.data?.image_url || post.data?.r2_image_url || '';
+    if (existingImageUrl.includes('/edited_')) {
+      console.log(`[ImageURL] 🎯 Found edited filename in existing URL: ${existingImageUrl}`);
+      const timestamp = forceRefresh ? `&t=${Date.now()}` : '';
+      return existingImageUrl + timestamp;
+    }
+    
+    // �🔍 INTELLIGENT PATTERN DETECTION: Handle multiple file naming patterns
+    
+    // Pattern 1: Standard format - ready_post_<ID>.json → Check for edited_image_<ID>.png FIRST, then image_<ID>.(jpg|png|jpeg|webp)
     const standardMatch = postKey.match(/ready_post_(\d+)\.json$/);
     if (standardMatch) {
       const imageId = standardMatch[1];
       console.log(`[ImageURL] Standard pattern detected, ID: ${imageId}`);
       
+      // 🎯 PRIORITY: Check for edited version first (edited images are always PNG)
+      const editedFilename = `edited_image_${imageId}.png`;
+      const editedUrl = `${API_BASE_URL}/api/r2-image/${username}/${editedFilename}?platform=${platform}&v=${imageRefreshKey.current}&post=${encodeURIComponent(postKey)}&edited=true`;
+      
+      // For now, we'll assume edited version exists if we're in an update flow
+      // In a future enhancement, we could add a HEAD request to check existence
+      if (forceRefresh || post.data?.image_url?.includes('edited_') || post.data?.r2_image_url?.includes('edited_')) {
+        console.log(`[ImageURL] 🎯 Using edited version: ${editedFilename}`);
+        const timestamp = forceRefresh ? `&t=${Date.now()}` : '';
+        return editedUrl + timestamp;
+      }
+      
+      // Fallback to original image with proper extension detection
       // Try to determine extension from post data with priority order
       if (post.data?.image_path) {
         const pathMatch = post.data.image_path.match(/\.(jpg|jpeg|png|webp)$/i);
@@ -439,13 +518,25 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       console.log(`[ImageURL] Standard pattern result: ${imageFilename}`);
     }
     
-    // Pattern 2: Campaign format - campaign_ready_post_<ID>_<hash>.json → campaign_ready_post_<ID>_<hash>.(jpg|png|jpeg|webp)
+    // Pattern 2: Campaign format - campaign_ready_post_<ID>_<hash>.json → Check for edited_campaign_ready_post_<ID>_<hash>.png FIRST, then campaign_ready_post_<ID>_<hash>.(jpg|png|jpeg|webp)
     else {
       const campaignMatch = postKey.match(/campaign_ready_post_(\d+_[a-f0-9]+)\.json$/);
       if (campaignMatch) {
         const campaignId = campaignMatch[1]; // This includes both ID and hash
         console.log(`[ImageURL] Campaign pattern detected, ID: ${campaignId}`);
         
+        // 🎯 PRIORITY: Check for edited campaign version first (edited images are always PNG)
+        const editedFilename = `edited_campaign_ready_post_${campaignId}.png`;
+        const editedUrl = `${API_BASE_URL}/api/r2-image/${username}/${editedFilename}?platform=${platform}&v=${imageRefreshKey.current}&post=${encodeURIComponent(postKey)}&edited=true`;
+        
+        // Check if this is an edited post update
+        if (forceRefresh || post.data?.image_url?.includes('edited_') || post.data?.r2_image_url?.includes('edited_')) {
+          console.log(`[ImageURL] 🎯 Using edited campaign version: ${editedFilename}`);
+          const timestamp = forceRefresh ? `&t=${Date.now()}` : '';
+          return editedUrl + timestamp;
+        }
+        
+        // Fallback to original campaign image with proper extension detection
         // For campaign posts, extract extension from post data with smart fallbacks
         if (post.data?.image_path) {
           const pathMatch = post.data.image_path.match(/\.(jpg|jpeg|png|webp)$/i);
@@ -517,7 +608,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     
     console.log(`[ImageURL] Final URL: ${reliableUrl}`);
     return reliableUrl;
-  }, [username, platform]);
+  }, [username, platform, imageRefreshKey.current]);
 
   // Simplified and more reliable image error handling
   const handleImageError = useCallback((key: string, imgElement: HTMLImageElement) => {
@@ -2430,7 +2521,12 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                     let imageUrl = getReliableImageUrl(post);
                     if (imageUrl && typeof imageUrl === 'string') {
                       const hasQuery = imageUrl.includes('?');
-                      imageUrl += (hasQuery ? '&' : '?') + 'refreshKey=' + imageRefreshKey;
+                      imageUrl += (hasQuery ? '&' : '?') + 'refreshKey=' + imageRefreshKey.current;
+                      
+                      // Add debug logging for edited posts
+                      if (imageUrl.includes('edited_')) {
+                        console.log(`[PostCooked] 🎯 Rendering EDITED image for ${post.key}: ${imageUrl}`);
+                      }
                     }
                     const shouldShowPlaceholder = (post.key in imageErrors && imageErrors[post.key]?.failed && imageErrors[post.key]?.retryCount >= 3) || 
                                                 imageUrl.includes('placeholder.jpg');
@@ -2451,11 +2547,12 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                           handleImageLoad(post.key, e.target as HTMLImageElement);
                         }}
                         onError={(e) => {
+                          console.log(`[PostCooked] ❌ Image load error for ${post.key}:`, imageUrl);
                           const target = e.target as HTMLImageElement;
                           handleImageError(post.key, target);
                         }}
                         onContextMenu={(e) => handleImageRightClick(e, post.key)}
-                        key={`${post.key}-${imageRefreshKey}`}
+                        key={`${post.key}-${imageRefreshKey.current}`}
                         style={{
                           backgroundColor: '#2a2a4a',
                           minHeight: '450px'

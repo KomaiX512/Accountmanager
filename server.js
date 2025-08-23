@@ -2261,27 +2261,49 @@ app.post('/api/save-edited-post/:username', upload.single('image'), async (req, 
     fs.writeFileSync(localImagePath, imageData);
     if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Successfully saved edited image locally: ${localImagePath}`);
     
-    // Update the post JSON data if caption was changed
-    if (caption !== null && caption !== undefined) {
-      try {
-        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Updating post caption in: ${postKey}`);
-        
-        // Get the existing post data
-        const getPostParams = {
-          Bucket: 'tasks',
-          Key: postKey
-        };
-        
-        const postResponse = await client.getObject(getPostParams).promise();
-        let postData = JSON.parse(postResponse.Body.toString('utf-8'));
-        
-        // Update the caption in the post data
+    // 🎯 CRITICAL: Always update post data to point to edited image, regardless of caption changes
+    try {
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Updating post data to point to edited image: ${postKey}`);
+      
+      // Get the existing post data
+      const getPostParams = {
+        Bucket: 'tasks',
+        Key: postKey
+      };
+      
+      const postResponse = await client.getObject(getPostParams).promise();
+      let postData = JSON.parse(postResponse.Body.toString('utf-8'));
+      
+      // Update caption if provided
+      if (caption !== null && caption !== undefined) {
         if (postData.post && postData.post.caption !== undefined) {
           postData.post.caption = caption;
         }
         if (postData.caption !== undefined) {
           postData.caption = caption;
         }
+      }
+        
+        // 🎯 CRITICAL FIX: Update image URLs to point to edited version
+        const editedImageUrl = `/api/r2-image/${username}/${imageKey}?platform=${platform}&edited=true&v=${Date.now()}`;
+        
+        // Update all image URL fields to point to the edited version
+        if (postData.image_url !== undefined) {
+          postData.image_url = editedImageUrl;
+        }
+        if (postData.r2_image_url !== undefined) {
+          postData.r2_image_url = editedImageUrl;
+        }
+        if (postData.post && postData.post.image_url !== undefined) {
+          postData.post.image_url = editedImageUrl;
+        }
+        if (postData.post && postData.post.r2_image_url !== undefined) {
+          postData.post.r2_image_url = editedImageUrl;
+        }
+        
+        // Mark as edited
+        postData.is_edited = true;
+        postData.edited_image_key = imageKey;
         
         // Add update timestamp
         postData.updated_at = new Date().toISOString();
@@ -2299,10 +2321,9 @@ app.post('/api/save-edited-post/:username', upload.single('image'), async (req, 
         await client.putObject(putPostParams).promise();
         if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Successfully updated post data: ${postKey}`);
         
-      } catch (postUpdateError) {
-        if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Error updating post data:`, postUpdateError);
-        // Continue even if post update fails - the image was saved
-      }
+    } catch (postUpdateError) {
+      if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Error updating post data:`, postUpdateError);
+      // Continue even if post update fails - the image was saved
     }
     
     // ===============================================

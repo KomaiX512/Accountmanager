@@ -320,6 +320,7 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       
       console.log(`[News4U] 🔍 Fetching news for ${effectiveAccountHolder} on ${effectivePlatform} (key: ${forceRefreshKey})`);
       console.log(`[News4U] 🔍 API URL: ${url}`);
+      console.log(`[News4U] 🔍 Force refresh: true, Cache busting: ${Date.now()}`);
       
       const res = await axios.get(url);
       console.log(`[News4U] Raw response status:`, res.status);
@@ -327,6 +328,19 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       console.log(`[News4U] Raw response data:`, res.data);
       console.log(`[News4U] Raw response data type:`, typeof res.data);
       console.log(`[News4U] Raw response data length:`, Array.isArray(res.data) ? res.data.length : 'Not an array');
+      
+      // 🔍 ENHANCED DEBUGGING: Show backend response structure
+      if (Array.isArray(res.data)) {
+        console.log(`[News4U] 🔍 Backend response structure analysis:`);
+        res.data.forEach((item, idx) => {
+          console.log(`[News4U] 🔍 Item ${idx}:`, {
+            key: item.key,
+            lastModified: item.lastModified,
+            hasData: !!item.data,
+            dataKeys: item.data ? Object.keys(item.data) : 'No data'
+          });
+        });
+      }
       
       // If no data, show empty state
       if (!res.data || (Array.isArray(res.data) && res.data.length === 0)) {
@@ -428,27 +442,21 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       console.log(`[News4U] Normalized items:`, normalized);
       console.log(`[News4U] Normalized items count:`, normalized.length);
 
-      // 🚀 Always show everything the backend returned (up to 4)
-      // Sort by timestamp to get the most recent news first, but DO NOT filter or dedupe
-      const sortedByTimestamp = [...normalized].sort((a, b) => {
-        try {
-          const timeA = new Date(a.timestamp || a.fetched_at || 0).getTime();
-          const timeB = new Date(b.timestamp || b.fetched_at || 0).getTime();
-          return timeB - timeA; // Most recent first
-        } catch {
-          return 0; // Keep original order if timestamp parsing fails
-        }
-      });
-
-      // Log timestamp information for debugging
-      console.log(`[News4U] 📊 Timestamp analysis:`, sortedByTimestamp.slice(0, 4).map((item, idx) => ({
+      // 🚀 FIXED: Trust the backend's R2 bucket sorting instead of overriding it
+      // The backend already sorts files by LastModified date (most recent first)
+      // We should NOT re-sort here as it can override the correct R2 bucket order
+      
+      // Log the original order from backend for debugging
+      console.log(`[News4U] 📊 Backend R2 bucket order (trusting this order):`, normalized.slice(0, 4).map((item, idx) => ({
         rank: idx + 1,
         title: item.title?.substring(0, 50) + '...',
         timestamp: item.timestamp || item.fetched_at,
-        parsed: new Date(item.timestamp || item.fetched_at || 0).toISOString()
+        backendOrder: idx + 1
       })));
-      // Take only the top 4 latest news items, with NO filtering or deduplication
-      const selectedItems = sortedByTimestamp.slice(0, 4);
+      
+      // Take only the top 4 items in the order they came from backend (R2 bucket sorted)
+      // This ensures we get the most recent items as determined by R2 bucket LastModified
+      const selectedItems = normalized.slice(0, 4);
       setItems(selectedItems);
 
       console.log(`[News4U] Final processed items (no filtering/dedup):`, selectedItems);

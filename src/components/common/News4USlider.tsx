@@ -257,8 +257,31 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       const url = `${baseUrl}&forceRefresh=true&_cb=${Date.now()}&_key=${forceRefreshKey}`;
       
       console.log(`[News4U-Slider] 🔍 Fetching news for ${effectiveAccountHolder} on ${effectivePlatform} (key: ${forceRefreshKey})`);
+      console.log(`[News4U-Slider] 🔍 API URL: ${url}`);
+      console.log(`[News4U-Slider] 🔍 Force refresh: true, Cache busting: ${Date.now()}`);
       
       const res = await axios.get(url);
+      
+      // 🔍 ENHANCED DEBUGGING: Show backend response structure
+      console.log(`[News4U-Slider] 🔍 Backend response:`, {
+        status: res.status,
+        dataType: typeof res.data,
+        dataLength: Array.isArray(res.data) ? res.data.length : 'Not array',
+        sampleData: res.data ? JSON.stringify(res.data).substring(0, 500) + '...' : 'No data'
+      });
+      
+      if (Array.isArray(res.data)) {
+        console.log(`[News4U-Slider] 🔍 Backend response structure analysis:`);
+        res.data.forEach((item, idx) => {
+          console.log(`[News4U-Slider] 🔍 Item ${idx}:`, {
+            key: item.key,
+            lastModified: item.lastModified,
+            hasData: !!item.data,
+            dataKeys: item.data ? Object.keys(item.data) : 'No data'
+          });
+        });
+      }
+      
       const itemsOrArrays: any[] = (res.data ?? [])
         .map((r: any) => (r && typeof r === 'object' && 'data' in r ? r.data : r))
         .filter(Boolean);
@@ -306,27 +329,27 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
         return { id, title, description, image_url, source_url, timestamp, source, fetched_at, iteration };
       });
 
-      // Remove duplicate stories based on unique id
+      // 🚀 FIXED: Trust the backend's R2 bucket sorting instead of overriding it
+      // The backend already sorts files by LastModified date (most recent first)
+      // We should NOT re-sort here as it can override the correct R2 bucket order
+      
+      // Remove duplicate stories based on unique id (but maintain backend order)
       const deduped: NewsItem[] = [];
       const seen = new Set<string>();
       normalized.forEach(n => {
         const key = (n.id || `${n.source_url || ''}::${n.fetched_at || n.timestamp || ''}` || `${n.title || ''}::${n.timestamp || ''}`).toLowerCase();
-        if (key && !seen.has(key)) { seen.add(key); deduped.push(n); }
-      });
-
-      // Sort by timestamp to get the most recent news first
-      const sortedByTimestamp = deduped.sort((a, b) => {
-        try {
-          const timeA = new Date(a.timestamp || a.fetched_at || 0).getTime();
-          const timeB = new Date(b.timestamp || b.fetched_at || 0).getTime();
-          return timeB - timeA; // Most recent first
-        } catch {
-          return 0; // Keep original order if timestamp parsing fails
+        if (key && !seen.has(key)) { 
+          seen.add(key); 
+          deduped.push(n); 
         }
       });
 
-      // Take only the top 4 latest news items
-      const top4Latest = sortedByTimestamp.slice(0, 4);
+      // 🚀 CRITICAL FIX: Do NOT re-sort by timestamp - trust the backend R2 bucket order
+      // The backend already sorts by LastModified date (most recent first)
+      // Re-sorting here can override the correct R2 bucket chronological order
+      
+      // Take only the top 4 items in the order they came from backend (R2 bucket sorted)
+      const top4Latest = deduped.slice(0, 4);
 
       // Strict: just use the top 4 latest (no fallback to arbitrary items)
       const finalItems: NewsItem[] = top4Latest;

@@ -12,7 +12,9 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
-  updateProfile
+  sendEmailVerification,
+  updateProfile,
+  reload
 } from "firebase/auth";
 import { getAnalytics, logEvent } from "firebase/analytics";
 
@@ -76,6 +78,14 @@ export const registerWithEmailPassword = async (
     // Set user display name
     await updateProfile(user, { displayName });
     
+    // Send email verification
+    await sendEmailVerification(user, {
+      url: `${window.location.origin}/login?verified=true`,
+      handleCodeInApp: false
+    });
+    
+    console.log('Email verification sent to:', email);
+    
     // Log successful registration event
     logEvent(analytics, 'sign_up', {
       method: 'email'
@@ -103,6 +113,16 @@ export const signInWithEmailPassword = async (
     const result = await signInWithEmailAndPassword(auth, email, password);
     const user = result.user;
     
+    // Reload user to get latest emailVerified status
+    await reload(user);
+    
+    // Check if email is verified
+    if (!user.emailVerified) {
+      // Sign out the user since email is not verified
+      await signOut(auth);
+      throw new Error('Please verify your email before signing in. Check your inbox for the verification link.');
+    }
+    
     // Log successful login event
     logEvent(analytics, 'login', {
       method: 'email'
@@ -124,7 +144,12 @@ export const signInWithEmailPassword = async (
 
 export const resetPassword = async (email: string): Promise<void> => {
   try {
-    await sendPasswordResetEmail(auth, email);
+    await sendPasswordResetEmail(auth, email, {
+      url: `${window.location.origin}/login?reset=true`,
+      handleCodeInApp: false
+    });
+    
+    console.log('Password reset email sent to:', email);
     
     // Log password reset request
     logEvent(analytics, 'password_reset', {
@@ -140,6 +165,57 @@ export const resetPassword = async (email: string): Promise<void> => {
     });
     
     throw error;
+  }
+};
+
+// Send email verification to current user
+export const sendVerificationEmail = async (): Promise<void> => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('No user is currently signed in');
+    }
+    
+    if (user.emailVerified) {
+      throw new Error('Email is already verified');
+    }
+    
+    await sendEmailVerification(user, {
+      url: `${window.location.origin}/login?verified=true`,
+      handleCodeInApp: false
+    });
+    
+    console.log('Email verification sent to:', user.email);
+    
+    // Log verification email sent
+    logEvent(analytics, 'email_verification_sent', {
+      method: 'email'
+    });
+  } catch (error: any) {
+    console.error("Error sending verification email:", error);
+    
+    // Log failed verification email attempt
+    logEvent(analytics, 'email_verification_error', {
+      error_code: error.code || 'unknown',
+      error_message: error.message || 'Unknown error'
+    });
+    
+    throw error;
+  }
+};
+
+// Check if current user's email is verified
+export const checkEmailVerified = async (): Promise<boolean> => {
+  try {
+    const user = auth.currentUser;
+    if (!user) return false;
+    
+    // Reload user to get latest emailVerified status
+    await reload(user);
+    return user.emailVerified;
+  } catch (error) {
+    console.error("Error checking email verification:", error);
+    return false;
   }
 };
 

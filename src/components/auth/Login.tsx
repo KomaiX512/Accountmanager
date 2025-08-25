@@ -1,8 +1,7 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
-import EmailVerification from './EmailVerification';
 import NeuralNetwork from '../homepage/NeuralNetwork';
 import './Auth.css';
 
@@ -21,12 +20,12 @@ const Login: React.FC = () => {
     signInWithEmail, 
     signUpWithEmail, 
     sendPasswordReset, 
-    sendVerificationEmail,
-    verifyEmailCode,
-    resendVerificationCode,
-    error, 
-    clearError, 
-    loading 
+    checkEmailVerification,
+    signOut,
+    resendFirebaseVerificationEmail,
+    loading,
+    error,
+    clearError
   } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -53,19 +52,26 @@ const Login: React.FC = () => {
   
   // Email verification state
   const [showEmailVerification, setShowEmailVerification] = useState<boolean>(false);
-  const [pendingUser, setPendingUser] = useState<{ email: string; userId: string } | null>(null);
-  const [demoVerificationCode, setDemoVerificationCode] = useState<string | null>(null);
+  const [pendingUserEmail, setPendingUserEmail] = useState<string | null>(null);
+  const [verificationCheckInterval, setVerificationCheckInterval] = useState<NodeJS.Timeout | null>(null);
+  const [isSigningUp, setIsSigningUp] = useState<boolean>(false);
 
   // Get the path the user was trying to access before being redirected to login
   // Default to dashboard instead of homepage for better UX
   const from = (location.state as LocationState)?.from?.pathname || '/account';
 
   useEffect(() => {
-    // If user is already logged in, redirect to the previous page or dashboard
-    if (currentUser) {
-      navigate(from, { replace: true });
+    // Only redirect if user is logged in AND not in the middle of signup process
+    if (currentUser && !isSigningUp && !showEmailVerification) {
+      // Check if user's email is verified before redirecting
+      if (currentUser.emailVerified) {
+        navigate(from, { replace: true });
+      } else {
+        // User is signed in but email not verified - sign them out
+        signOut();
+      }
     }
-  }, [currentUser, navigate, from]);
+  }, [currentUser, navigate, from, isSigningUp, showEmailVerification]);
 
   useEffect(() => {
     let animationFrame: number;
@@ -196,28 +202,34 @@ const Login: React.FC = () => {
     if (!validateForm()) return;
     
     try {
+      setIsSigningUp(true);
       await signUpWithEmail(email, password, displayName);
       
-      // Wait a moment for Firebase to update currentUser, then send verification
-      setTimeout(async () => {
-                  if (currentUser) {
-            setPendingUser({ email, userId: currentUser.uid });
-            try {
-              const result = await sendVerificationEmail(email, currentUser.uid);
-              if (result.demoMode && result.verificationCode) {
-                setDemoVerificationCode(result.verificationCode);
-                setSuccessMessage(`Demo Mode: Your verification code is: ${result.verificationCode}`);
-              }
-              setShowEmailVerification(true);
-            } catch (emailError) {
-              console.error('Failed to send verification email:', emailError);
-              setFormError('Account created but failed to send verification email. Please try logging in.');
-            }
-          } else {
-            setFormError('Account created but verification email could not be sent. Please try logging in.');
-          }
-      }, 1000);
+      // Firebase automatically sends verification email during signup
+      setPendingUserEmail(email);
+      setSuccessMessage(`Account created successfully! Please check your email (${email}) for a verification link before signing in.`);
+      
+      // Show verification waiting screen
+      setShowEmailVerification(true);
+      
+      // Start checking for email verification every 3 seconds
+      const interval = setInterval(async () => {
+        const isVerified = await checkEmailVerification();
+        if (isVerified) {
+          clearInterval(interval);
+          setVerificationCheckInterval(null);
+          setShowEmailVerification(false);
+          setPendingUserEmail(null);
+          setIsSigningUp(false);
+          setSuccessMessage('Email verified successfully! You can now sign in.');
+          setMode('login');
+        }
+      }, 3000);
+      
+      setVerificationCheckInterval(interval);
+      
     } catch (error) {
+      setIsSigningUp(false);
       setLoginAttempts((prev) => prev + 1);
     }
   };
@@ -242,43 +254,37 @@ const Login: React.FC = () => {
     }
   };
 
-  const handleEmailVerificationSuccess = async (verificationCode: string) => {
-    if (!pendingUser) return;
+  const handleResendVerificationEmail = async () => {
+    if (!pendingUserEmail) return;
     
     try {
-      await verifyEmailCode(pendingUser.email, verificationCode, pendingUser.userId);
-      setShowEmailVerification(false);
-      setPendingUser(null);
-      setSuccessMessage('Email verified successfully! Welcome to Account Manager.');
-      
-      // Redirect to dashboard after successful verification
-      setTimeout(() => {
-        navigate(from, { replace: true });
-      }, 2000);
+      await resendFirebaseVerificationEmail();
+      setSuccessMessage(`Verification email resent to ${pendingUserEmail}. Please check your inbox.`);
     } catch (error) {
-      console.error('Email verification failed:', error);
-    }
-  };
-
-  const handleResendVerificationCode = async () => {
-    if (!pendingUser) return;
-    
-    try {
-      const result = await resendVerificationCode(pendingUser.email, pendingUser.userId);
-      if (result.demoMode && result.verificationCode) {
-        setDemoVerificationCode(result.verificationCode);
-        setSuccessMessage(`Demo Mode: New verification code is: ${result.verificationCode}`);
-      }
-    } catch (error) {
-      console.error('Failed to resend verification code:', error);
+      console.error('Failed to resend verification email:', error);
+      setFormError('Failed to resend verification email. Please try again.');
     }
   };
 
   const handleCancelEmailVerification = () => {
+    if (verificationCheckInterval) {
+      clearInterval(verificationCheckInterval);
+      setVerificationCheckInterval(null);
+    }
     setShowEmailVerification(false);
-    setPendingUser(null);
+    setPendingUserEmail(null);
+    setIsSigningUp(false);
     setMode('login');
   };
+
+  // Cleanup interval on component unmount
+  useEffect(() => {
+    return () => {
+      if (verificationCheckInterval) {
+        clearInterval(verificationCheckInterval);
+      }
+    };
+  }, [verificationCheckInterval]);
 
   const renderForm = () => {
     switch (mode) {
@@ -450,16 +456,34 @@ const Login: React.FC = () => {
           backfaceVisibility: 'hidden'
         }}
       >
-        <motion.div
-          className="auth-card glassy-auth-card"
-          whileHover={{ boxShadow: '0 10px 30px rgba(0, 0, 0, 0.15)' }}
-          /* FIX: Prevent motion from causing rendering issues */
-          style={{
-            transform: 'translateZ(0)',
-            willChange: 'transform',
-            backfaceVisibility: 'hidden'
-          }}
-        >
+        {/* Responsive Container */}
+        <div className="auth-responsive-container">
+          {/* Auth Slider for Larger Screens */}
+          <div className="auth-slider">
+            <div className="auth-slider-content">
+              <h2>Welcome to AccountManager</h2>
+              <p>Your all-in-one social media management platform</p>
+              <ul className="auth-slider-features">
+                <li>Manage Instagram, Facebook, Twitter & LinkedIn</li>
+                <li>AI-powered content generation</li>
+                <li>Advanced analytics & insights</li>
+                <li>Cross-platform scheduling</li>
+                <li>Professional team collaboration</li>
+              </ul>
+            </div>
+          </div>
+          
+          {/* Auth Card */}
+          <motion.div
+            className="auth-card glassy-auth-card"
+            whileHover={{ boxShadow: '0 10px 30px rgba(0, 0, 0, 0.15)' }}
+            /* FIX: Prevent motion from causing rendering issues */
+            style={{
+              transform: 'translateZ(0)',
+              willChange: 'transform',
+              backfaceVisibility: 'hidden'
+            }}
+          >
           <div className="auth-header">
             <h1>
               {mode === 'login' && 'Welcome Back'}
@@ -575,17 +599,59 @@ const Login: React.FC = () => {
             <p>By signing in, you agree to our <a href="/terms">Terms of Service</a> and <a href="/privacy">Privacy Policy</a></p>
           </div>
         </motion.div>
+        </div> {/* Close auth-responsive-container */}
         
-        {/* Email Verification Modal */}
-        {showEmailVerification && pendingUser && (
-          <EmailVerification
-            email={pendingUser.email}
-            onVerificationSuccess={handleEmailVerificationSuccess}
-            onResendCode={handleResendVerificationCode}
-            onCancel={handleCancelEmailVerification}
-            isLoading={loading}
-            demoVerificationCode={demoVerificationCode}
-          />
+        {/* Email Verification Waiting Screen */}
+        {showEmailVerification && pendingUserEmail && (
+          <motion.div
+            className="verification-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="verification-modal"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.3 }}
+            >
+              <div className="verification-header">
+                <h2>Check Your Email</h2>
+                <p>We've sent a verification link to:</p>
+                <strong>{pendingUserEmail}</strong>
+              </div>
+              
+              <div className="verification-content">
+                <div className="verification-icon">
+                  📧
+                </div>
+                <p>Click the verification link in your email to activate your account.</p>
+                <p className="verification-note">
+                  <strong>Note:</strong> You must verify your email before you can sign in.
+                </p>
+              </div>
+              
+              <div className="verification-actions">
+                <button
+                  className="resend-btn"
+                  onClick={handleResendVerificationEmail}
+                  disabled={loading}
+                >
+                  {loading ? 'Sending...' : 'Resend Email'}
+                </button>
+                <button
+                  className="cancel-btn"
+                  onClick={handleCancelEmailVerification}
+                >
+                  Back to Sign In
+                </button>
+              </div>
+              
+              <div className="verification-footer">
+                <p>Didn't receive the email? Check your spam folder or click "Resend Email"</p>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </motion.div>
     </>

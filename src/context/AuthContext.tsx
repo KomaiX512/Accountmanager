@@ -1,16 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User } from 'firebase/auth';
-import { 
-  auth, 
-  onAuthStateChanged, 
-  signInWithGoogle, 
-  logoutUser,
-  signInWithEmailPassword,
-  registerWithEmailPassword,
-  resetPassword
-} from '../firebase/config';
+import { User, onAuthStateChanged } from 'firebase/auth';
+import { signInWithGoogle, signInWithEmailPassword, registerWithEmailPassword, resetPassword, sendVerificationEmail, checkEmailVerified, logoutUser, auth } from '../firebase/config';
 import { clearInstagramConnection, disconnectInstagramAccount } from '../utils/instagramSessionManager';
-import EmailVerificationService from '../services/EmailVerificationService';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -21,9 +12,9 @@ interface AuthContextType {
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string, displayName: string) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
-  sendVerificationEmail: (email: string, userId: string) => Promise<{ success: boolean; message: string; demoMode?: boolean; verificationCode?: string }>;
-  verifyEmailCode: (email: string, code: string, userId: string) => Promise<void>;
-  resendVerificationCode: (email: string, userId: string) => Promise<{ success: boolean; message: string; demoMode?: boolean; verificationCode?: string }>;
+  sendFirebaseVerificationEmail: () => Promise<void>;
+  checkEmailVerification: () => Promise<boolean>;
+  resendFirebaseVerificationEmail: () => Promise<void>;
   clearError: () => void;
   // ✅ CROSS-DEVICE LOADING STATE VALIDATION
   checkLoadingStateForPlatform: (platform: string) => Promise<{ hasLoadingState: boolean; redirectTo?: string; remainingMinutes?: number }>;
@@ -134,7 +125,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     setError(null);
     try {
-      await registerWithEmailPassword(email, password, displayName);
+      const user = await registerWithEmailPassword(email, password, displayName);
+      // Sign out the user immediately after registration since email is not verified
+      // This prevents automatic login and allows the verification flow to work properly
+      if (user && !user.emailVerified) {
+        await logoutUser();
+      }
     } catch (error: any) {
       setError(error.message || 'Failed to sign up with email/password');
     } finally {
@@ -154,12 +150,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const sendVerificationEmail = async (email: string, userId: string): Promise<{ success: boolean; message: string; demoMode?: boolean; verificationCode?: string }> => {
+  const sendFirebaseVerificationEmail = async (): Promise<void> => {
     setLoading(true);
     setError(null);
     try {
-      const result = await EmailVerificationService.sendVerificationEmail(email, userId);
-      return result;
+      await sendVerificationEmail();
     } catch (error: any) {
       setError(error.message || 'Failed to send verification email');
       throw error;
@@ -168,26 +163,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const verifyEmailCode = async (email: string, code: string, userId: string): Promise<void> => {
-    setLoading(true);
-    setError(null);
+  const checkEmailVerification = async (): Promise<boolean> => {
     try {
-      await EmailVerificationService.verifyEmailCode(email, code, userId);
+      return await checkEmailVerified();
     } catch (error: any) {
-      setError(error.message || 'Failed to verify email code');
-    } finally {
-      setLoading(false);
+      console.error('Error checking email verification:', error);
+      return false;
     }
   };
 
-  const resendVerificationCode = async (email: string, userId: string): Promise<{ success: boolean; message: string; demoMode?: boolean; verificationCode?: string }> => {
+  const resendFirebaseVerificationEmail = async (): Promise<void> => {
     setLoading(true);
     setError(null);
     try {
-      const result = await EmailVerificationService.resendVerificationCode(email, userId);
-      return result;
+      await sendVerificationEmail();
     } catch (error: any) {
-      setError(error.message || 'Failed to resend verification code');
+      setError(error.message || 'Failed to resend verification email');
       throw error;
     } finally {
       setLoading(false);
@@ -429,9 +420,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signInWithEmail,
     signUpWithEmail,
     sendPasswordReset,
-    sendVerificationEmail,
-    verifyEmailCode,
-    resendVerificationCode,
+    sendFirebaseVerificationEmail,
+    checkEmailVerification,
+    resendFirebaseVerificationEmail,
     signOut,
     clearError,
     checkLoadingStateForPlatform,

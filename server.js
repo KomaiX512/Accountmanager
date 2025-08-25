@@ -446,14 +446,17 @@ function clearImageCacheByFilename(imageFilename, username, context = 'CACHE-CLE
   return clearedCount;
 }
 
-// Create directory for public files
-const publicDir = path.join(process.cwd(), 'public');
-if (!fs.existsSync(publicDir)) {
-  fs.mkdirSync(publicDir, { recursive: true });
+// Serve built React app from dist directory
+const distDir = path.join(process.cwd(), 'dist');
+if (fs.existsSync(distDir)) {
+  app.use(express.static(distDir));
+} else {
+  // Fallback to public directory for development, but skip index.html
+  const publicDir = path.join(process.cwd(), 'public');
+  if (fs.existsSync(publicDir)) {
+    app.use(express.static(publicDir, { index: false }));
+  }
 }
-
-// Serve static files
-app.use(express.static(publicDir));
 
 // Serve our R2 fixer script
 app.get('/handle-r2-images.js', (req, res) => {
@@ -2754,13 +2757,8 @@ const startServer = async () => {
     }
     
     // Start the server
-    server = app.listen(port, '0.0.0.0', () => {
-      if (DEBUG_LOGS) console.log(`🚀 PROXY SERVER (Image Processing Only) running at http://localhost:${port}`);
-      if (DEBUG_LOGS) console.log('🖼️  ONLY handles: Image processing, R2 images, post generation');
-      if (DEBUG_LOGS) console.log('❌ NEVER handles: Notifications, DMs, social media connections');
-      if (DEBUG_LOGS) console.log('🔗 Main server (notifications): http://localhost:3000');
-      if (DEBUG_LOGS) console.log(`📊 Process ID: ${process.pid}`);
-      if (DEBUG_LOGS) console.log(`🕒 Started at: ${new Date().toISOString()}`);
+    const server = app.listen(port, '0.0.0.0', () => {
+      console.log(`Server running on port ${port}`);
       
       // Set server timeout for better connection handling
       server.timeout = 300000; // 5 minutes
@@ -3034,5 +3032,15 @@ app.post('/api/clear-image-cache', (req, res) => {
       error: 'Failed to clear image cache',
       details: error.message 
     });
+  }
+});
+
+// Catch-all handler: serve React app for SPA routing
+app.get('*', (req, res) => {
+  const indexPath = path.join(process.cwd(), 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(404).send('Application not found');
   }
 });

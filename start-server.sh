@@ -19,15 +19,8 @@ if [ ! -f ready_post/instagram/narsissist/image_1749203937329.jpg ]; then
   }
 fi
 
-# Create a general placeholder image
-echo "Creating general placeholder image..."
-convert -size 512x512 xc:lightgray -gravity center -pointsize 20 -annotate 0 "Placeholder Image" public/placeholder.jpg 2>/dev/null || {
-  # If imagemagick is not available, create a simple HTML placeholder
-  echo "ImageMagick not available, creating simple placeholder file"
-  echo '<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#cccccc"/><text x="50%" y="50%" font-family="Arial" font-size="20" text-anchor="middle" fill="#333333">Placeholder Image</text></svg>' > public/placeholder.svg
-  echo "Creating symlink from SVG to JPG"
-  ln -sf placeholder.svg public/placeholder.jpg
-}
+# Remove any legacy placeholder assets to avoid accidental usage
+rm -f public/placeholder.jpg public/placeholder.svg 2>/dev/null || true
 
 # Kill any existing node processes for this server
 echo "Checking for existing server processes..."

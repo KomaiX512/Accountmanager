@@ -642,6 +642,12 @@ app.get(['/api/user/:userId/usage', '/user/:userId/usage'], async (req, res) => 
         platformUserIds.push('facebook_KomaiX512', 'instagram_fentybeauty');
         console.log(`[${new Date().toISOString()}] [USER-API] Added known platform userIds for ${userId}:`, platformUserIds);
       }
+      
+      // TEMPORARY FIX: Add Twitter mapping for KUvVFxnLanYTWPuSIfphby5hxJQ2
+      if (userId === 'KUvVFxnLanYTWPuSIfphby5hxJQ2') {
+        platformUserIds.push('twitter_gdb');
+        console.log(`[${new Date().toISOString()}] [USER-API] Added Twitter platform userId for ${userId}:`, platformUserIds);
+      }
     }
     
     // Aggregate usage from all platform-specific userIds
@@ -1284,6 +1290,100 @@ app.post(['/api/usage/increment/:userId', '/usage/increment/:userId'], async (re
   }
 });
 
+// ✅ NEW: /api/users endpoint to return platform connections for mapping
+app.get(['/api/users'], async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [PLATFORM-USAGE] Fetching all user platform connections`);
+    
+    // Get all users with platform connections from account-info storage
+    const listCommand = new ListObjectsV2Command({
+      Bucket: 'tasks',
+      Prefix: 'account-info/',
+      Delimiter: '/'
+    });
+    
+    const response = await s3Client.send(listCommand);
+    const users = [];
+    
+    if (response.CommonPrefixes) {
+      // Process each platform directory
+      for (const platformPrefix of response.CommonPrefixes) {
+        const platform = platformPrefix.Prefix.replace('account-info/', '').replace('/', '');
+        
+        // Get users in this platform
+        const platformListCommand = new ListObjectsV2Command({
+          Bucket: 'tasks',
+          Prefix: platformPrefix.Prefix,
+          Delimiter: '/'
+        });
+        
+        const platformResponse = await s3Client.send(platformListCommand);
+        
+        if (platformResponse.CommonPrefixes) {
+          for (const userPrefix of platformResponse.CommonPrefixes) {
+            const username = userPrefix.Prefix.replace(platformPrefix.Prefix, '').replace('/', '');
+            
+            try {
+              // Try to get account info to find Firebase UID
+              const infoKey = `${userPrefix.Prefix}info.json`;
+              const getCommand = new GetObjectCommand({
+                Bucket: 'tasks',
+                Key: infoKey
+              });
+              
+              const infoResponse = await s3Client.send(getCommand);
+              const infoData = JSON.parse(await infoResponse.Body.transformToString());
+              
+              // Look for existing user or create new entry
+              let user = users.find(u => u.userId === infoData.firebaseUID);
+              if (!user) {
+                user = {
+                  userId: infoData.firebaseUID || `${platform}_${username}`,
+                  connections: {}
+                };
+                users.push(user);
+              }
+              
+              // Add platform connection
+              user.connections[platform] = {
+                username: username,
+                accountType: infoData.accountType,
+                connected: true
+              };
+              
+            } catch (error) {
+              // If no Firebase UID found, create platform-specific entry
+              const userId = `${platform}_${username}`;
+              let user = users.find(u => u.userId === userId);
+              if (!user) {
+                user = {
+                  userId: userId,
+                  connections: {}
+                };
+                users.push(user);
+              }
+              
+              user.connections[platform] = {
+                username: username,
+                connected: true
+              };
+            }
+          }
+        }
+      }
+    }
+    
+    console.log(`[${new Date().toISOString()}] [PLATFORM-USAGE] Found ${users.length} users with platform connections`);
+    res.json(users);
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [PLATFORM-USAGE] Error fetching users:`, error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
 // ✅ NEW: Platform/Username-based Usage Tracking with UserID Synchronization
 // Helper function to get userId from platform/username
 async function getUserIdFromPlatformUser(platform, username) {
@@ -1600,7 +1700,7 @@ app.post('/webhook/r2', async (req, res) => {
 
 // REMOVED: Duplicate SSE endpoint - using the enhanced version below
 
-// Enhanced data fetching with centralized schema management
+// Enhanced data fetching with centralized schema management and performance optimization
 async function fetchDataForModule(username, prefixTemplate, forceRefresh = false, platform = 'instagram') {
   if (!username) {
     console.error('No username provided, cannot fetch data');
@@ -1691,18 +1791,51 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
       });
     }
     
-    // ✅ NEW: Limit to most recent items based on module type
+    // ✅ OPTIMIZED: Limit to most recent items and auto-cleanup old files
     let maxItems;
+    let maxStorageItems; // How many to keep in R2 bucket for performance
+    
     if (module === 'recommendations' || module === 'competitor_analysis') {
-      maxItems = 3; // Strategies and competitor analysis: top 3
+      maxItems = 3; // Return top 3
+      maxStorageItems = 8; // Keep 8 in storage
     } else if (module === 'news_for_you') {
-      maxItems = 4; // News: always top 4 most recent
+      maxItems = 4; // Return top 4 
+      maxStorageItems = 8; // Keep only 8 in R2 bucket for performance
     } else {
       maxItems = sortedFiles.length; // Other modules: all items
+      maxStorageItems = sortedFiles.length; // No cleanup for other modules
     }
     
     // 🔍 DEBUG: Show module and limit information
-    console.log(`[${new Date().toISOString()}] [DEBUG] Module: ${module}, MaxItems: ${maxItems}, TotalFiles: ${sortedFiles.length}`);
+    console.log(`[${new Date().toISOString()}] [DEBUG] Module: ${module}, MaxItems: ${maxItems}, MaxStorage: ${maxStorageItems}, TotalFiles: ${sortedFiles.length}`);
+    
+    // 🚀 PERFORMANCE OPTIMIZATION: Auto-delete old files beyond storage limit
+    if (sortedFiles.length > maxStorageItems && (module === 'news_for_you' || module === 'recommendations' || module === 'competitor_analysis')) {
+      const filesToDelete = sortedFiles.slice(maxStorageItems);
+      console.log(`[${new Date().toISOString()}] [🗑️ CLEANUP] Deleting ${filesToDelete.length} old ${module} files to optimize performance`);
+      
+      // Delete old files asynchronously (non-blocking)
+      Promise.all(
+        filesToDelete.map(async (file) => {
+          try {
+            const deleteCommand = new DeleteObjectCommand({
+              Bucket: 'tasks',
+              Key: file.Key,
+            });
+            await s3Client.send(deleteCommand);
+            console.log(`[${new Date().toISOString()}] [🗑️ DELETED] ${file.Key}`);
+          } catch (deleteError) {
+            console.warn(`[${new Date().toISOString()}] [⚠️ DELETE-WARN] Failed to delete ${file.Key}:`, deleteError.message);
+          }
+        })
+      ).catch(err => {
+        console.error(`[${new Date().toISOString()}] [❌ DELETE-ERROR] Batch deletion failed:`, err.message);
+      });
+      
+      // Update sortedFiles to only include kept files
+      sortedFiles.splice(maxStorageItems);
+      console.log(`[${new Date().toISOString()}] [✅ OPTIMIZED] ${module} storage reduced from ${files.length} to ${maxStorageItems} files`);
+    }
     
     const limitedFiles = sortedFiles.slice(0, maxItems);
     
@@ -1854,59 +1987,91 @@ app.get(['/profile-info/:username', '/api/profile-info/:username'], async (req, 
   const forceRefresh = req.query.forceRefresh === 'true';
   const platform = req.query.platform || 'instagram'; // Default to Instagram
   
-  // Try multiple possible key formats for ProfileInfo
-  const possibleKeys = [
-    `ProfileInfo/${platform}/${username}/profileinfo.json`,
-    `ProfileInfo/${platform}/${username}.json`,
-    `ProfileInfo/${username}/profileinfo.json`,
-    `ProfileInfo/${username}.json`
-  ];
-
-  console.log(`[${new Date().toISOString()}] Attempting to fetch ${platform} profile info for ${username}`);
-
-  for (const key of possibleKeys) {
-    try {
-      console.log(`[${new Date().toISOString()}] Trying key: ${key}`);
-      
-      const getCommand = new GetObjectCommand({
-        Bucket: 'tasks',
-        Key: key,
-      });
-      const response = await s3Client.send(getCommand);
-      const body = await streamToString(response.Body);
-
-      if (!body || body.trim() === '') {
-        console.warn(`Empty file detected at ${key}`);
-        continue;
-      }
-
-      const data = JSON.parse(body);
-      
-      // 🎯 CRITICAL FIX: Validate that this is actual profile data, not account config
-      const hasProfileFields = data.fullName || data.followersCount !== undefined || 
-                               data.biography || data.profilePicUrl || data.profilePicUrlHD ||
-                               data.followsCount !== undefined || data.postsCount !== undefined ||
-                               data.verified !== undefined || data.private !== undefined;
-      
-      if (hasProfileFields) {
-        console.log(`[${new Date().toISOString()}] Successfully fetched ${platform} profile info for ${username} from ${key}`);
-        return res.json(data);
-      } else {
-        console.warn(`[${new Date().toISOString()}] Found account config (not profile data) at ${key}, continuing search...`);
-        continue; // This is account config data, keep looking for actual profile data
-      }
-    } catch (error) {
-      if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
-        console.log(`Key not found: ${key}`);
-        continue;
-      }
-      console.error(`Error fetching profile info from ${key}:`, error.message);
-      continue;
+  try {
+    // 🚀 SMART USERNAME RESOLUTION: Try multiple username formats intelligently
+    const { platform: normalizedPlatform, username: parsedUsername } = PlatformSchemaManager.parseRequestParams(req);
+    const platformConfig = PlatformSchemaManager.getPlatformConfig(normalizedPlatform);
+    
+    // 🎯 INTELLIGENT RESOLUTION: Create potential username variants
+    const usernameVariants = [];
+    
+    // Variant 1: Normalized username (lowercase for Instagram)
+    const normalizedUsername = platformConfig.normalizeUsername(parsedUsername);
+    usernameVariants.push(normalizedUsername);
+    
+    // Variant 2: Original username (as provided)
+    if (parsedUsername !== normalizedUsername) {
+      usernameVariants.push(parsedUsername);
     }
-  }
+    
+    // Variant 3: Remove @ prefix if present
+    if (parsedUsername.startsWith('@')) {
+      const withoutAt = parsedUsername.substring(1);
+      const normalizedWithoutAt = platformConfig.normalizeUsername(withoutAt);
+      if (!usernameVariants.includes(normalizedWithoutAt)) {
+        usernameVariants.push(normalizedWithoutAt);
+      }
+      if (!usernameVariants.includes(withoutAt)) {
+        usernameVariants.push(withoutAt);
+      }
+    }
+    
+    // 🔍 SMART SEARCH: Try each variant until we find profile data
+    for (let i = 0; i < usernameVariants.length; i++) {
+      const candidateUsername = usernameVariants[i];
+      const candidateKey = `ProfileInfo/${normalizedPlatform}/${candidateUsername}.json`;
+      
+      console.log(`[${new Date().toISOString()}] [${i + 1}/${usernameVariants.length}] Trying ProfileInfo for ${normalizedPlatform}/${candidateUsername}: ${candidateKey}`);
+      
+      try {
+        const getCommand = new GetObjectCommand({
+          Bucket: 'tasks',
+          Key: candidateKey,
+        });
+        
+        const response = await s3Client.send(getCommand);
+        const body = await streamToString(response.Body);
 
-  console.log(`Profile info not found for ${username} on ${platform} (tried ${possibleKeys.length} locations)`);
-  return res.status(404).json({ error: 'Profile info not found' });
+        if (!body || body.trim() === '') {
+          console.warn(`[${new Date().toISOString()}] Empty profile info file at ${candidateKey}`);
+          continue; // Try next variant
+        }
+
+        const data = JSON.parse(body);
+        
+        // 🎯 VALIDATE: Check if this is actual profile data
+        const hasProfileFields = data.fullName || data.followersCount !== undefined || 
+                                 data.biography || data.profilePicUrl || data.profilePicUrlHD ||
+                                 data.followsCount !== undefined || data.postsCount !== undefined ||
+                                 data.verified !== undefined || data.private !== undefined;
+        
+        if (hasProfileFields) {
+          console.log(`[${new Date().toISOString()}] ✅ PROFILE FOUND: Successfully resolved ${normalizedPlatform} profile for variant '${candidateUsername}' (attempt ${i + 1}/${usernameVariants.length})`);
+          return res.json(data);
+        } else {
+          console.warn(`[${new Date().toISOString()}] Account config detected (not profile data) at ${candidateKey}, trying next variant`);
+          continue; // Try next variant
+        }
+        
+      } catch (variantError) {
+        if (variantError.name === 'NoSuchKey' || variantError.$metadata?.httpStatusCode === 404) {
+          console.log(`[${new Date().toISOString()}] Variant '${candidateUsername}' not found, trying next...`);
+          continue; // Try next variant
+        } else {
+          console.error(`[${new Date().toISOString()}] Error checking variant '${candidateUsername}':`, variantError.message);
+          continue; // Try next variant
+        }
+      }
+    }
+    
+    // If we reach here, no variants worked
+    console.log(`[${new Date().toISOString()}] ❌ PROFILE NOT FOUND: No valid ProfileInfo found for ${normalizedPlatform} username '${parsedUsername}' after trying ${usernameVariants.length} variants: [${usernameVariants.join(', ')}]`);
+    return res.status(404).json({ error: 'Profile info not found for any username variant' });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] ❌ ProfileInfo fetch error for ${username} on ${platform}:`, error.message);
+    return res.status(500).json({ error: 'Internal server error while fetching profile info' });
+  }
 });
 
 // 🎯 NEW: API route to serve cached profile data for extraction
@@ -2729,7 +2894,7 @@ app.get(['/retrieve-account-info/:username', '/api/retrieve-account-info/:userna
       if (cache.has(prefix)) {
         console.log(`[${new Date().toISOString()}] Using cached account info as fallback for ${normalizedUsername}`);
         const cachedData = cache.get(prefix);
-        const key = PlatformSchemaManager.buildPath('AccountInfo', platform, normalizedUsername, 'info.json');
+        const candidateKey = `ProfileInfo/${normalizedPlatform}/${candidateUsername}.json`;
         const cachedAccountInfo = cachedData?.find(item => item.key === key)?.data;
         if (cachedAccountInfo) {
           return res.json(cachedAccountInfo);

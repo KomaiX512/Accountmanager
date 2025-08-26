@@ -29,38 +29,35 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Fetch event - serve from cache when offline
+// Fetch event - ONLY handle basic navigation, ignore everything else
 self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
+  // CRITICAL: Only handle main page navigation, ignore all dev server and asset requests
+  if (event.request.destination !== 'document') {
+    return; // Let the browser handle images, scripts, styles, etc. normally
+  }
   
-  // Skip API calls and external resources
-  if (url.pathname.startsWith('/api/') || 
-      url.hostname !== location.hostname ||
-      event.request.method !== 'GET') {
+  // Only handle requests to the main app page
+  const url = new URL(event.request.url);
+  if (url.pathname !== '/' && url.pathname !== '/index.html') {
+    return; // Let the browser handle other routes normally
+  }
+  
+  // Only handle GET requests to our own domain
+  if (event.request.method !== 'GET' || url.hostname !== location.hostname) {
     return;
   }
   
-  // Only handle navigation and static assets
-  if (event.request.destination === 'document' || 
-      event.request.destination === 'image' ||
-      event.request.destination === 'script' ||
-      event.request.destination === 'style') {
-    
-    event.respondWith(
-      caches.match(event.request)
-        .then((response) => {
-          // Return cached version or fetch from network
-          return response || fetch(event.request);
-        })
-        .catch((error) => {
-          console.error('PWA: Fetch failed for:', event.request.url, error);
-          // If both cache and network fail, return offline page for documents
-          if (event.request.destination === 'document') {
-            return caches.match('/index.html');
-          }
-        })
-    );
-  }
+  // Safe navigation handling - only for main page
+  event.respondWith(
+    caches.match('/index.html')
+      .then((response) => {
+        return response || fetch(event.request);
+      })
+      .catch(() => {
+        // Fallback to cached index.html if both cache and network fail
+        return caches.match('/index.html');
+      })
+  );
 });
 
 // Activate event - clean up old caches

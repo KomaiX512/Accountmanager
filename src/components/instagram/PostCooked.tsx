@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import ReactDOM, { createPortal } from 'react-dom';
 import './PostCooked.css';
 import { motion } from 'framer-motion';
@@ -21,6 +21,12 @@ import { getApiUrl } from '../../config/api';
 import CacheManager from '../../utils/cacheManager';
 // Missing modules - comment out until they're available
 
+// Extend Window interface for proxy server status
+declare global {
+  interface Window {
+    proxyServerDown?: boolean;
+  }
+}
 
 interface PostCookedProps {
   username: string;
@@ -449,13 +455,19 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
 
   // 🎯 GENIUS: Enhanced image URL generation with intelligent pattern matching
   const getReliableImageUrl = useCallback((post: any, forceRefresh: boolean = false) => {
+    // Check if proxy server is down - if so, don't try to load images
+    if (typeof window !== 'undefined' && window.proxyServerDown) {
+      console.log(`[PostCooked] Proxy server is down, skipping image load for ${post.key}`);
+      return '';
+    }
+
     const postKey = post.key;
     let imageFilename = '';
     let imageExtension = 'jpg'; // Default to jpg
     
     console.log(`[ImageURL] Processing post key: ${postKey}`);
     
-    // � PRIORITY CHECK: Look for edited image URLs first (highest priority)
+    // 🎯 PRIORITY CHECK: Look for edited image URLs first (highest priority)
     if (post.data?.image_url && post.data.image_url.includes('edited_')) {
       console.log(`[ImageURL] 🎯 Found edited image URL in post data: ${post.data.image_url}`);
       const timestamp = forceRefresh ? `&t=${Date.now()}` : '';
@@ -476,7 +488,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       return existingImageUrl + timestamp;
     }
     
-    // �🔍 INTELLIGENT PATTERN DETECTION: Handle multiple file naming patterns
+    // 🔍 INTELLIGENT PATTERN DETECTION: Handle multiple file naming patterns
     
     // Pattern 1: Standard format - ready_post_<ID>.json → Check for edited_image_<ID>.png FIRST, then image_<ID>.(jpg|png|jpeg|webp)
     const standardMatch = postKey.match(/ready_post_(\d+)\.json$/);
@@ -603,7 +615,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       }
       
       console.error(`[PostCooked] No valid image URL found for post ${postKey}`);
-      return `${API_BASE_URL}/placeholder.jpg?post=${encodeURIComponent(postKey)}&reason=no_pattern`;
+      // Return empty string to trigger UI placeholder component rendering
+      return '';
     }
     
     // Create timestamp for cache busting ONLY when explicitly forced
@@ -624,13 +637,12 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     
     if (currentRetries >= 3) {
       // Max retries reached - use placeholder
-      console.error(`[PostCooked] Max retries reached for ${key}, using placeholder`);
+      console.error(`[PostCooked] Max retries reached for ${key}, falling back to UI placeholder`);
       setImageErrors(prev => ({
         ...prev,
         [key]: { failed: true, retryCount: currentRetries + 1 }
       }));
-      
-      imgElement.src = `${API_BASE_URL}/placeholder.jpg?failed=${encodeURIComponent(key)}`;
+      // Stop attempting to set a network placeholder; allow React to render placeholder component
       return;
     }
     
@@ -643,12 +655,26 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     // Get the post and generate a fresh URL
     const post = localPosts.find(p => p.key === key);
     if (!post) {
-      imgElement.src = `${API_BASE_URL}/placeholder.jpg?nopost=${encodeURIComponent(key)}`;
+      // No post found; allow UI placeholder component to render
+      setImageErrors(prev => ({
+        ...prev,
+        [key]: { failed: true, retryCount: currentRetries + 1 }
+      }));
       return;
     }
     
     // Generate fresh URL with force refresh
     const freshUrl = getReliableImageUrl(post, true);
+    
+    // Check if proxy server is down before retrying
+    if (typeof window !== 'undefined' && window.proxyServerDown) {
+      console.log(`[PostCooked] Proxy server is down, showing placeholder for ${key}`);
+      setImageErrors(prev => ({
+        ...prev,
+        [key]: { failed: true, retryCount: 3 }
+      }));
+      return;
+    }
     
     // Add small delay to prevent rapid retries
     setTimeout(() => {
@@ -2535,7 +2561,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                       }
                     }
                     const shouldShowPlaceholder = (post.key in imageErrors && imageErrors[post.key]?.failed && imageErrors[post.key]?.retryCount >= 3) || 
-                                                imageUrl.includes('placeholder.jpg');
+                                                !imageUrl;
                     
                     return shouldShowPlaceholder ? (
                       <ImagePlaceholder postKey={post.key} />

@@ -288,11 +288,44 @@ app.use((req, res, next) => {
 
 // Use cors middleware with widest possible settings
 app.use(cors({
-  origin: '*',
+  origin: ['http://localhost:5173', 'http://localhost:3000'],
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: '*',
-  credentials: true
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// CRITICAL: Block all debug and development interfaces
+app.use((req, res, next) => {
+  // Block common debug/development endpoints
+  const debugPaths = [
+    '__vite_ping',
+    '__vite_hmr',
+    '@vite/client',
+    '@react-refresh',
+    'src/',
+    'node_modules/',
+    '/@id/',
+    '/@fs/',
+    '/debug',
+    '/status',
+    '/info',
+    '/health-check',
+    '/server-info'
+  ];
+  
+  const url = req.url.toLowerCase();
+  for (const debugPath of debugPaths) {
+    if (url.includes(debugPath.toLowerCase())) {
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] PROXY-SERVER: Blocked debug path ${req.url}`);
+      return res.status(404).json({
+        error: 'Debug interface not available',
+        message: 'This server only handles image processing and API endpoints'
+      });
+    }
+  }
+  
+  next();
+});
 
 app.use(express.json({ limit: '50mb' })); // Increased limit for larger images
 
@@ -344,7 +377,7 @@ app.use((req, res, next) => {
   // Define allowed paths for proxy server (whitelist approach)
   const allowedPaths = [
     '/health',
-    '/fix-image',
+    // '/fix-image', // disabled
     '/r2-images',
     '/proxy-image',
     '/api/r2-image',
@@ -352,7 +385,7 @@ app.use((req, res, next) => {
     '/posts/',
     '/api/posts/',
     '/api/save-edited-post',
-    '/placeholder',
+    // '/placeholder', // disabled
     '/handle-r2-images.js',
     '/admin/clear-image-cache'
   ];
@@ -446,17 +479,9 @@ function clearImageCacheByFilename(imageFilename, username, context = 'CACHE-CLE
   return clearedCount;
 }
 
-// Serve built React app from dist directory
-const distDir = path.join(process.cwd(), 'dist');
-if (fs.existsSync(distDir)) {
-  app.use(express.static(distDir));
-} else {
-  // Fallback to public directory for development, but skip index.html
-  const publicDir = path.join(process.cwd(), 'public');
-  if (fs.existsSync(publicDir)) {
-    app.use(express.static(publicDir, { index: false }));
-  }
-}
+// PRODUCTION SAFETY: Proxy server should NEVER serve HTML or static files
+// All HTML serving is handled by main server (port 3000) and Vite dev server
+// This eliminates any possibility of debug interfaces appearing from proxy server
 
 // Serve our R2 fixer script
 app.get('/handle-r2-images.js', (req, res) => {
@@ -538,58 +563,7 @@ app.post('/admin/clear-image-cache', (req, res) => {
   res.json({ success: true, message: `Image cache cleared (${cacheSize} items)` });
 });
 
-// Simple placeholder image endpoint
-app.get('/placeholder.jpg', (req, res) => {
-  const message = req.query.message || 'Image Not Available';
-  const placeholderImage = generatePlaceholderImage(message);
-  
-  res.setHeader('Content-Type', 'image/jpeg');
-  res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
-  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  
-  res.send(placeholderImage);
-});
-
-// Direct handler for the problematic image
-app.get('/fix-image-narsissist', (req, res) => {
-  // Generate a unique, stable local path for this specific image
-  const localFilePath = path.join(process.cwd(), 'ready_post', 'instagram', 'narsissist', 'image_1749203937329.jpg');
-  
-  // First check if we have a local copy
-  if (fs.existsSync(localFilePath)) {
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SPECIAL HANDLER] Serving local file for problematic image`);
-    // Set appropriate headers
-    res.setHeader('Content-Type', 'image/jpeg');
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    
-    // Send the file
-    return res.sendFile(localFilePath);
-  } else {
-    // Generate placeholder
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SPECIAL HANDLER] Generating placeholder for problematic image`);
-    const placeholderImage = generatePlaceholderImage('Image for narsissist');
-    
-    // Set headers
-    res.setHeader('Content-Type', 'image/jpeg');
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    
-    // Send the placeholder
-    res.send(placeholderImage);
-    
-    // Try to save a placeholder for future use
-    try {
-      fs.mkdirSync(path.dirname(localFilePath), { recursive: true });
-      fs.writeFileSync(localFilePath, placeholderImage);
-    } catch (error) {
-      if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [SPECIAL HANDLER] Error saving placeholder:`, error);
-    }
-  }
-});
+// Placeholder and special debug handlers removed for production safety
 
 // Function to convert WebP to JPEG for Instagram compatibility
 async function convertWebPToJPEG(webpBuffer) {
@@ -1325,87 +1299,37 @@ app.get('/r2-images/:username/:filename', async (req, res) => {
   }
 });
 
-// Add a middleware to inject our R2 fixer into HTML responses
+// PRODUCTION SAFETY: Proxy server must NEVER serve HTML content
+// Completely block all HTML responses to prevent debug interfaces
 app.use((req, res, next) => {
-  // Save the original send method
+  // Override res.send to block any HTML content
   const originalSend = res.send;
-  
-  // Override the send method
   res.send = function(body) {
-    // Only process HTML responses
-    if (typeof body === 'string' && body.includes('<!DOCTYPE html>')) {
-      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [HTML-INJECTOR] Injecting R2 fixer into HTML response`);
-      
-      // Create a script tag that loads our R2 fixer
-      const scriptInjection = `
-        <script>
-          // Dynamically load the R2 fixer script
-          (function() {
-            console.log("Loading R2 fixer script...");
-            const script = document.createElement('script');
-            script.src = "${req.protocol}://${req.get('host') || 'localhost:3002'}/handle-r2-images.js?t=" + Date.now();
-            script.async = true;
-            script.onerror = function() {
-              console.error("Failed to load R2 fixer script");
-              // Create a simple inline fixer as backup
-              const backupScript = document.createElement('script');
-              backupScript.textContent = \`
-                // Simple backup fixer
-                document.addEventListener('error', function(e) {
-                  if (e.target.tagName === 'IMG') {
-                    const src = e.target.src;
-                    if (src && (src.includes('r2.cloudflarestorage.com') || src.includes('r2.dev'))) {
-                      console.log("Fixing R2 image URL:", src);
-                      e.preventDefault();
-                      
-                      // Try to extract username and filename
-                      const parts = src.split('/');
-                      let username = null;
-                      let filename = null;
-                      
-                      for (let i = 0; i < parts.length; i++) {
-                        if (parts[i] === 'narsissist') {
-                          username = 'narsissist';
-                          // Look for the next part that ends with .jpg
-                          for (let j = i + 1; j < parts.length; j++) {
-                            if (parts[j].endsWith('.jpg')) {
-                              filename = parts[j];
-                              break;
-                            }
-                          }
-                          break;
-                        }
-                      }
-                      
-                      if (username && filename) {
-                        const newSrc = "${req.protocol}://${req.get('host') || 'localhost:3002'}/fix-image/" + username + "/" + filename + "?platform=instagram";
-                        console.log("Using proxy URL:", newSrc);
-                        e.target.src = newSrc;
-                      } else {
-                        e.target.src = "${req.protocol}://${req.get('host') || 'localhost:3002'}/placeholder.jpg";
-                      }
-                    }
-                  }
-                }, true);
-              \`;
-              document.head.appendChild(backupScript);
-            };
-            document.head.appendChild(script);
-          })();
-        </script>
-      `;
-      
-      // Inject script before closing head tag
-      if (body.includes('</head>')) {
-        body = body.replace('</head>', scriptInjection + '</head>');
-      } else {
-        // If no head tag, inject at the beginning of the document
-        body = body.replace('<!DOCTYPE html>', '<!DOCTYPE html>' + scriptInjection);
-      }
+    // If response contains HTML, convert to JSON error
+    if (typeof body === 'string' && (body.includes('<!DOCTYPE html>') || body.includes('<html') || body.includes('<body'))) {
+      console.log(`[${new Date().toISOString()}] PROXY-SERVER: BLOCKED HTML response for ${req.url}`);
+      return originalSend.call(this, JSON.stringify({
+        error: 'HTML content blocked on proxy server',
+        message: 'This server only handles image processing and API endpoints',
+        url: req.url,
+        redirectTo: 'http://localhost:3000'
+      }));
     }
-    
     return originalSend.call(this, body);
   };
+  
+  // Also check request headers for HTML requests
+  const acceptsHtml = req.headers.accept && req.headers.accept.includes('text/html');
+  const isHtmlRequest = req.url.endsWith('.html') || req.url.endsWith('/') || acceptsHtml;
+  
+  if (isHtmlRequest && !req.url.includes('/api/') && !req.url.includes('health')) {
+    console.log(`[${new Date().toISOString()}] PROXY-SERVER: Rejecting HTML request ${req.url}`);
+    return res.status(404).json({
+      error: 'HTML content not available on proxy server',
+      message: 'This server only handles image processing and API endpoints',
+      redirectTo: 'http://localhost:3000'
+    });
+  }
   
   next();
 });
@@ -3035,12 +2959,14 @@ app.post('/api/clear-image-cache', (req, res) => {
   }
 });
 
-// Catch-all handler: serve React app for SPA routing
+// PRODUCTION SAFETY: NO catch-all routes on proxy server
+// Proxy server should NEVER serve the main application
+// All unmatched routes return 404 to prevent debug interfaces from appearing
 app.get('*', (req, res) => {
-  const indexPath = path.join(process.cwd(), 'index.html');
-  if (fs.existsSync(indexPath)) {
-    res.sendFile(indexPath);
-  } else {
-    res.status(404).send('Application not found');
-  }
+  console.log(`[${new Date().toISOString()}] PROXY-SERVER: Rejected unmatched route ${req.url} - returning 404`);
+  res.status(404).json({
+    error: 'Endpoint not available on proxy server',
+    message: 'This endpoint should be handled by the main server (port 3000)',
+    redirectTo: 'http://localhost:3000' + req.url
+  });
 });

@@ -36,6 +36,13 @@ import LoadingStateGuard from './components/guards/LoadingStateGuard';
 import RagService from './services/RagService';
 import ErrorBoundary from './components/common/ErrorBoundary';
 
+// Extend Window interface for proxy server status
+declare global {
+  interface Window {
+    proxyServerDown?: boolean;
+  }
+}
+
 // Main App component with AuthProvider
 const App: React.FC = () => {
   return (
@@ -71,6 +78,61 @@ const AppContent: React.FC = () => {
   const [accountType, setAccountType] = useState<'branding' | 'non-branding'>(location.state?.accountType || 'branding');
   const [userId, setUserId] = useState<string | undefined>(undefined);
   const [isLoadingUserData, setIsLoadingUserData] = useState(false);
+
+  // Global image error handler to prevent crashes when proxy server is down
+  useEffect(() => {
+    const handleImageError = (event: Event) => {
+      const img = event.target as HTMLImageElement;
+      if (img && img.src) {
+        console.warn(`Image failed to load: ${img.src}`);
+        // Remove the failed src to prevent infinite retry loops
+        img.removeAttribute('src');
+        // Add a class to indicate the image failed
+        img.classList.add('image-load-failed');
+      }
+    };
+
+    // Add global image error listener
+    document.addEventListener('error', handleImageError, true);
+    
+    return () => {
+      document.removeEventListener('error', handleImageError, true);
+    };
+  }, []);
+
+  // Simple proxy server health check to prevent image loading when server is down
+  useEffect(() => {
+    const checkProxyHealth = async () => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        
+        const response = await fetch('/api/health-check', { 
+          method: 'GET',
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          console.warn('Proxy server health check failed, images may not load');
+          // Set a flag to indicate proxy server is down
+          window.proxyServerDown = true;
+        } else {
+          window.proxyServerDown = false;
+        }
+      } catch (error) {
+        console.warn('Proxy server health check failed:', error);
+        window.proxyServerDown = true;
+      }
+    };
+
+    // Check on mount and every 30 seconds
+    checkProxyHealth();
+    const interval = setInterval(checkProxyHealth, 30000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   // 🔄 Keep platform-specific user data in sync on route change
   useEffect(() => {

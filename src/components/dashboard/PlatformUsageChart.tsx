@@ -1,200 +1,121 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import axios from 'axios';
+import React from 'react';
+import { usePlatformUsageTracking } from '../../hooks/usePlatformUsageTracking';
 import './PlatformUsageChart.css';
-
-interface PlatformUsageData {
-  count: number;
-  percentage: number;
-}
-
-interface PlatformActivityResponse {
-  userId: string;
-  period: string;
-  totalActivity: number;
-  platforms: Record<string, PlatformUsageData>;
-  lastUpdated: string;
-}
 
 interface PlatformUsageChartProps {
   className?: string;
 }
 
 const PlatformUsageChart: React.FC<PlatformUsageChartProps> = ({ className }) => {
-  const { currentUser } = useAuth();
-  const [platformUsage, setPlatformUsage] = useState<Record<string, PlatformUsageData>>({});
-  const [totalActivity, setTotalActivity] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
+  const {
+    platformUsage,
+    platformStatuses,
+    isLoading,
+    getAcquiredPlatforms,
+    getTotalApiCalls
+  } = usePlatformUsageTracking();
 
-  // Map platform names to display names and colors
-  const platformConfig = {
-    instagram: {
-      name: 'Instagram',
-      color: '#E4405F',
-      icon: '/icons/instagram.svg'
-    },
-    facebook: {
-      name: 'Facebook', 
-      color: '#1877F2',
-      icon: '/icons/facebook.svg'
-    },
-    twitter: {
-      name: 'Twitter',
-      color: '#1DA1F2', 
-      icon: '/icons/twitter.svg'
-    }
-  };
+  // ✅ EMPTY STATE: Show meaningful message when no platforms are acquired
+  if (!isLoading && Object.keys(platformStatuses).length === 0) {
+    return (
+      <div className={`platform-usage-chart ${className || ''}`}>
+        <div className="chart-header">
+          <h3>Platform Usage Activity</h3>
+        </div>
+        <div className="empty-state">
+          <div className="empty-icon">🔍</div>
+          <p>Checking platform status...</p>
+        </div>
+      </div>
+    );
+  }
 
-  const fetchPlatformUsage = async () => {
-    if (!currentUser?.uid) return;
+  // ✅ NO ACQUIRED PLATFORMS: Show guidance message
+  const acquiredPlatforms = getAcquiredPlatforms();
+  if (!isLoading && acquiredPlatforms.length === 0) {
+    return (
+      <div className={`platform-usage-chart ${className || ''}`}>
+        <div className="chart-header">
+          <h3>Platform Usage Activity</h3>
+        </div>
+        <div className="empty-state">
+          <div className="empty-icon">🚀</div>
+          <p>No platforms acquired yet</p>
+          <p className="empty-subtitle">Acquire platforms to see your usage activity</p>
+        </div>
+      </div>
+    );
+  }
 
-    try {
-      setIsLoading(true);
-      const response = await axios.get<PlatformActivityResponse>(
-        `/api/user/${currentUser.uid}/platform-activity`
-      );
-      
-      const data = response.data;
-      
-      // Filter out 'account' platform since it represents general account activity, not actual Twitter usage
-      // Only show actual social media platform usage (instagram, facebook, twitter)
-      const filteredPlatforms = { ...data.platforms };
-      if (filteredPlatforms.account) {
-        delete filteredPlatforms.account;
-      }
-      
-      // Recalculate total activity and percentages without account platform
-      const filteredTotal = Object.values(filteredPlatforms).reduce((sum: number, platform: any) => sum + platform.count, 0);
-      
-      // Recalculate percentages based on filtered total
-      const recalculatedPlatforms: Record<string, PlatformUsageData> = {};
-      for (const [platform, data] of Object.entries(filteredPlatforms)) {
-        const platformData = data as PlatformUsageData;
-        recalculatedPlatforms[platform] = {
-          count: platformData.count,
-          percentage: filteredTotal > 0 ? Math.round((platformData.count / filteredTotal) * 100) : 0
-        };
-      }
-      
-      // Add Twitter with 0 usage if not present
-      if (!recalculatedPlatforms.twitter) {
-        recalculatedPlatforms.twitter = {
-          count: 0,
-          percentage: 0
-        };
-      }
-      
-      setPlatformUsage(recalculatedPlatforms);
-      setTotalActivity(filteredTotal);
-      
-      console.log('[PlatformUsageChart] Fetched platform usage data (filtered):', { platforms: recalculatedPlatforms, totalActivity: filteredTotal });
-    } catch (error) {
-      console.error('[PlatformUsageChart] Error fetching platform usage:', error);
-      // Set empty data on error
-      setPlatformUsage({});
-      setTotalActivity(0);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchPlatformUsage();
-  }, [currentUser?.uid]);
-
-  // Refresh data every 30 seconds
-  useEffect(() => {
-    if (!currentUser?.uid) return;
-
-    const interval = setInterval(() => {
-      fetchPlatformUsage();
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [currentUser?.uid]);
-
-  const getMaxUsage = () => {
-    const counts = Object.values(platformUsage).map(p => p.count);
-    return Math.max(...counts, 1);
-  };
-
-  const getSortedPlatforms = () => {
-    return Object.entries(platformUsage)
-      .sort(([, a], [, b]) => b.count - a.count) // Sort by usage count descending
-      .filter(([, data]) => data.count > 0); // Only show platforms with usage
-  };
+  // ✅ NO USAGE DATA: Show guidance when platforms are acquired but no usage
+  if (!isLoading && platformUsage.length === 0) {
+    return (
+      <div className={`platform-usage-chart ${className || ''}`}>
+        <div className="chart-header">
+          <h3>Platform Usage Activity</h3>
+        </div>
+        <div className="empty-state">
+          <div className="empty-icon">📊</div>
+          <p>No usage activity yet</p>
+          <p className="empty-subtitle">Start using your acquired platforms to see activity data</p>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
       <div className={`platform-usage-chart ${className || ''}`}>
         <div className="chart-header">
-          <h3>Platform Usage</h3>
+          <h3>Platform Usage Activity</h3>
         </div>
         <div className="loading-state">
           <div className="loading-spinner"></div>
+          <p>Loading platform usage...</p>
         </div>
       </div>
     );
   }
 
-  const sortedPlatforms = getSortedPlatforms();
-
-  if (totalActivity === 0 || sortedPlatforms.length === 0) {
-    return (
-      <div className={`platform-usage-chart ${className || ''}`}>
-        <div className="chart-header">
-          <h3>Platform Usage</h3>
-        </div>
-        <div className="empty-state">
-          <div className="empty-icon">📊</div>
-          <p>No usage data yet</p>
-        </div>
-      </div>
-    );
-  }
-
-  const maxUsage = getMaxUsage();
+  // ✅ DYNAMIC CHART RENDERING: Render chart based on real data
+  const maxUsage = Math.max(...platformUsage.map(p => p.count), 1);
 
   return (
     <div className={`platform-usage-chart ${className || ''}`}>
       <div className="chart-header">
-        <h3>Platform Usage</h3>
+        <h3>Platform Usage Activity</h3>
+        <div className="chart-subtitle">
+          API calls distribution across acquired platforms
+        </div>
       </div>
 
       <div className="chart-content">
         <div className="chart-bars">
-          {sortedPlatforms.map(([platform, data]) => {
-            const config = platformConfig[platform as keyof typeof platformConfig] || {
-              name: platform.charAt(0).toUpperCase() + platform.slice(1),
-              color: '#6c757d',
-              icon: '/icons/default.svg'
-            };
-
-            const heightPercentage = Math.max((data.count / maxUsage) * 100, 5);
+          {platformUsage.map((platformData) => {
+            const heightPercentage = Math.max((platformData.count / maxUsage) * 100, 8);
 
             return (
-              <div key={platform} className="chart-bar-container">
+              <div key={platformData.platform} className="chart-bar-container">
                 <div className="chart-bar-wrapper">
                   <div 
-                    className={`chart-bar ${platform}`}
+                    className={`chart-bar ${platformData.platform}`}
                     style={{ 
                       height: `${heightPercentage}%`,
-                      backgroundColor: config.color,
-                      boxShadow: `0 0 20px ${config.color}40`
+                      backgroundColor: platformData.color,
+                      boxShadow: `0 0 20px ${platformData.color}40`
                     }}
-                    title={`${config.name}: ${data.count} actions (${data.percentage}%)`}
+                    title={`${platformData.displayName}: ${platformData.count} API calls (${platformData.percentage}%)`}
                   >
                     <div className="bar-value">
-                      <span className="usage-count">{data.count}</span>
-                      <span className="usage-percentage">{data.percentage}%</span>
+                      <span className="usage-count">{platformData.count}</span>
+                      <span className="usage-percentage">{platformData.percentage}%</span>
                     </div>
-                    <div className="bar-glow" style={{ backgroundColor: config.color }}></div>
                   </div>
                 </div>
                 <div className="chart-label">
                   <img 
-                    src={config.icon} 
-                    alt={`${config.name} icon`}
+                    src={platformData.icon} 
+                    alt={`${platformData.displayName} icon`}
                     className="platform-icon"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
@@ -202,11 +123,28 @@ const PlatformUsageChart: React.FC<PlatformUsageChartProps> = ({ className }) =>
                       target.src = '/icons/default.svg';
                     }}
                   />
-                  <span className="platform-name">{config.name}</span>
+                  <span className="platform-name">{platformData.displayName}</span>
                 </div>
               </div>
             );
           })}
+        </div>
+
+        {/* ✅ ENHANCED LEGEND: Show total API calls and platform count */}
+        <div className="chart-legend">
+          <div className="legend-stats">
+            <div className="stat-item">
+              <span className="stat-label">Total API Calls:</span>
+              <span className="stat-value">{getTotalApiCalls()}</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-label">Active Platforms:</span>
+              <span className="stat-value">{platformUsage.length}</span>
+            </div>
+          </div>
+          <div className="legend-note">
+            <p>💡 Usage is distributed across acquired platforms based on feature activity</p>
+          </div>
         </div>
       </div>
     </div>

@@ -237,11 +237,13 @@ const AdminDashboard: React.FC = () => {
             </button>
             
             <button 
-              onClick={() => window.open('http://localhost:3002', '_blank')} 
+              onClick={() => console.log('Image server monitoring via logs only')} 
               className="action-btn server"
+              disabled
+              title="Image server access disabled for production safety"
             >
               <span className="action-icon">🖥️</span>
-              <span>Server Status</span>
+              <span className="action-text">Image Server (Monitor via Logs)</span>
             </button>
             
             <button 

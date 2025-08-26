@@ -327,10 +327,9 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     setImageError(false);
     try {
       const now = Date.now();
-      // 🔥 CRITICAL FIX: Only throttle profile picture fetching, not the entire profile data
-      // This ensures we always fetch follower counts and other profile data
+      // Single canonical path: always pass explicit platform to avoid confusion
       console.log(`[${new Date().toISOString()}] Fetching Instagram profile info for ${accountHolder}`);
-      const response = await axios.get(`/api/profile-info/${accountHolder}?forceRefresh=true`);
+      const response = await axios.get(`/api/profile-info/${accountHolder}?platform=instagram&forceRefresh=true`);
       
       // 🎯 CRITICAL DEBUG: Log the exact response to understand data structure
       console.log(`[${new Date().toISOString()}] Profile Info Response:`, response.data);
@@ -372,7 +371,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     if (!accountHolder) return;
     
     try {
-      const response = await axios.get(`/api/profile-info/${accountHolder}`);
+      const response = await axios.get(`/api/profile-info/${accountHolder}?platform=instagram`);
       const userId = response.data?.id;
       if (userId && !igBusinessId) {
         if (!isInstagramConnected) {

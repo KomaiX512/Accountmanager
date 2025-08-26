@@ -50,10 +50,14 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const [lastFetchTime, setLastFetchTime] = useState<number>(0);
   const [forceRefreshKey, setForceRefreshKey] = useState(0);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [latestItemTimestamp, setLatestItemTimestamp] = useState<string | null>(null);
   
   const menuAnchorRef = useRef<HTMLElement | null>(null);
   const portalRootRef = useRef<HTMLElement | null>(null);
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const autoRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastAutoRefreshRef = useRef<number>(0);
 
   // 🚀 ROBUST: Ensure portal root exists and persists
   useEffect(() => {
@@ -454,14 +458,26 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
         backendOrder: idx + 1
       })));
       
-      // Take only the top 4 items in the order they came from backend (R2 bucket sorted)
+      // Take only the top 3 items in the order they came from backend (R2 bucket sorted)
       // This ensures we get the most recent items as determined by R2 bucket LastModified
-      const selectedItems = normalized.slice(0, 4);
+      const selectedItems = normalized.slice(0, 3);
+      
+      // Track the latest item timestamp for dynamic updates
+      if (selectedItems.length > 0) {
+        const latestItem = selectedItems[0];
+        const latestTimestamp = latestItem.timestamp || latestItem.fetched_at;
+        if (latestTimestamp) {
+          setLatestItemTimestamp(latestTimestamp);
+        }
+      }
+      
       setItems(selectedItems);
 
       console.log(`[News4U] Final processed items (no filtering/dedup):`, selectedItems);
       console.log(`[News4U] Total items processed: ${normalized.length}, Selected: ${selectedItems.length}, Platform: ${effectivePlatform}`);
+      console.log(`[News4U] Latest item timestamp tracked:`, latestItemTimestamp);
       setLastFetchTime(Date.now());
+      lastAutoRefreshRef.current = Date.now();
 
     } catch (err: any) {
       console.error(`[News4U] ❌ Error fetching news:`, err);
@@ -480,19 +496,162 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     }
   }, [effectiveAccountHolder, effectivePlatform, forceRefreshKey]);
 
+  // 🚀 OPTIMIZED: High-performance auto-refresh for 8+ hour reliability
+  useEffect(() => {
+    if (!autoRefreshEnabled || !effectiveAccountHolder || !effectivePlatform) {
+      // Clear existing interval if disabled
+      if (autoRefreshIntervalRef.current) {
+        clearInterval(autoRefreshIntervalRef.current);
+        autoRefreshIntervalRef.current = null;
+      }
+      return;
+    }
+    
+    // Clear any existing interval before creating new one
+    if (autoRefreshIntervalRef.current) {
+      clearInterval(autoRefreshIntervalRef.current);
+    }
+    
+    // Start auto-refresh after initial load with delay
+    const startDelay = setTimeout(() => {
+      console.log(`[News4U] 🚀 Starting optimized auto-refresh for ${effectiveAccountHolder}`);
+      
+      autoRefreshIntervalRef.current = setInterval(async () => {
+        // Performance throttling - minimum 2 minutes between checks
+        const timeSinceLastRefresh = Date.now() - lastAutoRefreshRef.current;
+        if (timeSinceLastRefresh < 120000) { // 2 minutes
+          return;
+        }
+        
+        try {
+          console.log(`[News4U] 🔍 Checking for new items... (${new Date().toLocaleTimeString()})`);
+          
+          // Optimized check without triggering re-renders
+          const hasNewItems = await performOptimizedCheck();
+          
+          if (hasNewItems) {
+            console.log(`[News4U] 🆕 New items detected! Refreshing...`);
+            lastAutoRefreshRef.current = Date.now();
+            setForceRefreshKey(prev => prev + 1);
+          }
+        } catch (error: any) {
+          console.warn(`[News4U] ⚠️ Auto-refresh check failed:`, error?.message || 'Unknown error');
+        }
+      }, 150000); // Check every 2.5 minutes for 8+ hour reliability
+      
+    }, 90000); // Wait 1.5 minutes after initial load
+    
+    return () => {
+      clearTimeout(startDelay);
+      if (autoRefreshIntervalRef.current) {
+        clearInterval(autoRefreshIntervalRef.current);
+        autoRefreshIntervalRef.current = null;
+      }
+    };
+  }, [autoRefreshEnabled, effectiveAccountHolder, effectivePlatform]); // Removed problematic dependencies
+  
   // 🚀 ROBUST: Initial fetch and cleanup
   useEffect(() => {
     // Clear current items and errors when user/platform changes
     setItems([]);
     setError(null);
+    setLatestItemTimestamp(null);
     fetchNews();
     return () => {
       if (fetchTimeoutRef.current) {
         clearTimeout(fetchTimeoutRef.current);
       }
+      if (autoRefreshIntervalRef.current) {
+        clearInterval(autoRefreshIntervalRef.current);
+      }
     };
-  }, [fetchNews, effectiveAccountHolder, effectivePlatform]);
+  }, [fetchNews]);
+  
+  // 🚀 STABILITY: Prevent memory leaks with component cleanup
+  useEffect(() => {
+    return () => {
+      // Cleanup all timers and intervals on unmount
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+        fetchTimeoutRef.current = null;
+      }
+      if (autoRefreshIntervalRef.current) {
+        clearInterval(autoRefreshIntervalRef.current);
+        autoRefreshIntervalRef.current = null;
+      }
+    };
+  }, []);
 
+  // 🚀 PERFORMANCE-OPTIMIZED: Ultra-efficient new item detection
+  const performOptimizedCheck = useCallback(async () => {
+    if (!effectiveAccountHolder || !effectivePlatform) return false;
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+    
+    try {
+      // Lightweight HEAD request first to check if data exists
+      const baseUrl = `/api/news-for-you/${effectiveAccountHolder}?platform=${effectivePlatform}`;
+      const url = `${baseUrl}&forceRefresh=true&_cb=${Date.now()}`;
+      
+      const res = await axios.get(url, { 
+        signal: controller.signal,
+        timeout: 7000 // Strict timeout for reliability
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!res.data || (Array.isArray(res.data) && res.data.length === 0)) {
+        return false;
+      }
+      
+      // Ultra-fast timestamp extraction - only check first item
+      const firstResponse = res.data[0];
+      if (!firstResponse) return false;
+      
+      const dataPayload = firstResponse.data || firstResponse;
+      if (!dataPayload) return false;
+      
+      // Get timestamp from the most likely locations
+      let newItemTimestamp = null;
+      
+      // Try direct timestamp first
+      if (dataPayload.timestamp) {
+        newItemTimestamp = dataPayload.timestamp;
+      } else if (dataPayload.news_items && Array.isArray(dataPayload.news_items) && dataPayload.news_items[0]) {
+        const firstNews = dataPayload.news_items[0];
+        newItemTimestamp = firstNews.timestamp || firstNews.fetched_at || firstNews.published_at;
+      } else if (dataPayload.fetched_at) {
+        newItemTimestamp = dataPayload.fetched_at;
+      }
+      
+      // Fast timestamp comparison without heavy processing
+      if (latestItemTimestamp && newItemTimestamp) {
+        const currentTime = new Date(latestItemTimestamp).getTime();
+        const newTime = new Date(newItemTimestamp).getTime();
+        
+        if (newTime > currentTime) {
+          console.log(`[News4U] ✅ New content detected (${newTime} > ${currentTime})`);
+          return true;
+        }
+      } else if (!latestItemTimestamp && newItemTimestamp) {
+        // First time baseline
+        return true;
+      }
+      
+      return false;
+      
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (error?.name === 'AbortError') {
+        console.warn(`[News4U] ⏱️ Check timeout - continuing normally`);
+      } else {
+        console.error(`[News4U] ❌ Optimized check failed:`, error?.message || 'Unknown error');
+      }
+      return false;
+    }
+  }, []); // No dependencies to prevent re-creation
+  
   // 🚀 ROBUST: Manual refresh function
   const handleManualRefresh = useCallback(() => {
     if (fetchTimeoutRef.current) {
@@ -513,7 +672,7 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       <motion.div className="news4u-container" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
         <div className="news4u-loading">
           <div className="loading-spinner" />
-          <span>Fetching top 4 latest news...</span>
+          <span>Fetching top 3 latest news...</span>
         </div>
       </motion.div>
     );
@@ -589,6 +748,8 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
             <div>Account: <strong>{effectiveAccountHolder}</strong></div>
             <div>Platform: <strong>{effectivePlatform}</strong></div>
             <div>Last Fetch: <strong>{lastFetchTime ? new Date(lastFetchTime).toLocaleTimeString() : 'Never'}</strong></div>
+            <div>Auto-Refresh: <strong style={{color: autoRefreshEnabled ? '#00ffcc' : '#ff6b6b'}}>{autoRefreshEnabled ? 'Enabled' : 'Disabled'}</strong></div>
+            <div>Latest Item: <strong>{latestItemTimestamp ? new Date(latestItemTimestamp).toLocaleTimeString() : 'None'}</strong></div>
             
             {/* 🚀 TEST: Manual API test button */}
             <button 
@@ -629,6 +790,27 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
               }}
             >
               🧪 Test API Endpoint
+            </button>
+            
+            <button 
+              onClick={() => {
+                setAutoRefreshEnabled(!autoRefreshEnabled);
+                console.log(`[News4U] Auto-refresh ${!autoRefreshEnabled ? 'enabled' : 'disabled'}`);
+              }}
+              style={{
+                background: autoRefreshEnabled ? 'linear-gradient(135deg, #ff6b6b, #ee5a24)' : 'linear-gradient(135deg, #00ffcc, #00d4aa)',
+                border: 'none',
+                color: '#fff',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                fontSize: '0.65rem',
+                cursor: 'pointer',
+                marginTop: '8px',
+                marginLeft: '8px',
+                fontWeight: '600'
+              }}
+            >
+              {autoRefreshEnabled ? '⏸️ Disable Auto-Refresh' : '▶️ Enable Auto-Refresh'}
             </button>
             
             <div style={{ marginTop: '8px', fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.5)' }}>

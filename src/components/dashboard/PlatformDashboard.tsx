@@ -296,83 +296,30 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     try {
       console.log(`[PlatformDashboard] ⚡ Fetching profile info for ${platform}`);
       
-      // 🎯 CRITICAL FIX: Try different endpoints for different platforms to handle R2 bucket structure
+      // Single canonical path using dashboard username (accountHolder) and explicit platform
       let response;
       let profileData = null;
-      
-      if (platform === 'instagram') {
-        // Instagram works with the original endpoint (no platform param needed)
-        response = await axios.get(appendBypassParam(`/api/profile-info/${accountHolder}`, platform, accountHolder, 'profile'));
-        profileData = response.data;
-        } else {
-        // Twitter and Facebook need platform-specific path handling
-        try {
-          const platformParam = `?platform=${platform}`;
-          response = await axios.get(appendBypassParam(`/api/profile-info/${accountHolder}${platformParam}`, platform, accountHolder, 'profile'));
-          const rawData = response.data;
-          // Map Twitter raw fields to unified profileData format
-          if (platform === 'twitter' && rawData && rawData.username) {
-            profileData = {
-              username: rawData.username,
-              fullName: rawData.name || rawData.username,
-              biography: rawData.bio || rawData.description || '',
-              followersCount: rawData.follower_count ?? rawData.followersCount ?? 0,
-              followsCount: rawData.following_count ?? rawData.followsCount ?? 0,
-              postsCount: rawData.tweet_count ?? rawData.postsCount ?? 0,
-              externalUrl: rawData.website || rawData.externalUrl || '',
-              profilePicUrl: rawData.profile_image_url || rawData.profilePicUrl || '',
-              profilePicUrlHD: rawData.profile_image_url || rawData.profilePicUrlHD || rawData.profilePicUrl || '',
-              private: rawData.protected ?? false,
-              verified: rawData.verified ?? false,
-              platform: 'twitter',
-              extractedAt: new Date().toISOString()
-            };
-          } else {
-            profileData = rawData;
-          }
-        } catch (err: any) {
-          // For Twitter, don't log 404 as error since it's expected when profile data doesn't exist yet
-          if (platform === 'twitter' && err.response?.status === 404) {
-            console.log(`[TWITTER] Profile data not found in R2, this is expected for new Twitter accounts`);
-          } else {
-            console.warn(`[${platform.toUpperCase()}] Primary profile endpoint failed, trying fallback...`);
-          }
-          profileData = null;
-          // 🔁 MINIMAL FACEBOOK FALLBACK: try forced refresh & cache endpoints once
-          if (platform === 'facebook' && !facebookProfileFallbackTriedRef.current) {
-            facebookProfileFallbackTriedRef.current = true;
-            const fbAttempts: { label: string; url: string }[] = [
-              { label: 'forceRefresh platform endpoint', url: `/api/profile-info/${accountHolder}?platform=facebook&forceRefresh=true` },
-              { label: 'forceRefresh generic endpoint', url: `/api/profile-info/${accountHolder}?forceRefresh=true&platform=facebook` },
-            ];
-            for (const attempt of fbAttempts) {
-              try {
-                console.log(`[FACEBOOK] Fallback attempt (${attempt.label}) → ${attempt.url}`);
-                const resp = await axios.get(appendBypassParam(attempt.url, platform, accountHolder, 'profile-fallback'));
-                if (resp?.data && typeof resp.data === 'object') {
-                  const d = resp.data;
-                  const hasFields = d.fullName || d.followersCount !== undefined || d.biography || d.profilePicUrl || d.profilePicUrlHD;
-                  if (hasFields) {
-                    profileData = d;
-                    console.log('[FACEBOOK] ✅ Fallback profile fetch succeeded via', attempt.label);
-                    break;
-                  } else {
-                    console.log('[FACEBOOK] Fallback response lacked profile fields via', attempt.label);
-                  }
-                }
-              } catch (fbErr: any) {
-                if (fbErr?.response?.status === 404) {
-                  console.log(`[FACEBOOK] Fallback (${attempt.label}) 404 – will try next if available`);
-                } else {
-                  console.warn(`[FACEBOOK] Fallback (${attempt.label}) failed:`, fbErr?.message);
-                }
-              }
-            }
-            if (!profileData) {
-              console.warn('[FACEBOOK] All fallback profile attempts failed');
-            }
-          }
-        }
+      const platformParam = `?platform=${platform}&forceRefresh=true`;
+      response = await axios.get(appendBypassParam(`/api/profile-info/${accountHolder}${platformParam}`, platform, accountHolder, 'profile'));
+      const rawData = response.data;
+      if (platform === 'twitter' && rawData && rawData.username) {
+        profileData = {
+          username: rawData.username,
+          fullName: rawData.name || rawData.username,
+          biography: rawData.bio || rawData.description || '',
+          followersCount: rawData.follower_count ?? rawData.followersCount ?? 0,
+          followsCount: rawData.following_count ?? rawData.followsCount ?? 0,
+          postsCount: rawData.tweet_count ?? rawData.postsCount ?? 0,
+          externalUrl: rawData.website || rawData.externalUrl || '',
+          profilePicUrl: rawData.profile_image_url || rawData.profilePicUrl || '',
+          profilePicUrlHD: rawData.profile_image_url || rawData.profilePicUrlHD || rawData.profilePicUrl || '',
+          private: rawData.protected ?? false,
+          verified: rawData.verified ?? false,
+          platform: 'twitter',
+          extractedAt: new Date().toISOString()
+        };
+      } else {
+        profileData = rawData;
       }
       
       console.log(`[PlatformDashboard] Raw response for ${platform}:`, profileData);

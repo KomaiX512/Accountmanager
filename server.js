@@ -422,6 +422,145 @@ if (!fs.existsSync(localCacheDir)) {
 // =============================================================================
 
 /**
+ * 🚀 NUCLEAR CACHE DESTRUCTION: Complete elimination of ALL possible cache sources
+ * This function finds and destroys EVERY possible cache entry for an image
+ * @param {string} imageKey - The image filename (e.g., "image_123.jpg")
+ * @param {string} username - Username
+ * @param {string} platform - Platform (instagram, twitter, facebook)
+ * @param {string} context - Context for logging
+ */
+function nuclearCacheDestruction(imageKey, username, platform, context = 'NUCLEAR-CACHE-CLEAR') {
+  const timestamp = new Date().toISOString();
+  let clearedCount = 0;
+  
+  console.log(`[${timestamp}] [${context}] 🚀 INITIATING NUCLEAR CACHE DESTRUCTION for ${imageKey}`);
+  console.log(`[${timestamp}] [${context}] 🎯 Target: ${platform}/${username}/${imageKey}`);
+  
+  // ====== EXTENSION VARIATIONS ======
+  // Create variations of the image key with different extensions
+  const baseName = imageKey.replace(/\.(jpg|jpeg|png|webp)$/i, '');
+  const extensions = ['jpg', 'jpeg', 'png', 'webp'];
+  const imageKeyVariations = extensions.map(ext => `${baseName}.${ext}`);
+  
+  // ====== MEMORY CACHE DESTRUCTION ======
+  const memoryKeysToDestroy = [];
+  
+  // For each extension variation, create all possible cache keys
+  for (const keyVariation of imageKeyVariations) {
+    memoryKeysToDestroy.push(
+      `r2_ready_post/${platform}/${username}/${keyVariation}`,
+      `ready_post/${platform}/${username}/${keyVariation}`,
+      `r2_image_${platform}_${username}_${keyVariation}_default`,
+      `r2_image_${platform}_${username}_${keyVariation}_force`,
+      `r2_image_${platform}_${username}_${keyVariation}_refresh`,
+      `r2_image_${platform}_${username}_${keyVariation}_edited`,
+      `r2_image_${platform}_${username}_${keyVariation}_nuclear`,
+      `r2_image_${platform}_${username}_${keyVariation}_bypass`,
+      `r2_image_${platform}_${username}_${keyVariation}_nocache`,
+      `image_cache_${keyVariation}`,
+      `cached_${keyVariation}`,
+      `${platform}_${username}_${keyVariation}`,
+      `${username}_${keyVariation}`,
+      keyVariation
+    );
+  }
+  
+  // Destroy all memory cache variations
+  for (const key of memoryKeysToDestroy) {
+    if (imageCache.has(key)) {
+      imageCache.delete(key);
+      clearedCount++;
+      console.log(`[${timestamp}] [${context}] 💥 Destroyed memory cache: ${key}`);
+    }
+  }
+  
+  // AGGRESSIVE MEMORY SCAN: Find and destroy ANY cache entry containing the base name or username
+  for (const [cacheKey, value] of imageCache.entries()) {
+    if (cacheKey.includes(baseName) || cacheKey.includes(username)) {
+      imageCache.delete(cacheKey);
+      clearedCount++;
+      console.log(`[${timestamp}] [${context}] 💥 Destroyed related memory cache: ${cacheKey}`);
+    }
+  }
+  
+  // ====== LOCAL FILE CACHE DESTRUCTION ======
+  const localCacheKeysToDestroy = [];
+  
+  // For each extension variation, create local cache keys
+  for (const keyVariation of imageKeyVariations) {
+    const r2Key = `ready_post/${platform}/${username}/${keyVariation}`;
+    localCacheKeysToDestroy.push(
+      Buffer.from(r2Key).toString('base64').replace(/[\/\+=]/g, '_'),
+      Buffer.from(`${platform}/${username}/${keyVariation}`).toString('base64').replace(/[\/\+=]/g, '_'),
+      Buffer.from(keyVariation).toString('base64').replace(/[\/\+=]/g, '_')
+    );
+  }
+  
+  // Destroy all local cache files
+  for (const hashedKey of localCacheKeysToDestroy) {
+    const localCacheFilePath = path.join(localCacheDir, hashedKey);
+    if (fs.existsSync(localCacheFilePath)) {
+      try {
+        fs.unlinkSync(localCacheFilePath);
+        clearedCount++;
+        console.log(`[${timestamp}] [${context}] 💥 Destroyed local cache file: ${hashedKey}`);
+      } catch (error) {
+        console.warn(`[${timestamp}] [${context}] ⚠️ Failed to destroy local cache file: ${hashedKey}`, error.message);
+      }
+    }
+  }
+  
+  // AGGRESSIVE FILE SCAN: Scan entire cache directory for related files
+  try {
+    const cacheFiles = fs.readdirSync(localCacheDir);
+    for (const file of cacheFiles) {
+      try {
+        // Try to decode and check if it relates to our image
+        const decodedKey = Buffer.from(file.replace(/_/g, '/'), 'base64').toString('utf-8');
+        if (decodedKey.includes(baseName) || decodedKey.includes(username)) {
+          const fullPath = path.join(localCacheDir, file);
+          fs.unlinkSync(fullPath);
+          clearedCount++;
+          console.log(`[${timestamp}] [${context}] 💥 Destroyed related cache file: ${file}`);
+        }
+      } catch (decodeError) {
+        // Skip files that can't be decoded
+      }
+    }
+  } catch (scanError) {
+    console.warn(`[${timestamp}] [${context}] ⚠️ Error scanning cache directory:`, scanError.message);
+  }
+  
+  // ====== READY_POST DIRECTORY DESTRUCTION ======
+  const localPaths = [];
+  
+  // For each extension variation, create local file paths
+  for (const keyVariation of imageKeyVariations) {
+    localPaths.push(
+      path.join(process.cwd(), 'ready_post', platform, username, keyVariation),
+      path.join(process.cwd(), 'ready_post', username, keyVariation),
+      path.join(process.cwd(), 'image_cache', keyVariation),
+      path.join(process.cwd(), 'cache', keyVariation)
+    );
+  }
+  
+  for (const localPath of localPaths) {
+    if (fs.existsSync(localPath)) {
+      try {
+        fs.unlinkSync(localPath);
+        clearedCount++;
+        console.log(`[${timestamp}] [${context}] 💥 Destroyed local file: ${localPath}`);
+      } catch (error) {
+        console.warn(`[${timestamp}] [${context}] ⚠️ Failed to destroy local file: ${localPath}`, error.message);
+      }
+    }
+  }
+  
+  console.log(`[${timestamp}] [${context}] ✅ NUCLEAR DESTRUCTION COMPLETE: ${clearedCount} cache entries destroyed`);
+  return clearedCount;
+}
+
+/**
  * Clear cached image from both memory and local file cache
  * @param {string} imageR2Key - The R2 key for the image (e.g., "ready_post/instagram/username/image_123.png")
  * @param {string} context - Context for logging (e.g., "SAVE-EDITED-POST", "REIMAGINE")
@@ -561,6 +700,105 @@ app.post('/admin/clear-image-cache', (req, res) => {
   imageCache.clear();
   if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] Image cache cleared (${cacheSize} items)`);
   res.json({ success: true, message: `Image cache cleared (${cacheSize} items)` });
+});
+
+// 🚀 NUCLEAR CACHE DESTRUCTION DEBUG ENDPOINT
+app.post('/admin/nuclear-cache-destroy/:platform/:username/:imageKey', (req, res) => {
+  try {
+    const { platform, username, imageKey } = req.params;
+    
+    console.log(`[${new Date().toISOString()}] [NUCLEAR-DEBUG] Manual nuclear destruction requested`);
+    console.log(`[${new Date().toISOString()}] [NUCLEAR-DEBUG] Target: ${platform}/${username}/${imageKey}`);
+    
+    const destroyedCount = nuclearCacheDestruction(imageKey, username, platform, 'MANUAL-DEBUG');
+    
+    res.json({ 
+      success: true, 
+      destroyedCount,
+      target: {
+        platform,
+        username,
+        imageKey
+      },
+      message: `Nuclear destruction complete: ${destroyedCount} cache entries eliminated`
+    });
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [NUCLEAR-DEBUG] Error in nuclear destruction:`, error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 🔍 CACHE INSPECTION DEBUG ENDPOINT
+app.get('/admin/inspect-cache/:platform/:username/:imageKey', (req, res) => {
+  try {
+    const { platform, username, imageKey } = req.params;
+    
+    // Inspect all possible cache entries
+    const cacheInspection = {
+      memoryCache: [],
+      localFiles: [],
+      possibleKeys: []
+    };
+    
+    // Check memory cache
+    const possibleMemoryKeys = [
+      `r2_ready_post/${platform}/${username}/${imageKey}`,
+      `ready_post/${platform}/${username}/${imageKey}`,
+      `r2_image_${platform}_${username}_${imageKey}_default`,
+      `r2_image_${platform}_${username}_${imageKey}_force`,
+      `r2_image_${platform}_${username}_${imageKey}_refresh`,
+      `image_cache_${imageKey}`,
+      `cached_${imageKey}`,
+      `${platform}_${username}_${imageKey}`,
+      `${username}_${imageKey}`,
+      imageKey
+    ];
+    
+    for (const key of possibleMemoryKeys) {
+      cacheInspection.possibleKeys.push(key);
+      if (imageCache.has(key)) {
+        const cached = imageCache.get(key);
+        cacheInspection.memoryCache.push({
+          key,
+          size: cached?.data?.length || 0,
+          timestamp: cached?.timestamp || 0,
+          age: Date.now() - (cached?.timestamp || 0)
+        });
+      }
+    }
+    
+    // Check local files
+    const r2Key = `ready_post/${platform}/${username}/${imageKey}`;
+    const hashedKeys = [
+      Buffer.from(r2Key).toString('base64').replace(/[\/\+=]/g, '_'),
+      Buffer.from(`${platform}/${username}/${imageKey}`).toString('base64').replace(/[\/\+=]/g, '_'),
+      Buffer.from(imageKey).toString('base64').replace(/[\/\+=]/g, '_')
+    ];
+    
+    for (const hashedKey of hashedKeys) {
+      const localCacheFilePath = path.join(localCacheDir, hashedKey);
+      if (fs.existsSync(localCacheFilePath)) {
+        const stats = fs.statSync(localCacheFilePath);
+        cacheInspection.localFiles.push({
+          hashedKey,
+          path: localCacheFilePath,
+          size: stats.size,
+          modified: stats.mtime,
+          age: Date.now() - stats.mtime.getTime()
+        });
+      }
+    }
+    
+    res.json({
+      success: true,
+      target: { platform, username, imageKey },
+      cacheInspection,
+      totalMemoryEntries: imageCache.size,
+      cacheDirectory: localCacheDir
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Placeholder and special debug handlers removed for production safety
@@ -1965,30 +2203,35 @@ async function handlePostsEndpoint(req, res) {
               // 🔥 FIX: Try multiple extensions to find the actual image file
               const fileId = match[1];
               const prefix = file.Key.replace(/[^\/]+$/, ''); // Get directory path
-              const extensions = ['jpg', 'jpeg', 'png', 'webp'];
+              const extensions = ['png', 'webp', 'jpg', 'jpeg']; // Try PNG first since that's what we're saving
+              
+              console.log(`[${new Date().toISOString()}] [API-POSTS] 🔍 EXTENSION DETECTION: Looking for traditional image: ${fileId}`);
               
               // Find the first existing image file with any of these extensions
               for (const ext of extensions) {
                 const potentialKey = `${prefix}image_${fileId}.${ext}`;
+                if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [API-POSTS] 🔍 CHECKING: ${potentialKey}`);
+                
                 try {
                   const headCommand = new HeadObjectCommand({
                     Bucket: 'tasks',
                     Key: potentialKey
                   });
-                  await s3Client.send(headCommand);
+                  const headResult = await s3Client.send(headCommand);
                   imageKey = `image_${fileId}.${ext}`;
-                  if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [API-POSTS] Found image with extension .${ext}: ${imageKey}`);
+                  if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [API-POSTS] ✅ FOUND image with extension .${ext}: ${imageKey} (Size: ${headResult.ContentLength})`);
                   break;
                 } catch (error) {
+                  if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [API-POSTS] ❌ NOT FOUND: .${ext} (${error.message})`);
                   // Image doesn't exist with this extension, try next
                   continue;
                 }
               }
               
-              // If no image found with any extension, fallback to jpg (for backward compatibility)
+              // If no image found with any extension, fallback to png (since that's what we're saving now)
               if (!imageKey) {
-                imageKey = `image_${fileId}.jpg`;
-                if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [API-POSTS] No image found, using fallback: ${imageKey}`);
+                imageKey = `image_${fileId}.png`;
+                if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [API-POSTS] ⚠️ NO IMAGE FOUND: Using PNG fallback: ${imageKey}`);
               }
             }
           }
@@ -1999,30 +2242,35 @@ async function handlePostsEndpoint(req, res) {
               // 🔥 FIX: Try multiple extensions to find the actual image file
               const campaignId = campaignMatch[1];
               const prefix = file.Key.replace(/[^\/]+$/, ''); // Get directory path
-              const extensions = ['jpg', 'jpeg', 'png', 'webp'];
+              const extensions = ['png', 'webp', 'jpg', 'jpeg']; // Try PNG first since that's what we're saving
+              
+              console.log(`[${new Date().toISOString()}] [API-POSTS] 🔍 EXTENSION DETECTION: Looking for campaign image: ${campaignId}`);
               
               // Find the first existing image file with any of these extensions
               for (const ext of extensions) {
                 const potentialKey = `${prefix}campaign_ready_post_${campaignId}.${ext}`;
+                console.log(`[${new Date().toISOString()}] [API-POSTS] 🔍 CHECKING: ${potentialKey}`);
+                
                 try {
                   const headCommand = new HeadObjectCommand({
                     Bucket: 'tasks',
                     Key: potentialKey
                   });
-                  await s3Client.send(headCommand);
+                  const headResult = await s3Client.send(headCommand);
                   imageKey = `campaign_ready_post_${campaignId}.${ext}`;
-                  if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [API-POSTS] Found campaign image with extension .${ext}: ${imageKey}`);
+                  console.log(`[${new Date().toISOString()}] [API-POSTS] ✅ FOUND campaign image with extension .${ext}: ${imageKey} (Size: ${headResult.ContentLength})`);
                   break;
                 } catch (error) {
+                  console.log(`[${new Date().toISOString()}] [API-POSTS] ❌ NOT FOUND: .${ext} (${error.message})`);
                   // Image doesn't exist with this extension, try next
                   continue;
                 }
               }
               
-              // If no image found with any extension, fallback to jpg (for backward compatibility)
+              // If no image found with any extension, fallback to png (since that's what we're saving now)
               if (!imageKey) {
-                imageKey = `campaign_ready_post_${campaignId}.jpg`;
-                if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [API-POSTS] No campaign image found, using fallback: ${imageKey}`);
+                imageKey = `campaign_ready_post_${campaignId}.png`;
+                console.log(`[${new Date().toISOString()}] [API-POSTS] ⚠️ NO IMAGE FOUND: Using PNG fallback: ${imageKey}`);
               }
             }
           }
@@ -2122,23 +2370,79 @@ app.post('/api/save-edited-post/:username', upload.single('image'), async (req, 
     const client = getS3Client();
     
     if (postKey.includes('campaign_ready_post_') && postKey.endsWith('.json')) {
-      // Campaign pattern: campaign_ready_post_1752000987874_9c14f1fd.json -> edited_campaign_ready_post_1752000987874_9c14f1fd.png
+      // Campaign pattern: seamlessly replace original image
       const baseName = postKey.replace(/^.*\/([^\/]+)\.json$/, '$1');
       
-      // ALWAYS save edited images as PNG with "edited_" prefix to avoid overwriting originals
-      imageKey = `edited_${baseName}.png`;
-      console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] ✅ FIXED: Saving edited campaign image as PNG: ${imageKey}`);
-      console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] ✅ Original preserved, edited version clearly marked`);
+      // Get original image extension from post data to maintain consistency
+      let originalExtension = 'jpg'; // Default
+      try {
+        const getPostParams = {
+          Bucket: 'tasks',
+          Key: postKey
+        };
+        const postResponse = await client.getObject(getPostParams).promise();
+        const postData = JSON.parse(postResponse.Body.toString('utf-8'));
+        
+        // Extract extension from existing image URLs
+        const existingUrl = postData.image_url || postData.r2_image_url || '';
+        const extensionMatch = existingUrl.match(/\.(jpg|jpeg|png|webp)(\?|$)/i);
+        if (extensionMatch) {
+          originalExtension = extensionMatch[1].toLowerCase();
+        }
+      } catch (extractError) {
+        console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Could not extract original extension, using default`);
+      }
+      
+      // � EXTENSION STANDARDIZATION: Always use PNG for new standard + cleanup old versions
+      const pngImageKey = `${baseName}.png`;
+      const oldImageKey = `${baseName}.${originalExtension}`;
+      
+      console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] 🔄 STANDARDIZING: Converting ${oldImageKey} → ${pngImageKey}`);
+      
+      // If old extension is different from PNG, we'll need to cleanup
+      if (originalExtension !== 'png') {
+        console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] 🧹 CLEANUP SCHEDULED: Will remove old ${originalExtension} version after PNG save`);
+      }
+      
+      imageKey = pngImageKey;
     } else if (postKey.includes('ready_post_') && postKey.endsWith('.json')) {
-      // Traditional pattern: ready_post_1234567890.json -> edited_image_1234567890.png
+      // Traditional pattern: seamlessly replace original image
       const match = postKey.match(/ready_post_(\d+)\.json$/);
       if (match) {
         const fileId = match[1];
         
-        // ALWAYS save edited images as PNG with "edited_" prefix to avoid overwriting originals
-        imageKey = `edited_image_${fileId}.png`;
-        console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] ✅ FIXED: Saving edited regular image as PNG: ${imageKey}`);
-        console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] ✅ Original preserved, edited version clearly marked`);
+        // Get original image extension from post data to maintain consistency
+        let originalExtension = 'jpg'; // Default
+        try {
+          const getPostParams = {
+            Bucket: 'tasks',
+            Key: postKey
+          };
+          const postResponse = await client.getObject(getPostParams).promise();
+          const postData = JSON.parse(postResponse.Body.toString('utf-8'));
+          
+          // Extract extension from existing image URLs
+          const existingUrl = postData.image_url || postData.r2_image_url || '';
+          const extensionMatch = existingUrl.match(/\.(jpg|jpeg|png|webp)(\?|$)/i);
+          if (extensionMatch) {
+            originalExtension = extensionMatch[1].toLowerCase();
+          }
+        } catch (extractError) {
+          console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Could not extract original extension, using default`);
+        }
+        
+        // � EXTENSION STANDARDIZATION: Always use PNG for new standard + cleanup old versions
+        const pngImageKey = `image_${fileId}.png`;
+        const oldImageKey = `image_${fileId}.${originalExtension}`;
+        
+        console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] 🔄 STANDARDIZING: Converting ${oldImageKey} → ${pngImageKey}`);
+        
+        // If old extension is different from PNG, we'll need to cleanup
+        if (originalExtension !== 'png') {
+          console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] 🧹 CLEANUP SCHEDULED: Will remove old ${originalExtension} version after PNG save`);
+        }
+        
+        imageKey = pngImageKey;
       }
     }
     
@@ -2156,9 +2460,8 @@ app.post('/api/save-edited-post/:username', upload.single('image'), async (req, 
     
     if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Saving edited image to R2: ${imageR2Key}`);
     
-    // Determine ContentType based on the image key extension - edited images are PNG
-    const contentType = imageKey.endsWith('.png') ? 'image/png' : 
-                       imageKey.endsWith('.webp') ? 'image/webp' : 'image/jpeg';
+    // Force PNG content type since we're standardizing on PNG
+    const contentType = 'image/png';
     
     const putImageParams = {
       Bucket: 'tasks',
@@ -2175,6 +2478,45 @@ app.post('/api/save-edited-post/:username', upload.single('image'), async (req, 
     
     await client.putObject(putImageParams).promise();
     if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Successfully saved edited image to R2: ${imageR2Key}`);
+    
+    // 🧹 EXTENSION CLEANUP: Remove old versions with different extensions if they exist
+    if (imageKey.endsWith('.png')) {
+      const baseName = imageKey.replace('.png', '');
+      const cleanupExtensions = ['jpg', 'jpeg', 'webp']; // Extensions to cleanup
+      
+      for (const oldExt of cleanupExtensions) {
+        const oldImageKey = `${baseName}.${oldExt}`;
+        const oldR2Key = `ready_post/${platform}/${username}/${oldImageKey}`;
+        
+        try {
+          // Check if old file exists
+          const headParams = {
+            Bucket: 'tasks',
+            Key: oldR2Key
+          };
+          await client.headObject(headParams).promise();
+          
+          // File exists, delete it
+          const deleteParams = {
+            Bucket: 'tasks',
+            Key: oldR2Key
+          };
+          await client.deleteObject(deleteParams).promise();
+          console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] 🧹 CLEANUP: Removed legacy ${oldExt} version: ${oldR2Key}`);
+          
+          // Also remove from local cache if exists
+          const oldLocalPath = path.join(process.cwd(), 'ready_post', platform, username, oldImageKey);
+          if (fs.existsSync(oldLocalPath)) {
+            fs.unlinkSync(oldLocalPath);
+            console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] 🧹 CLEANUP: Removed local legacy file: ${oldLocalPath}`);
+          }
+          
+        } catch (error) {
+          // File doesn't exist or error accessing it, ignore
+          if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] 🧹 CLEANUP: No legacy ${oldExt} file to remove (${error.code})`);
+        }
+      }
+    }
     
     // Also save a local copy to the exact same location for caching
     const localImagePath = path.join(process.cwd(), 'ready_post', platform, username, imageKey);
@@ -2211,30 +2553,26 @@ app.post('/api/save-edited-post/:username', upload.single('image'), async (req, 
         }
       }
         
-        // 🎯 CRITICAL FIX: Update image URLs to point to edited version
-        const editedImageUrl = `/api/r2-image/${username}/${imageKey}?platform=${platform}&edited=true&v=${Date.now()}`;
+        // 🎯 SEAMLESS REPLACEMENT: Update image URLs to use cache-busted version of the same image
+        const cacheBustedImageUrl = `/api/r2-image/${username}/${imageKey}?platform=${platform}&v=${Date.now()}&refreshed=true`;
         
-        // Update all image URL fields to point to the edited version
+        // Update all image URL fields to point to the refreshed version
         if (postData.image_url !== undefined) {
-          postData.image_url = editedImageUrl;
+          postData.image_url = cacheBustedImageUrl;
         }
         if (postData.r2_image_url !== undefined) {
-          postData.r2_image_url = editedImageUrl;
+          postData.r2_image_url = cacheBustedImageUrl;
         }
         if (postData.post && postData.post.image_url !== undefined) {
-          postData.post.image_url = editedImageUrl;
+          postData.post.image_url = cacheBustedImageUrl;
         }
         if (postData.post && postData.post.r2_image_url !== undefined) {
-          postData.post.r2_image_url = editedImageUrl;
+          postData.post.r2_image_url = cacheBustedImageUrl;
         }
         
-        // Mark as edited
-        postData.is_edited = true;
-        postData.edited_image_key = imageKey;
-        
-        // Add update timestamp
+        // Add update timestamp without "edited" markers (seamless replacement)
         postData.updated_at = new Date().toISOString();
-        postData.last_edited = new Date().toISOString();
+        postData.last_modified = new Date().toISOString();
         
         // Save updated post data back to R2
         const putPostParams = {
@@ -2254,74 +2592,26 @@ app.post('/api/save-edited-post/:username', upload.single('image'), async (req, 
     }
     
     // ===============================================
-    // ENHANCED CACHE INVALIDATION FOR FRESH IMAGES
+    // 🚀 NUCLEAR CACHE DESTRUCTION FOR FRESH IMAGES
     // ===============================================
     
-    // Clear SPECIFIC cache for the edited image to force refresh from R2
-    const specificImageR2Key = `ready_post/${platform}/${username}/${imageKey}`;
-    clearImageCache(specificImageR2Key, 'SAVE-EDITED-POST');
+    console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] 🚀 INITIATING NUCLEAR CACHE DESTRUCTION`);
     
-    // NUCLEAR CACHE CLEARING: Clear ALL possible cache variations for this image
-    const imageName = imageKey.replace(/\.(jpg|jpeg|png|webp)$/i, '');
-    const allCacheVariations = [
-      `r2_${specificImageR2Key}`,
-      `r2_image_${platform}_${username}_${imageKey}_default`,
-      `ready_post_${platform}_${username}_${imageKey}`,
-      specificImageR2Key,
-      imageKey,
-      imageName,
-      `${platform}_${username}_${imageKey}`,
-      `${username}_${imageKey}`,
-      `image_cache_${imageKey}`,
-      `cached_${imageKey}`
-    ];
+    // NUCLEAR DESTRUCTION: Completely eliminate ALL possible cache sources for this image
+    const destroyedCount = nuclearCacheDestruction(imageKey, username, platform, 'SAVE-EDITED-POST');
     
-    // Clear all memory cache variations
-    for (const variation of allCacheVariations) {
-      if (imageCache.has(variation)) {
-        imageCache.delete(variation);
-        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Cleared memory cache variation: ${variation}`);
-      }
-    }
+    console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] ✅ NUCLEAR DESTRUCTION COMPLETE: ${destroyedCount} cache entries eliminated`);
     
-    // AGGRESSIVE CACHE CLEARING: Clear ALL memory cache entries that contain this image key
-    for (const [cacheKey, value] of imageCache.entries()) {
-      if (cacheKey.includes(imageKey) || cacheKey.includes(imageName)) {
-        imageCache.delete(cacheKey);
-        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Cleared related memory cache: ${cacheKey}`);
-      }
-    }
+    // ADDITIONAL AGGRESSIVE MEASURES: Clear any browser-side cache hints
+    console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] 🧹 Applying aggressive cache-busting measures`);
     
-    // Clear any cached files for this specific image with different encodings
-    try {
-      const cachePattern = imageKey.replace(/\.(jpg|jpeg|png|webp)$/i, '');
-      const cacheFiles = fs.readdirSync(localCacheDir);
-      
-      for (const file of cacheFiles) {
-        // Decode base64 filename to check if it contains our image
-        try {
-          const decodedKey = Buffer.from(file.replace(/_/g, '/'), 'base64').toString('utf-8');
-          if (decodedKey.includes(imageKey) || decodedKey.includes(cachePattern)) {
-            const fullPath = path.join(localCacheDir, file);
-            fs.unlinkSync(fullPath);
-            if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Cleared related cache file: ${file}`);
-          }
-        } catch (decodeError) {
-          // Skip files that can't be decoded
-        }
-      }
-    } catch (cacheError) {
-      if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Error clearing related cache files:`, cacheError.message);
-    }
-    
-    // ALSO clear the local ready_post directory cache (if it exists)
-    const localReadyPostPath = path.join(process.cwd(), 'ready_post', platform, username, imageKey);
-    if (fs.existsSync(localReadyPostPath)) {
+    // Force clear any lingering memory references
+    if (global.gc) {
       try {
-        fs.unlinkSync(localReadyPostPath);
-        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Cleared local ready_post cache: ${localReadyPostPath}`);
-      } catch (localError) {
-        if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [SAVE-EDITED-POST] Error clearing local ready_post cache:`, localError.message);
+        global.gc();
+        console.log(`[${new Date().toISOString()}] [SAVE-EDITED-POST] 🧹 Garbage collection triggered`);
+      } catch (gcError) {
+        // Ignore if GC is not available
       }
     }
     

@@ -1883,23 +1883,122 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
     
     return validData;
   } catch (error) {
-    console.error(`Error fetching ${platform} data for username ${username}:`, error);
+    console.error(`Error fetching ${platform} data for prefix ${prefix}:`, error);
+    return [];
+  }
+}
+
+// 🎯 WATCHDOG METADATA FUNCTION: Returns R2 bucket data with LastModified timestamps
+async function fetchDataForModuleWithMetadata(username, prefixTemplate, forceRefresh = false, platform = 'instagram') {
+  if (!username) {
+    console.error('No username provided, cannot fetch metadata');
+    return [];
+  }
+
+  try {
+    // Parse module from template (same logic as fetchDataForModule)
+    let module, additional = '';
     
-    // Try to build prefix for fallback cache lookup
-    try {
-      const module = prefixTemplate.includes('competitor_analysis') && prefixTemplate.includes('/{username}/') 
-        ? prefixTemplate.split('/{username}/')[0]
-        : prefixTemplate.replace('/{username}', '').replace('{username}', '');
-      const fallbackPrefix = PlatformSchemaManager.buildPath(module, platform, username);
-      
-      if (cache.has(fallbackPrefix)) {
-        console.log(`[${new Date().toISOString()}] Using cached ${platform} data as fallback for ${fallbackPrefix} due to fetch error`);
-        return cache.get(fallbackPrefix);
-      }
-    } catch (fallbackError) {
-      console.error(`Error building fallback cache key:`, fallbackError);
+    if (prefixTemplate.includes('competitor_analysis') && prefixTemplate.includes('/{username}/')) {
+      const parts = prefixTemplate.split('/{username}/');
+      module = parts[0];
+      additional = parts[1];
+    } else if (prefixTemplate.includes('{username}')) {
+      module = prefixTemplate.replace('/{username}', '').replace('{username}', '');
+    } else {
+      module = prefixTemplate;
     }
     
+    const prefix = PlatformSchemaManager.buildPath(module, platform, username, additional);
+    
+    // Handle alternative prefixes for news module
+    const altPrefixes = [];
+    if (module === 'news_for_you') {
+      const dashed = prefix.replace('news_for_you', 'news-for-you');
+      if (dashed !== prefix) {
+        altPrefixes.push(dashed);
+      }
+      const newForYou = prefix.replace('news_for_you', 'NewForYou');
+      if (newForYou !== prefix && newForYou !== dashed) {
+        altPrefixes.push(newForYou);
+      }
+    }
+
+    console.log(`[News4U Watchdog] 🎯 Fetching metadata for prefix: ${prefix}`);
+    
+    // Helper to list JSON objects with metadata
+    const listJsonObjectsWithMetadata = async (pref) => {
+      const listCommand = new ListObjectsV2Command({ Bucket: 'tasks', Prefix: pref });
+      const listResponse = await s3Client.send(listCommand);
+      return (listResponse.Contents || [])
+        .filter(file => file.Key.endsWith('.json'))
+        .map(file => ({
+          key: file.Key,
+          lastModified: file.LastModified.toISOString(),
+          size: file.Size
+        }));
+    };
+
+    let fileMetadata = await listJsonObjectsWithMetadata(prefix);
+    
+    // Fetch from alternative prefixes
+    for (const alt of altPrefixes) {
+      try {
+        const altMetadata = await listJsonObjectsWithMetadata(alt);
+        fileMetadata = fileMetadata.concat(altMetadata);
+      } catch (err) {
+        console.warn(`[News4U Watchdog] ⚠️ Alt prefix ${alt} not found:`, err.message);
+      }
+    }
+
+    // Sort by LastModified (most recent first)
+    const sortedMetadata = fileMetadata
+      .sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime());
+
+    console.log(`[News4U Watchdog] 📊 Found ${sortedMetadata.length} files with metadata`);
+    
+    // For watchdog, we need to fetch the actual data too for comparison
+    const bucketDataWithMetadata = [];
+    
+    // Limit to top items for performance
+    const maxItems = module === 'news_for_you' ? 4 : sortedMetadata.length;
+    const topFiles = sortedMetadata.slice(0, maxItems);
+    
+    for (const fileMeta of topFiles) {
+      try {
+        const getCommand = new GetObjectCommand({
+          Bucket: 'tasks',
+          Key: fileMeta.key,
+        });
+        const response = await s3Client.send(getCommand);
+        const body = await response.Body.transformToString();
+        const data = JSON.parse(body);
+        
+        bucketDataWithMetadata.push({
+          key: fileMeta.key,
+          lastModified: fileMeta.lastModified,
+          size: fileMeta.size,
+          data: data
+        });
+        
+      } catch (fetchError) {
+        console.warn(`[News4U Watchdog] ⚠️ Failed to fetch ${fileMeta.key}:`, fetchError.message);
+        // Still include metadata even if data fetch fails
+        bucketDataWithMetadata.push({
+          key: fileMeta.key,
+          lastModified: fileMeta.lastModified,
+          size: fileMeta.size,
+          data: null,
+          error: fetchError.message
+        });
+      }
+    }
+    
+    console.log(`[News4U Watchdog] ✅ Returning ${bucketDataWithMetadata.length} items with metadata and data`);
+    return bucketDataWithMetadata;
+    
+  } catch (error) {
+    console.error(`[News4U Watchdog] ❌ Error fetching metadata for ${prefix}:`, error);
     return [];
   }
 }
@@ -2448,12 +2547,23 @@ app.get(['/news-for-you/:accountHolder', '/api/news-for-you/:accountHolder'], as
   try {
     const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
     const forceRefresh = req.query.forceRefresh === 'true';
+    const includeMetadata = req.query.includeMetadata === 'true';
 
-    const data = await fetchDataForModule(username, 'news_for_you/{username}', forceRefresh, platform);
-    if (data.length === 0) {
-      res.status(404).json({ error: `No ${platform} news files found` });
+    console.log(`[News4U API] 📡 Request for ${username} on ${platform}, forceRefresh: ${forceRefresh}, includeMetadata: ${includeMetadata}`);
+
+    if (includeMetadata) {
+      // 🎯 WATCHDOG MODE: Return R2 bucket metadata with LastModified timestamps
+      const bucketData = await fetchDataForModuleWithMetadata(username, 'news_for_you/{username}', forceRefresh, platform);
+      console.log(`[News4U API] 🎯 Watchdog mode: returning ${bucketData.length} items with metadata`);
+      res.json(bucketData);
     } else {
-      res.json(data);
+      // 🔄 NORMAL MODE: Return processed news items as before
+      const data = await fetchDataForModule(username, 'news_for_you/{username}', forceRefresh, platform);
+      if (data.length === 0) {
+        res.status(404).json({ error: `No ${platform} news files found` });
+      } else {
+        res.json(data);
+      }
     }
   } catch (error) {
     console.error(`Retrieve ${req.query.platform || 'instagram'} news endpoint error:`, error);
@@ -3006,35 +3116,87 @@ app.get(['/posts/:username', '/api/posts/:username'], async (req, res) => {
             return null;
           }
           
-          // Look for matching image file
-          // 🔥 ENHANCED: Build image keys based on post type and extracted fileId
-          let potentialImageKeys = [];
+          // 🚀 UNIVERSAL EXTENSION RESOLVER: Handle all file extension mismatches
+          let imageFile = null;
+          let actualImageKey = null;
           
+          console.log(`[${new Date().toISOString()}] [API-POSTS] � UNIVERSAL EXTENSION RESOLVER: Processing post ${fileId}`);
+          
+          // Build potential image keys based on post type
+          let baseImageKeys = [];
           if (file.Key.includes('campaign_ready_post_')) {
             // Campaign posts: fileId includes both timestamp and hash (e.g., "1753505284728_63e2f9e5")
-            potentialImageKeys = [
-              `${prefix}/campaign_ready_post_${fileId}.jpg`,
-              `${prefix}/campaign_ready_post_${fileId}.jpeg`,
-              `${prefix}/campaign_ready_post_${fileId}.png`,
-              `${prefix}/campaign_ready_post_${fileId}.webp`
-            ];
+            baseImageKeys = [`campaign_ready_post_${fileId}`];
           } else {
             // Traditional posts: fileId is just timestamp (e.g., "1753505284728")
-            potentialImageKeys = [
-              `${prefix}/image_${fileId}.jpg`,
-              `${prefix}/image_${fileId}.png`,
-              `${prefix}/ready_post_${fileId}.jpg`,
-              `${prefix}/ready_post_${fileId}.png`
+            baseImageKeys = [
+              `image_${fileId}`,
+              `ready_post_${fileId}`
             ];
           }
+
+          // PHASE 1: Try local file list detection first (fastest)
+          const imageExtensions = ['png', 'webp', 'jpg', 'jpeg']; // PNG first for new standard
           
-          // Find the first matching image file
-          const imageFile = imageFiles.find(img => 
-            potentialImageKeys.includes(img.Key)
-          );
-          
+          for (const baseKey of baseImageKeys) {
+            for (const ext of imageExtensions) {
+              const potentialKey = `${prefix}/${baseKey}.${ext}`;
+              const foundImage = imageFiles.find(img => img.Key === potentialKey);
+              if (foundImage) {
+                imageFile = foundImage;
+                actualImageKey = `${baseKey}.${ext}`;
+                console.log(`[${new Date().toISOString()}] [API-POSTS] ✅ LOCAL MATCH: Found ${actualImageKey} in R2 file list`);
+                break;
+              }
+            }
+            if (imageFile) break;
+          }
+
+          // PHASE 2: R2 HEAD REQUEST for precise detection (handles any mismatches)
           if (!imageFile) {
-            console.warn(`[${new Date().toISOString()}] No matching image found for ${platform} post ${file.Key} (ID: ${fileId}), checked: ${potentialImageKeys.join(', ')}`);
+            console.log(`[${new Date().toISOString()}] [API-POSTS] 🔍 R2 HEAD DETECTION: Searching for ${baseImageKeys.join('/')} with extensions`);
+            
+            for (const baseKey of baseImageKeys) {
+              for (const ext of imageExtensions) {
+                const potentialKey = `${prefix}/${baseKey}.${ext}`;
+                console.log(`[${new Date().toISOString()}] [API-POSTS] 🔍 CHECKING R2: ${potentialKey}`);
+                
+                try {
+                  const headCommand = new HeadObjectCommand({
+                    Bucket: 'tasks',
+                    Key: potentialKey
+                  });
+                  const headResult = await s3Client.send(headCommand);
+                  
+                  // Create mock imageFile object for compatibility
+                  imageFile = {
+                    Key: potentialKey,
+                    LastModified: headResult.LastModified,
+                    Size: headResult.ContentLength
+                  };
+                  actualImageKey = `${baseKey}.${ext}`;
+                  console.log(`[${new Date().toISOString()}] [API-POSTS] ✅ R2 FOUND: ${actualImageKey} (Size: ${headResult.ContentLength}, Modified: ${headResult.LastModified})`);
+                  
+                  // CLEANUP: If we found an image with different extension than PNG, log for future cleanup
+                  if (ext !== 'png') {
+                    console.log(`[${new Date().toISOString()}] [API-POSTS] ⚠️ LEGACY EXTENSION DETECTED: ${actualImageKey} should be migrated to .png`);
+                  }
+                  break;
+                } catch (error) {
+                  console.log(`[${new Date().toISOString()}] [API-POSTS] ❌ R2 NOT FOUND: .${ext} (${error.code || error.message})`);
+                  continue;
+                }
+              }
+              if (imageFile) break;
+            }
+          }
+
+          if (!imageFile) {
+            // PHASE 3: Create fallback with PNG extension for new standard
+            const baseKey = baseImageKeys[0]; // Use first base key
+            actualImageKey = `${baseKey}.png`;
+            console.log(`[${new Date().toISOString()}] [API-POSTS] ⚠️ NO IMAGE FOUND: Using PNG fallback: ${actualImageKey}`);
+            console.warn(`[${new Date().toISOString()}] No matching image found for ${platform} post ${file.Key} (ID: ${fileId}), checked: ${baseImageKeys.map(key => imageExtensions.map(ext => `${prefix}/${key}.${ext}`)).flat().join(', ')}`);
             return null;
           }
           

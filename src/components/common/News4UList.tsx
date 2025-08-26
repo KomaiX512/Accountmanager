@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
-import { FaClock, FaExternalLinkAlt, FaPlus, FaSpinner, FaRss, FaRedo } from 'react-icons/fa';
+import { FaClock, FaExternalLinkAlt, FaPlus, FaSpinner, FaRss, FaRedo, FaEye } from 'react-icons/fa';
 import axios from 'axios';
 import RagService from '../../services/RagService';
+import { news4uWatchdog } from '../../utils/news4uWatchdog';
 import './News4U.css';
 
 interface News4UProps {
@@ -50,14 +51,15 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const [lastFetchTime, setLastFetchTime] = useState<number>(0);
   const [forceRefreshKey, setForceRefreshKey] = useState(0);
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [watchdogEnabled, setWatchdogEnabled] = useState(true);
   const [latestItemTimestamp, setLatestItemTimestamp] = useState<string | null>(null);
+  const [watchdogId, setWatchdogId] = useState<string | null>(null);
+  const [watchdogStatus, setWatchdogStatus] = useState<string>('Initializing...');
   
   const menuAnchorRef = useRef<HTMLElement | null>(null);
   const portalRootRef = useRef<HTMLElement | null>(null);
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const autoRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const lastAutoRefreshRef = useRef<number>(0);
+  const watchdogInitialized = useRef<boolean>(false);
 
   // 🚀 ROBUST: Ensure portal root exists and persists
   useEffect(() => {
@@ -483,7 +485,6 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       console.log(`[News4U] Total items processed: ${normalized.length}, Selected: ${selectedItems.length}, Platform: ${effectivePlatform}`);
       console.log(`[News4U] Latest item timestamp tracked:`, latestItemTimestamp);
       setLastFetchTime(Date.now());
-      lastAutoRefreshRef.current = Date.now();
 
     } catch (err: any) {
       console.error(`[News4U] ❌ Error fetching news:`, err);
@@ -502,78 +503,56 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     }
   }, [effectiveAccountHolder, effectivePlatform, forceRefreshKey]);
 
-  // 🚀 SIMPLIFIED: Dynamic refresh system that checks for new items every 15 seconds
+  // 🎯 PRODUCTION WATCHDOG: Efficient R2 bucket monitoring with 4-hour intervals
   useEffect(() => {
-    if (!autoRefreshEnabled || !effectiveAccountHolder || !effectivePlatform) {
-      // Clear existing interval if disabled
-      if (autoRefreshIntervalRef.current) {
-        clearInterval(autoRefreshIntervalRef.current);
-        autoRefreshIntervalRef.current = null;
-      }
+    if (!watchdogEnabled || !effectiveAccountHolder || !effectivePlatform || watchdogInitialized.current) {
       return;
     }
     
-    // Clear any existing interval before creating new one
-    if (autoRefreshIntervalRef.current) {
-      clearInterval(autoRefreshIntervalRef.current);
-    }
+    console.log(`[News4U] 🎯 Initializing production watchdog for ${effectiveAccountHolder} on ${effectivePlatform}`);
+    setWatchdogStatus('Starting watchdog...');
     
-    // Start simple auto-refresh after initial load
-    const startDelay = setTimeout(() => {
-      console.log(`[News4U] 🚀 Starting dynamic refresh for ${effectiveAccountHolder} on ${effectivePlatform}`);
-      
-      autoRefreshIntervalRef.current = setInterval(async () => {
-        try {
-          console.log(`[News4U] 🔄 Auto-checking for new items... (${new Date().toLocaleTimeString()})`);
-          
-          // Simple approach: just refetch and compare item count/content
-          const currentItemCount = items.length;
-          const currentFirstItemId = items[0]?.id || items[0]?.title;
-          
-          // Force a fresh fetch to check for new items
-          setForceRefreshKey(prev => prev + 1);
-          
-          // The fetchNews effect will handle the actual refresh
-          console.log(`[News4U] 🔄 Triggered refresh check - current items: ${currentItemCount}, first item: ${currentFirstItemId}`);
-          
-        } catch (error: any) {
-          console.warn(`[News4U] ⚠️ Auto-refresh failed:`, error?.message || 'Unknown error');
-        }
-      }, 15000); // Check every 15 seconds for better responsiveness
-      
-    }, 5000); // Start 5s after initial load
-    
-    return () => {
-      clearTimeout(startDelay);
-      if (autoRefreshIntervalRef.current) {
-        clearInterval(autoRefreshIntervalRef.current);
-        autoRefreshIntervalRef.current = null;
-      }
-    };
-  }, [autoRefreshEnabled, effectiveAccountHolder, effectivePlatform, items.length])
-
-  // 🚀 ENHANCED: Refresh when tab becomes visible and add window focus refresh
-  useEffect(() => {
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        console.log(`[News4U] 👁️ Tab visible - checking for new items`);
+    const watchdogConfig = {
+      accountHolder: effectiveAccountHolder,
+      platform: effectivePlatform,
+      intervalHours: 4, // Check every 4 hours (production scalable)
+      onNewItemsDetected: (newItems: any[]) => {
+        console.log(`[News4U] 🎉 Watchdog detected ${newItems.length} new items!`);
+        setWatchdogStatus(`New items detected! Refreshing...`);
+        
+        // Trigger smooth refresh of frontend
         setForceRefreshKey(prev => prev + 1);
+        
+        // Update status
+        setTimeout(() => {
+          setWatchdogStatus(`Active - Last check: ${new Date().toLocaleTimeString()}`);
+        }, 2000);
+      },
+      onError: (error: string) => {
+        console.error(`[News4U] ❌ Watchdog error:`, error);
+        setWatchdogStatus(`Error: ${error}`);
       }
     };
     
-    const onFocus = () => {
-      console.log(`[News4U] 🎯 Window focused - checking for new items`);
-      setForceRefreshKey(prev => prev + 1);
-    };
+    const id = news4uWatchdog.startWatchdog(watchdogConfig);
+    setWatchdogId(id);
+    setWatchdogStatus(`Active - Monitoring every 4 hours`);
+    watchdogInitialized.current = true;
     
-    document.addEventListener('visibilitychange', onVisibility);
-    window.addEventListener('focus', onFocus);
+    console.log(`[News4U] ✅ Watchdog started with ID: ${id}`);
     
     return () => {
-      document.removeEventListener('visibilitychange', onVisibility);
-      window.removeEventListener('focus', onFocus);
+      if (id) {
+        news4uWatchdog.stopWatchdog(id);
+        console.log(`[News4U] 🛑 Stopped watchdog: ${id}`);
+      }
+      watchdogInitialized.current = false;
     };
-  }, []);
+  }, [watchdogEnabled, effectiveAccountHolder, effectivePlatform])
+
+  // 🎯 PRODUCTION: Removed frequent refresh triggers - watchdog handles updates
+  // Tab visibility and window focus refreshes DISABLED to prevent constant API calls
+  // The 4-hour watchdog system will handle new item detection efficiently
   
   // 🚀 ROBUST: Initial fetch and cleanup
   useEffect(() => {
@@ -586,9 +565,7 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       if (fetchTimeoutRef.current) {
         clearTimeout(fetchTimeoutRef.current);
       }
-      if (autoRefreshIntervalRef.current) {
-        clearInterval(autoRefreshIntervalRef.current);
-      }
+      // Cleanup handled by watchdog system
     };
   }, [fetchNews]);
   
@@ -600,20 +577,18 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
         clearTimeout(fetchTimeoutRef.current);
         fetchTimeoutRef.current = null;
       }
-      if (autoRefreshIntervalRef.current) {
-        clearInterval(autoRefreshIntervalRef.current);
-        autoRefreshIntervalRef.current = null;
-      }
+      // Watchdog cleanup handled automatically
     };
   }, []);
 
   // 🚀 REMOVED: Complex optimized check - using simple refresh approach instead
   
-  // 🚀 ROBUST: Manual refresh function
+  // 🚀 ROBUST: Manual refresh function (for debug/testing only)
   const handleManualRefresh = useCallback(() => {
     if (fetchTimeoutRef.current) {
       clearTimeout(fetchTimeoutRef.current);
     }
+    console.log(`[News4U] 🔧 Manual refresh triggered (debug only)`);
     setForceRefreshKey(prev => prev + 1);
     fetchNews();
   }, [fetchNews]);
@@ -705,7 +680,8 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
             <div>Account: <strong>{effectiveAccountHolder}</strong></div>
             <div>Platform: <strong>{effectivePlatform}</strong></div>
             <div>Last Fetch: <strong>{lastFetchTime ? new Date(lastFetchTime).toLocaleTimeString() : 'Never'}</strong></div>
-            <div>Auto-Refresh: <strong style={{color: autoRefreshEnabled ? '#00ffcc' : '#ff6b6b'}}>{autoRefreshEnabled ? 'Enabled' : 'Disabled'}</strong></div>
+            <div>Watchdog: <strong style={{color: watchdogEnabled ? '#00ffcc' : '#ff6b6b'}}>{watchdogEnabled ? 'Active' : 'Disabled'}</strong></div>
+            <div>Status: <strong style={{color: '#00ffcc'}}>{watchdogStatus}</strong></div>
             <div>Latest Item: <strong>{latestItemTimestamp ? new Date(latestItemTimestamp).toLocaleTimeString() : 'None'}</strong></div>
             
             {/* 🚀 TEST: Manual API test button */}
@@ -751,11 +727,14 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
             
             <button 
               onClick={() => {
-                setAutoRefreshEnabled(!autoRefreshEnabled);
-                console.log(`[News4U] Auto-refresh ${!autoRefreshEnabled ? 'enabled' : 'disabled'}`);
+                setWatchdogEnabled(!watchdogEnabled);
+                console.log(`[News4U] Watchdog ${!watchdogEnabled ? 'enabled' : 'disabled'}`);
+                if (!watchdogEnabled) {
+                  watchdogInitialized.current = false; // Allow re-initialization
+                }
               }}
               style={{
-                background: autoRefreshEnabled ? 'linear-gradient(135deg, #ff6b6b, #ee5a24)' : 'linear-gradient(135deg, #00ffcc, #00d4aa)',
+                background: watchdogEnabled ? 'linear-gradient(135deg, #ff6b6b, #ee5a24)' : 'linear-gradient(135deg, #00ffcc, #00d4aa)',
                 border: 'none',
                 color: '#fff',
                 padding: '6px 12px',
@@ -767,8 +746,37 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
                 fontWeight: '600'
               }}
             >
-              {autoRefreshEnabled ? '⏸️ Disable Auto-Refresh' : '▶️ Enable Auto-Refresh'}
+              {watchdogEnabled ? '⏸️ Disable Watchdog' : '▶️ Enable Watchdog'}
             </button>
+            
+            {watchdogId && (
+              <button 
+                onClick={async () => {
+                  try {
+                    setWatchdogStatus('Manual check in progress...');
+                    await news4uWatchdog.triggerManualCheck(watchdogId);
+                    setWatchdogStatus(`Manual check completed - ${new Date().toLocaleTimeString()}`);
+                  } catch (error: any) {
+                    setWatchdogStatus(`Manual check failed: ${error.message}`);
+                  }
+                }}
+                style={{
+                  background: 'linear-gradient(135deg, #9c88ff, #8c7ae6)',
+                  border: 'none',
+                  color: '#fff',
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  fontSize: '0.65rem',
+                  cursor: 'pointer',
+                  marginTop: '8px',
+                  marginLeft: '8px',
+                  fontWeight: '600'
+                }}
+              >
+                <FaEye style={{ marginRight: '4px' }} />
+                Manual Check
+              </button>
+            )}
             
             <div style={{ marginTop: '8px', fontSize: '0.65rem', color: 'rgba(255, 255, 255, 0.5)' }}>
               Check browser console for detailed data processing logs

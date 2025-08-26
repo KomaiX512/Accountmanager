@@ -3147,14 +3147,14 @@ async function streamToBuffer(stream) {
 }
 
 // Instagram App Credentials
-const APP_ID = '576296982152813';
-const APP_SECRET = 'd48ddc9eaf0e5c4969d4ddc4e293178c';
-const REDIRECT_URI = 'https://www.sentientm.com/instagram/callback';
+const APP_ID = '1089716559763623';
+const APP_SECRET = '0733abf780036963e9f57f33a4b2fa6e';
+const REDIRECT_URI = 'https://b4bd9386ac7b.ngrok-free.app/instagram/callback';
 const VERIFY_TOKEN = 'myInstagramWebhook2025';
 // Facebook App Credentials  
 const FB_APP_ID = '581584257679639'; // Your ACTUAL Facebook App ID (NOT Configuration ID)
 const FB_APP_SECRET = 'cdd153955e347e194390333e48cb0480'; // Your actual App Secret
-const FB_REDIRECT_URI = 'https://www.sentientm.com/facebook/callback';
+const FB_REDIRECT_URI = 'https://b4bd9386ac7b.ngrok-free.app/facebook/callback';
 const FB_VERIFY_TOKEN = 'myFacebookWebhook2025';
 
 app.get([
@@ -5719,6 +5719,11 @@ app.get(['/events-list/:userId', '/api/events-list/:userId'], async (req, res) =
       }
     }
 
+    // 🛡️ APPLY STRONGEST FILTERING: Remove handled notifications AND own account notifications
+    console.log(`[${new Date().toISOString()}] Raw ${platform} notifications fetched: ${notifications.length}`);
+    notifications = await filterHandledNotifications(notifications, userId, platform);
+    console.log(`[${new Date().toISOString()}] After filtering ${platform} notifications: ${notifications.length}`);
+
     res.json(notifications);
   } catch (error) {
     console.error(`[events-list] Error fetching ${platform} notifications for userId=${userId}:`, error);
@@ -5726,7 +5731,7 @@ app.get(['/events-list/:userId', '/api/events-list/:userId'], async (req, res) =
   }
 });
 
-// Helper function to filter out handled/replied/ignored notifications
+// Helper function to filter out handled/replied/ignored notifications AND own account notifications
 async function filterHandledNotifications(notifications, userId, platform) {
   if (!notifications || notifications.length === 0) {
     return notifications;
@@ -5735,6 +5740,47 @@ async function filterHandledNotifications(notifications, userId, platform) {
   const eventPrefix = platform === 'twitter' ? 'TwitterEvents' : 
                      platform === 'facebook' ? 'FacebookEvents' :
                      'InstagramEvents';
+
+  // 🛡️ STEP 1: Get connected account IDs to filter out own notifications
+  let connectedAccountIds = new Set();
+  
+  if (platform === 'instagram') {
+    try {
+      const listTokensCommand = new ListObjectsV2Command({
+        Bucket: 'tasks',
+        Prefix: `InstagramTokens/`,
+      });
+      const { Contents: TokenContents } = await s3Client.send(listTokensCommand);
+      
+      if (TokenContents) {
+        for (const obj of TokenContents) {
+          if (obj.Key.endsWith('/token.json')) {
+            try {
+              const getCommand = new GetObjectCommand({
+                Bucket: 'tasks',
+                Key: obj.Key,
+              });
+              const data = await s3Client.send(getCommand);
+              const token = JSON.parse(await data.Body.transformToString());
+              
+              // Add all possible IDs for this connected account
+              if (token.instagram_user_id) connectedAccountIds.add(token.instagram_user_id);
+              if (token.instagram_graph_id) connectedAccountIds.add(token.instagram_graph_id);
+              if (token.user_id) connectedAccountIds.add(token.user_id);
+              if (token.id) connectedAccountIds.add(token.id);
+            } catch (tokenError) {
+              console.error(`[${new Date().toISOString()}] Error reading token ${obj.Key}:`, tokenError.message);
+            }
+          }
+        }
+      }
+      
+      console.log(`[${new Date().toISOString()}] 🛡️ Connected account IDs for filtering: [${Array.from(connectedAccountIds).join(', ')}]`);
+      
+    } catch (error) {
+      console.error(`[${new Date().toISOString()}] Error fetching connected accounts for filtering:`, error.message);
+    }
+  }
 
 
 
@@ -5785,11 +5831,42 @@ async function filterHandledNotifications(notifications, userId, platform) {
       });
     }
     
-    // Filter notifications based on status map
+    // Filter notifications based on status map AND own account filtering
     const filteredNotifications = notifications.filter(notification => {
       const notificationId = notification.message_id || notification.comment_id;
       if (!notificationId) {
         return true; // Keep notifications without IDs
+      }
+      
+      // 🛡️ ULTIMATE FRONTEND FILTER: Block notifications from connected accounts
+      if (platform === 'instagram' && connectedAccountIds.size > 0) {
+        const senderId = notification.sender_id || notification.from?.id;
+        const senderUsername = notification.username || notification.from?.username;
+        
+        // Filter out notifications where sender ID matches any connected account
+        if (senderId && connectedAccountIds.has(senderId)) {
+          console.log(`[${new Date().toISOString()}] 🚫 FRONTEND FILTER: Blocking own notification ${notificationId} from connected account ${senderId}`);
+          return false;
+        }
+        
+        // Additional check: filter by AI reply patterns in text
+        const notificationText = notification.text || notification.message || '';
+        const aiReplyPatterns = [
+          /Great comment!/i,
+          /Thanks for engaging/i,
+          /appreciate you taking the time/i,
+          /I'll share some more insights/i,
+          /Love this interaction/i,
+          /Thanks for commenting/i,
+          /🔥.*soon/i,
+          /💭.*shortly/i
+        ];
+        
+        const isAIReplyPattern = aiReplyPatterns.some(pattern => pattern.test(notificationText));
+        if (isAIReplyPattern) {
+          console.log(`[${new Date().toISOString()}] 🚫 FRONTEND FILTER: Blocking AI reply pattern ${notificationId}: "${notificationText.substring(0, 50)}..."`);
+          return false;
+        }
       }
       
       const status = statusMap.get(notificationId);
@@ -5856,8 +5933,8 @@ async function fetchInstagramNotifications(userId) {
       }))
     ];
 
-    // Filter out handled/replied/ignored notifications
-    notifications = await filterHandledNotifications(notifications, userId, 'instagram');
+    // Sort notifications by timestamp (newest first)
+    notifications.sort((a, b) => b.timestamp - a.timestamp);
 
     return notifications;
   } catch (error) {
@@ -9640,7 +9717,7 @@ class PlatformSchemaManager {
 // Twitter OAuth 2.0 credentials
 const TWITTER_CLIENT_ID = 'cVNYR3UxVm5jQ3d5UWw0UHFqUTI6MTpjaQ';
 const TWITTER_CLIENT_SECRET = 'Wr8Kewh92NVB-035hAvpQeQ1Azc7chre3PUTgDoEltjO57mxzO';
-const TWITTER_REDIRECT_URI = 'https://www.sentientm.com/twitter/callback';
+const TWITTER_REDIRECT_URI = 'https://b4bd9386ac7b.ngrok-free.app/twitter/callback';
 
 // Debug logging for OAuth 2.0
 console.log(`[${new Date().toISOString()}] Twitter OAuth 2.0 Configuration:`);

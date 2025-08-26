@@ -14,15 +14,26 @@ module.exports = defineConfig({
       '78291997257a.ngrok-free.app' // Specific ngrok host
     ],
     proxy: {
-      // Proxy posts endpoint to the main server (port 3000)
+      // Proxy posts endpoint to the PROXY server (port 3002) where extension detection works
       '/posts': {
-        target: 'http://127.0.0.1:3000',
+        target: 'http://127.0.0.1:3002',
         changeOrigin: true,
         secure: false,
         onError: (err, req, res) => {
           console.warn('[Vite Proxy] Posts endpoint error:', err.message);
           res.writeHead(503, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Service temporarily unavailable' }));
+        }
+      },
+      // Proxy health check to the proxy server to check the correct service
+      '/health': {
+        target: 'http://127.0.0.1:3002',
+        changeOrigin: true,
+        secure: false,
+        onError: (err, req, res) => {
+          console.warn('[Vite Proxy] Health check error:', err.message);
+          res.writeHead(503, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Health check service temporarily unavailable' }));
         }
       },
       // Proxy R2 image endpoints to the proxy server (port 3002)

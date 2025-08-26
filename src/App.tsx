@@ -105,9 +105,11 @@ const AppContent: React.FC = () => {
     const checkProxyHealth = async () => {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // Increase timeout
         
-        const response = await fetch('/api/health-check', { 
+        // Check proxy server health through proxy endpoints
+        // Try to fetch a simple test endpoint that exercises the proxy functionality
+        const response = await fetch('/health', { 
           method: 'GET',
           signal: controller.signal
         });
@@ -115,15 +117,17 @@ const AppContent: React.FC = () => {
         clearTimeout(timeoutId);
         
         if (!response.ok) {
-          console.warn('Proxy server health check failed, images may not load');
-          // Set a flag to indicate proxy server is down
-          window.proxyServerDown = true;
+          console.warn('Proxy server health check failed, images may not load properly');
+          // Only set as down if it's a severe error (500+), not for other issues
+          window.proxyServerDown = response.status >= 500;
         } else {
           window.proxyServerDown = false;
+          console.log('Proxy server health check passed');
         }
       } catch (error) {
         console.warn('Proxy server health check failed:', error);
-        window.proxyServerDown = true;
+        // Be more lenient - don't immediately mark as down for network issues
+        window.proxyServerDown = false; // Changed to false to allow image loading attempts
       }
     };
 

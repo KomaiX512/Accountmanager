@@ -444,10 +444,10 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
 
   // 🎯 SIMPLIFIED: Enhanced image URL generation for seamless replacement
   const getReliableImageUrl = useCallback((post: any, forceRefresh: boolean = false) => {
-    // Check if proxy server is down - if so, don't try to load images
+    // Check if proxy server is severely down - if so, try fallback approaches
     if (typeof window !== 'undefined' && window.proxyServerDown) {
-      console.log(`[PostCooked] Proxy server is down, skipping image load for ${post.key}`);
-      return '';
+      console.log(`[PostCooked] Proxy server appears down, attempting fallback for ${post.key}`);
+      // Don't return empty string - still try to load images with fallback approach
     }
 
     const postKey = post.key;
@@ -607,12 +607,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     
     // Check if proxy server is down before retrying
     if (typeof window !== 'undefined' && window.proxyServerDown) {
-      console.log(`[PostCooked] Proxy server is down, showing placeholder for ${key}`);
-      setImageErrors(prev => ({
-        ...prev,
-        [key]: { failed: true, retryCount: 3 }
-      }));
-      return;
+      console.log(`[PostCooked] Proxy server appears down, but attempting retry anyway for ${key}`);
+      // Still attempt retry - the server might recover or this might be a false positive
     }
     
     // Add small delay to prevent rapid retries

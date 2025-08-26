@@ -3375,14 +3375,16 @@ app.post([
           // 🔥 CRITICAL FIX: Additional filter to prevent account owner's own messages
           if (msg.sender && matchedToken) {
             const senderId = msg.sender.id;
-            const accountOwnerId = matchedToken.instagram_graph_id || webhookGraphId;
+            // Compare against BOTH instagram_user_id AND instagram_graph_id to catch all cases
+            const accountOwnerUserId = matchedToken.instagram_user_id;
+            const accountOwnerGraphId = matchedToken.instagram_graph_id;
             
-            if (senderId === accountOwnerId) {
-              console.log(`[${new Date().toISOString()}] ✅ Filtering out own DM: ${msg.message.mid} from account owner ${senderId}`);
+            if (senderId === accountOwnerUserId || senderId === accountOwnerGraphId || senderId === webhookGraphId) {
+              console.log(`[${new Date().toISOString()}] 🚫 FILTERING OUT OWN DM: ${msg.message.mid} from account owner ${senderId} (user_id: ${accountOwnerUserId}, graph_id: ${accountOwnerGraphId})`);
               continue; // Skip storing the account owner's own messages
             }
             
-            console.log(`[${new Date().toISOString()}] ✅ DM from external user: ${msg.message.mid} from ${senderId} (account: ${accountOwnerId})`);
+            console.log(`[${new Date().toISOString()}] ✅ DM from external user: ${msg.message.mid} from ${senderId} (user_id: ${accountOwnerUserId}, graph_id: ${accountOwnerGraphId})`);
           }
 
           // 🚀 DYNAMIC SENDER USERNAME MAPPING WITH CACHING
@@ -3573,14 +3575,16 @@ app.post([
           // Check if the comment was made by the account owner themselves
           if (change.value.from && matchedToken) {
             const commentAuthorId = change.value.from.id;
-            const accountOwnerId = matchedToken.instagram_graph_id || webhookGraphId;
+            // Compare against BOTH instagram_user_id AND instagram_graph_id to catch all cases
+            const accountOwnerUserId = matchedToken.instagram_user_id;
+            const accountOwnerGraphId = matchedToken.instagram_graph_id;
             
-            if (commentAuthorId === accountOwnerId) {
-              console.log(`[${new Date().toISOString()}] ✅ Filtering out own comment: ${change.value.id} from account owner ${commentAuthorId}`);
+            if (commentAuthorId === accountOwnerUserId || commentAuthorId === accountOwnerGraphId || commentAuthorId === webhookGraphId) {
+              console.log(`[${new Date().toISOString()}] 🚫 FILTERING OUT OWN COMMENT: ${change.value.id} from account owner ${commentAuthorId} (user_id: ${accountOwnerUserId}, graph_id: ${accountOwnerGraphId})`);
               continue; // Skip storing the account owner's own comments
             }
             
-            console.log(`[${new Date().toISOString()}] ✅ Comment from external user: ${change.value.id} from ${commentAuthorId} (account: ${accountOwnerId})`);
+            console.log(`[${new Date().toISOString()}] ✅ Comment from external user: ${change.value.id} from ${commentAuthorId} (user_id: ${accountOwnerUserId}, graph_id: ${accountOwnerGraphId})`);
           }
 
           const eventData = {

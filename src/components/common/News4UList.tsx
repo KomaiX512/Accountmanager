@@ -375,6 +375,9 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
         } else if (Array.isArray(entry.news_items)) {
           // 🚀 FIXED: Handle the actual API response structure
           rawItems.push(...entry.news_items);
+        } else if (entry.news_item && typeof entry.news_item === 'object') {
+          // 🚀 NEW: Support single-object shape
+          rawItems.push(entry.news_item);
         } else {
           // Only include if it looks like a real news item or has a direct news_data object
           const looksLikeNews = Boolean(
@@ -383,7 +386,8 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
               entry.description || entry.summary || entry.breaking_news_summary || entry.body || entry.text ||
               entry.source_url || entry.url || entry.link || entry.source ||
               entry.image_url || entry.image || entry.thumbnail || entry.picture ||
-              (entry.news_data && typeof entry.news_data === 'object')
+              (entry.news_data && typeof entry.news_data === 'object') ||
+              (entry.news_item && typeof entry.news_item === 'object')
             )
           );
           if (looksLikeNews) {
@@ -424,6 +428,8 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
           base = n.data;
         } else if (n && typeof n === 'object' && n.content) {
           base = n.content;
+        } else if (n && typeof n === 'object' && n.news_item) {
+          base = n.news_item;
         }
         
         // Extract fields with multiple fallbacks - handle the actual API structure
@@ -496,7 +502,7 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     }
   }, [effectiveAccountHolder, effectivePlatform, forceRefreshKey]);
 
-  // 🚀 OPTIMIZED: High-performance auto-refresh for 8+ hour reliability
+  // 🚀 SIMPLIFIED: Dynamic refresh system that checks for new items every 15 seconds
   useEffect(() => {
     if (!autoRefreshEnabled || !effectiveAccountHolder || !effectivePlatform) {
       // Clear existing interval if disabled
@@ -512,34 +518,30 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       clearInterval(autoRefreshIntervalRef.current);
     }
     
-    // Start auto-refresh after initial load with delay
+    // Start simple auto-refresh after initial load
     const startDelay = setTimeout(() => {
-      console.log(`[News4U] 🚀 Starting optimized auto-refresh for ${effectiveAccountHolder}`);
+      console.log(`[News4U] 🚀 Starting dynamic refresh for ${effectiveAccountHolder} on ${effectivePlatform}`);
       
       autoRefreshIntervalRef.current = setInterval(async () => {
-        // Performance throttling - minimum 2 minutes between checks
-        const timeSinceLastRefresh = Date.now() - lastAutoRefreshRef.current;
-        if (timeSinceLastRefresh < 120000) { // 2 minutes
-          return;
-        }
-        
         try {
-          console.log(`[News4U] 🔍 Checking for new items... (${new Date().toLocaleTimeString()})`);
+          console.log(`[News4U] 🔄 Auto-checking for new items... (${new Date().toLocaleTimeString()})`);
           
-          // Optimized check without triggering re-renders
-          const hasNewItems = await performOptimizedCheck();
+          // Simple approach: just refetch and compare item count/content
+          const currentItemCount = items.length;
+          const currentFirstItemId = items[0]?.id || items[0]?.title;
           
-          if (hasNewItems) {
-            console.log(`[News4U] 🆕 New items detected! Refreshing...`);
-            lastAutoRefreshRef.current = Date.now();
-            setForceRefreshKey(prev => prev + 1);
-          }
+          // Force a fresh fetch to check for new items
+          setForceRefreshKey(prev => prev + 1);
+          
+          // The fetchNews effect will handle the actual refresh
+          console.log(`[News4U] 🔄 Triggered refresh check - current items: ${currentItemCount}, first item: ${currentFirstItemId}`);
+          
         } catch (error: any) {
-          console.warn(`[News4U] ⚠️ Auto-refresh check failed:`, error?.message || 'Unknown error');
+          console.warn(`[News4U] ⚠️ Auto-refresh failed:`, error?.message || 'Unknown error');
         }
-      }, 150000); // Check every 2.5 minutes for 8+ hour reliability
+      }, 15000); // Check every 15 seconds for better responsiveness
       
-    }, 90000); // Wait 1.5 minutes after initial load
+    }, 5000); // Start 5s after initial load
     
     return () => {
       clearTimeout(startDelay);
@@ -548,7 +550,30 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
         autoRefreshIntervalRef.current = null;
       }
     };
-  }, [autoRefreshEnabled, effectiveAccountHolder, effectivePlatform]); // Removed problematic dependencies
+  }, [autoRefreshEnabled, effectiveAccountHolder, effectivePlatform, items.length])
+
+  // 🚀 ENHANCED: Refresh when tab becomes visible and add window focus refresh
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        console.log(`[News4U] 👁️ Tab visible - checking for new items`);
+        setForceRefreshKey(prev => prev + 1);
+      }
+    };
+    
+    const onFocus = () => {
+      console.log(`[News4U] 🎯 Window focused - checking for new items`);
+      setForceRefreshKey(prev => prev + 1);
+    };
+    
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', onFocus);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, []);
   
   // 🚀 ROBUST: Initial fetch and cleanup
   useEffect(() => {
@@ -582,75 +607,7 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     };
   }, []);
 
-  // 🚀 PERFORMANCE-OPTIMIZED: Ultra-efficient new item detection
-  const performOptimizedCheck = useCallback(async () => {
-    if (!effectiveAccountHolder || !effectivePlatform) return false;
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
-    
-    try {
-      // Lightweight HEAD request first to check if data exists
-      const baseUrl = `/api/news-for-you/${effectiveAccountHolder}?platform=${effectivePlatform}`;
-      const url = `${baseUrl}&forceRefresh=true&_cb=${Date.now()}`;
-      
-      const res = await axios.get(url, { 
-        signal: controller.signal,
-        timeout: 7000 // Strict timeout for reliability
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (!res.data || (Array.isArray(res.data) && res.data.length === 0)) {
-        return false;
-      }
-      
-      // Ultra-fast timestamp extraction - only check first item
-      const firstResponse = res.data[0];
-      if (!firstResponse) return false;
-      
-      const dataPayload = firstResponse.data || firstResponse;
-      if (!dataPayload) return false;
-      
-      // Get timestamp from the most likely locations
-      let newItemTimestamp = null;
-      
-      // Try direct timestamp first
-      if (dataPayload.timestamp) {
-        newItemTimestamp = dataPayload.timestamp;
-      } else if (dataPayload.news_items && Array.isArray(dataPayload.news_items) && dataPayload.news_items[0]) {
-        const firstNews = dataPayload.news_items[0];
-        newItemTimestamp = firstNews.timestamp || firstNews.fetched_at || firstNews.published_at;
-      } else if (dataPayload.fetched_at) {
-        newItemTimestamp = dataPayload.fetched_at;
-      }
-      
-      // Fast timestamp comparison without heavy processing
-      if (latestItemTimestamp && newItemTimestamp) {
-        const currentTime = new Date(latestItemTimestamp).getTime();
-        const newTime = new Date(newItemTimestamp).getTime();
-        
-        if (newTime > currentTime) {
-          console.log(`[News4U] ✅ New content detected (${newTime} > ${currentTime})`);
-          return true;
-        }
-      } else if (!latestItemTimestamp && newItemTimestamp) {
-        // First time baseline
-        return true;
-      }
-      
-      return false;
-      
-    } catch (error: any) {
-      clearTimeout(timeoutId);
-      if (error?.name === 'AbortError') {
-        console.warn(`[News4U] ⏱️ Check timeout - continuing normally`);
-      } else {
-        console.error(`[News4U] ❌ Optimized check failed:`, error?.message || 'Unknown error');
-      }
-      return false;
-    }
-  }, []); // No dependencies to prevent re-creation
+  // 🚀 REMOVED: Complex optimized check - using simple refresh approach instead
   
   // 🚀 ROBUST: Manual refresh function
   const handleManualRefresh = useCallback(() => {

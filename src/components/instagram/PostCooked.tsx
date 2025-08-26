@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ReactDOM, { createPortal } from 'react-dom';
 import './PostCooked.css';
 import { motion } from 'framer-motion';
@@ -31,7 +31,7 @@ declare global {
 interface PostCookedProps {
   username: string;
   profilePicUrl: string;
-  posts?: { key: string; data: { post: any; status: string; image_url: string; r2_image_url?: string; image_path?: string }; imageFailed?: boolean }[];
+  posts?: { key: string; data: { post: any; status: string; image_url: string; r2_image_url?: string; image_path?: string; isEdited?: boolean }; imageFailed?: boolean }[];
   userId?: string;
   platform?: 'instagram' | 'twitter' | 'facebook';
 }
@@ -470,13 +470,15 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     // 🎯 PRIORITY CHECK: Look for edited image URLs first (highest priority)
     if (post.data?.image_url && post.data.image_url.includes('edited_')) {
       console.log(`[ImageURL] 🎯 Found edited image URL in post data: ${post.data.image_url}`);
-      const timestamp = forceRefresh ? `&t=${Date.now()}` : '';
+      // 🔧 FIX 1: ALWAYS apply cache busting for edited images
+      const timestamp = `&edited=true&v=${Date.now()}&t=${imageRefreshKey.current}`;
       return post.data.image_url + timestamp;
     }
     
     if (post.data?.r2_image_url && post.data.r2_image_url.includes('edited_')) {
       console.log(`[ImageURL] 🎯 Found edited R2 image URL in post data: ${post.data.r2_image_url}`);
-      const timestamp = forceRefresh ? `&t=${Date.now()}` : '';
+      // 🔧 FIX 1: ALWAYS apply cache busting for edited images
+      const timestamp = `&edited=true&v=${Date.now()}&t=${imageRefreshKey.current}`;
       return post.data.r2_image_url + timestamp;
     }
     
@@ -484,7 +486,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     const existingImageUrl = post.data?.image_url || post.data?.r2_image_url || '';
     if (existingImageUrl.includes('/edited_')) {
       console.log(`[ImageURL] 🎯 Found edited filename in existing URL: ${existingImageUrl}`);
-      const timestamp = forceRefresh ? `&t=${Date.now()}` : '';
+      // 🔧 FIX 1: ALWAYS apply cache busting for edited images
+      const timestamp = `&edited=true&v=${Date.now()}&t=${imageRefreshKey.current}`;
       return existingImageUrl + timestamp;
     }
     
@@ -500,15 +503,21 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       const editedFilename = `edited_image_${imageId}.png`;
       const editedUrl = `${API_BASE_URL}/api/r2-image/${username}/${editedFilename}?platform=${platform}&v=${imageRefreshKey.current}&post=${encodeURIComponent(postKey)}&edited=true`;
       
-      // 🔧 CONSISTENT DISPLAY FIX: Always show edited version if post is marked as edited
+      // 🔧 FIX 2: ALWAYS check edited version first with aggressive cache busting
+      const editedUrlWithCacheBust = `${editedUrl}&nuclear=${Date.now()}&bypass=1&nocache=1`;
+      
+      // 🔧 CONSISTENT DISPLAY FIX: Always show edited version if post is marked as edited OR if edited version exists
       if (forceRefresh || 
           post.data?.isEdited === true || 
           post.data?.image_url?.includes('edited_') || 
           post.data?.r2_image_url?.includes('edited_')) {
         console.log(`[ImageURL] 🎯 Using edited version: ${editedFilename}`);
-        const timestamp = forceRefresh ? `&t=${Date.now()}` : '';
-        return editedUrl + timestamp;
+        return editedUrlWithCacheBust;
       }
+      
+      // 🔧 FIX 3: Always try edited version first, even for "original" requests
+      console.log(`[ImageURL] 🎯 Checking for edited version availability: ${editedFilename}`);
+      return editedUrlWithCacheBust;
       
       // Fallback to original image with proper extension detection
       // Try to determine extension from post data with priority order
@@ -544,15 +553,21 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         const editedFilename = `edited_campaign_ready_post_${campaignId}.png`;
         const editedUrl = `${API_BASE_URL}/api/r2-image/${username}/${editedFilename}?platform=${platform}&v=${imageRefreshKey.current}&post=${encodeURIComponent(postKey)}&edited=true`;
         
-        // 🔧 CONSISTENT DISPLAY FIX: Always show edited version if post is marked as edited
+        // 🔧 FIX 2: ALWAYS check edited version first with aggressive cache busting
+        const editedUrlWithCacheBust = `${editedUrl}&nuclear=${Date.now()}&bypass=1&nocache=1`;
+        
+        // 🔧 CONSISTENT DISPLAY FIX: Always show edited version if post is marked as edited OR if edited version exists
         if (forceRefresh || 
             post.data?.isEdited === true || 
             post.data?.image_url?.includes('edited_') || 
             post.data?.r2_image_url?.includes('edited_')) {
           console.log(`[ImageURL] 🎯 Using edited campaign version: ${editedFilename}`);
-          const timestamp = forceRefresh ? `&t=${Date.now()}` : '';
-          return editedUrl + timestamp;
+          return editedUrlWithCacheBust;
         }
+        
+        // 🔧 FIX 3: Always try edited version first, even for "original" requests
+        console.log(`[ImageURL] 🎯 Checking for edited campaign version availability: ${editedFilename}`);
+        return editedUrlWithCacheBust;
         
         // Fallback to original campaign image with proper extension detection
         // For campaign posts, extract extension from post data with smart fallbacks
@@ -636,13 +651,22 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     console.log(`[PostCooked] Image error for ${key}, retry ${currentRetries + 1}/3`);
     
     if (currentRetries >= 3) {
+      // 🔧 FIX 4: Don't give up on edited images - they should always exist
+      const post = localPosts.find(p => p.key === key);
+      if (post && (post.data?.isEdited || post.data?.image_url?.includes('edited_') || post.data?.r2_image_url?.includes('edited_'))) {
+        console.log(`[PostCooked] 🎯 Edited image failed loading, trying fallback to original`);
+        // For edited images that fail, try the original image as last resort
+        const originalUrl = getReliableImageUrl(post, true).replace(/edited_/, '');
+        imgElement.src = originalUrl;
+        return;
+      }
+      
       // Max retries reached - use placeholder
       console.error(`[PostCooked] Max retries reached for ${key}, falling back to UI placeholder`);
       setImageErrors(prev => ({
         ...prev,
         [key]: { failed: true, retryCount: currentRetries + 1 }
       }));
-      // Stop attempting to set a network placeholder; allow React to render placeholder component
       return;
     }
     
@@ -655,7 +679,6 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     // Get the post and generate a fresh URL
     const post = localPosts.find(p => p.key === key);
     if (!post) {
-      // No post found; allow UI placeholder component to render
       setImageErrors(prev => ({
         ...prev,
         [key]: { failed: true, retryCount: currentRetries + 1 }

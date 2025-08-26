@@ -48,6 +48,8 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [lastFetchTime, setLastFetchTime] = useState<number>(0);
   const [forceRefreshKey, setForceRefreshKey] = useState(0);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const autoRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Portal root for dropdown menu
   const menuAnchorRef = useRef<HTMLElement | null>(null);
@@ -387,6 +389,79 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     }
   }, [effectiveAccountHolder, effectivePlatform, forceRefreshKey]);
 
+  // 🚀 SIMPLIFIED: Dynamic refresh system that checks for new items every 15 seconds
+  useEffect(() => {
+    if (!autoRefreshEnabled || !effectiveAccountHolder || !effectivePlatform) {
+      // Clear existing interval if disabled
+      if (autoRefreshIntervalRef.current) {
+        clearInterval(autoRefreshIntervalRef.current);
+        autoRefreshIntervalRef.current = null;
+      }
+      return;
+    }
+    
+    // Clear any existing interval before creating new one
+    if (autoRefreshIntervalRef.current) {
+      clearInterval(autoRefreshIntervalRef.current);
+    }
+    
+    // Start simple auto-refresh after initial load
+    const startDelay = setTimeout(() => {
+      console.log(`[News4U-Slider] 🚀 Starting dynamic refresh for ${effectiveAccountHolder} on ${effectivePlatform}`);
+      
+      autoRefreshIntervalRef.current = setInterval(async () => {
+        try {
+          console.log(`[News4U-Slider] 🔄 Auto-checking for new items... (${new Date().toLocaleTimeString()})`);
+          
+          // Simple approach: just refetch and compare item count/content
+          const currentItemCount = items.length;
+          const currentFirstItemId = items[0]?.id || items[0]?.title;
+          
+          // Force a fresh fetch to check for new items
+          setForceRefreshKey(prev => prev + 1);
+          
+          // The fetchNews effect will handle the actual refresh
+          console.log(`[News4U-Slider] 🔄 Triggered refresh check - current items: ${currentItemCount}, first item: ${currentFirstItemId}`);
+          
+        } catch (error: any) {
+          console.warn(`[News4U-Slider] ⚠️ Auto-refresh failed:`, error?.message || 'Unknown error');
+        }
+      }, 15000); // Check every 15 seconds for better responsiveness
+      
+    }, 5000); // Start 5s after initial load
+    
+    return () => {
+      clearTimeout(startDelay);
+      if (autoRefreshIntervalRef.current) {
+        clearInterval(autoRefreshIntervalRef.current);
+        autoRefreshIntervalRef.current = null;
+      }
+    };
+  }, [autoRefreshEnabled, effectiveAccountHolder, effectivePlatform, items.length]);
+
+  // 🚀 ENHANCED: Refresh when tab becomes visible and add window focus refresh
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        console.log(`[News4U-Slider] 👁️ Tab visible - checking for new items`);
+        setForceRefreshKey(prev => prev + 1);
+      }
+    };
+    
+    const onFocus = () => {
+      console.log(`[News4U-Slider] 🎯 Window focused - checking for new items`);
+      setForceRefreshKey(prev => prev + 1);
+    };
+    
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', onFocus);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, []);
+
   // 🚀 ROBUST: Initial fetch and cleanup
   useEffect(() => {
     setItems([]);
@@ -395,6 +470,10 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
     return () => {
       if (fetchTimeoutRef.current) {
         clearTimeout(fetchTimeoutRef.current);
+      }
+      if (autoRefreshIntervalRef.current) {
+        clearInterval(autoRefreshIntervalRef.current);
+        autoRefreshIntervalRef.current = null;
       }
     };
   }, [fetchNews, effectiveAccountHolder, effectivePlatform]);

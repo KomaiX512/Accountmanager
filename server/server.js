@@ -3571,20 +3571,128 @@ app.post([
             continue;
           }
 
-          // 🔥 CRITICAL FIX: Filter out comments made by the account owner
-          // Check if the comment was made by the account owner themselves
+          // �️ ULTIMATE ANTI-LOOP FILTER - STRONGEST POSSIBLE PROTECTION
+          // This filter prevents ANY possibility of replying to own comments/replies
           if (change.value.from && matchedToken) {
             const commentAuthorId = change.value.from.id;
-            // Compare against BOTH instagram_user_id AND instagram_graph_id to catch all cases
+            const commentText = change.value.text;
             const accountOwnerUserId = matchedToken.instagram_user_id;
             const accountOwnerGraphId = matchedToken.instagram_graph_id;
+            const accountUsername = matchedToken.username;
             
-            if (commentAuthorId === accountOwnerUserId || commentAuthorId === accountOwnerGraphId || commentAuthorId === webhookGraphId) {
-              console.log(`[${new Date().toISOString()}] 🚫 FILTERING OUT OWN COMMENT: ${change.value.id} from account owner ${commentAuthorId} (user_id: ${accountOwnerUserId}, graph_id: ${accountOwnerGraphId})`);
-              continue; // Skip storing the account owner's own comments
+            // 🚫 LAYER 1: Direct ID Matching - Check ALL possible ID comparisons
+            if (commentAuthorId === accountOwnerUserId || 
+                commentAuthorId === accountOwnerGraphId || 
+                commentAuthorId === webhookGraphId) {
+              console.log(`[${new Date().toISOString()}] 🚫 LAYER 1 BLOCK: Own comment by ID match - ${change.value.id} from ${commentAuthorId} (account: ${accountOwnerUserId}/${accountOwnerGraphId})`);
+              continue;
             }
             
-            console.log(`[${new Date().toISOString()}] ✅ Comment from external user: ${change.value.id} from ${commentAuthorId} (user_id: ${accountOwnerUserId}, graph_id: ${accountOwnerGraphId})`);
+            // 🚫 LAYER 2: Username Matching - Block if sender username matches account username
+            const commentAuthorUsername = change.value.from?.username;
+            if (commentAuthorUsername && accountUsername && commentAuthorUsername === accountUsername) {
+              console.log(`[${new Date().toISOString()}] 🚫 LAYER 2 BLOCK: Own comment by username match - ${change.value.id} from @${commentAuthorUsername}`);
+              continue;
+            }
+            
+            // 🚫 LAYER 3: AI-Generated Reply Detection - Block text that looks like AI replies
+            const aiReplyPatterns = [
+              /Great comment!/i,
+              /Thanks for engaging/i,
+              /appreciate you taking the time/i,
+              /I'll share some more insights/i,
+              /I'll respond with more detailed thoughts/i,
+              /Love this interaction/i,
+              /Thanks for commenting/i,
+              /I'll get back with/i,
+              /more detailed response/i,
+              /🔥.*soon/i,
+              /💭.*shortly/i,
+              /Thanks for.*engage/i,
+              /appreciate.*engage/i
+            ];
+            
+            const isAIReplyPattern = aiReplyPatterns.some(pattern => pattern.test(commentText));
+            if (isAIReplyPattern) {
+              console.log(`[${new Date().toISOString()}] 🚫 LAYER 3 BLOCK: AI-generated reply pattern detected - ${change.value.id}: "${commentText.substring(0, 50)}..."`);
+              continue;
+            }
+            
+            // 🚫 LAYER 4: R2 Bucket Cross-Reference - Check if this user has any tokens stored
+            try {
+              const listCommand = new ListObjectsV2Command({
+                Bucket: 'tasks',
+                Prefix: `InstagramTokens/`,
+              });
+              const { Contents } = await s3Client.send(listCommand);
+              
+              let isConnectedAccount = false;
+              if (Contents) {
+                for (const obj of Contents) {
+                  if (obj.Key.endsWith('/token.json')) {
+                    const getCommand = new GetObjectCommand({
+                      Bucket: 'tasks',
+                      Key: obj.Key,
+                    });
+                    const data = await s3Client.send(getCommand);
+                    const json = await data.Body.transformToString();
+                    const token = JSON.parse(json);
+                    
+                    // Check if comment author matches ANY connected account
+                    if (token.instagram_user_id === commentAuthorId || 
+                        token.instagram_graph_id === commentAuthorId ||
+                        token.username === commentAuthorUsername) {
+                      isConnectedAccount = true;
+                      console.log(`[${new Date().toISOString()}] 🚫 LAYER 4 BLOCK: Comment from connected account - ${change.value.id} from ${commentAuthorId} (connected as @${token.username})`);
+                      break;
+                    }
+                  }
+                }
+              }
+              
+              if (isConnectedAccount) {
+                continue; // Skip processing this comment
+              }
+              
+            } catch (error) {
+              console.error(`[${new Date().toISOString()}] ⚠️ Error in Layer 4 filter:`, error.message);
+              // Continue with other layers if R2 check fails
+            }
+            
+            // 🚫 LAYER 5: Recent Reply Check - Don't reply to comments on posts we recently replied to
+            try {
+              const recentRepliesKey = `InstagramEvents/${accountOwnerUserId}/recent_replies.json`;
+              const getCommand = new GetObjectCommand({
+                Bucket: 'tasks',
+                Key: recentRepliesKey,
+              });
+              
+              try {
+                const data = await s3Client.send(getCommand);
+                const recentReplies = JSON.parse(await data.Body.transformToString());
+                const postId = change.value.media.id;
+                
+                // Check if we replied to this post in the last 10 minutes
+                const recentReplyToPost = recentReplies.find(reply => 
+                  reply.post_id === postId && 
+                  (Date.now() - reply.timestamp) < 600000 // 10 minutes
+                );
+                
+                if (recentReplyToPost) {
+                  console.log(`[${new Date().toISOString()}] 🚫 LAYER 5 BLOCK: Recently replied to this post - ${change.value.id} on post ${postId}`);
+                  continue;
+                }
+              } catch (recentRepliesError) {
+                // If no recent replies file exists, that's fine - first time replying
+                if (recentRepliesError.name !== 'NoSuchKey' && recentRepliesError.name !== 'NotFound') {
+                  console.error(`[${new Date().toISOString()}] ⚠️ Error checking recent replies:`, recentRepliesError.message);
+                }
+              }
+            } catch (error) {
+              console.error(`[${new Date().toISOString()}] ⚠️ Error in Layer 5 filter:`, error.message);
+            }
+            
+            console.log(`[${new Date().toISOString()}] ✅ PASSED ALL FILTERS: Comment from external user - ${change.value.id} from ${commentAuthorId} (@${commentAuthorUsername})`);
           }
 
           const eventData = {
@@ -3626,6 +3734,45 @@ app.post([
               console.error(`[${new Date().toISOString()}] Error checking for duplicate comment:`, error.message);
             }
             // If NotFound, comment doesn't exist, so we can proceed
+          }
+          
+          // 🛡️ LAYER 6: GLOBAL ANTI-SPAM COOLDOWN - Prevent rapid comment processing
+          const globalCooldownKey = `InstagramEvents/${storeUserId}/last_comment_processed.json`;
+          try {
+            const getLastCommand = new GetObjectCommand({
+              Bucket: 'tasks',
+              Key: globalCooldownKey,
+            });
+            const lastProcessedData = await s3Client.send(getLastCommand);
+            const lastProcessed = JSON.parse(await lastProcessedData.Body.transformToString());
+            
+            // Don't process comments faster than every 30 seconds from same account
+            const timeSinceLastComment = Date.now() - lastProcessed.timestamp;
+            if (timeSinceLastComment < 30000) { // 30 seconds
+              console.log(`[${new Date().toISOString()}] 🚫 LAYER 6 BLOCK: Global cooldown active - ${change.value.id} (last comment ${timeSinceLastComment}ms ago)`);
+              continue;
+            }
+          } catch (cooldownError) {
+            // No previous comment recorded, proceed
+            if (cooldownError.name !== 'NoSuchKey' && cooldownError.name !== 'NotFound') {
+              console.error(`[${new Date().toISOString()}] ⚠️ Error checking global cooldown:`, cooldownError.message);
+            }
+          }
+          
+          // Update last comment processed timestamp
+          try {
+            await s3Client.send(new PutObjectCommand({
+              Bucket: 'tasks',
+              Key: globalCooldownKey,
+              Body: JSON.stringify({
+                comment_id: change.value.id,
+                timestamp: Date.now(),
+                updated_at: new Date().toISOString()
+              }, null, 2),
+              ContentType: 'application/json',
+            }));
+          } catch (updateError) {
+            console.error(`[${new Date().toISOString()}] ⚠️ Error updating global cooldown:`, updateError.message);
           }
           
           console.log(`[${new Date().toISOString()}] Storing comment event with USER ID: ${storeUserId}`);
@@ -5218,6 +5365,60 @@ app.post(['/send-comment-reply/:userId', '/api/send-comment-reply/:userId'], asy
     });
 
     console.log(`[${new Date().toISOString()}] Comment reply sent for comment_id ${comment_id}`);
+
+    // 🛡️ TRACK RECENT REPLY - Prevent multiple replies to same post
+    try {
+      // Get the original comment to extract post_id
+      const commentKey = `InstagramEvents/${userId}/comment_${comment_id}.json`;
+      const getCommentCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: commentKey,
+      });
+      const commentData = await s3Client.send(getCommentCommand);
+      const comment = JSON.parse(await commentData.Body.transformToString());
+      const postId = comment.post_id;
+      
+      // Update recent replies tracking
+      const recentRepliesKey = `InstagramEvents/${userId}/recent_replies.json`;
+      let recentReplies = [];
+      
+      try {
+        const getRecentCommand = new GetObjectCommand({
+          Bucket: 'tasks',
+          Key: recentRepliesKey,
+        });
+        const recentData = await s3Client.send(getRecentCommand);
+        recentReplies = JSON.parse(await recentData.Body.transformToString());
+      } catch (error) {
+        // File doesn't exist yet, start with empty array
+        recentReplies = [];
+      }
+      
+      // Add this reply to recent replies
+      recentReplies.push({
+        comment_id,
+        post_id: postId,
+        timestamp: Date.now(),
+        reply_id: response.data.id
+      });
+      
+      // Keep only replies from last hour
+      const oneHourAgo = Date.now() - (60 * 60 * 1000);
+      recentReplies = recentReplies.filter(reply => reply.timestamp > oneHourAgo);
+      
+      // Store updated recent replies
+      await s3Client.send(new PutObjectCommand({
+        Bucket: 'tasks',
+        Key: recentRepliesKey,
+        Body: JSON.stringify(recentReplies, null, 2),
+        ContentType: 'application/json',
+      }));
+      
+      console.log(`[${new Date().toISOString()}] 📝 Tracked recent reply: post ${postId}, total recent replies: ${recentReplies.length}`);
+      
+    } catch (trackingError) {
+      console.error(`[${new Date().toISOString()}] ⚠️ Error tracking recent reply:`, trackingError.message);
+    }
 
     // Update original comment status
     const commentKey = `InstagramEvents/${userId}/comment_${comment_id}.json`;

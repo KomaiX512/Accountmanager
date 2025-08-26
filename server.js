@@ -262,6 +262,10 @@ const s3Client = {
         return await getS3Client().send(command);
       }
     };
+  },
+  // Add direct send method for AWS SDK v3 compatibility
+  send(command) {
+    return getS3Client().send(command);
   }
 };
 
@@ -2217,7 +2221,7 @@ async function handlePostsEndpoint(req, res) {
                     Bucket: 'tasks',
                     Key: potentialKey
                   });
-                  const headResult = await s3Client.send(headCommand);
+                  const headResult = await getS3Client().send(headCommand);
                   imageKey = `image_${fileId}.${ext}`;
                   if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [API-POSTS] ✅ FOUND image with extension .${ext}: ${imageKey} (Size: ${headResult.ContentLength})`);
                   break;
@@ -2256,7 +2260,7 @@ async function handlePostsEndpoint(req, res) {
                     Bucket: 'tasks',
                     Key: potentialKey
                   });
-                  const headResult = await s3Client.send(headCommand);
+                  const headResult = await getS3Client().send(headCommand);
                   imageKey = `campaign_ready_post_${campaignId}.${ext}`;
                   console.log(`[${new Date().toISOString()}] [API-POSTS] ✅ FOUND campaign image with extension .${ext}: ${imageKey} (Size: ${headResult.ContentLength})`);
                   break;

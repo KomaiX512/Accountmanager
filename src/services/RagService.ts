@@ -141,7 +141,7 @@ class RagService {
   ];
   
   private static readonly AI_REPLIES_URLS = [
-    '',  // Use relative URLs to go through vite proxy
+    '/ai-replies',  // Use correct AI replies endpoint
   ];
   
   // Request deduplication to prevent multiple identical requests
@@ -432,22 +432,43 @@ class RagService {
       console.log(`[RagService] Post generation completed successfully`);
       }
       
-      // ✅ INCREMENT USAGE: Only count when image generator API is actually called
+      // ✅ INCREMENT USAGE: Always log attempt and debug what's happening
+      console.log(`[RagService] 🔍 USAGE TRACKING START - Attempting to increment usage for ${platform}/${username}`);
+      
       try {
-        const usageResponse = await fetch(`/api/usage/increment/${platform}/${username}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ feature: 'posts', count: 1 })
-        });
+        // Get current Firebase user ID from localStorage (set by AuthContext)
+        const currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
+        const userId = currentUser?.uid;
         
-        if (usageResponse.ok) {
-          console.log(`[RagService] ✅ Usage incremented for ${platform}/${username} - post generation`);
+        console.log(`[RagService] 🔍 USAGE DEBUG - currentUser from localStorage:`, currentUser);
+        console.log(`[RagService] 🔍 USAGE DEBUG - extracted userId:`, userId);
+        
+        if (userId) {
+          console.log(`[RagService] 🔍 USAGE DEBUG - Making fetch call to /api/usage/increment/${userId}`);
+          
+          const usageResponse = await fetch(`/api/usage/increment/${userId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ feature: 'posts', count: 1 })
+          });
+          
+          console.log(`[RagService] 🔍 USAGE DEBUG - Response status:`, usageResponse.status);
+          
+          if (usageResponse.ok) {
+            console.log(`[RagService] ✅ Usage incremented for userId ${userId} (${platform}/${username}) - post generation`);
+          } else {
+            const errorText = await usageResponse.text();
+            console.warn(`[RagService] ⚠️ Failed to increment usage:`, errorText);
+          }
         } else {
-          console.warn(`[RagService] ⚠️ Failed to increment usage:`, await usageResponse.text());
+          console.warn(`[RagService] ⚠️ No Firebase userId found, skipping usage tracking`);
         }
       } catch (usageError) {
-        console.warn(`[RagService] ⚠️ Usage tracking failed:`, usageError);
+        console.error(`[RagService] ❌ Usage tracking failed with error:`, usageError);
       }
+      
+      console.log(`[RagService] 🔍 USAGE TRACKING END - Completed usage tracking attempt`);
+      
       
       // Format the response for easier use by the UI
       const postData: PostData = {

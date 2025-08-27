@@ -379,12 +379,13 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
         }
         console.log(`[${new Date().toISOString()}] Set igBusinessId from profile: ${userId}`);
       } else if (!userId) {
-        console.error(`[${new Date().toISOString()}] No userId found in profile info`);
+        console.warn(`[${new Date().toISOString()}] No userId found in profile info for ${accountHolder}. Response:`, response.data);
         if (attempt < maxAttempts) {
           console.log(`[${new Date().toISOString()}] Retrying fetchIgBusinessId, attempt ${attempt + 1}/${maxAttempts}`);
           setTimeout(() => fetchIgBusinessId(attempt + 1, maxAttempts), 2000);
         } else {
           // Failed to initialize Instagram account after retries
+          console.warn(`[${new Date().toISOString()}] Failed to get userId after ${maxAttempts} attempts for ${accountHolder}`);
         }
       }
     } catch (err) {
@@ -1752,35 +1753,28 @@ Image Description: ${response.post.image_prompt}
         const response = await fetch(`/autopilot-settings/${accountHolder}?platform=instagram`);
         
         if (response.ok) {
-          const autopilotSettings = await response.json();
+          const responseText = await response.text();
           
-          if (autopilotSettings && autopilotSettings.enabled) {
-            console.log(`[AutopilotService] ✅ Autopilot enabled for ${accountHolder}:`, autopilotSettings);
+          try {
+            const autopilotSettings = responseText ? JSON.parse(responseText) : null;
             
-            // 🚀 Update UI state for autopilot status
-            setAutopilotStatus({
-              enabled: true,
-              autoSchedule: autopilotSettings.autoSchedule || false,
-              autoReply: autopilotSettings.autoReply || false,
-              scheduledCount: 0, // Will be updated by event listeners
-              repliedCount: 0    // Will be updated by event listeners
-            });
-            
-            // Start auto-schedule interval if enabled and not already running
-            if (autopilotSettings.autoSchedule && !autoScheduleInterval) {
-              console.log(`[AutopilotService] 🚀 Starting auto-schedule interval (${autopilotSettings.autoScheduleInterval || 60} minutes)`);
+            if (autopilotSettings && autopilotSettings.enabled) {
+              console.log(`[AutopilotService] ✅ Autopilot enabled for ${accountHolder}:`, autopilotSettings);
               
-              // Trigger immediately first
-              window.dispatchEvent(new CustomEvent('triggerAutoSchedule', {
-                detail: { 
-                  username: accountHolder, 
-                  platform: 'instagram',
-                  interval: autopilotSettings.autoScheduleInterval || 60
-                }
-              }));
+              // 🚀 Update UI state for autopilot status
+              setAutopilotStatus({
+                enabled: true,
+                autoSchedule: autopilotSettings.autoSchedule || false,
+                autoReply: autopilotSettings.autoReply || false,
+                scheduledCount: 0, // Will be updated by event listeners
+                repliedCount: 0    // Will be updated by event listeners
+              });
               
-              // Set up interval
-              autoScheduleInterval = setInterval(() => {
+              // Start auto-schedule interval if enabled and not already running
+              if (autopilotSettings.autoSchedule && !autoScheduleInterval) {
+                console.log(`[AutopilotService] 🚀 Starting auto-schedule interval (${autopilotSettings.autoScheduleInterval || 60} minutes)`);
+                
+                // Trigger immediately first
                 window.dispatchEvent(new CustomEvent('triggerAutoSchedule', {
                   detail: { 
                     username: accountHolder, 
@@ -1788,35 +1782,66 @@ Image Description: ${response.post.image_prompt}
                     interval: autopilotSettings.autoScheduleInterval || 60
                   }
                 }));
-              }, (autopilotSettings.autoScheduleInterval || 60) * 60000);
-            }
-            
-            // Start auto-reply interval if enabled and not already running
-            if (autopilotSettings.autoReply && !autoReplyInterval) {
-              console.log(`[AutopilotService] 💬 Starting auto-reply interval (30 seconds)`);
+                
+                // Set up interval
+                autoScheduleInterval = setInterval(() => {
+                  window.dispatchEvent(new CustomEvent('triggerAutoSchedule', {
+                    detail: { 
+                      username: accountHolder, 
+                      platform: 'instagram',
+                      interval: autopilotSettings.autoScheduleInterval || 60
+                    }
+                  }));
+                }, (autopilotSettings.autoScheduleInterval || 60) * 60000);
+              }
               
-              // Trigger immediately first
-              window.dispatchEvent(new CustomEvent('triggerAutoReply', {
-                detail: { 
-                  username: accountHolder, 
-                  platform: 'instagram'
-                }
-              }));
-              
-              // Set up 30-second interval
-              autoReplyInterval = setInterval(() => {
+              // Start auto-reply interval if enabled and not already running
+              if (autopilotSettings.autoReply && !autoReplyInterval) {
+                console.log(`[AutopilotService] 💬 Starting auto-reply interval (30 seconds)`);
+                
+                // Trigger immediately first
                 window.dispatchEvent(new CustomEvent('triggerAutoReply', {
                   detail: { 
                     username: accountHolder, 
                     platform: 'instagram'
                   }
                 }));
-              }, 30000); // 30 seconds
+                
+                // Set up 30-second interval
+                autoReplyInterval = setInterval(() => {
+                  window.dispatchEvent(new CustomEvent('triggerAutoReply', {
+                    detail: { 
+                      username: accountHolder, 
+                      platform: 'instagram'
+                    }
+                  }));
+                }, 30000); // 30 seconds
+              }
+            } else {
+              console.log(`[AutopilotService] 🔒 Autopilot disabled for ${accountHolder}`);
+              
+              // 🚀 Update UI state to show autopilot is disabled
+              setAutopilotStatus({
+                enabled: false,
+                autoSchedule: false,
+                autoReply: false,
+                scheduledCount: 0,
+                repliedCount: 0
+              });
+              
+              // Clear intervals if autopilot is disabled
+              if (autoScheduleInterval) {
+                clearInterval(autoScheduleInterval);
+                autoScheduleInterval = null;
+              }
+              if (autoReplyInterval) {
+                clearInterval(autoReplyInterval);
+                autoReplyInterval = null;
+              }
             }
-          } else {
-            console.log(`[AutopilotService] 🔒 Autopilot disabled for ${accountHolder}`);
-            
-            // 🚀 Update UI state to show autopilot is disabled
+          } catch (jsonError) {
+            console.warn(`[AutopilotService] ⚠️ Invalid JSON response for autopilot settings:`, responseText);
+            // Treat as no settings found
             setAutopilotStatus({
               enabled: false,
               autoSchedule: false,
@@ -1824,16 +1849,6 @@ Image Description: ${response.post.image_prompt}
               scheduledCount: 0,
               repliedCount: 0
             });
-            
-            // Clear intervals if autopilot is disabled
-            if (autoScheduleInterval) {
-              clearInterval(autoScheduleInterval);
-              autoScheduleInterval = null;
-            }
-            if (autoReplyInterval) {
-              clearInterval(autoReplyInterval);
-              autoReplyInterval = null;
-            }
           }
         } else if (response.status === 404) {
           console.log(`[AutopilotService] 📝 No autopilot settings found for ${accountHolder} - autopilot disabled`);

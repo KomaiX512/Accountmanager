@@ -85,79 +85,72 @@
   gap: 32px;
 }
 
-/* Chart Bars - Modern Minimalist */
-.chart-bars {
+/* Horizontal Chart Bars - Right to Left Layout */
+.horizontal-chart-bars {
   display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  height: 180px;
-  padding: 20px;
-  gap: 32px;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px;
   background: rgba(255, 255, 255, 0.02);
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.05);
-  position: relative;
 }
 
-.chart-bar-container {
+.horizontal-bar-container {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  flex: 1;
-  max-width: 80px;
-  min-width: 60px;
+  gap: 16px;
+  min-height: 40px;
 }
 
-.chart-bar-wrapper {
-  height: 120px;
-  width: 100%;
+.platform-label {
   display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  position: relative;
-  margin-bottom: 16px;
+  align-items: center;
+  gap: 12px;
+  min-width: 120px;
+  flex-shrink: 0;
 }
 
-.chart-bar {
-  width: 32px;
-  min-height: 8px;
-  border-radius: 4px;
+.horizontal-bar-track {
+  flex: 1;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.horizontal-bar {
+  height: 100%;
+  min-width: 8px;
+  border-radius: 16px;
   position: relative;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
-  overflow: visible;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 12px;
 }
 
-.chart-bar:hover {
-  transform: translateY(-2px);
-  filter: brightness(1.1);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+.horizontal-bar:hover {
+  filter: brightness(1.15);
+  transform: scaleY(1.1);
 }
 
 .bar-value {
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%) translateY(-8px);
   display: flex;
-  flex-direction: column;
   align-items: center;
+  gap: 8px;
   color: white;
   font-weight: 600;
-  z-index: 10;
-  background: rgba(0, 0, 0, 0.9);
-  padding: 6px 8px;
-  border-radius: 6px;
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  white-space: nowrap;
+  font-size: 0.8rem;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
   opacity: 0;
   transition: opacity 0.3s ease;
-  font-size: 0.75rem;
 }
 
-.chart-bar:hover .bar-value {
+.horizontal-bar:hover .bar-value {
   opacity: 1;
 }
 
@@ -172,20 +165,10 @@
   opacity: 0.8;
 }
 
-.chart-label {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  text-align: center;
-}
-
 .platform-icon {
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
 }
 
 .platform-icon img {
@@ -196,14 +179,14 @@
   transition: filter 0.3s ease;
 }
 
-.chart-bar-container:hover .platform-icon img {
+.horizontal-bar-container:hover .platform-icon img {
   filter: brightness(1.1);
 }
 
 .platform-name {
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(255, 255, 255, 0.9);
   white-space: nowrap;
 }
 
@@ -325,49 +308,29 @@
     margin: 12px 0;
   }
 
-  .chart-header {
-    flex-direction: column;
-    align-items: flex-start;
+  .horizontal-chart-bars {
+    padding: 16px;
+    gap: 16px;
+  }
+
+  .horizontal-bar-container {
     gap: 12px;
+    min-height: 36px;
   }
 
-  .chart-info {
-    align-items: flex-start;
+  .platform-label {
+    min-width: 100px;
+    gap: 8px;
   }
 
-  .chart-bars {
-    height: 150px;
-    gap: 24px;
-    padding: 16px;
+  .horizontal-bar-track {
+    height: 28px;
   }
 
-  .chart-bar-wrapper {
-    height: 100px;
+  .platform-name {
+    font-size: 0.8rem;
   }
 
-  .chart-bar {
-    width: 28px;
-  }
-
-  .chart-footer {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .chart-bars {
-    gap: 20px;
-    padding: 16px;
-  }
-  
-  .chart-bar-container {
-    max-width: 60px;
-    min-width: 50px;
-  }
-  
-  .chart-bar {
-    width: 28px;
-  }
-  
   .legend-stats {
     flex-direction: column;
     gap: 16px;
@@ -385,51 +348,36 @@
     font-size: 1.2rem;
   }
 
-  .chart-bars {
-    height: 130px;
-    gap: 16px;
+  .platform-usage-chart {
+    padding: 16px;
   }
 
-  .chart-bar-wrapper {
-    height: 80px;
+  .horizontal-chart-bars {
+    gap: 12px;
+    padding: 12px;
   }
 
-  .chart-bar {
-    width: 24px;
+  .horizontal-bar-container {
+    gap: 8px;
+    min-height: 32px;
+  }
+
+  .platform-label {
+    min-width: 80px;
+    gap: 6px;
+  }
+
+  .horizontal-bar-track {
+    height: 24px;
   }
 
   .platform-name {
     font-size: 0.75rem;
   }
 
-  .legend-items {
-    gap: 8px;
-  }
-
-  .platform-usage-chart {
-    padding: 16px;
-  }
-  
-  .chart-bars {
-    gap: 16px;
-    padding: 12px;
-  }
-  
-  .chart-bar-container {
-    max-width: 50px;
-    min-width: 40px;
-  }
-  
-  .chart-bar {
-    width: 24px;
-  }
-  
-  .chart-label {
-    gap: 6px;
-  }
-  
-  .platform-name {
-    font-size: 0.7rem;
+  .platform-icon {
+    width: 16px;
+    height: 16px;
   }
 }
 

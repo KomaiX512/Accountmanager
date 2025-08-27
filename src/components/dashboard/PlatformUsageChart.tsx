@@ -77,7 +77,7 @@ const PlatformUsageChart: React.FC<PlatformUsageChartProps> = ({ className }) =>
     );
   }
 
-  // ✅ DYNAMIC CHART RENDERING: Render chart based on real data
+  // ✅ HORIZONTAL CHART RENDERING: Right-to-left horizontal bars
   const maxUsage = Math.max(...platformUsage.map(p => p.count), 1);
 
   return (
@@ -90,29 +90,13 @@ const PlatformUsageChart: React.FC<PlatformUsageChartProps> = ({ className }) =>
       </div>
 
       <div className="chart-content">
-        <div className="chart-bars">
+        <div className="horizontal-chart-bars">
           {platformUsage.map((platformData) => {
-            const heightPercentage = Math.max((platformData.count / maxUsage) * 100, 8);
+            const widthPercentage = Math.max((platformData.count / maxUsage) * 100, 8);
 
             return (
-              <div key={platformData.platform} className="chart-bar-container">
-                <div className="chart-bar-wrapper">
-                  <div 
-                    className={`chart-bar ${platformData.platform}`}
-                    style={{ 
-                      height: `${heightPercentage}%`,
-                      backgroundColor: platformData.color,
-                      boxShadow: `0 0 20px ${platformData.color}40`
-                    }}
-                    title={`${platformData.displayName}: ${platformData.count} API calls (${platformData.percentage}%)`}
-                  >
-                    <div className="bar-value">
-                      <span className="usage-count">{platformData.count}</span>
-                      <span className="usage-percentage">{platformData.percentage}%</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="chart-label">
+              <div key={platformData.platform} className="horizontal-bar-container">
+                <div className="platform-label">
                   <img 
                     src={platformData.icon} 
                     alt={`${platformData.displayName} icon`}
@@ -125,26 +109,25 @@ const PlatformUsageChart: React.FC<PlatformUsageChartProps> = ({ className }) =>
                   />
                   <span className="platform-name">{platformData.displayName}</span>
                 </div>
+                <div className="horizontal-bar-track">
+                  <div 
+                    className={`horizontal-bar ${platformData.platform}`}
+                    style={{ 
+                      width: `${widthPercentage}%`,
+                      backgroundColor: platformData.color,
+                      boxShadow: `0 0 15px ${platformData.color}30`
+                    }}
+                    title={`${platformData.displayName}: ${platformData.count} API calls (${platformData.percentage}%)`}
+                  >
+                    <div className="bar-value">
+                      <span className="usage-count">{platformData.count}</span>
+                      <span className="usage-percentage">{platformData.percentage}%</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             );
           })}
-        </div>
-
-        {/* ✅ ENHANCED LEGEND: Show total API calls and platform count */}
-        <div className="chart-legend">
-          <div className="legend-stats">
-            <div className="stat-item">
-              <span className="stat-label">Total API Calls:</span>
-              <span className="stat-value">{getTotalApiCalls()}</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-label">Active Platforms:</span>
-              <span className="stat-value">{platformUsage.length}</span>
-            </div>
-          </div>
-          <div className="legend-note">
-            <p>💡 Usage is distributed across acquired platforms based on feature activity</p>
-          </div>
         </div>
       </div>
     </div>

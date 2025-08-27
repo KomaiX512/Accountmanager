@@ -2366,7 +2366,7 @@ const MainDashboard: React.FC = () => {
 
   // Calculate total API calls for the usage section
   const getTotalApiCalls = () => {
-    return usage.posts + usage.aiReplies + usage.discussions;
+    return usage.posts + usage.aiReplies + usage.discussions + usage.campaigns;
   };
 
 

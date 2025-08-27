@@ -46,23 +46,23 @@ declare global {
 // Main App component with AuthProvider
 const App: React.FC = () => {
   return (
-    <ErrorBoundary>
-      <AuthProvider>
-        <ProcessingProvider>
-          <UsageProvider>
-            <UpgradePopupProvider>
-              <InstagramProvider>
-                <TwitterProvider>
-                  <FacebookProvider>
+    <AuthProvider>
+      <ProcessingProvider>
+        <UsageProvider>
+          <UpgradePopupProvider>
+            <InstagramProvider>
+              <TwitterProvider>
+                <FacebookProvider>
+                  <ErrorBoundary>
                     <AppContent />
-                  </FacebookProvider>
-                </TwitterProvider>
-              </InstagramProvider>
-            </UpgradePopupProvider>
-          </UsageProvider>
-        </ProcessingProvider>
-      </AuthProvider>
-    </ErrorBoundary>
+                  </ErrorBoundary>
+                </FacebookProvider>
+              </TwitterProvider>
+            </InstagramProvider>
+          </UpgradePopupProvider>
+        </UsageProvider>
+      </ProcessingProvider>
+    </AuthProvider>
   );
 };
 

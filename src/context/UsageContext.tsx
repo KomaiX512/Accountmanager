@@ -277,11 +277,14 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
 
     try {
       console.log(`[UsageContext] 🚀 INCREMENT STARTED: ${feature} usage by ${count} for userId: ${currentUser.uid}`);
+      console.log(`[UsageContext] 📊 Current platform/username: ${currentPlatform}/${currentUsername}`);
       console.log(`[UsageContext] 📊 Current usage before increment: ${feature} = ${usage[feature]}`);
       
-      // Call userId-based backend API
-      console.log(`[UsageContext] 🌐 Calling backend usage increment API...`);
-      const response = await fetch(`/api/usage/increment/${currentUser.uid}`, {
+      let response;
+      
+      // ✅ UNIFIED APPROACH: Always use userId-based endpoint (platform mapping not reliable)
+      console.log(`[UsageContext] 🌐 Calling userId-based usage increment API for ${currentPlatform}/${currentUsername}...`);
+      response = await fetch(`/api/usage/increment/${currentUser.uid}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -314,6 +317,8 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
       console.error(`[UsageContext] ❌ Error details:`, {
         feature,
         userId: currentUser.uid,
+        platform: currentPlatform,
+        username: currentUsername,
         count,
         error: error instanceof Error ? error.message : String(error)
       });
@@ -323,7 +328,7 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
     } finally {
       isIncrementInProgress.current = false;
     }
-  }, [currentUser?.uid, usage, refreshUsage]);
+  }, [currentUser?.uid, usage, refreshUsage, currentPlatform, currentUsername]);
 
 
   const trackFeatureUsage = useCallback(async (feature: keyof UsageStats, platform: string, action: string, count: number = 1) => {

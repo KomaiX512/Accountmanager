@@ -1,14 +1,15 @@
-// import { StrictMode } from 'react'; // Temporarily disabled
+import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App';
 import { BrowserRouter } from 'react-router-dom';
 
-createRoot(document.getElementById('root')!).render(
-  // Temporarily disabled StrictMode to debug platform requests
-  // <StrictMode>
+const root = createRoot(document.getElementById('root')!);
+
+root.render(
+  <StrictMode>
     <BrowserRouter>
       <App />
     </BrowserRouter>
-  // </StrictMode>
+  </StrictMode>
 );

@@ -110,7 +110,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
 
   // Debounce function to avoid rapid consecutive operations
   const debounce = (func: Function, wait: number) => {
-    let timeout: NodeJS.Timeout;
+    let timeout: ReturnType<typeof setTimeout>;
     return (...args: any[]) => {
       clearTimeout(timeout);
       timeout = setTimeout(() => func(...args), wait);
@@ -201,7 +201,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
       }
     }
 
-    setImages(prev => [...prev, ...newImages]);
+    setImages((prev: ImageItem[]) => [...prev, ...newImages]);
     setIsProcessing(false);
 
           // Load the first new image if no image is currently loaded
@@ -248,7 +248,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
       return;
     }
 
-    const newImages = images.filter((_, i) => i !== index);
+    const newImages = images.filter((_: ImageItem, i: number) => i !== index);
     setImages(newImages);
 
     // Adjust current index if necessary
@@ -259,7 +259,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
         loadImageIntoEditor(newImages[newIndex].processedUrl || newImages[newIndex].url);
       }
     } else if (index < currentImageIndex) {
-      setCurrentImageIndex(prev => prev - 1);
+      setCurrentImageIndex((prev: number) => prev - 1);
     }
   };
 
@@ -458,7 +458,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     
     // Draw each brand element
-    brandElements.forEach(element => {
+    brandElements.forEach((element: BrandElement) => {
       const img = new Image();
       img.onload = () => {
         ctx.save();
@@ -633,8 +633,8 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
   
   // Update brand element properties
   const updateBrandElement = (id: string, updates: Partial<BrandElement>) => {
-    setBrandElements(elements => 
-      elements.map(el => 
+    setBrandElements((elements: BrandElement[]) => 
+      elements.map((el: BrandElement) => 
         el.id === id ? { ...el, ...updates } : el
       )
     );
@@ -642,7 +642,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
   
   // Remove brand element
   const removeBrandElement = (id: string) => {
-    setBrandElements(elements => elements.filter(el => el.id !== id));
+    setBrandElements((elements: BrandElement[]) => elements.filter((el: BrandElement) => el.id !== id));
     if (selectedElement === id) {
       setSelectedElement(null);
     }
@@ -781,7 +781,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
     const y = e.clientY - rect.top;
     
     // Find the selected element
-    const element = brandElements.find(el => el.id === selectedElement);
+    const element = brandElements.find((el: BrandElement) => el.id === selectedElement);
     if (!element) return;
     
     // Determine which type of operation we're doing based on the mouse position
@@ -1270,7 +1270,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
               <input
                 type="checkbox"
                 checked={isAutoSquareCrop}
-                onChange={(e) => setIsAutoSquareCrop(e.target.checked)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setIsAutoSquareCrop(e.target.checked)}
               />
               Auto Square Crop
             </label>
@@ -1308,7 +1308,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
               </button>
             </div>
             <div className="image-preview-grid">
-              {images.map((image, index) => (
+              {images.map((image: ImageItem, index: number) => (
                 <div 
                   key={image.id} 
                   className={`image-preview-item ${index === currentImageIndex ? 'active' : ''}`}
@@ -1326,7 +1326,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
                     )}
                     <button 
                       className="remove-image-button"
-                      onClick={(e) => {
+                      onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                         e.stopPropagation();
                         removeImage(index);
                       }}
@@ -1381,7 +1381,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
                   
                   <select 
                     className="brand-element-type-select"
-                    onChange={(e) => {
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                       const type = e.target.value as 'logo' | 'watermark' | 'contactInfo';
                       if (type) {
                         addBrandElement(type);
@@ -1403,7 +1403,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
                     <p className="no-elements-message">No elements added yet</p>
                   ) : (
                     <ul>
-                      {brandElements.map(element => (
+                      {brandElements.map((element: BrandElement) => (
                         <li 
                           key={element.id}
                           className={`brand-element-item ${selectedElement === element.id ? 'selected' : ''}`}
@@ -1412,7 +1412,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
                           <span>{element.type}</span>
                           <button 
                             className="remove-element-button"
-                            onClick={(e) => {
+                            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                               e.stopPropagation();
                               removeBrandElement(element.id);
                             }}
@@ -1430,7 +1430,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
                   <div className="element-properties">
                     <h4>Element Properties</h4>
                     
-                    {brandElements.filter(e => e.id === selectedElement).map(element => (
+                    {brandElements.filter((e: BrandElement) => e.id === selectedElement).map((element: BrandElement) => (
                       <div key={element.id} className="properties-container">
                         <div className="property-group">
                           <label>Opacity:</label>
@@ -1440,7 +1440,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
                             max="1"
                             step="0.01"
                             value={element.opacity}
-                            onChange={(e) => {
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                               updateBrandElement(element.id, {
                                 opacity: parseFloat(e.target.value)
                               });
@@ -1457,7 +1457,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
                             max="2"
                             step="0.05"
                             value={element.scale}
-                            onChange={(e) => {
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                               updateBrandElement(element.id, {
                                 scale: parseFloat(e.target.value)
                               });
@@ -1474,7 +1474,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
                             max="360"
                             step="1"
                             value={element.rotation}
-                            onChange={(e) => {
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                               updateBrandElement(element.id, {
                                 rotation: parseInt(e.target.value)
                               });
@@ -1626,7 +1626,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
                 <textarea
                   id="post-caption"
                   value={caption}
-                  onChange={(e) => setCaption(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setCaption(e.target.value)}
                   placeholder={detectedPlatform === 'twitter' ? "What's happening?" : "Write your caption here... (include any hashtags)"}
                   rows={4}
                   className="caption-input"

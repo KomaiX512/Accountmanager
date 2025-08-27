@@ -1753,10 +1753,12 @@ app.get('/api/signed-image-url/:username/:imageKey', async (req, res) => {
   }
 });
 
-// Enhanced R2 Image Renderer with white image prevention
+// Enhanced R2 Image Renderer with white image prevention and progressive optimization
 app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
   const { username, imageKey } = req.params;
   const platform = req.query.platform || 'instagram';
+  const quality = req.query.quality || 'medium'; // 'thumbnail', 'mobile', 'desktop', 'original'
+  const progressive = req.query.progressive === 'true';
   
   // ENHANCED FORCE REFRESH DETECTION: Detect all cache-busting parameters
   const forceRefresh = req.query.t || req.query.v || req.query.refresh || 
@@ -1764,8 +1766,8 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
                       req.query.nocache || req.query.nuclear || req.query.reimagined || 
                       req.query.bypass;
   
-  // Generate unique cache key for this specific request
-  const cacheKey = `r2_image_${platform}_${username}_${imageKey}_${forceRefresh || 'default'}`;
+  // Generate unique cache key for this specific request including quality
+  const cacheKey = `r2_image_${platform}_${username}_${imageKey}_${quality}_${forceRefresh || 'default'}`;
   // Skip memory cache when a force refresh is requested
   if (forceRefresh) {
     imageCache.delete(cacheKey);
@@ -1778,10 +1780,9 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
     // NUCLEAR CACHE-BUSTING: Pass the full URL with query parameters to detect cache-busting
     const fullUrl = `${r2Key}?${new URLSearchParams(req.query).toString()}`;
     
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] Fetching: ${r2Key} (cache key: ${cacheKey})`);
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] Full URL with params: ${fullUrl}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] Fetching: ${r2Key} (quality: ${quality}, cache key: ${cacheKey})`);
     
-    // Use enhanced fetch with all fallbacks and validation - pass the full URL for cache-busting detection
+    // Use enhanced fetch with all fallbacks and validation
     const { data, source } = await fetchImageWithFallbacks(fullUrl, null, username, imageKey);
     
     // CRITICAL: Validate that we actually have image data (prevent white images)
@@ -1790,134 +1791,118 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
       throw new Error('Empty image data');
     }
     
-    // CRITICAL: Validate image format to prevent corrupted/white images
+    // Process image based on quality request
+    let processedData = data;
     let contentType = 'image/jpeg';
-    let isValidImage = false;
     
+    // Enhanced image format detection
     if (data.length > 12) {
-      // Comprehensive image format detection and validation
       const firstBytes = data.slice(0, 12);
-      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] DEBUG: First 12 bytes for ${imageKey}:`, Array.from(firstBytes).map(b => b.toString(16).padStart(2, '0')).join(' '));
       
-      // JPEG validation (FF D8)
       if (firstBytes[0] === 0xFF && firstBytes[1] === 0xD8) {
-         contentType = 'image/jpeg';
-         isValidImage = true;
-         if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] Valid JPEG detected for ${imageKey}`);
-         if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] JPEG bytes confirmed: ${firstBytes[0].toString(16)} ${firstBytes[1].toString(16)} ${firstBytes[2].toString(16)} ${firstBytes[3].toString(16)}`);
-       }
-      // PNG validation (89 50 4E 47)
-      else if (firstBytes[0] === 0x89 && firstBytes[1] === 0x50 && firstBytes[2] === 0x4E && firstBytes[3] === 0x47) {
+        contentType = 'image/jpeg';
+      } else if (firstBytes[0] === 0x89 && firstBytes[1] === 0x50 && firstBytes[2] === 0x4E && firstBytes[3] === 0x47) {
         contentType = 'image/png';
-        isValidImage = true;
-        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] Valid PNG detected for ${imageKey}`);
+      } else if (firstBytes[0] === 0x52 && firstBytes[1] === 0x49 && firstBytes[2] === 0x46 && firstBytes[3] === 0x46) {
+        contentType = 'image/webp';
       }
-      // 🚀 BULLETPROOF WebP validation with enhanced tolerance for corrupted files
-      else if (firstBytes[0] === 0x52 && firstBytes[1] === 0x49 && firstBytes[2] === 0x46 && firstBytes[3] === 0x46) {
-        // This is a RIFF container format
-        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] RIFF container detected for ${imageKey}`);
+    }
+    
+    // Optimize image based on quality parameter
+    try {
+      if (quality === 'thumbnail') {
+        processedData = await sharp(data)
+          .resize(300, 300, { 
+            fit: 'cover',
+            position: 'center'
+          })
+          .jpeg({ 
+            quality: 70,
+            progressive: true,
+            mozjpeg: true
+          })
+          .toBuffer();
+        contentType = 'image/jpeg';
         
-        // Check for WEBP signature at offset 8-11 (more tolerant approach)
-        if (data.length >= 12) {
-          const webpSigBytes = data.slice(8, 12);
-          const hasWebPSig = webpSigBytes[0] === 0x57 && webpSigBytes[1] === 0x45 && 
-                             webpSigBytes[2] === 0x42 && webpSigBytes[3] === 0x50;
-          
-          if (hasWebPSig) {
-            contentType = 'image/webp';
-            isValidImage = true;
-            if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] Valid WebP signature confirmed for ${imageKey}`);
-          } else {
-            // RIFF but not clearly WebP - could be corrupted WebP or other RIFF format
-            // ✅ TOLERANT MODE: Accept it anyway as browsers might still render it
-            contentType = 'image/webp'; // Treat as WebP for conversion
-            isValidImage = true;
-            if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] RIFF format without clear WebP signature - accepting anyway (bytes 8-11: ${Array.from(webpSigBytes).map(b => '0x' + b.toString(16)).join(' ')})`);
-          }
-        } else {
-          // Too short for proper WebP validation but has RIFF header
-          contentType = 'image/webp';
-          isValidImage = true;
-          if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] Short RIFF format detected - accepting anyway for ${imageKey}`);
-        }
+      } else if (quality === 'mobile') {
+        processedData = await sharp(data)
+          .resize(600, 600, { 
+            fit: 'inside',
+            withoutEnlargement: true
+          })
+          .jpeg({ 
+            quality: 80,
+            progressive: true,
+            mozjpeg: true
+          })
+          .toBuffer();
+        contentType = 'image/jpeg';
+        
+      } else if (quality === 'desktop') {
+        processedData = await sharp(data)
+          .resize(1080, 1080, { 
+            fit: 'inside',
+            withoutEnlargement: true
+          })
+          .jpeg({ 
+            quality: 85,
+            progressive: true,
+            mozjpeg: true
+          })
+          .toBuffer();
+        contentType = 'image/jpeg';
+        
+      } else if (contentType === 'image/webp') {
+        // Convert WebP to JPEG for better compatibility
+        processedData = await sharp(data)
+          .jpeg({ 
+            quality: 90,
+            progressive: true
+          })
+          .toBuffer();
+        contentType = 'image/jpeg';
       }
-      // Additional validation for other image formats
-      else if (firstBytes[0] === 0x47 && firstBytes[1] === 0x49 && firstBytes[2] === 0x46) {
-        // GIF format
-        contentType = 'image/gif';
-        isValidImage = true;
-        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] Valid GIF detected for ${imageKey}`);
-      }
-      else if (firstBytes[0] === 0x42 && firstBytes[1] === 0x4D) {
-        // BMP format
-        contentType = 'image/bmp';
-        isValidImage = true;
-        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] Valid BMP detected for ${imageKey}`);
-      }
+    } catch (processingError) {
+      if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [R2-IMAGE] Image processing failed, serving original:`, processingError.message);
+      // Fallback to original data if processing fails
     }
     
-    // CRITICAL: If image validation fails, try to serve anyway with basic validation
-    if (!isValidImage) {
-      if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [R2-IMAGE] Unknown image format for ${imageKey}, first 12 bytes:`, Array.from(data.slice(0, 12)).map(b => b.toString(16).padStart(2, '0')).join(' '));
-      
-      // More lenient validation - if it has some image-like characteristics, serve it
-      if (data.length > 100 && (data[0] === 0xFF || data[0] === 0x89 || data[0] === 0x52 || data[0] === 0x47 || data[0] === 0x42)) {
-        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] Accepting unknown format as valid image for ${imageKey}`);
-        isValidImage = true;
-        contentType = 'image/jpeg'; // Default to JPEG
-      } else {
-        if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [R2-IMAGE] Invalid image format detected for ${imageKey}, first 12 bytes:`, Array.from(data.slice(0, 12)).map(b => b.toString(16).padStart(2, '0')).join(' '));
-        throw new Error('Invalid image format detected');
-      }
-    }
-    
-    // Minimum size check (prevent tiny corrupted files)
-    if (data.length < 1024) { // Less than 1KB is suspicious for a real image
-      console.warn(`[${new Date().toISOString()}] [R2-IMAGE] Suspiciously small image for ${imageKey}: ${data.length} bytes`);
-      // Don't fail immediately, but log for monitoring
-    } else if (data.length < 1024) {
-      // Small but likely valid images - just log for monitoring without warning
-      console.log(`[${new Date().toISOString()}] [R2-IMAGE] Small but valid image for ${imageKey}: ${data.length} bytes`);
-    }
-    
-    // Set comprehensive headers with validation info
+    // Set comprehensive headers with optimization info
     res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Length', data.length);
+    res.setHeader('Content-Length', processedData.length);
     res.setHeader('X-Image-Format', contentType.split('/')[1]);
     res.setHeader('X-Image-Source', source);
-    res.setHeader('X-Image-Valid', 'true');
-    res.setHeader('X-Image-Size', data.length.toString());
+    res.setHeader('X-Image-Quality', quality);
+    res.setHeader('X-Image-Size', processedData.length.toString());
+    res.setHeader('X-Original-Size', data.length.toString());
     
-    // Cache control based on request type - ENHANCED FOR EDITED IMAGES
+    // Progressive loading support
+    if (progressive) {
+      res.setHeader('X-Progressive-Support', 'true');
+    }
+    
+    // Cache control based on quality and request type
     if (forceRefresh) {
-      // NUCLEAR CACHE BUSTING: Multiple headers to prevent ANY caching
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
       res.setHeader('Last-Modified', new Date().toUTCString());
       res.setHeader('X-Cache-Mode', 'force-refresh');
-      res.setHeader('X-Edited-Image', 'true');
       
-      // Aggressive cache prevention headers
-      res.setHeader('Surrogate-Control', 'no-store');
-      res.setHeader('X-Accel-Expires', '0');
-      
-      // CRITICAL: Dynamic ETag for edited images to prevent browser cache
-      const dynamicEtag = `"${imageKey}-${data.length}-edited-${Date.now()}-${Math.random().toString(36).substr(2, 9)}"`;
+      const dynamicEtag = `"${imageKey}-${quality}-${processedData.length}-edited-${Date.now()}-${Math.random().toString(36).substr(2, 9)}"`;
       res.setHeader('ETag', dynamicEtag);
     } else {
-      res.setHeader('Cache-Control', 'public, max-age=21600'); // 6 hours (optimized from 1 hour)
+      // Different cache durations for different qualities
+      const cacheDuration = quality === 'thumbnail' ? 86400 : // 24 hours for thumbnails
+                           quality === 'mobile' ? 43200 : // 12 hours for mobile
+                           quality === 'desktop' ? 21600 : // 6 hours for desktop
+                           21600; // 6 hours for original
+      
+      res.setHeader('Cache-Control', `public, max-age=${cacheDuration}`);
       res.setHeader('X-Cache-Mode', 'normal');
       
-      // STABLE ETag for normal images (don't use Date.now())
-      const stableEtag = `"${imageKey}-${data.length}-v2"`;
+      const stableEtag = `"${imageKey}-${quality}-${processedData.length}-v3"`;
       res.setHeader('ETag', stableEtag);
-    }
-    
-    // Set consistent Last-Modified only for normal images (not edited)
-    if (!forceRefresh) {
-      const lastModified = new Date(Math.floor(Date.now() / (1000 * 60 * 60)) * 1000 * 60 * 60); // Round to hour
-      res.setHeader('Last-Modified', lastModified.toUTCString());
     }
     
     // CORS headers
@@ -1925,46 +1910,14 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
     res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', '*');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    res.setHeader('Access-Control-Expose-Headers', 'X-Image-Source, X-Image-Format, X-Image-Valid, X-Image-Size, X-Cache-Mode');
+    res.setHeader('Access-Control-Expose-Headers', 'X-Image-Source, X-Image-Format, X-Image-Quality, X-Image-Size, X-Original-Size, X-Cache-Mode');
     
-    // Convert WebP to JPEG for better compatibility
-    let finalData = data;
-    let finalContentType = contentType;
+    // Send the optimized image buffer
+    res.send(processedData);
     
-    if (contentType === 'image/webp') {
-      try {
-        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] Attempting WebP→JPEG conversion: ${imageKey}`);
-        const jpegBuffer = await sharp(data, { failOnError: false })
-          .jpeg({ quality: 90 })
-          .toBuffer();
-
-        // CRITICAL FIX: Accept smaller valid JPEGs (don't require 1KB minimum)
-        if (jpegBuffer && jpegBuffer.length > 200 && jpegBuffer[0] === 0xFF && jpegBuffer[1] === 0xD8) {
-          finalData = jpegBuffer;
-          finalContentType = 'image/jpeg';
-          if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] ✅ WebP→JPEG conversion succeeded for ${imageKey}`);
-        } else {
-          if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [R2-IMAGE] WebP→JPEG conversion produced invalid result for ${imageKey}; serving original WebP`);
-        }
-      } catch (conversionError) {
-        if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [R2-IMAGE] WebP→JPEG conversion error for ${imageKey}: ${conversionError.message}; serving original WebP`);
-      }
-    }
-    
-    // Update headers with final content type
-    res.setHeader('Content-Type', finalContentType);
-    res.setHeader('X-Image-Format', finalContentType.split('/')[1]);
-    res.setHeader('Content-Length', finalData.length);
-    
-    // Send the validated image buffer
-    res.send(finalData);
-    
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] ✅ About to complete successfully: ${r2Key} (${finalData.length} bytes) from ${source}, isValidImage: ${isValidImage}`);
-    
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] ✅ Successfully served valid ${finalContentType.split('/')[1].toUpperCase()}: ${r2Key} (${finalData.length} bytes) from ${source}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] ✅ Served optimized ${quality} quality ${contentType}: ${r2Key} (${processedData.length} bytes, original: ${data.length} bytes) from ${source}`);
     
   } catch (error) {
-    if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [R2-IMAGE] ❌ Exception caught for ${username}/${imageKey}:`, error.message, error.stack);
     if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [R2-IMAGE] ❌ Error serving ${username}/${imageKey}:`, error.message);
     
     // Enhanced error response with debugging info

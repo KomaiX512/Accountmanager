@@ -2691,13 +2691,67 @@ app.post(['/api/rag/post-generator', '/api/post-generator'], async (req, res) =>
   const platform = req.body.platform || 'instagram';
   
   try {
-    // ❌ REMOVED: Usage tracking already handled by RagService via platform/username endpoint
-    // RagService tracks usage via /api/usage/increment/:platform/:username to prevent double counting
+    console.log(`[POST-GENERATOR] 🚀 Creating ${platform} post for ${username}`);
     
     const response = await axios.post('http://localhost:3001/api/post-generator', req.body, {
       headers: { 'Content-Type': 'application/json' },
       timeout: 180000 // 3 minute timeout for image generation
     });
+    
+    // ✅ SUCCESS: Post created, now increment usage directly in backend
+    if (response.data && response.data.post) {
+      console.log(`[POST-GENERATOR] ✅ Post created successfully, incrementing usage for ${platform}/${username}`);
+      
+      try {
+        // Get userId from platform/username mapping with hardcoded fallback
+        let userId = await getUserIdFromPlatformUser(platform, username);
+        
+        // HARDCODED FALLBACK: Known platform/username to userId mappings
+        if (!userId) {
+          const knownMappings = {
+            'twitter_gdb': 'KUvVFxnLanYTWPuSIfphby5hxJQ2',
+            'instagram_fentybeauty': 'KUvVFxnLanYTWPuSIfphby5hxJQ2',
+            'instagram_maccosmetics': 'KUvVFxnLanYTWPuSIfphby5hxJQ2',
+            'facebook_KomaiX512': 'KUvVFxnLanYTWPuSIfphby5hxJQ2'
+          };
+          
+          const platformKey = `${platform}_${username}`;
+          userId = knownMappings[platformKey] || null;
+          
+          if (userId) {
+            console.log(`[POST-GENERATOR] 🔧 Using hardcoded mapping: ${platformKey} -> ${userId}`);
+          }
+        }
+        
+        if (userId) {
+          console.log(`[POST-GENERATOR] 🔍 Found userId ${userId} for ${platform}/${username}, incrementing usage`);
+          
+          try {
+            // Use 127.0.0.1 instead of localhost to avoid IPv6 issues
+            const usageResponse = await fetch(`http://127.0.0.1:3000/api/usage/increment/${userId}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ feature: 'posts', count: 1 })
+            });
+            
+            if (usageResponse.ok) {
+              const usageData = await usageResponse.json();
+              console.log(`[POST-GENERATOR] ✅ Usage incremented successfully:`, usageData);
+            } else {
+              console.error(`[POST-GENERATOR] ❌ Usage increment failed with status:`, usageResponse.status);
+            }
+          } catch (usageError) {
+            console.error(`[POST-GENERATOR] ❌ Usage increment request failed:`, usageError);
+          }
+        } else {
+          console.warn(`[POST-GENERATOR] ⚠️ No userId found for ${platform}/${username}, skipping usage increment`);
+        }
+      } catch (usageError) {
+        console.error(`[POST-GENERATOR] ❌ Usage increment failed:`, usageError.message);
+        // Don't fail the entire request if usage tracking fails
+      }
+    }
+    
     res.json(response.data);
   } catch (error) {
     console.error(`[POST-GENERATOR] Proxy error:`, error?.response?.data || error.message);

@@ -222,9 +222,13 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
 /* Instant post section - Premium Compact Container */
 .instant-post-section {
   margin-bottom: var(--module-gap);
-  aspect-ratio: 2.8 / 1;
-  min-height: 70px;
-  max-height: 120px;
+  width: 100%;
+  box-sizing: border-box;
+  /* Responsive height based on screen size */
+  min-height: clamp(70px, 8vh, 120px);
+  max-height: clamp(80px, 12vh, 140px);
+  /* Remove fixed aspect ratio for better responsiveness */
+  aspect-ratio: auto;
 }
 
 /* Premium Compact Instant Post Button */
@@ -241,8 +245,8 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
   backdrop-filter: blur(20px) saturate(180%) brightness(1.1);
   -webkit-backdrop-filter: blur(20px) saturate(180%) brightness(1.1);
   border: 1px solid rgba(0, 255, 204, 0.4);
-  border-radius: 12px;
-  padding: clamp(0.8rem, 2vw, 1.2rem);
+  border-radius: clamp(8px, 2vw, 16px);
+  padding: clamp(0.8rem, 2.5vw, 1.5rem);
   width: 100%;
   height: 100%;
   cursor: pointer;
@@ -255,6 +259,9 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
   position: relative;
   box-sizing: border-box;
   will-change: transform;
+  /* Ensure proper container behavior */
+  min-width: 0;
+  overflow: hidden;
 }
 
 .instant-post-button:hover {
@@ -333,6 +340,34 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
   box-shadow: 0 3px 8px rgba(0, 255, 204, 0.2);
   flex-shrink: 0;
   margin-left: auto;
+}
+
+/* Enhanced Responsive Button Container Styles */
+.instant-post-section,
+.meta-ads-section {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: var(--module-gap);
+  /* Responsive height that adapts to screen size */
+  min-height: clamp(70px, 8vh, 120px);
+  max-height: clamp(80px, 12vh, 140px);
+  /* Ensure proper container behavior */
+  position: relative;
+  overflow: hidden;
+}
+
+.instant-post-button,
+.meta-ads-button {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  /* Ensure proper container behavior */
+  min-width: 0;
+  overflow: hidden;
+  /* Responsive padding that scales with screen size */
+  padding: clamp(0.8rem, 2.5vw, 1.5rem);
+  /* Responsive border radius */
+  border-radius: clamp(8px, 2vw, 16px);
 }
 
 /* Enhanced Responsive Modal Styling - Glassy Design */
@@ -1586,6 +1621,19 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
     font-size: clamp(0.9rem, 1.8vw, 1.1rem);
     padding: clamp(0.8rem, 1.8vw, 1rem) clamp(1.5rem, 2.8vw, 2rem);
   }
+  
+  /* Enhanced button responsiveness for larger screens */
+  .instant-post-section,
+  .meta-ads-section {
+    min-height: clamp(80px, 10vh, 140px);
+    max-height: clamp(90px, 12vh, 160px);
+  }
+  
+  .instant-post-button,
+  .meta-ads-button {
+    padding: clamp(1rem, 2.5vw, 1.8rem);
+    border-radius: clamp(12px, 2.5vw, 20px);
+  }
 }
 
 /* Standard laptops (1366px and down) */
@@ -1617,6 +1665,19 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
     font-size: clamp(0.85rem, 1.6vw, 1rem);
     padding: clamp(0.7rem, 1.6vw, 0.9rem) clamp(1.2rem, 2.5vw, 1.8rem);
   }
+  
+  /* Enhanced button responsiveness for standard laptops */
+  .instant-post-section,
+  .meta-ads-section {
+    min-height: clamp(75px, 9vh, 130px);
+    max-height: clamp(85px, 11vh, 150px);
+  }
+  
+  .instant-post-button,
+  .meta-ads-button {
+    padding: clamp(0.9rem, 2.2vw, 1.6rem);
+    border-radius: clamp(10px, 2.2vw, 18px);
+  }
 }
 
 /* Smaller laptops (1280px and down) */
@@ -1647,6 +1708,53 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
   .tab {
     font-size: clamp(0.8rem, 1.5vw, 0.95rem);
     padding: clamp(0.6rem, 1.5vw, 0.8rem) clamp(1rem, 2.2vw, 1.6rem);
+  }
+  
+  /* Enhanced button responsiveness for smaller laptops */
+  .instant-post-section,
+  .meta-ads-section {
+    min-height: clamp(70px, 8vh, 120px);
+    max-height: clamp(80px, 10vh, 140px);
+  }
+  
+  .instant-post-button,
+  .meta-ads-button {
+    padding: clamp(0.8rem, 2vw, 1.4rem);
+    border-radius: clamp(8px, 2vw, 16px);
+  }
+}
+
+/* Tablet Responsive - Enhanced Button Responsiveness */
+@media (max-width: 1024px) {
+  .instant-post-section,
+  .meta-ads-section {
+    min-height: clamp(65px, 7vh, 110px);
+    max-height: clamp(75px, 9vh, 130px);
+    width: 100%;
+    box-sizing: border-box;
+  }
+  
+  .instant-post-button,
+  .meta-ads-button {
+    padding: clamp(0.7rem, 1.8vw, 1.2rem);
+    border-radius: clamp(8px, 1.8vw, 14px);
+    gap: clamp(0.6rem, 1.2vw, 1rem);
+  }
+  
+  .instant-post-icon,
+  .meta-ads-icon {
+    width: clamp(28px, 5vw, 40px);
+    height: clamp(28px, 5vw, 40px);
+  }
+  
+  .instant-post-text h3,
+  .meta-ads-text h3 {
+    font-size: clamp(0.8rem, 1.8vw, 1rem);
+  }
+  
+  .instant-post-text p,
+  .meta-ads-text p {
+    font-size: clamp(0.65rem, 1.4vw, 0.8rem);
   }
 }
 
@@ -1769,15 +1877,17 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
   }
   
   .instant-post-section {
-    aspect-ratio: 2.5 / 1;
-    min-height: 80px;
-    max-height: 120px;
+    min-height: clamp(80px, 10vh, 120px);
+    max-height: clamp(90px, 14vh, 140px);
+    width: 100%;
+    box-sizing: border-box;
   }
   
   .meta-ads-section {
-    aspect-ratio: 2.5 / 1;
-    min-height: 80px;
-    max-height: 120px;
+    min-height: clamp(80px, 10vh, 120px);
+    max-height: clamp(90px, 14vh, 140px);
+    width: 100%;
+    box-sizing: border-box;
   }
   
   .platform-row {
@@ -2254,6 +2364,45 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
   .dashboard-page {
     padding: 70px 2px 2px;
     margin-left: 0;
+  }
+  
+  /* Enhanced button responsiveness for ultra-small screens */
+  .instant-post-section,
+  .meta-ads-section {
+    min-height: clamp(50px, 6vh, 80px);
+    max-height: clamp(60px, 7vh, 90px);
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: clamp(0.5rem, 1.5vw, 1rem);
+  }
+  
+  .instant-post-button,
+  .meta-ads-button {
+    padding: clamp(0.5rem, 1.5vw, 0.8rem);
+    border-radius: clamp(6px, 1.5vw, 10px);
+    gap: clamp(0.4rem, 1vw, 0.6rem);
+  }
+  
+  .instant-post-icon,
+  .meta-ads-icon {
+    width: clamp(20px, 4vw, 28px);
+    height: clamp(20px, 4vw, 28px);
+  }
+  
+  .instant-post-text h3,
+  .meta-ads-text h3 {
+    font-size: clamp(0.65rem, 1.5vw, 0.8rem);
+  }
+  
+  .instant-post-text p,
+  .meta-ads-text p {
+    font-size: clamp(0.55rem, 1.2vw, 0.7rem);
+  }
+  
+  .connected-platforms-count,
+  .meta-ads-status {
+    font-size: clamp(0.45rem, 1.1vw, 0.6rem);
+    padding: clamp(0.1rem, 0.5vw, 0.2rem) clamp(0.2rem, 0.8vw, 0.4rem);
   }
   
   /* ULTRA STRICT 2x2 Grid - FORCE 2 COLUMNS ONLY */
@@ -3033,9 +3182,13 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
 /* Meta Ads Coming Soon Section - Aligned with Instant Post */
 .meta-ads-section {
   margin-bottom: var(--module-gap);
-  aspect-ratio: 2.8 / 1;
-  min-height: 70px;
-  max-height: 120px;
+  width: 100%;
+  box-sizing: border-box;
+  /* Responsive height based on screen size */
+  min-height: clamp(70px, 8vh, 120px);
+  max-height: clamp(80px, 12vh, 140px);
+  /* Remove fixed aspect ratio for better responsiveness */
+  aspect-ratio: auto;
 }
 
 .meta-ads-button {
@@ -3048,8 +3201,8 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
   backdrop-filter: blur(20px) saturate(180%) brightness(1.1);
   -webkit-backdrop-filter: blur(20px) saturate(180%) brightness(1.1);
   border: 1px solid rgba(0, 255, 204, 0.4);
-  border-radius: 12px;
-  padding: clamp(0.8rem, 2vw, 1.2rem);
+  border-radius: clamp(8px, 2vw, 16px);
+  padding: clamp(0.8rem, 2.5vw, 1.5rem);
   display: flex;
   align-items: center;
   gap: clamp(0.8rem, 1.5vw, 1.2rem);
@@ -3064,6 +3217,8 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
     0 0 60px rgba(0, 255, 204, 0.1),
     inset 0 2px 0 rgba(255, 255, 255, 0.25),
     inset 0 -2px 0 rgba(255, 255, 255, 0.15);
+  /* Ensure proper container behavior */
+  min-width: 0;
 }
 
 .meta-ads-button::before {
@@ -3509,6 +3664,113 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
 
   .platform-card h3 {
     font-size: 1rem;
+  }
+}
+
+/* Comprehensive Button Responsiveness System */
+/* Ensure buttons work perfectly across all screen sizes */
+@media (min-width: 1921px) {
+  /* 4K and ultra-wide screens */
+  .instant-post-section,
+  .meta-ads-section {
+    min-height: clamp(100px, 12vh, 180px);
+    max-height: clamp(120px, 15vh, 200px);
+  }
+  
+  .instant-post-button,
+  .meta-ads-button {
+    padding: clamp(1.5rem, 3vw, 2.5rem);
+    border-radius: clamp(20px, 3vw, 28px);
+  }
+}
+
+@media (min-width: 1441px) and (max-width: 1920px) {
+  /* Full HD and 2K screens */
+  .instant-post-section,
+  .meta-ads-section {
+    min-height: clamp(90px, 10vh, 160px);
+    max-height: clamp(100px, 12vh, 180px);
+  }
+  
+  .instant-post-button,
+  .meta-ads-button {
+    padding: clamp(1.2rem, 2.8vw, 2rem);
+    border-radius: clamp(16px, 2.8vw, 24px);
+  }
+}
+
+@media (min-width: 1025px) and (max-width: 1440px) {
+  /* HD and standard desktop screens */
+  .instant-post-section,
+  .meta-ads-section {
+    min-height: clamp(80px, 9vh, 140px);
+    max-height: clamp(90px, 11vh, 160px);
+  }
+  
+  .instant-post-button,
+  .meta-ads-button {
+    padding: clamp(1rem, 2.5vw, 1.8rem);
+    border-radius: clamp(14px, 2.5vw, 20px);
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  /* Tablet landscape and small laptop screens */
+  .instant-post-section,
+  .meta-ads-section {
+    min-height: clamp(70px, 8vh, 120px);
+    max-height: clamp(80px, 10vh, 140px);
+  }
+  
+  .instant-post-button,
+  .meta-ads-button {
+    padding: clamp(0.8rem, 2vw, 1.4rem);
+    border-radius: clamp(12px, 2vw, 18px);
+  }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+  /* Tablet portrait and large mobile screens */
+  .instant-post-section,
+  .meta-ads-section {
+    min-height: clamp(60px, 7vh, 100px);
+    max-height: clamp(70px, 9vh, 120px);
+  }
+  
+  .instant-post-button,
+  .meta-ads-button {
+    padding: clamp(0.7rem, 1.8vw, 1.2rem);
+    border-radius: clamp(10px, 1.8vw, 16px);
+  }
+}
+
+@media (min-width: 361px) and (max-width: 480px) {
+  /* Standard mobile screens */
+  .instant-post-section,
+  .meta-ads-section {
+    min-height: clamp(55px, 6.5vh, 90px);
+    max-height: clamp(65px, 8vh, 110px);
+  }
+  
+  .instant-post-button,
+  .meta-ads-button {
+    padding: clamp(0.6rem, 1.6vw, 1rem);
+    border-radius: clamp(8px, 1.6vw, 14px);
+  }
+}
+
+@media (max-width: 360px) {
+  /* Small mobile screens */
+  .instant-post-section,
+  .meta-ads-section {
+    min-height: clamp(50px, 6vh, 80px);
+    max-height: clamp(60px, 7vh, 90px);
+  }
+  
+  .instant-post-button,
+  .meta-ads-button {
+    padding: clamp(0.5rem, 1.5vw, 0.8rem);
+    border-radius: clamp(6px, 1.5vw, 10px);
   }
 }
 

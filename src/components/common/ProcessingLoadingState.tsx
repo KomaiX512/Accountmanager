@@ -651,7 +651,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     const interval = setInterval(updateTimer, getUpdateInterval());
     
     return () => clearInterval(interval);
-  }, [platform, isTabVisible, timerCompleted, allowAutoComplete, currentUser?.uid, username]); // ✅ REMOVED currentTime and getRemainingMs from dependencies to prevent infinite loops
+  }, [platform, isTabVisible, timerCompleted, allowAutoComplete, currentUser?.uid, username]); // ✅ Dependencies optimized
 
   // ✅ PAGE VISIBILITY API - Perfect tab switching synchronization
   useEffect(() => {

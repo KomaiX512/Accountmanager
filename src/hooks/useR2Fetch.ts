@@ -33,19 +33,47 @@ const useR2Fetch = <T>(url: string, expectedPlatform?: string, section?: string)
       }
       
       try {
-        // Apply 12h global bypass at hook level if caller didn't already append
-        let finalUrl = url;
-        try {
-          const alreadyHasBypass = /[?&]bypass_cache=/.test(url) || /[?&]_cb=/.test(url);
-          const accountMatch = url.match(/\/api\/(?:retrieve|profile-info|posts|responses|news-for-you|retrieve-multiple|retrieve-strategies|retrieve-engagement-strategies)\/([^/?&]+)/);
-          const accountHolder = accountMatch ? decodeURIComponent(accountMatch[1]) : undefined;
-          if (!alreadyHasBypass && expectedPlatform && accountHolder) {
-            // ✅ FIXED: Pass section parameter for proper cache invalidation
-            finalUrl = CacheManager.appendBypassParam(url, expectedPlatform, accountHolder, section);
+        // ✅ CRITICAL GUARD: Block API calls with wrong usernames for current platform
+        const accountMatch = url.match(/\/api\/(?:retrieve|profile-info|posts|responses|news-for-you|retrieve-multiple|retrieve-strategies|retrieve-engagement-strategies)\/([^/?&]+)/);
+        const accountHolder = accountMatch ? decodeURIComponent(accountMatch[1]) : undefined;
+        
+        if (accountHolder && expectedPlatform) {
+          const currentPath = window.location.pathname;
+          const currentPlatform = currentPath.includes('twitter') ? 'twitter' : 
+                                 currentPath.includes('facebook') ? 'facebook' : 'instagram';
+          
+          if (expectedPlatform === currentPlatform) {
+            // Try to get user ID from auth context or localStorage
+            const authUserString = localStorage.getItem('firebase:authUser:AIzaSyDlU_-gNGfcF4-W9zUZKHy1rr7v9VEXZRM:[DEFAULT]');
+            let uid = '';
+            if (authUserString) {
+              try {
+                const authUser = JSON.parse(authUserString);
+                uid = authUser.uid;
+              } catch {}
+            }
+            
+            const correctUsername = localStorage.getItem(`${currentPlatform}_username_${uid}`) || '';
+            
+            if (correctUsername && accountHolder !== correctUsername) {
+              console.error(`[useR2Fetch] 🚫 BLOCKED: Wrong username "${accountHolder}" for ${currentPlatform}, expected "${correctUsername}"`);
+              setState({
+                data: null,
+                loading: false,
+                error: `Username mismatch: using ${accountHolder} instead of ${correctUsername} for ${currentPlatform}`
+              });
+              return;
+            }
           }
-        } catch {}
-
-        console.log(`[useR2Fetch] ✅ Fetching: ${finalUrl}`);
+        }
+        
+        // Apply cache bypass if needed
+        let finalUrl = url;
+        const alreadyHasBypass = /[?&]bypass_cache=/.test(url) || /[?&]_cb=/.test(url);
+        if (!alreadyHasBypass && expectedPlatform && accountHolder) {
+          finalUrl = CacheManager.appendBypassParam(url, expectedPlatform, accountHolder, section);
+        }
+        
         const response = await axios.get(finalUrl);
         setState({ data: response.data, loading: false, error: null });
       } catch (error: any) {

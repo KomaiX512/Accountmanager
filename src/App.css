@@ -7,7 +7,7 @@
   box-sizing: border-box;
 }
 
-/* DEPRECATED: Left bar styles moved to LeftBar.css for professional implementation */
+/* DEPRECATED: Left bar styles moved to LeftBar.css for professional implementation */F
 /* These legacy styles are disabled to prevent conflicts with the new viewport-locked design */
 
 .left-bar svg {
@@ -32,6 +32,8 @@
   max-width: 100%;
   box-sizing: border-box;
 }
+
+@import url('./styles/image-optimization.css');
 
 .App {
   display: flex;

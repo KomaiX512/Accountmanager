@@ -1,7 +1,7 @@
 .platform-icon {
-  width: 20px;
-  height: 20px;
-  margin-right: 8px;
+  width: 28px;
+  height: 28px;
+  margin-right: 10px;
   filter: brightness(1.2);
   transition: filter 0.2s ease;
   vertical-align: middle;

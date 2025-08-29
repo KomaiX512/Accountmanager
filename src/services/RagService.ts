@@ -614,7 +614,7 @@ class RagService {
         try {
           console.log(`[RagService] Fetching AI replies for ${platform}/${username}`);
           
-          return await this.tryServerUrls(`/ai-replies/${username}?platform=${platform}`, (url) => {
+          return await this.tryServerUrls(`/api/ai-replies/${username}?platform=${platform}`, (url) => {
             console.log(`[RagService] Trying URL: ${url}`);
             return axios.get(url, {
               timeout: 10000,

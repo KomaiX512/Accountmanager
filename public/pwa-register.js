@@ -1,14 +1,51 @@
-// PWA Registration and Installation Handler
+// PWA Registration and Installation Handler - NON-INTERFERING VERSION
 class PWAInstaller {
   constructor() {
     this.deferredPrompt = null;
     this.installButton = null;
+    this.isInitialized = false;
     this.init();
   }
 
   init() {
-    // Register service worker
-    if ('serviceWorker' in navigator) {
+    // Wait for the main app to be fully loaded before initializing PWA features
+    this.waitForAppLoad();
+  }
+
+  waitForAppLoad() {
+    // Check if React app is loaded by looking for root content
+    const rootElement = document.getElementById('root');
+    
+    if (rootElement && rootElement.children.length > 0) {
+      // Wait a bit more to ensure React is fully rendered
+      setTimeout(() => {
+        this.setupPWA();
+      }, 2000);
+    } else {
+      // Check again in 500ms
+      setTimeout(() => {
+        this.waitForAppLoad();
+      }, 500);
+    }
+  }
+
+  setupPWA() {
+    if (this.isInitialized) return;
+    
+    console.log('PWA: App loaded, setting up PWA features');
+    this.isInitialized = true;
+    
+    // Only register service worker if not in development
+    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      this.registerServiceWorker();
+    }
+    
+    this.setupInstallPrompt();
+  }
+
+  registerServiceWorker() {
+    // Only register service worker in production
+    if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/service-worker.js')
           .then((registration) => {
@@ -29,13 +66,15 @@ class PWAInstaller {
           });
       });
     }
+  }
 
+  setupInstallPrompt() {
     // Listen for beforeinstallprompt event
     window.addEventListener('beforeinstallprompt', (e) => {
       console.log('PWA: Install prompt available');
       e.preventDefault();
       this.deferredPrompt = e;
-      this.showInstallButton();
+      // Don't show install button automatically - let user decide
     });
 
     // Listen for app installed event
@@ -46,6 +85,11 @@ class PWAInstaller {
   }
 
   showInstallButton() {
+    // Only show if the main app is loaded and user hasn't dismissed it
+    if (!document.getElementById('root') || document.getElementById('root').children.length === 0) {
+      return;
+    }
+
     // Create install button if it doesn't exist
     if (!this.installButton) {
       this.installButton = document.createElement('button');
@@ -66,6 +110,7 @@ class PWAInstaller {
         cursor: pointer;
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         transition: all 0.3s ease;
+        display: none;
       `;
       
       this.installButton.addEventListener('click', () => {
@@ -115,14 +160,10 @@ class PWAInstaller {
   }
 }
 
-// Initialize PWA installer when DOM is loaded
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    new PWAInstaller();
-  });
-} else {
+// Initialize PWA installer with delay to ensure app loads first
+setTimeout(() => {
   new PWAInstaller();
-}
+}, 3000);
 
 // Expose unregister method globally for debugging
 window.PWAInstaller = PWAInstaller;

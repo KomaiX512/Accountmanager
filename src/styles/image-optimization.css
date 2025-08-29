@@ -1,0 +1,198 @@
+/* Global Image Optimization Styles */
+
+/* Image loading performance optimizations */
+img {
+  /* Hardware acceleration for images */
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  
+  /* Optimize image rendering */
+  image-rendering: auto;
+  image-rendering: -webkit-optimize-contrast;
+  
+  /* Prevent layout shifts */
+  max-width: 100%;
+  height: auto;
+  
+  /* Smooth loading transition */
+  transition: opacity 0.3s ease, filter 0.3s ease;
+}
+
+/* Mobile image optimizations */
+@media (max-width: 768px) {
+  img {
+    /* More aggressive optimization for mobile */
+    image-rendering: optimizeSpeed;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: -webkit-optimize-contrast;
+    
+    /* Reduce transform overhead on mobile */
+    will-change: opacity;
+  }
+}
+
+/* Low-end device optimizations */
+@media (max-width: 480px), (max-height: 600px) {
+  img {
+    /* Minimal effects for low-end devices */
+    transition: opacity 0.2s ease;
+    transform: none;
+  }
+}
+
+/* High DPI optimizations */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  img {
+    /* Better quality on high DPI screens */
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: optimize-contrast;
+  }
+}
+
+/* Loading states for images */
+.image-loading {
+  opacity: 0.7;
+  filter: blur(1px);
+}
+
+.image-loaded {
+  opacity: 1;
+  filter: none;
+}
+
+.image-error {
+  opacity: 0.5;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px dashed rgba(255, 255, 255, 0.3);
+}
+
+/* Progressive loading enhancement */
+.progressive-image {
+  transition: filter 0.5s ease;
+}
+
+.progressive-image.blurred {
+  filter: blur(2px);
+}
+
+.progressive-image.sharp {
+  filter: none;
+}
+
+/* Lazy loading intersection observer styles */
+.lazy-image {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.lazy-image.in-view {
+  opacity: 1;
+}
+
+/* Container optimizations */
+.image-container {
+  overflow: hidden;
+  position: relative;
+}
+
+.image-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Skeleton loading for better perceived performance */
+.image-skeleton {
+  background: linear-gradient(90deg, 
+    rgba(255, 255, 255, 0.1) 25%, 
+    rgba(255, 255, 255, 0.05) 50%, 
+    rgba(255, 255, 255, 0.1) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-loading 2s infinite;
+}
+
+@keyframes skeleton-loading {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Network-aware optimizations */
+@media (prefers-reduced-data: reduce) {
+  img {
+    /* Reduce image quality on slow connections */
+    image-rendering: optimizeSpeed;
+    filter: contrast(0.9) brightness(0.95);
+  }
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+  img,
+  .image-loading,
+  .image-loaded,
+  .progressive-image,
+  .lazy-image {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* Print optimizations */
+@media print {
+  img {
+    /* Optimize for print */
+    image-rendering: auto;
+    filter: none !important;
+    opacity: 1 !important;
+    transition: none !important;
+  }
+}
+
+/* Critical path optimizations */
+.above-fold img {
+  /* Prioritize above-fold images */
+  content-visibility: auto;
+  contain-intrinsic-size: 300px;
+}
+
+.below-fold img {
+  /* Defer below-fold images */
+  content-visibility: auto;
+}
+
+/* Memory management */
+.offscreen-images {
+  /* Help browser manage memory for offscreen images */
+  content-visibility: hidden;
+}
+
+/* Responsive image utilities */
+.img-responsive {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+}
+
+.img-fluid {
+  max-width: 100%;
+  height: auto;
+}
+
+.img-thumbnail {
+  width: 50px;
+  height: 50px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+/* Quality-specific styles */
+.img-high-quality {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: optimize-contrast;
+}
+
+.img-fast-loading {
+  image-rendering: optimizeSpeed;
+  image-rendering: pixelated;
+}

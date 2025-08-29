@@ -372,20 +372,20 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     
     try {
       const response = await axios.get(`/api/profile-info/${accountHolder}?platform=instagram`);
-      const userId = response.data?.id;
+      // Try to get userId from id field, fallback to username if id doesn't exist
+      const userId = response.data?.id || response.data?.username;
       if (userId && !igBusinessId) {
         if (!isInstagramConnected) {
           connectInstagram(userId, userId);
         }
-        console.log(`[${new Date().toISOString()}] Set igBusinessId from profile: ${userId}`);
+        console.log(`[${new Date().toISOString()}] Set igBusinessId from profile: ${userId} (${response.data?.id ? 'id' : 'username'} field)`);
       } else if (!userId) {
-        console.warn(`[${new Date().toISOString()}] No userId found in profile info for ${accountHolder}. Response:`, response.data);
+        console.error(`[${new Date().toISOString()}] No userId found in profile info for ${accountHolder}. Response:`, response.data);
         if (attempt < maxAttempts) {
           console.log(`[${new Date().toISOString()}] Retrying fetchIgBusinessId, attempt ${attempt + 1}/${maxAttempts}`);
           setTimeout(() => fetchIgBusinessId(attempt + 1, maxAttempts), 2000);
         } else {
-          // Failed to initialize Instagram account after retries
-          console.warn(`[${new Date().toISOString()}] Failed to get userId after ${maxAttempts} attempts for ${accountHolder}`);
+          console.error(`[${new Date().toISOString()}] Failed to get userId after ${maxAttempts} attempts for ${accountHolder}`);
         }
       }
     } catch (err) {
@@ -1750,7 +1750,7 @@ Image Description: ${response.post.image_prompt}
       try {
         console.log(`[AutopilotService] 🔍 Checking autopilot settings for ${accountHolder}`);
         
-        const response = await fetch(`/autopilot-settings/${accountHolder}?platform=instagram`);
+        const response = await fetch(`/api/autopilot-settings/${accountHolder}?platform=instagram`);
         
         if (response.ok) {
           const responseText = await response.text();

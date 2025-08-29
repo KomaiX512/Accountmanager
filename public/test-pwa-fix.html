@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PWA Fix Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f0f0f0;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .warning { background: #fff3cd; color: #856404; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>PWA Fix Test Page</h1>
+    
+    <div class="test-section">
+        <h2>Service Worker Status</h2>
+        <div id="sw-status" class="status warning">Checking...</div>
+        <button onclick="checkServiceWorkers()">Check Service Workers</button>
+        <button onclick="clearServiceWorkers()">Clear All Service Workers</button>
+    </div>
+    
+    <div class="test-section">
+        <h2>Cache Status</h2>
+        <div id="cache-status" class="status warning">Checking...</div>
+        <button onclick="checkCaches()">Check Caches</button>
+        <button onclick="clearCaches()">Clear All Caches</button>
+    </div>
+    
+    <div class="test-section">
+        <h2>App Loading Test</h2>
+        <div id="app-test" class="status warning">Ready to test</div>
+        <button onclick="testAppLoading()">Test App Loading</button>
+        <button onclick="goToMainApp()">Go to Main App</button>
+    </div>
+
+    <script>
+        // Check service workers
+        async function checkServiceWorkers() {
+            const statusDiv = document.getElementById('sw-status');
+            if ('serviceWorker' in navigator) {
+                try {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    if (registrations.length === 0) {
+                        statusDiv.className = 'status success';
+                        statusDiv.textContent = 'No service workers registered';
+                    } else {
+                        statusDiv.className = 'status warning';
+                        statusDiv.textContent = `${registrations.length} service worker(s) registered`;
+                        registrations.forEach((reg, index) => {
+                            statusDiv.textContent += `\n- ${index + 1}: ${reg.scope} (${reg.active ? 'active' : 'inactive'})`;
+                        });
+                    }
+                } catch (error) {
+                    statusDiv.className = 'status error';
+                    statusDiv.textContent = `Error checking service workers: ${error.message}`;
+                }
+            } else {
+                statusDiv.className = 'status error';
+                statusDiv.textContent = 'Service workers not supported';
+            }
+        }
+
+        // Clear service workers
+        async function clearServiceWorkers() {
+            const statusDiv = document.getElementById('sw-status');
+            if ('serviceWorker' in navigator) {
+                try {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for (let registration of registrations) {
+                        await registration.unregister();
+                    }
+                    statusDiv.className = 'status success';
+                    statusDiv.textContent = `Cleared ${registrations.length} service worker(s)`;
+                } catch (error) {
+                    statusDiv.className = 'status error';
+                    statusDiv.textContent = `Error clearing service workers: ${error.message}`;
+                }
+            }
+        }
+
+        // Check caches
+        async function checkCaches() {
+            const statusDiv = document.getElementById('cache-status');
+            if ('caches' in window) {
+                try {
+                    const cacheNames = await caches.keys();
+                    if (cacheNames.length === 0) {
+                        statusDiv.className = 'status success';
+                        statusDiv.textContent = 'No caches found';
+                    } else {
+                        statusDiv.className = 'status warning';
+                        statusDiv.textContent = `${cacheNames.length} cache(s) found:`;
+                        cacheNames.forEach(name => {
+                            statusDiv.textContent += `\n- ${name}`;
+                        });
+                    }
+                } catch (error) {
+                    statusDiv.className = 'status error';
+                    statusDiv.textContent = `Error checking caches: ${error.message}`;
+                }
+            } else {
+                statusDiv.className = 'status error';
+                statusDiv.textContent = 'Cache API not supported';
+            }
+        }
+
+        // Clear caches
+        async function clearCaches() {
+            const statusDiv = document.getElementById('cache-status');
+            if ('caches' in window) {
+                try {
+                    const cacheNames = await caches.keys();
+                    for (let cacheName of cacheNames) {
+                        await caches.delete(cacheName);
+                    }
+                    statusDiv.className = 'status success';
+                    statusDiv.textContent = `Cleared ${cacheNames.length} cache(s)`;
+                } catch (error) {
+                    statusDiv.className = 'status error';
+                    statusDiv.textContent = `Error clearing caches: ${error.message}`;
+                }
+            }
+        }
+
+        // Test app loading
+        function testAppLoading() {
+            const testDiv = document.getElementById('app-test');
+            testDiv.className = 'status warning';
+            testDiv.textContent = 'Testing app loading...';
+            
+            // Simulate checking if main app assets are accessible
+            const testAssets = [
+                '/assets/index-BI2TxP0Z.js',
+                '/assets/index-Bib4K4v-.css'
+            ];
+            
+            let loadedCount = 0;
+            testAssets.forEach(asset => {
+                fetch(asset)
+                    .then(response => {
+                        if (response.ok) {
+                            loadedCount++;
+                            if (loadedCount === testAssets.length) {
+                                testDiv.className = 'status success';
+                                testDiv.textContent = 'All app assets are accessible!';
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        testDiv.className = 'status error';
+                        testDiv.textContent = `Asset loading failed: ${asset} - ${error.message}`;
+                    });
+            });
+        }
+
+        // Go to main app
+        function goToMainApp() {
+            window.location.href = '/';
+        }
+
+        // Auto-check on page load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                checkServiceWorkers();
+                checkCaches();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

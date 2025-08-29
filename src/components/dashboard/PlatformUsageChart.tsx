@@ -1,22 +1,146 @@
 import React from 'react';
-import { usePlatformUsageTracking } from '../../hooks/usePlatformUsageTracking';
+import { useUsage } from '../../context/UsageContext';
+import { useAuth } from '../../context/AuthContext';
+import { PlatformUsageService, PlatformUsageBreakdown } from '../../services/PlatformUsageService';
 import './PlatformUsageChart.css';
 
 interface PlatformUsageChartProps {
   className?: string;
 }
 
-const PlatformUsageChart: React.FC<PlatformUsageChartProps> = ({ className }) => {
-  const {
-    platformUsage,
-    platformStatuses,
-    isLoading,
-    getAcquiredPlatforms,
-    getTotalApiCalls
-  } = usePlatformUsageTracking();
+// ✅ CACHE PLATFORM STATUSES: Avoid repeated API calls like main dashboard
+const platformStatusCache = new Map<string, {[key: string]: boolean}>();
 
-  // ✅ EMPTY STATE: Show meaningful message when no platforms are acquired
-  if (!isLoading && Object.keys(platformStatuses).length === 0) {
+const PlatformUsageChart: React.FC<PlatformUsageChartProps> = ({ className }) => {
+  const { currentUser } = useAuth();
+  const { usage } = useUsage();
+  
+  // ✅ INSTANT RENDERING: Use same data source as main Usage Dashboard
+  // ✅ CACHED PLATFORM STATUSES: Avoid repeated API calls
+  const [platformStatuses, setPlatformStatuses] = React.useState<{[key: string]: boolean}>({});
+  const [platformUsage, setPlatformUsage] = React.useState<PlatformUsageBreakdown[]>([]);
+  const [hasCheckedStatuses, setHasCheckedStatuses] = React.useState(false);
+
+  // ✅ CACHED PLATFORM STATUS: Get from cache first, then backend if needed (like main dashboard)
+  React.useEffect(() => {
+    if (!currentUser?.uid) return;
+
+    const getPlatformStatuses = async () => {
+      // ✅ CHECK CACHE FIRST: Use cached statuses if available (instant)
+      const cacheKey = currentUser.uid;
+      if (platformStatusCache.has(cacheKey)) {
+        const cachedStatuses = platformStatusCache.get(cacheKey)!;
+        console.log('[PlatformUsageChart] Using cached platform statuses:', cachedStatuses);
+        setPlatformStatuses(cachedStatuses);
+        setHasCheckedStatuses(true);
+        return;
+      }
+
+      console.log('[PlatformUsageChart] Cache miss, checking backend for platform statuses...');
+      
+      const statuses: {[key: string]: boolean} = {};
+      const platforms = ['instagram', 'twitter', 'facebook', 'linkedin'];
+      
+      // Check each platform individually using the SAME endpoints as MainDashboard
+      for (const platformId of platforms) {
+        try {
+          let endpoint = '';
+          if (platformId === 'instagram') {
+            endpoint = `/api/user-instagram-status/${currentUser.uid}`;
+          } else if (platformId === 'twitter') {
+            endpoint = `/api/user-twitter-status/${currentUser.uid}`;
+          } else if (platformId === 'facebook') {
+            endpoint = `/api/user-facebook-status/${currentUser.uid}`;
+          } else {
+            endpoint = `/api/platform-access/${currentUser.uid}`;
+          }
+          
+          const resp = await fetch(endpoint);
+          if (resp.ok) {
+            const json = await resp.json();
+            const data = json?.data || json;
+            
+            // Check the SAME fields as MainDashboard for consistency
+            let isClaimed = false;
+            if (platformId === 'instagram') {
+              isClaimed = data.hasEnteredInstagramUsername === true;
+            } else if (platformId === 'twitter') {
+              isClaimed = data.hasEnteredTwitterUsername === true;
+            } else if (platformId === 'facebook') {
+              isClaimed = data.hasEnteredFacebookUsername === true;
+            } else {
+              isClaimed = data[platformId]?.claimed === true;
+            }
+            
+            statuses[platformId] = isClaimed;
+            console.log(`[PlatformUsageChart] ${platformId} status:`, isClaimed, 'from endpoint:', endpoint);
+          } else {
+            statuses[platformId] = false;
+            console.log(`[PlatformUsageChart] ${platformId} endpoint failed:`, resp.status);
+          }
+        } catch (error) {
+          console.warn(`[PlatformUsageChart] Failed to check ${platformId} status:`, error);
+          statuses[platformId] = false;
+        }
+      }
+
+      console.log('[PlatformUsageChart] Final platform statuses from backend:', statuses);
+      
+      // ✅ CACHE THE RESULTS: Store for future use (like main dashboard)
+      platformStatusCache.set(cacheKey, statuses);
+      
+      setPlatformStatuses(statuses);
+      setHasCheckedStatuses(true);
+    };
+
+    getPlatformStatuses();
+
+    // ✅ CLEAR CACHE ON USER CHANGE: Ensure data consistency
+    return () => {
+      if (currentUser?.uid) {
+        platformStatusCache.delete(currentUser.uid);
+      }
+    };
+  }, [currentUser?.uid]);
+
+  // ✅ INSTANT USAGE CALCULATION: Calculate platform usage when data changes (instant)
+  React.useEffect(() => {
+    if (!currentUser?.uid || !hasCheckedStatuses || Object.keys(platformStatuses).length === 0) {
+      setPlatformUsage([]);
+      return;
+    }
+
+    const calculatePlatformUsage = () => {
+      // Get list of acquired platforms
+      const acquiredPlatforms = Object.entries(platformStatuses)
+        .filter(([, acquired]) => acquired)
+        .map(([id]) => id);
+
+      if (acquiredPlatforms.length === 0) {
+        setPlatformUsage([]);
+        return;
+      }
+
+      try {
+        // Use the service to calculate platform usage with real backend data (synchronous)
+        const usageData = PlatformUsageService.calculatePlatformUsage(usage, acquiredPlatforms);
+        setPlatformUsage(usageData);
+      } catch (error) {
+        console.error('[PlatformUsageChart] Error calculating platform usage:', error);
+        setPlatformUsage([]);
+      }
+    };
+
+    calculatePlatformUsage();
+  }, [currentUser?.uid, platformStatuses, usage, hasCheckedStatuses]);
+
+  // ✅ UTILITY FUNCTIONS: Helper functions (instant)
+  const getAcquiredPlatforms = React.useCallback(() => {
+    return Object.entries(platformStatuses).filter(([, acquired]) => acquired).map(([id]) => id);
+  }, [platformStatuses]);
+
+  // ✅ INITIAL STATE: Show checking message only briefly while getting platform statuses
+  if (!hasCheckedStatuses) {
     return (
       <div className={`platform-usage-chart ${className || ''}`}>
         <div className="chart-header">
@@ -30,9 +154,9 @@ const PlatformUsageChart: React.FC<PlatformUsageChartProps> = ({ className }) =>
     );
   }
 
-  // ✅ NO ACQUIRED PLATFORMS: Show guidance message
+  // ✅ NO ACQUIRED PLATFORMS: Show guidance message (instant)
   const acquiredPlatforms = getAcquiredPlatforms();
-  if (!isLoading && acquiredPlatforms.length === 0) {
+  if (acquiredPlatforms.length === 0) {
     return (
       <div className={`platform-usage-chart ${className || ''}`}>
         <div className="chart-header">
@@ -47,8 +171,8 @@ const PlatformUsageChart: React.FC<PlatformUsageChartProps> = ({ className }) =>
     );
   }
 
-  // ✅ NO USAGE DATA: Show guidance when platforms are acquired but no usage
-  if (!isLoading && platformUsage.length === 0) {
+  // ✅ NO USAGE DATA: Show guidance when platforms are acquired but no usage (instant)
+  if (platformUsage.length === 0) {
     return (
       <div className={`platform-usage-chart ${className || ''}`}>
         <div className="chart-header">
@@ -63,21 +187,7 @@ const PlatformUsageChart: React.FC<PlatformUsageChartProps> = ({ className }) =>
     );
   }
 
-  if (isLoading) {
-    return (
-      <div className={`platform-usage-chart ${className || ''}`}>
-        <div className="chart-header">
-          <h3>Platform Usage Activity</h3>
-        </div>
-        <div className="loading-state">
-          <div className="loading-spinner"></div>
-          <p>Loading platform usage...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // ✅ HORIZONTAL CHART RENDERING: Right-to-left horizontal bars
+  // ✅ HORIZONTAL CHART RENDERING: Right-to-left horizontal bars (instant)
   const maxUsage = Math.max(...platformUsage.map(p => p.count), 1);
 
   return (

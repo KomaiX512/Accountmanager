@@ -78,13 +78,21 @@ export const registerWithEmailPassword = async (
     // Set user display name
     await updateProfile(user, { displayName });
     
-    // Send email verification
-    await sendEmailVerification(user, {
-      url: `${window.location.origin}/login?verified=true`,
-      handleCodeInApp: false
-    });
-    
-    console.log('Email verification sent to:', email);
+    // Send email verification with enhanced debugging
+    try {
+      await sendEmailVerification(user, {
+        url: `${window.location.origin}/login?verified=true`,
+        handleCodeInApp: false
+      });
+      console.log('✅ Email verification sent successfully to:', email);
+      console.log('✅ Verification URL:', `${window.location.origin}/login?verified=true`);
+    } catch (verificationError: any) {
+      console.error('❌ Failed to send email verification:', verificationError);
+      console.error('❌ User object:', user);
+      console.error('❌ User email:', user.email);
+      console.error('❌ User emailVerified status:', user.emailVerified);
+      throw new Error(`Failed to send verification email: ${verificationError.message || 'Unknown error'}`);
+    }
     
     // Log successful registration event
     logEvent(analytics, 'sign_up', {
@@ -116,12 +124,8 @@ export const signInWithEmailPassword = async (
     // Reload user to get latest emailVerified status
     await reload(user);
     
-    // Check if email is verified
-    if (!user.emailVerified) {
-      // Sign out the user since email is not verified
-      await signOut(auth);
-      throw new Error('Please verify your email before signing in. Check your inbox for the verification link.');
-    }
+    // Email verification is only required for sign-up, not sign-in
+    // Allow users to sign in regardless of email verification status
     
     // Log successful login event
     logEvent(analytics, 'login', {
@@ -173,10 +177,15 @@ export const sendVerificationEmail = async (): Promise<void> => {
   try {
     const user = auth.currentUser;
     if (!user) {
+      console.error('❌ No user is currently signed in for verification');
       throw new Error('No user is currently signed in');
     }
     
+    console.log('🔍 Sending verification email to user:', user.email);
+    console.log('🔍 User emailVerified status:', user.emailVerified);
+    
     if (user.emailVerified) {
+      console.log('✅ Email is already verified, skipping');
       throw new Error('Email is already verified');
     }
     
@@ -185,14 +194,17 @@ export const sendVerificationEmail = async (): Promise<void> => {
       handleCodeInApp: false
     });
     
-    console.log('Email verification sent to:', user.email);
+    console.log('✅ Email verification sent successfully to:', user.email);
+    console.log('✅ Verification URL:', `${window.location.origin}/login?verified=true`);
     
     // Log verification email sent
     logEvent(analytics, 'email_verification_sent', {
       method: 'email'
     });
   } catch (error: any) {
-    console.error("Error sending verification email:", error);
+    console.error("❌ Error sending verification email:", error);
+    console.error("❌ Error code:", error.code);
+    console.error("❌ Error message:", error.message);
     
     // Log failed verification email attempt
     logEvent(analytics, 'email_verification_error', {

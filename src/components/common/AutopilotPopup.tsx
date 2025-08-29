@@ -47,7 +47,7 @@ const AutopilotPopup: React.FC<AutopilotPopupProps> = ({
   // 🚀 AUTOPILOT: Fetch current automation settings
   const fetchAutopilotSettings = async () => {
     try {
-      const response = await axios.get(`/autopilot-settings/${username}?platform=${platform}`);
+      const response = await axios.get(`/api/autopilot-settings/${username}?platform=${platform}`);
       if (response.data) {
         setAutopilotSettings(response.data);
       }
@@ -78,7 +78,7 @@ const AutopilotPopup: React.FC<AutopilotPopupProps> = ({
     try {
       const updatedSettings = { ...autopilotSettings, ...newSettings };
       
-      const response = await axios.post(`/autopilot-settings/${username}`, {
+      const response = await axios.post(`/api/autopilot-settings/${username}`, {
         platform,
         settings: updatedSettings
       });

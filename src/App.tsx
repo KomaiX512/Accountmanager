@@ -35,12 +35,22 @@ import GlobalProcessingGuard from './components/guards/GlobalProcessingGuard';
 import LoadingStateGuard from './components/guards/LoadingStateGuard';
 import RagService from './services/RagService';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import { setupPlatformUsernameInterceptor } from './utils/platformUsernameInterceptor';
 
-// Extend Window interface for proxy server status
+// Extend Window interface for proxy server status and optimization tester
 declare global {
   interface Window {
     proxyServerDown?: boolean;
+    optimizationTester?: any;
   }
+}
+
+// Load optimization tester in development
+if (process.env.NODE_ENV === 'development') {
+  import('./utils/imageOptimizationTester.js').then((module) => {
+    window.optimizationTester = new module.default();
+    console.log('🚀 Image Optimization Tester loaded! Use window.optimizationTester in console.');
+  }).catch(console.error);
 }
 
 // Main App component with AuthProvider
@@ -79,14 +89,12 @@ const AppContent: React.FC = () => {
   const [userId, setUserId] = useState<string | undefined>(undefined);
   const [isLoadingUserData, setIsLoadingUserData] = useState(false);
 
-  // Global image error handler to prevent crashes when proxy server is down
+  // Global image error handling and platform username interceptor setup
   useEffect(() => {
-    const handleImageError = (event: Event) => {
-      const img = event.target as HTMLImageElement;
-      if (img && img.src) {
-        console.warn(`Image failed to load: ${img.src}`);
-        // Remove the failed src to prevent infinite retry loops
-        img.removeAttribute('src');
+    const handleImageError = (e: Event) => {
+      const img = e.target as HTMLImageElement;
+      if (img && img.tagName === 'IMG') {
+        console.error('Image failed to load:', img.src);
         // Add a class to indicate the image failed
         img.classList.add('image-load-failed');
       }
@@ -94,6 +102,9 @@ const AppContent: React.FC = () => {
 
     // Add global image error listener
     document.addEventListener('error', handleImageError, true);
+    
+    // ✅ CRITICAL: Setup platform username interceptor to block wrong API calls
+    setupPlatformUsernameInterceptor();
     
     return () => {
       document.removeEventListener('error', handleImageError, true);
@@ -142,14 +153,20 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     if (!currentUser?.uid) return;
 
-    const platformId = getCurrentPlatform();
     const uid = currentUser.uid;
 
-    // Primary source for username used across the app
-    let username = localStorage.getItem(`${platformId}_username_${uid}`) || '';
+    // ✅ CRITICAL FIX: Force immediate platform-username isolation on platform switch
+    const currentUrlPlatform = location.pathname.includes('twitter') ? 'twitter' : 
+                              location.pathname.includes('facebook') ? 'facebook' : 'instagram';
+    
+    // ✅ PLATFORM ISOLATION: Only use username from the current platform's localStorage
+    let username = localStorage.getItem(`${currentUrlPlatform}_username_${uid}`) || '';
+    
+    // ✅ VALIDATION: Log platform-username mapping for debugging
+    console.log(`[App] 🔄 Platform-Username Mapping: URL=${currentUrlPlatform}, Username=${username}`);
 
     // Facebook-specific backfill: if missing, try account_data.name
-    if (platformId === 'facebook' && !username) {
+    if (currentUrlPlatform === 'facebook' && !username) {
       try {
         const raw = localStorage.getItem(`facebook_account_data_${uid}`);
         if (raw) {
@@ -163,16 +180,16 @@ const AppContent: React.FC = () => {
       } catch {}
     }
 
-    // Load competitors (names array). For Facebook, backfill from full competitor_data if needed
+    // ✅ PLATFORM ISOLATION: Load competitors only from current platform
     let parsedCompetitors: string[] = [];
     try {
-      const competitorsRaw = localStorage.getItem(`${platformId}_competitors_${uid}`) || '[]';
+      const competitorsRaw = localStorage.getItem(`${currentUrlPlatform}_competitors_${uid}`) || '[]';
       parsedCompetitors = JSON.parse(competitorsRaw);
       if (!Array.isArray(parsedCompetitors)) parsedCompetitors = [];
     } catch {
       parsedCompetitors = [];
     }
-    if (platformId === 'facebook' && parsedCompetitors.length === 0) {
+    if (currentUrlPlatform === 'facebook' && parsedCompetitors.length === 0) {
       try {
         const fullRaw = localStorage.getItem(`facebook_competitor_data_${uid}`);
         if (fullRaw) {
@@ -190,34 +207,23 @@ const AppContent: React.FC = () => {
       } catch {}
     }
 
-    const savedAccountType = (localStorage.getItem(`${platformId}_account_type_${uid}`) as 'branding' | 'non-branding') || 'branding';
+    const savedAccountType = (localStorage.getItem(`${currentUrlPlatform}_account_type_${uid}`) as 'branding' | 'non-branding') || 'branding';
 
-    // ✅ FIXED: Only update if values actually differ to avoid infinite loops
-    // Use functional updates to prevent dependency issues
-    setAccountHolder(prev => {
-      if (username !== prev) {
-        console.log(`[App] 🔄 Updating accountHolder: ${prev} -> ${username}`);
-        return username;
-      }
-      return prev;
-    });
+    // ✅ ENHANCED: Force immediate state update on platform switch with validation
+    const isValidUsername = username && username.trim() !== '';
     
-    setCompetitors(prev => {
-      if (JSON.stringify(parsedCompetitors) !== JSON.stringify(prev)) {
-        console.log(`[App] 🔄 Updating competitors for ${platformId}`);
-        return parsedCompetitors;
-      }
-      return prev;
-    });
+    // ✅ CRITICAL: ALWAYS force immediate state update on platform switch
+    setAccountHolder(username);
+    console.log(`[App] 🔄 PLATFORM SWITCH: Force set accountHolder: ${username} (Platform: ${currentUrlPlatform})`);
     
-    setAccountType(prev => {
-      if (savedAccountType !== prev) {
-        console.log(`[App] 🔄 Updating accountType: ${prev} -> ${savedAccountType}`);
-        return savedAccountType;
-      }
-      return prev;
-    });
-  }, [currentUser?.uid]); // ✅ REMOVED location.pathname from dependencies to prevent infinite loop
+    // ✅ CRITICAL: Also force competitors update for current platform
+    setCompetitors(parsedCompetitors);
+    console.log(`[App] 🔄 PLATFORM SWITCH: Force set competitors for ${currentUrlPlatform}:`, parsedCompetitors);
+    
+    // ✅ CRITICAL: Also force account type update for current platform  
+    setAccountType(savedAccountType);
+    console.log(`[App] 🔄 PLATFORM SWITCH: Force set accountType: ${savedAccountType} (Platform: ${currentUrlPlatform})`);
+  }, [currentUser?.uid, location.pathname]); // ✅ CRITICAL: Add location.pathname to trigger on platform navigation
 
   // ✅ SEPARATE EFFECT: Handle platform changes when location changes (without infinite loops)
   useEffect(() => {

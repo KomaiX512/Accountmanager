@@ -896,6 +896,13 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
   animation: none !important;
   transform: none !important;
   transition: none !important;
+  width: clamp(48px, 8vw, 72px) !important;
+  height: clamp(48px, 8vw, 72px) !important;
+}
+
+.platform-row .platform-icon img {
+  width: clamp(36px, 6vw, 56px) !important;
+  height: clamp(36px, 6vw, 56px) !important;
 }
 
 /* Remove hover effects from platform row container */
@@ -958,15 +965,19 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
   transition: transform 0.05s ease;
 }
 
-.platform-icon {
-  width: clamp(40px, 6vw, 60px);
-  height: clamp(40px, 6vw, 60px);
+/* FORCE PLATFORM ICON SIZING - HIGHEST PRIORITY - UPDATED 2024 */
+.platform-icon,
+.platforms-container .platform-icon,
+.platform-row .platform-icon,
+.clickable-area .platform-icon {
+  width: clamp(48px, 8vw, 72px) !important;
+  height: clamp(48px, 8vw, 72px) !important;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   background: rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
+  border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   animation: none !important;
   transform: none !important;
@@ -987,11 +998,15 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
   transition: transform 0.05s ease;
 }
 
-.platform-icon img {
-  width: clamp(32px, 5vw, 44px);
-  height: clamp(32px, 5vw, 44px);
+/* FORCE PLATFORM ICON IMAGE SIZING - HIGHEST PRIORITY */
+.platform-icon img,
+.platforms-container .platform-icon img,
+.platform-row .platform-icon img,
+.clickable-area .platform-icon img {
+  width: clamp(36px, 6vw, 56px) !important;
+  height: clamp(36px, 6vw, 56px) !important;
   object-fit: contain;
-  border-radius: 10px;
+  border-radius: 12px;
   filter: drop-shadow(0 0 6px rgba(0, 255, 204, 0.25));
   animation: none !important;
   transform: none !important;
@@ -1758,13 +1773,13 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
   }
   
   .platform-icon {
-    width: clamp(32px, 5vw, 40px);
-    height: clamp(32px, 5vw, 40px);
+    width: clamp(140px, 18vw, 180px);
+    height: clamp(140px, 18vw, 180px);
   }
   
   .platform-icon img {
-    width: clamp(28px, 4vw, 36px);
-    height: clamp(28px, 4vw, 36px);
+    width: clamp(112px, 15vw, 144px);
+    height: clamp(112px, 15vw, 144px);
   }
   
   .platform-name {
@@ -1860,13 +1875,13 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
 
   /* LARGE platform icon size for mobile - MUCH MORE PROMINENT */
   .platform-icon {
-    width: clamp(48px, 7vw, 60px);
-    height: clamp(48px, 7vw, 60px);
+    width: clamp(180px, 24vw, 220px);
+    height: clamp(180px, 24vw, 220px);
   }
 
   .platform-icon img {
-    width: clamp(36px, 5.5vw, 48px);
-    height: clamp(36px, 5.5vw, 48px);
+    width: clamp(140px, 20vw, 176px);
+    height: clamp(140px, 20vw, 176px);
   }
 
   .platform-name {
@@ -2027,13 +2042,13 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
   }
   
   .platform-icon {
-    width: clamp(24px, 3.5vw, 32px);
-    height: clamp(24px, 3.5vw, 32px);
+    width: clamp(100px, 14vw, 120px);
+    height: clamp(100px, 14vw, 120px);
   }
   
   .platform-icon img {
-    width: clamp(20px, 3vw, 28px);
-    height: clamp(20px, 3vw, 28px);
+    width: clamp(80px, 11vw, 96px);
+    height: clamp(80px, 11vw, 96px);
   }
   
   .platform-name {
@@ -2113,13 +2128,13 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
 
   /* Fix platform icon size for ultra-small screens - MUCH SMALLER */
   .platform-icon {
-    width: clamp(40px, 6vw, 52px);
-    height: clamp(40px, 6vw, 52px);
+    width: clamp(140px, 18vw, 160px);
+    height: clamp(140px, 18vw, 160px);
   }
 
   .platform-icon img {
-    width: clamp(30px, 4.5vw, 40px);
-    height: clamp(30px, 4.5vw, 40px);
+    width: clamp(112px, 15vw, 128px);
+    height: clamp(112px, 15vw, 128px);
   }
 
   .platform-name {
@@ -2345,13 +2360,13 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
 
   /* Fix platform icon size for extra-small screens - MUCH SMALLER */
   .platform-icon {
-    width: clamp(36px, 5.5vw, 48px);
-    height: clamp(36px, 5.5vw, 48px);
+    width: clamp(120px, 16vw, 140px);
+    height: clamp(120px, 16vw, 140px);
   }
 
   .platform-icon img {
-    width: clamp(28px, 4vw, 36px);
-    height: clamp(28px, 4vw, 36px);
+    width: clamp(96px, 13vw, 112px);
+    height: clamp(96px, 13vw, 112px);
   }
 
   .platform-name {
@@ -3436,8 +3451,8 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
 
   /* Scale down icon */
   .dashboard-content .platform-row .platform-icon {
-    width: 35px !important;
-    height: 35px !important;
+    width: 48px !important;
+    height: 48px !important;
     margin-bottom: 5px !important;
   }
 

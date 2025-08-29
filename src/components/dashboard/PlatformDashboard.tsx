@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import '../instagram/Dashboard.css'; // Reuse the same styles
 import Cs_Analysis from '../instagram/Cs_Analysis';
 import OurStrategies from '../instagram/OurStrategies';
@@ -65,28 +66,41 @@ interface PlatformDashboardProps {
 }
 
 const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ 
-  accountHolder, 
+  accountHolder: propAccountHolder, // Keep prop but override with localStorage
   competitors, 
   accountType, 
-  platform,
-  onOpenChat
+  platform = 'instagram',
+  onOpenChat 
 }) => {
+  const { currentUser } = useAuth();
+  const navigate = useNavigate();
+  
+  // ✅ CRITICAL FIX: Always read username from platform-specific localStorage
+  const accountHolder = currentUser?.uid 
+    ? localStorage.getItem(`${platform}_username_${currentUser.uid}`) || ''
+    : '';
+  
+  console.log(`[PlatformDashboard] 🔄 Platform=${platform}, Username=${accountHolder} (from localStorage)`);
+  
+  // Early return if no username found for this platform
+  if (!accountHolder) {
+    console.log(`[PlatformDashboard] ⚠️ No username found for ${platform}, redirecting to entry form`);
+    navigate(`/${platform}`);
+    return null;
+  }
+
   // ALL HOOKS MUST BE CALLED FIRST - Rules of Hooks
   const guard = useProcessingGuard(platform, accountHolder);
   const [isLoading, setIsLoading] = useState(true);
-  const navigate = useNavigate();
   const loadingCheckRef = useRef(false);
   const { processingState } = useProcessing();
 
-
-
   // ALL CONTEXT HOOKS MUST BE CALLED FIRST - Rules of Hooks
-  const { currentUser } = useAuth();
   const { userId: igUserId, isConnected: isInstagramConnected } = useInstagram();
   const { userId: twitterId, isConnected: isTwitterConnected } = useTwitter();
   const { userId: facebookPageId, isConnected: isFacebookConnected, connectFacebook } = useFacebook();
   const { trackRealAIReply, trackRealPostCreation, canUseFeature } = useFeatureTracking();
-  const { trackAIReply } = useDefensiveUsageTracking();
+  const { safeIncrementUsage } = useDefensiveUsageTracking();
   const { showUpgradePopup, blockedFeature, closeUpgradePopup, currentUsage } = useUpgradeHandler();
   const { resetAndAllowReconnection } = useResetPlatformState();
 
@@ -159,7 +173,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
 
   // 🍎 Mobile profile menu state
   const [isMobileProfileMenuOpen, setIsMobileProfileMenuOpen] = useState(false);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 60, right: 10 });
+  const hamburgerButtonRef = useRef<HTMLButtonElement>(null);
 
   // 🍎 Mobile expandable modules state
   const [expandedModules, setExpandedModules] = useState<{
@@ -181,6 +195,60 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const [isMobileImageEditorOpen, setIsMobileImageEditorOpen] = useState(false);
   const [isMobileProfilePopupOpen, setIsMobileProfilePopupOpen] = useState(false);
   const [isMobileManualOpen, setIsMobileManualOpen] = useState(false);
+
+  // 🚀 POST CREATION DROPDOWN STATE
+  const [isPostDropdownOpen, setIsPostDropdownOpen] = useState(false);
+  const [postDropdownPosition, setPostDropdownPosition] = useState<{ top: number; left: number; width?: number } | null>(null);
+  const postInputRef = useRef<HTMLInputElement>(null);
+  const portalRootRef = useRef<HTMLElement | null>(null);
+
+  // 🚀 PRE-MADE POST PROMPTS - Generic and applicable to all accounts
+  const postPrompts = [
+    {
+      id: 'typographical',
+      title: 'Typographical Post',
+      prompt: 'Create an engaging typographical post with bold text design and motivational quote'
+    },
+    {
+      id: 'numerical',
+      title: 'Statistical/Numerical',
+      prompt: 'Create a data-driven post with interesting statistics and numbers relevant to my industry'
+    },
+    {
+      id: 'infographic',
+      title: 'Infographic Style',
+      prompt: 'Design an informative infographic post with clear visual hierarchy and key insights'
+    },
+    {
+      id: 'single_image',
+      title: 'Single Image',
+      prompt: 'Create a compelling single image post with strong visual impact and clear message'
+    },
+    {
+      id: 'meme',
+      title: 'Meme Style',
+      prompt: 'Generate a fun, engaging meme-style post that resonates with my audience'
+    }
+  ];
+
+  // 🍎 Mobile profile dropdown click outside handler
+  useEffect(() => {
+    if (isMobileProfileMenuOpen) {
+      const handleClickOutside = (e: MouseEvent) => {
+        const target = e.target as Node;
+        if (!hamburgerButtonRef.current?.contains(target) && 
+            !document.querySelector('.mobile-profile-dropdown')?.contains(target)) {
+          setIsMobileProfileMenuOpen(false);
+        }
+      };
+      
+      document.addEventListener('click', handleClickOutside);
+      
+      return () => {
+        document.removeEventListener('click', handleClickOutside);
+      };
+    }
+  }, [isMobileProfileMenuOpen]);
 
   // 🍎 Mobile module click handler for expandable modules
   const handleMobileModuleClick = (moduleKey: keyof typeof expandedModules, e: React.MouseEvent) => {
@@ -288,15 +356,26 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     }
   }, [accountHolder, platform, accountType, competitors]);
 
-  const fetchProfileInfo = useCallback(async () => {
-    if (!accountHolder) return;
+  const fetchProfileInfo = useCallback(async (retryCount = 0) => {
+    const maxRetries = 3;
     setProfileLoading(true);
     setProfileError(null);
-    setImageError(false);
+    
     try {
-      console.log(`[PlatformDashboard] ⚡ Fetching profile info for ${platform}`);
+      // ✅ PLATFORM-USERNAME VALIDATION: Ensure accountHolder matches current platform
+      const currentUrlPlatform = location.pathname.includes('twitter') ? 'twitter' : 
+                                location.pathname.includes('facebook') ? 'facebook' : 'instagram';
       
-      // Single canonical path using dashboard username (accountHolder) and explicit platform
+      if (platform !== currentUrlPlatform) {
+        console.error(`[PlatformDashboard] ❌ PLATFORM MISMATCH: prop=${platform}, URL=${currentUrlPlatform}`);
+        setProfileError(`Platform mismatch detected. Expected ${currentUrlPlatform}, got ${platform}`);
+        return;
+      }
+      
+      // ✅ USERNAME VALIDATION: Removed - accountHolder now comes directly from localStorage
+      
+      console.log(`[${new Date().toISOString()}] 🔍 Fetching ${platform} profile info for: ${accountHolder} (attempt ${retryCount + 1}/${maxRetries}) ✅ VALIDATED`);
+      
       let response;
       let profileData = null;
       const platformParam = `?platform=${platform}&forceRefresh=true`;
@@ -438,6 +517,158 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
 
   // Helper function to get viewed storage key
   const getViewedStorageKey = (section: string) => `viewed_${section}_${platform}_${accountHolder}`;
+
+  // 🚀 POST DROPDOWN: Portal setup and positioning logic
+  useEffect(() => {
+    let node = document.getElementById('post-dropdown-portal-root') as HTMLElement | null;
+    if (!node) {
+      node = document.createElement('div');
+      node.id = 'post-dropdown-portal-root';
+      document.body.appendChild(node);
+    }
+    portalRootRef.current = node;
+
+    return () => {
+      // Clean up portal on unmount
+      const existingNode = document.getElementById('post-dropdown-portal-root');
+      if (existingNode && existingNode.parentNode) {
+        existingNode.parentNode.removeChild(existingNode);
+      }
+    };
+  }, []);
+
+
+
+  // 🚀 POST DROPDOWN: Position calculation
+  const updateDropdownPosition = useCallback(() => {
+    const inputElement = postInputRef.current;
+    console.log('🚀 updateDropdownPosition called, input element:', inputElement);
+    if (!inputElement) {
+      setPostDropdownPosition(null);
+      return;
+    }
+
+    const rect = inputElement.getBoundingClientRect();
+    console.log('🚀 Input rect:', rect);
+    
+    // Find the post-creation-bar container for proper alignment
+    const parentContainer = inputElement.closest('.post-creation-bar');
+    const containerRect = parentContainer ? parentContainer.getBoundingClientRect() : rect;
+    
+  // Try to measure the actual rendered dropdown to compute an exact top position
+  const portalEl = document.getElementById('post-dropdown-portal') as HTMLElement | null;
+  const measuredDropdownRect = portalEl ? portalEl.getBoundingClientRect() : null;
+  const dropdownHeight = measuredDropdownRect ? Math.round(measuredDropdownRect.height) : 340; // Fallback
+  const measuredDropdownWidth = measuredDropdownRect ? Math.round(measuredDropdownRect.width) : 480; // Fallback
+
+  // Determine desired width: match input width (with padding), clamped to sensible min/max
+  const inputPreferredWidth = Math.round(Math.min(480, Math.max(280, rect.width + 32)));
+  const dropdownWidth = Math.min(measuredDropdownWidth || 480, inputPreferredWidth);
+
+  // Small visual gap between input and the dropdown (keeps creation container visible)
+  const spacing = 12;
+
+  // Position centered above the input field (upward drawer)
+  let top = rect.top - dropdownHeight - spacing; // vertical position above input
+  let left = rect.left + (rect.width / 2) - (dropdownWidth / 2); // center horizontally above input
+
+    console.log('🚀 Container rect:', containerRect);
+    console.log('🚀 Input rect for vertical positioning:', rect);
+    console.log('🚀 Calculated position - top:', top, 'left:', left);
+
+    // Ensure dropdown stays within viewport (top)
+    if (top < 24) {
+      top = rect.bottom + spacing; // Fallback to below if no space above
+    }
+
+    // Horizontal positioning with safe margins
+    const safeMargin = 16;
+    if (left + dropdownWidth > window.innerWidth - safeMargin) {
+      left = window.innerWidth - dropdownWidth - safeMargin;
+    }
+    if (left < safeMargin) {
+      left = safeMargin;
+    }
+
+    // Mobile responsiveness
+    if (window.innerWidth <= 767) {
+      left = 12;
+    } else if (window.innerWidth <= 480) {
+      left = 8;
+    }
+
+  const position = { top, left, width: dropdownWidth };
+  console.log('🚀 Setting dropdown position:', position);
+  setPostDropdownPosition(position);
+  }, []);
+
+  // 🚀 POST DROPDOWN: Click outside and positioning logic
+  useEffect(() => {
+    if (isPostDropdownOpen) {
+      // Wait a frame for the dropdown to render so we can measure it accurately
+      requestAnimationFrame(() => {
+        setTimeout(() => updateDropdownPosition(), 8);
+      });
+      
+      const handleResize = () => updateDropdownPosition();
+      const handleScroll = () => updateDropdownPosition();
+      const handleClickOutside = (e: MouseEvent) => {
+        const inputElement = postInputRef.current;
+        // portal element id lives in DOM when dropdown is rendered
+        const portalElement = document.getElementById('post-dropdown-portal');
+
+        if (portalElement && (portalElement.contains(e.target as Node) || 
+            (inputElement && inputElement.contains(e.target as Node)))) {
+          return;
+        }
+        setIsPostDropdownOpen(false);
+      };
+
+      window.addEventListener('resize', handleResize, { passive: true });
+      window.addEventListener('scroll', handleScroll, { passive: true });
+      document.addEventListener('click', handleClickOutside);
+
+      return () => {
+        window.removeEventListener('resize', handleResize);
+        window.removeEventListener('scroll', handleScroll);
+        document.removeEventListener('click', handleClickOutside);
+      };
+    }
+  }, [isPostDropdownOpen, updateDropdownPosition]);
+
+  // 🚀 POST DROPDOWN: Handle prompt selection
+  const handlePromptSelect = useCallback((prompt: string) => {
+    setQuery(prompt);
+    setIsPostDropdownOpen(false);
+    
+    // Focus back to input for immediate editing
+    if (postInputRef.current) {
+      postInputRef.current.focus();
+    }
+  }, []);
+
+  // 🚀 POST DROPDOWN: Handle input focus (only show when empty)
+  const handleInputFocus = useCallback(() => {
+    console.log('🚀 Input focused! Current query length:', query.length);
+    // Only show dropdown if input is empty
+    if (query.trim().length === 0) {
+      console.log('🚀 Input is empty, showing dropdown');
+      setIsPostDropdownOpen(true);
+    } else {
+      console.log('🚀 Input has content, hiding dropdown');
+      setIsPostDropdownOpen(false);
+    }
+  }, [query]);
+
+  // 🚀 POST DROPDOWN: Handle input change (hide dropdown when typing)
+  const handleInputChange = useCallback((newQuery: string) => {
+    setQuery(newQuery);
+    // Hide dropdown when user starts typing
+    if (newQuery.trim().length > 0) {
+      console.log('🚀 User started typing, hiding dropdown');
+      setIsPostDropdownOpen(false);
+    }
+  }, []);
 
   // Helper functions to get unseen counts for each section
   const getUnseenStrategiesCount = () => {
@@ -1470,7 +1701,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       }
       
       // 🤖 DEFENSIVE AI REPLY TRACKING: Track AI reply usage
-      await trackAIReply(`ai-reply-${platform.toLowerCase()}`);
+      await trackRealAIReply(platform, { type: 'dm', mode: 'instant' });
       
       try {
         console.log(`[${new Date().toISOString()}] Calling RAG service for instant ${platform} AI reply`);
@@ -1876,7 +2107,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
             }
             
             // 🤖 DEFENSIVE AUTO AI REPLY TRACKING: Track auto AI reply usage
-            await trackAIReply(`auto-ai-reply-${platform.toLowerCase()}`);
+            await trackRealAIReply(platform, { type: 'auto', mode: 'auto' });
             
             console.log(`[PlatformDashboard] ✅ Auto AI Reply tracked: ${platform} ${notification.type}`);
 
@@ -2362,33 +2593,11 @@ Image Description: ${response.post.image_prompt}
                     <>
                       {(profileInfo?.profilePicUrlHD || profileInfo?.profilePicUrl) && !imageError ? (
                         <img
-                          src={`/api/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD || profileInfo.profilePicUrl)}&t=${Date.now()}`}
+                          src={`/api/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD || profileInfo.profilePicUrl)}`}
                           alt={`${accountHolder}'s profile picture`}
                           className="profile-pic-bar"
-                          onError={(e) => {
-                            console.error(`Failed to load ${platform} profile picture for ${accountHolder} attempt ${imageRetryAttemptsRef.current + 1}`);
-                            if (imageRetryAttemptsRef.current < maxImageRetryAttempts) {
-                              imageRetryAttemptsRef.current++;
-                              const imgElement = e.target as HTMLImageElement;
-                              const imageUrl = profileInfo.profilePicUrlHD || profileInfo.profilePicUrl;
-                              
-                              if (imageRetryAttemptsRef.current === 1) {
-                                // First retry: try direct URL without proxy
-                                console.log(`Trying direct URL for ${platform} profile picture, attempt ${imageRetryAttemptsRef.current}`);
-                                setTimeout(() => {
-                                  imgElement.src = imageUrl;
-                                }, 500);
-                              } else {
-                                // Final retry: try proxy again with timestamp
-                                console.log(`Final retry with proxy for ${platform}, attempt ${imageRetryAttemptsRef.current}/${maxImageRetryAttempts}`);
-                                setTimeout(() => {
-                                  imgElement.src = `/api/proxy-image?url=${encodeURIComponent(imageUrl)}&t=${Date.now()}`;
-                                }, 1000);
-                              }
-                            } else {
-                              console.log(`Max retries reached for ${platform}, showing fallback for ${accountHolder}`);
-                              setImageError(true);
-                            }
+                          onError={() => {
+                            setImageError(true);
                           }}
                         />
                       ) : (
@@ -2524,6 +2733,7 @@ Image Description: ${response.post.image_prompt}
                     
                     {/* ✨ MOBILE PROFILE MENU BUTTON */}
                     <button
+                      ref={hamburgerButtonRef}
                       className="mobile-profile-menu"
                       onClick={() => {
                         console.log('Hamburger button clicked, current state:', isMobileProfileMenuOpen);
@@ -2540,7 +2750,7 @@ Image Description: ${response.post.image_prompt}
 
           {/* ✨ MOBILE PROFILE DROPDOWN - RENDERED OUTSIDE CONTAINER */}
           {isMobileProfileMenuOpen && (
-            <div className="mobile-profile-dropdown" style={{ position: 'fixed', top: dropdownPosition.top, right: dropdownPosition.right }}>
+            <div className="mobile-profile-dropdown">
               {/* ✨ PLATFORM-SPECIFIC CONNECT BUTTON INSIDE DROPDOWN */}
               <div className="mobile-connect-wrapper">
                 {platform === 'instagram' ? (
@@ -2826,14 +3036,17 @@ Image Description: ${response.post.image_prompt}
                 
                 <div className="post-input-section">
                   <input
+                    ref={postInputRef}
                     type="text"
                     value={query}
-                    onChange={(e) => setQuery(e.target.value)}
+                    onChange={(e) => handleInputChange(e.target.value)}
+                    onFocus={handleInputFocus}
                     placeholder={`What would you like to post on ${config.name}?`}
                     className="post-input-field"
                     disabled={isProcessing}
                     onKeyPress={(e) => {
                       if (e.key === 'Enter' && !isProcessing && query.trim()) {
+                        setIsPostDropdownOpen(false);
                         handleSendQuery();
                       }
                     }}
@@ -2856,6 +3069,38 @@ Image Description: ${response.post.image_prompt}
             </div>
           </div>
         </div>
+        
+        {/* 🚀 POST CREATION DROPDOWN - SIMPLIFIED VERSION */}
+        {isPostDropdownOpen && postDropdownPosition && (
+          <div
+            id="post-dropdown-portal"
+            className="post-creation-dropdown"
+            style={{ 
+              position: 'fixed', 
+              top: postDropdownPosition.top, 
+              left: postDropdownPosition.left, 
+              zIndex: 2000,
+              width: postDropdownPosition.width ? `${postDropdownPosition.width}px` : undefined,
+              maxWidth: 'calc(100vw - 16px)'
+            }}
+          >
+            <div className="dropdown-header">
+              <span>✨ Quick Post Templates</span>
+            </div>
+            {postPrompts.map((prompt) => (
+              <button
+                key={prompt.id}
+                className="dropdown-prompt-item"
+                onClick={() => handlePromptSelect(prompt.prompt)}
+                disabled={isProcessing}
+              >
+                <div className="prompt-title">{prompt.title}</div>
+                <div className="prompt-description">{prompt.prompt}</div>
+              </button>
+            ))}
+          </div>
+        )}
+        
         <ToastNotification toast={toast} type={toastType} />
       </motion.div>
       

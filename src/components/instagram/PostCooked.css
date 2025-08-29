@@ -10,6 +10,20 @@
   }
 }
 
+/* Image optimization loading state */
+@keyframes pulse-optimizing {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.post-image.optimizing {
+  animation: pulse-optimizing 1.5s ease-in-out infinite;
+}
+
 .post-cooked-container {
   height: 100%;
   display: flex;
@@ -467,7 +481,8 @@
 .schedule-button,
 .reject-button,
 .edit-button,
-.post-now-button {
+.post-now-button,
+.reimagine-button {
   padding: 6px 12px;
   border: 1px solid transparent;
   border-radius: 6px;
@@ -538,10 +553,25 @@
   color: #000000;
 }
 
+.reimagine-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  color: #ffffff !important;
+  padding: 6px 12px;
+  font-size: 11px;
+  min-width: 80px;
+}
+
+.reimagine-button:hover {
+  background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%) !important;
+  transform: translateY(-1px);
+  color: #ffffff !important;
+}
+
 .schedule-button svg,
 .reject-button svg,
 .edit-button svg,
-.post-now-button svg {
+.post-now-button svg,
+.reimagine-button svg {
   width: 12px;
   height: 12px;
   transition: transform 0.2s ease;
@@ -551,7 +581,8 @@
 .schedule-button:hover svg,
 .reject-button:hover svg,
 .edit-button:hover svg,
-.post-now-button:hover svg {
+.post-now-button:hover svg,
+.reimagine-button:hover svg {
   transform: scale(1.1);
 }
 

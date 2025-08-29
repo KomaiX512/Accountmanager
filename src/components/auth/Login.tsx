@@ -63,13 +63,9 @@ const Login: React.FC = () => {
   useEffect(() => {
     // Only redirect if user is logged in AND not in the middle of signup process
     if (currentUser && !isSigningUp && !showEmailVerification) {
-      // Check if user's email is verified before redirecting
-      if (currentUser.emailVerified) {
-        navigate(from, { replace: true });
-      } else {
-        // User is signed in but email not verified - sign them out
-        signOut();
-      }
+      // For sign-in: Allow access regardless of email verification status
+      // Email verification is only required for sign-up flow
+      navigate(from, { replace: true });
     }
   }, [currentUser, navigate, from, isSigningUp, showEmailVerification]);
 

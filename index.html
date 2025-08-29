@@ -30,6 +30,48 @@
     <!-- Cookie and lexical declaration error fix -->
     <script src="/ga-cookie-fix.js"></script>
     
+    <!-- Debug script to ensure proper loading -->
+    <script>
+      // Debug script to identify loading issues
+      console.log('Main HTML loading...');
+      
+      // Check if assets are accessible
+      function checkAssets() {
+        console.log('Checking asset accessibility...');
+        const assets = [
+          '/assets/index-BI2TxP0Z.js',
+          '/assets/index-Bib4K4v-.css'
+        ];
+        
+        assets.forEach(asset => {
+          fetch(asset)
+            .then(response => {
+              if (response.ok) {
+                console.log(`✅ Asset accessible: ${asset}`);
+              } else {
+                console.error(`❌ Asset not accessible: ${asset} (${response.status})`);
+              }
+            })
+            .catch(error => {
+              console.error(`❌ Asset fetch failed: ${asset}`, error);
+            });
+        });
+      }
+      
+      // Run asset check after a delay
+      setTimeout(checkAssets, 1000);
+      
+      // Monitor for any loading errors
+      window.addEventListener('error', (event) => {
+        console.error('Resource loading error:', event.target, event.error);
+      });
+      
+      // Monitor for unhandled promise rejections
+      window.addEventListener('unhandledrejection', (event) => {
+        console.error('Unhandled promise rejection:', event.reason);
+      });
+    </script>
+    
     <!-- PWA Registration Script -->
     <script src="/pwa-register.js"></script>
   </head>

@@ -1,27 +1,19 @@
 const CACHE_NAME = 'sentient-marketing-v1';
-const urlsToCache = [
-  '/',
-  '/index.html',
-  '/Logo/logo.png',
-  '/pwa-register.js',
-  '/manifest.json',
-  '/icons/icon-72x72.png',
-  '/icons/icon-96x96.png',
-  '/icons/icon-128x128.png',
-  '/icons/icon-144x144.png',
-  '/icons/icon-152x152.png',
-  '/icons/icon-192x192.png',
-  '/icons/icon-384x384.png',
-  '/icons/icon-512x512.png'
-];
 
-// Install event - cache resources
+// Install event - minimal caching
 self.addEventListener('install', (event) => {
+  console.log('PWA: Service Worker installing');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
         console.log('PWA: Opened cache');
-        return cache.addAll(urlsToCache);
+        // Only cache essential PWA files, not app assets
+        return cache.addAll([
+          '/',
+          '/index.html',
+          '/manifest.json',
+          '/icons/icon-192x192.png'
+        ]);
       })
       .catch((error) => {
         console.error('PWA: Cache installation failed:', error);
@@ -29,45 +21,53 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Fetch event - ONLY handle basic navigation, ignore everything else
+// Fetch event - COMPLETELY NON-INTERFERING
 self.addEventListener('fetch', (event) => {
-  // CRITICAL: Only handle main page navigation, ignore all dev server and asset requests
-  if (event.request.destination !== 'document') {
-    return; // Let the browser handle images, scripts, styles, etc. normally
-  }
-  
-  // Only handle requests to the main app page
+  // CRITICAL: Let ALL requests pass through normally - don't interfere with app loading
+  // Only handle very specific PWA-related requests
   const url = new URL(event.request.url);
-  if (url.pathname !== '/' && url.pathname !== '/index.html') {
-    return; // Let the browser handle other routes normally
-  }
   
-  // Only handle GET requests to our own domain
-  if (event.request.method !== 'GET' || url.hostname !== location.hostname) {
+  // Only handle requests to our own domain
+  if (url.hostname !== location.hostname) {
     return;
   }
   
-  // Safe navigation handling - only for main page
-  event.respondWith(
-    caches.match('/index.html')
-      .then((response) => {
-        return response || fetch(event.request);
-      })
-      .catch(() => {
-        // Fallback to cached index.html if both cache and network fail
-        return caches.match('/index.html');
-      })
-  );
+  // Only handle GET requests
+  if (event.request.method !== 'GET') {
+    return;
+  }
+  
+  // ONLY handle PWA-specific files, ignore all app assets
+  if (url.pathname === '/manifest.json' || 
+      url.pathname === '/icons/icon-192x192.png' ||
+      url.pathname === '/') {
+    
+    // Handle PWA files with cache-first strategy
+    event.respondWith(
+      caches.match(event.request)
+        .then((response) => {
+          return response || fetch(event.request);
+        })
+        .catch(() => {
+          // Fallback to network
+          return fetch(event.request);
+        })
+    );
+  }
+  
+  // For all other requests (CSS, JS, images, API calls), let the browser handle normally
+  // This ensures the app loads without any interference
 });
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
+  console.log('PWA: Service Worker activating');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
-            console.log('Deleting old cache:', cacheName);
+            console.log('PWA: Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
@@ -76,14 +76,13 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Handle background sync for offline actions
-self.addEventListener('sync', (event) => {
-  if (event.tag === 'background-sync') {
-    event.waitUntil(doBackgroundSync());
-  }
-});
+// Skip background sync for now to avoid interference
+// self.addEventListener('sync', (event) => {
+//   if (event.tag === 'background-sync') {
+//     event.waitUntil(doBackgroundSync());
+// }
+// });
 
-function doBackgroundSync() {
-  // Implement background sync logic here if needed
-  console.log('Background sync triggered');
-}
+// function doBackgroundSync() {
+//   console.log('Background sync triggered');
+// }

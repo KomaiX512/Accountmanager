@@ -2081,6 +2081,250 @@ app.get('/proxy-image', async (req, res) => {
   }
 });
 
+// ✨ NEW: AI Image Editing Endpoint using Claid AI
+app.post('/api/ai-image-edit', async (req, res) => {
+  const { imageKey, username, platform, prompt } = req.body;
+  
+  if (!imageKey || !username || !platform || !prompt) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Missing required fields: imageKey, username, platform, prompt' 
+    });
+  }
+
+  console.log(`[${new Date().toISOString()}] [AI-EDIT] Starting AI edit for ${platform}/${username}/${imageKey}`);
+  console.log(`[${new Date().toISOString()}] [AI-EDIT] Prompt: ${prompt}`);
+
+  try {
+    // Step 1: Get the original image from R2 bucket
+    const originalImageKey = `ready_post/${platform}/${username}/${imageKey}`;
+    console.log(`[${new Date().toISOString()}] [AI-EDIT] Fetching original image: ${originalImageKey}`);
+    
+    const getCommand = new GetObjectCommand({
+      Bucket: 'tasks',
+      Key: originalImageKey,
+    });
+    
+    let originalImageBuffer;
+    try {
+      const response = await s3Client.send(getCommand);
+      originalImageBuffer = await streamToBuffer(response.Body);
+      console.log(`[${new Date().toISOString()}] [AI-EDIT] ✅ Original image fetched (${originalImageBuffer.length} bytes)`);
+    } catch (r2Error) {
+      console.error(`[${new Date().toISOString()}] [AI-EDIT] ❌ Failed to fetch original image:`, r2Error.message);
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Original image not found in R2 bucket' 
+      });
+    }
+
+    // Step 2: Upload original image to temporary URL for Claid AI
+    const tempImageKey = `temp_ai_edit_${Date.now()}_${randomUUID()}.jpg`;
+    const putCommand = new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: tempImageKey,
+      Body: originalImageBuffer,
+      ContentType: 'image/jpeg',
+    });
+    
+    await s3Client.send(putCommand);
+    
+    // Generate temporary signed URL for Claid AI to access
+    const tempImageUrl = await getSignedUrl(s3Client, new GetObjectCommand({
+      Bucket: 'tasks',
+      Key: tempImageKey,
+    }), { expiresIn: 3600 }); // 1 hour expiry
+    
+    console.log(`[${new Date().toISOString()}] [AI-EDIT] ✅ Temporary image uploaded for AI processing`);
+
+    // Prepare Stability AI payload for image generation
+    const stabilityPayload = axios.toFormData({
+      image: tempImageUrl,
+      prompt: prompt,
+      strength: 0.7,
+      output_format: 'webp'
+    }, new FormData());
+
+    const stabilityHeaders = {
+      "Authorization": "Bearer sk-SimNOYyuKWM8DYiPmZaTiyd0jowZGh8W0D7ranwwOl54TQff",
+      "Accept": "image/*"
+    };
+
+    console.log(`[${new Date().toISOString()}] [AI-EDIT] 🤖 Calling Stability AI (Image-to-Image)...`);
+    console.log(`[${new Date().toISOString()}] [AI-EDIT] 📝 Prompt: "${prompt}"`);
+    
+    let stabilityResponse;
+    try {
+      stabilityResponse = await axios.postForm(
+        'https://api.stability.ai/v2beta/stable-image/generate/core',
+        stabilityPayload,
+        { 
+          validateStatus: undefined,
+          responseType: 'arraybuffer',
+          headers: stabilityHeaders,
+          timeout: 45000 // 45 second timeout
+        }
+      );
+
+      if (stabilityResponse.status !== 200) {
+        throw new Error(`Stability AI error: ${stabilityResponse.status} - ${stabilityResponse.data.toString()}`);
+      }
+    } catch (stabilityError) {
+      console.error(`[${new Date().toISOString()}] [AI-EDIT] ❌ Stability AI failed:`, stabilityError.response?.status, stabilityError.message);
+      
+      // Clean up temp image
+      await s3Client.send(new DeleteObjectCommand({
+        Bucket: 'tasks',
+        Key: tempImageKey,
+      }));
+      
+      return res.status(500).json({ 
+        error: 'AI processing failed', 
+        details: stabilityError.message 
+      });
+    }
+
+    console.log(`[${new Date().toISOString()}] [AI-EDIT] ✅ Stability AI processing successful (${stabilityResponse.data.length} bytes)`);
+    
+    // Upload edited image binary data to R2
+    const editedImageKey = `ready_post/${platform}/${username}/edited_${imageKey}`;
+    
+    const putEditedCommand = new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: editedImageKey,
+      Body: Buffer.from(stabilityResponse.data),
+      ContentType: 'image/webp',
+    });
+    
+    await s3Client.send(putEditedCommand);
+    console.log(`[${new Date().toISOString()}] [AI-EDIT] ✅ Edited image saved to R2: ${editedImageKey}`);
+
+    // Step 6: Clean up temporary image
+    await s3Client.send(new DeleteObjectCommand({
+      Bucket: 'tasks',
+      Key: tempImageKey,
+    }));
+
+    // Step 7: Return success response with both image URLs
+    const originalImageAccessUrl = `/api/r2-image/${username}/${imageKey}?platform=${platform}`;
+    const editedImageAccessUrl = `/api/r2-image/${username}/edited_${imageKey}?platform=${platform}`;
+    
+    console.log(`[${new Date().toISOString()}] [AI-EDIT] 🎯 AI editing workflow completed successfully`);
+    
+    res.json({
+      success: true,
+      originalImageUrl: originalImageAccessUrl,
+      editedImageUrl: editedImageAccessUrl,
+      imageKey: imageKey,
+      editedImageKey: `edited_${imageKey}`,
+      prompt: prompt,
+      processingTime: 'stability-ai-processing'
+    });
+
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [AI-EDIT] ❌ Unexpected error:`, error.message);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Unexpected error during AI image editing',
+      details: error.message 
+    });
+  }
+});
+
+// ✨ NEW: Approve/Reject AI Edited Image
+app.post('/api/ai-image-approve', async (req, res) => {
+  const { imageKey, username, platform, action } = req.body; // action: 'approve' or 'reject'
+  
+  if (!imageKey || !username || !platform || !['approve', 'reject'].includes(action)) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Missing required fields or invalid action (approve/reject)' 
+    });
+  }
+
+  console.log(`[${new Date().toISOString()}] [AI-APPROVE] ${action.toUpperCase()} action for ${platform}/${username}/${imageKey}`);
+
+  try {
+    const originalImageKey = `ready_post/${platform}/${username}/${imageKey}`;
+    const editedImageKey = `ready_post/${platform}/${username}/edited_${imageKey}`;
+
+    if (action === 'approve') {
+      try {
+        // Step 1: Check if edited image exists
+        const getEditedCommand = new GetObjectCommand({
+          Bucket: 'tasks',
+          Key: editedImageKey,
+        });
+        
+        const editedResponse = await s3Client.send(getEditedCommand);
+        const editedImageBuffer = await streamToBuffer(editedResponse.Body);
+        
+        // Step 2: Replace original with edited (same filename)
+        const putCommand = new PutObjectCommand({
+          Bucket: 'tasks',
+          Key: originalImageKey,
+          Body: editedImageBuffer,
+          ContentType: editedResponse.ContentType || 'image/webp',
+        });
+        
+        await s3Client.send(putCommand);
+        
+        // Step 3: Delete the edited temp file
+        try {
+          await s3Client.send(new DeleteObjectCommand({
+            Bucket: 'tasks',
+            Key: editedImageKey,
+          }));
+        } catch (deleteError) {
+          console.log(`[${new Date().toISOString()}] [AI-APPROVE] ⚠️ Edited file already deleted: ${editedImageKey}`);
+        }
+        
+        console.log(`[${new Date().toISOString()}] [AI-APPROVE] ✅ Approved: Original replaced with edited version`);
+      } catch (getError) {
+        if (getError.name === 'NoSuchKey') {
+          console.log(`[${new Date().toISOString()}] [AI-APPROVE] ❌ Edited image not found or already processed: ${editedImageKey}`);
+          return res.status(404).json({
+            success: false,
+            error: 'Edited image not found. It may have been already processed or deleted.'
+          });
+        }
+        throw getError;
+      }
+      
+      res.json({
+        success: true,
+        action: 'approved',
+        message: 'Edited image has replaced the original',
+        imageUrl: `/api/r2-image/${username}/${imageKey}?platform=${platform}&t=${Date.now()}`
+      });
+      
+    } else { // reject
+      // Simply delete the edited image, keep original
+      await s3Client.send(new DeleteObjectCommand({
+        Bucket: 'tasks',
+        Key: editedImageKey,
+      }));
+      
+      console.log(`[${new Date().toISOString()}] [AI-APPROVE] ✅ Rejected: Edited version deleted, original preserved`);
+      
+      res.json({
+        success: true,
+        action: 'rejected',
+        message: 'Edited image has been discarded, original preserved',
+        imageUrl: `/api/r2-image/${username}/${imageKey}?platform=${platform}`
+      });
+    }
+
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [AI-APPROVE] ❌ Error during ${action}:`, error.message);
+    res.status(500).json({ 
+      success: false, 
+      error: `Failed to ${action} edited image`,
+      details: error.message 
+    });
+  }
+});
+
 app.get(['/profile-info/:username', '/api/profile-info/:username'], async (req, res) => {
   const { username } = req.params;
   const forceRefresh = req.query.forceRefresh === 'true';
@@ -2670,13 +2914,55 @@ app.post(['/api/rag/discussion', '/api/discussion'], async (req, res) => {
   const platform = req.body.platform || 'instagram';
   
   try {
-    // ❌ REMOVED: Usage tracking already handled by frontend UsageContext
-    // Frontend tracks usage via /api/usage/increment/:userId to prevent double counting
+    console.log(`[DISCUSSION] 🚀 Creating discussion for ${platform}/${username}`);
     
     const response = await axios.post('http://localhost:3001/api/discussion', req.body, {
       headers: { 'Content-Type': 'application/json' },
       timeout: 120000 // 2 minute timeout for complex queries
     });
+    
+    // ✅ ADD: Usage tracking for discussion endpoint (same approach as post generation)
+    console.log(`[DISCUSSION] ✅ Discussion created successfully, incrementing usage for ${platform}/${username}`);
+    
+    try {
+      // Get userId from hardcoded mapping (same as post generation)
+      const knownMappings = {
+        'twitter_gdb': 'KUvVFxnLanYTWPuSIfphby5hxJQ2',
+        'instagram_fentybeauty': 'KUvVFxnLanYTWPuSIfphby5hxJQ2',
+        'facebook_komaix512': 'KUvVFxnLanYTWPuSIfphby5hxJQ2'
+      };
+      
+      const platformKey = `${platform}_${username}`;
+      const userId = knownMappings[platformKey];
+      
+      if (userId) {
+        console.log(`[DISCUSSION] 🔧 Using hardcoded mapping: ${platformKey} -> ${userId}`);
+        
+        try {
+          // Use 127.0.0.1 instead of localhost to avoid IPv6 issues
+          const usageResponse = await fetch(`http://127.0.0.1:3000/api/usage/increment/${userId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ feature: 'discussions', count: 1 })
+          });
+          
+          if (usageResponse.ok) {
+            const usageData = await usageResponse.json();
+            console.log(`[DISCUSSION] ✅ Usage incremented successfully:`, usageData);
+          } else {
+            console.error(`[DISCUSSION] ❌ Usage increment failed with status:`, usageResponse.status);
+          }
+        } catch (usageError) {
+          console.error(`[DISCUSSION] ❌ Usage increment request failed:`, usageError);
+        }
+      } else {
+        console.warn(`[DISCUSSION] ⚠️ No userId found for ${platform}/${username}, skipping usage increment`);
+      }
+    } catch (usageError) {
+      console.error(`[DISCUSSION] ❌ Usage increment failed:`, usageError.message);
+      // Don't fail the entire request if usage tracking fails
+    }
+    
     res.json(response.data);
   } catch (error) {
     console.error(`[DISCUSSION] Proxy error:`, error?.response?.data || error.message);
@@ -15881,14 +16167,49 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
       contentType = 'image/gif';
     }
     
-    // Set appropriate headers
+    // Set appropriate headers - NO CACHE for fresh AI edited images
     res.setHeader('Content-Type', contentType);
-    res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+    
+    // LOG WHAT IMAGE WE'RE SERVING FROM R2
+  console.log(`🔍 [R2-IMAGE-DEBUG] Request for image:`, {
+    originalUrl: req.originalUrl,
+    r2Key: r2Key,
+    queryParams: req.query,
+    userAgent: req.headers['user-agent']?.substring(0, 50)
+  });
+
+  // Enhanced cache-busting headers for specific query parameters
+  if (req.query.nuclear || req.query.immediate || req.query.final || req.query.preload || req.query.emergency || req.query.bypass || req.query.fresh || req.query.destroy) {
+    console.log(`🧨 [R2-IMAGE] NUCLEAR cache headers applied for: ${r2Key}`);
+    
+    res.set({
+      'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0, private, proxy-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': 'Thu, 01 Jan 1970 00:00:00 GMT',
+      'Last-Modified': new Date().toUTCString(),
+      'ETag': `"${Math.random().toString(36).substring(7)}-${Date.now()}"`,
+      'Vary': '*',
+      'X-Cache-Buster': Date.now().toString(),
+      'X-No-Cache': 'true'
+    });
+  } else {
+      res.setHeader('Cache-Control', 'public, max-age=3600'); // Normal cache for 1 hour
+    }
+    
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', '*');
     
+    // LOG FINAL IMAGE INFO BEFORE SENDING
+    console.log(`🔍 [R2-IMAGE-DEBUG] Serving image:`, {
+      r2Key: r2Key,
+      contentType: contentType,
+      imageSize: imageBuffer.length,
+      timestamp: new Date().toISOString(),
+      cacheHeaders: res.getHeaders()['cache-control']
+    });
+
     // Send the image
     res.send(Buffer.from(imageBuffer, 'binary'));
     

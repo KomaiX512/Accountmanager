@@ -30,7 +30,7 @@ import type { ChatMessage as ChatModalMessage } from './ChatModal';
 import type { Notification, ProfileInfo, LinkedAccount } from '../../types/notifications';
 import { safeFilter, safeLength } from '../../utils/safeArrayUtils';
 // Import icons from react-icons
-import { FaChartLine, FaCalendarAlt, FaBullhorn, FaUndo, FaPencilAlt, FaRocket, FaRobot } from 'react-icons/fa';
+import { FaChartLine, FaCalendarAlt, FaBullhorn, FaUndo, FaPencilAlt, FaRobot } from 'react-icons/fa';
 import { Bell, Newspaper, Target } from 'lucide-react';
 
 // Define RagService compatible ChatMessage
@@ -60,14 +60,12 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const { resetAndAllowReconnection } = useResetPlatformState();
   const [query, setQuery] = useState('');
   const [toast, setToast] = useState<string | null>(null);
-  const [responses, setResponses] = useState<{ key: string; data: any }[]>([]);
   const [strategies, setStrategies] = useState<{ key: string; data: any }[]>([]);
   const [posts, setPosts] = useState<{ key: string; data: any }[]>([]);
   const [competitorData, setCompetitorData] = useState<{ key: string; data: any }[]>([]);
-  const [news, setNews] = useState<{ key: string; data: any }[]>([]);
+  const [responses, setResponses] = useState<{ key: string; data: any }[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [profileInfo, setProfileInfo] = useState<ProfileInfo | null>(null);
-  const [profileError, setProfileError] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
   const { userId: igBusinessId, isConnected: isInstagramConnected, connectInstagram } = useInstagram();
@@ -76,17 +74,9 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
   const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
   const [showCampaignButton, setShowCampaignButton] = useState(false);
-  const [replySentTracker, setReplySentTracker] = useState<{
-    text: string;
-    timestamp: number;
-    type: 'dm' | 'comment';
-    id: string;
-  }[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [processingNotifications, setProcessingNotifications] = useState<string[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatModalMessage[]>([]);
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
-  const [result, setResult] = useState('');
   const [isMobileProfileMenuOpen, setIsMobileProfileMenuOpen] = useState(false);
   const [isMobileChatOpen, setIsMobileChatOpen] = useState(false);
   const [isMobileImageEditorOpen, setIsMobileImageEditorOpen] = useState(false);
@@ -98,7 +88,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
 
   // 🚀 POST CREATION DROPDOWN STATE
   const [isPostDropdownOpen, setIsPostDropdownOpen] = useState(false);
-  const [postDropdownPosition, setPostDropdownPosition] = useState<{ top: string; left: string; width: string; transform: string; transformOrigin: string; } | null>(null);
+  const [postDropdownPosition, setPostDropdownPosition] = useState<{ top: string; left: string; width: string } | null>(null);
   const postInputRef = useRef<HTMLInputElement>(null);
 
   // 🚀 PRE-MADE POST PROMPTS - Generic and applicable to all accounts
@@ -148,7 +138,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     return stored ? new Set(JSON.parse(stored)) : new Set();
   });
 
-  const [autopilotStatus, setAutopilotStatus] = useState<{
+  const [, setAutopilotStatus] = useState<{ // Keep this for now, will remove if unused later
     enabled: boolean;
     autoSchedule: boolean;
     autoReply: boolean;
@@ -171,7 +161,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const baseReconnectDelay = 1000;
   const lastProfilePicRenderTimeRef = useRef<number>(0);
   const [aiProcessingNotifications, setAiProcessingNotifications] = useState<Record<string, boolean>>({});
-  const [linkedAccounts, setLinkedAccounts] = useState<LinkedAccount[]>([]);
+  const [linkedAccounts] = useState<LinkedAccount[]>([]);
 
   const [showInitialText, setShowInitialText] = useState(true);
   const [showBio, setShowBio] = useState(false);
@@ -243,6 +233,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const autoReplyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // 🛡️ CRITICAL BUG FIX: Track processed notification IDs to prevent duplicate processing
   const processedNotificationIds = useRef<Set<string>>(new Set());
+    
 
   // 🚀 POST DROPDOWN: Update dropdown position
   const updateDropdownPosition = useCallback(() => {
@@ -257,18 +248,15 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     const top = spaceBelow >= dropdownHeight 
       ? inputRect.bottom + 8 
       : inputRect.top - dropdownHeight - 8;
-    const scale = getComputedStyle(document.documentElement).getPropertyValue('--dashboard-scale-factor').trim() || '1';
-
+    
     setPostDropdownPosition({
       top: `${top}px`,
       left: `${inputRect.left}px`,
-      width: `${inputRect.width}px`,
-      transform: `scale(${scale})`,
-      transformOrigin: 'top left',
+      width: `${inputRect.width}px`
     });
   }, []);
 
-  // POST DROPDOWN: Click outside handler
+  // 🚀 POST DROPDOWN: Click outside handler & position updater
   useEffect(() => {
     if (isPostDropdownOpen) {
       // Wait a frame for the dropdown to render so we can measure it accurately
@@ -278,8 +266,10 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
       
       const handleClickOutside = (e: MouseEvent) => {
         const target = e.target as Node;
-        if (!document.querySelector('#post-dropdown-portal')?.contains(target) && 
-            !postInputRef.current?.contains(target)) {
+        const dropdownPortal = document.querySelector('#post-dropdown-portal');
+        
+        if (dropdownPortal && !dropdownPortal.contains(target) && 
+            postInputRef.current && !postInputRef.current.contains(target)) {
           setIsPostDropdownOpen(false);
         }
       };
@@ -296,13 +286,10 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
 
   // 🚀 POST DROPDOWN: Handle input focus (only show when empty)
   const handleInputFocus = useCallback(() => {
-    console.log('🚀 Input focused! Current query length:', query.length);
     // Only show dropdown if input is empty
     if (query.trim().length === 0) {
-      console.log('🚀 Input is empty, showing dropdown');
       setIsPostDropdownOpen(true);
     } else {
-      console.log('🚀 Input has content, hiding dropdown');
       setIsPostDropdownOpen(false);
     }
   }, [query]);
@@ -312,7 +299,6 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     setQuery(newQuery);
     // Hide dropdown when user starts typing
     if (newQuery.trim().length > 0) {
-      console.log('🚀 User started typing, hiding dropdown');
       setIsPostDropdownOpen(false);
     }
   }, []);
@@ -321,8 +307,8 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const handlePromptSelect = useCallback((prompt: string) => {
     setQuery(prompt);
     setIsPostDropdownOpen(false);
-    // Optional: Auto-send the query after selection
-    // handleSendQuery();
+    // Optional: focus the input after selecting a prompt
+    postInputRef.current?.focus();
   }, []);
 
   // Helper function to get unseen count for each section
@@ -455,7 +441,6 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const fetchProfileInfo = async () => {
     if (!accountHolder) return;
     setProfileLoading(true);
-    setProfileError(null);
     setImageError(false);
     try {
       const now = Date.now();
@@ -490,9 +475,8 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
       console.error(`[${new Date().toISOString()}] ❌ Error fetching Instagram profile info:`, err);
       if (err.response?.status === 404) {
         setProfileInfo(null);
-        setProfileError('Profile info not available.');
       } else {
-        setProfileError('Failed to load profile info.');
+        console.error('Failed to load profile info.');
       }
     } finally {
       setProfileLoading(false);
@@ -602,7 +586,6 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     }
     
     setIsProcessing(true);
-    setResult('');
     
     try {
       // ✅ REAL USAGE TRACKING: Check limits BEFORE creating post
@@ -639,8 +622,6 @@ Call to Action: ${response.post.call_to_action}
 
 Image Description: ${response.post.image_prompt}
         `;
-        
-        setResult(postContent);
         console.log(`[Dashboard] ✨ Post content generated for ${accountHolder} on Instagram`);
         
         // Add to history
@@ -742,15 +723,6 @@ Image Description: ${response.post.image_prompt}
         
         console.log(`[Dashboard] ✅ DM reply tracked: Instagram manual reply`);
         
-        setReplySentTracker(prev => [
-          ...prev, 
-          {
-            text: replyText,
-            timestamp: Date.now(),
-            type: 'dm' as const,
-            id: notification.message_id || ''
-          }
-        ].slice(-20));
         setNotifications(prev => safeFilter(prev, n => n.message_id !== notification.message_id));
         setToast('DM reply sent!');
       } else if (notification.type === 'comment' && notification.comment_id) {
@@ -778,15 +750,6 @@ Image Description: ${response.post.image_prompt}
         
         console.log(`[Dashboard] ✅ Comment reply tracked: Instagram manual reply`);
         
-        setReplySentTracker(prev => [
-          ...prev, 
-          {
-            text: replyText,
-            timestamp: Date.now(),
-            type: 'comment' as const,
-            id: notification.comment_id || ''
-          }
-        ].slice(-20));
         setNotifications(prev => safeFilter(prev, n => n.comment_id !== notification.comment_id));
         setToast('Comment reply sent!');
       }
@@ -1415,13 +1378,13 @@ Image Description: ${response.post.image_prompt}
       ]);
 
       // Defensive checks for array data before setting state
-      setResponses(Array.isArray(responsesData.data) ? responsesData.data : []);
-      setStrategies(Array.isArray(strategiesData.data) ? strategiesData.data : []);
-      setPosts(Array.isArray(postsData.data) ? postsData.data : []);
+      setResponses(responsesData.data);
+      setStrategies(strategiesData.data);
+      setPosts(postsData.data);
       
       // Always set competitor data with defensive check
       const competitorResponses = competitorData as any[];
-      const flatData = competitorResponses.flatMap(res => Array.isArray(res.data) ? res.data : []);
+      const flatData = competitorResponses.flatMap(res => res.data);
       setCompetitorData(flatData);
 
       if (firstLoadRef.current) {
@@ -1478,7 +1441,7 @@ Image Description: ${response.post.image_prompt}
         const { prefix } = data;
         if (prefix.startsWith(`queries/${accountHolder}/`)) {
           axios.get(`/api/responses/${accountHolder}`).then(res => {
-            setResponses(Array.isArray(res.data) ? res.data : []);
+            setResponses(res.data);
             setToast('New response received!');
           }).catch(err => {
             console.error('Error fetching responses:', err);
@@ -1489,7 +1452,7 @@ Image Description: ${response.post.image_prompt}
           const endpoint = `/api/recommendations/${accountHolder}?platform=instagram&forceRefresh=true`;
           
           axios.get(endpoint).then(res => {
-            setStrategies(Array.isArray(res.data) ? res.data : []);
+            setStrategies(res.data);
             setToast('New strategies available!');
           }).catch(err => {
             console.error('Error fetching recommendations:', err);
@@ -1497,7 +1460,7 @@ Image Description: ${response.post.image_prompt}
         }
         if (prefix.startsWith(`ready_post/${accountHolder}/`)) {
           axios.get(`/api/posts/${accountHolder}`).then(res => {
-            setPosts(Array.isArray(res.data) ? res.data : []);
+            setPosts(res.data);
             setToast('New post cooked!');
           }).catch(err => {
             console.error('Error fetching posts:', err);
@@ -1514,7 +1477,7 @@ Image Description: ${response.post.image_prompt}
             )
           )
             .then(res => {
-              const flatData = res.flatMap(r => Array.isArray(r.data) ? r.data : []);
+              const flatData = res.flatMap(r => r.data);
               setCompetitorData(flatData);
               setToast('New competitor analysis available!');
             })
@@ -1659,6 +1622,7 @@ Image Description: ${response.post.image_prompt}
   };
 
   const handleGoalSuccess = () => {
+    console.log(`[Dashboard] handleGoalSuccess called - setting showCampaignButton to true`);
     setShowCampaignButton(true);
     setIsGoalModalOpen(false);
   };
@@ -1742,14 +1706,11 @@ Image Description: ${response.post.image_prompt}
   const clearInstagramFrontendData = () => {
     // Clear all Instagram-specific state data
     setNotifications([]);
-    setResponses([]);
     setStrategies([]);
     setPosts([]);
     setCompetitorData([]);
-    setNews([]);
     setProfileInfo(null);
     setChatMessages([]);
-    setResult('');
     
     // Clear localStorage for Instagram - include all relevant keys
     if (currentUser?.uid) {
@@ -1775,29 +1736,52 @@ Image Description: ${response.post.image_prompt}
     try {
       console.log(`[Dashboard] Checking campaign status for ${accountHolder}`);
       // Add bypass_cache=true to ensure we get fresh data from the server
-      const response = await axios.get(`/campaign-status/${accountHolder}?platform=instagram&bypass_cache=true`);
+      const response = await axios.get(`/api/campaign-status/${accountHolder}?platform=instagram&bypass_cache=true`);
       const statusData = response.data;
       
       console.log(`[Dashboard] Campaign status response:`, statusData);
       
       // Update UI based on campaign status
       if (statusData.hasActiveCampaign && statusData.platform === 'instagram') {
+        console.log(`[Dashboard] ✅ Campaign active - setting showCampaignButton to true`);
         setShowCampaignButton(true);
       } else {
+        console.log(`[Dashboard] ❌ No active campaign - setting showCampaignButton to false`);
         setShowCampaignButton(false);
       }
     } catch (err) {
       console.error(`[Dashboard] Error checking campaign status:`, err);
       // If there's an error checking status, assume no active campaign
+      console.log(`[Dashboard] ❌ Error occurred - setting showCampaignButton to false`);
       setShowCampaignButton(false);
     }
   };
 
   // Handle custom event for opening campaign modal
   useEffect(() => {
+    if (!accountHolder) return;
+
+    const handleNewPost = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      if (customEvent.detail.username === accountHolder && customEvent.detail.platform === 'instagram') {
+        console.log(`[Dashboard] 🔄 Refreshing posts for Instagram due to new post event...`);
+        refreshAllData();
+      }
+    };
+
+    window.addEventListener('newPostCreated', handleNewPost);
+
+    return () => {
+      window.removeEventListener('newPostCreated', handleNewPost);
+    };
+  }, [accountHolder, responses]);
+
+  useEffect(() => {
     const handleOpenCampaignEvent = (event: any) => {
       const { username, platform } = event.detail;
-      if (username === accountHolder && platform === 'Instagram') {
+      console.log(`[Dashboard] OpenCampaignModal event received: username=${username}, platform=${platform}, accountHolder=${accountHolder}`);
+      if (username === accountHolder && platform.toLowerCase() === 'instagram') {
+        console.log(`[Dashboard] OpenCampaignModal event matched: Setting campaign button to true`);
         setShowCampaignButton(true);
         setIsCampaignModalOpen(true);
       }
@@ -1862,8 +1846,7 @@ Image Description: ${response.post.image_prompt}
   // Clean old entries from reply tracker (older than 10 minutes)
   useEffect(() => {
     const cleanInterval = setInterval(() => {
-      const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
-              setReplySentTracker(prev => safeFilter(prev, reply => reply.timestamp > tenMinutesAgo));
+        Date.now() - 10 * 60 * 1000;
     }, 60000); // Check every minute
     
     return () => clearInterval(cleanInterval);
@@ -2090,6 +2073,7 @@ Image Description: ${response.post.image_prompt}
   // Check campaign status when component mounts or accountHolder changes
   useEffect(() => {
     if (accountHolder) {
+      console.log(`[Dashboard] useEffect triggered - accountHolder: ${accountHolder}, calling checkCampaignStatus`);
       checkCampaignStatus();
     }
   }, [accountHolder]);
@@ -2182,52 +2166,40 @@ Image Description: ${response.post.image_prompt}
           <div className="profile-metadata">
             <div className="profile-header">
               {profileLoading ? (
-                <div className="profile-loading-advanced">
-                  <div className="loading-spinner-container">
-                    <div className="loading-spinner-ring"></div>
-                    <div className="loading-spinner-ring"></div>
-                    <div className="loading-spinner-ring"></div>
-                  </div>
-                  <div className="loading-text-container">
-                    <div className="loading-text-primary">Loading Instagram account information...</div>
-                    <div className="loading-text-secondary">Please wait while we retrieve your account data</div>
-                  </div>
-                  <div className="loading-progress-bar">
-                    <div className="loading-progress-fill"></div>
-                  </div>
-                </div>
+                <div className="profile-loading">Loading...</div>
               ) : (
                 <div className="profile-bar">
                   {profileInfo?.profilePicUrlHD && !imageError ? (
-                    <img
-                      src={`/api/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}`}
-                      alt={`${accountHolder}'s profile picture`}
-                      className="profile-pic-bar"
-                      onError={(e) => {
-                        console.error(`Failed to load profile picture for ${accountHolder} ${imageRetryAttemptsRef.current + 1}`);
-                        if (imageRetryAttemptsRef.current < maxImageRetryAttempts.current) {
-                          imageRetryAttemptsRef.current++;
-                          const imgElement = e.target as HTMLImageElement;
-                          
-                          if (imageRetryAttemptsRef.current === 1) {
-                            // First retry: try direct URL without proxy
-                            console.log(`Trying direct URL for profile picture, attempt ${imageRetryAttemptsRef.current}`);
-                            setTimeout(() => {
-                              imgElement.src = profileInfo.profilePicUrlHD;
-                            }, 500);
+                    <div className="profile-pic-bar">
+                      <img
+                        src={`/api/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}`}
+                        alt={`${accountHolder}'s profile picture`}
+                        onError={(e) => {
+                          console.error(`Failed to load profile picture for ${accountHolder} ${imageRetryAttemptsRef.current + 1}`);
+                          if (imageRetryAttemptsRef.current < maxImageRetryAttempts.current) {
+                            imageRetryAttemptsRef.current++;
+                            const imgElement = e.target as HTMLImageElement;
+                            
+                            if (imageRetryAttemptsRef.current === 1) {
+                              // First retry: try direct URL without proxy
+                              console.log(`Trying direct URL for profile picture, attempt ${imageRetryAttemptsRef.current}`);
+                              setTimeout(() => {
+                                imgElement.src = profileInfo.profilePicUrlHD;
+                              }, 500);
+                            } else {
+                              // Final retry: try proxy again
+                              console.log(`Final retry with proxy, attempt ${imageRetryAttemptsRef.current}/${maxImageRetryAttempts.current}`);
+                              setTimeout(() => {
+                                imgElement.src = `/api/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}`;
+                              }, 1000);
+                            }
                           } else {
-                            // Final retry: try proxy again
-                            console.log(`Final retry with proxy, attempt ${imageRetryAttemptsRef.current}/${maxImageRetryAttempts.current}`);
-                            setTimeout(() => {
-                              imgElement.src = `/api/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}`;
-                            }, 1000);
+                            console.log(`Max retries reached, showing fallback for ${accountHolder}`);
+                            setImageError(true);
                           }
-                        } else {
-                          console.log(`Max retries reached, showing fallback for ${accountHolder}`);
-                          setImageError(true);
-                        }
-                      }}
-                    />
+                        }}
+                      />
+                    </div>
                   ) : (
                     <div className="profile-pic-bar">
                       <div className="profile-pic-fallback">
@@ -2298,6 +2270,7 @@ Image Description: ${response.post.image_prompt}
                       <span>Autopilot</span>
                     </button>
                     
+                    {/* Debug: Campaign Button State - showCampaignButton: {showCampaignButton ? 'true' : 'false'} */}
                     {showCampaignButton && (
                       <button
                         onClick={handleOpenCampaignModal}
@@ -2399,6 +2372,7 @@ Image Description: ${response.post.image_prompt}
                 <span>Autopilot</span>
               </button>
               
+              {/* Debug: Mobile Campaign Button State - showCampaignButton: {showCampaignButton ? 'true' : 'false'} */}
               {showCampaignButton && (
                 <button
                   onClick={() => {
@@ -2543,50 +2517,56 @@ Image Description: ${response.post.image_prompt}
                 disabled={!query.trim() || isProcessing}
                 title="Send Post"
               >
-                {isProcessing ? (
-                  <div className="btn-spinner"></div>
-                ) : (
-                  <FaRocket />
-                )}
+                                  {isProcessing ? (
+                    <div className="btn-spinner"></div>
+                  ) : (
+                    <>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M22 2L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <span style={{fontSize: '8px', marginTop: '2px', color: 'inherit'}}>Send</span>
+                    </>
+                  )}
               </button>
+
             </div>
           </div>
 
-          {/* 🚀 POST CREATION DROPDOWN - TEMPLATE SUGGESTIONS */}
-          {isPostDropdownOpen && postDropdownPosition && (
-            <div
-              id="post-dropdown-portal"
-              className="post-creation-dropdown"
-              style={{
-                position: 'fixed',
-                top: postDropdownPosition.top,
-                left: postDropdownPosition.left,
-                width: postDropdownPosition.width,
-                transform: postDropdownPosition.transform,
-                transformOrigin: postDropdownPosition.transformOrigin,
-                maxWidth: 'calc(100vw - 16px)',
-                zIndex: 2000,
-              }}
-            >
-              <div className="dropdown-header">
-                <span>✨ Quick Post Templates</span>
-              </div>
-              {postPrompts.map((prompt) => (
-                <button
-                  key={prompt.id}
-                  className="dropdown-prompt-item"
-                  onClick={() => handlePromptSelect(prompt.prompt)}
-                  disabled={isProcessing}
-                >
-                  <div className="prompt-title">{prompt.title}</div>
-                  <div className="prompt-description">{prompt.prompt}</div>
-                </button>
-              ))}
-            </div>
-          )}
-
         </div>
       </div>
+
+      {/* 🚀 POST CREATION DROPDOWN - TEMPLATE SUGGESTIONS (PORTAL) */}
+      {isPostDropdownOpen && postDropdownPosition && (
+        <div
+          id="post-dropdown-portal"
+          className="post-creation-dropdown"
+          style={{
+            position: 'fixed',
+            top: postDropdownPosition.top,
+            left: postDropdownPosition.left,
+            width: postDropdownPosition.width,
+            zIndex: 99999,
+            maxWidth: 'calc(100vw - 16px)'
+          }}
+        >
+          <div className="dropdown-header">
+            <span>✨ Quick Post Templates</span>
+          </div>
+          {postPrompts.map((prompt) => (
+            <button
+              key={prompt.id}
+              className="dropdown-prompt-item"
+              onClick={() => handlePromptSelect(prompt.prompt)}
+              disabled={isProcessing}
+            >
+              <div className="prompt-title">{prompt.title}</div>
+              <div className="prompt-description">{prompt.prompt}</div>
+            </button>
+          ))}
+        </div>
+      )}
+
       {toast && (
         <motion.div
           className="toast-notification"

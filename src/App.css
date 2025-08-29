@@ -33,6 +33,7 @@
   box-sizing: border-box;
 }
 
+/* === CSS IMPORTS === */
 @import url('./styles/image-optimization.css');
 
 .App {

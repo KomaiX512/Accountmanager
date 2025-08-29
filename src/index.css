@@ -91,6 +91,29 @@ button:focus-visible {
   box-sizing: border-box;
 }
 
+/* === GLOBAL USER AVATAR STYLES (VPS Compatibility) === */
+/* Ensure circular profile images work everywhere */
+.user-avatar,
+.user-avatar *,
+.user-avatar img,
+.user-avatar img * {
+  border-radius: 50% !important;
+  -webkit-border-radius: 50% !important;
+  -moz-border-radius: 50% !important;
+  -ms-border-radius: 50% !important;
+  -o-border-radius: 50% !important;
+}
+
+.user-avatar img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+  border-radius: 50% !important;
+  -webkit-border-radius: 50% !important;
+  -moz-border-radius: 50% !important;
+}
+
 /* Ensure proper loading states */
 .loading {
   opacity: 0;

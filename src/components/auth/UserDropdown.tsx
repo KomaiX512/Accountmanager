@@ -62,9 +62,27 @@ const UserDropdown: React.FC = () => {
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={toggleDropdown}
+        style={{
+          /* 🔒 VPS COMPATIBILITY: Inline styles as backup for circular profile image */
+          borderRadius: '50%',
+          overflow: 'hidden',
+          width: '40px',
+          height: '40px'
+        }}
       >
         {currentUser.photoURL ? (
-          <img src={currentUser.photoURL} alt={currentUser.displayName || 'User'} />
+          <img 
+            src={currentUser.photoURL} 
+            alt={currentUser.displayName || 'User'} 
+            style={{
+              /* 🔒 VPS COMPATIBILITY: Inline styles as backup for circular profile image */
+              borderRadius: '50%',
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              display: 'block'
+            }}
+          />
         ) : (
           userInitial
         )}

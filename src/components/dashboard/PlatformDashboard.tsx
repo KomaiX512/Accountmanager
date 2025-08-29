@@ -30,7 +30,7 @@ import RagService from '../../services/RagService';
 import type { ChatMessage as ChatModalMessage, LinkedAccount } from '../instagram/ChatModal';
 import { Notification, ProfileInfo } from '../../types/notifications';
 // Import icons from react-icons
-import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaTwitter, FaInstagram, FaPen, FaFacebook, FaBell, FaUndo, FaInfoCircle, FaPencilAlt, FaRocket, FaRobot, FaNewspaper, FaRss } from 'react-icons/fa';
+import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaTwitter, FaInstagram, FaPen, FaFacebook, FaBell, FaUndo, FaInfoCircle, FaPencilAlt, FaRobot, FaNewspaper, FaRss } from 'react-icons/fa';
 import { MdAnalytics, MdOutlineSchedule, MdOutlineAutoGraph } from 'react-icons/md';
 import { BsLightningChargeFill, BsBinoculars, BsLightbulb } from 'react-icons/bs';
 import { IoMdAnalytics } from 'react-icons/io';
@@ -3062,7 +3062,13 @@ Image Description: ${response.post.image_prompt}
                   {isProcessing ? (
                     <div className="btn-spinner"></div>
                   ) : (
-                    <FaRocket />
+                    <>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M22 2L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <span style={{fontSize: '8px', marginTop: '2px', color: 'inherit'}}>Send</span>
+                    </>
                   )}
                 </button>
               </div>

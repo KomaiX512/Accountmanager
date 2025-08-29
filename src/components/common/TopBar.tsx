@@ -174,7 +174,13 @@ const TopBar: React.FC = () => {
           )}
           
           {currentUser ? (
-            <UserDropdown />
+            <div style={{ 
+              /* 🔒 VPS COMPATIBILITY: Inline styles as backup for circular profile image */
+              display: 'flex',
+              alignItems: 'center'
+            }}>
+              <UserDropdown />
+            </div>
           ) : (
             <motion.button
               className="login-button"

@@ -308,6 +308,19 @@
   flex-shrink: 0;
 }
 
+.chat-send-button svg {
+  width: 18px;
+  height: 18px;
+  transition: all 0.3s ease;
+  transform: rotate(-45deg);
+  color: #1a1a1a;
+}
+
+.chat-send-button:hover:not(:disabled) svg {
+  transform: rotate(-45deg) scale(1.1);
+  filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.3));
+}
+
 .chat-send-button:hover:not(:disabled) {
   transform: scale(1.05);
   box-shadow: 0 4px 12px rgba(0, 255, 204, 0.3);

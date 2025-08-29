@@ -976,3 +976,254 @@
     padding: 5px 10px !important;
   }
 }
+
+/* === USER AVATAR STYLES (Added to fix circular image issue) === */
+.user-profile {
+  position: relative;
+  margin-left: auto;
+  margin-right: 15px;
+  z-index: 2;
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50% !important;
+  cursor: pointer;
+  background: linear-gradient(135deg, #00ffcc, #00d4aa);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000000;
+  font-weight: 600;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.user-avatar img {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 50% !important;
+  object-fit: cover;
+  display: block;
+}
+
+/* === HIGH SPECIFICITY OVERRIDES FOR VPS COMPATIBILITY === */
+.top-bar .user-profile .user-avatar {
+  border-radius: 50% !important;
+  overflow: hidden !important;
+}
+
+.top-bar .user-profile .user-avatar img {
+  border-radius: 50% !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+}
+
+/* === ADDITIONAL ENFORCEMENT RULES === */
+.user-avatar,
+.user-avatar *,
+.user-avatar img,
+.user-avatar img * {
+  border-radius: 50% !important;
+}
+
+.user-avatar img {
+  border-radius: 50% !important;
+  -webkit-border-radius: 50% !important;
+  -moz-border-radius: 50% !important;
+}
+
+/* === VPS-SPECIFIC FIXES === */
+/* Force circular styling with maximum specificity */
+div.user-profile div.user-avatar {
+  border-radius: 50% !important;
+  overflow: hidden !important;
+}
+
+div.user-profile div.user-avatar img {
+  border-radius: 50% !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+  -webkit-border-radius: 50% !important;
+  -moz-border-radius: 50% !important;
+}
+
+/* Additional specificity for VPS compatibility */
+.top-bar .right-controls .user-profile .user-avatar {
+  border-radius: 50% !important;
+  overflow: hidden !important;
+}
+
+.top-bar .right-controls .user-profile .user-avatar img {
+  border-radius: 50% !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+}
+
+/* === ULTIMATE VPS COMPATIBILITY FIXES === */
+/* Target the exact DOM structure */
+.top-bar > div:last-child > div:last-child .user-profile .user-avatar {
+  border-radius: 50% !important;
+  overflow: hidden !important;
+  -webkit-border-radius: 50% !important;
+  -moz-border-radius: 50% !important;
+}
+
+.top-bar > div:last-child > div:last-child .user-profile .user-avatar img {
+  border-radius: 50% !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+  -webkit-border-radius: 50% !important;
+  -moz-border-radius: 50% !important;
+}
+
+/* Force circular styling with attribute selectors */
+[class*="user-avatar"] {
+  border-radius: 50% !important;
+  overflow: hidden !important;
+}
+
+[class*="user-avatar"] img {
+  border-radius: 50% !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+}
+
+/* === CSS RESET FOR USER AVATAR === */
+/* Ensure no other styles override the circular design */
+.user-avatar,
+.user-avatar *,
+.user-avatar img,
+.user-avatar img * {
+  border-radius: 50% !important;
+  -webkit-border-radius: 50% !important;
+  -moz-border-radius: 50% !important;
+  -ms-border-radius: 50% !important;
+  -o-border-radius: 50% !important;
+}
+
+/* === CROSS-BROWSER COMPATIBILITY === */
+/* Ensure circular styling works in all browsers */
+.user-avatar {
+  -webkit-mask-image: -webkit-radial-gradient(circle, white 100%, black 100%);
+  mask-image: radial-gradient(circle, white 100%, black 100%);
+}
+
+.user-avatar img {
+  -webkit-mask-image: -webkit-radial-gradient(circle, white 100%, black 100%);
+  mask-image: radial-gradient(circle, white 100%, black 100%);
+}
+
+/* Force circular styling on all possible selectors */
+.top-bar .user-profile .user-avatar,
+.top-bar .right-controls .user-profile .user-avatar,
+.right-controls .user-profile .user-avatar,
+.user-profile .user-avatar {
+  border-radius: 50% !important;
+  overflow: hidden !important;
+  -webkit-border-radius: 50% !important;
+  -moz-border-radius: 50% !important;
+}
+
+.top-bar .user-profile .user-avatar img,
+.top-bar .right-controls .user-profile .user-avatar img,
+.right-controls .user-profile .user-avatar img,
+.user-profile .user-avatar img {
+  border-radius: 50% !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+  -webkit-border-radius: 50% !important;
+  -moz-border-radius: 50% !important;
+}
+
+.user-avatar:hover {
+  transform: scale(1.05);
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 8px 20px rgba(0, 255, 204, 0.2);
+}
+
+.user-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 12px;
+  background: rgba(0, 0, 0, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 16px 0;
+  min-width: 200px;
+  z-index: 1000;
+}
+
+.dropdown-menu-item {
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.dropdown-menu-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+}
+
+.dropdown-menu-item.logout {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 8px;
+  padding-top: 16px;
+  color: #ff5050;
+}
+
+.dropdown-menu-item.logout:hover {
+  background: rgba(255, 50, 50, 0.1);
+  color: #ffaaaa;
+}
+
+.dropdown-menu-item svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+/* === RESPONSIVE USER AVATAR STYLES === */
+@media (max-width: 1440px) {
+  .user-avatar {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+@media (max-width: 1366px) {
+  .user-avatar {
+    width: 34px;
+    height: 34px;
+  }
+}
+
+@media (max-width: 768px) {
+  .user-avatar {
+    width: 32px;
+    height: 32px;
+  }
+}

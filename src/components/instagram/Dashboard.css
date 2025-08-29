@@ -1684,6 +1684,7 @@ h2 {
   border: 1.5px solid rgba(0, 255, 204, 0.4);
   border-radius: 12px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   cursor: pointer;
@@ -1694,6 +1695,36 @@ h2 {
   overflow: hidden;
   flex-shrink: 0;
   box-shadow: 0 2px 8px rgba(0, 255, 204, 0.2);
+  min-width: 40px;
+  min-height: 40px;
+  /* Ensure button is visible */
+  z-index: 10;
+  gap: 2px;
+}
+
+.post-send-btn svg {
+  width: 18px;
+  height: 18px;
+  transition: all 0.3s ease;
+  transform: rotate(-45deg);
+  color: #00ffcc;
+  display: block;
+  flex-shrink: 0;
+  /* Ensure SVG is visible */
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Force SVG visibility with higher specificity */
+.post-creation-container .post-send-btn svg {
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+}
+
+.post-send-btn:hover:not(:disabled) svg {
+  transform: rotate(-45deg) scale(1.1);
+  filter: drop-shadow(0 0 8px rgba(0, 255, 204, 0.6));
 }
 
 .post-send-btn::before {

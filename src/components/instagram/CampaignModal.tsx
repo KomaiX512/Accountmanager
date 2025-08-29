@@ -67,7 +67,7 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
       // Fetch campaign summary (original endpoint)
       let summaryData = null;
       try {
-        const summaryResponse = await axios.get(`/goal-summary/${username}?platform=${platform}`);
+        const summaryResponse = await axios.get(`/api/goal-summary/${username}?platform=${platform}`);
         summaryData = summaryResponse.data;
         setSummary(summaryData);
       } catch (summaryError: any) {
@@ -82,7 +82,7 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
       // Fetch generated content summary (new endpoint for posts.json)
       let generatedSummaryData = null;
       try {
-        const generatedSummaryResponse = await axios.get(`/generated-content-summary/${username}?platform=${platform}`);
+        const generatedSummaryResponse = await axios.get(`/api/generated-content-summary/${username}?platform=${platform}`);
         generatedSummaryData = generatedSummaryResponse.data;
         setGeneratedSummary(generatedSummaryData);
       } catch (generatedSummaryError: any) {
@@ -96,7 +96,7 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
       }
 
       // Fetch engagement metrics
-      const engagementResponse = await axios.get(`/engagement-metrics/${username}?platform=${platform}&connected=${isConnected}`);
+      const engagementResponse = await axios.get(`/api/engagement-metrics/${username}?platform=${platform}&connected=${isConnected}`);
       setEngagement(engagementResponse.data);
 
     } catch (err: any) {
@@ -132,7 +132,7 @@ const CampaignModal: React.FC<CampaignModalProps> = ({ username, platform, isCon
         console.log(`[CampaignModal] ✅ Campaign stop tracked: ${platform} campaign stopped`);
       }
 
-      const response = await axios.delete(`/stop-campaign/${username}?platform=${platform.toLowerCase()}`);
+      const response = await axios.delete(`/api/stop-campaign/${username}?platform=${platform.toLowerCase()}`);
       
       if (response.data.success) {
         console.log('[CampaignModal] Campaign stopped successfully:', response.data);

@@ -40,9 +40,6 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform, onClose, onSu
   const [campaignStatus, setCampaignStatus] = useState<CampaignStatus | null>(null);
   const normalizedPlatform = (platform || 'instagram').toLowerCase();
   const displayPlatform = platform || 'Instagram';
-  
-  // Debug platform normalization
-  console.log(`[GoalModal] Platform received: "${platform}", normalized: "${normalizedPlatform}", display: "${displayPlatform}"`);
 
   const MAX_TRIAL_DAYS = 3; // Non-premium cap
 
@@ -247,18 +244,6 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform, onClose, onSu
         setCampaignStatus({ hasActiveCampaign: true, platform: normalizedPlatform, username });
       }, 1200);
       
-      // Dispatch event to notify Dashboard that goal was saved
-      const eventDetail = { username, platform: normalizedPlatform };
-      console.log(`[GoalModal] 🎯 Dispatching goalSaved event with details:`, eventDetail);
-      
-      // Small delay to ensure Dashboard event listeners are ready
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('goalSaved', { 
-          detail: eventDetail
-        }));
-        console.log(`[GoalModal] ✅ goalSaved event dispatched for ${username} on ${normalizedPlatform}`);
-      }, 100);
-      
       if (onSuccess) {
         onSuccess();
       }
@@ -295,6 +280,7 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform, onClose, onSu
     onClose();
     // The parent component should handle opening the campaign modal
     // We'll pass this information through an event or callback
+    console.log(`[GoalModal] Dispatching openCampaignModal event: username=${username}, platform=${normalizedPlatform}`);
     window.dispatchEvent(new CustomEvent('openCampaignModal', { detail: { username, platform: normalizedPlatform } }));
   };
 

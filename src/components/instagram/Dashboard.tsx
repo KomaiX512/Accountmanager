@@ -60,14 +60,12 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const { resetAndAllowReconnection } = useResetPlatformState();
   const [query, setQuery] = useState('');
   const [toast, setToast] = useState<string | null>(null);
-  const [responses, setResponses] = useState<{ key: string; data: any }[]>([]);
   const [strategies, setStrategies] = useState<{ key: string; data: any }[]>([]);
   const [posts, setPosts] = useState<{ key: string; data: any }[]>([]);
   const [competitorData, setCompetitorData] = useState<{ key: string; data: any }[]>([]);
-  const [news, setNews] = useState<{ key: string; data: any }[]>([]);
+  const [responses, setResponses] = useState<{ key: string; data: any }[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [profileInfo, setProfileInfo] = useState<ProfileInfo | null>(null);
-  const [profileError, setProfileError] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
   const { userId: igBusinessId, isConnected: isInstagramConnected, connectInstagram } = useInstagram();
@@ -76,27 +74,51 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
   const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
   const [showCampaignButton, setShowCampaignButton] = useState(false);
-  const [replySentTracker, setReplySentTracker] = useState<{
-    text: string;
-    timestamp: number;
-    type: 'dm' | 'comment';
-    id: string;
-  }[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [processingNotifications, setProcessingNotifications] = useState<string[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatModalMessage[]>([]);
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
-  const [result, setResult] = useState('');
   const [isMobileProfileMenuOpen, setIsMobileProfileMenuOpen] = useState(false);
   const [isMobileChatOpen, setIsMobileChatOpen] = useState(false);
   const [isMobileImageEditorOpen, setIsMobileImageEditorOpen] = useState(false);
   const [isMobileProfilePopupOpen, setIsMobileProfilePopupOpen] = useState(false);
   const [isMobileManualOpen, setIsMobileManualOpen] = useState(false);
   const [isAutopilotPopupOpen, setIsAutopilotPopupOpen] = useState(false);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
-  const profileActionsRef = useRef<HTMLDivElement>(null);
+
+  // 🚀 POST CREATION DROPDOWN STATE
+  const [isPostDropdownOpen, setIsPostDropdownOpen] = useState(false);
+  const [postDropdownPosition, setPostDropdownPosition] = useState<{ top: string } | null>(null);
+  const postInputRef = useRef<HTMLInputElement>(null);
+
+  // 🚀 PRE-MADE POST PROMPTS - Generic and applicable to all accounts
+  const postPrompts = [
+    {
+      id: 'typographical',
+      title: 'Typographical Post',
+      prompt: 'Create an engaging typographical post with bold text design and motivational quote'
+    },
+    {
+      id: 'numerical',
+      title: 'Statistical/Numerical',
+      prompt: 'Create a data-driven post with interesting statistics and numbers relevant to my industry'
+    },
+    {
+      id: 'infographic',
+      title: 'Infographic Style',
+      prompt: 'Design an informative infographic post with clear visual hierarchy and key insights'
+    },
+    {
+      id: 'single_image',
+      title: 'Single Image',
+      prompt: 'Create a compelling single image post with strong visual impact and clear message'
+    },
+    {
+      id: 'meme',
+      title: 'Meme Style',
+      prompt: 'Generate a fun, engaging meme-style post that resonates with my audience'
+    }
+  ];
 
   // Content viewed tracking - track what has been seen vs unseen with localStorage persistence
   const getViewedStorageKey = (section: string) => `viewed_${section}_instagram_${accountHolder}`;
@@ -116,7 +138,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     return stored ? new Set(JSON.parse(stored)) : new Set();
   });
 
-  const [autopilotStatus, setAutopilotStatus] = useState<{
+  const [, setAutopilotStatus] = useState<{ // Keep this for now, will remove if unused later
     enabled: boolean;
     autoSchedule: boolean;
     autoReply: boolean;
@@ -131,15 +153,15 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   });
 
   const eventSourceRef = useRef<EventSource | null>(null);
-  const maxImageRetryAttempts = useRef(3);
+  const maxImageRetryAttempts = useRef<number>(3);
   const imageRetryAttemptsRef = useRef(0);
   const firstLoadRef = useRef(true);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
   const baseReconnectDelay = 1000;
   const lastProfilePicRenderTimeRef = useRef<number>(0);
-  const [aiProcessingNotifications, setAiProcessingNotifications] = useState<string[]>([]);
-  const [linkedAccounts, setLinkedAccounts] = useState<LinkedAccount[]>([]);
+  const [aiProcessingNotifications, setAiProcessingNotifications] = useState<Record<string, boolean>>({});
+  const [linkedAccounts] = useState<LinkedAccount[]>([]);
 
   const [showInitialText, setShowInitialText] = useState(true);
   const [showBio, setShowBio] = useState(false);
@@ -160,6 +182,25 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     competitorAnalysis: false,
     news4u: false
   });
+
+  // 🍎 Mobile profile dropdown click outside handler
+  useEffect(() => {
+    if (isMobileProfileMenuOpen) {
+      const handleClickOutside = (e: MouseEvent) => {
+        const target = e.target as Node;
+        if (!document.querySelector('.mobile-profile-menu')?.contains(target) && 
+            !document.querySelector('.mobile-profile-dropdown')?.contains(target)) {
+          setIsMobileProfileMenuOpen(false);
+        }
+      };
+      
+      document.addEventListener('click', handleClickOutside);
+      
+      return () => {
+        document.removeEventListener('click', handleClickOutside);
+      };
+    }
+  }, [isMobileProfileMenuOpen]);
 
   // 🍎 Mobile module click handler for expandable modules
   const handleMobileModuleClick = (moduleKey: keyof typeof expandedModules, e: React.MouseEvent) => {
@@ -192,6 +233,76 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const autoReplyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // 🛡️ CRITICAL BUG FIX: Track processed notification IDs to prevent duplicate processing
   const processedNotificationIds = useRef<Set<string>>(new Set());
+    
+
+  // 🚀 POST DROPDOWN: Update dropdown position
+  const updateDropdownPosition = useCallback(() => {
+    if (!postInputRef.current) return;
+    
+    const inputWrapper = postInputRef.current.parentElement;
+    if (!inputWrapper) return;
+
+    const wrapperHeight = inputWrapper.offsetHeight;
+    
+    setPostDropdownPosition({
+      top: `${wrapperHeight + 4}px` // Position just below the input wrapper with a small gap
+    });
+  }, []);
+
+  // 🚀 POST DROPDOWN: Click outside handler & position updater
+  useEffect(() => {
+    if (isPostDropdownOpen) {
+      // Wait a frame for the dropdown to render so we can measure it accurately
+      requestAnimationFrame(() => {
+        setTimeout(() => updateDropdownPosition(), 8);
+      });
+      
+      const handleClickOutside = (e: MouseEvent) => {
+        const target = e.target as Node;
+        const dropdownPortal = document.querySelector('#post-dropdown-portal');
+        
+        if (dropdownPortal && !dropdownPortal.contains(target) && 
+            postInputRef.current && !postInputRef.current.contains(target)) {
+          setIsPostDropdownOpen(false);
+        }
+      };
+      
+      document.addEventListener('click', handleClickOutside);
+      window.addEventListener('resize', updateDropdownPosition);
+      
+      return () => {
+        document.removeEventListener('click', handleClickOutside);
+        window.removeEventListener('resize', updateDropdownPosition);
+      };
+    }
+  }, [isPostDropdownOpen, updateDropdownPosition]);
+
+  // 🚀 POST DROPDOWN: Handle input focus (only show when empty)
+  const handleInputFocus = useCallback(() => {
+    // Only show dropdown if input is empty
+    if (query.trim().length === 0) {
+      setIsPostDropdownOpen(true);
+    } else {
+      setIsPostDropdownOpen(false);
+    }
+  }, [query]);
+
+  // 🚀 POST DROPDOWN: Handle input change (hide dropdown when typing)
+  const handleInputChange = useCallback((newQuery: string) => {
+    setQuery(newQuery);
+    // Hide dropdown when user starts typing
+    if (newQuery.trim().length > 0) {
+      setIsPostDropdownOpen(false);
+    }
+  }, []);
+
+  // 🚀 POST DROPDOWN: Handle prompt selection
+  const handlePromptSelect = useCallback((prompt: string) => {
+    setQuery(prompt);
+    setIsPostDropdownOpen(false);
+    // Optional: focus the input after selecting a prompt
+    postInputRef.current?.focus();
+  }, []);
 
   // Helper function to get unseen count for each section
   const getUnseenStrategiesCount = () => {
@@ -323,7 +434,6 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const fetchProfileInfo = async () => {
     if (!accountHolder) return;
     setProfileLoading(true);
-    setProfileError(null);
     setImageError(false);
     try {
       const now = Date.now();
@@ -358,9 +468,8 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
       console.error(`[${new Date().toISOString()}] ❌ Error fetching Instagram profile info:`, err);
       if (err.response?.status === 404) {
         setProfileInfo(null);
-        setProfileError('Profile info not available.');
       } else {
-        setProfileError('Failed to load profile info.');
+        console.error('Failed to load profile info.');
       }
     } finally {
       setProfileLoading(false);
@@ -470,7 +579,6 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     }
     
     setIsProcessing(true);
-    setResult('');
     
     try {
       // ✅ REAL USAGE TRACKING: Check limits BEFORE creating post
@@ -507,8 +615,6 @@ Call to Action: ${response.post.call_to_action}
 
 Image Description: ${response.post.image_prompt}
         `;
-        
-        setResult(postContent);
         console.log(`[Dashboard] ✨ Post content generated for ${accountHolder} on Instagram`);
         
         // Add to history
@@ -610,15 +716,6 @@ Image Description: ${response.post.image_prompt}
         
         console.log(`[Dashboard] ✅ DM reply tracked: Instagram manual reply`);
         
-        setReplySentTracker(prev => [
-          ...prev, 
-          {
-            text: replyText,
-            timestamp: Date.now(),
-            type: 'dm' as const,
-            id: notification.message_id || ''
-          }
-        ].slice(-20));
         setNotifications(prev => safeFilter(prev, n => n.message_id !== notification.message_id));
         setToast('DM reply sent!');
       } else if (notification.type === 'comment' && notification.comment_id) {
@@ -646,15 +743,6 @@ Image Description: ${response.post.image_prompt}
         
         console.log(`[Dashboard] ✅ Comment reply tracked: Instagram manual reply`);
         
-        setReplySentTracker(prev => [
-          ...prev, 
-          {
-            text: replyText,
-            timestamp: Date.now(),
-            type: 'comment' as const,
-            id: notification.comment_id || ''
-          }
-        ].slice(-20));
         setNotifications(prev => safeFilter(prev, n => n.comment_id !== notification.comment_id));
         setToast('Comment reply sent!');
       }
@@ -1283,13 +1371,13 @@ Image Description: ${response.post.image_prompt}
       ]);
 
       // Defensive checks for array data before setting state
-      setResponses(Array.isArray(responsesData.data) ? responsesData.data : []);
-      setStrategies(Array.isArray(strategiesData.data) ? strategiesData.data : []);
-      setPosts(Array.isArray(postsData.data) ? postsData.data : []);
+      setResponses(responsesData.data);
+      setStrategies(strategiesData.data);
+      setPosts(postsData.data);
       
       // Always set competitor data with defensive check
       const competitorResponses = competitorData as any[];
-      const flatData = competitorResponses.flatMap(res => Array.isArray(res.data) ? res.data : []);
+      const flatData = competitorResponses.flatMap(res => res.data);
       setCompetitorData(flatData);
 
       if (firstLoadRef.current) {
@@ -1346,7 +1434,7 @@ Image Description: ${response.post.image_prompt}
         const { prefix } = data;
         if (prefix.startsWith(`queries/${accountHolder}/`)) {
           axios.get(`/api/responses/${accountHolder}`).then(res => {
-            setResponses(Array.isArray(res.data) ? res.data : []);
+            setResponses(res.data);
             setToast('New response received!');
           }).catch(err => {
             console.error('Error fetching responses:', err);
@@ -1357,7 +1445,7 @@ Image Description: ${response.post.image_prompt}
           const endpoint = `/api/recommendations/${accountHolder}?platform=instagram&forceRefresh=true`;
           
           axios.get(endpoint).then(res => {
-            setStrategies(Array.isArray(res.data) ? res.data : []);
+            setStrategies(res.data);
             setToast('New strategies available!');
           }).catch(err => {
             console.error('Error fetching recommendations:', err);
@@ -1365,7 +1453,7 @@ Image Description: ${response.post.image_prompt}
         }
         if (prefix.startsWith(`ready_post/${accountHolder}/`)) {
           axios.get(`/api/posts/${accountHolder}`).then(res => {
-            setPosts(Array.isArray(res.data) ? res.data : []);
+            setPosts(res.data);
             setToast('New post cooked!');
           }).catch(err => {
             console.error('Error fetching posts:', err);
@@ -1382,7 +1470,7 @@ Image Description: ${response.post.image_prompt}
             )
           )
             .then(res => {
-              const flatData = res.flatMap(r => Array.isArray(r.data) ? r.data : []);
+              const flatData = res.flatMap(r => r.data);
               setCompetitorData(flatData);
               setToast('New competitor analysis available!');
             })
@@ -1610,14 +1698,11 @@ Image Description: ${response.post.image_prompt}
   const clearInstagramFrontendData = () => {
     // Clear all Instagram-specific state data
     setNotifications([]);
-    setResponses([]);
     setStrategies([]);
     setPosts([]);
     setCompetitorData([]);
-    setNews([]);
     setProfileInfo(null);
     setChatMessages([]);
-    setResult('');
     
     // Clear localStorage for Instagram - include all relevant keys
     if (currentUser?.uid) {
@@ -1662,6 +1747,24 @@ Image Description: ${response.post.image_prompt}
   };
 
   // Handle custom event for opening campaign modal
+  useEffect(() => {
+    if (!accountHolder) return;
+
+    const handleNewPost = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      if (customEvent.detail.username === accountHolder && customEvent.detail.platform === 'instagram') {
+        console.log(`[Dashboard] 🔄 Refreshing posts for Instagram due to new post event...`);
+        refreshAllData();
+      }
+    };
+
+    window.addEventListener('newPostCreated', handleNewPost);
+
+    return () => {
+      window.removeEventListener('newPostCreated', handleNewPost);
+    };
+  }, [accountHolder, responses]);
+
   useEffect(() => {
     const handleOpenCampaignEvent = (event: any) => {
       const { username, platform } = event.detail;
@@ -1730,8 +1833,7 @@ Image Description: ${response.post.image_prompt}
   // Clean old entries from reply tracker (older than 10 minutes)
   useEffect(() => {
     const cleanInterval = setInterval(() => {
-      const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
-              setReplySentTracker(prev => safeFilter(prev, reply => reply.timestamp > tenMinutesAgo));
+        Date.now() - 10 * 60 * 1000;
     }, 60000); // Check every minute
     
     return () => clearInterval(cleanInterval);
@@ -1962,71 +2064,9 @@ Image Description: ${response.post.image_prompt}
     }
   }, [accountHolder]);
 
-  // ✨ MOBILE PROFILE DROPDOWN CLICK OUTSIDE HANDLER
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Element;
-      // ✨ FIX: Check if click is outside both profile-actions and dropdown
-      if (!target.closest('.profile-actions') && !target.closest('.mobile-profile-dropdown') && isMobileProfileMenuOpen) {
-        setIsMobileProfileMenuOpen(false);
-      }
-    };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isMobileProfileMenuOpen]);
 
-  // ✨ RECALCULATE POSITION WHEN DROPDOWN OPENS
-  useEffect(() => {
-    if (isMobileProfileMenuOpen) {
-      console.log('Mobile dropdown opening, calculating position...');
-      calculateDropdownPosition();
-    }
-  }, [isMobileProfileMenuOpen]);
 
-  // ✨ CALCULATE DROPDOWN POSITION
-  const calculateDropdownPosition = () => {
-    if (profileActionsRef.current) {
-      const rect = profileActionsRef.current.getBoundingClientRect();
-      const viewportHeight = window.innerHeight;
-      const viewportWidth = window.innerWidth;
-      const dropdownHeight = 350; // Approximate dropdown height
-      const dropdownWidth = 240; // Dropdown width
-      
-      // ✨ FIX: Position dropdown near the profile bar, not center
-      let top = rect.bottom + 8;
-      let right = viewportWidth - rect.right;
-      
-      console.log('Profile bar position:', rect);
-      console.log('Calculated dropdown position:', { top, right });
-      
-      // If dropdown would go below viewport, position it above the profile bar
-      if (top + dropdownHeight > viewportHeight - 20) {
-        top = rect.top - dropdownHeight - 8;
-      }
-      
-      // Ensure minimum top position
-      if (top < 20) {
-        top = 20;
-      }
-      
-      // Ensure dropdown doesn't go off the right edge
-      if (right + dropdownWidth > viewportWidth - 20) {
-        right = 20;
-      }
-      
-      setDropdownPosition({
-        top,
-        right
-      });
-      
-      console.log('Final dropdown position:', { top, right });
-    } else {
-      console.log('Profile actions ref not found');
-    }
-  };
 
   // 🚀 AUTOPILOT: Handlers for autopilot popup
   const handleOpenAutopilotPopup = () => {
@@ -2116,35 +2156,36 @@ Image Description: ${response.post.image_prompt}
               ) : (
                 <div className="profile-bar">
                   {profileInfo?.profilePicUrlHD && !imageError ? (
-                    <img
-                      src={`/api/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}`}
-                      alt={`${accountHolder}'s profile picture`}
-                      className="profile-pic-bar"
-                      onError={(e) => {
-                        console.error(`Failed to load profile picture for ${accountHolder} ${imageRetryAttemptsRef.current + 1}`);
-                        if (imageRetryAttemptsRef.current < maxImageRetryAttempts) {
-                          imageRetryAttemptsRef.current++;
-                          const imgElement = e.target as HTMLImageElement;
-                          
-                          if (imageRetryAttemptsRef.current === 1) {
-                            // First retry: try direct URL without proxy
-                            console.log(`Trying direct URL for profile picture, attempt ${imageRetryAttemptsRef.current}`);
-                            setTimeout(() => {
-                              imgElement.src = profileInfo.profilePicUrlHD;
-                            }, 500);
+                    <div className="profile-pic-bar">
+                      <img
+                        src={`/api/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}`}
+                        alt={`${accountHolder}'s profile picture`}
+                        onError={(e) => {
+                          console.error(`Failed to load profile picture for ${accountHolder} ${imageRetryAttemptsRef.current + 1}`);
+                          if (imageRetryAttemptsRef.current < maxImageRetryAttempts.current) {
+                            imageRetryAttemptsRef.current++;
+                            const imgElement = e.target as HTMLImageElement;
+                            
+                            if (imageRetryAttemptsRef.current === 1) {
+                              // First retry: try direct URL without proxy
+                              console.log(`Trying direct URL for profile picture, attempt ${imageRetryAttemptsRef.current}`);
+                              setTimeout(() => {
+                                imgElement.src = profileInfo.profilePicUrlHD;
+                              }, 500);
+                            } else {
+                              // Final retry: try proxy again
+                              console.log(`Final retry with proxy, attempt ${imageRetryAttemptsRef.current}/${maxImageRetryAttempts.current}`);
+                              setTimeout(() => {
+                                imgElement.src = `/api/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}`;
+                              }, 1000);
+                            }
                           } else {
-                            // Final retry: try proxy again
-                            console.log(`Final retry with proxy, attempt ${imageRetryAttemptsRef.current}/${maxImageRetryAttempts}`);
-                            setTimeout(() => {
-                              imgElement.src = `/api/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}`;
-                            }, 1000);
+                            console.log(`Max retries reached, showing fallback for ${accountHolder}`);
+                            setImageError(true);
                           }
-                        } else {
-                          console.log(`Max retries reached, showing fallback for ${accountHolder}`);
-                          setImageError(true);
-                        }
-                      }}
-                    />
+                        }}
+                      />
+                    </div>
                   ) : (
                     <div className="profile-pic-bar">
                       <div className="profile-pic-fallback">
@@ -2166,7 +2207,7 @@ Image Description: ${response.post.image_prompt}
                       </span>
                     </div>
                   </div>
-                  <div className="profile-actions" ref={profileActionsRef}>
+                  <div className="profile-actions">
                     <InstagramConnect onConnected={handleInstagramConnected} />
                     
                     <InstagramRequiredButton
@@ -2244,7 +2285,7 @@ Image Description: ${response.post.image_prompt}
 
           {/* ✨ MOBILE PROFILE DROPDOWN - RENDERED OUTSIDE CONTAINER */}
           {isMobileProfileMenuOpen && (
-            <div className="mobile-profile-dropdown" style={{ position: 'fixed', top: dropdownPosition.top, right: dropdownPosition.right }}>
+            <div className="mobile-profile-dropdown">
               {/* ✨ CONNECT BUTTON INSIDE DROPDOWN */}
               <div className="mobile-connect-wrapper">
                 <InstagramConnect onConnected={handleInstagramConnected} />
@@ -2437,14 +2478,17 @@ Image Description: ${response.post.image_prompt}
               
               <div className="post-input-section">
                 <input
+                  ref={postInputRef}
                   type="text"
                   value={query}
-                  onChange={(e) => setQuery(e.target.value)}
+                  onChange={(e) => handleInputChange(e.target.value)}
+                  onFocus={handleInputFocus}
                   placeholder="What would you like to post on Instagram?"
                   className="post-input-field"
                   disabled={isProcessing}
                   onKeyPress={(e) => {
                     if (e.key === 'Enter' && !isProcessing && query.trim()) {
+                      setIsPostDropdownOpen(false);
                       handleSendQuery();
                     }
                   }}
@@ -2463,9 +2507,38 @@ Image Description: ${response.post.image_prompt}
                   <FaRocket />
                 )}
               </button>
+
+              {/* 🚀 POST CREATION DROPDOWN - TEMPLATE SUGGESTIONS */}
+              {isPostDropdownOpen && postDropdownPosition && (
+                <div
+                  id="post-dropdown-portal"
+                  className="post-creation-dropdown"
+                  style={{
+                    position: 'absolute',
+                    top: postDropdownPosition.top,
+                    left: 0,
+                    right: 0,
+                    zIndex: 2000,
+                  }}
+                >
+                  <div className="dropdown-header">
+                    <span>✨ Quick Post Templates</span>
+                  </div>
+                  {postPrompts.map((prompt) => (
+                    <button
+                      key={prompt.id}
+                      className="dropdown-prompt-item"
+                      onClick={() => handlePromptSelect(prompt.prompt)}
+                      disabled={isProcessing}
+                    >
+                      <div className="prompt-title">{prompt.title}</div>
+                      <div className="prompt-description">{prompt.prompt}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
-
 
         </div>
       </div>
@@ -2631,20 +2704,23 @@ Image Description: ${response.post.image_prompt}
           className="mobile-floating-btn chat-btn"
           onClick={() => setIsMobileChatOpen(true)}
           title="AI Chat"
+          style={{ fontSize: '20px', color: '#00ffcc' }}
         >
-          💬
+          🤖
         </button>
         <button
           className="mobile-floating-btn image-btn"
           onClick={() => setIsMobileImageEditorOpen(true)}
           title="Image Editor"
+          style={{ fontSize: '20px', color: '#00ffcc' }}
         >
-          🎨
+          ✏️
         </button>
         <button
           className="mobile-floating-btn profile-btn"
           onClick={() => setIsMobileProfilePopupOpen(true)}
           title="Profile"
+          style={{ fontSize: '20px', color: '#00ffcc' }}
         >
           👤
         </button>
@@ -2652,8 +2728,9 @@ Image Description: ${response.post.image_prompt}
           className="mobile-floating-btn manual-btn"
           onClick={() => setIsMobileManualOpen(true)}
           title="Manual"
+          style={{ fontSize: '20px', color: '#00ffcc' }}
         >
-          📘
+          📚
         </button>
       </div>
 

@@ -76,7 +76,7 @@
   align-items: center;
   height: 100vh;
   width: 100%;
-  background-color: #1a1a2e;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
   color: #e0e0ff;
   font-size: 1.2rem;
   font-weight: 500;
@@ -86,27 +86,218 @@
   top: 0;
   left: 0;
   margin: 0 auto;
+  overflow: hidden;
 }
 
-/* Add a spinning animation to indicate loading */
-.loading-screen::after {
-  content: "";
-  display: block;
-  width: 30px;
-  height: 30px;
-  margin-left: 15px;
+.loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  max-width: 90%;
+  padding: 2rem;
+  animation: fadeInUp 0.6s ease-out;
+}
+
+.platform-icon {
+  margin-bottom: 1.5rem;
+  animation: bounceIn 0.8s ease-out 0.2s both;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.platform-icon img {
+  width: 4rem;
+  height: 4rem;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+  transition: transform 0.3s ease;
+  object-fit: contain;
+  max-width: 100%;
+  height: auto;
+}
+
+.platform-icon img:hover {
+  transform: scale(1.05);
+}
+
+/* Fallback for SVG loading issues */
+.platform-icon img:not([src]), 
+.platform-icon img[src=""], 
+.platform-icon img[src*="undefined"] {
+  display: none;
+}
+
+.platform-icon img:not([src])::after,
+.platform-icon img[src=""]::after,
+.platform-icon img[src*="undefined"]::after {
+  content: "📱";
+  font-size: 4rem;
+  color: #e0e0ff;
+}
+
+.loading-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  letter-spacing: -0.5px;
+  animation: slideInLeft 0.6s ease-out 0.4s both;
+}
+
+.loading-subtitle {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #ffffff;
+  opacity: 0.9;
+  animation: slideInRight 0.6s ease-out 0.6s both;
+}
+
+.loading-description {
+  font-size: 1rem;
+  opacity: 0.7;
+  margin-bottom: 2rem;
+  color: #b8b8d1;
+  animation: slideInUp 0.6s ease-out 0.8s both;
+}
+
+.loading-spinner {
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
-  border: 3px solid #e0e0ff;
-  border-color: #e0e0ff transparent #e0e0ff transparent;
-  animation: loading-spinner 1.2s linear infinite;
+  border: 4px solid;
+  border-color: #e0e0ff;
+  position: relative;
+  margin-bottom: 2rem;
+  animation: pulse 2s ease-in-out infinite;
 }
 
-@keyframes loading-spinner {
+.spinner-inner {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 4px solid transparent;
+  border-top-color: #e0e0ff;
+  animation: spin 1.2s linear infinite;
+}
+
+.loading-progress {
+  width: 200px;
+  margin-top: 1rem;
+  animation: slideInUp 0.6s ease-out 1s both;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-fill {
+  height: 100%;
+  width: 30%;
+  background: linear-gradient(90deg, #e0e0ff, #a8a8ff);
+  border-radius: 3px;
+  animation: progressFill 2s ease-in-out infinite;
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bounceIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spin {
   0% {
     transform: rotate(0deg);
   }
   100% {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+}
+
+@keyframes progressFill {
+  0%, 100% {
+    width: 30%;
+    opacity: 0.7;
+  }
+  50% {
+    width: 70%;
+    opacity: 1;
   }
 }
 
@@ -166,49 +357,458 @@
     max-width: 100%;
     padding: 0;
   }
+  
+  .loading-content {
+    padding: 1.5rem;
+    max-width: 95%;
+  }
+  
+  .platform-icon {
+    margin-bottom: 1rem;
+  }
+  
+  .platform-icon img {
+    width: 3rem;
+    height: 3rem;
+  }
+  
+  .loading-title {
+    font-size: 2rem;
+    margin-bottom: 0.8rem;
+  }
+  
+  .loading-subtitle {
+    font-size: 1.1rem;
+    margin-bottom: 0.4rem;
+  }
+  
+  .loading-description {
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .loading-spinner {
+    width: 50px;
+    height: 50px;
+    margin-bottom: 1.5rem;
+  }
+  
+  .spinner-inner {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .loading-progress {
+    width: 160px;
+  }
+  
+  .mobile-loading-hint {
+    margin-top: 1.2rem;
+  }
+  
+  .hint-text {
+    font-size: 0.85rem;
+    margin-bottom: 0.6rem;
+  }
+  
+  .dot {
+    width: 7px;
+    height: 7px;
+  }
+  
+  /* Mobile-specific animations */
+  .loading-content {
+    animation: fadeInUp 0.4s ease-out;
+  }
+  
+  .platform-icon {
+    animation: bounceIn 0.6s ease-out 0.1s both;
+  }
+  
+  .loading-title {
+    animation: slideInLeft 0.4s ease-out 0.3s both;
+  }
+  
+  .loading-subtitle {
+    animation: slideInRight 0.4s ease-out 0.5s both;
+  }
+  
+  .loading-description {
+    animation: slideInUp 0.4s ease-out 0.7s both;
+  }
+  
+  .loading-spinner {
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  
+  .loading-progress {
+    animation: slideInUp 0.4s ease-out 0.9s both;
+  }
+  
+  .mobile-loading-hint {
+    animation: fadeIn 0.6s ease-out 1s both;
+  }
 }
 
 @media (max-width: 480px) {
-  .content-area {
-    margin: 0 auto;
-    width: 100%;
-    max-width: 100%;
-    padding: 0;
+  .loading-content {
+    padding: 1rem;
   }
   
-  .main-content {
-    margin: 0 auto;
-    width: 100%;
-    max-width: 100%;
-    padding: 0;
+  .platform-icon {
+    margin-bottom: 0.8rem;
+  }
+  
+  .platform-icon img {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+  
+  .loading-title {
+    font-size: 1.8rem;
+    margin-bottom: 0.6rem;
+  }
+  
+  .loading-subtitle {
+    font-size: 1rem;
+    margin-bottom: 0.3rem;
+  }
+  
+  .loading-description {
+    font-size: 0.85rem;
+    margin-bottom: 1.2rem;
+  }
+  
+  .loading-spinner {
+    width: 45px;
+    height: 45px;
+    margin-bottom: 1.2rem;
+  }
+  
+  .spinner-inner {
+    width: 45px;
+    height: 45px;
+  }
+  
+  .loading-progress {
+    width: 140px;
+  }
+  
+  .mobile-loading-hint {
+    margin-top: 1rem;
+  }
+  
+  .hint-text {
+    font-size: 0.8rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .dot {
+    width: 6px;
+    height: 6px;
+  }
+  
+  /* Faster animations for small screens */
+  .loading-content {
+    animation: fadeInUp 0.3s ease-out;
+  }
+  
+  .platform-icon {
+    animation: bounceIn 0.5s ease-out 0.1s both;
+  }
+  
+  .loading-title {
+    animation: slideInLeft 0.3s ease-out 0.2s both;
+  }
+  
+  .loading-subtitle {
+    animation: slideInRight 0.3s ease-out 0.4s both;
+  }
+  
+  .loading-description {
+    animation: slideInUp 0.3s ease-out 0.6s both;
+  }
+  
+  .loading-spinner {
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  
+  .loading-progress {
+    animation: slideInUp 0.3s ease-out 0.8s both;
+  }
+  
+  .mobile-loading-hint {
+    animation: fadeIn 0.5s ease-out 0.9s both;
   }
 }
 
-/* Global image error handling */
-.image-load-failed {
-  background-color: #f5f5f5;
-  border: 1px solid #ddd;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #999;
-  font-size: 12px;
+@media (max-width: 360px) {
+  .loading-content {
+    padding: 0.8rem;
+  }
+  
+  .platform-icon {
+    margin-bottom: 0.6rem;
+  }
+  
+  .platform-icon img {
+    width: 2rem;
+    height: 2rem;
+  }
+  
+  .loading-title {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .loading-subtitle {
+    font-size: 0.9rem;
+    margin-bottom: 0.2rem;
+  }
+  
+  .loading-description {
+    font-size: 0.8rem;
+    margin-bottom: 1rem;
+  }
+  
+  .loading-spinner {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 1rem;
+  }
+  
+  .spinner-inner {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .loading-progress {
+    width: 120px;
+  }
+  
+  .mobile-loading-hint {
+    margin-top: 0.8rem;
+  }
+  
+  .hint-text {
+    font-size: 0.75rem;
+    margin-bottom: 0.4rem;
+  }
+  
+  .dot {
+    width: 5px;
+    height: 5px;
+  }
+  
+  /* Ultra-fast animations for very small screens */
+  .loading-content {
+    animation: fadeInUp 0.25s ease-out;
+  }
+  
+  .platform-icon {
+    animation: bounceIn 0.4s ease-out 0.1s both;
+  }
+  
+  .loading-title {
+    animation: slideInLeft 0.25s ease-out 0.2s both;
+  }
+  
+  .loading-subtitle {
+    animation: slideInRight 0.25s ease-out 0.4s both;
+  }
+  
+  .loading-description {
+    animation: slideInUp 0.25s ease-out 0.6s both;
+  }
+  
+  .loading-spinner {
+    animation: pulse 1s ease-in-out infinite;
+  }
+  
+  .loading-progress {
+    animation: slideInUp 0.25s ease-out 0.8s both;
+  }
+  
+  .mobile-loading-hint {
+    animation: fadeIn 0.4s ease-out 0.8s both;
+  }
+}
+
+/* Landscape orientation for mobile */
+@media (max-width: 768px) and (orientation: landscape) {
+  .loading-content {
+    padding: 1rem;
+  }
+  
+  .platform-icon {
+    margin-bottom: 0.8rem;
+  }
+  
+  .platform-icon img {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+  
+  .loading-title {
+    font-size: 1.8rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .loading-subtitle {
+    font-size: 1rem;
+    margin-bottom: 0.3rem;
+  }
+  
+  .loading-description {
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+  }
+  
+  .loading-spinner {
+    width: 45px;
+    height: 45px;
+    margin-bottom: 1rem;
+  }
+  
+  .spinner-inner {
+    width: 45px;
+    height: 45px;
+  }
+  
+  .loading-progress {
+    width: 140px;
+  }
+  
+  /* Landscape-specific animations */
+  .loading-content {
+    animation: fadeInUp 0.35s ease-out;
+  }
+  
+  .platform-icon {
+    animation: bounceIn 0.6s ease-out 0.1s both;
+  }
+  
+  .loading-title {
+    animation: slideInLeft 0.35s ease-out 0.3s both;
+  }
+  
+  .loading-subtitle {
+    animation: slideInRight 0.35s ease-out 0.5s both;
+  }
+  
+  .loading-description {
+    animation: slideInUp 0.35s ease-out 0.7s both;
+  }
+  
+  .loading-spinner {
+    animation: pulse 1.3s ease-in-out infinite;
+  }
+  
+  .loading-progress {
+    animation: slideInUp 0.35s ease-out 0.9s both;
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  .loading-spinner {
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  
+  .progress-fill {
+    animation: progressFill 1.5s ease-in-out infinite;
+  }
+}
+
+/* High DPI displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .loading-spinner {
+    border-width: 2px;
+  }
+  
+  .spinner-inner {
+    border-width: 2px;
+  }
+  
+  .progress-bar {
+    height: 4px;
+  }
+}
+
+/* Reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .loading-content,
+  .platform-icon,
+  .loading-title,
+  .loading-subtitle,
+  .loading-description,
+  .loading-spinner,
+  .loading-progress {
+    animation: none;
+  }
+  
+  .spinner-inner {
+    animation: spin 2s linear infinite;
+  }
+  
+  .progress-fill {
+    animation: progressFill 3s ease-in-out infinite;
+  }
+}
+
+/* Mobile-specific loading indicator */
+.mobile-loading-hint {
+  margin-top: 1.5rem;
   text-align: center;
-  min-height: 100px;
+  animation: fadeIn 0.8s ease-out 1.2s both;
 }
 
-.image-load-failed::before {
-  content: "🖼️ Image unavailable";
-  display: block;
+.hint-text {
+  font-size: 0.9rem;
+  color: #b8b8d1;
+  margin-bottom: 0.8rem;
+  opacity: 0.8;
 }
 
-/* Ensure images don't cause layout shifts when they fail */
-img {
-  max-width: 100%;
-  height: auto;
-  object-fit: cover;
+.hint-dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
 }
 
-img[src=""], img:not([src]) {
-  display: none;
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #e0e0ff;
+  opacity: 0.6;
+  animation: dotPulse 1.4s ease-in-out infinite;
+}
+
+.dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes dotPulse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
 }

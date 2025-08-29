@@ -62,6 +62,39 @@ const ChatModal: React.FC<ChatModalProps> = ({
     }
   }[platform];
 
+  // Preemptive questions based on platform and username
+  const getPreemptiveQuestions = () => {
+    const baseQuestions = [
+      `Give me 10 trending hashtags for ${username}`,
+      `Write 3 caption ideas with a strong hook`,
+      `Best time to post this week and why?`,
+      `Suggest a carousel content plan for tomorrow`,
+      `How can we improve reach from our last post?`
+    ];
+
+    const platformSpecificQuestions = {
+      instagram: [
+        `What are the best Instagram Reels ideas for ${username}?`,
+        `How can we increase Instagram engagement?`,
+        `Suggest Instagram Story highlights for ${username}`
+      ],
+      twitter: [
+        `What are trending Twitter topics for ${username}?`,
+        `How can we increase Twitter engagement?`,
+        `Suggest Twitter thread ideas for ${username}`
+      ],
+      facebook: [
+        `What are trending Facebook topics for ${username}?`,
+        `How can we increase Facebook engagement?`,
+        `Suggest Facebook post ideas for ${username}`
+      ]
+    };
+
+    return [...baseQuestions, ...platformSpecificQuestions[platform]];
+  };
+
+  const preemptiveQuestions = getPreemptiveQuestions();
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -81,6 +114,12 @@ const ChatModal: React.FC<ChatModalProps> = ({
     if (newMessage.trim() && onSendMessage && !isProcessing) {
       onSendMessage(newMessage);
       setNewMessage('');
+    }
+  };
+
+  const handlePreemptiveQuestion = (question: string) => {
+    if (onSendMessage && !isProcessing) {
+      onSendMessage(question);
     }
   };
 
@@ -135,8 +174,8 @@ const ChatModal: React.FC<ChatModalProps> = ({
           >
             <div className="chat-modal-header">
               <div className="chat-modal-title">
-                <h2>{username}</h2>
-                <span className="platform-indicator">{platformConfig.name} AI Manager</span>
+                <h2>AI Discussion with {username}</h2>
+                <span className="platform-indicator">{platformConfig.name}</span>
               </div>
               <button className="chat-modal-close" onClick={onClose}>
                 ✕
@@ -146,7 +185,28 @@ const ChatModal: React.FC<ChatModalProps> = ({
             <div className="chat-messages-container">
               {messages.length === 0 ? (
                 <div className="chat-no-messages">
-                  No chat history yet. Start a conversation!
+                  <div className="chat-start-section">
+                    <div className="chat-start-icon">💬</div>
+                    <h3>Start an AI Discussion</h3>
+                    <p>Ask questions, get strategic insights, or discuss your {platformConfig.name.toLowerCase()} growth strategy.</p>
+                    
+                    {/* Preemptive Questions */}
+                    <div className="preemptive-questions">
+                      <h4>Suggested Questions:</h4>
+                      <div className="questions-grid">
+                        {preemptiveQuestions.map((question, index) => (
+                          <button
+                            key={index}
+                            className="preemptive-question-btn"
+                            onClick={() => handlePreemptiveQuestion(question)}
+                            disabled={isProcessing}
+                          >
+                            {question}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 messages.map((message, index) => {
@@ -216,7 +276,7 @@ const ChatModal: React.FC<ChatModalProps> = ({
                   className="chat-input"
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder={`Ask me anything about your ${platformConfig.name} strategy...`}
+                  placeholder={`Message ${username}...`}
                   disabled={isProcessing}
                 />
                 <button

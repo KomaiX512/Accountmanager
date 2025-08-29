@@ -4,15 +4,16 @@
   bottom: 0;
   left: 0;
   right: 0;
-  background: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(10px);
-  border-top: 1px solid rgba(0, 255, 204, 0.2);
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid rgba(0, 255, 204, 0.15);
   z-index: 1000;
-  padding: 8px 0;
+  padding: 4px 0;
   display: flex;
   justify-content: center;
   align-items: center;
   transition: all 0.3s ease;
+  height: 28px;
 }
 
 .privacy-policy-footer:hover {
@@ -22,20 +23,25 @@
 
 .privacy-footer-content {
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 16px;
+  height: 100%;
 }
 
 .privacy-link {
   color: rgba(0, 255, 204, 0.7);
   text-decoration: none;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 400;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
   text-transform: uppercase;
-  padding: 4px 12px;
-  border-radius: 12px;
-  transition: all 0.3s ease;
+  padding: 2px 8px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
   position: relative;
   overflow: hidden;
 }
@@ -67,22 +73,180 @@
   box-shadow: 0 1px 4px rgba(0, 255, 204, 0.3);
 }
 
+/* Footer Left Section */
+.footer-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.support-text {
+  color: rgba(0, 255, 204, 0.7);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+/* Social Icons Styles */
+.social-icons {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.social-icon {
+  background: none;
+  border: none;
+  color: rgba(0, 255, 204, 0.6);
+  cursor: pointer;
+  padding: 0;
+  border-radius: 0;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  height: auto;
+  position: relative;
+  overflow: visible;
+}
+
+
+.social-icon:hover {
+  color: #00ffcc;
+  background: none;
+  transform: translateY(-1px) scale(1.1);
+  box-shadow: none;
+}
+
+
+.social-icon:active {
+  transform: translateY(0) scale(1.05);
+  box-shadow: none;
+}
+
+/* Platform-specific colors on hover */
+.social-icon.twitter:hover {
+  color: #1da1f2;
+}
+
+.social-icon.facebook:hover {
+  color: #1877f2;
+}
+
+.social-icon.instagram:hover {
+  color: #e4405f;
+}
+
+.social-icon svg {
+  width: 12px;
+  height: 12px;
+  transition: transform 0.2s ease;
+}
+
+.social-icon:hover svg {
+  transform: scale(1.1);
+}
+
 /* Mobile responsive adjustments */
 @media (max-width: 768px) {
   .privacy-policy-footer {
-    padding: 6px 0;
+    height: 24px;
+    padding: 3px 0;
+  }
+  
+  .privacy-footer-content {
+    padding: 0 12px;
+  }
+  
+  .footer-left {
+    gap: 6px;
+  }
+  
+  .support-text {
+    font-size: 9px;
+  }
+  
+  .social-icons {
+    gap: 4px;
+  }
+  
+  .social-icon {
+    width: auto;
+    height: auto;
+    padding: 0;
+  }
+  
+  .social-icon svg {
+    width: 10px;
+    height: 10px;
   }
   
   .privacy-link {
-    font-size: 11px;
-    padding: 3px 10px;
+    font-size: 9px;
+    padding: 1px 6px;
+  }
+}
+
+/* Extra small screens */
+@media (max-width: 480px) {
+  .privacy-policy-footer {
+    height: 22px;
+    padding: 2px 0;
+  }
+  
+  .privacy-footer-content {
+    padding: 0 8px;
+  }
+  
+  .footer-left {
+    gap: 4px;
+  }
+  
+  .support-text {
+    font-size: 8px;
+  }
+  
+  .social-icons {
+    gap: 3px;
+  }
+  
+  .social-icon {
+    width: auto;
+    height: auto;
+    padding: 0;
+  }
+  
+  .social-icon svg {
+    width: 9px;
+    height: 9px;
+  }
+  
+  .privacy-link {
+    font-size: 8px;
+    padding: 1px 4px;
   }
 }
 
 /* Ensure footer doesn't interfere with content */
 .dashboard-wrapper,
 .platform-dashboard-wrapper {
-  padding-bottom: 40px;
+  padding-bottom: 32px;
+}
+
+@media (max-width: 768px) {
+  .dashboard-wrapper,
+  .platform-dashboard-wrapper {
+    padding-bottom: 28px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-wrapper,
+  .platform-dashboard-wrapper {
+    padding-bottom: 26px;
+  }
 }
 
 /* Dark theme compatibility */

@@ -791,11 +791,106 @@ const AppContent: React.FC = () => {
     // ✅ ENHANCED: Show which platform is being loaded
     const currentPlatformName = location.pathname.includes('twitter') ? 'Twitter' : 
                                location.pathname.includes('facebook') ? 'Facebook' : 'Instagram';
+    
+    // Platform-specific colors and icons
+    const getPlatformStyles = () => {
+      switch (currentPlatformName.toLowerCase()) {
+        case 'twitter':
+          return {
+            primaryColor: '#1DA1F2',
+            secondaryColor: '#14171A',
+            accentColor: '#E8F5FD',
+            icon: '/icons/twitter.svg',
+            gradient: 'linear-gradient(135deg, #1DA1F2 0%, #0D8BD9 100%)'
+          };
+        case 'facebook':
+          return {
+            primaryColor: '#1877F2',
+            secondaryColor: '#0C1B33',
+            accentColor: '#E7F3FF',
+            icon: '/icons/facebook.svg',
+            gradient: 'linear-gradient(135deg, #1877F2 0%, #0D5BB8 100%)'
+          };
+        default: // Instagram
+          return {
+            primaryColor: '#E4405F',
+            secondaryColor: '#2D1B2E',
+            accentColor: '#FCE4EC',
+            icon: '/icons/instagram.svg',
+            gradient: 'linear-gradient(135deg, #E4405F 0%, #C13584 100%)'
+          };
+      }
+    };
+    
+    const platformStyles = getPlatformStyles();
+    
     return (
-      <div className="loading-screen">
-        <div>Loading {currentPlatformName} account information...</div>
-        <div style={{ fontSize: '0.9em', opacity: 0.7, marginTop: '10px' }}>
-          Please wait while we retrieve your account data
+      <div className="loading-screen" style={{ backgroundColor: platformStyles.secondaryColor }}>
+        <div className="loading-content">
+          <div className="platform-icon">
+            <img 
+              src={platformStyles.icon} 
+              alt={`${currentPlatformName} icon`}
+              style={{ 
+                width: '4rem', 
+                height: '4rem',
+                filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))'
+              }}
+              onError={(e) => {
+                // Fallback to emoji if SVG fails to load
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                const fallback = document.createElement('div');
+                fallback.style.cssText = `
+                  width: 4rem;
+                  height: 4rem;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  font-size: 2.5rem;
+                  color: ${platformStyles.primaryColor};
+                `;
+                fallback.textContent = currentPlatformName === 'Twitter' ? '🐦' : 
+                                      currentPlatformName === 'Facebook' ? '📘' : '📷';
+                target.parentNode?.appendChild(fallback);
+              }}
+            />
+          </div>
+          
+          <div className="loading-title" style={{ color: platformStyles.primaryColor }}>
+            {currentPlatformName}
+          </div>
+          
+          <div className="loading-subtitle">
+            Loading account information...
+          </div>
+          
+          <div className="loading-description">
+            Please wait while we retrieve your account data
+          </div>
+          
+          <div className="loading-spinner" style={{ borderColor: platformStyles.primaryColor }}>
+            <div className="spinner-inner" style={{ borderColor: `${platformStyles.primaryColor} transparent transparent transparent` }}></div>
+          </div>
+          
+          <div className="loading-progress">
+            <div className="progress-bar" style={{ backgroundColor: platformStyles.accentColor }}>
+              <div className="progress-fill" style={{ 
+                background: platformStyles.gradient,
+                animation: 'progressFill 2s ease-in-out infinite'
+              }}></div>
+            </div>
+          </div>
+          
+          {/* Mobile-specific loading indicator */}
+          <div className="mobile-loading-hint">
+            <div className="hint-text">Switching to {currentPlatformName}</div>
+            <div className="hint-dots">
+              <span className="dot"></span>
+              <span className="dot"></span>
+              <span className="dot"></span>
+            </div>
+          </div>
         </div>
       </div>
     );

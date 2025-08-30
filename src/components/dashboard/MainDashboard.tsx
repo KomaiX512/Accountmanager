@@ -13,7 +13,7 @@ import { useAuth } from '../../context/AuthContext';
 import PostScheduler from '../instagram/PostScheduler';
 import TwitterCompose from '../twitter/TwitterCompose';
 import UsageDashboard from './UsageDashboard';
-import PlatformUsageChart from './PlatformUsageChart';
+// import PlatformUsageChart from './PlatformUsageChart'; // Temporarily commented out
 
 import { schedulePost } from '../../utils/scheduleHelpers';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
@@ -2771,7 +2771,7 @@ const MainDashboard: React.FC = () => {
               </div>
             </div>
             
-            <PlatformUsageChart />
+            {/* <PlatformUsageChart /> */} {/* Temporarily commented out */}
             </div>
           </div>
         )}

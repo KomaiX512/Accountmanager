@@ -58,7 +58,7 @@ describe('Processing Logic Unit Tests', () => {
       platform,
       username: originalUsername,
       startTime: Date.now(),
-      endTime: Date.now() + 15 * 60 * 1000
+      endTime: Date.now() + 2 * 60 * 1000 // Reduced from 15 to 2 minutes for testing
     };
     
     localStorageMock.setItem(`${platform}_processing_info`, JSON.stringify(processingInfo));
@@ -132,12 +132,12 @@ describe('Processing Logic Unit Tests', () => {
       const now = Date.now();
       
       if (scenario.hasCountdown) {
-        const endTime = scenario.isExpired ? now - 1000 : now + 15 * 60 * 1000;
+        const endTime = scenario.isExpired ? now - 1000 : now + 2 * 60 * 1000; // Reduced from 15 to 2 minutes for testing
         localStorageMock.setItem(`${platform}_processing_countdown`, endTime.toString());
       }
       
       if (scenario.hasInfo) {
-        const info = { platform, username, startTime: now, endTime: now + 15 * 60 * 1000 };
+        const info = { platform, username, startTime: now, endTime: now + 2 * 60 * 1000 }; // Reduced from 15 to 2 minutes for testing
         localStorageMock.setItem(`${platform}_processing_info`, JSON.stringify(info));
       }
       

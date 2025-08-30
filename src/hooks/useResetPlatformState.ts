@@ -234,6 +234,61 @@ export const useResetPlatformState = () => {
   }, []);
 
   /**
+   * Verifies backend processing status is cleared/inactive after reset
+   */
+  const verifyBackendProcessingCleared = useCallback(async (platform: string, userId: string): Promise<boolean> => {
+    console.log(`[ResetPlatformState] 🔍 Verifying backend processing state is cleared for ${platform}`);
+    const maxAttempts = 8; // ~16s @ 2s intervals
+    const delayMs = 2000;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const url = `/api/processing-status/${userId}?platform=${platform}&cb=${Date.now()}&bypass_cache=true`;
+        const resp = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
+        if (resp.ok) {
+          const json = await resp.json();
+          const data = (json && typeof json === 'object' && 'data' in json) ? (json as any).data : json;
+          const nowTs = Date.now();
+
+          // No data at all -> treated as cleared
+          if (!data) {
+            console.log(`[ResetPlatformState] ✅ Backend confirms ${platform} processing state is cleared`);
+            return true;
+          }
+
+          // Explicit inactive flag
+          const activeFlag = typeof (data as any).active === 'boolean' ? (data as any).active : undefined;
+          if (activeFlag === false) {
+            console.log(`[ResetPlatformState] ✅ Backend indicates inactive processing for ${platform}`);
+            return true;
+          }
+
+          // Expired endTime -> treated as cleared
+          const endTimeRaw: unknown = (data as any).endTime;
+          const endTimeNum = typeof endTimeRaw === 'string' || typeof endTimeRaw === 'number' ? Number(endTimeRaw) : NaN;
+          if (Number.isFinite(endTimeNum) && nowTs >= endTimeNum) {
+            console.log(`[ResetPlatformState] ✅ Backend processing state expired for ${platform} (treated as cleared)`);
+            return true;
+          }
+
+          console.log(`[ResetPlatformState] ⏳ Backend still indicates active processing for ${platform} (attempt ${attempt}/${maxAttempts})`);
+        } else {
+          // 404 means no status exists -> treat as cleared
+          if (resp.status === 404) {
+            console.log(`[ResetPlatformState] ✅ Backend returned 404 (no processing status) for ${platform}`);
+            return true;
+          }
+          console.warn(`[ResetPlatformState] ⚠️ Backend verification request failed (status=${resp.status}) attempt ${attempt}/${maxAttempts}`);
+        }
+      } catch (err) {
+        console.warn(`[ResetPlatformState] ⚠️ Error verifying backend processing status (attempt ${attempt}/${maxAttempts}):`, err);
+      }
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+    console.warn(`[ResetPlatformState] ❌ Backend processing status did not clear after verification window for ${platform}`);
+    return false;
+  }, []);
+
+  /**
    * Main reset function that orchestrates all reset operations
    */
   const resetPlatformState = useCallback(async (options: PlatformResetOptions): Promise<boolean> => {
@@ -280,12 +335,25 @@ export const useResetPlatformState = () => {
         console.warn('[ResetPlatformState] ⚠️ Backend reset failed, but continuing with frontend reset');
       }
 
+      // Step 2.1: Verify backend processing status cleared to avoid premature navigation
+      const backendCleared = await verifyBackendProcessingCleared(platform, userId);
+      if (!backendCleared) {
+        console.warn(`[ResetPlatformState] ❌ Backend not cleared for ${platform}. Aborting navigation to ensure consistency.`);
+        return false;
+      }
+
       // Step 3: Prevent back navigation if requested
       if (clearBrowserHistory) {
         preventBackNavigation();
       }
 
-      // Step 4: Navigate to main dashboard if requested
+      // Step 4: Refresh acquired platforms BEFORE navigation to update main dashboard status
+      refreshPlatforms();
+      // Allow a short tick to let state propagate
+      await new Promise(resolve => setTimeout(resolve, 50));
+      console.log(`[ResetPlatformState] 🔄 Refreshed acquired platforms - dashboard will reflect reset`);
+
+      // Step 5: Navigate to main dashboard if requested
       if (navigateToMain) {
         console.log(`[ResetPlatformState] 🧭 Navigating to main dashboard`);
         
@@ -299,10 +367,6 @@ export const useResetPlatformState = () => {
         });
       }
 
-      // Step 5: 🔥 BULLETPROOF FIX - Refresh acquired platforms to update main dashboard status
-      refreshPlatforms();
-      console.log(`[ResetPlatformState] 🔄 Refreshed acquired platforms - main dashboard will show "not acquired"`);
-
       console.log(`[ResetPlatformState] ✅ Platform reset completed successfully for ${platform}`);
       return true;
 
@@ -310,7 +374,7 @@ export const useResetPlatformState = () => {
       console.error(`[ResetPlatformState] ❌ Platform reset failed:`, error);
       return false;
     }
-  }, [currentUser, checkActiveCampaign, stopActiveCampaign, clearPlatformLocalStorage, clearPlatformSessionStorage, clearSessionManagerData, performBackendReset, preventBackNavigation, navigate, refreshPlatforms]);
+  }, [currentUser, checkActiveCampaign, stopActiveCampaign, clearPlatformLocalStorage, clearPlatformSessionStorage, clearSessionManagerData, performBackendReset, verifyBackendProcessingCleared, preventBackNavigation, navigate, refreshPlatforms]);
 
   /**
    * Quick reset function for immediate use (with sensible defaults)

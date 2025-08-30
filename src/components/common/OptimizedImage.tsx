@@ -194,7 +194,7 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
       const isExternalUrl = src.startsWith('http') && !src.includes(window.location.origin);
       if (!isExternalUrl) {
         // For same-origin requests, don't set crossOrigin
-        tempImg.crossOrigin = undefined;
+        tempImg.crossOrigin = null;
       } else {
         tempImg.crossOrigin = 'anonymous';
       }
@@ -207,11 +207,12 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
           
           const optimized = await optimizeImage(tempImg);
           
-          // Only use optimized version if it's actually smaller or significantly different
+          // Skip optimization for images that are already reasonably sized
+          const isAlreadyOptimal = tempImg.naturalWidth <= 800 && tempImg.naturalHeight <= 800;
           const originalEstimate = src.length;
           const optimizedSize = optimized.length;
           const sizeDifference = originalEstimate - optimizedSize;
-          const isBeneficial = sizeDifference > 1024; // Only if saves at least 1KB
+          const isBeneficial = !isAlreadyOptimal && sizeDifference > 512; // Reduced threshold and skip small images
           
           if (isBeneficial) {
             // Cache the optimized result

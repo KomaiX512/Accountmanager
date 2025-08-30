@@ -99,11 +99,11 @@ const checkPortInUse = (port) => {
 
 // Configure AWS SDK v3 (Enterprise-grade with connection pooling)
 const S3_CONFIG = {
-  endpoint: 'https://570f213f1410829ee9a733a77a5f40e3.r2.cloudflarestorage.com',
+  endpoint: 'https://f049515e642b0c91e7679c3d80962686.r2.cloudflarestorage.com',
   region: 'auto',
   credentials: {
-    accessKeyId: '18f60c98e08f1a24040de7cb7aab646c',
-    secretAccessKey: '0a8c50865ecab3c410baec4d751f35493fd981f4851203fe205fe0f86063a5f6',
+    accessKeyId: '7e15d4a51abb43fff3a7da4a8813044f',
+    secretAccessKey: '8fccd5540c85304347cbbd25d8e1f67776a8473c73c4a8811e83d0970bd461e2',
   },
   maxAttempts: 5,
   requestHandler: {

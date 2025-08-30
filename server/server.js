@@ -466,17 +466,18 @@ function scheduleCacheCleanup() {
 scheduleCacheCleanup();
 
 const s3Client = new S3Client({
-  endpoint: 'https://570f213f1410829ee9a733a77a5f40e3.r2.cloudflarestorage.com',
+  endpoint: 'https://f049515e642b0c91e7679c3d80962686.r2.cloudflarestorage.com',
   region: 'auto',
   credentials: {
-    accessKeyId: '18f60c98e08f1a24040de7cb7aab646c',
-    secretAccessKey: '0a8c50865ecab3c410baec4d751f35493fd981f4851203fe205fe0f86063a5f6',
+    accessKeyId: '7e15d4a51abb43fff3a7da4a8813044f',
+    secretAccessKey: '8fccd5540c85304347cbbd25d8e1f67776a8473c73c4a8811e83d0970bd461e2',
   },
-  maxAttempt: 3,
-  httpOptions: {
-    connectTimeout: 50000,
-    timeout: 100000,
+  maxAttempts: 5,
+  requestHandler: {
+    connectionTimeout: 15000,
+    requestTimeout: 30000,
   },
+  retryMode: 'adaptive'
 });
 
 // R2 public URL for direct image access
@@ -2003,7 +2004,7 @@ async function fetchDataForModuleWithMetadata(username, prefixTemplate, forceRef
   }
 }
 
-app.get('/proxy-image', async (req, res) => {
+app.get(['/api/proxy-image', '/proxy-image'], async (req, res) => {
   let { url } = req.query;
   if (!url) return res.status(400).send('Image URL is required');
   
@@ -7461,6 +7462,241 @@ app.post(['/api/post-instagram-now/:userId', '/post-instagram-now/:userId'], upl
     `);
     
     let errorMessage = 'Failed to post to Instagram';
+    if (error.response?.data?.error?.message) {
+      errorMessage = error.response.data.error.message;
+    } else if (error.response?.data?.error) {
+      errorMessage = error.response.data.error;
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
+    res.status(500).json({ 
+      error: errorMessage,
+      details: error.response?.data || error.message 
+    });
+  }
+});
+
+// ============= FACEBOOK POST NOW ENDPOINT =============
+
+// Real-time Facebook posting endpoint - matches Instagram implementation
+app.post(['/api/post-facebook-now/:userId', '/post-facebook-now/:userId'], upload.single('image'), async (req, res) => {
+  setCorsHeaders(res);
+  
+  const { userId } = req.params;
+  const { caption } = req.body;
+  const file = req.file;
+
+  console.log(`[${new Date().toISOString()}] 🚀 Starting Facebook post request for page ${userId}`);
+  console.log(`[${new Date().toISOString()}] 📝 Request details:
+    - Page ID: ${userId}
+    - Image present: ${!!file}
+    - Caption present: ${!!caption}
+    - Image size: ${file?.size || 0} bytes
+    - Image type: ${file?.mimetype || 'N/A'}
+  `);
+
+  if (!file) {
+    console.log(`[${new Date().toISOString()}] ❌ Request validation failed: Missing image file`);
+    return res.status(400).json({ error: 'Image is required for Facebook posts' });
+  }
+
+  if (!caption || caption.trim() === '') {
+    console.log(`[${new Date().toISOString()}] ❌ Request validation failed: Missing caption`);
+    return res.status(400).json({ error: 'Caption is required for Facebook posts' });
+  }
+
+  try {
+    // Get Facebook connection data using the page ID
+    let connectionData = null;
+    
+    try {
+      console.log(`[${new Date().toISOString()}] 🔍 Searching for Facebook connection with page ID ${userId}...`);
+      
+      // Search all Facebook connections to find the one with matching facebook_page_id
+      const listCommand = new ListObjectsV2Command({
+        Bucket: 'tasks',
+        Prefix: `FacebookConnection/`,
+      });
+      const { Contents } = await s3Client.send(listCommand);
+
+      if (Contents) {
+        for (const obj of Contents) {
+          if (obj.Key.endsWith('/connection.json')) {
+            const getCommand = new GetObjectCommand({
+              Bucket: 'tasks',
+              Key: obj.Key,
+            });
+            const data = await s3Client.send(getCommand);
+            const json = await data.Body.transformToString();
+            const connection = JSON.parse(json);
+            
+            if (connection.facebook_page_id === userId) {
+              connectionData = connection;
+              console.log(`[${new Date().toISOString()}] ✅ Found Facebook connection for page ${userId}`);
+              break;
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`[${new Date().toISOString()}] ❌ Error searching for Facebook connection:`, error);
+    }
+    
+    if (!connectionData) {
+      console.log(`[${new Date().toISOString()}] ❌ Authentication failed: No Facebook connection found for page ${userId}`);
+      return res.status(404).json({ error: 'No Facebook connection found for this page. Please reconnect Facebook.' });
+    }
+
+    const { access_token } = connectionData;
+    
+    console.log(`[${new Date().toISOString()}] 🎯 Proceeding with Facebook post using page ID: ${userId}`);
+
+    // Process image - same logic as Instagram
+    let imageBuffer = file.buffer;
+    
+    // Detect actual image format from file content (magic bytes)
+    let actualFormat = 'unknown';
+    let mimeType = file.mimetype;
+    
+    if (imageBuffer.length >= 4) {
+      // Check for JPEG signature (FF D8)
+      if (imageBuffer[0] === 0xFF && imageBuffer[1] === 0xD8) {
+        actualFormat = 'jpeg';
+        mimeType = 'image/jpeg';
+      }
+      // Check for PNG signature (89 50 4E 47)
+      else if (imageBuffer[0] === 0x89 && imageBuffer[1] === 0x50 && 
+               imageBuffer[2] === 0x4E && imageBuffer[3] === 0x47) {
+        actualFormat = 'png';
+        mimeType = 'image/png';
+      }
+      // Check for RIFF format (WebP) - Convert to JPEG for Facebook compatibility
+      else if (imageBuffer.length >= 4 &&
+               imageBuffer.toString('ascii', 0, 4) === 'RIFF') {
+        console.log(`[${new Date().toISOString()}] 🔄 RIFF format detected, converting to JPEG...`);
+        
+        try {
+          // Convert to JPEG using sharp
+          imageBuffer = await sharp(imageBuffer)
+            .jpeg({ 
+              quality: 85,
+              progressive: true 
+            })
+            .toBuffer();
+          
+          actualFormat = 'jpeg';
+          mimeType = 'image/jpeg';
+          
+          console.log(`[${new Date().toISOString()}] ✅ RIFF conversion successful: ${imageBuffer.length} bytes`);
+        } catch (conversionError) {
+          console.error(`[${new Date().toISOString()}] ❌ RIFF conversion failed:`, conversionError);
+          return res.status(500).json({ error: 'Image conversion failed' });
+        }
+      }
+    }
+    
+    // Validate supported format
+    if (!['jpeg', 'png'].includes(actualFormat)) {
+      console.log(`[${new Date().toISOString()}] ❌ Unsupported image format: ${actualFormat}`);
+      return res.status(400).json({ 
+        error: `Unsupported image format detected. Facebook API only supports JPEG and PNG images.`,
+        details: `Detected format: ${actualFormat}. Reported mimetype: ${file.mimetype}`
+      });
+    }
+    
+    // Validate image size (Facebook max 4MB for photos)
+    if (imageBuffer.length > 4 * 1024 * 1024) {
+      console.log(`[${new Date().toISOString()}] ❌ Image too large: ${imageBuffer.length} bytes`);
+      return res.status(400).json({ error: 'Image too large. Maximum file size is 4MB for Facebook posts.' });
+    }
+    
+    console.log(`[${new Date().toISOString()}] 📤 Uploading image to Facebook:
+    Format: ${mimeType}
+    Size: ${imageBuffer.length} bytes
+    Status: Processing...`);
+    
+    // Store image in R2 and use signed URL for Facebook
+    const fileExtension = actualFormat === 'jpeg' ? 'jpg' : actualFormat;
+    const r2Key = `temp_facebook_uploads/${userId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`;
+    
+    try {
+      await s3Client.send(new PutObjectCommand({
+        Bucket: 'tasks',
+        Key: r2Key,
+        Body: imageBuffer,
+        ContentType: mimeType,
+        ACL: 'public-read'
+      }));
+      console.log(`[${new Date().toISOString()}] ✅ Image uploaded to R2 storage: ${r2Key}`);
+    } catch (uploadError) {
+      console.error(`[${new Date().toISOString()}] ❌ R2 upload failed:`, uploadError);
+      return res.status(500).json({ error: 'Failed to upload image to storage', details: uploadError.message });
+    }
+
+    // Generate signed URL for Facebook access
+    const publicImageUrl = await getSignedUrl(
+      s3Client,
+      new GetObjectCommand({ Bucket: 'tasks', Key: r2Key }),
+      { expiresIn: 900 } // 15 minutes
+    );
+    console.log(`[${new Date().toISOString()}] 🔗 Generated signed URL for Facebook access`);
+
+    // Post to Facebook using Graph API
+    console.log(`[${new Date().toISOString()}] 📢 Publishing post to Facebook...`);
+    
+    const postResponse = await axios.post(`https://graph.facebook.com/v18.0/${userId}/photos`, {
+      url: publicImageUrl,
+      caption: caption.trim(),
+      access_token: access_token
+    }, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const postId = postResponse.data.id;
+    console.log(`[${new Date().toISOString()}] 🎉 Facebook post published successfully:
+    Post ID: ${postId}
+    Page ID: ${userId}`);
+
+    // Store post record for tracking
+    const postKey = `FacebookPosts/${userId}/${postId}.json`;
+    const postData = {
+      id: postId,
+      pageId: userId,
+      platform: 'facebook',
+      caption: caption.trim(),
+      posted_at: new Date().toISOString(),
+      status: 'published',
+      type: 'real_time_post'
+    };
+
+    await s3Client.send(new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: postKey,
+      Body: JSON.stringify(postData, null, 2),
+      ContentType: 'application/json',
+    }));
+
+    console.log(`[${new Date().toISOString()}] 📝 Facebook post record stored: ${postKey}`);
+
+    res.json({ 
+      success: true, 
+      message: 'Facebook post published successfully!',
+      post_id: postId,
+      posted_at: postData.posted_at
+    });
+
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] ❌ Facebook posting failed:
+    Error Type: ${error.name}
+    Message: ${error.message}
+    API Response: ${JSON.stringify(error.response?.data || {})}
+    Stack: ${error.stack}
+    `);
+    
+    let errorMessage = 'Failed to post to Facebook';
     if (error.response?.data?.error?.message) {
       errorMessage = error.response.data.error.message;
     } else if (error.response?.data?.error) {

@@ -1,18 +1,28 @@
 // Removed unused Interface to satisfy linter
 
-class CacheManager {
-  private static readonly COMPETITOR_CACHE_DURATION = 15 * 60 * 1000; // 15 minutes in milliseconds
+/**
+ * CacheManager - Handles caching for competitor analysis data
+ * 
+ * Cache invalidation triggers:
+ * 1. After 2 minutes when competitor analysis is added/edited (reduced from 15 for testing)
+ * 2. When competitor data is manually refreshed
+ * 3. When cache duration expires
+ * 
+ * This ensures fresh data while maintaining performance
+ */
+export class CacheManager {
+  private static readonly COMPETITOR_CACHE_DURATION = 2 * 60 * 1000; // 2 minutes in milliseconds (reduced from 15 for testing)
   private static readonly GENERAL_CACHE_DURATION = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
 
   /**
    * Check if cache should be invalidated based on the two conditions:
-   * 1. After 15 minutes when competitor analysis is added/edited
+   * 1. After 2 minutes when competitor analysis is added/edited (reduced from 15 for testing)
    * 2. After 12 hours for all dashboard modules
    */
   static shouldInvalidateCache(platform: string, accountHolder: string, section?: string): boolean {
     const now = Date.now();
     
-    // Check competitor edit condition (15 minutes)
+    // Check competitor edit condition (2 minutes)
     const competitorEditKey = `competitor_edit_time_${platform}_${accountHolder}`;
     const competitorEditTime = localStorage.getItem(competitorEditKey);
     
@@ -44,7 +54,8 @@ class CacheManager {
   }
 
   /**
-   * Mark competitor edit time to trigger 15-minute cache invalidation
+   * Mark competitor edit time to trigger 2-minute cache invalidation (reduced from 15 for testing)
+   * This ensures fresh data is fetched after competitor updates
    */
   static markCompetitorEdit(platform: string, accountHolder: string): void {
     const key = `competitor_edit_time_${platform}_${accountHolder}`;

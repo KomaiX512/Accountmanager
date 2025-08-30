@@ -30,55 +30,37 @@ const Processing: React.FC = () => {
 
   const targetPlatform = platform || stateData?.platform || 'instagram';
   
-    // ✅ BULLETPROOF USERNAME RETRIEVAL: Enhanced username handling with defensive fallbacks
+  // Get username from state or localStorage (NO FALLBACKS TO 'User')
   const username = (() => {
-    console.log(`🔍 USERNAME RETRIEVAL: Starting for platform ${targetPlatform}`);
-    
-    // Priority 1: Navigation state username (most reliable for fresh navigation)
-    if (stateData?.username && typeof stateData.username === 'string' && stateData.username.trim()) {
-      const navUsername = stateData.username.trim();
-      console.log(`🔍 USERNAME SOURCE: Navigation state - "${navUsername}"`);
-      return navUsername;
-    }
-    
-    // Priority 2: Processing info username (preserves during extensions)
+    // 🔒 BULLETPROOF USERNAME LOCKING: Check for locked username first
     try {
       const processingInfo = localStorage.getItem(`${targetPlatform}_processing_info`);
       if (processingInfo) {
-        const parsed = JSON.parse(processingInfo);
-        if (parsed.username && typeof parsed.username === 'string' && parsed.username.trim()) {
-          const storedUsername = parsed.username.trim();
-          console.log(`🔍 USERNAME SOURCE: Processing info - "${storedUsername}"`);
-          return storedUsername;
+        const info = JSON.parse(processingInfo);
+        if (info && typeof info.username === 'string' && info.username.trim()) {
+          // 🔒 CRITICAL: If username is locked, use it exclusively
+          if (info.usernameLocked === true) {
+            console.log(`🔒 LOCKED USERNAME DETECTED: Using locked username '${info.username}' for ${targetPlatform}`);
+            return info.username.trim();
+          }
+          console.log(`📝 UNLOCKED USERNAME: Using unlocked username '${info.username}' for ${targetPlatform}`);
+          return info.username.trim();
         }
       }
     } catch (error) {
-      console.error('🔍 USERNAME RETRIEVAL: Error reading processing info:', error);
+      console.error('Error reading processing info from localStorage:', error);
     }
     
-    // Priority 3: Platform-specific localStorage (legacy support)
-    try {
-      const platformKey = `${targetPlatform}_username`;
-      const platformUsername = localStorage.getItem(platformKey);
-      if (platformUsername && platformUsername.trim()) {
-        const legacyUsername = platformUsername.trim();
-        console.log(`🔍 USERNAME SOURCE: Platform storage - "${legacyUsername}"`);
-        return legacyUsername;
-      }
-    } catch (error) {
-      console.error('🔍 USERNAME RETRIEVAL: Error reading platform storage:', error);
+    // Strong source of truth order: stateData.username -> processing_info.username -> NO FALLBACK
+    if (stateData?.username && typeof stateData.username === 'string' && stateData.username.trim()) {
+      const trimmedUsername = stateData.username.trim();
+      console.log(`🔑 STATE USERNAME: Using username from navigation state '${trimmedUsername}' for ${targetPlatform}`);
+      return trimmedUsername;
     }
     
-    // ✅ NO FALLBACKS: Don't use 'User' or empty strings - this prevents system disruption
-    console.error(`🚨 CRITICAL: No valid username found for platform ${targetPlatform}`);
-    console.error(`🚨 DEBUG INFO:`, {
-      stateUsername: stateData?.username,
-      targetPlatform,
-      hasStateData: !!stateData,
-      forcedRedirect: stateData?.forcedRedirect
-    });
-    
-    return ''; // Return empty to allow error handling downstream
+    // ❌ REMOVED: No fallback to 'User' - this causes system disruption
+    console.error(`🚨 CRITICAL: No username available for platform ${targetPlatform}. This should never happen.`);
+    return ''; // Return empty to avoid system disruption
   })();
   
   const remainingMinutes = stateData?.remainingMinutes;
@@ -232,9 +214,9 @@ const Processing: React.FC = () => {
     finalizeTriggeredRef.current = true;
     console.log(`🎯 FINALIZE_AND_NAVIGATE: Starting finalization for platform ${plat}`);
 
-    // ✅ BULLETPROOF USERNAME PRESERVATION: Get username from most reliable source
+    // ✅ CRITICAL FIX: Always verify run status exists before finalizing
     const infoRaw = localStorage.getItem(`${plat}_processing_info`);
-    let primaryUsername = username; // Start with prop username
+    let primaryUsername = username;
     try {
       if (infoRaw) {
         const info = JSON.parse(infoRaw);
@@ -244,92 +226,124 @@ const Processing: React.FC = () => {
       }
     } catch {}
 
-    // ✅ DEFENSIVE CHECK: Ensure we have a valid username before proceeding
-    if (!primaryUsername || primaryUsername.trim() === '') {
-      console.error(`🚨 FINALIZE CRITICAL ERROR: No valid username available for ${plat}`);
-      finalizeTriggeredRef.current = false;
-      return;
-    }
-
     console.log(`🎯 FINALIZE: Checking run status for ${plat}/${primaryUsername} before finalizing`);
     const runStatusCheck = await checkRunStatus(plat, primaryUsername);
     
-    // ✅ SIMPLIFIED LOGIC: Only two outcomes - proceed or extend (no other fallbacks)
     if (!runStatusCheck.exists) {
-      console.log(`🎯 FINALIZE: Run status not ready for ${plat}/${primaryUsername}, extending 5 minutes`);
+      console.log(`🎯 FINALIZE BLOCKED: Run status data does not exist for ${plat}/${primaryUsername}, extending 5 minutes instead`);
       finalizeTriggeredRef.current = false;
       
-      // Extend timer by 5 minutes with preserved username
+      // Extend timer by 5 minutes and continue processing
       const newEnd = Date.now() + 5 * 60 * 1000;
       localStorage.setItem(`${plat}_processing_countdown`, newEnd.toString());
       
       try {
-        const existingInfo = infoRaw ? JSON.parse(infoRaw) : {};
-        const updatedInfo = {
-          ...existingInfo,
-          platform: plat,
-          username: primaryUsername, // ✅ PRESERVE USERNAME
-          endTime: newEnd,
-          isExtension: true,
-          extensionCount: (existingInfo.extensionCount || 0) + 1
-        };
-        localStorage.setItem(`${plat}_processing_info`, JSON.stringify(updatedInfo));
+        const info = infoRaw ? JSON.parse(infoRaw) : {};
+        info.endTime = newEnd;
+        info.isExtension = true;
+        localStorage.setItem(`${plat}_processing_info`, JSON.stringify(info));
       } catch {}
       
       setExtensionMessage('We are facing a bit of difficulty while fetching your data. Please allow 5 more minutes while we finalize your dashboard.');
-      console.log(`🎯 FINALIZE: Extended ${plat} by 5 minutes, preserving username: ${primaryUsername}`);
+      console.log(`🎯 FINALIZE: Extended ${plat} by 5 minutes due to missing run status data`);
       return;
     }
 
-    console.log(`🎯 FINALIZE: Run status verified for ${plat}/${primaryUsername}, proceeding with dashboard navigation`);
+    console.log(`🎯 FINALIZE: Run status verified for ${plat}/${primaryUsername}, proceeding with finalization`);
 
-    // ✅ STREAMLINED BACKEND CLEANUP: Direct path to dashboard
+    // Backend authority: Recheck before any cleanup; if backend still active, abort finalization
     if (currentUser?.uid) {
-      // Clean up backend processing status
+      try {
+        const statusResp = await fetch(`/api/processing-status/${currentUser.uid}?platform=${plat}`);
+        if (statusResp.ok) {
+          const json = await statusResp.json();
+          const data = json?.data;
+          const nowTs = Date.now();
+          if (data && typeof data.endTime === 'number' && nowTs < data.endTime) {
+            console.log(`🎯 FINALIZE ABORTED: Backend indicates active processing for ${plat}, returning to processing page`);
+            finalizeTriggeredRef.current = false;
+            safeNavigate(navigate, `/processing/${plat}`, { replace: true }, 8);
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('🎯 FINALIZE: Backend recheck error, aborting finalization to avoid cross-device races', e);
+        finalizeTriggeredRef.current = false;
+        safeNavigate(navigate, `/processing/${plat}`, { replace: true }, 8);
+        return;
+      }
+    }
+
+    // Proceed with backend cleanup now that backend confirmed inactive
+    if (currentUser?.uid) {
+      let deleteOk = false;
       try {
         const resp = await fetch(`/api/processing-status/${currentUser.uid}`, {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ platform: plat })
         });
-        console.log(`🎯 FINALIZE: Backend cleanup response: ${resp.status}`);
+        // Treat 2xx as success; 404 means nothing to delete -> acceptable
+        deleteOk = resp.ok || resp.status === 404;
+        if (!deleteOk) {
+          console.warn(`🎯 FINALIZE: Backend delete not successful (status=${resp.status}). Aborting finalization.`);
+        }
       } catch (e) {
-        console.warn('🎯 FINALIZE: Backend cleanup error (continuing anyway):', e);
+        console.warn('🎯 FINALIZE: Backend delete error. Aborting finalization to avoid bypass.', e);
+        deleteOk = false;
       }
 
-      // ✅ BULLETPROOF LOCAL CLEANUP: Always clean up local state
+      if (!deleteOk) {
+        // Reset guard and return user to processing route
+        finalizeTriggeredRef.current = false;
+        safeNavigate(navigate, `/processing/${plat}`, { replace: true }, 8);
+        return;
+      }
+
+      // Only after successful delete (or 404 already gone) set override and perform local cleanup
+      try { localStorage.setItem(`processing_override_${plat}`, Date.now().toString()); } catch {}
+
       try {
         console.log(`🎯 FINALIZE: Clearing localStorage for ${plat}`);
+        // Clear local copies; backend remains authoritative for other devices
         localStorage.removeItem(`${plat}_processing_countdown`);
         localStorage.removeItem(`${plat}_processing_info`);
-        localStorage.setItem(`processing_override_${plat}`, Date.now().toString());
         
-        // Mark platform as completed
+        console.log(`🎯 FINALIZE: Updating completed platforms`);
         const completedPlatforms = localStorage.getItem('completedPlatforms');
         const completed = completedPlatforms ? JSON.parse(completedPlatforms) : [];
         if (!completed.includes(plat)) {
           completed.push(plat);
           localStorage.setItem('completedPlatforms', JSON.stringify(completed));
+          console.log(`🎯 FINALIZE: Added ${plat} to completed platforms: [${completed.join(', ')}]`);
+        } else {
+          console.log(`🎯 FINALIZE: ${plat} was already in completed platforms: [${completed.join(', ')}]`);
         }
-        
-        // Set access flag for cross-device consistency
-        const accessKey = `${plat}_accessed_${currentUser.uid}`;
-        localStorage.setItem(accessKey, 'true');
-        window.dispatchEvent(new StorageEvent('storage', { key: accessKey, newValue: 'true' }));
-        
-        console.log(`🎯 FINALIZE: Local cleanup completed for ${plat}`);
       } catch (err) {
         console.error(`🎯 FINALIZE: Error during localStorage cleanup:`, err);
+      }
+      
+      // ✅ Ensure local access flag is set immediately for cross-device consistency
+      if (currentUser?.uid) {
+        try {
+          const accessKey = `${plat}_accessed_${currentUser.uid}`;
+          localStorage.setItem(accessKey, 'true');
+          // Fire storage event manually for same-tab listeners
+          window.dispatchEvent(new StorageEvent('storage', { key: accessKey, newValue: 'true' }));
+        } catch (err) {
+          console.warn('🎯 FINALIZE: Failed to set access flag', err);
+        }
       }
 
       console.log(`🎯 FINALIZE: Calling completeProcessing()`);
       completeProcessing();
       
       const dashboardPath = getDashboardPath(plat);
-      console.log(`🎯 FINALIZE: Navigating to dashboard: ${dashboardPath}`);
+      console.log(`🎯 FINALIZE: Navigating to dashboard path: ${dashboardPath}`);
       
       safeNavigate(navigate, dashboardPath, { replace: true }, 8);
-      console.log(`🎯 FINALIZE: Navigation completed for ${plat}`);
+      console.log(`🎯 FINALIZE: Navigation initiated for ${plat} -> ${dashboardPath}`);
+      return;
     }
   };
 
@@ -377,23 +391,27 @@ const Processing: React.FC = () => {
     }
   };
 
-  // ✅ SIMPLIFIED BACKEND VALIDATION: Streamlined validation with clear outcomes
+  // ✅ BACKEND VALIDATION: Ensure processing state is valid from server perspective
   const validateWithBackend = async (): Promise<{ isValid: boolean; reason?: string; shouldRedirect?: string }> => {
     if (!currentUser?.uid || !targetPlatform) {
       return { isValid: false, reason: 'no_auth' };
     }
 
     try {
-      console.log(`🔍 BACKEND VALIDATION: Validating processing state for ${targetPlatform}`);
+      console.log(`🔍 BACKEND VALIDATION: Validating processing state for ${targetPlatform} with backend`);
       const response = await fetch(`/api/validate-dashboard-access/${currentUser.uid}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platform: targetPlatform })
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          platform: targetPlatform
+        })
       });
 
       if (!response.ok) {
         console.warn(`🔍 BACKEND VALIDATION: Request failed with status ${response.status}`);
-        return { isValid: true, reason: 'api_error_assume_active' }; // ✅ DEFENSIVE: Assume active on error
+        return { isValid: false, reason: 'api_error' };
       }
 
       const data = await response.json();
@@ -401,13 +419,13 @@ const Processing: React.FC = () => {
 
       if (data.success) {
         if (data.accessAllowed === false && data.reason === 'processing_active') {
-          console.log(`🔍 BACKEND VALIDATION: ✅ Processing active (authoritative)`);
-          // Sync backend data to local storage
+          // Backend confirms processing is active
+          console.log(`🔍 BACKEND VALIDATION: ✅ Active (authoritative)`);
           if (data.processingData) {
             localStorage.setItem(`${targetPlatform}_processing_countdown`, data.processingData.endTime.toString());
             localStorage.setItem(`${targetPlatform}_processing_info`, JSON.stringify({
               platform: targetPlatform,
-              username: data.processingData.username || username, // ✅ PRESERVE USERNAME
+              username: data.processingData.username || '',
               startTime: data.processingData.startTime,
               endTime: data.processingData.endTime,
               totalDuration: data.processingData.endTime - data.processingData.startTime,
@@ -416,7 +434,19 @@ const Processing: React.FC = () => {
           }
           return { isValid: true };
         } else if (data.accessAllowed === true) {
-          console.log(`🔍 BACKEND VALIDATION: ❌ Processing complete, should redirect to dashboard`);
+          // Backend believes no processing active. Double-check local timer; if active (> now) we must REPAIR.
+          const localCountdownRaw = localStorage.getItem(`${targetPlatform}_processing_countdown`);
+          const localInfoRaw = localStorage.getItem(`${targetPlatform}_processing_info`);
+          const now = Date.now();
+          if (localCountdownRaw && localInfoRaw) {
+            const localEnd = parseInt(localCountdownRaw, 10);
+            if (localEnd && localEnd > now) {
+              console.log('⚠️ BACKEND DESYNC: Local timer active but backend says complete. Repairing backend status.');
+              await ensureBackendProcessingStatus(targetPlatform);
+              return { isValid: true, reason: 'repaired_backend' };
+            }
+          }
+          console.log(`🔍 BACKEND VALIDATION: ❌ Complete (no active processing)`);
           return { 
             isValid: false, 
             reason: 'completed_by_backend',
@@ -426,100 +456,87 @@ const Processing: React.FC = () => {
       }
 
       console.warn(`🔍 BACKEND VALIDATION: Unexpected response format:`, data);
-      return { isValid: true, reason: 'unexpected_response_assume_active' }; // ✅ DEFENSIVE
+      return { isValid: false, reason: 'unexpected_response' };
 
     } catch (error) {
       console.error(`🔍 BACKEND VALIDATION: Error validating with backend:`, error);
-      // ✅ DEFENSIVE: On network errors, ensure local timer exists and assume active
+      // On network errors, ensure at least local timer exists
       getOrInitLocalTimer(targetPlatform);
       await ensureBackendProcessingStatus(targetPlatform);
-      return { isValid: true, reason: 'network_error_assume_active' };
+      return { isValid: true, reason: 'network_assumed_active' }; // assume active to avoid skipping
     }
   };
 
-  // ✅ BULLETPROOF VALIDATION: Simplified validation with clear decision tree
+  // BULLETPROOF processing page protection
   useEffect(() => {
     if (validationRef.current) return;
     validationRef.current = true;
 
     const validate = async () => {
-      console.log(`🔍 PROCESSING VALIDATION: Starting validation for ${targetPlatform}`);
-      
-      // Step 1: Check if platform is already completed
-      const completedPlatforms = localStorage.getItem('completedPlatforms');
-      if (completedPlatforms) {
-        const completed = JSON.parse(completedPlatforms);
-        if (completed.includes(targetPlatform)) {
-          console.log(`🔍 ALREADY COMPLETED: Platform ${targetPlatform} is completed, redirecting to dashboard`);
-          finalizeAndNavigate(targetPlatform);
-          return;
-        }
-      }
-
-      // Step 2: Backend validation (authoritative source)
+      // Step 1: Backend validation first (source of truth)
+      console.log(`🔍 PROCESSING VALIDATION: Starting backend validation for ${targetPlatform}`);
       const backendCheck = await validateWithBackend();
-      
+
       if (!backendCheck.isValid) {
         if (backendCheck.shouldRedirect || backendCheck.reason === 'completed_by_backend') {
-          console.log(`🔍 BACKEND SAYS COMPLETE: Finalizing ${targetPlatform}`);
+          console.log(`🔍 BACKEND COMPLETION: Using finalizeAndNavigate for ${targetPlatform}`);
           finalizeAndNavigate(targetPlatform);
           return;
         }
+        console.warn(`🔍 BACKEND FALLBACK: Backend validation failed (${backendCheck.reason}), checking local state`);
       } else {
-        console.log(`🔍 BACKEND CONFIRMED: Processing active for ${targetPlatform} (${backendCheck.reason})`);
+        console.log(`🔍 BACKEND CONFIRMED: Processing state valid according to backend (${backendCheck.reason || 'authoritative'})`);
       }
 
-      // Step 3: Ensure local timer exists (create if missing)
+      // Ensure local timer exists (repair if missing)
       getOrInitLocalTimer(targetPlatform);
-      await ensureBackendProcessingStatus(targetPlatform);
 
-      // Step 4: Check if timer has expired and handle accordingly
+      // Step 2: Local timer validation (fallback or confirmation)
       const timer = validateTimer();
-      if (!timer.isValid && timer.reason === 'expired') {
-        console.log(`🔍 TIMER EXPIRED: Checking run status for ${targetPlatform}`);
-        
-        // Get username from most reliable source
-        const infoRaw = localStorage.getItem(`${targetPlatform}_processing_info`);
-        let primaryUsername = username;
-        try {
-          if (infoRaw) {
-            const info = JSON.parse(infoRaw);
-            if (info.username && typeof info.username === 'string' && info.username.trim()) {
-              primaryUsername = info.username.trim();
+      if (!timer.isValid) {
+        if (timer.reason === 'no_data') {
+          // Force creation again for robustness
+            getOrInitLocalTimer(targetPlatform);
+            await ensureBackendProcessingStatus(targetPlatform);
+            setShouldRender(true);
+            setIsValidating(false);
+            return;
+        }
+        if (timer.reason === 'expired') {
+          const infoRaw = localStorage.getItem(`${targetPlatform}_processing_info`);
+          let primaryUsername = username;
+          try {
+            if (infoRaw) {
+              const info = JSON.parse(infoRaw);
+              if (info.username && typeof info.username === 'string' && info.username.trim()) {
+                primaryUsername = info.username.trim();
+              }
             }
+          } catch {}
+          const status = await checkRunStatus(targetPlatform, primaryUsername);
+          if (status.exists) {
+            finalizeAndNavigate(targetPlatform);
+            return;
           }
-        } catch {}
-
-        const status = await checkRunStatus(targetPlatform, primaryUsername);
-        if (status.exists) {
-          console.log(`🎉 RUN STATUS READY: Completing ${targetPlatform} immediately`);
-          finalizeAndNavigate(targetPlatform);
-          return;
-        } else {
-          console.log(`⏳ RUN STATUS NOT READY: Extending ${targetPlatform} by 5 minutes`);
-          // Extend timer and continue processing
+          // If still not exists, extend 5 minutes but DO NOT finalize
           const newEnd = Date.now() + 5 * 60 * 1000;
           localStorage.setItem(`${targetPlatform}_processing_countdown`, newEnd.toString());
-          
           try {
-            const existingInfo = infoRaw ? JSON.parse(infoRaw) : {};
-            const updatedInfo = {
-              ...existingInfo,
-              platform: targetPlatform,
-              username: primaryUsername, // ✅ PRESERVE USERNAME
-              endTime: newEnd,
-              isExtension: true,
-              extensionCount: (existingInfo.extensionCount || 0) + 1
-            };
-            localStorage.setItem(`${targetPlatform}_processing_info`, JSON.stringify(updatedInfo));
+            const info = infoRaw ? JSON.parse(infoRaw) : {};
+            info.endTime = newEnd;
+            info.isExtension = true;
+            localStorage.setItem(`${targetPlatform}_processing_info`, JSON.stringify(info));
           } catch {}
-          
           await ensureBackendProcessingStatus(targetPlatform);
           setExtensionMessage('We are facing a bit of difficulty while fetching your data. Please allow 5 more minutes while we finalize your dashboard.');
+          setShouldRender(true);
+          setIsValidating(false);
+          return;
         }
+        finalizeAndNavigate(targetPlatform);
+        return;
       }
 
-      // ✅ RENDER PROCESSING PAGE: All validations passed, show processing page
       setShouldRender(true);
       setIsValidating(false);
     };
@@ -553,21 +570,35 @@ const Processing: React.FC = () => {
     return path;
   };
 
-  // ✅ STREAMLINED TIMER MONITORING: Simplified interval logic with clear outcomes
+  // ANTI-REFRESH protection - continuously validate timer
   useEffect(() => {
     if (!shouldRender) return;
 
+    let backendRecheckInFlight = false;
     const interval = setInterval(async () => {
-      if (finalizeTriggeredRef.current) return; // Already finalizing
-      
-      console.log(`🔥 TIMER CHECK: Validating timer for ${targetPlatform}`);
+      if (finalizeTriggeredRef.current) return; // already finalizing
+      console.log(`🔥 TIMER_INTERVAL: Checking timer validity for ${targetPlatform}`);
       const timer = validateTimer();
 
-      // If timer is invalid (expired or missing), check run status
       if (!timer.isValid) {
-        console.log(`🔥 TIMER EXPIRED: Timer invalid for ${targetPlatform}, checking run status`);
-        
-        // Get username from most reliable source
+        console.log(`🔥 TIMER_INVALID: Timer invalid for ${targetPlatform}, reason: ${timer.reason}`);
+        if (!backendRecheckInFlight) {
+          backendRecheckInFlight = true;
+          const backendCheck = await validateWithBackend();
+          backendRecheckInFlight = false;
+          if (!backendCheck.isValid && (backendCheck.shouldRedirect || backendCheck.reason === 'completed_by_backend')) {
+            console.log(`🔥 BACKEND RECHECK COMPLETION: Finalizing for ${targetPlatform}`);
+            clearInterval(interval);
+            finalizeAndNavigate(targetPlatform);
+            return;
+          }
+          if (backendCheck.isValid) {
+            // backend repaired; ensure local timer present
+            getOrInitLocalTimer(targetPlatform);
+          }
+        }
+
+        // On any expiry, perform R2 check
         const infoRaw = localStorage.getItem(`${targetPlatform}_processing_info`);
         let primaryUsername = username;
         try {
@@ -575,58 +606,73 @@ const Processing: React.FC = () => {
             const info = JSON.parse(infoRaw);
             if (info.username && typeof info.username === 'string' && info.username.trim()) {
               primaryUsername = info.username.trim();
+              // ✅ DEBUGGING: Log username source for run status check
+              console.log(`🔍 USERNAME SOURCE DEBUG (INTERVAL):`);
+              console.log(`  - Initial username: "${username}"`);
+              console.log(`  - localStorage username: "${info.username}"`);
+              console.log(`  - Final primaryUsername: "${primaryUsername}"`);
+              console.log(`  - Username match: ${username === primaryUsername ? 'YES' : 'NO'}`);
             }
           }
         } catch {}
 
-        // ✅ DEFENSIVE CHECK: Ensure we have a valid username
-        if (!primaryUsername || primaryUsername.trim() === '') {
-          console.error(`🚨 TIMER CHECK ERROR: No valid username for ${targetPlatform}`);
-          return;
-        }
-
-        console.log(`🔍 CHECKING RUN STATUS: ${targetPlatform}/${primaryUsername}`);
+        console.log(`🔍 STARTING RUNSTATUS CHECK: ${targetPlatform}/${primaryUsername}`);
         const status = await checkRunStatus(targetPlatform, primaryUsername);
-        console.log(`🔍 RUN STATUS RESULT: exists=${status.exists}, status=${status.status}`);
+        console.log(`🔍 RUNSTATUS CHECK RESULT: ${targetPlatform}/${primaryUsername} - exists: ${status.exists}, status: ${status.status}`);
         
         if (status.exists) {
-          // ✅ RUN STATUS READY: Complete processing immediately
-          console.log(`🎉 COMPLETION TRIGGERED: Run status ready for ${targetPlatform}/${primaryUsername}`);
+          // 🚨 CRITICAL FIX: Clear interval and navigate immediately
+          console.log(`🎉 RUNSTATUS SUCCESS: Data found for ${targetPlatform}/${primaryUsername}, completing processing!`);
+          console.log(`🎉 RUNSTATUS COMPLETION: About to clear interval and call finalizeAndNavigate`);
           clearInterval(interval);
           finalizeAndNavigate(targetPlatform);
           return;
         } else {
-          // ✅ RUN STATUS NOT READY: Extend timer by 5 minutes
-          console.log(`⏳ EXTENDING TIMER: Run status not ready for ${targetPlatform}/${primaryUsername}`);
+          console.log(`⏳ RUNSTATUS NOT_FOUND: Data not ready yet for ${targetPlatform}/${primaryUsername}, extending timer`);
+        }
+
+        // Treat ANY interval completion (missing or expired countdown) as a 5-minute extension
+        const countdownRaw = localStorage.getItem(`${targetPlatform}_processing_countdown`);
+        const currentEnd = countdownRaw ? parseInt(countdownRaw, 10) : NaN;
+        const intervalCompleted = !currentEnd || Number.isNaN(currentEnd) || Date.now() >= currentEnd;
+        
+        console.log(`🔥 EXTENSION CHECK: countdownRaw=${countdownRaw}, currentEnd=${currentEnd}, now=${Date.now()}, intervalCompleted=${intervalCompleted}`);
+        
+        if (intervalCompleted) {
+          console.log(`🔥 TIMER_EXPIRED: Extending ${targetPlatform} by 5 minutes due to timer expiry`);
           const newEnd = Date.now() + 5 * 60 * 1000;
           localStorage.setItem(`${targetPlatform}_processing_countdown`, newEnd.toString());
+          console.log(`🔥 EXTENSION: New timer end set to ${new Date(newEnd).toLocaleTimeString()}`);
           
           try {
-            const existingInfo = infoRaw ? JSON.parse(infoRaw) : {};
-            const updatedInfo = {
-              ...existingInfo,
+            const info = infoRaw ? JSON.parse(infoRaw) : {};
+            const safeInfo = {
               platform: targetPlatform,
-              username: primaryUsername, // ✅ PRESERVE USERNAME
-              endTime: newEnd,
+              username: primaryUsername, // NO FALLBACKS - use exact primaryUsername
+              startTime: info.startTime || Date.now(),
+              totalDuration: info.totalDuration || undefined,
               isExtension: true,
-              extensionCount: (existingInfo.extensionCount || 0) + 1
-            };
-            localStorage.setItem(`${targetPlatform}_processing_info`, JSON.stringify(updatedInfo));
-            console.log(`⏳ TIMER EXTENDED: New end time set for ${targetPlatform}`);
+              endTime: newEnd,
+            } as any;
+            localStorage.setItem(`${targetPlatform}_processing_info`, JSON.stringify(safeInfo));
+            console.log(`🔥 EXTENSION: Updated processing info with extension data`);
           } catch (extErr) {
-            console.error(`⏳ EXTENSION ERROR: Failed to update info for ${targetPlatform}:`, extErr);
+            console.error(`🔥 EXTENSION: Error updating processing info:`, extErr);
           }
-          
           setExtensionMessage('We are facing a bit of difficulty while fetching your data. Please allow 5 more minutes while we finalize your dashboard.');
+          console.log(`🔥 EXTENSION: Set extension message and returning to continue timer`);
+          return;
+        } else {
+          console.log(`🔥 TIMER_VALID: Timer still active, continuing checks`);
         }
       } else {
-        console.log(`🔥 TIMER VALID: Timer still active for ${targetPlatform}`);
+        console.log(`🔥 TIMER_VALID: Timer is valid for ${targetPlatform}, continuing`);
       }
-    }, 10000); // Check every 10 seconds
+    }, 10000); // throttled from 5000ms to 10000ms for stability
 
-    console.log(`🔥 TIMER MONITORING: Started for ${targetPlatform}`);
+    console.log(`🔥 TIMER_INTERVAL: Started interval monitoring for ${targetPlatform}`);
     return () => {
-      console.log(`🔥 TIMER MONITORING: Stopped for ${targetPlatform}`);
+      console.log(`🔥 TIMER_INTERVAL: Cleaning up interval for ${targetPlatform}`);
       clearInterval(interval);
     };
   }, [shouldRender, targetPlatform, navigate, completeProcessing, username]);
@@ -801,7 +847,7 @@ const Processing: React.FC = () => {
     }
   };
 
-// ✅ BULLETPROOF LOCAL TIMER INITIALIZATION: Enhanced username preservation
+  // Helper to initialize or read local timer (2 min default) and ensure storage consistency
 const getOrInitLocalTimer = (plat: string) => {
   const countdownKey = `${plat}_processing_countdown`;
   const infoKey = `${plat}_processing_info`;
@@ -809,94 +855,61 @@ const getOrInitLocalTimer = (plat: string) => {
   let endTimeRaw = localStorage.getItem(countdownKey);
   let infoRaw = localStorage.getItem(infoKey);
   let endTime = endTimeRaw ? parseInt(endTimeRaw, 10) : NaN;
-  
-  // Initialize new timer if missing or expired
   if (!endTime || Number.isNaN(endTime) || endTime < now) {
-    endTime = now + 15 * 60 * 1000; // 15 minutes
+    // Initialize new 2 minute window (reduced from 15 for testing)
+    endTime = now + 2 * 60 * 1000;
     localStorage.setItem(countdownKey, endTime.toString());
-    console.log(`🛠 TIMER INIT: New timer created for ${plat}, ends at ${new Date(endTime).toLocaleTimeString()}`);
   }
-  
-  // ✅ ENHANCED INFO HANDLING: Preserve existing username or use prop username
   if (!infoRaw) {
     const info = {
       platform: plat,
-      username: username || '', // ✅ USE PROP USERNAME WHEN CREATING NEW
+      username: username || '',
       startTime: now,
       endTime,
       totalDuration: endTime - now,
       initializedAt: now,
-      source: 'processing_page_init'
-    };
+      source: 'processing_page_repair'
+    } as any;
     localStorage.setItem(infoKey, JSON.stringify(info));
-    console.log(`🛠 INFO INIT: New processing info created for ${plat} with username: ${username}`);
   } else {
     try {
       const parsed = JSON.parse(infoRaw);
-      // ✅ PRESERVE EXISTING USERNAME: Don't overwrite existing username
-      const preservedUsername = parsed.username || username || '';
-      const updatedInfo = {
-        ...parsed,
-        platform: plat,
-        username: preservedUsername, // ✅ PRESERVE USERNAME
-        endTime,
-        updatedAt: now
-      };
-      localStorage.setItem(infoKey, JSON.stringify(updatedInfo));
-      console.log(`🛠 INFO UPDATE: Processing info updated for ${plat}, preserved username: ${preservedUsername}`);
-    } catch {
-      // If parsing fails, create new info
-      const info = {
-        platform: plat,
-        username: username || '',
-        startTime: now,
-        endTime,
-        totalDuration: endTime - now,
-        initializedAt: now,
-        source: 'processing_page_recovery'
-      };
-      localStorage.setItem(infoKey, JSON.stringify(info));
-      console.log(`🛠 INFO RECOVERY: Processing info recovered for ${plat} with username: ${username}`);
-    }
+      if (!parsed.endTime || parsed.endTime !== endTime) {
+        parsed.endTime = endTime;
+        localStorage.setItem(infoKey, JSON.stringify(parsed));
+      }
+    } catch {}
   }
-  
   return { endTime };
 };
 
-// ✅ ENHANCED BACKEND SYNC: Improved backend status synchronization
+// Repair / create backend status if missing but local timer active
 const ensureBackendProcessingStatus = async (plat: string) => {
   if (!currentUser?.uid) return;
-  
   try {
     const countdown = localStorage.getItem(`${plat}_processing_countdown`);
     const infoRaw = localStorage.getItem(`${plat}_processing_info`);
-    if (!countdown || !infoRaw) return;
-    
+    if (!countdown || !infoRaw) return; // nothing to repair
     const endTime = parseInt(countdown, 10);
-    if (!endTime || Date.now() >= endTime) return; // Don't sync expired timers
-    
+    if (!endTime || Date.now() >= endTime) return; // expired
     const info = JSON.parse(infoRaw);
-    const syncUsername = info.username || username || ''; // ✅ PRESERVE USERNAME
-    
-    const payload = {
-      platform: plat,
-      username: syncUsername,
-      startTime: info.startTime || Date.now(),
-      endTime,
-      totalDuration: (typeof info.totalDuration === 'number' && info.totalDuration > 0)
-        ? info.totalDuration
-        : (endTime - (info.startTime || Date.now()))
-    };
-    
+    // POST create/update
     await fetch(`/api/processing-status/${currentUser.uid}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        platform: plat,
+        username: info.username || '',
+        startTime: info.startTime || Date.now(),
+        endTime,
+        totalDuration: (typeof info.totalDuration === 'number' && info.totalDuration > 0)
+          ? info.totalDuration
+          : (endTime - (info.startTime || Date.now()))
+      })
     });
-    
-    console.log(`🛠 BACKEND SYNC: Synced processing status for ${plat} with username: ${syncUsername}`);
+    console.log(`🛠 BACKEND REPAIR: Ensured backend processing status for ${plat}`);
   } catch (e) {
-    console.warn('🛠 BACKEND SYNC: Failed to sync backend status', e);
+    console.warn('🛠 BACKEND REPAIR: Failed ensuring backend status', e);
   }
 };
 

@@ -127,7 +127,7 @@ class CrossDeviceLoadingStateTest {
     return comparison;
   }
 
-  async simulateLoadingState(platform, durationMinutes = 15) {
+  async simulateLoadingState(platform, durationMinutes = 2) { // Reduced from 15 to 2 minutes for testing
     if (!this.platforms.includes(platform)) {
       console.error(`${this.logPrefix} Invalid platform: ${platform}`);
       return false;
@@ -245,7 +245,7 @@ testUtil.checkBackendProcessingStatus()        // Check backend status
 testUtil.compareStates()                       // Compare local vs backend
 
 // Simulate loading states for testing
-testUtil.simulateLoadingState('instagram', 15) // Create 15min loading state
+testUtil.simulateLoadingState('instagram', 2) // Create 2min loading state (reduced from 15)
 testUtil.clearLoadingState('instagram')        // Clear loading state
 
 // Full cross-device test

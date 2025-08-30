@@ -293,7 +293,7 @@ const usernameCheckUrl = '/api/check-username-availability';
         showMessage('Submission successful', 'success');
         
         // Start the processing phase using unified ProcessingContext
-        startProcessing('twitter', confirmationData.username, 15); // 15 minutes duration
+        startProcessing('twitter', confirmationData.username, 2); // 2 minutes duration (reduced from 15)
       }
     } catch (error: any) {
       console.error('Error submitting data:', error);
@@ -321,7 +321,7 @@ const usernameCheckUrl = '/api/check-username-availability';
             <h1>Setup Your Twitter Account</h1>
             <div className="importance-notice">
               <div className="importance-icon">⚠️</div>
-              <p><strong>Critical Setup:</strong> This information initiates a 15-minute AI analysis process. Please ensure all details are accurate before submission.</p>
+              <p><strong>Critical Setup:</strong> This information initiates a 2-minute AI analysis process. Please ensure all details are accurate before submission.</p>
             </div>
           </div>
 
@@ -355,7 +355,7 @@ const usernameCheckUrl = '/api/check-username-availability';
                     <li>✓ Must be a valid Twitter username</li>
                     <li>✓ No spaces or special characters (except underscores)</li>
                     <li>✓ Used for AI analysis and competitor research</li>
-                    <li>✓ This will be used for 15 minutes of AI processing</li>
+                    <li>✓ This will be used for 2 minutes of AI processing</li>
                   </ul>
                   <div className="format-example">
                     <strong>Examples:</strong> "YourBrandName", "YourName", "Brand_123"
@@ -508,7 +508,7 @@ const usernameCheckUrl = '/api/check-username-availability';
           <h1>Setup Your Twitter Account</h1>
           <div className="importance-notice">
             <div className="importance-icon">⚠️</div>
-            <p><strong>Critical Setup:</strong> This information initiates a 15-minute AI analysis process. Please ensure all details are accurate before submission.</p>
+            <p><strong>Critical Setup:</strong> This information initiates a 2-minute AI analysis process. Please ensure all details are accurate before submission.</p>
           </div>
         </div>
 
@@ -542,7 +542,7 @@ const usernameCheckUrl = '/api/check-username-availability';
                   <li>✓ Must be a valid Twitter username</li>
                   <li>✓ No spaces or special characters (except underscores)</li>
                   <li>✓ Used for AI analysis and competitor research</li>
-                  <li>✓ This will be used for 15 minutes of AI processing</li>
+                  <li>✓ This will be used for 2 minutes of AI processing</li>
                   </ul>
                 <div className="format-example">
                   <strong>Examples:</strong> "YourBrandName", "YourName", "Brand_123"
@@ -722,7 +722,7 @@ const usernameCheckUrl = '/api/check-username-availability';
           >
             <div className="confirmation-header">
               <h3>🔍 Final Review Required</h3>
-              <p><strong>Please verify your information before starting the 15-minute AI analysis:</strong></p>
+              <p><strong>Please verify your information before starting the 2-minute AI analysis:</strong></p>
             </div>
             
             <div className="confirmation-content">
@@ -750,7 +750,7 @@ const usernameCheckUrl = '/api/check-username-availability';
               </div>
               
               <div className="confirmation-warning">
-                <p><strong>⚠️ Important:</strong> Once submitted, this will initiate a 15-minute AI analysis process. Make sure all information is correct!</p>
+                <p><strong>⚠️ Important:</strong> Once submitted, this will initiate a 2-minute AI analysis process. Make sure all information is correct!</p>
               </div>
             </div>
             

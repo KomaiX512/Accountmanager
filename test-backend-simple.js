@@ -19,7 +19,7 @@ async function testStabilityAIIntegration() {
   // Test 1: Backend Server Health
   console.log('🏥 Test 1: Backend Server Health');
   try {
-    await axios.get(`${baseURL}/api/r2-image/test/test.jpg?platform=test`, { timeout: 5000 });
+    await axios.get(`${baseURL}/health`, { timeout: 5000 });
     console.log('✅ Backend server: RUNNING');
     testsPassed++;
   } catch (error) {

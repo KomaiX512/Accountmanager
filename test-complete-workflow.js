@@ -26,7 +26,7 @@ async function testCompleteWorkflow() {
   console.log('\n🔧 Stage 2: Backend API Structure');
   try {
     // Test if backend is running
-    await axios.get('http://localhost:3002/api/r2-image/test/test.jpg?platform=test', { timeout: 2000 });
+    await axios.get('http://localhost:3002/health', { timeout: 2000 });
     console.log('✅ Backend server: RUNNING');
     console.log('✅ AI edit endpoint: /api/ai-image-edit AVAILABLE');
     console.log('✅ Approve endpoint: /api/ai-image-approve AVAILABLE');

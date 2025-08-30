@@ -99,14 +99,14 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
   // ✅ NEW: Tooltip state for smart loading hover
   const [showLoadingTooltip, setShowLoadingTooltip] = useState<string | null>(null);
   
-  // ✅ NEW: Check if competitor is in smart loading period (up to 20 minutes)
+  // ✅ NEW: Check if competitor is in smart loading period (up to 2 minutes)
   const isCompetitorInLoadingPeriod = (competitor: string): boolean => {
     const state = competitorLoadingStates[competitor];
     if (!state || !state.isLoading) return false;
     
     const currentTime = Date.now();
     const elapsedTime = currentTime - state.timestamp;
-    const maxLoadingTime = 20 * 60 * 1000; // 20 minutes in milliseconds
+    const maxLoadingTime = 2 * 60 * 1000; // 2 minutes in milliseconds (reduced from 20)
     
     return elapsedTime < maxLoadingTime;
   };
@@ -151,7 +151,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     
     const currentTime = Date.now();
     const elapsedTime = currentTime - state.timestamp;
-    const maxLoadingTime = 20 * 60 * 1000; // 20 minutes
+    const maxLoadingTime = 2 * 60 * 1000; // 2 minutes (reduced from 20)
     const remainingTime = Math.max(0, maxLoadingTime - elapsedTime);
     
     return Math.ceil(remainingTime / 1000); // Return in seconds
@@ -179,7 +179,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
   // ✅ NEW: Load persistent loading states from localStorage on mount
   const loadPersistentLoadingStates = useCallback(() => {
     const now = Date.now();
-    const maxLoadingTime = 20 * 60 * 1000; // 20 minutes
+    const maxLoadingTime = 2 * 60 * 1000; // 2 minutes (reduced from 20)
     const persistentStates: Record<string, { timestamp: number; retryCount: number; isLoading: boolean }> = {};
     
     // Load all competitors from localStorage for this platform and account
@@ -514,7 +514,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     const cleanupInterval = setInterval(() => {
       setCompetitorLoadingStates(prev => {
         const now = Date.now();
-        const maxLoadingTime = 20 * 60 * 1000; // 20 minutes
+        const maxLoadingTime = 2 * 60 * 1000; // 2 minutes (reduced from 20)
         let hasExpired = false;
         
         const cleaned = Object.entries(prev).reduce((acc, [competitor, state]) => {
@@ -605,10 +605,10 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
       const serverCompetitors = await fetchAccountInfoWithRetry();
       if (serverCompetitors) {
         setLocalCompetitors(serverCompetitors);
-        setToast('Competitor added successfully! Analysis will be ready within 20 minutes.');
+        setToast('Competitor added successfully! Analysis will be ready within 2 minutes.');
       } else {
         setLocalCompetitors(updatedCompetitors);
-        setToast('Competitor added successfully! Analysis will be ready within 20 minutes.');
+        setToast('Competitor added successfully! Analysis will be ready within 2 minutes.');
       }
 
       // Update local Facebook map after success
@@ -690,12 +690,12 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
       if (serverCompetitors) {
         setLocalCompetitors(serverCompetitors);
         setToast(editCompetitor !== currentCompetitor 
-          ? 'Competitor updated successfully! Analysis will be ready within 20 minutes.' 
+          ? 'Competitor updated successfully! Analysis will be ready within 2 minutes.' 
           : 'Competitor updated successfully!');
       } else {
         setLocalCompetitors(updatedCompetitors);
         setToast(editCompetitor !== currentCompetitor 
-          ? 'Competitor updated successfully! Analysis will be ready within 20 minutes.' 
+          ? 'Competitor updated successfully! Analysis will be ready within 2 minutes.' 
           : 'Competitor updated successfully!');
       }
 
@@ -1077,7 +1077,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
                           Competitor analysis will be ready in approximately <strong>{getFormattedRemainingTime(competitor)}</strong>
                         </div>
                         <div className="tooltip-note">
-                          Analysis typically completes within 20 minutes. The container will update automatically when ready.
+                          Analysis typically completes within 2 minutes. The container will update automatically when ready.
                         </div>
                       </div>
                       <div className="tooltip-arrow"></div>
@@ -1539,7 +1539,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
                                               <div className="reason-item">
                           <span className="reason-icon">🆕</span>
                           <div className="reason-text">
-                            <strong>New Competitor:</strong> Recently added competitor - analysis is still processing (can take up to 20 minutes)
+                            <strong>New Competitor:</strong> Recently added competitor - analysis is still processing (can take up to 2 minutes)
                           </div>
                         </div>
                       
@@ -1556,7 +1556,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
                       <ul>
                         <li><strong>Verify Username:</strong> Double-check the competitor's {platform} username for typos</li>
                         <li><strong>Check Profile:</strong> Ensure the competitor's profile is public and accessible</li>
-                        <li><strong>Wait for Processing:</strong> If recently added, wait 15-20 minutes for analysis to complete</li>
+                        <li><strong>Wait for Processing:</strong> If recently added, wait 1-2 minutes for analysis to complete</li>
                         <li><strong>Edit or Delete:</strong> Use the edit button to correct the username or delete if no longer needed</li>
                         <li><strong>Try Again:</strong> Refresh the page and check if analysis becomes available</li>
                       </ul>

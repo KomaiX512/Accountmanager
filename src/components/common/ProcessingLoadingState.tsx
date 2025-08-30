@@ -3,9 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 /**
  * PLATFORM TIMING CONFIGURATION:
- * - Facebook: 20 minutes initial setup
- * - Instagram: 15 minutes initial setup  
- * - Twitter: 15 minutes initial setup
+ * - Facebook: 2 minutes initial setup (reduced from 20 for testing)
+ * - Instagram: 2 minutes initial setup (reduced from 15 for testing)
+ * - Twitter: 2 minutes initial setup (reduced from 15 for testing)
  * - All platforms: 5 minutes extension when running statistics not found
  * 
  * The component automatically detects whether it's an initial setup or extension
@@ -71,7 +71,7 @@ const PLATFORM_CONFIGS: Record<string, PlatformConfigType> = {
     primaryColor: '#e4405f',
     secondaryColor: '#00ffcc',
     icon: <FaInstagram />,
-    initialMinutes: 15, // Instagram gets 15 minutes initially
+    initialMinutes: 2, // Instagram gets 2 minutes initially (reduced from 15 for testing)
     extensionMinutes: 5  // 5 minutes extension for all platforms
   },
   twitter: {
@@ -79,7 +79,7 @@ const PLATFORM_CONFIGS: Record<string, PlatformConfigType> = {
     primaryColor: '#000000',
     secondaryColor: '#ffffff',
     icon: <FaTwitter />,
-    initialMinutes: 15, // Twitter gets 15 minutes initially
+    initialMinutes: 2, // Twitter gets 2 minutes initially (reduced from 15 for testing)
     extensionMinutes: 5  // 5 minutes extension for all platforms
   },
   facebook: {
@@ -87,7 +87,7 @@ const PLATFORM_CONFIGS: Record<string, PlatformConfigType> = {
     primaryColor: '#1877f2',
     secondaryColor: '#42a5f5',
     icon: <FaFacebook />,
-    initialMinutes: 20, // Facebook gets 20 minutes initially
+    initialMinutes: 2, // Facebook gets 2 minutes initially (reduced from 20 for testing)
     extensionMinutes: 5  // 5 minutes extension for all platforms
   }
 };
@@ -98,7 +98,7 @@ const DEFAULT_PLATFORM_CONFIG: PlatformConfigType = {
   primaryColor: '#666666',
   secondaryColor: '#cccccc',
   icon: <BsLightningChargeFill />,
-  initialMinutes: 15, // Default to 15 minutes
+  initialMinutes: 2, // Default to 2 minutes (reduced from 15 for testing)
   extensionMinutes: 5  // Default extension time
 };
 
@@ -154,18 +154,32 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
 
   // ✅ NO FALLBACKS: Get username with absolute priority preservation
   const username = React.useMemo(() => {
+    // 🔒 BULLETPROOF USERNAME LOCKING: Check for locked username first
     const stored = getUsernameFromStorage(platform);
     if (stored) {
       console.log(`🔒 LOCKED USERNAME: Using stored username '${stored}' for ${platform}`);
       return stored;
     }
+    
+    // 🔒 CRITICAL: If no stored username, check if there's a locked username from processing context
     if (propUsername && typeof propUsername === 'string') {
       const trimmed = propUsername.trim();
       if (trimmed) {
         console.log(`🔑 PROP USERNAME: Using prop username '${trimmed}' for ${platform}`);
+        // 🔒 CRITICAL: Lock this username immediately to prevent corruption
+        try {
+          const { lockUsername } = useProcessing();
+          if (lockUsername) {
+            lockUsername(platform, trimmed);
+            console.log(`🔒 USERNAME LOCKED IN LOADING STATE: '${trimmed}' is now protected for ${platform}`);
+          }
+        } catch (err) {
+          console.warn('Could not lock username in loading state:', err);
+        }
         return trimmed;
       }
     }
+    
     // Do NOT throw here. Allow backend sync effect to repair username from server.
     console.error(`🚨 FATAL: No username available for platform ${platform}. Deferring to backend sync to repair.`);
     return '';
@@ -518,35 +532,21 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
       if (remaining <= 0 && !timerCompleted) {
         if (allowAutoComplete) {
           setTimerCompleted(true);
-          // Clean up localStorage only when auto-completing
+          // Determine final username BEFORE clearing any local storage
+          let usernameToUse = cachedTimerData?.username || username;
           try {
-            localStorage.removeItem(`${platform}_processing_countdown`);
-            localStorage.removeItem(`${platform}_processing_info`);
-            // Clear cache
-            setCachedTimerData(null);
-            
-            // Mark platform as completed
-            const completedPlatforms = localStorage.getItem('completedPlatforms');
-            const completed = completedPlatforms ? JSON.parse(completedPlatforms) : [];
-            if (!completed.includes(platform)) {
-              completed.push(platform);
-              localStorage.setItem('completedPlatforms', JSON.stringify(completed));
+            const processingInfoRaw = localStorage.getItem(`${platform}_processing_info`);
+            if (processingInfoRaw) {
+              const info = JSON.parse(processingInfoRaw);
+              if (info && typeof info.username === 'string' && info.username.trim()) {
+                usernameToUse = info.username.trim();
+              }
             }
-            
-            // ✅ CRITICAL: Mark platform as claimed in backend when processing completes
-            if (currentUser?.uid) {
-              // Get username from localStorage or use the current username prop
-              let usernameToUse = username;
-              try {
-                const processingInfo = localStorage.getItem(`${platform}_processing_info`);
-                if (processingInfo) {
-                  const info = JSON.parse(processingInfo);
-                  if (info.username && typeof info.username === 'string' && info.username.trim()) {
-                    usernameToUse = info.username.trim();
-                  }
-                }
-              } catch {}
+          } catch {}
 
+          // ✅ CRITICAL: Mark platform as claimed in backend when processing completes
+          try {
+            if (currentUser?.uid) {
               // (1) Update platform-access endpoint (used by MainDashboard)
               fetch(`/api/platform-access/${currentUser.uid}`, {
                 method: 'POST',
@@ -651,7 +651,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     const interval = setInterval(updateTimer, getUpdateInterval());
     
     return () => clearInterval(interval);
-  }, [platform, isTabVisible, timerCompleted, allowAutoComplete, currentUser?.uid, username]); // ✅ Dependencies optimized
+  }, [platform, isTabVisible, timerCompleted, allowAutoComplete, currentUser?.uid, username]); // ✅ REMOVED currentTime and getRemainingMs from dependencies to prevent infinite loops
 
   // ✅ PAGE VISIBILITY API - Perfect tab switching synchronization
   useEffect(() => {
@@ -691,7 +691,8 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     if (!currentUser?.uid) return;
     let cancelled = false;
     let lastSyncTime = 0;
-    const SYNC_COOLDOWN = 8000; // ✅ OPTIMIZED: Increased to 8 seconds for better performance
+    // Run sync faster when username is missing to avoid stuck-at-zero scenarios
+    const SYNC_COOLDOWN = (!username || !username.trim()) ? 2000 : 8000;
 
     const syncFromServer = async () => {
       const now = Date.now();
@@ -712,19 +713,42 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
             // Server has active status - mirror to local
             localStorage.setItem(`${platform}_processing_countdown`, String(data.endTime));
             try {
+              // Preserve existing username and timer info from local storage
+              let existingInfo: any = {};
+              try {
+                const existingRaw = localStorage.getItem(`${platform}_processing_info`);
+                if (existingRaw) {
+                  existingInfo = JSON.parse(existingRaw);
+                }
+              } catch {}
+
+              let finalUsername: string | undefined = undefined;
+              if (data.username && typeof data.username === 'string' && data.username.trim()) {
+                finalUsername = data.username.trim();
+              } else if (existingInfo.username) {
+                finalUsername = existingInfo.username;
+              } else if (currentUser?.uid) {
+                try {
+                  const rescued = localStorage.getItem(`${platform}_username_${currentUser.uid}`);
+                  if (rescued && rescued.trim()) finalUsername = rescued.trim();
+                } catch {}
+              }
+
               const info: any = {
                 platform,
-                startTime: data.startTime,
-                endTime: data.endTime,
-                totalDuration: data.totalDuration,
+                // CRITICAL FIX: Do NOT overwrite startTime or totalDuration from server
+                // as this causes the progress bar to fluctuate. Only sync endTime.
+                startTime: existingInfo.startTime || data.startTime,
+                totalDuration: existingInfo.totalDuration || data.totalDuration,
+                endTime: data.endTime, // Always sync endTime
               };
-              if (data.username) info.username = data.username;
+              if (finalUsername) info.username = finalUsername;
               localStorage.setItem(`${platform}_processing_info`, JSON.stringify(info));
-              console.log(`🔍 BACKEND SYNC: ${platform} - mirrored server status to local`);
+              console.log(` BACKEND SYNC: ${platform} - mirrored server status to local`);
             } catch {}
             setCurrentTime(Date.now());
           } else {
-            // ✅ CRITICAL FIX: Check if platform is completed on server before clearing local timer
+            // CRITICAL FIX: Check if platform is completed on server before clearing local timer
             try {
               const accessResp = await fetch(`/api/platform-access/${currentUser.uid}`);
               if (accessResp.ok) {
@@ -783,22 +807,35 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
                     console.log(`🔍 BACKEND SYNC: ${platform} - local timer active but missing on server, syncing back`);
                     try {
                       const localInfo = JSON.parse(localProcessingInfo);
+                      // Ensure we do not lose username on sync back
+                      let usernameToSync = '';
+                      if (localInfo && typeof localInfo.username === 'string' && localInfo.username.trim()) {
+                        usernameToSync = localInfo.username.trim();
+                      } else if (currentUser?.uid) {
+                        try {
+                          const rescued = localStorage.getItem(`${platform}_username_${currentUser.uid}`);
+                          if (rescued && rescued.trim()) usernameToSync = rescued.trim();
+                        } catch {}
+                      }
+
+                      const payload: any = {
+                        platform,
+                        startTime: localInfo.startTime || nowTs,
+                        endTime: localEndTimeNum,
+                        totalDuration: localInfo.totalDuration || (localEndTimeNum - (localInfo.startTime || nowTs))
+                      };
+                      if (usernameToSync) payload.username = usernameToSync;
+
                       await fetch(`/api/processing-status/${currentUser.uid}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          platform,
-                          username: localInfo.username || '',
-                          startTime: localInfo.startTime || nowTs,
-                          endTime: localEndTimeNum,
-                          totalDuration: localInfo.totalDuration || (localEndTimeNum - (localInfo.startTime || nowTs))
-                        })
+                        body: JSON.stringify(payload)
                       });
                       console.log(`🔍 BACKEND SYNC: ${platform} - successfully synced local timer back to server`);
-                            } catch (syncError) {
-          console.warn(`🔍 BACKEND SYNC: ${platform} - failed to sync local timer back to server:`, syncError instanceof Error ? syncError.message : 'Unknown error');
+                    } catch (syncError) {
+                      console.warn(`🔍 BACKEND SYNC: ${platform} - failed to sync local timer back to server:`, syncError instanceof Error ? syncError.message : 'Unknown error');
+                    }
         }
-                  }
                 }
                       } catch (error) {
           console.warn(`🔍 BACKEND SYNC: ${platform} - error parsing local timer data:`, error instanceof Error ? error.message : 'Unknown error');
@@ -808,26 +845,34 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
           }
         }
               } catch (error) {
-          console.warn(`🔍 BACKEND SYNC: ${platform} - error:`, error instanceof Error ? error.message : 'Unknown error');
+          console.warn(` BACKEND SYNC: ${platform} - error:`, error instanceof Error ? error.message : 'Unknown error');
         }
     };
     
-    // Initial sync with delay to allow local timer to initialize and persist to backend
+    // If username is missing, run an immediate sync to rescue username and timer quickly
+    if (!username || !username.trim()) {
+      console.log(` BACKEND SYNC: ${platform} - username missing, running immediate sync`);
+      syncFromServer();
+    }
+
+    // Initial sync with adaptive delay (sooner if username missing)
+    const initialDelayMs = (!username || !username.trim()) ? 300 : 5000;
     const initialSyncDelay = setTimeout(() => {
       if (!cancelled) {
-        console.log(`🔍 BACKEND SYNC: ${platform} - initial sync after delay`);
+        console.log(` BACKEND SYNC: ${platform} - initial sync after ${initialDelayMs}ms delay`);
         syncFromServer();
       }
-    }, 5000); // ✅ OPTIMIZED: Increased to 5 seconds for better performance
+    }, initialDelayMs);
     
-    // ✅ OPTIMIZED SYNC FREQUENCY: Increased to 10 seconds for better performance
-    const id = setInterval(syncFromServer, 10000); // Increased to 10 seconds
+    // Adaptive sync frequency: faster polling while username is missing
+    const intervalMs = (!username || !username.trim()) ? 3000 : 10000;
+    const id = setInterval(syncFromServer, intervalMs);
     return () => { 
       cancelled = true; 
       clearTimeout(initialSyncDelay);
       clearInterval(id); 
     };
-  }, [platform, currentUser?.uid, timerJustCreated]);
+  }, [platform, currentUser?.uid, timerJustCreated, username]);
 
   // Current values for display
   const countdown = getRemainingSeconds();
@@ -940,20 +985,32 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     }
   ];
 
+  // Monotonic smoothed progress to avoid backward jumps and jitter
+  const [smoothedProgress, setSmoothedProgress] = useState<number>(0);
+
+  const calculateProgress = (): number => {
+    return getProgressPercentage();
+  };
+
+  useEffect(() => {
+    const target = calculateProgress();
+    setSmoothedProgress(prev => {
+      // Never decrease; only allow progress to move forward
+      const next = Math.max(prev, target);
+      return Number.isFinite(next) ? next : prev;
+    });
+  }, [currentTime]);
+
   // Update current stage based on time progress - BULLETPROOF real-time calculation
   useEffect(() => {
-    const progress = getProgressPercentage();
+    const progress = smoothedProgress;
     const newStageIndex = processingStages.findIndex(stage => progress < stage.percentage);
     const stageIndex = newStageIndex === -1 ? processingStages.length - 1 : Math.max(0, newStageIndex - 1);
     
     if (stageIndex !== currentStage) {
       setCurrentStage(stageIndex);
     }
-  }, [currentTime, currentStage, processingStages]);
-
-  const calculateProgress = (): number => {
-    return getProgressPercentage();
-  };
+  }, [smoothedProgress, currentStage, processingStages]);
 
   const proTips: ProTip[] = [
     {
@@ -1364,8 +1421,8 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
               className="progress-fill"
               style={{ backgroundColor: platformConfig.primaryColor }}
               initial={{ width: 0 }}
-              animate={{ width: `${calculateProgress()}%` }}
-              transition={{ duration: 0.8, ease: "easeInOut" }}
+              animate={{ width: `${smoothedProgress}%` }}
+              transition={{ type: 'tween', duration: 0.2, ease: 'linear' }}
             />
           </div>
 

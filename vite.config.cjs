@@ -58,6 +58,17 @@ module.exports = defineConfig({
           res.end(JSON.stringify({ error: 'Post saving service temporarily unavailable' }));
         }
       },
+      // Proxy proxy-image endpoint to the main server (port 3000) where it's implemented
+      '/api/proxy-image': {
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+        secure: false,
+        onError: (err, req, res) => {
+          console.warn('[Vite Proxy] Proxy image endpoint error:', err.message);
+          res.writeHead(503, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Image proxy service temporarily unavailable' }));
+        }
+      },
       // Proxy all other /api/* requests to the main server
       '/api': {
         target: 'http://127.0.0.1:3000',

@@ -1495,12 +1495,40 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           if (info.platform === platform && now < endTime) {
             const remainingMinutes = Math.ceil((endTime - now) / 1000 / 60);
             
+            // 🔒 BULLETPROOF USERNAME PROTECTION: Check if username is locked before navigation
+            let shouldNavigate = true;
+            let navigationUsername = null;
+            
+            try {
+              // Check if there's a locked username that should be preserved
+              if (info.usernameLocked === true && info.username && info.username.trim()) {
+                console.log(`🔒 LOCKED USERNAME PROTECTED: Username '${info.username}' is locked for ${platform} - preserving during navigation`);
+                navigationUsername = info.username;
+                
+                // 🔒 CRITICAL: Ensure the locked username is not overwritten by current accountHolder
+                if (accountHolder && accountHolder.trim() && accountHolder !== info.username) {
+                  console.log(`⚠️ USERNAME MISMATCH DETECTED: Current accountHolder '${accountHolder}' differs from locked username '${info.username}'`);
+                  console.log(`🔒 PRESERVING LOCKED USERNAME: Will use locked username '${info.username}' for processing`);
+                }
+              } else if (info.username && info.username.trim()) {
+                console.log(`📝 UNLOCKED USERNAME: Using unlocked username '${info.username}' for ${platform} navigation`);
+                navigationUsername = info.username;
+              } else {
+                console.log(`⚠️ NO USERNAME IN PROCESSING INFO: Using current accountHolder '${accountHolder}' for ${platform}`);
+                navigationUsername = accountHolder;
+              }
+            } catch (error) {
+              console.error('Error checking username lock status:', error);
+              // Fallback to current accountHolder
+              navigationUsername = accountHolder;
+            }
+            
             // ✅ CRITICAL FIX: NEVER pass username when re-navigating to prevent overwriting inter-username form data
             // The ProcessingLoadingState will get the username from localStorage, which is the source of truth
             navigate(`/processing/${platform}`, {
               state: {
                 platform,
-                // username: info.username || accountHolder, // REMOVED: This was overwriting the crucial inter-username form username
+                // username: navigationUsername, // REMOVED: This was overwriting the crucial inter-username form username
                 remainingMinutes
               },
               replace: true
@@ -2570,33 +2598,19 @@ Image Description: ${response.post.image_prompt}
     setIsResetConfirmOpen(false);
 
     try {
-      console.log(`[${new Date().toISOString()}] 🔄 Starting bulletproof reset for ${platform} dashboard (user: ${currentUser.uid})`);
-
-      // Use the bulletproof reset hook - this handles everything:
-      // 1. Complete cache clearing (localStorage & sessionStorage)
-      // 2. Session manager cleanup
-      // 3. Backend API reset
-      // 4. Browser history manipulation
-      // 5. Navigation to main dashboard
-      const resetSuccess = await resetAndAllowReconnection(platform, accountHolder);
-
-      if (resetSuccess) {
-        console.log(`[${new Date().toISOString()}] ✅ Bulletproof reset completed successfully for ${platform}`);
-        setToast(`${platform.charAt(0).toUpperCase() + platform.slice(1)} dashboard reset successfully! Redirecting to main dashboard...`);
-        
-        // The navigation is already handled by the reset hook
-        // No need for manual navigation here
-      } else {
-        throw new Error('Reset operation failed');
+      console.log(`[${new Date().toISOString()}] 🔁 Initiating bulletproof reset for ${platform}`);
+      const success = await resetAndAllowReconnection(platform, currentUser.uid);
+      if (success) {
+        // Navigation handled inside the hook
+        return;
       }
+      // Backend verification did not confirm clearance; do not navigate
+      console.warn(`[${new Date().toISOString()}] ⚠️ Reset aborted: backend processing still running for ${platform}`);
+      setToast('Reset could not complete: backend processing still running. Please wait and try again.');
     } catch (error: any) {
       console.error(`[${new Date().toISOString()}] ❌ Bulletproof reset failed for ${platform}:`, error);
-      setToast('Failed to reset dashboard. Please try again.');
-      
-      // Fallback navigation if reset completely fails
-      setTimeout(() => {
-        navigate('/account', { replace: true });
-      }, 2000);
+      setToast(error?.message || 'Failed to reset dashboard. Please try again.');
+      // Do NOT fallback navigate; keep user on the current dashboard
     } finally {
       setIsResetting(false);
     }

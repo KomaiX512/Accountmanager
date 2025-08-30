@@ -745,7 +745,7 @@ const MainDashboard: React.FC = () => {
   const startPlatformLoading = useCallback((platformId: string, durationMinutes?: number) => {
     // Use platform-specific timing if not explicitly provided
     if (durationMinutes === undefined) {
-      durationMinutes = platformId === 'facebook' ? 20 : 15;
+              durationMinutes = 2; // All platforms now use 2 minutes for testing (reduced from 20/15)
     }
     // Don't start loading for completed platforms
     if (completedPlatforms.has(platformId)) {

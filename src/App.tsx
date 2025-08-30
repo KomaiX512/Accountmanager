@@ -645,10 +645,13 @@ const AppContent: React.FC = () => {
             localStorage.setItem(`${platformKey}_accessed_${uid}`, 'true');
             console.log(`[App] 🔄 CROSS-DEVICE SYNC: Platform ${platformKey} marked as accessed in localStorage for user ${uid}`);
             
-            // ✅ CRITICAL FIX: Also sync username to localStorage if missing
-            if (savedUsername && !localStorage.getItem(`${platformKey}_username_${uid}`)) {
-              localStorage.setItem(`${platformKey}_username_${uid}`, savedUsername);
-              console.log(`[App] 🔄 CROSS-DEVICE SYNC: Username ${savedUsername} synced to localStorage for ${platformKey}`);
+            // ✅ CRITICAL FIX: Always sync (and overwrite if changed) username in localStorage for cross-device consistency
+            if (savedUsername) {
+              const existingLocalUsername = localStorage.getItem(`${platformKey}_username_${uid}`);
+              if (existingLocalUsername !== savedUsername) {
+                localStorage.setItem(`${platformKey}_username_${uid}`, savedUsername);
+                console.log(`[App] 🔄 CROSS-DEVICE SYNC: Username updated in localStorage for ${platformKey}: "${existingLocalUsername}" ➡️ "${savedUsername}"`);
+              }
             }
             
             // ✅ ENHANCED: Get competitors from AccountInfo for all platforms

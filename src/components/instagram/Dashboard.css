@@ -1855,6 +1855,7 @@ h2 {
   padding: 0;
   z-index: 99999; /* ensure dropdown floats above dashboard grid */
   overflow: hidden;
+  /* ✅ IMPROVED: Better shadow and positioning */
   box-shadow: 
     0 40px 120px rgba(0, 0, 0, 0.6),
     0 16px 48px rgba(0, 0, 0, 0.4),
@@ -1863,6 +1864,9 @@ h2 {
     0 0 40px rgba(100, 255, 218, 0.08);
   animation: dropdownSlideIn 0.45s cubic-bezier(0.16, 1, 0.3, 1);
   transform-origin: bottom center;
+  /* ✅ ADDED: Ensure proper stacking and no interference */
+  pointer-events: auto;
+  user-select: none;
 }
 
 @keyframes dropdownSlideIn {
@@ -2061,10 +2065,10 @@ h2 {
 /* Mobile responsive adjustments */
 @media (max-width: 767px) {
   .post-creation-dropdown {
-    min-width: calc(100vw - 24px);
-    max-width: calc(100vw - 24px);
-    left: 12px !important;
-    right: 12px !important;
+    /* ✅ REMOVED: Fixed left/right positioning that conflicts with JavaScript */
+    /* Let JavaScript handle positioning for better control */
+    min-width: 280px;
+    max-width: calc(100vw - 32px);
     border-radius: 20px;
     box-shadow: 
       0 32px 80px rgba(0, 0, 0, 0.5),
@@ -2101,10 +2105,10 @@ h2 {
 
 @media (max-width: 480px) {
   .post-creation-dropdown {
-    min-width: calc(100vw - 16px);
-    max-width: calc(100vw - 16px);
-    left: 8px !important;
-    right: 8px !important;
+    /* ✅ REMOVED: Fixed left/right positioning that conflicts with JavaScript */
+    /* Let JavaScript handle positioning for better control */
+    min-width: 280px;
+    max-width: calc(100vw - 24px);
     border-radius: 18px;
   }
   

@@ -630,6 +630,21 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     return reliableUrl;
   }, [username, platform, imageRefreshKey.current]);
 
+  // Helper to ensure preview/download use original quality
+  const toOriginalQualityUrl = useCallback((url: string) => {
+    if (!url) return url;
+    try {
+      if (url.includes('quality=')) {
+        return url.replace(/quality=[^&]*/i, 'quality=original');
+      }
+      const sep = url.includes('?') ? '&' : '?';
+      return `${url}${sep}quality=original`;
+    } catch {
+      const sep = url.includes('?') ? '&' : '?';
+      return `${url}${sep}quality=original`;
+    }
+  }, []);
+
   // Simplified and more reliable image error handling
   const handleImageError = useCallback((key: string, imgElement: HTMLImageElement) => {
     const currentRetries = imageErrors[key]?.retryCount || 0;
@@ -1883,7 +1898,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       if (!post) return;
       
       // Get the cache-busted image URL with proper proxy endpoint
-      const imageUrl = getReliableImageUrl(post, true);
+      const imageUrl = toOriginalQualityUrl(getReliableImageUrl(post, true));
       console.log('[Download] Image URL:', imageUrl);
       
       // Fetch the image as blob to ensure proper download
@@ -1891,14 +1906,22 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       if (!response.ok) {
         throw new Error(`Failed to fetch image: ${response.status} - ${response.statusText}`);
       }
-      
+      // Determine file extension from content-type
+      const contentType = (response.headers.get('content-type') || '').toLowerCase();
+      let fileExt = 'jpg';
+      if (contentType.includes('png')) fileExt = 'png';
+      else if (contentType.includes('jpeg') || contentType.includes('jpg')) fileExt = 'jpg';
+      else if (contentType.includes('gif')) fileExt = 'gif';
+      else if (contentType.includes('bmp')) fileExt = 'bmp';
+      else if (contentType.includes('webp')) fileExt = 'jpg'; // server converts webp to jpeg
+
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       
       // Create download link with proper filename
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${username}_${postKey}_${Date.now()}.jpg`;
+      link.download = `${username}_${postKey}_${Date.now()}.${fileExt}`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1912,7 +1935,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       setToastMessage('❌ Failed to download image: ' + (error instanceof Error ? error.message : String(error)));
     }
     setShowContextMenu(null);
-  }, [localPosts, username, getReliableImageUrl]);
+  }, [localPosts, username, getReliableImageUrl, toOriginalQualityUrl]);
   
   const handleReimagineSubmit = useCallback(async () => {
     if (!reimaginePostKey) return;
@@ -2547,15 +2570,15 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                         src={profilePicUrl}
                         alt={`${username}'s profile picture`}
                         className="profile-pic"
+                        aggressiveMobileOptimization={true}
+                        maxWidth={60}
+                        quality={0.6}
+                        enableOptimization={true}
+                        enableWebP={true}
                         onError={() => {
                           console.error(`Failed to load profile picture for ${username} in post`);
                           setProfileImageError(true);
                         }}
-                        // Lighter optimization for profile pics (smaller, so less aggressive)
-                        quality={0.9}
-                        maxWidth={100}
-                        enableOptimization={true}
-                        enableWebP={true}
                       />
                     ) : (
                       <div className="profile-pic" />
@@ -2584,6 +2607,11 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                         src={imageUrl}
                         alt="Post visual"
                         className={`post-image ${loadingImages.has(post.key) ? 'loading' : 'loaded'}`}
+                        aggressiveMobileOptimization={true}
+                        enableProgressiveLoading={true}
+                        preserveOriginalForActions={true}
+                        maxWidth={600}
+                        quality={0.5}
                         onLoadStart={() => {
                           console.log(`[PostCooked] Image load started for ${post.key}: ${imageUrl}`);
                           handleImageLoadStart(post.key);
@@ -2597,7 +2625,14 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                           const target = e.target as HTMLImageElement;
                           handleImageError(post.key, target);
                         }}
-                        onContextMenu={(e) => handleImageRightClick(e, post.key)}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          setShowContextMenu({
+                            x: e.clientX,
+                            y: e.clientY,
+                            postKey: post.key
+                          });
+                        }}
                         key={`${post.key}-${imageRefreshKey.current}`}
                         style={{
                           backgroundColor: '#2a2a4a',
@@ -3043,7 +3078,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             onClick={() => {
               const post = localPosts.find(p => p.key === showContextMenu.postKey);
               if (post) {
-                setPreviewImageUrl(getReliableImageUrl(post, true));
+                setPreviewImageUrl(toOriginalQualityUrl(getReliableImageUrl(post, true)));
               }
               setShowContextMenu(null);
             }}
@@ -3327,6 +3362,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
           <OptimizedImage
             src={previewImageUrl}
             alt="Preview"
+            enableOptimization={false}
             style={{
               maxWidth: '90vw',
               maxHeight: '90vh',
@@ -3335,11 +3371,6 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
               background: '#222',
               objectFit: 'contain'
             }}
-            // Higher quality for preview modal since it's larger
-            quality={0.9}
-            maxWidth={1200}
-            enableOptimization={true}
-            enableWebP={true}
           />
         </div>,
         document.body

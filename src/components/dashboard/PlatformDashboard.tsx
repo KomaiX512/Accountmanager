@@ -537,9 +537,19 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     };
   }, []);
 
+  // ✅ ADDED: Handle initial positioning when component mounts
+  useEffect(() => {
+    if (isPostDropdownOpen && postInputRef.current) {
+      // Small delay to ensure DOM is ready
+      setTimeout(() => {
+        if (updateDropdownPosition) {
+          updateDropdownPosition();
+        }
+      }, 100);
+    }
+  }, [isPostDropdownOpen]);
 
-
-  // 🚀 POST DROPDOWN: Position calculation
+  // 🚀 POST DROPDOWN: Position calculation - FIXED POSITIONING
   const updateDropdownPosition = useCallback(() => {
     const inputElement = postInputRef.current;
     console.log('🚀 updateDropdownPosition called, input element:', inputElement);
@@ -549,39 +559,72 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     }
 
     const rect = inputElement.getBoundingClientRect();
-    console.log('🚀 Input rect:', rect);
+    console.log('🚀 Input field rect:', rect);
     
-    // Find the post-creation-bar container for proper alignment
-    const parentContainer = inputElement.closest('.post-creation-bar');
-    const containerRect = parentContainer ? parentContainer.getBoundingClientRect() : rect;
+    // ✅ CRITICAL: Use ONLY the input field position, not the creation bar container
+    // This ensures dropdown appears directly above the input field
+    console.log('🚀 Positioning dropdown relative to input field only');
     
-  // Try to measure the actual rendered dropdown to compute an exact top position
-  const portalEl = document.getElementById('post-dropdown-portal') as HTMLElement | null;
-  const measuredDropdownRect = portalEl ? portalEl.getBoundingClientRect() : null;
-  const dropdownHeight = measuredDropdownRect ? Math.round(measuredDropdownRect.height) : 340; // Fallback
-  const measuredDropdownWidth = measuredDropdownRect ? Math.round(measuredDropdownRect.width) : 480; // Fallback
+    // ✅ ADDED: Double-check that we're getting the right input element
+    console.log('🚀 Input element:', inputElement);
+    console.log('🚀 Input element classList:', inputElement.className);
+    
+    // ✅ ADDED: Check if input element is actually visible and positioned correctly
+    const computedStyle = window.getComputedStyle(inputElement);
+    console.log('🚀 Input element computed styles:', {
+      position: computedStyle.position,
+      top: computedStyle.top,
+      left: computedStyle.left,
+      transform: computedStyle.transform,
+      zIndex: computedStyle.zIndex
+    });
+    
+    // Try to measure the actual rendered dropdown to compute an exact top position
+    const portalEl = document.getElementById('post-dropdown-portal') as HTMLElement | null;
+    const measuredDropdownRect = portalEl ? portalEl.getBoundingClientRect() : null;
+    const dropdownHeight = measuredDropdownRect ? Math.round(measuredDropdownRect.height) : 340; // Fallback
+    const measuredDropdownWidth = measuredDropdownRect ? Math.round(measuredDropdownRect.width) : 480; // Fallback
 
-  // Determine desired width: match input width (with padding), clamped to sensible min/max
-  const inputPreferredWidth = Math.round(Math.min(480, Math.max(280, rect.width + 32)));
-  const dropdownWidth = Math.min(measuredDropdownWidth || 480, inputPreferredWidth);
+    // Determine desired width: match input width (with padding), clamped to sensible min/max
+    const inputPreferredWidth = Math.round(Math.min(480, Math.max(280, rect.width + 32)));
+    const dropdownWidth = Math.min(measuredDropdownWidth || 480, inputPreferredWidth);
 
-  // Small visual gap between input and the dropdown (keeps creation container visible)
-  const spacing = 12;
-
-  // Position centered above the input field (upward drawer)
-  let top = rect.top - dropdownHeight - spacing; // vertical position above input
-  let left = rect.left + (rect.width / 2) - (dropdownWidth / 2); // center horizontally above input
-
-    console.log('🚀 Container rect:', containerRect);
-    console.log('🚀 Input rect for vertical positioning:', rect);
-    console.log('🚀 Calculated position - top:', top, 'left:', left);
-
-    // Ensure dropdown stays within viewport (top)
-    if (top < 24) {
-      top = rect.bottom + spacing; // Fallback to below if no space above
+    // ✅ FIXED POSITIONING: Force dropdown to appear at top of viewport with safe margin
+    const viewportTopMargin = 100; // Safe margin from viewport top
+    
+    // 🎯 CRITICAL FIX: Position dropdown at top of viewport, not relative to input
+    // This ensures it never overlaps with any input fields or bars
+    let top = viewportTopMargin; // Always at top of viewport with safe margin
+    
+    // ✅ ENSURE NO OVERLAP: Since we're positioning at viewport top, this check is not needed
+    // The dropdown will always be at a safe position from the top
+    
+    // ✅ ADDED: Extra safety check - ensure dropdown is never overlapping with input
+    const inputBottom = rect.bottom;
+    const dropdownBottom = top + dropdownHeight;
+    
+    if (dropdownBottom >= inputBottom - 10) {
+      // If dropdown would overlap, move it even higher
+      top = Math.max(50, top - 100); // Move 100px higher, minimum 50px from viewport top
+      console.log('🚀 Preventing overlap - moved dropdown higher to viewport top');
     }
+    
+    // ✅ ADDED: Final safety check - ensure dropdown is always visible
+    if (top < 50) {
+      top = 50; // Minimum 50px from viewport top
+      console.log('🚀 Ensuring minimum viewport margin - set to 50px');
+    }
+    
+    // Horizontal centering over the input field
+    let left = rect.left + (rect.width / 2) - (dropdownWidth / 2);
 
-    // Horizontal positioning with safe margins
+    console.log('🚀 Input field positioning for dropdown:', rect);
+    console.log('🚀 Input field top position:', rect.top);
+    console.log('🚀 Dropdown height:', dropdownHeight);
+    console.log('🚀 Viewport top margin used:', viewportTopMargin);
+    console.log('🚀 Final position - top:', top, 'left:', left);
+
+    // ✅ HORIZONTAL POSITIONING: Ensure dropdown stays within viewport bounds
     const safeMargin = 16;
     if (left + dropdownWidth > window.innerWidth - safeMargin) {
       left = window.innerWidth - dropdownWidth - safeMargin;
@@ -590,28 +633,53 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       left = safeMargin;
     }
 
-    // Mobile responsiveness
+    // ✅ MOBILE RESPONSIVENESS: Better mobile positioning
     if (window.innerWidth <= 767) {
-      left = 12;
+      // For mobile, ensure dropdown is properly aligned with input
+      const mobileLeft = Math.max(12, Math.min(left, window.innerWidth - dropdownWidth - 12));
+      left = mobileLeft;
     } else if (window.innerWidth <= 480) {
-      left = 8;
+      // For very small screens, use safe margins
+      left = Math.max(8, Math.min(left, window.innerWidth - dropdownWidth - 8));
     }
 
-  const position = { top, left, width: dropdownWidth };
-  console.log('🚀 Setting dropdown position:', position);
-  setPostDropdownPosition(position);
+    const position = { top, left, width: dropdownWidth };
+    console.log('🚀 Setting dropdown position:', position);
+    setPostDropdownPosition(position);
   }, []);
 
-  // 🚀 POST DROPDOWN: Click outside and positioning logic
+  // 🚀 POST DROPDOWN: Click outside and positioning logic - IMPROVED
   useEffect(() => {
     if (isPostDropdownOpen) {
-      // Wait a frame for the dropdown to render so we can measure it accurately
-      requestAnimationFrame(() => {
-        setTimeout(() => updateDropdownPosition(), 8);
-      });
+      // ✅ IMPROVED: More responsive positioning with better timing
+      const updatePosition = () => {
+        // Wait for DOM to settle, then measure and position
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            updateDropdownPosition();
+            // ✅ ADDED: Double-check position after a short delay for mobile
+            setTimeout(() => updateDropdownPosition(), 100);
+            // ✅ ADDED: Triple-check position for extra reliability
+            setTimeout(() => updateDropdownPosition(), 300);
+          }, 16);
+        });
+      };
       
-      const handleResize = () => updateDropdownPosition();
-      const handleScroll = () => updateDropdownPosition();
+      // Initial positioning
+      updatePosition();
+      
+      const handleResize = () => {
+        // ✅ IMPROVED: Debounced resize handler for better performance
+        clearTimeout((window as any).resizeTimeout);
+        (window as any).resizeTimeout = setTimeout(updatePosition, 100);
+      };
+      
+      const handleScroll = () => {
+        // ✅ IMPROVED: Debounced scroll handler
+        clearTimeout((window as any).scrollTimeout);
+        (window as any).scrollTimeout = setTimeout(updatePosition, 50);
+      };
+      
       const handleClickOutside = (e: MouseEvent) => {
         const inputElement = postInputRef.current;
         // portal element id lives in DOM when dropdown is rendered
@@ -624,14 +692,24 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         setIsPostDropdownOpen(false);
       };
 
+      // ✅ IMPROVED: Add orientation change handler for mobile
+      const handleOrientationChange = () => {
+        setTimeout(updatePosition, 300); // Wait for orientation change to complete
+      };
+
       window.addEventListener('resize', handleResize, { passive: true });
       window.addEventListener('scroll', handleScroll, { passive: true });
+      window.addEventListener('orientationchange', handleOrientationChange);
       document.addEventListener('click', handleClickOutside);
 
       return () => {
         window.removeEventListener('resize', handleResize);
         window.removeEventListener('scroll', handleScroll);
+        window.removeEventListener('orientationchange', handleOrientationChange);
         document.removeEventListener('click', handleClickOutside);
+        // Clean up timeouts
+        clearTimeout((window as any).resizeTimeout);
+        clearTimeout((window as any).scrollTimeout);
       };
     }
   }, [isPostDropdownOpen, updateDropdownPosition]);
@@ -650,23 +728,27 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   // 🚀 POST DROPDOWN: Handle input focus (only show when empty)
   const handleInputFocus = useCallback(() => {
     console.log('🚀 Input focused! Current query length:', query.length);
-    // Only show dropdown if input is empty
-    if (query.trim().length === 0) {
-      console.log('🚀 Input is empty, showing dropdown');
+    // ✅ IMPROVED: Only show dropdown if input is empty and not processing
+    if (query.trim().length === 0 && !isProcessing) {
+      console.log('🚀 Input is empty and not processing, showing dropdown');
       setIsPostDropdownOpen(true);
     } else {
-      console.log('🚀 Input has content, hiding dropdown');
+      console.log('🚀 Input has content or processing, hiding dropdown');
       setIsPostDropdownOpen(false);
     }
-  }, [query]);
+  }, [query, isProcessing]);
 
   // 🚀 POST DROPDOWN: Handle input change (hide dropdown when typing)
   const handleInputChange = useCallback((newQuery: string) => {
     setQuery(newQuery);
-    // Hide dropdown when user starts typing
+    // ✅ IMPROVED: Hide dropdown when user starts typing or when query becomes empty
     if (newQuery.trim().length > 0) {
       console.log('🚀 User started typing, hiding dropdown');
       setIsPostDropdownOpen(false);
+    } else if (newQuery.trim().length === 0 && document.activeElement === postInputRef.current) {
+      // ✅ ADDED: Show dropdown again if input becomes empty and is focused
+      console.log('🚀 Input became empty and focused, showing dropdown');
+      setIsPostDropdownOpen(true);
     }
   }, []);
 
@@ -3041,6 +3123,12 @@ Image Description: ${response.post.image_prompt}
                     value={query}
                     onChange={(e) => handleInputChange(e.target.value)}
                     onFocus={handleInputFocus}
+                    onClick={() => {
+                      // ✅ ADDED: Ensure dropdown is properly positioned when input is clicked
+                      if (query.trim().length === 0 && !isProcessing) {
+                        setTimeout(() => updateDropdownPosition(), 50);
+                      }
+                    }}
                     placeholder={`What would you like to post on ${config.name}?`}
                     className="post-input-field"
                     disabled={isProcessing}
@@ -3076,18 +3164,33 @@ Image Description: ${response.post.image_prompt}
           </div>
         </div>
         
-        {/* 🚀 POST CREATION DROPDOWN - SIMPLIFIED VERSION */}
+        {/* 🚀 POST CREATION DROPDOWN - IMPROVED POSITIONING */}
         {isPostDropdownOpen && postDropdownPosition && (
           <div
             id="post-dropdown-portal"
             className="post-creation-dropdown"
+            // ✅ ADDED: Debug class to help identify positioning issues
+            data-debug-position={`top:${postDropdownPosition.top},left:${postDropdownPosition.left}`}
+            data-positioning-strategy="viewport-top"
             style={{ 
               position: 'fixed', 
-              top: postDropdownPosition.top, 
-              left: postDropdownPosition.left, 
+              top: `${postDropdownPosition.top}px`, 
+              left: `${postDropdownPosition.left}px`, 
               zIndex: 2000,
               width: postDropdownPosition.width ? `${postDropdownPosition.width}px` : undefined,
-              maxWidth: 'calc(100vw - 16px)'
+              maxWidth: 'calc(100vw - 16px)',
+              // ✅ IMPROVED: Enhanced visual separation with better shadows and borders
+              boxShadow: '0 12px 40px rgba(0, 0, 0, 0.15), 0 6px 20px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(100, 255, 218, 0.2)',
+              border: '2px solid rgba(100, 255, 218, 0.3)',
+              borderRadius: '16px',
+              backgroundColor: 'rgba(8, 12, 20, 0.98)',
+              backdropFilter: 'blur(20px)',
+              // ✅ ADDED: Ensure dropdown floats above everything
+              transform: 'translateZ(0)',
+              willChange: 'transform',
+              // ✅ ADDED: Force maximum separation from input field
+              marginTop: '0',
+              marginBottom: '0'
             }}
           >
             <div className="dropdown-header">

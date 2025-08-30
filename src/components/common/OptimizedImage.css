@@ -1,0 +1,116 @@
+/* Optimized Image Component Styles for Mobile Performance */
+
+/* Base image styles with performance optimizations */
+.optimized-image {
+  /* Hardware acceleration for smooth transitions */
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+  
+  /* Optimize rendering */
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  
+  /* Smooth loading transitions */
+  transition: opacity 0.3s ease-out, filter 0.3s ease-out;
+}
+
+/* Progressive loading states */
+.optimized-image.blur-loading {
+  filter: blur(8px);
+  opacity: 0.8;
+}
+
+.optimized-image.loaded {
+  filter: none;
+  opacity: 1;
+}
+
+/* Optimizing state indicator */
+.optimized-image.optimizing {
+  position: relative;
+}
+
+.optimized-image.optimizing::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  border: 2px solid rgba(0, 255, 204, 0.3);
+  border-top: 2px solid #00ffcc;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  z-index: 1;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Mobile-specific optimizations */
+@media (max-width: 768px) {
+  .optimized-image {
+    /* More aggressive mobile optimizations */
+    will-change: transform, opacity;
+    
+    /* Reduce memory usage on mobile */
+    image-rendering: optimizeSpeed;
+  }
+  
+  /* Faster transitions on mobile */
+  .optimized-image.blur-loading {
+    transition: filter 0.2s ease-out, opacity 0.2s ease-out;
+  }
+  
+  .optimized-image.loaded {
+    transition: filter 0.2s ease-out, opacity 0.2s ease-out;
+  }
+}
+
+/* PostCooked specific optimizations */
+.post-image.optimized-image {
+  /* Ensure proper aspect ratio maintenance */
+  object-fit: cover;
+  width: 100%;
+  height: auto;
+  
+  /* Smooth loading for post images */
+  background: linear-gradient(135deg, #2a2a4a 0%, #1a1a3a 100%);
+}
+
+.post-image.optimized-image.loading {
+  /* Loading shimmer effect */
+  background: linear-gradient(
+    90deg,
+    #2a2a4a 0%,
+    #3a3a5a 50%,
+    #2a2a4a 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Profile picture optimizations */
+.profile-pic.optimized-image {
+  border-radius: 50%;
+  object-fit: cover;
+  
+  /* Small profile pics load instantly */
+  transition: opacity 0.1s ease-out;
+}
+
+/* Preview modal - no optimization for full quality */
+.preview-modal .optimized-image {
+  /* Disable optimizations for preview */
+  image-rendering: auto;
+  will-change: auto;
+}

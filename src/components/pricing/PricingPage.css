@@ -1,18 +1,31 @@
-/* MINIMAL VPS-COMPATIBLE PRICING PAGE CSS */
+/* PREMIUM PRICING PAGE - MAINDASHBOARD VPS-COMPATIBLE APPROACH */
 .pricing-page {
   min-height: 100vh;
-  background: #000000;
-  color: #ffffff;
-  font-family: Arial, sans-serif;
-  line-height: 1.6;
+  padding: 80px 20px 20px;
+  box-sizing: border-box;
+  background: radial-gradient(ellipse at center, 
+    #0a0a1a 0%, 
+    #000008 100%
+  );
+  overflow-x: auto;
+  overflow-y: auto;
+  color: rgba(255, 255, 255, 0.95);
 }
 
-/* Hero Section */
+/* Premium Hero Section - MainDashboard Style */
 .pricing-hero {
-  background: #111111;
-  padding: 80px 20px 60px;
+  max-width: 1200px;
+  margin: 0 auto 40px;
+  padding: 40px 32px;
   text-align: center;
-  border-bottom: 1px solid #333333;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  backdrop-filter: blur(20px);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+  box-sizing: border-box;
 }
 
 .hero-content {
@@ -20,98 +33,116 @@
   margin: 0 auto;
 }
 
+/* Hero Content with MainDashboard Typography */
 .hero-content h1 {
-  font-size: 3rem;
-  font-weight: bold;
+  font-size: 3.5rem;
+  font-weight: 700;
   margin: 0 0 8px 0;
-  color: #00ffcc;
+  background: linear-gradient(135deg, #00c9a7, #00b4e6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 20px rgba(0, 255, 204, 0.3);
+  letter-spacing: -0.02em;
 }
 
 .hero-content h2 {
-  font-size: 2rem;
-  font-weight: bold;
+  font-size: 2.5rem;
+  font-weight: 600;
   margin: 0 0 24px 0;
-  color: #ffffff;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
 }
 
 .hero-content p {
-  font-size: 1.1rem;
-  color: #cccccc;
-  margin: 0 0 32px 0;
+  font-size: 1.2rem;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0 auto 32px;
+  line-height: 1.6;
   max-width: 600px;
-  margin-left: auto;
-  margin-right: auto;
 }
 
 .trial-badge {
-  display: inline-block;
-  background: #003333;
-  border: 1px solid #00ffcc;
-  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 255, 204, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 255, 204, 0.3);
+  border-radius: 24px;
   padding: 12px 20px;
-  font-weight: bold;
+  font-weight: 500;
   font-size: 0.9rem;
   color: #00ffcc;
   margin-top: 16px;
+  transition: all 0.3s ease;
 }
 
-/* Simple 3-Card Layout */
+/* Premium Pricing Container - MainDashboard Grid Style */
 .pricing-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 80px 20px;
-  display: block;
-  text-align: center;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-@media (min-width: 800px) {
+@media (min-width: 900px) {
   .pricing-container {
-    display: table;
-    width: 100%;
-    table-layout: fixed;
-  }
-  
-  .pricing-card {
-    display: table-cell;
-    width: 33.333%;
-    vertical-align: top;
+    grid-template-columns: repeat(3, 1fr);
+    padding: 40px 20px;
   }
 }
 
+/* Premium Pricing Cards - MainDashboard Glass Style */
 .pricing-card {
-  background: #111111;
-  border: 1px solid #333333;
-  border-radius: 16px;
-  padding: 40px 32px;
-  margin: 0 auto 32px;
-  max-width: 400px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  padding: 32px;
   position: relative;
   text-align: center;
-}
-
-@media (min-width: 800px) {
-  .pricing-card {
-    margin: 0 16px;
-    max-width: none;
-  }
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+  box-sizing: border-box;
+  width: 100%;
+  height: auto;
+  overflow: hidden;
 }
 
 .pricing-card:hover {
-  border-color: #00ffcc;
-  background: #001a1a;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1.5px solid rgba(0, 255, 204, 0.3);
+  transform: translateY(-5px) scale(1.02);
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.25),
+    0 0 40px rgba(0, 255, 204, 0.15),
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
 }
 
 .pricing-card.popular {
-  border-color: #00ffcc;
-  background: #001a1a;
+  border: 1.5px solid rgba(0, 255, 204, 0.4);
+  background: rgba(0, 255, 204, 0.08);
+  box-shadow: 
+    0 12px 40px rgba(0, 255, 204, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
 }
 
 .pricing-card.current {
-  border-color: #4CAF50;
-  background: #0a1a0a;
+  border: 1.5px solid rgba(76, 175, 80, 0.4);
+  background: rgba(76, 175, 80, 0.08);
+  box-shadow: 
+    0 12px 40px rgba(76, 175, 80, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
 }
 
-/* Badges */
+/* Premium Badges - MainDashboard Style */
 .popular-badge,
 .current-badge {
   position: absolute;
@@ -122,21 +153,26 @@
   padding: 8px 16px;
   border-radius: 20px;
   font-size: 0.8rem;
-  font-weight: bold;
+  font-weight: 600;
   text-align: center;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border: 1px solid;
 }
 
 .popular-badge {
-  background: #00ffcc;
+  background: rgba(0, 255, 204, 0.9);
   color: #000000;
+  border-color: rgba(0, 255, 204, 0.5);
 }
 
 .current-badge {
-  background: #4CAF50;
+  background: rgba(76, 175, 80, 0.9);
   color: #ffffff;
+  border-color: rgba(76, 175, 80, 0.5);
 }
 
-/* Plan Header */
+/* Premium Plan Header - MainDashboard Icon Style */
 .plan-header {
   text-align: center;
   margin-bottom: 32px;
@@ -147,18 +183,30 @@
   height: 64px;
   margin: 0 auto 20px;
   border-radius: 16px;
-  background: #003333;
-  border: 1px solid #00ffcc;
+  background: rgba(0, 255, 204, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 255, 204, 0.3);
   color: #00ffcc;
-  line-height: 64px;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 255, 204, 0.2);
+}
+
+.pricing-card:hover .plan-icon {
+  background: rgba(0, 255, 204, 0.2);
+  border-color: rgba(0, 255, 204, 0.5);
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(0, 255, 204, 0.3);
 }
 
 .plan-header h3 {
   font-size: 1.5rem;
-  font-weight: bold;
-  color: #ffffff;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
   margin: 0 0 16px 0;
+  letter-spacing: -0.02em;
 }
 
 .plan-price {
@@ -167,20 +215,23 @@
 
 .price {
   font-size: 2.5rem;
-  font-weight: bold;
+  font-weight: 700;
   color: #00ffcc;
+  text-shadow: 0 0 10px rgba(0, 255, 204, 0.3);
 }
 
 .period {
   font-size: 1rem;
-  color: #cccccc;
-  font-weight: normal;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 400;
+  margin-left: 4px;
 }
 
 .plan-description {
-  color: #cccccc;
+  color: rgba(255, 255, 255, 0.7);
   font-size: 0.95rem;
   margin: 0;
+  line-height: 1.5;
 }
 
 /* Plan Features */
@@ -191,9 +242,10 @@
 
 .plan-features h4 {
   font-size: 1rem;
-  font-weight: bold;
-  color: #ffffff;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
   margin-bottom: 20px;
+  letter-spacing: -0.02em;
 }
 
 .plan-features ul {
@@ -203,16 +255,19 @@
 }
 
 .plan-features li {
+  display: flex;
+  align-items: flex-start;
   padding: 8px 0;
-  color: #cccccc;
+  color: rgba(255, 255, 255, 0.8);
   font-size: 0.9rem;
+  line-height: 1.4;
 }
 
-.plan-features li:before {
-  content: "✓ ";
-  color: #00ffcc;
-  font-weight: bold;
+.plan-features li .feature-icon {
   margin-right: 8px;
+  color: #00ffcc;
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 /* Plan Actions */
@@ -225,54 +280,76 @@
 .btn-current {
   width: 100%;
   padding: 16px 24px;
-  border: 2px solid;
+  border: 1px solid;
   border-radius: 12px;
   font-size: 1rem;
-  font-weight: bold;
+  font-weight: 600;
   cursor: pointer;
-  text-align: center;
-  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 
+    0 4px 15px rgba(0, 0, 0, 0.1),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
   text-decoration: none;
-  display: inline-block;
 }
 
 .btn-primary {
-  border-color: #00ffcc;
+  border-color: rgba(0, 255, 204, 0.4);
   color: #00ffcc;
-  background: #003333;
+  background: rgba(0, 255, 204, 0.1);
+  box-shadow: 
+    0 8px 25px rgba(0, 255, 204, 0.15),
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
 }
 
 .btn-primary:hover {
-  background: #004d4d;
-  border-color: #00ffcc;
+  background: rgba(0, 255, 204, 0.2);
+  border-color: rgba(0, 255, 204, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 
+    0 12px 32px rgba(0, 255, 204, 0.25),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
 }
 
 .btn-secondary {
-  border-color: #666666;
-  color: #cccccc;
-  background: #222222;
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .btn-secondary:hover {
-  background: #333333;
-  border-color: #999999;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 25px rgba(0, 0, 0, 0.15),
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
 }
 
 .btn-contact {
-  border-color: #ff8e53;
+  border-color: rgba(255, 142, 83, 0.4);
   color: #ff8e53;
-  background: #331a00;
+  background: rgba(255, 142, 83, 0.1);
 }
 
 .btn-contact:hover {
-  background: #4d2600;
-  border-color: #ff8e53;
+  background: rgba(255, 142, 83, 0.2);
+  border-color: rgba(255, 142, 83, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 25px rgba(255, 142, 83, 0.25),
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
 }
 
 .btn-current {
-  border-color: #4CAF50;
+  border-color: rgba(76, 175, 80, 0.4);
   color: #4CAF50;
-  background: #0a1a0a;
+  background: rgba(76, 175, 80, 0.1);
   cursor: not-allowed;
   opacity: 0.8;
 }

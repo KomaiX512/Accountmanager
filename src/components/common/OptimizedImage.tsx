@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import frontendImageCache from '../../utils/frontendImageCache';
+import './OptimizedImage.css';
 
 interface OptimizedImageProps {
   src: string;
@@ -16,6 +17,10 @@ interface OptimizedImageProps {
   maxWidth?: number; // max width for mobile optimization, default 800
   enableOptimization?: boolean; // default true
   enableWebP?: boolean; // convert to WebP if supported, default true
+  // NEW: Dual quality system for PostCooked
+  preserveOriginalForActions?: boolean; // Keep original URL for preview/download, default false
+  aggressiveMobileOptimization?: boolean; // Extra aggressive mobile compression, default false
+  enableProgressiveLoading?: boolean; // Blur-to-sharp transition, default false
 }
 
 const OptimizedImage: React.FC<OptimizedImageProps> = ({
@@ -31,11 +36,17 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
   maxWidth = 800,
   enableOptimization = true,
   enableWebP = true,
+  preserveOriginalForActions = false,
+  aggressiveMobileOptimization = false,
+  enableProgressiveLoading = false,
   ...props
 }) => {
   const [optimizedSrc, setOptimizedSrc] = useState<string>(src);
+  const [originalSrc] = useState<string>(src); // Store original for actions
   const [isProcessing, setIsProcessing] = useState(false);
   const [fallbackToOriginal, setFallbackToOriginal] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [showBlur, setShowBlur] = useState(enableProgressiveLoading);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
 
@@ -69,35 +80,51 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
     const connection = (navigator as any).connection;
     const effectiveType = connection?.effectiveType;
     
-    // More aggressive compression on mobile and slow connections
+    // AGGRESSIVE mobile optimization for PostCooked
     if (isMobile()) {
+      if (aggressiveMobileOptimization) {
+        // Extra aggressive for PostCooked module
+        if (effectiveType === 'slow-2g' || effectiveType === '2g') return 0.3;
+        if (effectiveType === '3g') return 0.4;
+        return 0.5; // Much more aggressive mobile quality
+      }
+      // Standard mobile optimization
       if (effectiveType === 'slow-2g' || effectiveType === '2g') return 0.5;
       if (effectiveType === '3g') return 0.6;
-      return 0.7; // Default mobile quality
+      return 0.7;
     }
     
     // Desktop optimization
     if (effectiveType === 'slow-2g' || effectiveType === '2g') return 0.6;
     if (effectiveType === '3g') return 0.7;
-    return quality; // Use provided quality or default 0.8
-  }, [quality, enableOptimization, isMobile]);
+    return quality;
+  }, [quality, enableOptimization, isMobile, aggressiveMobileOptimization]);
 
-  // Get optimal dimensions
+  // Get optimal dimensions with aggressive mobile scaling
   const getOptimalDimensions = useCallback((originalWidth: number, originalHeight: number) => {
     if (!enableOptimization) return { width: originalWidth, height: originalHeight };
     
-    const mobileMaxWidth = isMobile() ? Math.min(maxWidth, 600) : maxWidth;
+    let targetMaxWidth = maxWidth;
     
-    if (originalWidth <= mobileMaxWidth) {
+    if (isMobile()) {
+      if (aggressiveMobileOptimization) {
+        // Much smaller dimensions for PostCooked mobile display
+        targetMaxWidth = Math.min(maxWidth, 400); // Reduced from 600 to 400
+      } else {
+        targetMaxWidth = Math.min(maxWidth, 600);
+      }
+    }
+    
+    if (originalWidth <= targetMaxWidth) {
       return { width: originalWidth, height: originalHeight };
     }
     
     const ratio = originalHeight / originalWidth;
     return {
-      width: mobileMaxWidth,
-      height: Math.round(mobileMaxWidth * ratio)
+      width: targetMaxWidth,
+      height: Math.round(targetMaxWidth * ratio)
     };
-  }, [maxWidth, enableOptimization, isMobile]);
+  }, [maxWidth, enableOptimization, isMobile, aggressiveMobileOptimization]);
 
   // Optimize image using canvas
   const optimizeImage = useCallback(async (imageElement: HTMLImageElement): Promise<string> => {
@@ -261,12 +288,19 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
     }
   }, [src, loadAndOptimize, enableOptimization]);
 
-  // Handle image load event
+  // Handle image load event with progressive loading
   const handleLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    setIsLoaded(true);
+    
+    // Progressive loading effect
+    if (enableProgressiveLoading && showBlur) {
+      setTimeout(() => setShowBlur(false), 100);
+    }
+    
     if (onLoad) {
       onLoad(e);
     }
-  }, [onLoad]);
+  }, [onLoad, enableProgressiveLoading, showBlur]);
 
   // Handle image error event
   const handleError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
@@ -283,22 +317,29 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
     }
   }, [onError, fallbackToOriginal, optimizedSrc, src]);
 
+  // Store original URL for potential future use
+
   return (
     <>
       {/* Hidden canvas for image optimization */}
       <canvas ref={canvasRef} style={{ display: 'none' }} />
       
-      {/* The actual image */}
+      {/* The actual image with progressive loading */}
       <img
         ref={imgRef}
         src={optimizedSrc}
         alt={alt}
-        className={`${className} ${isProcessing ? 'optimizing' : ''}`}
-        style={style}
+        className={`optimized-image ${className} ${isProcessing ? 'optimizing' : ''} ${enableProgressiveLoading && showBlur ? 'blur-loading' : ''} ${isLoaded ? 'loaded' : ''}`}
+        style={{
+          ...style,
+          filter: enableProgressiveLoading && showBlur ? 'blur(8px)' : 'none',
+          transition: enableProgressiveLoading ? 'filter 0.3s ease-out' : 'none'
+        }}
         onLoad={handleLoad}
         onError={handleError}
         onLoadStart={onLoadStart}
         onContextMenu={onContextMenu}
+        data-original-src={preserveOriginalForActions ? originalSrc : undefined}
         {...props}
       />
     </>

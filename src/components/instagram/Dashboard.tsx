@@ -235,24 +235,41 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const processedNotificationIds = useRef<Set<string>>(new Set());
     
 
-  // 🚀 POST DROPDOWN: Update dropdown position
+  // 🚀 POST DROPDOWN: Update dropdown position - FIXED VIEWPORT POSITIONING
   const updateDropdownPosition = useCallback(() => {
     if (!postInputRef.current) return;
     
     const inputRect = postInputRef.current.getBoundingClientRect();
     const dropdownHeight = 280; // Approximate dropdown height
-    const viewportHeight = window.innerHeight;
-    const spaceBelow = viewportHeight - inputRect.bottom;
     
-    // Position dropdown below input, but adjust if not enough space
-    const top = spaceBelow >= dropdownHeight 
-      ? inputRect.bottom + 8 
-      : inputRect.top - dropdownHeight - 8;
+    // ✅ FIXED POSITIONING: Force dropdown to appear at top of viewport with safe margin
+    const viewportTopMargin = 100; // Safe margin from viewport top
+    let top = viewportTopMargin; // Always at top of viewport
+    
+    // ✅ SAFETY CHECKS: Ensure dropdown never overlaps with input
+    const inputBottom = inputRect.bottom;
+    const dropdownBottom = top + dropdownHeight;
+    
+    if (dropdownBottom >= inputBottom - 10) {
+      // If dropdown would overlap, move it even higher
+      top = Math.max(50, top - 100); // Move 100px higher, minimum 50px from viewport top
+      console.log('🚀 [Instagram] Preventing overlap - moved dropdown higher to viewport top');
+    }
+    
+    // ✅ FINAL SAFETY CHECK: Ensure dropdown is always visible
+    if (top < 50) {
+      top = 50; // Minimum 50px from viewport top
+      console.log('🚀 [Instagram] Ensuring minimum viewport margin - set to 50px');
+    }
+    
+    // Horizontal centering over the input field
+    const dropdownWidth = Math.min(480, Math.max(280, inputRect.width + 32));
+    const left = inputRect.left + (inputRect.width / 2) - (dropdownWidth / 2);
     
     setPostDropdownPosition({
       top: `${top}px`,
-      left: `${inputRect.left}px`,
-      width: `${inputRect.width}px`
+      left: `${left}px`,
+      width: `${dropdownWidth}px`
     });
   }, []);
 
@@ -2541,13 +2558,25 @@ Image Description: ${response.post.image_prompt}
         <div
           id="post-dropdown-portal"
           className="post-creation-dropdown"
+          // ✅ ADDED: Debug attributes to help identify positioning issues
+          data-debug-position={`top:${postDropdownPosition.top},left:${postDropdownPosition.left}`}
+          data-positioning-strategy="viewport-top"
           style={{
             position: 'fixed',
             top: postDropdownPosition.top,
             left: postDropdownPosition.left,
             width: postDropdownPosition.width,
             zIndex: 99999,
-            maxWidth: 'calc(100vw - 16px)'
+            maxWidth: 'calc(100vw - 16px)',
+            // ✅ IMPROVED: Enhanced visual separation with better shadows and borders
+            boxShadow: '0 12px 40px rgba(0, 0, 0, 0.15), 0 6px 20px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(100, 255, 218, 0.2)',
+            border: '2px solid rgba(100, 255, 218, 0.3)',
+            borderRadius: '16px',
+            backgroundColor: 'rgba(8, 12, 20, 0.98)',
+            backdropFilter: 'blur(20px)',
+            // ✅ ADDED: Ensure dropdown floats above everything
+            transform: 'translateZ(0)',
+            willChange: 'transform'
           }}
         >
           <div className="dropdown-header">
@@ -2729,33 +2758,41 @@ Image Description: ${response.post.image_prompt}
           className="mobile-floating-btn chat-btn"
           onClick={() => setIsMobileChatOpen(true)}
           title="AI Chat"
-          style={{ fontSize: '20px', color: '#00ffcc' }}
         >
-          🤖
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ transform: 'scale(1.2)' }}>
+            <path d="M12 2C6.48 2 2 6.48 2 12c0 1.54.36 3.04 1.05 4.35L2 22l5.65-1.05C9.96 21.64 11.46 22 13 22c5.52 0 10-4.48 10-10S17.52 2 12 2z"/>
+            <circle cx="8.5" cy="12" r="1.5" fill="#1a1a2e"/>
+            <circle cx="15.5" cy="12" r="1.5" fill="#1a1a2e"/>
+            <path d="M12 8v8" stroke="#1a1a2e" strokeWidth="2"/>
+          </svg>
         </button>
         <button
           className="mobile-floating-btn image-btn"
           onClick={() => setIsMobileImageEditorOpen(true)}
           title="Image Editor"
-          style={{ fontSize: '20px', color: '#00ffcc' }}
         >
-          ✏️
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ transform: 'scale(1.2)' }}>
+            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+          </svg>
         </button>
         <button
           className="mobile-floating-btn profile-btn"
           onClick={() => setIsMobileProfilePopupOpen(true)}
           title="Profile"
-          style={{ fontSize: '20px', color: '#00ffcc' }}
         >
-          👤
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ transform: 'scale(1.2)' }}>
+            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+          </svg>
         </button>
         <button
           className="mobile-floating-btn manual-btn"
           onClick={() => setIsMobileManualOpen(true)}
           title="Manual"
-          style={{ fontSize: '20px', color: '#00ffcc' }}
         >
-          📚
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ transform: 'scale(1.2)' }}>
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            <path d="M8 7h8M8 11h8M8 15h6" stroke="#1a1a2e" strokeWidth="1.5"/>
+          </svg>
         </button>
       </div>
 

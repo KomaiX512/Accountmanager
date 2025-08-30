@@ -22,29 +22,9 @@ interface PlatformUsageChartProps {
 
 const PlatformUsageChart: React.FC<PlatformUsageChartProps> = ({ className }) => {
   const { currentUser } = useAuth();
-  
-  // ✅ OPTIMIZED: Initialize with cached data for instant loading like other dashboard sections
-  const [platformUsage, setPlatformUsage] = useState<Record<string, PlatformUsageData>>(() => {
-    if (!currentUser?.uid) return {};
-    try {
-      const cached = localStorage.getItem(`platformUsage_${currentUser.uid}`);
-      return cached ? JSON.parse(cached) : {};
-    } catch {
-      return {};
-    }
-  });
-  
-  // ✅ OPTIMIZED: Initialize totalActivity from cache
-  const [totalActivity, setTotalActivity] = useState(() => {
-    if (!currentUser?.uid) return 0;
-    try {
-      const cached = localStorage.getItem(`platformTotalActivity_${currentUser.uid}`);
-      return cached ? parseInt(cached, 10) : 0;
-    } catch {
-      return 0;
-    }
-  });
-  // ✅ REMOVED: No loading state - behave like other dashboard sections
+  const [platformUsage, setPlatformUsage] = useState<Record<string, PlatformUsageData>>({});
+  const [totalActivity, setTotalActivity] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Map platform names to display names and colors
   const platformConfig = {
@@ -60,52 +40,35 @@ const PlatformUsageChart: React.FC<PlatformUsageChartProps> = ({ className }) =>
     },
     twitter: {
       name: 'Twitter',
-      color: '#1DA1F2', 
+      color: '#000000ff', 
       icon: '/icons/twitter.svg'
-    },
-    general: {
-      name: 'Platform Activity',
-      color: '#6366f1',
-      icon: '/icons/activity.svg'
     }
   };
 
   const fetchPlatformUsage = async () => {
     if (!currentUser?.uid) return;
 
-    // ✅ OPTIMIZED: Silent fetch without loading states - like other dashboard sections
     try {
+      setIsLoading(true);
       const response = await axios.get<PlatformActivityResponse>(
         `/api/user/${currentUser.uid}/platform-activity`
       );
       
       const data = response.data;
       
-      // ✅ IMPROVED: Handle platform activity data more intelligently
-      let processedPlatforms = { ...data.platforms };
-      
-      // If we only have 'account' data but no specific platform data, 
-      // it means the user's activity is stored under the main userId
-      // In this case, we should still show it as general platform activity
-      const specificPlatforms = Object.keys(processedPlatforms).filter(p => p !== 'account');
-      
-      if (specificPlatforms.length === 0 && processedPlatforms.account) {
-        // Only account data exists - this represents real user activity
-        // Keep the account data but rename it to show as general activity
-        processedPlatforms.general = processedPlatforms.account;
-        delete processedPlatforms.account;
-      } else if (specificPlatforms.length > 0 && processedPlatforms.account) {
-        // We have both specific platform data and account data
-        // Remove account to avoid duplication since specific platforms are more accurate
-        delete processedPlatforms.account;
+      // Filter out 'account' platform since it represents general account activity, not actual Twitter usage
+      // Only show actual social media platform usage (instagram, facebook, twitter)
+      const filteredPlatforms = { ...data.platforms };
+      if (filteredPlatforms.account) {
+        delete filteredPlatforms.account;
       }
       
-      // Recalculate total activity and percentages
-      const filteredTotal = Object.values(processedPlatforms).reduce((sum: number, platform: any) => sum + platform.count, 0);
+      // Recalculate total activity and percentages without account platform
+      const filteredTotal = Object.values(filteredPlatforms).reduce((sum: number, platform: any) => sum + platform.count, 0);
       
       // Recalculate percentages based on filtered total
       const recalculatedPlatforms: Record<string, PlatformUsageData> = {};
-      for (const [platform, data] of Object.entries(processedPlatforms)) {
+      for (const [platform, data] of Object.entries(filteredPlatforms)) {
         const platformData = data as PlatformUsageData;
         recalculatedPlatforms[platform] = {
           count: platformData.count,
@@ -113,66 +76,39 @@ const PlatformUsageChart: React.FC<PlatformUsageChartProps> = ({ className }) =>
         };
       }
       
+      // Add Twitter with 0 usage if not present
+      if (!recalculatedPlatforms.twitter) {
+        recalculatedPlatforms.twitter = {
+          count: 0,
+          percentage: 0
+        };
+      }
+      
       setPlatformUsage(recalculatedPlatforms);
       setTotalActivity(filteredTotal);
       
-      // ✅ OPTIMIZED: Cache data locally for instant loading like other dashboard sections
-      if (currentUser?.uid) {
-        try {
-          localStorage.setItem(`platformUsage_${currentUser.uid}`, JSON.stringify(recalculatedPlatforms));
-          localStorage.setItem(`platformTotalActivity_${currentUser.uid}`, String(filteredTotal));
-        } catch (error) {
-          console.warn('[PlatformUsageChart] Failed to cache platform usage data:', error);
-        }
-      }
-      
-      console.log('[PlatformUsageChart] ✅ Platform usage data updated (silent):', { platforms: recalculatedPlatforms, totalActivity: filteredTotal });
+      console.log('[PlatformUsageChart] Fetched platform usage data (filtered):', { platforms: recalculatedPlatforms, totalActivity: filteredTotal });
     } catch (error) {
-      console.error('[PlatformUsageChart] ❌ Error fetching platform usage:', error);
-      // ✅ IMPROVED: Keep existing data on error instead of clearing
-      // Only clear if this is the first load and we have no data
-      if (Object.keys(platformUsage).length === 0) {
-        setPlatformUsage({});
-        setTotalActivity(0);
-      }
+      console.error('[PlatformUsageChart] Error fetching platform usage:', error);
+      // Set empty data on error
+      setPlatformUsage({});
+      setTotalActivity(0);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    // ✅ OPTIMIZED: Initialize from cache immediately, then fetch fresh data silently
-    if (currentUser?.uid) {
-      // Load from cache first for instant display
-      try {
-        const cachedUsage = localStorage.getItem(`platformUsage_${currentUser.uid}`);
-        const cachedTotal = localStorage.getItem(`platformTotalActivity_${currentUser.uid}`);
-        
-        if (cachedUsage && cachedTotal) {
-          const parsedUsage = JSON.parse(cachedUsage);
-          const parsedTotal = parseInt(cachedTotal, 10);
-          
-          // Only update if cache has meaningful data
-          if (Object.keys(parsedUsage).length > 0 || parsedTotal > 0) {
-            setPlatformUsage(parsedUsage);
-            setTotalActivity(parsedTotal);
-            console.log('[PlatformUsageChart] 🚀 Loaded from cache instantly:', { cachedUsage: parsedUsage, cachedTotal: parsedTotal });
-          }
-        }
-      } catch (error) {
-        console.warn('[PlatformUsageChart] Failed to load from cache:', error);
-      }
-      
-      // Then fetch fresh data silently in background
-      fetchPlatformUsage();
-    }
+    fetchPlatformUsage();
   }, [currentUser?.uid]);
 
-  // ✅ OPTIMIZED: Aligned with other dashboard sections - refresh every 60 seconds (same as UsageContext)
+  // Refresh data every 30 seconds
   useEffect(() => {
     if (!currentUser?.uid) return;
 
     const interval = setInterval(() => {
       fetchPlatformUsage();
-    }, 60000); // 60 seconds to match UsageContext refresh rate
+    }, 30000);
 
     return () => clearInterval(interval);
   }, [currentUser?.uid]);
@@ -185,13 +121,25 @@ const PlatformUsageChart: React.FC<PlatformUsageChartProps> = ({ className }) =>
   const getSortedPlatforms = () => {
     return Object.entries(platformUsage)
       .sort(([, a], [, b]) => b.count - a.count) // Sort by usage count descending
-      .filter(([, data]) => data.count >= 0); // Show all platforms (including 0 if needed)
+      .filter(([, data]) => data.count > 0); // Only show platforms with usage
   };
+
+  if (isLoading) {
+    return (
+      <div className={`platform-usage-chart ${className || ''}`}>
+        <div className="chart-header">
+          <h3>Platform Usage</h3>
+        </div>
+        <div className="loading-state">
+          <div className="loading-spinner"></div>
+        </div>
+      </div>
+    );
+  }
 
   const sortedPlatforms = getSortedPlatforms();
 
-  // ✅ IMPROVED: Show content immediately - no loading states like other dashboard sections
-  if (totalActivity === 0 && sortedPlatforms.length === 0) {
+  if (totalActivity === 0 || sortedPlatforms.length === 0) {
     return (
       <div className={`platform-usage-chart ${className || ''}`}>
         <div className="chart-header">
@@ -199,8 +147,7 @@ const PlatformUsageChart: React.FC<PlatformUsageChartProps> = ({ className }) =>
         </div>
         <div className="empty-state">
           <div className="empty-icon">📊</div>
-          <p>No activity data yet</p>
-          <span className="empty-hint">Start using the platforms to see usage statistics</span>
+          <p>No usage data yet</p>
         </div>
       </div>
     );

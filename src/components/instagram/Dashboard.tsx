@@ -2759,40 +2759,28 @@ Image Description: ${response.post.image_prompt}
           onClick={() => setIsMobileChatOpen(true)}
           title="AI Chat"
         >
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ transform: 'scale(1.2)' }}>
-            <path d="M12 2C6.48 2 2 6.48 2 12c0 1.54.36 3.04 1.05 4.35L2 22l5.65-1.05C9.96 21.64 11.46 22 13 22c5.52 0 10-4.48 10-10S17.52 2 12 2z"/>
-            <circle cx="8.5" cy="12" r="1.5" fill="#1a1a2e"/>
-            <circle cx="15.5" cy="12" r="1.5" fill="#1a1a2e"/>
-            <path d="M12 8v8" stroke="#1a1a2e" strokeWidth="2"/>
-          </svg>
+          🤖
         </button>
         <button
           className="mobile-floating-btn image-btn"
           onClick={() => setIsMobileImageEditorOpen(true)}
           title="Image Editor"
         >
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ transform: 'scale(1.2)' }}>
-            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
-          </svg>
+          ✏️
         </button>
         <button
           className="mobile-floating-btn profile-btn"
           onClick={() => setIsMobileProfilePopupOpen(true)}
           title="Profile"
         >
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ transform: 'scale(1.2)' }}>
-            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-          </svg>
+          👤
         </button>
         <button
           className="mobile-floating-btn manual-btn"
           onClick={() => setIsMobileManualOpen(true)}
           title="Manual"
         >
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ transform: 'scale(1.2)' }}>
-            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-            <path d="M8 7h8M8 11h8M8 15h6" stroke="#1a1a2e" strokeWidth="1.5"/>
-          </svg>
+          📚
         </button>
       </div>
 

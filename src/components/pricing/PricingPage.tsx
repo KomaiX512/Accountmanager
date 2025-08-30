@@ -1,280 +1,157 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import UserService from '../../services/UserService';
-import { PricingPlan, User } from '../../types/user';
-import { 
-  FiTarget, 
-  FiStar, 
-  FiHome, 
-  FiPackage,
-  FiRepeat,
-  FiZap,
-  FiCpu,
-  FiBarChart,
-  FiLifeBuoy,
-  FiEdit3,
-  FiMessageCircle,
-  FiSettings,
-  FiClock,
-  FiTag,
-  FiShield,
-  FiGift,
-  FiCheck,
-  FiArrowRight,
-  FiUsers,
-  FiTrendingUp,
-  FiAward
-} from 'react-icons/fi';
+import React from 'react';
 import './PricingPage.css';
-import PrivacyPolicyFooter from '../common/PrivacyPolicyFooter';
 
 const PricingPage: React.FC = () => {
-  const { currentUser } = useAuth();
-  const navigate = useNavigate();
-  const [userData, setUserData] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
-
-  useEffect(() => {
-    const loadUserData = async () => {
-      if (currentUser?.uid) {
-        try {
-          const user = await UserService.getUserData(currentUser.uid);
-          setUserData(user);
-        } catch (error) {
-          console.error('Error loading user data:', error);
-        }
-      }
-      setLoading(false);
-    };
-
-    loadUserData();
-  }, [currentUser]);
-
-  const handlePlanSelect = async (planId: string) => {
-    if (!currentUser?.uid) {
-      navigate('/login');
-      return;
-    }
-
-    setSelectedPlan(planId);
-
-    // For enterprise plan, show contact info
-    if (planId === 'enterprise') {
-      alert('Please contact us at support@accountmanager.com for enterprise pricing and setup.');
-      setSelectedPlan(null);
-      return;
-    }
-
-    // For now, we'll simulate the upgrade process
-    // In production, this would integrate with the payment gateway
-    try {
-      // TODO: Integrate with payment gateway here
-      console.log(`Selected plan: ${planId} for user: ${currentUser.uid}`);
-      
-      // For demo purposes, show success message
-      alert(`Plan ${planId} selected! Payment gateway integration will be added soon.`);
-    } catch (error) {
-      console.error('Error selecting plan:', error);
-      alert('Error selecting plan. Please try again.');
-    } finally {
-      setSelectedPlan(null);
-    }
-  };
-
-  const getPlanIcon = (planId: string) => {
-    switch (planId) {
-      case 'basic':
-        return <FiTarget size={24} />;
-      case 'premium':
-        return <FiStar size={24} />;
-      case 'enterprise':
-        return <FiHome size={24} />;
-      default:
-        return <FiPackage size={24} />;
-    }
-  };
-
-  const getFeatureIcon = (feature: string) => {
-    if (feature.includes('Unlimited')) return <FiRepeat size={16} />;
-    if (feature.includes('Auto')) return <FiZap size={16} />;
-    if (feature.includes('AI')) return <FiCpu size={16} />;
-    if (feature.includes('Analytics')) return <FiBarChart size={16} />;
-    if (feature.includes('Support')) return <FiLifeBuoy size={16} />;
-    if (feature.includes('Posts')) return <FiEdit3 size={16} />;
-    if (feature.includes('Discussions')) return <FiMessageCircle size={16} />;
-    if (feature.includes('Campaigns')) return <FiTarget size={16} />;
-    if (feature.includes('Custom')) return <FiSettings size={16} />;
-    if (feature.includes('Priority')) return <FiZap size={16} />;
-    if (feature.includes('White-label')) return <FiTag size={16} />;
-    if (feature.includes('SLA')) return <FiShield size={16} />;
-    return <FiCheck size={16} />;
-  };
-
-  const currentPlan = userData?.subscription?.planId;
-  const isTrialActive = userData?.isTrialActive;
-  const trialDaysRemaining = userData?.subscription?.trialDaysRemaining;
-
-  if (loading) {
-    return (
-      <div className="pricing-page">
-        <div className="pricing-loading">
-          <div className="loading-spinner"></div>
-          <p>Loading pricing information...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="pricing-page">
       {/* Hero Section */}
-      <div className="pricing-hero">
+      <section className="pricing-hero">
         <div className="hero-content">
-          <h1>Start for free.</h1>
-          <h2>Start the savings.</h2>
-          <p>Whether you're a startup, global enterprise, or somewhere in between, our AI-powered social media management is designed to save you time and money.</p>
-          
-          {isTrialActive && trialDaysRemaining && (
-            <div className="trial-badge">
-              <span className="trial-icon"><FiClock size={16} /></span>
-              <span>{trialDaysRemaining} days left in your free trial</span>
-            </div>
-          )}
+          <h1>Choose Your Plan</h1>
+          <h2>Unlock the Power of AI-Driven Social Media Management</h2>
+          <p>
+            Transform your social media presence with our comprehensive suite of tools. 
+            From content creation to analytics, we've got everything you need to succeed.
+          </p>
+          <div className="trial-badge">
+            <span>🚀</span>
+            <span>7-Day Free Trial Available</span>
+          </div>
         </div>
-      </div>
+      </section>
 
       {/* Pricing Cards */}
-      <div className="pricing-container">
-        {UserService.PRICING_PLANS.map((plan: PricingPlan) => (
-          <div 
-            key={plan.id}
-            className={`pricing-card ${plan.popular ? 'popular' : ''} ${currentPlan === plan.id ? 'current' : ''}`}
-          >
-            {plan.popular && (
-              <div className="popular-badge">
-                <FiAward size={14} />
-                <span>Most Popular</span>
-              </div>
-            )}
-            {currentPlan === plan.id && (
-              <div className="current-badge">
-                <FiCheck size={14} />
-                <span>Current Plan</span>
-              </div>
-            )}
-            
-            <div className="plan-header">
-              <div className="plan-icon">{getPlanIcon(plan.id)}</div>
-              <h3>{plan.name}</h3>
-              <div className="plan-price">
-                <span className="price">{plan.price}</span>
-                <span className="period">{plan.period}</span>
-              </div>
-              <p className="plan-description">{plan.description}</p>
+      <section className="pricing-container">
+        {/* Starter Plan */}
+        <div className="pricing-card">
+          <div className="plan-header">
+            <div className="plan-icon">
+              <i className="fas fa-rocket"></i>
             </div>
-
-            <div className="plan-features">
-              <h4>Key features:</h4>
-              <ul>
-                {plan.features.map((feature, index) => (
-                  <li key={index}>
-                    <span className="feature-icon">{getFeatureIcon(feature)}</span>
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
+            <h3>Starter</h3>
+            <div className="plan-price">
+              <span className="price">$29</span>
+              <span className="period">/month</span>
             </div>
-
-            <div className="plan-action">
-              {plan.contactUs ? (
-                <button 
-                  className="btn-contact"
-                  onClick={() => handlePlanSelect(plan.id)}
-                >
-                  Contact Sales
-                  <FiArrowRight size={16} />
-                </button>
-              ) : currentPlan === plan.id ? (
-                <button className="btn-current" disabled>
-                  <FiCheck size={16} />
-                  Current Plan
-                </button>
-              ) : (
-                <button 
-                  className={`btn-select ${plan.popular ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => handlePlanSelect(plan.id)}
-                  disabled={selectedPlan === plan.id}
-                >
-                  {selectedPlan === plan.id ? (
-                    <>
-                      <span className="btn-spinner"></span>
-                      Processing...
-                    </>
-                  ) : plan.id === 'basic' ? (
-                    <>
-                      Get started for free
-                      <FiArrowRight size={16} />
-                    </>
-                  ) : (
-                    <>
-                      Get started for free
-                      <FiArrowRight size={16} />
-                    </>
-                  )}
-                </button>
-              )}
-            </div>
-
-            {plan.trialDays && (
-              <div className="trial-info">
-                <small><FiGift size={14} /> {plan.trialDays}-day free trial included</small>
-              </div>
-            )}
+            <p className="plan-description">Perfect for individuals and small businesses getting started</p>
           </div>
-        ))}
-      </div>
+
+          <div className="plan-features">
+            <h4>What's Included</h4>
+            <ul>
+              <li><span className="feature-icon">✓</span>Up to 3 social media accounts</li>
+              <li><span className="feature-icon">✓</span>50 AI-generated posts per month</li>
+              <li><span className="feature-icon">✓</span>Basic analytics dashboard</li>
+              <li><span className="feature-icon">✓</span>Content scheduling</li>
+              <li><span className="feature-icon">✓</span>Email support</li>
+            </ul>
+          </div>
+
+          <div className="plan-action">
+            <a href="#" className="btn-select btn-secondary">Get Started</a>
+            <p className="trial-info">7-day free trial included</p>
+          </div>
+        </div>
+
+        {/* Professional Plan */}
+        <div className="pricing-card popular">
+          <div className="popular-badge">Most Popular</div>
+          <div className="plan-header">
+            <div className="plan-icon">
+              <i className="fas fa-star"></i>
+            </div>
+            <h3>Professional</h3>
+            <div className="plan-price">
+              <span className="price">$79</span>
+              <span className="period">/month</span>
+            </div>
+            <p className="plan-description">Ideal for growing businesses and marketing teams</p>
+          </div>
+
+          <div className="plan-features">
+            <h4>Everything in Starter, plus</h4>
+            <ul>
+              <li><span className="feature-icon">✓</span>Up to 10 social media accounts</li>
+              <li><span className="feature-icon">✓</span>200 AI-generated posts per month</li>
+              <li><span className="feature-icon">✓</span>Advanced analytics & insights</li>
+              <li><span className="feature-icon">✓</span>Competitor analysis</li>
+              <li><span className="feature-icon">✓</span>Team collaboration tools</li>
+              <li><span className="feature-icon">✓</span>Priority support</li>
+            </ul>
+          </div>
+
+          <div className="plan-action">
+            <a href="#" className="btn-select btn-primary">Choose Professional</a>
+            <p className="trial-info">7-day free trial included</p>
+          </div>
+        </div>
+
+        {/* Enterprise Plan */}
+        <div className="pricing-card">
+          <div className="plan-header">
+            <div className="plan-icon">
+              <i className="fas fa-building"></i>
+            </div>
+            <h3>Enterprise</h3>
+            <div className="plan-price">
+              <span className="price">Custom</span>
+              <span className="period"></span>
+            </div>
+            <p className="plan-description">Tailored solutions for large organizations</p>
+          </div>
+
+          <div className="plan-features">
+            <h4>Everything in Professional, plus</h4>
+            <ul>
+              <li><span className="feature-icon">✓</span>Unlimited social media accounts</li>
+              <li><span className="feature-icon">✓</span>Unlimited AI-generated content</li>
+              <li><span className="feature-icon">✓</span>Custom integrations</li>
+              <li><span className="feature-icon">✓</span>Dedicated account manager</li>
+              <li><span className="feature-icon">✓</span>Advanced security features</li>
+              <li><span className="feature-icon">✓</span>24/7 phone support</li>
+            </ul>
+          </div>
+
+          <div className="plan-action">
+            <a href="#" className="btn-contact">Contact Sales</a>
+            <p className="trial-info">Custom pricing available</p>
+          </div>
+        </div>
+      </section>
 
       {/* FAQ Section */}
-      <div className="pricing-faq">
+      <section className="pricing-faq">
         <h2>Frequently Asked Questions</h2>
         <div className="faq-grid">
           <div className="faq-item">
             <h3>Can I change my plan anytime?</h3>
-            <p>Yes, you can upgrade or downgrade your plan at any time. Changes take effect immediately.</p>
+            <p>Yes, you can upgrade or downgrade your plan at any time. Changes will be reflected in your next billing cycle.</p>
           </div>
           <div className="faq-item">
-            <h3>What happens after my trial ends?</h3>
-            <p>Your account will be automatically converted to a free plan with limited features unless you upgrade.</p>
+            <h3>Is there a free trial?</h3>
+            <p>All plans come with a 7-day free trial. No credit card required to get started.</p>
           </div>
           <div className="faq-item">
-            <h3>Do you offer refunds?</h3>
-            <p>Yes, we offer a 30-day money-back guarantee for all paid plans.</p>
+            <h3>What payment methods do you accept?</h3>
+            <p>We accept all major credit cards, PayPal, and bank transfers for Enterprise customers.</p>
           </div>
           <div className="faq-item">
-            <h3>Is my data secure?</h3>
-            <p>Absolutely. We use enterprise-grade security and encryption to protect your data.</p>
+            <h3>Can I cancel anytime?</h3>
+            <p>Yes, you can cancel your subscription at any time. Your account will remain active until the end of your billing period.</p>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* CTA Section */}
-      <div className="pricing-cta">
+      <section className="pricing-cta">
         <div className="cta-content">
-          <h2>Time is money. Save both.</h2>
-          <p>Join thousands of businesses simplifying their social media management with AI.</p>
-          <button className="btn-cta">
-            Get started for free
-            <FiArrowRight size={18} />
-          </button>
+          <h2>Ready to Get Started?</h2>
+          <p>Join thousands of businesses already using our platform to grow their social media presence.</p>
+          <a href="#" className="btn-cta">Start Your Free Trial</a>
         </div>
-      </div>
-      
-      {/* Privacy Policy Footer */}
-      <PrivacyPolicyFooter />
+      </section>
     </div>
   );
 };
 
-export default PricingPage; 
+export default PricingPage;

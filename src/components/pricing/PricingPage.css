@@ -1,4 +1,4 @@
-/* PREMIUM PRICING PAGE - MAINDASHBOARD VPS-COMPATIBLE APPROACH */
+/* PREMIUM PRICING PAGE - MAINDASHBOARD VPS-COMPATIBLE ARCHITECTURE */
 .pricing-page {
   min-height: 100vh;
   padding: 80px 20px 20px;
@@ -12,7 +12,7 @@
   color: rgba(255, 255, 255, 0.95);
 }
 
-/* Premium Hero Section - MainDashboard Style */
+/* Premium Hero Section - MainDashboard Glass Style */
 .pricing-hero {
   max-width: 1200px;
   margin: 0 auto 40px;
@@ -192,6 +192,7 @@
   justify-content: center;
   transition: all 0.3s ease;
   box-shadow: 0 4px 12px rgba(0, 255, 204, 0.2);
+  font-size: 1.5rem;
 }
 
 .pricing-card:hover .plan-icon {
@@ -356,86 +357,94 @@
 
 .trial-info {
   text-align: center;
-  color: #999999;
-  font-weight: normal;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 400;
   font-size: 0.8rem;
+  margin-top: 8px;
 }
 
-/* FAQ Section */
+/* Premium FAQ Section - MainDashboard Glass Style */
 .pricing-faq {
-  max-width: 1000px;
+  max-width: 1200px;
   margin: 80px auto;
-  padding: 60px 20px;
-  background: #111111;
-  border: 1px solid #333333;
+  padding: 60px 32px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
   border-radius: 20px;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+  box-sizing: border-box;
 }
 
 .pricing-faq h2 {
   text-align: center;
-  color: #ffffff;
+  color: rgba(255, 255, 255, 0.9);
   font-size: 2rem;
-  font-weight: bold;
+  font-weight: 600;
   margin-bottom: 48px;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
 }
 
 .faq-grid {
-  display: block;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
 }
 
-@media (min-width: 600px) {
+@media (min-width: 768px) {
   .faq-grid {
-    display: table;
-    width: 100%;
-    table-layout: fixed;
-  }
-  
-  .faq-item {
-    display: table-cell;
-    width: 50%;
-    vertical-align: top;
-    padding-right: 20px;
-  }
-  
-  .faq-item:nth-child(even) {
-    padding-right: 0;
-    padding-left: 20px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
   }
 }
 
 .faq-item {
   padding: 24px;
-  background: #0a0a0a;
-  border: 1px solid #333333;
-  border-radius: 12px;
-  margin-bottom: 24px;
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 
+    0 6px 24px rgba(0, 0, 0, 0.1),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+  box-sizing: border-box;
 }
 
 .faq-item:hover {
-  background: #1a1a1a;
-  border-color: #666666;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 
+    0 12px 32px rgba(0, 0, 0, 0.15),
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
 }
 
 .faq-item h3 {
-  color: #ffffff;
+  color: rgba(255, 255, 255, 0.9);
   font-size: 1.1rem;
-  font-weight: bold;
+  font-weight: 600;
   margin-bottom: 12px;
+  letter-spacing: -0.02em;
 }
 
 .faq-item p {
-  color: #cccccc;
+  color: rgba(255, 255, 255, 0.8);
   line-height: 1.6;
   margin: 0;
   font-size: 0.95rem;
 }
 
-/* CTA Section */
+/* Premium CTA Section - MainDashboard Glass Style */
 .pricing-cta {
-  background: #111111;
-  padding: 80px 20px;
+  background: rgba(0, 255, 204, 0.05);
+  backdrop-filter: blur(20px);
+  padding: 80px 32px;
   text-align: center;
-  border-top: 1px solid #333333;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 0 1px rgba(0, 255, 204, 0.1) inset;
 }
 
 .cta-content {
@@ -445,51 +454,59 @@
 
 .cta-content h2 {
   font-size: 2.5rem;
-  font-weight: bold;
-  color: #ffffff;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
   margin-bottom: 16px;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
 }
 
 .cta-content p {
   font-size: 1.1rem;
-  color: #cccccc;
+  color: rgba(255, 255, 255, 0.8);
   margin-bottom: 32px;
   line-height: 1.6;
 }
 
 .btn-cta {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   padding: 16px 32px;
-  background: #00ffcc;
-  color: #000000;
+  background: linear-gradient(135deg, #00ffcc, #007bff);
+  color: #1a1a3a;
   border: none;
   border-radius: 12px;
   font-size: 1.1rem;
-  font-weight: bold;
+  font-weight: 600;
   cursor: pointer;
   text-decoration: none;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 8px 25px rgba(0, 255, 204, 0.3);
 }
 
 .btn-cta:hover {
-  background: #00d4aa;
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 12px 32px rgba(0, 255, 204, 0.4);
 }
 
-/* Loading State */
+/* Premium Loading State - MainDashboard Style */
 .pricing-loading {
-  display: block;
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   padding: 50px 20px;
   min-height: 50vh;
-  color: white;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .loading-spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid #333333;
+  border: 3px solid rgba(255, 255, 255, 0.1);
   border-top: 3px solid #00ffcc;
   border-radius: 50%;
-  margin: 0 auto 16px;
+  margin-bottom: 16px;
   animation: spin 1s linear infinite;
 }
 
@@ -498,27 +515,89 @@
   100% { transform: rotate(360deg); }
 }
 
-/* Mobile Responsive */
-@media (max-width: 799px) {
-  .hero-content h1 {
-    font-size: 2.5rem;
-  }
-  
-  .hero-content h2 {
-    font-size: 1.8rem;
-  }
-  
-  .pricing-container {
-    padding: 40px 20px;
-  }
-  
-  .pricing-card {
-    margin-bottom: 32px;
+/* Premium Mobile Responsive - MainDashboard Breakpoints */
+@media (max-width: 1200px) {
+  .pricing-hero {
     padding: 32px 24px;
   }
   
-  .plan-header h3 {
-    font-size: 1.3rem;
+  .pricing-container {
+    padding: 32px 16px;
+  }
+}
+
+@media (max-width: 900px) {
+  .pricing-container {
+    grid-template-columns: 1fr;
+    max-width: 600px;
+    gap: 24px;
+  }
+  
+  .pricing-card {
+    padding: 28px;
+  }
+}
+
+@media (max-width: 768px) {
+  .pricing-hero {
+    margin-bottom: 32px;
+  }
+  
+  .hero-content h1 {
+    font-size: 2.8rem;
+    margin-bottom: 6px;
+  }
+  
+  .hero-content h2 {
+    font-size: 2rem;
+    margin-bottom: 20px;
+  }
+  
+  .hero-content p {
+    font-size: 1.1rem;
+    margin-bottom: 28px;
+  }
+}
+
+@media (max-width: 480px) {
+  .pricing-page {
+    padding: 60px 16px 16px;
+  }
+  
+  .pricing-hero {
+    padding: 24px 20px;
+  }
+  
+  .pricing-container {
+    padding: 24px 16px;
+    gap: 20px;
+  }
+  
+  .pricing-card {
+    padding: 24px 20px;
+  }
+  
+  .popular-badge,
+  .current-badge {
+    width: 100px;
+    margin-left: -50px;
+    padding: 6px 12px;
+    font-size: 0.75rem;
+  }
+  
+  .btn-select,
+  .btn-contact,
+  .btn-current {
+    padding: 14px 20px;
+    font-size: 0.95rem;
+  }
+  
+  .hero-content h1 {
+    font-size: 2.2rem;
+  }
+  
+  .hero-content h2 {
+    font-size: 1.6rem;
   }
   
   .price {
@@ -543,29 +622,34 @@
   }
 }
 
-@media (max-width: 480px) {
+/* Enhanced VPS Compatibility - No Advanced CSS */
+@supports not (backdrop-filter: blur(10px)) {
+  .pricing-hero,
+  .pricing-card,
+  .pricing-faq,
+  .faq-item,
+  .pricing-cta {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  
   .pricing-hero {
-    padding: 60px 16px 40px;
-  }
-  
-  .hero-content h1 {
-    font-size: 2rem;
-  }
-  
-  .hero-content h2 {
-    font-size: 1.5rem;
-  }
-  
-  .pricing-container {
-    padding: 32px 16px;
+    background: rgba(17, 17, 17, 0.95);
   }
   
   .pricing-card {
-    padding: 24px 20px;
+    background: rgba(17, 17, 17, 0.9);
   }
   
-  .btn-select, .btn-contact, .btn-current {
-    padding: 14px 20px;
-    font-size: 0.9rem;
+  .pricing-faq {
+    background: rgba(17, 17, 17, 0.95);
+  }
+  
+  .faq-item {
+    background: rgba(10, 10, 10, 0.8);
+  }
+  
+  .pricing-cta {
+    background: rgba(0, 26, 26, 0.9);
   }
 }

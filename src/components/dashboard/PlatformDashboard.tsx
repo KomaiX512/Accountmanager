@@ -2618,7 +2618,7 @@ Image Description: ${response.post.image_prompt}
       >
         <div className="welcome-header">
           <h1 className="welcome-text">
-            Welcome {profileInfo?.fullName || accountHolder}!
+            Welcome {accountHolder}!
           </h1>
           <div className="welcome-subtext-container" style={{ position: 'relative', minHeight: '48px' }}>
             <motion.p 
@@ -2685,7 +2685,7 @@ Image Description: ${response.post.image_prompt}
                       ) : (
                         <div className="profile-pic-bar">
                           <div className="profile-pic-fallback">
-                            {profileInfo?.fullName ? profileInfo.fullName.charAt(0).toUpperCase() : accountHolder.charAt(0).toUpperCase()}
+                            {accountHolder.charAt(0).toUpperCase()}
                           </div>
                         </div>
                       )}

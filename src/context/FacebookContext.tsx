@@ -43,7 +43,8 @@ export const FacebookProvider: React.FC<FacebookProviderProps> = ({ children }) 
       
       // Check localStorage first for immediate response
       const cachedPageId = localStorage.getItem(`facebook_page_id_${currentUser.uid}`);
-      const cachedUsername = localStorage.getItem(`facebook_username_${currentUser.uid}`);
+      // ✅ CRITICAL FIX: Use separate key for connected Facebook username to prevent dashboard username overwrite
+      const cachedUsername = localStorage.getItem(`facebook_connected_username_${currentUser.uid}`);
       
       if (cachedPageId) {
         setUserId(cachedPageId);
@@ -72,7 +73,8 @@ export const FacebookProvider: React.FC<FacebookProviderProps> = ({ children }) 
         // Cache the values
         localStorage.setItem(`facebook_page_id_${currentUser.uid}`, pageId);
         if (username) {
-          localStorage.setItem(`facebook_username_${currentUser.uid}`, username);
+          // ✅ CRITICAL FIX: Store connected Facebook username separately from dashboard username
+          localStorage.setItem(`facebook_connected_username_${currentUser.uid}`, username);
         }
         
         console.log(`[${new Date().toISOString()}] Updated Facebook connection:`, {
@@ -139,7 +141,8 @@ export const FacebookProvider: React.FC<FacebookProviderProps> = ({ children }) 
           
           // Also sync username and other data
           if (data.facebook_username) {
-            localStorage.setItem(`facebook_username_${currentUser.uid}`, data.facebook_username);
+            // ✅ CRITICAL FIX: Store connected Facebook username separately from dashboard username
+            localStorage.setItem(`facebook_connected_username_${currentUser.uid}`, data.facebook_username);
           }
           if (data.accountType) {
             localStorage.setItem(`facebook_account_type_${currentUser.uid}`, data.accountType);

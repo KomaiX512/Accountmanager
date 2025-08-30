@@ -40,6 +40,7 @@ const Facebook: React.FC = () => {
         
         if (hasAccessedInStorage) {
           // User has already accessed, try to get saved data from localStorage
+          // ✅ CRITICAL FIX: Dashboard username should remain unchanged for routing
           const savedUsername = localStorage.getItem(`facebook_username_${currentUser.uid}`);
           const savedAccountType = localStorage.getItem(`facebook_account_type_${currentUser.uid}`) as 'branding' | 'non-branding' || 'branding';
           const savedCompetitors = JSON.parse(localStorage.getItem(`facebook_competitors_${currentUser.uid}`) || '[]');
@@ -92,6 +93,7 @@ const Facebook: React.FC = () => {
               
               // ✅ CRITICAL FIX: Immediately sync to localStorage for cross-device sync
               localStorage.setItem(`facebook_accessed_${currentUser.uid}`, 'true');
+              // ✅ CRITICAL FIX: Keep dashboard username unchanged for routing
               localStorage.setItem(`facebook_username_${currentUser.uid}`, savedUsername);
               localStorage.setItem(`facebook_account_type_${currentUser.uid}`, savedAccountType);
               localStorage.setItem(`facebook_competitors_${currentUser.uid}`, JSON.stringify(savedCompetitors));
@@ -180,6 +182,7 @@ const Facebook: React.FC = () => {
           // Mirror to localStorage for instant consistency on this device
           try {
             localStorage.setItem(`facebook_accessed_${currentUser.uid}`, 'true');
+            // ✅ CRITICAL FIX: Keep dashboard username for routing, never overwrite with connected username
             localStorage.setItem(`facebook_username_${currentUser.uid}`, username);
             localStorage.setItem(`facebook_account_type_${currentUser.uid}`, accountType);
             localStorage.setItem(`facebook_competitors_${currentUser.uid}`, JSON.stringify(competitors || []));

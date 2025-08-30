@@ -4,7 +4,9 @@
 // Storage key prefixes
 export const FB_USER_ID_KEY_PREFIX = 'facebook_user_id_';
 export const FB_PAGE_ID_KEY_PREFIX = 'facebook_page_id_';
-export const FB_USERNAME_KEY_PREFIX = 'facebook_username_';
+// ✅ CRITICAL FIX: Separate connected username from dashboard username
+export const FB_CONNECTED_USERNAME_KEY_PREFIX = 'facebook_connected_username_';
+export const FB_USERNAME_KEY_PREFIX = 'facebook_username_'; // Dashboard username - never overwrite
 export const FB_TOKEN_KEY_PREFIX = 'facebook_token_';
 export const FB_DISCONNECTED_KEY_PREFIX = 'facebook_disconnected_';
 

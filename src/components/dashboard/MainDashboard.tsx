@@ -194,7 +194,8 @@ const MainDashboard: React.FC = () => {
                 
                 // Also sync username data if available
                 if (json.facebook_username) {
-                  localStorage.setItem(`facebook_username_${currentUser.uid}`, json.facebook_username);
+                  // ✅ CRITICAL FIX: Store connected Facebook username separately from dashboard username
+                  localStorage.setItem(`facebook_connected_username_${currentUser.uid}`, json.facebook_username);
                 }
                 if (json.accountType) {
                   localStorage.setItem(`facebook_account_type_${currentUser.uid}`, json.accountType);
@@ -998,7 +999,7 @@ const MainDashboard: React.FC = () => {
             console.log(`🔍 FACEBOOK LOCALSTORAGE DEBUG:`, {
               allFacebookKeys,
               facebook_accessed: localStorage.getItem(`facebook_accessed_${currentUser.uid}`),
-              facebook_username: localStorage.getItem(`facebook_username_${currentUser.uid}`),
+              facebook_username: localStorage.getItem(`facebook_connected_username_${currentUser.uid}`),
               facebook_account_type: localStorage.getItem(`facebook_account_type_${currentUser.uid}`)
             });
           }
@@ -1010,7 +1011,8 @@ const MainDashboard: React.FC = () => {
             
             // Also sync username and other data if available
             if (platformId === 'facebook' && data.facebook_username) {
-              localStorage.setItem(`facebook_username_${currentUser.uid}`, data.facebook_username);
+              // ✅ CRITICAL FIX: Store connected Facebook username separately from dashboard username
+              localStorage.setItem(`facebook_connected_username_${currentUser.uid}`, data.facebook_username);
               if (data.accountType) {
                 localStorage.setItem(`facebook_account_type_${currentUser.uid}`, data.accountType);
               }

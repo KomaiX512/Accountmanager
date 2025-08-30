@@ -318,7 +318,8 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
             JSON.stringify(confirmationData.competitor_data)
           );
         } catch {}
-        // Critical for dashboard routing: persist platform-scoped username used by App routing logic
+        // ✅ CRITICAL FIX: Dashboard username remains unchanged for routing
+        // This is the original dashboard username entered by user, never overwrite with connected page name
         localStorage.setItem(
           `facebook_username_${currentUser.uid}`,
           confirmationData.accountData.name

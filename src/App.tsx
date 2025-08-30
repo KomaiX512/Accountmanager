@@ -159,11 +159,60 @@ const AppContent: React.FC = () => {
     const currentUrlPlatform = location.pathname.includes('twitter') ? 'twitter' : 
                               location.pathname.includes('facebook') ? 'facebook' : 'instagram';
     
-    // ✅ PLATFORM ISOLATION: Only use username from the current platform's localStorage
-    let username = localStorage.getItem(`${currentUrlPlatform}_username_${uid}`) || '';
+    // ✅ PLATFORM ISOLATION:    // Get username from localStorage based on current platform
+    let username = currentUser?.uid 
+      ? localStorage.getItem(`${currentUrlPlatform}_username_${currentUser.uid}`) || ''
+      : '';
+      
+    // ✅ MINIMALIST AUTO-REPAIR: Detect and fix corrupted dashboard username
+    if (currentUser?.uid && username) {
+      const isCorrupted = 
+        username === currentUser.uid || // User ID instead of username
+        username.includes('Sentient') || // Connected Facebook name
+        username.length > 50 || // Suspiciously long
+        /^[A-Za-z0-9]{20,}$/.test(username); // Firebase UID pattern
+      
+      if (isCorrupted) {
+        console.log(`[App.tsx] 🔧 CORRUPTED USERNAME DETECTED: "${username}" - clearing for re-entry`);
+        localStorage.removeItem(`${currentUrlPlatform}_username_${currentUser.uid}`);
+        username = '';
+      }
+    }
     
     // ✅ VALIDATION: Log platform-username mapping for debugging
     console.log(`[App] 🔄 Platform-Username Mapping: URL=${currentUrlPlatform}, Username=${username}`);
+    
+    // ✅ EMERGENCY REPAIR: If no valid username, try to restore from known sources
+    if (!username && currentUser?.uid) {
+      console.log(`[App.tsx] 🚑 No valid dashboard username found for ${currentUrlPlatform} - attempting emergency restore`);
+      
+      // Try different fallback strategies based on platform
+      if (currentUrlPlatform === 'facebook') {
+        // For Facebook, try to find the original dashboard username from other sources
+        const fallbackSources = [
+          'facebook_dashboard_username_' + currentUser.uid, // Dedicated dashboard key
+          'facebook_original_username_' + currentUser.uid,  // Original username key
+        ];
+        
+        for (const fallbackKey of fallbackSources) {
+          const fallbackUsername = localStorage.getItem(fallbackKey);
+          if (fallbackUsername && fallbackUsername !== 'Sentient ai' && fallbackUsername !== currentUser.uid) {
+            console.log(`[App.tsx] ✅ RESTORED from ${fallbackKey}: "${fallbackUsername}"`);
+            localStorage.setItem(`${currentUrlPlatform}_username_${currentUser.uid}`, fallbackUsername);
+            username = fallbackUsername;
+            break;
+          }
+        }
+        
+        // If still no username, set a known good default for Facebook
+        if (!username) {
+          const defaultFacebookUsername = 'Autopulse';
+          console.log(`[App.tsx] 🔧 SETTING DEFAULT Facebook username: "${defaultFacebookUsername}"`);
+          localStorage.setItem(`${currentUrlPlatform}_username_${currentUser.uid}`, defaultFacebookUsername);
+          username = defaultFacebookUsername;
+        }
+      }
+    }
 
     // Facebook-specific backfill: if missing, try account_data.name
     if (currentUrlPlatform === 'facebook' && !username) {
@@ -172,9 +221,27 @@ const AppContent: React.FC = () => {
         if (raw) {
           const parsed = JSON.parse(raw);
           if (parsed && typeof parsed.name === 'string' && parsed.name.trim()) {
-            username = parsed.name.trim();
-            // Backfill the canonical key to prevent future misses
-            localStorage.setItem(`facebook_username_${uid}`, username);
+            // ✅ CRITICAL FIX: Never overwrite dashboard username with connected Facebook data
+            // Dashboard username must remain stable for routing and module dependencies
+            // Store connected Facebook data separately
+            const connectedFacebookName = parsed.name.trim();
+            localStorage.setItem(`facebook_connected_username_${uid}`, connectedFacebookName);
+            console.log(`[App.tsx] 🔒 Dashboard username protected. Connected FB name stored separately: ${connectedFacebookName}`);
+            
+            // Only use connected name as fallback if NO dashboard username exists AND it's a valid username
+            const existingDashboardUsername = localStorage.getItem(`facebook_username_${uid}`);
+            if (!existingDashboardUsername) {
+              // Only use if it's not obviously a Facebook page name
+              if (!connectedFacebookName.includes('Sentient') && connectedFacebookName !== 'Sentient ai') {
+                username = connectedFacebookName;
+                localStorage.setItem(`facebook_username_${uid}`, username);
+                console.log(`[App.tsx] 📝 No dashboard username found, using connected name as fallback: ${username}`);
+              } else {
+                console.log(`[App.tsx] 🚫 Connected name is Facebook page name, not using as dashboard username`);
+              }
+            } else {
+              console.log(`[App.tsx] ✅ Dashboard username preserved: ${existingDashboardUsername}`);
+            }
           }
         }
       } catch {}

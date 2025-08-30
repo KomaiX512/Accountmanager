@@ -1,26 +1,4 @@
-import React, { useState, us  // Map platform names to display names and colors
-  const platformConfig = {
-    instagram: {
-      name: 'Instagram',
-      color: '#E4405F',
-      icon: '/icons/instagram.svg'
-    },
-    facebook: {
-      name: 'Facebook', 
-      color: '#1877F2',
-      icon: '/icons/facebook.svg'
-    },
-    twitter: {
-      name: 'Twitter',
-      color: '#000000ff', 
-      icon: '/icons/twitter.svg'
-    },
-    general: {
-      name: 'Platform Activity',
-      color: '#6366f1',
-      icon: '/icons/activity.svg'
-    }
-  };act';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
 import './PlatformUsageChart.css';
@@ -62,7 +40,7 @@ const PlatformUsageChart: React.FC<PlatformUsageChartProps> = ({ className }) =>
     },
     twitter: {
       name: 'Twitter',
-      color: '#1DA1F2', 
+      color: '#000000ff', 
       icon: '/icons/twitter.svg'
     }
   };
@@ -78,35 +56,31 @@ const PlatformUsageChart: React.FC<PlatformUsageChartProps> = ({ className }) =>
       
       const data = response.data;
       
-      // Handle platform activity data intelligently
-      let processedPlatforms = { ...data.platforms };
-      
-      // If we only have 'account' data but no specific platform data, 
-      // it means the user's activity is stored under the main userId
-      // In this case, we should show it as general platform activity instead of hiding it
-      const specificPlatforms = Object.keys(processedPlatforms).filter(p => p !== 'account');
-      
-      if (specificPlatforms.length === 0 && processedPlatforms.account) {
-        // Only account data exists - this represents real user activity
-        // Show as general activity instead of hiding it completely
-        processedPlatforms.general = processedPlatforms.account;
-        delete processedPlatforms.account;
-      } else if (specificPlatforms.length > 0 && processedPlatforms.account) {
-        // We have both specific platform data and account data
-        // Remove account to avoid duplication since specific platforms are more accurate
-        delete processedPlatforms.account;
+      // Filter out 'account' platform since it represents general account activity, not actual Twitter usage
+      // Only show actual social media platform usage (instagram, facebook, twitter)
+      const filteredPlatforms = { ...data.platforms };
+      if (filteredPlatforms.account) {
+        delete filteredPlatforms.account;
       }
       
-      // Recalculate total activity and percentages
-      const filteredTotal = Object.values(processedPlatforms).reduce((sum: number, platform: any) => sum + platform.count, 0);
+      // Recalculate total activity and percentages without account platform
+      const filteredTotal = Object.values(filteredPlatforms).reduce((sum: number, platform: any) => sum + platform.count, 0);
       
       // Recalculate percentages based on filtered total
       const recalculatedPlatforms: Record<string, PlatformUsageData> = {};
-      for (const [platform, data] of Object.entries(processedPlatforms)) {
+      for (const [platform, data] of Object.entries(filteredPlatforms)) {
         const platformData = data as PlatformUsageData;
         recalculatedPlatforms[platform] = {
           count: platformData.count,
           percentage: filteredTotal > 0 ? Math.round((platformData.count / filteredTotal) * 100) : 0
+        };
+      }
+      
+      // Add Twitter with 0 usage if not present
+      if (!recalculatedPlatforms.twitter) {
+        recalculatedPlatforms.twitter = {
+          count: 0,
+          percentage: 0
         };
       }
       
@@ -147,7 +121,7 @@ const PlatformUsageChart: React.FC<PlatformUsageChartProps> = ({ className }) =>
   const getSortedPlatforms = () => {
     return Object.entries(platformUsage)
       .sort(([, a], [, b]) => b.count - a.count) // Sort by usage count descending
-      .filter(([, data]) => data.count >= 0); // Show all platforms (including 0 if needed)
+      .filter(([, data]) => data.count > 0); // Only show platforms with usage
   };
 
   if (isLoading) {

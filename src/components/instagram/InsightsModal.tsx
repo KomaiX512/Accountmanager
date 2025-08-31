@@ -114,8 +114,7 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
           ? `/api/user-facebook-status/${currentUser.uid}`
           : `/api/user-instagram-status/${currentUser.uid}`;
         
-        // Add 10-second timeout to avoid hanging forever
-        const response = await axios.get(statusEndpoint, { timeout: 10000 });
+        const response = await axios.get(statusEndpoint);
         const username = platform === 'twitter' 
           ? response.data.twitter_username 
           : platform === 'facebook'
@@ -162,10 +161,8 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
           `[${new Date().toISOString()}] Fetching statistical analysis for ${platform} user: ${accountUsername}`
         );
 
-        // Add a 15-second timeout so the UI never hangs indefinitely
         const response = await axios.get(
-          `/api/profit-analysis/${accountUsername}?platform=${platform}`,
-          { timeout: 15000 }
+          `/api/profit-analysis/${accountUsername}?platform=${platform}`
         );
 
         setProfitAnalysis(response.data);
@@ -179,10 +176,8 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
           err
         );
         const message =
-          err.code === 'ECONNABORTED'
-            ? 'Statistical analysis request timed out. Please try again later.'
-            : err.response?.data?.message ||
-              'No statistical analysis data available for this account.';
+          err.response?.data?.message ||
+          'No statistical analysis data available for this account.';
         setAnalysisError(message);
       } finally {
         setAnalysisLoading(false);

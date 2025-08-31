@@ -847,7 +847,7 @@ const Processing: React.FC = () => {
     }
   };
 
-  // Helper to initialize or read local timer (2 min default) and ensure storage consistency
+  // Helper to initialize or read local timer (15 min default) and ensure storage consistency
 const getOrInitLocalTimer = (plat: string) => {
   const countdownKey = `${plat}_processing_countdown`;
   const infoKey = `${plat}_processing_info`;
@@ -856,8 +856,8 @@ const getOrInitLocalTimer = (plat: string) => {
   let infoRaw = localStorage.getItem(infoKey);
   let endTime = endTimeRaw ? parseInt(endTimeRaw, 10) : NaN;
   if (!endTime || Number.isNaN(endTime) || endTime < now) {
-    // Initialize new 2 minute window (reduced from 15 for testing)
-    endTime = now + 2 * 60 * 1000;
+    // Initialize new 15 minute window
+    endTime = now + 15 * 60 * 1000;
     localStorage.setItem(countdownKey, endTime.toString());
   }
   if (!infoRaw) {

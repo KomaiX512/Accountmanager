@@ -3,9 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 /**
  * PLATFORM TIMING CONFIGURATION:
- * - Facebook: 2 minutes initial setup (reduced from 20 for testing)
- * - Instagram: 2 minutes initial setup (reduced from 15 for testing)
- * - Twitter: 2 minutes initial setup (reduced from 15 for testing)
+ * - Facebook: 20 minutes initial setup
+ * - Instagram: 15 minutes initial setup  
+ * - Twitter: 15 minutes initial setup
  * - All platforms: 5 minutes extension when running statistics not found
  * 
  * The component automatically detects whether it's an initial setup or extension
@@ -71,7 +71,7 @@ const PLATFORM_CONFIGS: Record<string, PlatformConfigType> = {
     primaryColor: '#e4405f',
     secondaryColor: '#00ffcc',
     icon: <FaInstagram />,
-    initialMinutes: 2, // Instagram gets 2 minutes initially (reduced from 15 for testing)
+    initialMinutes: 15, // Instagram gets 15 minutes initially
     extensionMinutes: 5  // 5 minutes extension for all platforms
   },
   twitter: {
@@ -79,7 +79,7 @@ const PLATFORM_CONFIGS: Record<string, PlatformConfigType> = {
     primaryColor: '#000000',
     secondaryColor: '#ffffff',
     icon: <FaTwitter />,
-    initialMinutes: 2, // Twitter gets 2 minutes initially (reduced from 15 for testing)
+    initialMinutes: 15, // Twitter gets 15 minutes initially
     extensionMinutes: 5  // 5 minutes extension for all platforms
   },
   facebook: {
@@ -87,7 +87,7 @@ const PLATFORM_CONFIGS: Record<string, PlatformConfigType> = {
     primaryColor: '#1877f2',
     secondaryColor: '#42a5f5',
     icon: <FaFacebook />,
-    initialMinutes: 2, // Facebook gets 2 minutes initially (reduced from 20 for testing)
+    initialMinutes: 20, // Facebook gets 20 minutes initially
     extensionMinutes: 5  // 5 minutes extension for all platforms
   }
 };
@@ -98,7 +98,7 @@ const DEFAULT_PLATFORM_CONFIG: PlatformConfigType = {
   primaryColor: '#666666',
   secondaryColor: '#cccccc',
   icon: <BsLightningChargeFill />,
-  initialMinutes: 2, // Default to 2 minutes (reduced from 15 for testing)
+  initialMinutes: 15, // Default to 15 minutes
   extensionMinutes: 5  // Default extension time
 };
 

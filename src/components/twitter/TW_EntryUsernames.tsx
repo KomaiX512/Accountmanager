@@ -293,7 +293,7 @@ const usernameCheckUrl = '/api/check-username-availability';
         showMessage('Submission successful', 'success');
         
         // Start the processing phase using unified ProcessingContext
-        startProcessing('twitter', confirmationData.username, 2); // 2 minutes duration (reduced from 15)
+        startProcessing('twitter', confirmationData.username, 15); // 15 minutes duration
       }
     } catch (error: any) {
       console.error('Error submitting data:', error);

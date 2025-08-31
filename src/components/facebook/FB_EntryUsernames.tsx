@@ -329,7 +329,7 @@ const FB_EntryUsernames: React.FC<FB_EntryUsernamesProps> = ({
         showMessage('Submission successful', 'success');
         
         // Start the processing phase using unified ProcessingContext
-        startProcessing('facebook', confirmationData.accountData.name, 2); // 2 minutes duration (reduced from 20)
+        startProcessing('facebook', confirmationData.accountData.name, 20); // 20 minutes duration
       }
     } catch (error: any) {
       console.error('Error submitting Facebook data:', error);

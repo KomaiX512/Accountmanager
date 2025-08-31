@@ -2348,7 +2348,13 @@ app.get(['/profile-info/:username', '/api/profile-info/:username'], async (req, 
       usernameVariants.push(parsedUsername);
     }
     
-    // Variant 3: Remove @ prefix if present
+    // Variant 3: Lowercase variant (especially important for Twitter where case might differ)
+    const lowercaseUsername = parsedUsername.toLowerCase().trim();
+    if (!usernameVariants.includes(lowercaseUsername)) {
+      usernameVariants.push(lowercaseUsername);
+    }
+    
+    // Variant 4: Remove @ prefix if present
     if (parsedUsername.startsWith('@')) {
       const withoutAt = parsedUsername.substring(1);
       const normalizedWithoutAt = platformConfig.normalizeUsername(withoutAt);
@@ -2357,6 +2363,11 @@ app.get(['/profile-info/:username', '/api/profile-info/:username'], async (req, 
       }
       if (!usernameVariants.includes(withoutAt)) {
         usernameVariants.push(withoutAt);
+      }
+      // Also add lowercase variant without @
+      const lowercaseWithoutAt = withoutAt.toLowerCase().trim();
+      if (!usernameVariants.includes(lowercaseWithoutAt)) {
+        usernameVariants.push(lowercaseWithoutAt);
       }
     }
     

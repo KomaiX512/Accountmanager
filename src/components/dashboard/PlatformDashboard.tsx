@@ -276,6 +276,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const reconnectAttempts = useRef(0);
   const lastProfilePicRenderTimeRef = useRef<number>(0);
   const imageRetryAttemptsRef = useRef(0);
+  const lastProfileFetchRef = useRef<{[key: string]: number}>({});
   // Prevent redundant Facebook fallback attempts & log spam
   const facebookProfileFallbackTriedRef = useRef(false);
 
@@ -356,8 +357,24 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     }
   }, [accountHolder, platform, accountType, competitors]);
 
-  const fetchProfileInfo = useCallback(async (retryCount = 0) => {
+  const fetchProfileInfo = useCallback(async (retryCount = 0, forceRefresh = false) => {
     const maxRetries = 3;
+    const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // Cache for 1 day (24 hours) to prevent excessive API calls
+    const cacheKey = `${platform}_${accountHolder}`;
+    const now = Date.now();
+    
+    // Check cache unless force refresh is requested
+    if (!forceRefresh && lastProfileFetchRef.current[cacheKey]) {
+      const timeSinceLastFetch = now - lastProfileFetchRef.current[cacheKey];
+      if (timeSinceLastFetch < CACHE_DURATION_MS) {
+        console.log(`[PlatformDashboard] 🚀 Skipping profile fetch for ${platform}/${accountHolder} (cached for ${Math.round(timeSinceLastFetch/1000/60/60)}h)`);
+        return;
+      }
+    }
+    
+    // Update cache timestamp
+    lastProfileFetchRef.current[cacheKey] = now;
+    
     setProfileLoading(true);
     setProfileError(null);
     
@@ -460,8 +477,8 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     
     console.log(`[PlatformDashboard] 🔄 Refreshing data for ${platform}`);
     refreshAllData();
-    fetchProfileInfo();
-  }, [platform, accountHolder, refreshAllData, fetchProfileInfo]);
+    fetchProfileInfo(0, true); // Force refresh when user manually refreshes
+  }, [platform, accountHolder, refreshAllData]); // Removed fetchProfileInfo from dependencies to avoid circular dependency
 
   // ✅ BULLET-PROOF F5 INTEGRATION: Simple hook usage
   useDashboardRefresh({
@@ -492,9 +509,9 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     
     // Force immediate profile fetch for new platform
     if (accountHolder && platform) {
-      fetchProfileInfo();
+      fetchProfileInfo(0, true); // Force refresh when switching platforms
     }
-  }, [platform, accountHolder, fetchProfileInfo]);
+  }, [platform, accountHolder]); // Removed fetchProfileInfo from dependencies to avoid circular dependency
 
   // ✅ CLEANUP: Reset state when component unmounts
   useEffect(() => {
@@ -1132,12 +1149,23 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   }, [isLoading, platform, igUserId, twitterId, facebookPageId]);
 
   useEffect(() => {
+    let lastFocusTime = 0;
+    const FOCUS_THROTTLE_MS = 60 * 60 * 1000; // Only refresh on focus if 1 hour has passed (consistent with 1-day cache)
+    
     const handleFocus = () => {
       if (document.visibilityState === 'visible') {
-        // Refresh data when user returns to the tab
-        if (accountHolder) {
-          refreshAllData();
-          fetchProfileInfo();
+        const now = Date.now();
+        // Only refresh if enough time has passed since last focus refresh
+        if (now - lastFocusTime > FOCUS_THROTTLE_MS) {
+          lastFocusTime = now;
+          // Refresh data when user returns to the tab after being away
+          if (accountHolder) {
+            console.log(`[PlatformDashboard] 👁️ User returned to tab after ${FOCUS_THROTTLE_MS/1000/60}m+ - refreshing data`);
+            refreshAllData();
+            fetchProfileInfo(0, true); // Force refresh when user returns to tab after long absence
+          }
+        } else {
+          console.log(`[PlatformDashboard] 👁️ User returned to tab but skipping refresh (throttled)`);
         }
       }
     };
@@ -1149,7 +1177,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       document.removeEventListener('visibilitychange', handleFocus);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [accountHolder]);
+  }, [accountHolder]); // Removed refreshAllData and fetchProfileInfo from dependencies
 
   // Modern Toast auto-dismiss
   useEffect(() => {

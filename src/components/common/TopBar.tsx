@@ -5,6 +5,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import UserDropdown from '../auth/UserDropdown';
 import { useAuth } from '../../context/AuthContext';
 import PlatformButton from './PlatformButton';
+import PWAInstallButton from './PWAInstallButton';
 import { usePlatformStatus } from '../../hooks/usePlatformStatus';
 import { useMobileDetection } from '../../hooks/useMobileDetection';
 
@@ -157,6 +158,9 @@ const TopBar: React.FC = () => {
         )}
 
         <div className="right-controls">
+          {/* PWA Install Button - Show for all users */}
+          <PWAInstallButton forceShow={true} />
+          
           {/* Mobile Hamburger Menu - Only show on desktop (for non-mobile users) */}
           {!isMobile && (
             <div className="mobile-menu-toggle">

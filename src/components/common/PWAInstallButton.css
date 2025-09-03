@@ -1,0 +1,184 @@
+/* PWA Install Button Styles - Enhanced for better visibility */
+.pwa-install-button {
+  width: auto;
+  min-width: clamp(80px, 8vw, 120px);
+  height: clamp(32px, 4vh, 40px);
+  color: rgba(255, 255, 255, 0.8);
+  transition: all 0.2s ease;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(6px, 1vw, 8px);
+  position: relative;
+  border-radius: clamp(6px, 1vw, 8px);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-sizing: border-box;
+  margin: clamp(2px, 0.5vh, 5px) 0;
+  padding: 0 clamp(8px, 1.5vw, 12px);
+  outline: none;
+  font-size: clamp(0.7rem, 1.5vw, 0.85rem);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.pwa-install-button:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.pwa-install-button:active {
+  transform: translateY(0);
+}
+
+.pwa-install-icon {
+  width: clamp(14px, 2vw, 18px);
+  height: clamp(14px, 2vw, 18px);
+  fill: currentColor;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.pwa-install-text {
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  transition: all 0.2s ease;
+}
+
+/* Responsive sizing - Enhanced for better visibility */
+@media (max-width: 1440px) {
+  .pwa-install-button {
+    min-width: 70px;
+    height: 36px;
+    font-size: 0.75rem;
+    padding: 0 10px;
+  }
+  
+  .pwa-install-icon {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+@media (max-width: 1366px) {
+  .pwa-install-button {
+    min-width: 65px;
+    height: 34px;
+    font-size: 0.7rem;
+    padding: 0 8px;
+  }
+  
+  .pwa-install-icon {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+@media (max-width: 1280px) {
+  .pwa-install-button {
+    min-width: 60px;
+    height: 32px;
+    font-size: 0.65rem;
+    padding: 0 6px;
+  }
+  
+  .pwa-install-icon {
+    width: 12px;
+    height: 12px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .pwa-install-button {
+    min-width: 55px;
+    height: 30px;
+    font-size: 0.6rem;
+    padding: 0 5px;
+  }
+  
+  .pwa-install-icon {
+    width: 10px;
+    height: 10px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .pwa-install-button {
+    min-width: 50px;
+    height: 28px;
+    font-size: 0.55rem;
+    padding: 0 4px;
+  }
+  
+  .pwa-install-icon {
+    width: 8px;
+    height: 8px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .pwa-install-button {
+    min-width: 45px;
+    height: 26px;
+    font-size: 0.5rem;
+    padding: 0 3px;
+  }
+  
+  .pwa-install-icon {
+    width: 6px;
+    height: 6px;
+  }
+}
+
+@media (max-width: 768px) {
+  .pwa-install-button {
+    min-width: 40px;
+    height: 24px;
+    font-size: 0.45rem;
+    padding: 0 2px;
+  }
+  
+  .pwa-install-icon {
+    width: 4px;
+    height: 4px;
+  }
+  
+  .pwa-install-text {
+    display: none; /* Hide text on very small screens */
+  }
+}
+
+@media (max-width: 480px) {
+  .pwa-install-button {
+    min-width: 35px;
+    height: 22px;
+    font-size: 0.4rem;
+    padding: 0 1px;
+  }
+  
+  .pwa-install-icon {
+    width: 3px;
+    height: 3px;
+  }
+}
+
+@media (max-width: 360px) {
+  .pwa-install-button {
+    min-width: 30px;
+    height: 20px;
+    font-size: 0.35rem;
+    padding: 0 1px;
+  }
+  
+  .pwa-install-icon {
+    width: 2px;
+    height: 2px;
+  }
+}

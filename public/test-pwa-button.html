@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PWA Install Button Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #1a1a32;
+            color: white;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .status-box {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .success { border-color: #00ffcc; }
+        .error { border-color: #ff5050; }
+        .warning { border-color: #ffaa00; }
+        button {
+            background: #00ffcc;
+            color: #1a1a32;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-weight: 600;
+        }
+        button:hover { background: #00d4aa; }
+        .pwa-install-button {
+            width: auto;
+            min-width: 100px;
+            height: 40px;
+            color: rgba(255, 255, 255, 0.8);
+            transition: all 0.2s ease;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            position: relative;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-sizing: border-box;
+            margin: 5px 0;
+            padding: 0 12px;
+            outline: none;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+        .pwa-install-button:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.3);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        .pwa-install-icon {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+            flex-shrink: 0;
+        }
+        .pwa-install-text {
+            font-size: inherit;
+            font-weight: inherit;
+            color: inherit;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>PWA Install Button Test</h1>
+        
+        <div class="status-box">
+            <h3>PWA Support Status</h3>
+            <div id="pwa-status">Checking...</div>
+        </div>
+        
+        <div class="status-box">
+            <h3>Install Button Test</h3>
+            <p>This is how the PWA install button should look in the top bar:</p>
+            <div style="display: flex; align-items: center; gap: 10px; margin: 20px 0;">
+                <span>Top Bar Layout:</span>
+                <div style="background: rgba(26, 26, 46, 0.95); padding: 10px 20px; border-radius: 8px; display: flex; align-items: center; gap: 15px;">
+                    <span>Logo</span>
+                    <span>Dashboard</span>
+                    <button class="pwa-install-button" onclick="testInstall()" title="Install App">
+                        <svg class="pwa-install-icon" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                        </svg>
+                        <span class="pwa-install-text">Install</span>
+                    </button>
+                    <span>User Avatar</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="status-box">
+            <h3>Test Actions</h3>
+            <button onclick="checkPWASupport()">Check PWA Support</button>
+            <button onclick="goToMainApp()">Go to Main App</button>
+            <button onclick="testInstall()">Test Install Button</button>
+        </div>
+    </div>
+
+    <script>
+        function checkPWASupport() {
+            const statusDiv = document.getElementById('pwa-status');
+            const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+            const isIOSStandalone = window.navigator.standalone === true;
+            const hasServiceWorker = 'serviceWorker' in navigator;
+            const hasManifest = document.querySelector('link[rel="manifest"]') !== null;
+            const isHTTPS = window.location.protocol === 'https:';
+            const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            
+            let status = '';
+            let className = 'warning';
+            
+            if (isStandalone || isIOSStandalone) {
+                status = '✅ App is already installed (standalone mode)';
+                className = 'success';
+            } else if (hasServiceWorker && hasManifest && (isHTTPS || isLocalhost)) {
+                status = '✅ PWA is supported and ready for installation';
+                className = 'success';
+            } else {
+                status = '❌ PWA not fully supported. Issues:';
+                className = 'error';
+                if (!hasServiceWorker) status += '\n- Service Worker not supported';
+                if (!hasManifest) status += '\n- Manifest not found';
+                if (!isHTTPS && !isLocalhost) status += '\n- HTTPS required for production';
+            }
+            
+            status += `\n\nDetails:
+- Standalone: ${isStandalone}
+- iOS Standalone: ${isIOSStandalone}
+- Service Worker: ${hasServiceWorker}
+- Manifest: ${hasManifest}
+- Protocol: ${window.location.protocol}
+- Hostname: ${window.location.hostname}`;
+            
+            statusDiv.className = className;
+            statusDiv.innerHTML = status.replace(/\n/g, '<br>');
+        }
+        
+        function testInstall() {
+            alert('PWA Install Button Clicked!\n\nIn the real app, this would:\n1. Show the browser install prompt (if available)\n2. Or show manual installation instructions\n3. The button should appear in the top bar next to the user avatar');
+        }
+        
+        function goToMainApp() {
+            window.location.href = '/';
+        }
+        
+        // Auto-check on page load
+        window.addEventListener('load', () => {
+            setTimeout(checkPWASupport, 1000);
+        });
+    </script>
+</body>
+</html>

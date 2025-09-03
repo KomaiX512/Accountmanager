@@ -251,6 +251,14 @@
   gap: clamp(15px, 3vw, 20px);
 }
 
+/* PWA Install Button Integration */
+.right-controls .pwa-install-button {
+  margin-right: clamp(12px, 2.5vw, 16px);
+  z-index: 2;
+  /* Ensure it doesn't interfere with other elements */
+  flex-shrink: 0;
+}
+
 /* Dashboard button on platform pages */
 .dashboard-button {
   color: #e0e0ff;

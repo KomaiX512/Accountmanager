@@ -1,8 +1,7 @@
-// PWA Registration and Installation Handler - NON-INTERFERING VERSION
+// PWA Registration and Installation Handler - REACT INTEGRATED VERSION
 class PWAInstaller {
   constructor() {
     this.deferredPrompt = null;
-    this.installButton = null;
     this.isInitialized = false;
     this.init();
   }
@@ -40,7 +39,8 @@ class PWAInstaller {
       this.registerServiceWorker();
     }
     
-    this.setupInstallPrompt();
+    // Note: Install prompt is now handled by React component
+    console.log('PWA: Install prompt will be handled by React component');
   }
 
   registerServiceWorker() {
@@ -68,84 +68,10 @@ class PWAInstaller {
     }
   }
 
-  setupInstallPrompt() {
-    // Listen for beforeinstallprompt event
-    window.addEventListener('beforeinstallprompt', (e) => {
-      console.log('PWA: Install prompt available');
-      e.preventDefault();
-      this.deferredPrompt = e;
-      // Don't show install button automatically - let user decide
-    });
-
-    // Listen for app installed event
-    window.addEventListener('appinstalled', (evt) => {
-      console.log('PWA: App was installed successfully');
-      this.hideInstallButton();
-    });
-  }
-
-  showInstallButton() {
-    // Only show if the main app is loaded and user hasn't dismissed it
-    if (!document.getElementById('root') || document.getElementById('root').children.length === 0) {
-      return;
-    }
-
-    // Create install button if it doesn't exist
-    if (!this.installButton) {
-      this.installButton = document.createElement('button');
-      this.installButton.textContent = 'Install App';
-      this.installButton.className = 'pwa-install-btn';
-      this.installButton.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        z-index: 10000;
-        background: #2c3e50;
-        color: white;
-        border: none;
-        padding: 12px 20px;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        transition: all 0.3s ease;
-        display: none;
-      `;
-      
-      this.installButton.addEventListener('click', () => {
-        this.installPWA();
-      });
-      
-      document.body.appendChild(this.installButton);
-    }
-    
-    this.installButton.style.display = 'block';
-  }
-
-  hideInstallButton() {
-    if (this.installButton) {
-      this.installButton.style.display = 'none';
-    }
-  }
-
+  // Note: Install prompt handling is now done by React component
+  // This method is kept for backward compatibility but not used
   async installPWA() {
-    if (!this.deferredPrompt) {
-      console.log('PWA: No install prompt available');
-      return;
-    }
-
-    this.deferredPrompt.prompt();
-    const { outcome } = await this.deferredPrompt.userChoice;
-    
-    if (outcome === 'accepted') {
-      console.log('PWA: User accepted the install prompt');
-    } else {
-      console.log('PWA: User dismissed the install prompt');
-    }
-    
-    this.deferredPrompt = null;
-    this.hideInstallButton();
+    console.log('PWA: Install method called - handled by React component');
   }
 
   // Method to unregister service worker (useful for debugging)

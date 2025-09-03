@@ -106,7 +106,19 @@ module.exports = defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true
+    sourcemap: true,
+    rollupOptions: {
+      output: {
+        // Add timestamp to asset names to force cache busting
+        assetFileNames: (assetInfo) => {
+          const info = assetInfo.name.split('.');
+          const ext = info[info.length - 1];
+          return `assets/[name]-[hash]-${Date.now()}.${ext}`;
+        },
+        chunkFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
+        entryFileNames: `assets/[name]-[hash]-${Date.now()}.js`
+      }
+    }
   },
   define: {
     // Expose environment variables to the client

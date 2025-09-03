@@ -28,6 +28,7 @@ import { syncInstagramConnection, isInstagramDisconnected } from './utils/instag
 import ChatModal from './components/common/ChatModal';
 import type { ChatMessage as ChatModalMessage } from './components/common/ChatModal';
 import QuotaStatusToast from './components/common/QuotaStatusToast';
+import UpdateNotification from './components/common/UpdateNotification';
 import AdminPanel from './components/admin/AdminPanel';
 import { ProcessingProvider } from './context/ProcessingContext';
 import Processing from './pages/Processing';
@@ -969,6 +970,7 @@ const AppContent: React.FC = () => {
   return (
     <div className="App">
       <TopBar />
+      <UpdateNotification />
       <div className="main-content">
         {!shouldHideLeftBar && <LeftBar accountHolder={accountHolder} userId={userId} platform={currentPlatform} onOpenChat={handleOpenChatFromMessages} />}
         <div className={`content-area ${shouldHideLeftBar ? 'full-width' : ''}`}>

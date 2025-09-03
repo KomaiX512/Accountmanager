@@ -44,8 +44,8 @@ class PWAInstaller {
   }
 
   registerServiceWorker() {
-    // Only register service worker in production
-    if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
+    // Register service worker in both development and production
+    if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/service-worker.js')
           .then((registration) => {
@@ -55,11 +55,22 @@ class PWAInstaller {
             registration.addEventListener('updatefound', () => {
               const newWorker = registration.installing;
               newWorker.addEventListener('statechange', () => {
-                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                  console.log('PWA: New version available');
+                if (newWorker.state === 'installed') {
+                  if (navigator.serviceWorker.controller) {
+                    console.log('PWA: New version available - reloading page');
+                    // Force reload to get the latest version
+                    window.location.reload();
+                  } else {
+                    console.log('PWA: Service Worker installed for the first time');
+                  }
                 }
               });
             });
+            
+            // Check for updates every 30 seconds
+            setInterval(() => {
+              registration.update();
+            }, 30000);
           })
           .catch((registrationError) => {
             console.error('PWA: Service Worker registration failed:', registrationError);

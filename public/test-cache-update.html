@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cache Update Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #1a1a32;
+            color: white;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .status-box {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .success { border-color: #00ffcc; }
+        .error { border-color: #ff5050; }
+        .warning { border-color: #ffaa00; }
+        button {
+            background: #00ffcc;
+            color: #1a1a32;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-weight: 600;
+        }
+        button:hover { background: #00d4aa; }
+        .clear-btn {
+            background: #ff6b6b;
+            color: white;
+        }
+        .clear-btn:hover { background: #ff5252; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🔄 PWA Cache Update Test</h1>
+        
+        <div class="status-box">
+            <h3>Current Status</h3>
+            <div id="current-status">Checking...</div>
+        </div>
+        
+        <div class="status-box">
+            <h3>Cache Information</h3>
+            <div id="cache-info">Loading...</div>
+        </div>
+        
+        <div class="status-box">
+            <h3>Service Worker Status</h3>
+            <div id="sw-info">Loading...</div>
+        </div>
+        
+        <div class="status-box">
+            <h3>Test Actions</h3>
+            <button onclick="checkStatus()">🔄 Refresh Status</button>
+            <button onclick="clearAllCaches()" class="clear-btn">🗑️ Clear All Caches</button>
+            <button onclick="forceUpdate()">⚡ Force Update</button>
+            <button onclick="goToMainApp()">🏠 Go to Main App</button>
+        </div>
+        
+        <div class="status-box">
+            <h3>Instructions</h3>
+            <p>1. <strong>Clear All Caches</strong> - Removes all cached data and forces fresh download</p>
+            <p>2. <strong>Force Update</strong> - Checks for service worker updates</p>
+            <p>3. <strong>Go to Main App</strong> - Navigate to the main application</p>
+            <p>4. After clearing cache, refresh the main app to see the latest updates</p>
+        </div>
+    </div>
+
+    <script>
+        async function checkStatus() {
+            const statusDiv = document.getElementById('current-status');
+            const cacheDiv = document.getElementById('cache-info');
+            const swDiv = document.getElementById('sw-info');
+            
+            // Check current timestamp
+            const now = new Date().toLocaleString();
+            statusDiv.innerHTML = `Last checked: ${now}`;
+            
+            // Check caches
+            if ('caches' in window) {
+                try {
+                    const cacheNames = await caches.keys();
+                    cacheDiv.innerHTML = `
+                        <strong>Found ${cacheNames.length} cache(s):</strong><br>
+                        ${cacheNames.map(name => `• ${name}`).join('<br>')}
+                    `;
+                } catch (error) {
+                    cacheDiv.innerHTML = `Error checking caches: ${error.message}`;
+                }
+            } else {
+                cacheDiv.innerHTML = 'Cache API not supported';
+            }
+            
+            // Check service worker
+            if ('serviceWorker' in navigator) {
+                try {
+                    const registration = await navigator.serviceWorker.getRegistration();
+                    if (registration) {
+                        swDiv.innerHTML = `
+                            <strong>Service Worker Active:</strong><br>
+                            • Scope: ${registration.scope}<br>
+                            • State: ${registration.active ? registration.active.state : 'No active worker'}
+                        `;
+                    } else {
+                        swDiv.innerHTML = 'No service worker registered';
+                    }
+                } catch (error) {
+                    swDiv.innerHTML = `Error checking service worker: ${error.message}`;
+                }
+            } else {
+                swDiv.innerHTML = 'Service Worker not supported';
+            }
+        }
+        
+        async function clearAllCaches() {
+            try {
+                console.log('Clearing all caches...');
+                
+                // Clear service worker caches
+                if ('caches' in window) {
+                    const cacheNames = await caches.keys();
+                    await Promise.all(
+                        cacheNames.map(cacheName => {
+                            console.log('Deleting cache:', cacheName);
+                            return caches.delete(cacheName);
+                        })
+                    );
+                }
+                
+                // Unregister service worker
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    await Promise.all(
+                        registrations.map(registration => {
+                            console.log('Unregistering service worker');
+                            return registration.unregister();
+                        })
+                    );
+                }
+                
+                console.log('All caches cleared successfully');
+                alert('✅ Cache cleared! The page will reload to get the latest version.');
+                
+                // Reload the page
+                window.location.reload(true);
+                
+            } catch (error) {
+                console.error('Error clearing caches:', error);
+                alert('❌ Error clearing cache: ' + error.message);
+            }
+        }
+        
+        async function forceUpdate() {
+            try {
+                if ('serviceWorker' in navigator) {
+                    const registration = await navigator.serviceWorker.getRegistration();
+                    if (registration) {
+                        await registration.update();
+                        console.log('Service worker update triggered');
+                        alert('✅ Update check triggered! Check console for details.');
+                    } else {
+                        alert('❌ No service worker registered');
+                    }
+                } else {
+                    alert('❌ Service Worker not supported');
+                }
+            } catch (error) {
+                console.error('Error forcing update:', error);
+                alert('❌ Error forcing update: ' + error.message);
+            }
+        }
+        
+        function goToMainApp() {
+            window.location.href = '/';
+        }
+        
+        // Auto-check on page load
+        window.addEventListener('load', () => {
+            setTimeout(checkStatus, 1000);
+        });
+    </script>
+</body>
+</html>

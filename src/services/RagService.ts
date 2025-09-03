@@ -287,6 +287,8 @@ class RagService {
         '/api/rag/discussion',
         async (serverUrl) => {
           try {
+            const currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
+            const firebaseUID = currentUser?.uid;
             const requestData = {
               username,
               query,
@@ -295,7 +297,8 @@ class RagService {
                 content: msg.content
               })),
               platform,
-              model
+              model,
+              firebaseUID
             };
 
             if (this.VERBOSE_LOGGING) {
@@ -417,7 +420,8 @@ class RagService {
         axios.post(url, {
           username,
           query,
-          platform
+          platform,
+          firebaseUID: (JSON.parse(localStorage.getItem('currentUser') || 'null') || {})?.uid
         }, {
           timeout: 180000, // 3 minute timeout for image generation + queueing
           withCredentials: false, // Disable sending cookies
@@ -433,42 +437,7 @@ class RagService {
       }
       
       // ✅ INCREMENT USAGE: Always log attempt and debug what's happening
-      console.log(`[RagService] 🔍 USAGE TRACKING START - Attempting to increment usage for ${platform}/${username}`);
-      
-      try {
-        // Get current Firebase user ID from localStorage (set by AuthContext)
-        const currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
-        const userId = currentUser?.uid;
-        
-        console.log(`[RagService] 🔍 USAGE DEBUG - currentUser from localStorage:`, currentUser);
-        console.log(`[RagService] 🔍 USAGE DEBUG - extracted userId:`, userId);
-        
-        if (userId) {
-          console.log(`[RagService] 🔍 USAGE DEBUG - Making fetch call to /api/usage/increment/${userId}`);
-          
-          const usageResponse = await fetch(`/api/usage/increment/${userId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ feature: 'posts', count: 1 })
-          });
-          
-          console.log(`[RagService] 🔍 USAGE DEBUG - Response status:`, usageResponse.status);
-          
-          if (usageResponse.ok) {
-            console.log(`[RagService] ✅ Usage incremented for userId ${userId} (${platform}/${username}) - post generation`);
-          } else {
-            const errorText = await usageResponse.text();
-            console.warn(`[RagService] ⚠️ Failed to increment usage:`, errorText);
-          }
-        } else {
-          console.warn(`[RagService] ⚠️ No Firebase userId found, skipping usage tracking`);
-        }
-      } catch (usageError) {
-        console.error(`[RagService] ❌ Usage tracking failed with error:`, usageError);
-      }
-      
-      console.log(`[RagService] 🔍 USAGE TRACKING END - Completed usage tracking attempt`);
-      
+      // Usage tracking is handled server-side (UID-first). Removed client-side increment to prevent double counting.
       
       // Format the response for easier use by the UI
       const postData: PostData = {
@@ -693,7 +662,8 @@ class RagService {
         getApiUrl('/api/instant-reply'),
         {
           username,
-          notification
+          notification,
+          firebaseUID: (JSON.parse(localStorage.getItem('currentUser') || 'null') || {})?.uid
         },
         {
           headers: {

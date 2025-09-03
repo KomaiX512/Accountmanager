@@ -125,17 +125,19 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
 
   // Load usage from backend on mount and user change
   const refreshUsage = useCallback(async () => {
-    if (!currentUser?.uid) {
+    // Fallback to localStorage if AuthContext is not yet hydrated (mobile/PWA race condition)
+    const uid = currentUser?.uid || (JSON.parse(localStorage.getItem('currentUser') || 'null')?.uid);
+    if (!uid) {
       console.warn('[UsageContext] No current user, skipping usage refresh');
       return;
     }
     
     setIsLoading(true);
     try {
-      console.log(`[UsageContext] 🔄 Refreshing usage for userId: ${currentUser.uid}`);
+      console.log(`[UsageContext] 🔄 Refreshing usage for userId: ${uid}`);
       
-      // Get usage from userId-based backend API 
-      const response = await fetch(`/api/user/${currentUser.uid}/usage`);
+      // Get usage from userId-based backend API
+      const response = await fetch(`/api/user/${uid}/usage`);
       
       if (response.ok) {
         const backendUsage = await response.json();
@@ -262,7 +264,9 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
   }, [currentUser?.uid]);
 
   const incrementUsage = useCallback(async (feature: keyof UsageStats, _platform?: string, count: number = 1) => {
-    if (!currentUser?.uid) {
+    // Fallback to localStorage for Firebase UID on mobile where AuthContext may not be ready
+    const uid = currentUser?.uid || (JSON.parse(localStorage.getItem('currentUser') || 'null')?.uid);
+    if (!uid) {
       console.warn(`[UsageContext] ⚠️ No current user available, skipping ${feature} increment`);
       return;
     }
@@ -276,7 +280,7 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
     isIncrementInProgress.current = true;
 
     try {
-      console.log(`[UsageContext] 🚀 INCREMENT STARTED: ${feature} usage by ${count} for userId: ${currentUser.uid}`);
+      console.log(`[UsageContext] 🚀 INCREMENT STARTED: ${feature} usage by ${count} for userId: ${uid}`);
       console.log(`[UsageContext] 📊 Current platform/username: ${currentPlatform}/${currentUsername}`);
       console.log(`[UsageContext] 📊 Current usage before increment: ${feature} = ${usage[feature]}`);
       
@@ -284,7 +288,7 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
       
       // ✅ UNIFIED APPROACH: Always use userId-based endpoint (platform mapping not reliable)
       console.log(`[UsageContext] 🌐 Calling userId-based usage increment API for ${currentPlatform}/${currentUsername}...`);
-      response = await fetch(`/api/usage/increment/${currentUser.uid}`, {
+      response = await fetch(`/api/usage/increment/${uid}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -305,18 +309,18 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
       console.log(`[UsageContext] ✅ INCREMENT COMPLETED: ${feature} usage successfully updated`);
       
       // Broadcast usage update to other tabs
-      window.dispatchEvent(new CustomEvent('usageUpdated', { 
-        detail: { 
-          userId: currentUser.uid, 
+      window.dispatchEvent(new CustomEvent('usageUpdated', {
+        detail: {
+          userId: uid,
           usage: usage // Use updated usage
-        } 
+        }
       }));
       
     } catch (error) {
       console.error(`[UsageContext] ❌ Error incrementing ${feature} usage:`, error);
       console.error(`[UsageContext] ❌ Error details:`, {
         feature,
-        userId: currentUser.uid,
+        userId: uid,
         platform: currentPlatform,
         username: currentUsername,
         count,
@@ -411,14 +415,16 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
         campaigns: 0,
         views: 0
       };
-      if (currentUser?.uid) {
-        window.dispatchEvent(new CustomEvent('usageUpdated', { 
-          detail: { 
-            userId: currentUser.uid, 
-            usage: newUsage 
-          } 
+      // Fallback to localStorage UID for cross-device consistency
+      const uid = currentUser?.uid || (JSON.parse(localStorage.getItem('currentUser') || 'null')?.uid);
+      if (uid) {
+        window.dispatchEvent(new CustomEvent('usageUpdated', {
+          detail: {
+            userId: uid,
+            usage: newUsage
+          }
         }));
-        console.log(`[UsageContext] 🔄 Dashboard reset for userId: ${currentUser.uid}`);
+        console.log(`[UsageContext] 🔄 Dashboard reset for userId: ${uid}`);
       }
       return newUsage;
     });

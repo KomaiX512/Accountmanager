@@ -80,6 +80,28 @@
             font-weight: inherit;
             color: inherit;
         }
+        
+        /* Mobile version */
+        .pwa-install-button.mobile {
+            min-width: 36px;
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            border-radius: 50%;
+            background: rgba(0, 255, 204, 0.15);
+            border: 2px solid rgba(0, 255, 204, 0.4);
+            box-shadow: 0 2px 8px rgba(0, 255, 204, 0.2);
+        }
+        
+        .pwa-install-button.mobile .pwa-install-icon {
+            width: 20px;
+            height: 20px;
+            color: #00ffcc;
+        }
+        
+        .pwa-install-button.mobile .pwa-install-text {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -94,18 +116,36 @@
         <div class="status-box">
             <h3>Install Button Test</h3>
             <p>This is how the PWA install button should look in the top bar:</p>
-            <div style="display: flex; align-items: center; gap: 10px; margin: 20px 0;">
-                <span>Top Bar Layout:</span>
-                <div style="background: rgba(26, 26, 46, 0.95); padding: 10px 20px; border-radius: 8px; display: flex; align-items: center; gap: 15px;">
-                    <span>Logo</span>
-                    <span>Dashboard</span>
-                    <button class="pwa-install-button" onclick="testInstall()" title="Install App">
-                        <svg class="pwa-install-icon" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-                        </svg>
-                        <span class="pwa-install-text">Install</span>
-                    </button>
-                    <span>User Avatar</span>
+            
+            <div style="display: flex; flex-direction: column; gap: 20px; margin: 20px 0;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span>Desktop Layout:</span>
+                    <div style="background: rgba(26, 26, 46, 0.95); padding: 10px 20px; border-radius: 8px; display: flex; align-items: center; gap: 15px;">
+                        <span>Logo</span>
+                        <span>Dashboard</span>
+                        <button class="pwa-install-button" onclick="testInstall()" title="Install App">
+                            <svg class="pwa-install-icon" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                            </svg>
+                            <span class="pwa-install-text">Install</span>
+                        </button>
+                        <span>User Avatar</span>
+                    </div>
+                </div>
+                
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span>Mobile Layout:</span>
+                    <div style="background: rgba(26, 26, 46, 0.95); padding: 8px 15px; border-radius: 8px; display: flex; align-items: center; gap: 10px;">
+                        <span>Logo</span>
+                        <span>Dashboard</span>
+                        <button class="pwa-install-button mobile" onclick="testInstall()" title="Install App">
+                            <svg class="pwa-install-icon" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                            </svg>
+                            <span class="pwa-install-text">Install</span>
+                        </button>
+                        <span>User Avatar</span>
+                    </div>
                 </div>
             </div>
         </div>

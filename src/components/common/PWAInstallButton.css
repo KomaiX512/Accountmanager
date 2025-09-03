@@ -139,46 +139,79 @@
 
 @media (max-width: 768px) {
   .pwa-install-button {
-    min-width: 40px;
-    height: 24px;
-    font-size: 0.45rem;
-    padding: 0 2px;
+    min-width: 36px;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: 50%;
+    background: rgba(0, 255, 204, 0.15);
+    border: 2px solid rgba(0, 255, 204, 0.4);
+    box-shadow: 0 2px 8px rgba(0, 255, 204, 0.2);
+  }
+  
+  .pwa-install-button:hover {
+    background: rgba(0, 255, 204, 0.25);
+    border-color: rgba(0, 255, 204, 0.6);
+    box-shadow: 0 4px 12px rgba(0, 255, 204, 0.3);
   }
   
   .pwa-install-icon {
-    width: 4px;
-    height: 4px;
+    width: 20px;
+    height: 20px;
+    color: #00ffcc;
   }
   
   .pwa-install-text {
-    display: none; /* Hide text on very small screens */
+    display: none; /* Hide text on mobile - icon only */
   }
 }
 
 @media (max-width: 480px) {
   .pwa-install-button {
-    min-width: 35px;
-    height: 22px;
-    font-size: 0.4rem;
-    padding: 0 1px;
+    min-width: 32px;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: 50%;
+    background: rgba(0, 255, 204, 0.15);
+    border: 2px solid rgba(0, 255, 204, 0.4);
+    box-shadow: 0 2px 8px rgba(0, 255, 204, 0.2);
+  }
+  
+  .pwa-install-button:hover {
+    background: rgba(0, 255, 204, 0.25);
+    border-color: rgba(0, 255, 204, 0.6);
+    box-shadow: 0 4px 12px rgba(0, 255, 204, 0.3);
   }
   
   .pwa-install-icon {
-    width: 3px;
-    height: 3px;
+    width: 18px;
+    height: 18px;
+    color: #00ffcc;
   }
 }
 
 @media (max-width: 360px) {
   .pwa-install-button {
-    min-width: 30px;
-    height: 20px;
-    font-size: 0.35rem;
-    padding: 0 1px;
+    min-width: 28px;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: 50%;
+    background: rgba(0, 255, 204, 0.15);
+    border: 2px solid rgba(0, 255, 204, 0.4);
+    box-shadow: 0 2px 8px rgba(0, 255, 204, 0.2);
+  }
+  
+  .pwa-install-button:hover {
+    background: rgba(0, 255, 204, 0.25);
+    border-color: rgba(0, 255, 204, 0.6);
+    box-shadow: 0 4px 12px rgba(0, 255, 204, 0.3);
   }
   
   .pwa-install-icon {
-    width: 2px;
-    height: 2px;
+    width: 16px;
+    height: 16px;
+    color: #00ffcc;
   }
 }

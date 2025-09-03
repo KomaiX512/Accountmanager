@@ -102,10 +102,10 @@ const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ className = '', for
     return null;
   }
 
-  // Show button if PWA is supported, in development, or forced to show
-  if (!showInstallButton && !isSupported && !forceShow) {
-    return null;
-  }
+  // Always show button for testing (remove this condition to make it conditional)
+  // if (!showInstallButton && !isSupported && !forceShow) {
+  //   return null;
+  // }
 
   return (
     <motion.button

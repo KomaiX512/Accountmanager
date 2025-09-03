@@ -78,21 +78,21 @@ export const registerWithEmailPassword = async (
     // Set user display name
     await updateProfile(user, { displayName });
     
-    // Send email verification with enhanced debugging
-    try {
-      await sendEmailVerification(user, {
-        url: `${window.location.origin}/login?verified=true`,
-        handleCodeInApp: false
-      });
-      console.log('✅ Email verification sent successfully to:', email);
-      console.log('✅ Verification URL:', `${window.location.origin}/login?verified=true`);
-    } catch (verificationError: any) {
-      console.error('❌ Failed to send email verification:', verificationError);
-      console.error('❌ User object:', user);
-      console.error('❌ User email:', user.email);
-      console.error('❌ User emailVerified status:', user.emailVerified);
-      throw new Error(`Failed to send verification email: ${verificationError.message || 'Unknown error'}`);
-    }
+    // Email verification temporarily disabled during sign up (will re-enable later)
+    // try {
+    //   await sendEmailVerification(user, {
+    //     url: `${window.location.origin}/login?verified=true`,
+    //     handleCodeInApp: false
+    //   });
+    //   console.log('✅ Email verification sent successfully to:', email);
+    //   console.log('✅ Verification URL:', `${window.location.origin}/login?verified=true`);
+    // } catch (verificationError: any) {
+    //   console.error('❌ Failed to send email verification:', verificationError);
+    //   console.error('❌ User object:', user);
+    //   console.error('❌ User email:', user.email);
+    //   console.error('❌ User emailVerified status:', user.emailVerified);
+    //   throw new Error(`Failed to send verification email: ${verificationError.message || 'Unknown error'}`);
+    // }
     
     // Log successful registration event
     logEvent(analytics, 'sign_up', {

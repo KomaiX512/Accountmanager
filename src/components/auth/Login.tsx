@@ -20,8 +20,6 @@ const Login: React.FC = () => {
     signInWithEmail, 
     signUpWithEmail, 
     sendPasswordReset, 
-    checkEmailVerification,
-    signOut,
     resendFirebaseVerificationEmail,
     loading,
     error,
@@ -200,29 +198,12 @@ const Login: React.FC = () => {
     try {
       setIsSigningUp(true);
       await signUpWithEmail(email, password, displayName);
-      
-      // Firebase automatically sends verification email during signup
-      setPendingUserEmail(email);
-      setSuccessMessage(`Account created successfully! Please check your email (${email}) for a verification link before signing in.`);
-      
-      // Show verification waiting screen
-      setShowEmailVerification(true);
-      
-      // Start checking for email verification every 3 seconds
-      const interval = setInterval(async () => {
-        const isVerified = await checkEmailVerification();
-        if (isVerified) {
-          clearInterval(interval);
-          setVerificationCheckInterval(null);
-          setShowEmailVerification(false);
-          setPendingUserEmail(null);
-          setIsSigningUp(false);
-          setSuccessMessage('Email verified successfully! You can now sign in.');
-          setMode('login');
-        }
-      }, 3000);
-      
-      setVerificationCheckInterval(interval);
+      // Skip email verification UI/polling; route user to account directly
+      setIsSigningUp(false);
+      setPendingUserEmail(null);
+      setShowEmailVerification(false);
+      setSuccessMessage('Account created successfully! Redirecting...');
+      navigate('/account', { replace: true });
       
     } catch (error) {
       setIsSigningUp(false);

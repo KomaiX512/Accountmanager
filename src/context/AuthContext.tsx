@@ -125,12 +125,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     setError(null);
     try {
-      const user = await registerWithEmailPassword(email, password, displayName);
-      // Sign out the user immediately after registration since email is not verified
-      // This prevents automatic login and allows the verification flow to work properly
-      if (user && !user.emailVerified) {
-        await logoutUser();
-      }
+      await registerWithEmailPassword(email, password, displayName);
+      // Temporarily allow immediate access after sign up (no email verification enforcement)
+      // if (user && !user.emailVerified) {
+      //   await logoutUser();
+      // }
     } catch (error: any) {
       setError(error.message || 'Failed to sign up with email/password');
     } finally {

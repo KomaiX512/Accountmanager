@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Direct PWA Install Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #1a1a32;
+            color: white;
+        }
+        .test-container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .status-box {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .success { border-color: #00ffcc; }
+        .error { border-color: #ff5050; }
+        .warning { border-color: #ffaa00; }
+        button {
+            background: #00ffcc;
+            color: #1a1a32;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        button:hover { background: #00d4aa; }
+        .install-btn {
+            background: #ff6b6b;
+            color: white;
+            font-size: 18px;
+            padding: 15px 30px;
+        }
+        .install-btn:hover { background: #ff5252; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🚀 Direct PWA Install Test</h1>
+        
+        <div class="status-box">
+            <h3>Installation Status</h3>
+            <div id="install-status">Checking...</div>
+        </div>
+        
+        <div class="status-box">
+            <h3>Direct Install Test</h3>
+            <p>Click the button below to test direct PWA installation:</p>
+            <button class="install-btn" onclick="testDirectInstall()">📱 Install App Directly</button>
+        </div>
+        
+        <div class="status-box">
+            <h3>Debug Information</h3>
+            <div id="debug-info">Loading...</div>
+        </div>
+        
+        <div class="status-box">
+            <h3>Test Actions</h3>
+            <button onclick="checkInstallStatus()">🔄 Check Status</button>
+            <button onclick="goToMainApp()">🏠 Go to Main App</button>
+        </div>
+    </div>
+
+    <script>
+        let deferredPrompt = null;
+        
+        // Listen for beforeinstallprompt event
+        window.addEventListener('beforeinstallprompt', (e) => {
+            console.log('Direct Install Test: beforeinstallprompt event received');
+            e.preventDefault();
+            deferredPrompt = e;
+            updateInstallStatus();
+        });
+        
+        // Listen for app installed event
+        window.addEventListener('appinstalled', (e) => {
+            console.log('Direct Install Test: App was installed successfully');
+            deferredPrompt = null;
+            updateInstallStatus();
+        });
+        
+        function updateInstallStatus() {
+            const statusDiv = document.getElementById('install-status');
+            const debugDiv = document.getElementById('debug-info');
+            
+            if (deferredPrompt) {
+                statusDiv.innerHTML = '✅ <strong>Install prompt available!</strong> Ready for direct installation.';
+                statusDiv.className = 'status-box success';
+            } else {
+                statusDiv.innerHTML = '❌ <strong>No install prompt available.</strong> Manual installation required.';
+                statusDiv.className = 'status-box warning';
+            }
+            
+            // Debug info
+            const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+            const isIOSStandalone = window.navigator.standalone === true;
+            const hasServiceWorker = 'serviceWorker' in navigator;
+            const hasManifest = document.querySelector('link[rel="manifest"]') !== null;
+            
+            debugDiv.innerHTML = `
+                <strong>Debug Information:</strong><br>
+                • Deferred Prompt: ${deferredPrompt ? 'Available' : 'Not Available'}<br>
+                • Standalone Mode: ${isStandalone}<br>
+                • iOS Standalone: ${isIOSStandalone}<br>
+                • Service Worker: ${hasServiceWorker}<br>
+                • Manifest: ${hasManifest}<br>
+                • Protocol: ${window.location.protocol}<br>
+                • User Agent: ${navigator.userAgent.includes('Mobile') ? 'Mobile' : 'Desktop'}
+            `;
+        }
+        
+        async function testDirectInstall() {
+            if (deferredPrompt) {
+                try {
+                    console.log('Direct Install Test: Triggering install prompt');
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    
+                    if (outcome === 'accepted') {
+                        console.log('Direct Install Test: User accepted the install prompt');
+                        alert('✅ Installation started! The app will be added to your home screen.');
+                    } else {
+                        console.log('Direct Install Test: User dismissed the install prompt');
+                        alert('❌ Installation was cancelled by user.');
+                    }
+                    
+                    deferredPrompt = null;
+                    updateInstallStatus();
+                } catch (error) {
+                    console.error('Direct Install Test: Error during installation:', error);
+                    alert('❌ Installation failed: ' + error.message);
+                }
+            } else {
+                // Try to use global PWA installer
+                if (window.PWAInstaller) {
+                    try {
+                        console.log('Direct Install Test: Using global PWA installer');
+                        const outcome = await window.PWAInstaller.installPWA();
+                        if (outcome === 'accepted') {
+                            alert('✅ Installation successful via global installer!');
+                        } else {
+                            alert('❌ Installation cancelled via global installer.');
+                        }
+                        updateInstallStatus();
+                    } catch (error) {
+                        console.error('Direct Install Test: Global installer failed:', error);
+                        alert('❌ Global installer failed: ' + error.message);
+                    }
+                } else {
+                    alert('❌ No install prompt available. Please use your browser\'s menu to "Add to Home Screen".');
+                }
+            }
+        }
+        
+        function checkInstallStatus() {
+            updateInstallStatus();
+        }
+        
+        function goToMainApp() {
+            window.location.href = '/';
+        }
+        
+        // Auto-check on page load
+        window.addEventListener('load', () => {
+            setTimeout(updateInstallStatus, 1000);
+        });
+    </script>
+</body>
+</html>

@@ -56,6 +56,13 @@ const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ className = '', for
       setShowInstallButton(true);
     };
 
+    // Listen for custom events from PWA registration script
+    const handlePWAInstallPrompt = (e: CustomEvent) => {
+      console.log('PWA: Custom install prompt event received');
+      setDeferredPrompt(e.detail.deferredPrompt);
+      setShowInstallButton(true);
+    };
+
     // Listen for app installed event
     const handleAppInstalled = () => {
       console.log('PWA: App was installed successfully');
@@ -64,36 +71,76 @@ const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ className = '', for
       setDeferredPrompt(null);
     };
 
+    // Listen for custom installed event
+    const handlePWAInstalled = () => {
+      console.log('PWA: Custom installed event received');
+      setShowInstallButton(false);
+      setIsInstalled(true);
+      setDeferredPrompt(null);
+    };
+
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('pwa-install-prompt', handlePWAInstallPrompt as EventListener);
     window.addEventListener('appinstalled', handleAppInstalled);
+    window.addEventListener('pwa-installed', handlePWAInstalled);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('pwa-install-prompt', handlePWAInstallPrompt as EventListener);
       window.removeEventListener('appinstalled', handleAppInstalled);
+      window.removeEventListener('pwa-installed', handlePWAInstalled);
     };
   }, []);
 
   const handleInstallClick = async () => {
-    if (deferredPrompt) {
-      try {
+    try {
+      // Try to use the global PWA installer first
+      if ((window as any).PWAInstaller) {
+        const installer = (window as any).PWAInstaller;
+        const globalPrompt = installer.getDeferredPrompt();
+        
+        if (globalPrompt) {
+          console.log('PWA: Using global installer for direct installation');
+          const outcome = await installer.installPWA();
+          if (outcome === 'accepted') {
+            console.log('PWA: Installation successful');
+            setShowInstallButton(false);
+            setIsInstalled(true);
+          }
+          return;
+        }
+      }
+      
+      // Fallback to local deferred prompt
+      if (deferredPrompt) {
+        console.log('PWA: Using local deferred prompt for direct installation');
         deferredPrompt.prompt();
         const { outcome } = await deferredPrompt.userChoice;
         
         if (outcome === 'accepted') {
           console.log('PWA: User accepted the install prompt');
+          setShowInstallButton(false);
+          setIsInstalled(true);
         } else {
           console.log('PWA: User dismissed the install prompt');
         }
-      } catch (error) {
-        console.error('PWA: Error during installation:', error);
+        
+        setDeferredPrompt(null);
+      } else {
+        // No install prompt available - show platform-specific instructions
+        console.log('PWA: No install prompt available, showing instructions');
+        
+        if (navigator.userAgent.includes('iPhone') || navigator.userAgent.includes('iPad')) {
+          alert('To install this app on iOS:\n\n1. Tap the Share button (square with arrow up)\n2. Scroll down and tap "Add to Home Screen"\n3. Tap "Add" to confirm');
+        } else if (navigator.userAgent.includes('Android')) {
+          alert('To install this app on Android:\n\n1. Tap the menu button (three dots)\n2. Select "Add to Home screen" or "Install app"\n3. Tap "Add" to confirm');
+        } else {
+          alert('To install this app:\n\n1. Look for the "Add to Home Screen" option in your browser menu\n2. Or use the browser\'s install button if available\n3. The app will be added to your home screen');
+        }
       }
-      
-      setDeferredPrompt(null);
-      setShowInstallButton(false);
-    } else {
-      // Fallback: Show instructions for manual installation
-      console.log('PWA: Manual installation required');
-      alert('To install this app:\n\n1. Look for the "Add to Home Screen" option in your browser menu\n2. Or use the browser\'s install button if available\n3. On iOS Safari: Tap the Share button, then "Add to Home Screen"');
+    } catch (error) {
+      console.error('PWA: Error during installation:', error);
+      alert('Installation failed. Please try using your browser\'s menu to "Add to Home Screen".');
     }
   };
 

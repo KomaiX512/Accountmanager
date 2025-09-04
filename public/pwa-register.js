@@ -65,33 +65,34 @@ class PWAInstaller {
   }
 
   registerServiceWorker() {
-    // Register service worker in both development and production
+    // Register service worker for PWA functionality only (no aggressive caching)
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/service-worker.js')
           .then((registration) => {
-            console.log('PWA: Service Worker registered successfully:', registration);
+            console.log('PWA: Service Worker registered for install functionality only');
             
-            // Handle updates
+            // Handle updates - always use new version immediately
             registration.addEventListener('updatefound', () => {
               const newWorker = registration.installing;
               newWorker.addEventListener('statechange', () => {
                 if (newWorker.state === 'installed') {
                   if (navigator.serviceWorker.controller) {
-                    console.log('PWA: New version available - reloading page');
-                    // Force reload to get the latest version
+                    console.log('PWA: New version available - auto-updating');
+                    // Auto-activate new service worker for fresh content
+                    newWorker.postMessage({ type: 'SKIP_WAITING' });
                     window.location.reload();
                   } else {
-                    console.log('PWA: Service Worker installed for the first time');
+                    console.log('PWA: Service Worker installed (fresh content mode)');
                   }
                 }
               });
             });
             
-            // Check for updates every 30 seconds
+            // Check for updates more frequently to ensure fresh content
             setInterval(() => {
               registration.update();
-            }, 30000);
+            }, 10000); // Check every 10 seconds
           })
           .catch((registrationError) => {
             console.error('PWA: Service Worker registration failed:', registrationError);

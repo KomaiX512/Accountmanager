@@ -1,37 +1,36 @@
-// Dynamic cache name with timestamp to force updates
-const CACHE_VERSION = Date.now();
-const CACHE_NAME = `sentient-marketing-v${CACHE_VERSION}`;
+// FRESH CONTENT SERVICE WORKER - No App Caching, Always Network First
+// This service worker ensures the PWA behaves like a website with fresh content
 
-// Install event - minimal caching with immediate activation
+const CACHE_NAME = 'pwa-minimal-cache';
+const PWA_ASSETS = [
+  '/manifest.json',
+  '/icons/icon-192x192.png',
+  '/icons/icon-512x512.png'
+];
+
+// Install - Only cache PWA manifest and icons (required for install)
 self.addEventListener('install', (event) => {
-  console.log('PWA: Service Worker installing with version:', CACHE_VERSION);
-  // Skip waiting to immediately activate new service worker
-  self.skipWaiting();
+  console.log('PWA: Installing service worker - minimal caching mode');
+  self.skipWaiting(); // Take control immediately
   
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('PWA: Opened cache with version:', CACHE_VERSION);
-        // Only cache essential PWA files, not app assets
-        return cache.addAll([
-          '/',
-          '/index.html',
-          '/manifest.json',
-          '/icons/icon-192x192.png'
-        ]);
+        console.log('PWA: Caching only essential PWA files');
+        return cache.addAll(PWA_ASSETS);
       })
       .catch((error) => {
-        console.error('PWA: Cache installation failed:', error);
+        console.error('PWA: Failed to cache PWA assets:', error);
       })
   );
 });
 
-// Fetch event - NETWORK FIRST for app updates
+// Fetch - ALWAYS NETWORK FIRST for fresh content
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   
-  // Only handle requests to our own domain
-  if (url.hostname !== location.hostname) {
+  // Only handle same-origin requests
+  if (url.origin !== location.origin) {
     return;
   }
   
@@ -40,57 +39,66 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
-  // For app assets (JS, CSS, images), use network-first strategy to get updates
-  if (url.pathname.includes('/assets/') || 
-      url.pathname.endsWith('.js') || 
-      url.pathname.endsWith('.css') ||
-      url.pathname.endsWith('.html')) {
-    
+  // For PWA manifest and icons only - use cache first (required for PWA functionality)
+  if (PWA_ASSETS.some(asset => url.pathname === asset)) {
     event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          // If network request succeeds, update cache and return response
-          if (response.status === 200) {
-            const responseClone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, responseClone);
-            });
-          }
-          return response;
-        })
-        .catch(() => {
-          // If network fails, try cache as fallback
-          return caches.match(event.request);
+      caches.match(event.request)
+        .then((cachedResponse) => {
+          return cachedResponse || fetch(event.request);
         })
     );
     return;
   }
   
-  // For PWA-specific files, use cache-first strategy
-  if (url.pathname === '/manifest.json' || 
-      url.pathname === '/icons/icon-192x192.png') {
-    
-    event.respondWith(
-      caches.match(event.request)
-        .then((response) => {
-          return response || fetch(event.request);
-        })
-        .catch(() => {
-          return fetch(event.request);
-        })
-    );
-  }
-  
-  // For all other requests, let the browser handle normally
+  // For ALL other requests (HTML, JS, CSS, API, etc.) - ALWAYS use network first
+  // This ensures fresh content like a website
+  event.respondWith(
+    fetch(event.request)
+      .then((response) => {
+        // Return fresh response - no caching of app content
+        return response;
+      })
+      .catch((error) => {
+        console.log('PWA: Network failed for:', url.pathname);
+        // If network fails, show a simple offline message
+        if (event.request.headers.get('accept').includes('text/html')) {
+          return new Response(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <title>Offline</title>
+              <style>
+                body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #1a1a32; color: white; }
+                .offline-message { max-width: 400px; margin: 0 auto; }
+                .retry-btn { background: #00ffcc; color: #1a1a32; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-top: 20px; }
+              </style>
+            </head>
+            <body>
+              <div class="offline-message">
+                <h1>You're Offline</h1>
+                <p>Please check your internet connection and try again.</p>
+                <button class="retry-btn" onclick="window.location.reload()">Retry</button>
+              </div>
+            </body>
+            </html>
+          `, {
+            status: 503,
+            statusText: 'Service Unavailable',
+            headers: { 'Content-Type': 'text/html' }
+          });
+        }
+        throw error;
+      })
+  );
 });
 
-// Activate event - clean up old caches and take control
+// Activate - Clean up and take control
 self.addEventListener('activate', (event) => {
-  console.log('PWA: Service Worker activating with version:', CACHE_VERSION);
+  console.log('PWA: Service worker activated - fresh content mode');
   
   event.waitUntil(
     Promise.all([
-      // Clean up old caches
+      // Clean up any old caches
       caches.keys().then((cacheNames) => {
         return Promise.all(
           cacheNames.map((cacheName) => {
@@ -101,19 +109,21 @@ self.addEventListener('activate', (event) => {
           })
         );
       }),
-      // Take control of all clients immediately
+      // Take control immediately
       self.clients.claim()
     ])
   );
 });
 
-// Skip background sync for now to avoid interference
-// self.addEventListener('sync', (event) => {
-//   if (event.tag === 'background-sync') {
-//     event.waitUntil(doBackgroundSync());
-// }
-// });
-
-// function doBackgroundSync() {
-//   console.log('Background sync triggered');
-// }
+// Message handling for manual cache clearing
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+  
+  if (event.data && event.data.type === 'CLEAR_CACHE') {
+    caches.delete(CACHE_NAME).then(() => {
+      console.log('PWA: Cache cleared manually');
+    });
+  }
+});

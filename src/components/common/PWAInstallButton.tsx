@@ -94,11 +94,11 @@ const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ className = '', for
       console.log('PWA: No automatic install available, showing manual instructions');
       
       if (navigator.userAgent.includes('iPhone') || navigator.userAgent.includes('iPad')) {
-        alert('To install this app on iOS:\n\n1. Tap the Share button (square with arrow up)\n2. Scroll down and tap "Add to Home Screen"\n3. Tap "Add" to confirm');
+        alert('To install this app on iOS:\n\n1. Tap the Share button (square with arrow up)\n2. Scroll down and tap "Add to Home Screen"\n3. Tap "Add" to confirm\n\nNote: The app will always load fresh content like a website.');
       } else if (navigator.userAgent.includes('Android')) {
-        alert('To install this app on Android:\n\n1. Tap the menu button (three dots)\n2. Select "Add to Home screen" or "Install app"\n3. Tap "Add" to confirm');
+        alert('To install this app on Android:\n\n1. Tap the menu button (three dots)\n2. Select "Add to Home screen" or "Install app"\n3. Tap "Add" to confirm\n\nNote: The app will always load fresh content like a website.');
       } else {
-        alert('To install this app:\n\n1. Look for the "Add to Home Screen" option in your browser menu\n2. Or use the browser\'s install button if available\n3. The app will be added to your home screen');
+        alert('To install this app:\n\n1. Look for the "Add to Home Screen" option in your browser menu\n2. Or use the browser\'s install button if available\n3. The app will be added to your home screen\n\nNote: The app will always load fresh content like a website.');
       }
     } catch (error) {
       console.error('PWA: Error during installation:', error);

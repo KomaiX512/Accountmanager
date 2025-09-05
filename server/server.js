@@ -18,6 +18,18 @@ import OAuth from 'oauth-1.0a';
 import FormData from 'form-data';
 import nodemailer from 'nodemailer';
 import jpeg from 'jpeg-js';
+import net from 'net';
+import { Transform } from 'stream';
+const __filename = new URL(import.meta.url).pathname;
+const __dirname = path.dirname(__filename);
+
+// PERFORMANCE: Import cache middleware for optimized response times
+import { cacheManager, cacheMiddleware } from './cache-middleware.js';
+import fetch from 'node-fetch';
+// Ensure fetch is available in Node environments without global fetch (e.g., Node < 18)
+if (!globalThis.fetch) {
+  globalThis.fetch = fetch;
+}
 
 const verificationCodes = new Map();
 // Clean up expired verification codes every 10 minutes
@@ -488,8 +500,8 @@ function setCorsHeaders(res, origin = '*') {
   res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', '*');
-  res.setHeader('Access-Control-Expose-Headers', 'Content-Type');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Type, X-Cache, X-Cache-TTL');
   res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
 }
 
@@ -2819,7 +2831,10 @@ app.post('/api/ai-image-approve', async (req, res) => {
   }
 });
 
-app.get(['/profile-info/:username', '/api/profile-info/:username'], async (req, res) => {
+// Apply intelligent caching for profile info (5 minute TTL)
+app.get(['/profile-info/:username', '/api/profile-info/:username'], 
+  cacheMiddleware('profileInfo', (req) => [req.params.username, req.query.platform || 'instagram']),
+  async (req, res) => {
   const { username } = req.params;
   const forceRefresh = req.query.forceRefresh === 'true';
   const platform = req.query.platform || 'instagram'; // Default to Instagram
@@ -4836,19 +4851,22 @@ app.post([
 });
 
 // Simplified Instagram DM fetching - ALWAYS use USER ID
-async function fetchInstagramDMs(userId) {
+async function fetchInstagramDMs(userId, limit = 1000) {
   try {
     const listCommand = new ListObjectsV2Command({
       Bucket: 'tasks',
       Prefix: `InstagramEvents/${userId}/`, // ALWAYS use userId directly
+      MaxKeys: limit * 2 // Fetch more to account for filtering
     });
     
     const { Contents } = await s3Client.send(listCommand);
     const dms = [];
     
     if (Contents && Contents.length > 0) {
-      for (const obj of Contents) {
-        if (obj.Key.endsWith('.json') && !obj.Key.includes('reply_') && !obj.Key.includes('comment_')) {
+      // 🚀 PERFORMANCE: Process all DMs in parallel
+      const dmPromises = Contents
+        .filter(obj => obj.Key.endsWith('.json') && !obj.Key.includes('reply_') && !obj.Key.includes('comment_'))
+        .map(async (obj) => {
           try {
             const getCommand = new GetObjectCommand({
               Bucket: 'tasks',
@@ -4858,20 +4876,32 @@ async function fetchInstagramDMs(userId) {
             const eventData = JSON.parse(await data.Body.transformToString());
             
             if (eventData.type === 'message') {
-              dms.push({
+              return {
                 id: eventData.message_id,
                 sender_id: eventData.sender_id,
                 text: eventData.text,
                 created_at: eventData.received_at,
                 sender_username: eventData.username || 'unknown',
-                status: eventData.status || 'pending'
-              });
+                status: eventData.status || 'pending',
+                timestamp: new Date(eventData.received_at).getTime()
+              };
             }
+            return null;
           } catch (error) {
-            console.error(`Error reading stored event ${obj.Key}:`, error);
+            console.error(`Error reading stored event ${obj.Key}:`, error.message);
+            return null;
           }
-        }
-      }
+        });
+      
+      // Wait for all parallel operations to complete
+      const dmResults = await Promise.all(dmPromises);
+      
+      // Filter out nulls and sort by timestamp (newest first)
+      dmResults
+        .filter(dm => dm !== null)
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, limit)
+        .forEach(dm => dms.push(dm));
     }
 
     return dms;
@@ -4881,20 +4911,23 @@ async function fetchInstagramDMs(userId) {
   }
 }
 
-// Simplified Instagram Comments fetching - ALWAYS use USER ID
-async function fetchInstagramComments(userId) {
+// Simplified Instagram Comments fetching - OPTIMIZED WITH PARALLEL PROCESSING
+async function fetchInstagramComments(userId, limit = 1000) {
   try {
     const listCommand = new ListObjectsV2Command({
       Bucket: 'tasks',
       Prefix: `InstagramEvents/${userId}/`, // ALWAYS use userId directly
+      MaxKeys: limit * 2 // Fetch more to account for filtering
     });
     
     const { Contents } = await s3Client.send(listCommand);
     const comments = [];
     
     if (Contents && Contents.length > 0) {
-      for (const obj of Contents) {
-        if (obj.Key.endsWith('.json') && obj.Key.includes('comment_') && !obj.Key.includes('reply_')) {
+      // 🚀 PERFORMANCE: Process all comments in parallel
+      const commentPromises = Contents
+        .filter(obj => obj.Key.endsWith('.json') && obj.Key.includes('comment_') && !obj.Key.includes('reply_'))
+        .map(async (obj) => {
           try {
             const getCommand = new GetObjectCommand({
               Bucket: 'tasks',
@@ -4904,21 +4937,33 @@ async function fetchInstagramComments(userId) {
             const eventData = JSON.parse(await data.Body.transformToString());
             
             if (eventData.type === 'comment') {
-              comments.push({
+              return {
                 id: eventData.comment_id,
                 user_id: eventData.sender_id,
                 text: eventData.text,
                 created_at: eventData.received_at,
                 username: eventData.username || 'unknown',
                 media_id: eventData.post_id,
-                status: eventData.status || 'pending'
-              });
+                status: eventData.status || 'pending',
+                timestamp: new Date(eventData.received_at).getTime()
+              };
             }
+            return null;
           } catch (error) {
-            console.error(`Error reading stored comment event ${obj.Key}:`, error);
+            console.error(`Error reading stored comment event ${obj.Key}:`, error.message);
+            return null;
           }
-        }
-      }
+        });
+      
+      // Wait for all parallel operations to complete
+      const commentResults = await Promise.all(commentPromises);
+      
+      // Filter out nulls and sort by timestamp (newest first)
+      commentResults
+        .filter(comment => comment !== null)
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, limit)
+        .forEach(comment => comments.push(comment));
     }
 
     return comments;
@@ -6729,12 +6774,26 @@ app.post(['/ignore-notification/:userId', '/api/ignore-notification/:userId'], a
   }
 });
 
-// List Stored Events
-app.get(['/events-list/:userId', '/api/events-list/:userId'], async (req, res) => {
-  res.setHeader('Cache-Control', 'no-store'); // Always return fresh data for notifications
+// List Stored Events - OPTIMIZED WITH PAGINATION AND PARALLEL PROCESSING
+// Apply intelligent caching for notifications (30 second TTL)
+app.get(['/events-list/:userId', '/api/events-list/:userId'], 
+  cacheMiddleware('notifications', (req) => [
+    req.params.userId, 
+    req.query.platform || 'instagram',
+    req.query.limit || '50',
+    req.query.offset || '0',
+    req.query.filterStatus || ''
+  ]),
+  async (req, res) => {
   const { userId } = req.params;
   const platform = req.query.platform || 'instagram';
   const forceRefresh = req.query.forceRefresh === 'true';
+  
+  // 🚀 PERFORMANCE: Add pagination parameters
+  const limit = parseInt(req.query.limit) || 50; // Default 50 notifications
+  const offset = parseInt(req.query.offset) || 0;
+  const sortBy = req.query.sortBy || 'timestamp'; // timestamp or status
+  const filterStatus = req.query.filterStatus || 'pending'; // pending, all, handled
 
   try {
     // Clear cache if force refresh is requested
@@ -6748,46 +6807,76 @@ app.get(['/events-list/:userId', '/api/events-list/:userId'], async (req, res) =
       console.log(`[${new Date().toISOString()}] Force refreshing ${platform} notifications cache for ${userId}`);
     }
 
+    const fetchStartTime = performance.now();
     let notifications = [];
+    let totalCount = 0;
+    
+    // 🚀 PERFORMANCE: Fetch with pagination and early filtering
     if (platform === 'instagram') {
       try {
-        notifications = await fetchInstagramNotifications(userId);
+        // Pass pagination params to fetch only what's needed
+        notifications = await fetchInstagramNotifications(userId, limit * 2, 0); // Fetch 2x for filtering buffer
+        totalCount = notifications.length;
       } catch (error) {
         if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
           console.warn(`[events-list] No Instagram notifications found for userId=${userId}`);
-          return res.json([]);
+          return res.json({ notifications: [], total: 0, offset, limit });
         }
         throw error;
       }
     } else if (platform === 'twitter') {
       try {
-        notifications = await fetchTwitterNotifications(userId);
+        notifications = await fetchTwitterNotifications(userId, limit * 2, 0);
+        totalCount = notifications.length;
       } catch (error) {
         if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
           console.warn(`[events-list] No Twitter notifications found for userId=${userId}`);
-          return res.json([]);
+          return res.json({ notifications: [], total: 0, offset, limit });
         }
         throw error;
       }
     } else if (platform === 'facebook') {
       try {
         // For Facebook, pass forceRefresh flag to enable API fallback when R2 is empty
-        notifications = await fetchFacebookNotifications(userId, forceRefresh);
+        notifications = await fetchFacebookNotifications(userId, forceRefresh, limit * 2, 0);
+        totalCount = notifications.length;
       } catch (error) {
         if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
           console.warn(`[events-list] No Facebook notifications found for userId=${userId}`);
-          return res.json([]);
+          return res.json({ notifications: [], total: 0, offset, limit });
         }
         throw error;
       }
     }
 
-    // 🛡️ APPLY STRONGEST FILTERING: Remove handled notifications AND own account notifications
-    console.log(`[${new Date().toISOString()}] Raw ${platform} notifications fetched: ${notifications.length}`);
-    notifications = await filterHandledNotifications(notifications, userId, platform);
-    console.log(`[${new Date().toISOString()}] After filtering ${platform} notifications: ${notifications.length}`);
+    // 🛡️ OPTIMIZED FILTERING: Filter with status preference
+    const filterStartTime = performance.now();
+    console.log(`[PERFORMANCE] Raw ${platform} notifications fetched: ${notifications.length} in ${(filterStartTime - fetchStartTime).toFixed(0)}ms`);
+    
+    // Apply filtering based on filterStatus parameter
+    if (filterStatus !== 'all') {
+      notifications = await filterHandledNotifications(notifications, userId, platform, filterStatus);
+    }
+    
+    // Apply final pagination after filtering
+    const paginatedNotifications = notifications.slice(offset, offset + limit);
+    
+    const totalTime = performance.now() - fetchStartTime;
+    console.log(`[PERFORMANCE] After filtering ${platform} notifications: ${notifications.length} -> ${paginatedNotifications.length} in ${totalTime.toFixed(0)}ms total`);
 
-    res.json(notifications);
+    // Return paginated response with metadata
+    res.json({
+      notifications: paginatedNotifications,
+      total: notifications.length,
+      offset,
+      limit,
+      hasMore: notifications.length > (offset + limit),
+      performance: {
+        fetchTime: (filterStartTime - fetchStartTime).toFixed(0),
+        filterTime: (performance.now() - filterStartTime).toFixed(0),
+        totalTime: totalTime.toFixed(0)
+      }
+    });
   } catch (error) {
     console.error(`[events-list] Error fetching ${platform} notifications for userId=${userId}:`, error);
     res.status(500).json({ error: `Failed to fetch ${platform} notifications`, details: error.message });
@@ -6795,7 +6884,8 @@ app.get(['/events-list/:userId', '/api/events-list/:userId'], async (req, res) =
 });
 
 // Helper function to filter out handled/replied/ignored notifications AND own account notifications
-async function filterHandledNotifications(notifications, userId, platform) {
+// 🚀 PERFORMANCE: Optimized with parallel processing and early exit
+async function filterHandledNotifications(notifications, userId, platform, filterStatus = 'pending') {
   if (!notifications || notifications.length === 0) {
     return notifications;
   }
@@ -6959,13 +7049,16 @@ async function filterHandledNotifications(notifications, userId, platform) {
 
 
 
-async function fetchInstagramNotifications(userId) {
+async function fetchInstagramNotifications(userId, limit = 50, offset = 0) {
+  const startTime = performance.now();
   try {
-    // Fetch Instagram DMs
-    const dms = await fetchInstagramDMs(userId);
+    // 🚀 PERFORMANCE: Fetch DMs and comments in parallel with limits
+    const [dms, comments] = await Promise.all([
+      fetchInstagramDMs(userId, limit + offset),
+      fetchInstagramComments(userId, limit + offset)
+    ]);
     
-    // Fetch Instagram comments
-    const comments = await fetchInstagramComments(userId);
+    console.log(`[PERFORMANCE] Instagram notifications fetch: ${dms.length} DMs, ${comments.length} comments in ${(performance.now() - startTime).toFixed(0)}ms`);
     
     // Combine and format notifications
     let notifications = [
@@ -6975,10 +7068,10 @@ async function fetchInstagramNotifications(userId) {
         sender_id: dm.sender_id,
         message_id: dm.id,
         text: dm.text,
-        timestamp: new Date(dm.created_at).getTime(),
+        timestamp: dm.timestamp || new Date(dm.created_at).getTime(),
         received_at: dm.created_at,
         username: dm.sender_username,
-        status: 'pending',
+        status: dm.status || 'pending',
         platform: 'instagram'
       })),
       ...comments.map(comment => ({
@@ -6988,18 +7081,23 @@ async function fetchInstagramNotifications(userId) {
         comment_id: comment.id,
         text: comment.text,
         post_id: comment.media_id,
-        timestamp: new Date(comment.created_at).getTime(),
+        timestamp: comment.timestamp || new Date(comment.created_at).getTime(),
         received_at: comment.created_at,
         username: comment.username,
-        status: 'pending',
+        status: comment.status || 'pending',
         platform: 'instagram'
       }))
     ];
 
-    // Sort notifications by timestamp (newest first)
+    // Sort notifications by timestamp (newest first) and apply pagination
     notifications.sort((a, b) => b.timestamp - a.timestamp);
+    
+    // Apply offset and limit for pagination
+    const paginatedNotifications = notifications.slice(offset, offset + limit);
+    
+    console.log(`[PERFORMANCE] Returning ${paginatedNotifications.length} notifications (offset: ${offset}, limit: ${limit})`);
 
-    return notifications;
+    return paginatedNotifications;
   } catch (error) {
     console.error('Error fetching Instagram notifications:', error);
     throw error;
@@ -16599,6 +16697,40 @@ app.delete(['/platform-reset/:userId', '/api/platform-reset/:userId'], async (re
 });
 
 // ===============================================================
+// PERFORMANCE MONITORING ENDPOINT
+// ===============================================================
+app.get(['/api/performance/stats', '/performance/stats'], (req, res) => {
+  setCorsHeaders(res);
+  
+  const stats = cacheManager.getStats();
+  const uptime = process.uptime();
+  const memUsage = process.memoryUsage();
+  
+  res.json({
+    success: true,
+    data: {
+      cache: stats,
+      server: {
+        uptime: Math.floor(uptime),
+        uptimeReadable: `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m`,
+        memory: {
+          rss: `${Math.round(memUsage.rss / 1024 / 1024)}MB`,
+          heapTotal: `${Math.round(memUsage.heapTotal / 1024 / 1024)}MB`,
+          heapUsed: `${Math.round(memUsage.heapUsed / 1024 / 1024)}MB`,
+          external: `${Math.round(memUsage.external / 1024 / 1024)}MB`
+        }
+      },
+      optimizations: {
+        parallelFetching: 'enabled',
+        caching: 'enabled',
+        pagination: 'enabled',
+        serverSideFiltering: 'enabled'
+      }
+    }
+  });
+});
+
+// ===============================================================
 // PROCESSING STATUS ENDPOINTS (cross-device sync)
 // Persist per-user, per-platform processing timers in R2 so all devices see the same state
 // Path: ProcessingStatus/<userId>/<platform>.json
@@ -16742,7 +16874,10 @@ app.delete(['/platform-access/:userId', '/api/platform-access/:userId'], async (
   }
 });
 
-app.get(['/processing-status/:userId', '/api/processing-status/:userId'], async (req, res) => {
+// Apply intelligent caching for processing status (10 second TTL)
+app.get(['/processing-status/:userId', '/api/processing-status/:userId'], 
+  cacheMiddleware('processingStatus', (req) => [req.params.userId, req.query.platform || 'all']),
+  async (req, res) => {
   setCorsHeaders(res);
   try {
     const { userId } = req.params;
@@ -16776,13 +16911,14 @@ app.get(['/processing-status/:userId', '/api/processing-status/:userId'], async 
     }
 
     // Otherwise, list all platforms for this user
+    const startTime = Date.now();
     const prefix = `ProcessingStatus/${userId}/`;
     const list = await s3Client.send(new ListObjectsV2Command({ Bucket: 'tasks', Prefix: prefix }));
     const items = list.Contents || [];
-    const results = {};
-
-    for (const obj of items) {
-      if (!obj.Key) continue;
+    
+    // 🚀 OPTIMIZATION: Fetch all processing statuses in parallel
+    const fetchPromises = items.map(async (obj) => {
+      if (!obj.Key) return null;
       try {
         const get = await s3Client.send(new GetObjectCommand({ Bucket: 'tasks', Key: obj.Key }));
         const body = await streamToString(get.Body);
@@ -16791,12 +16927,27 @@ app.get(['/processing-status/:userId', '/api/processing-status/:userId'], async 
           data.active = Date.now() < Number(data.endTime);
         }
         const filePlatform = obj.Key.replace(prefix, '').replace('.json', '');
-        results[filePlatform] = data;
+        return { platform: filePlatform, data };
       } catch (err) {
-        // Skip corrupted entries
+        console.warn(`[${new Date().toISOString()}] Failed to fetch ${obj.Key}:`, err.message);
+        return null; // Skip corrupted entries
+      }
+    });
+
+    // Wait for all fetches to complete in parallel
+    const allResults = await Promise.all(fetchPromises);
+    
+    // Build results object from successful fetches
+    const results = {};
+    for (const result of allResults) {
+      if (result && result.platform && result.data) {
+        results[result.platform] = result.data;
       }
     }
 
+    const endTime = Date.now();
+    console.log(`[${new Date().toISOString()}] [PERFORMANCE] Fetched ${Object.keys(results).length} processing statuses in ${endTime - startTime}ms (parallel)`);
+    
     return res.json({ success: true, data: results });
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Error fetching processing status:`, error);
@@ -16809,6 +16960,9 @@ app.post(['/processing-status/:userId', '/api/processing-status/:userId'], async
   try {
     const { userId } = req.params;
     const { platform, startTime, endTime, totalDuration, username } = req.body || {};
+    
+    // 🚀 CACHE INVALIDATION: Clear cache when processing status changes
+    cacheManager.invalidate('processingStatus', userId, platform || 'all');
 
     const allowed = ['instagram', 'twitter', 'facebook', 'linkedin'];
     if (!platform || !allowed.includes(platform)) {
@@ -16839,6 +16993,9 @@ app.post(['/processing-status/:userId', '/api/processing-status/:userId'], async
     }));
 
     console.log(`[${new Date().toISOString()}] Saved processing status for ${platform}/${userId} (ends ${endTime})`);
+    
+    // Invalidate related caches that depend on processing status
+    cacheManager.invalidateRelated('processingStatus', userId, platform);
     return res.json({ success: true, data: payload });
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Error saving processing status:`, error);
@@ -16850,7 +17007,13 @@ app.delete(['/processing-status/:userId', '/api/processing-status/:userId'], asy
   setCorsHeaders(res);
   try {
     const { userId } = req.params;
-    const { platform } = req.body || {};
+    const { platform } = req.body;
+    
+    // 🚀 CACHE INVALIDATION: Clear cache when processing status is deleted
+    if (platform) {
+      cacheManager.invalidate('processingStatus', userId, platform);
+      cacheManager.invalidate('processingStatus', userId, 'all');
+    }
     const allowed = ['instagram', 'twitter', 'facebook', 'linkedin'];
     if (!platform || !allowed.includes(platform)) {
       return res.status(400).json({ success: false, error: 'Valid platform is required' });

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './ChatModal.css';
+import useFeatureTracking from '../../hooks/useFeatureTracking';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -36,6 +37,8 @@ const ChatModal: React.FC<ChatModalProps> = ({
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [conversationTracked, setConversationTracked] = useState(false);
+  const { trackRealDiscussion, canUseFeature } = useFeatureTracking();
 
   // Platform configuration
   const platformConfig = {
@@ -109,18 +112,56 @@ const ChatModal: React.FC<ChatModalProps> = ({
     }
   }, [open]);
 
+  // Reset tracking state when modal closes so a new session can be tracked next time
+  useEffect(() => {
+    if (!open) {
+      setConversationTracked(false);
+    }
+  }, [open]);
+
+  // Unified send handler with access checks and one-time discussion tracking
+  const sendMessage = async (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || isProcessing) return;
+
+    // Pre-action access check
+    const access = canUseFeature('discussions');
+    if (!access.allowed) {
+      alert(access.reason || 'Discussions feature is not available');
+      return;
+    }
+
+    try {
+      // Track only once per conversation session
+      if (!conversationTracked) {
+        const tracked = await trackRealDiscussion(platform, {
+          messageCount: 1,
+          type: 'chat'
+        });
+        if (!tracked) {
+          // If tracking fails due to limits, do not send message
+          return;
+        }
+        setConversationTracked(true);
+      }
+    } catch (err) {
+      console.error('[Instagram ChatModal] Discussion tracking error:', err);
+      // Continue to send message even if logging fails
+    }
+
+    if (onSendMessage) {
+      onSendMessage(trimmed);
+    }
+    setNewMessage('');
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newMessage.trim() && onSendMessage && !isProcessing) {
-      onSendMessage(newMessage);
-      setNewMessage('');
-    }
+    void sendMessage(newMessage);
   };
 
   const handlePreemptiveQuestion = (question: string) => {
-    if (onSendMessage && !isProcessing) {
-      onSendMessage(question);
-    }
+    void sendMessage(question);
   };
 
   // Function to extract platform-specific accounts from a message

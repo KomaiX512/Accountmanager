@@ -311,10 +311,12 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       return;
     }
     try {
-      console.log(`[PlatformDashboard] ⚡ Fetching data efficiently for ${platform}`);
+      console.log(`[PlatformDashboard] ⚡ PERFORMANCE: Fetching all data in parallel for ${platform}`);
+      const startTime = performance.now();
       const platformParam = `?platform=${platform}`;
       
-      const [responsesData, strategiesData, postsData, competitorData] = await Promise.all([
+      // 🚀 PERFORMANCE OPTIMIZATION: Execute ALL requests in parallel
+      const [responsesData, strategiesData, postsData, competitorData, profileData, notificationsData] = await Promise.all([
         axios.get(appendBypassParam(`/api/responses/${accountHolder}${platformParam}`, platform, accountHolder, 'responses')).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
@@ -338,8 +340,73 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
               throw err;
             })
           )
-        )
+        ),
+        // 🚀 PARALLEL PROFILE FETCH - No more sequential blocking
+        axios.get(appendBypassParam(`/api/profile-info/${accountHolder}${platformParam}&forceRefresh=true`, platform, accountHolder, 'profile')).catch(err => {
+          console.warn(`Profile info fetch failed:`, err);
+          return { data: null };
+        }),
+        // 🚀 PARALLEL NOTIFICATIONS FETCH with pagination
+        (() => {
+          const currentUserId = platform === 'twitter' ? twitterId : 
+                               platform === 'facebook' ? facebookPageId :
+                               igUserId;
+          if (currentUserId) {
+            return fetch(`/events-list/${currentUserId}?platform=${platform}&limit=50`).then(res => res.json()).then(data => {
+              // Handle both old array format and new paginated format
+              if (Array.isArray(data)) {
+                return data;
+              } else if (data && data.notifications) {
+                console.log(`[PERFORMANCE] Notifications loaded: ${data.notifications.length} of ${data.total} in ${data.performance?.totalTime}ms`);
+                return data.notifications;
+              }
+              return [];
+            }).catch(err => {
+              console.warn(`Notifications fetch failed:`, err);
+              return [];
+            });
+          }
+          return Promise.resolve([]);
+        })()
       ]);
+
+      const endTime = performance.now();
+      console.log(`[PlatformDashboard] ⚡ PERFORMANCE: All data fetched in ${(endTime - startTime).toFixed(0)}ms`);
+
+      // Process profile data
+      if (profileData.data) {
+        const rawData = profileData.data;
+        let processedProfileData = null;
+        
+        if (platform === 'twitter' && rawData && rawData.username) {
+          processedProfileData = {
+            username: rawData.username,
+            fullName: rawData.name || rawData.username,
+            biography: rawData.bio || rawData.description || '',
+            followersCount: rawData.follower_count ?? rawData.followersCount ?? 0,
+            followsCount: rawData.following_count ?? rawData.followsCount ?? 0,
+            postsCount: rawData.tweet_count ?? rawData.postsCount ?? 0,
+            externalUrl: rawData.website || rawData.externalUrl || '',
+            profilePicUrl: rawData.profile_image_url || rawData.profilePicUrl || '',
+            profilePicUrlHD: rawData.profile_image_url || rawData.profilePicUrlHD || rawData.profilePicUrl || '',
+            private: rawData.protected ?? false,
+            verified: rawData.verified ?? false,
+            platform: 'twitter',
+            extractedAt: new Date().toISOString()
+          };
+        } else {
+          processedProfileData = rawData;
+        }
+        
+        if (processedProfileData && (processedProfileData.fullName || processedProfileData.followersCount !== undefined)) {
+          setProfileInfo(processedProfileData);
+        }
+      }
+
+      // Process notifications
+      if (Array.isArray(notificationsData) && notificationsData.length > 0) {
+        setNotifications(notificationsData);
+      }
 
       // Defensive checks for array data before setting state
       setResponses(Array.isArray(responsesData.data) ? responsesData.data : []);
@@ -355,7 +422,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       console.error(`Error refreshing ${platform} data:`, error);
       setToast(`Failed to load ${platform} dashboard data.`);
     }
-  }, [accountHolder, platform, accountType, competitors]);
+  }, [accountHolder, platform, accountType, competitors, twitterId, facebookPageId, igUserId]);
 
   const fetchProfileInfo = useCallback(async (retryCount = 0, forceRefresh = false) => {
     const maxRetries = 3;

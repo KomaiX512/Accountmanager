@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'vps-main',
+      name: 'main-api',
       script: 'server/server.js',
       instances: parseInt(process.env.MAIN_INSTANCES || '3', 10),
       exec_mode: 'cluster',
@@ -22,7 +22,7 @@ module.exports = {
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z'
     },
     {
-      name: 'vps-rag',
+      name: 'rag-server',
       script: 'rag-server.js',
       instances: parseInt(process.env.RAG_INSTANCES || '1', 10),
       exec_mode: 'cluster',
@@ -43,7 +43,7 @@ module.exports = {
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z'
     },
     {
-      name: 'vps-proxy',
+      name: 'proxy-server',
       script: 'server.js',
       instances: parseInt(process.env.PROXY_INSTANCES || '2', 10),
       exec_mode: 'cluster',

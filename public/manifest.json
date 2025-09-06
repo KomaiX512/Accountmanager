@@ -1,13 +1,15 @@
 {
-  "name": "Sentient Marketing",
-  "short_name": "Sentient",
-  "description": "AI-powered social media management platform",
+  "name": "Sentient Marketing - AI Social Media Management",
+  "short_name": "Sentient Marketing",
+  "description": "Transform your social media presence with cutting-edge AI that thinks, learns, and grows your brand across Instagram, Twitter, Facebook, and more. Automated content creation, scheduling, and analytics.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#2c3e50",
   "orientation": "portrait-primary",
   "scope": "/",
+  "lang": "en",
+  "dir": "ltr",
   "icons": [
     {
       "src": "/icons/icon-72x72.png",

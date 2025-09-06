@@ -342,7 +342,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           )
         ),
         // 🚀 PARALLEL PROFILE FETCH - No more sequential blocking
-        axios.get(appendBypassParam(`/api/profile-info/${accountHolder}${platformParam}&forceRefresh=true`, platform, accountHolder, 'profile')).catch(err => {
+        axios.get(appendBypassParam(`/api/profile-info/${accountHolder}${platformParam}`, platform, accountHolder, 'profile')).catch(err => {
           console.warn(`Profile info fetch failed:`, err);
           return { data: null };
         }),
@@ -462,7 +462,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       
       let response;
       let profileData = null;
-      const platformParam = `?platform=${platform}&forceRefresh=true`;
+      const platformParam = `?platform=${platform}`;
       response = await axios.get(appendBypassParam(`/api/profile-info/${accountHolder}${platformParam}`, platform, accountHolder, 'profile'));
       const rawData = response.data;
       if (platform === 'twitter' && rawData && rawData.username) {

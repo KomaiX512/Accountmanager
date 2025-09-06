@@ -649,7 +649,7 @@ const MainDashboard: React.FC = () => {
   useEffect(() => {
     if (!currentUser?.uid) return;
 
-    const checkForCompletedPlatforms = () => {
+    const runPlatformCompletionCheck = () => {
       const platforms = ['instagram', 'twitter', 'facebook', 'linkedin'];
       let hasCompletion = false;
 
@@ -676,10 +676,10 @@ const MainDashboard: React.FC = () => {
     };
 
     // Check immediately
-    checkForCompletedPlatforms();
+    runPlatformCompletionCheck();
 
     // Check every 2 seconds for platform completion
-    const completionInterval = setInterval(checkForCompletedPlatforms, 2000);
+    const completionInterval = setInterval(runPlatformCompletionCheck, 2000);
     
     return () => clearInterval(completionInterval);
   }, [currentUser?.uid, platformLoadingStates, completePlatformLoading]);

@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useAcquiredPlatforms } from '../context/AcquiredPlatformsContext';
 import axios from 'axios';
 import { AnimatePresence } from 'framer-motion';
+import PlatformSEO from '../components/seo/PlatformSEO';
 
 const Facebook: React.FC = () => {
   const { currentUser } = useAuth();
@@ -232,16 +233,19 @@ const Facebook: React.FC = () => {
   }
 
   return (
-    <div className="facebook-page">
-      <AnimatePresence mode="wait">
-        <FB_EntryUsernames
-          key="entry"
-          onSubmitSuccess={handleSubmitSuccess}
-          redirectIfCompleted={false}
-          markPlatformAccessed={(id) => markPlatformAsAcquired(id)}
-        />
-      </AnimatePresence>
-    </div>
+    <>
+      <PlatformSEO platform="facebook" />
+      <div className="facebook-page">
+        <AnimatePresence mode="wait">
+          <FB_EntryUsernames
+            key="entry"
+            onSubmitSuccess={handleSubmitSuccess}
+            redirectIfCompleted={false}
+            markPlatformAccessed={(id) => markPlatformAsAcquired(id)}
+          />
+        </AnimatePresence>
+      </div>
+    </>
   );
 };
 

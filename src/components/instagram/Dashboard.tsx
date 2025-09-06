@@ -463,7 +463,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
       const now = Date.now();
       // Single canonical path: always pass explicit platform to avoid confusion
       console.log(`[${new Date().toISOString()}] Fetching Instagram profile info for ${accountHolder}`);
-      const response = await axios.get(`/api/profile-info/${accountHolder}?platform=instagram&forceRefresh=true`);
+      const response = await axios.get(`/api/profile-info/${accountHolder}?platform=instagram`);
       
       // 🎯 CRITICAL DEBUG: Log the exact response to understand data structure
       console.log(`[${new Date().toISOString()}] Profile Info Response:`, response.data);
@@ -1365,25 +1365,24 @@ Image Description: ${response.post.image_prompt}
       return;
     }
     try {
-      const forceRefresh = firstLoadRef.current;
       const [responsesData, strategiesData, postsData, competitorData] = await Promise.all([
-        axios.get(`/api/responses/${accountHolder}${forceRefresh ? '?forceRefresh=true' : ''}`).catch(err => {
+        axios.get(`/api/responses/${accountHolder}`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
         // ✅ FIX: Use correct recommendations endpoint instead of retrieve-strategies
-        axios.get(`/api/recommendations/${accountHolder}?platform=instagram&forceRefresh=true`).catch(err => {
+        axios.get(`/api/recommendations/${accountHolder}?platform=instagram`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        axios.get(`/api/posts/${accountHolder}${forceRefresh ? '?forceRefresh=true' : ''}`).catch(err => {
+        axios.get(`/api/posts/${accountHolder}`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
         // ✅ FIX: Use correct competitor analysis endpoint with platform parameter
         Promise.all(
           competitors.map(comp =>
-            axios.get(`/api/competitor-analysis/${accountHolder}/${comp}?platform=instagram&forceRefresh=true`).catch(err => {
+            axios.get(`/api/competitor-analysis/${accountHolder}/${comp}?platform=instagram`).catch(err => {
               if (err.response?.status === 404) {
                 console.warn(`No competitor data found for ${comp}`);
                 return { data: [] };
@@ -1466,7 +1465,7 @@ Image Description: ${response.post.image_prompt}
         }
         if (prefix.startsWith(`recommendations/${accountHolder}/`) || prefix.startsWith(`engagement_strategies/${accountHolder}/`)) {
           // ✅ FIX: Use correct recommendations endpoint with platform parameter
-          const endpoint = `/api/recommendations/${accountHolder}?platform=instagram&forceRefresh=true`;
+          const endpoint = `/api/recommendations/${accountHolder}?platform=instagram`;
           
           axios.get(endpoint).then(res => {
             setStrategies(res.data);
@@ -1487,7 +1486,7 @@ Image Description: ${response.post.image_prompt}
           // ✅ FIX: Use correct competitor analysis endpoint with platform parameter
           Promise.all(
             competitors.map(comp =>
-              axios.get(`/api/competitor-analysis/${accountHolder}/${comp}?platform=instagram&forceRefresh=true`).catch(err => {
+              axios.get(`/api/competitor-analysis/${accountHolder}/${comp}?platform=instagram`).catch(err => {
                 if (err.response?.status === 404) return { data: [] };
                 throw err;
               })

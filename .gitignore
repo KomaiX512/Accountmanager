@@ -107,7 +107,6 @@ ultimate-nginx-*.conf
 sentientm.nginx.conf
 
 # Scripts that are temporary
-*.sh
 !start-*.sh
 !stop-*.sh
 !install-*.sh
@@ -139,7 +138,5 @@ server-direct-fix.js
 server-monitor.js
 # rag-server.js
 create-fallback.js
-ecosystem.*.js
 
 # Ecosystem configs (keep only the main one)
-ecosystem.config.cjs

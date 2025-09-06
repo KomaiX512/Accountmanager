@@ -1,6 +1,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
 import './App.css';
 import { safeNavigate } from './utils/navigationGuard';
 import './styles/global-ui-refinements.css';
@@ -37,6 +38,8 @@ import LoadingStateGuard from './components/guards/LoadingStateGuard';
 import RagService from './services/RagService';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import { setupPlatformUsernameInterceptor } from './utils/platformUsernameInterceptor';
+import PerformanceOptimizer from './components/seo/PerformanceOptimizer';
+import GoogleAnalytics from './components/seo/GoogleAnalytics';
 
 // Extend Window interface for proxy server status and optimization tester
 declare global {
@@ -57,23 +60,25 @@ if (process.env.NODE_ENV === 'development') {
 // Main App component with AuthProvider
 const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <ProcessingProvider>
-        <UsageProvider>
-          <UpgradePopupProvider>
-            <InstagramProvider>
-              <TwitterProvider>
-                <FacebookProvider>
-                  <ErrorBoundary>
-                    <AppContent />
-                  </ErrorBoundary>
-                </FacebookProvider>
-              </TwitterProvider>
-            </InstagramProvider>
-          </UpgradePopupProvider>
-        </UsageProvider>
-      </ProcessingProvider>
-    </AuthProvider>
+    <HelmetProvider>
+      <AuthProvider>
+        <ProcessingProvider>
+          <UsageProvider>
+            <UpgradePopupProvider>
+              <InstagramProvider>
+                <TwitterProvider>
+                  <FacebookProvider>
+                    <ErrorBoundary>
+                      <AppContent />
+                    </ErrorBoundary>
+                  </FacebookProvider>
+                </TwitterProvider>
+              </InstagramProvider>
+            </UpgradePopupProvider>
+          </UsageProvider>
+        </ProcessingProvider>
+      </AuthProvider>
+    </HelmetProvider>
   );
 };
 
@@ -969,6 +974,8 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="App">
+      <GoogleAnalytics />
+      <PerformanceOptimizer />
       <TopBar />
       <UpdateNotification />
       <div className="main-content">

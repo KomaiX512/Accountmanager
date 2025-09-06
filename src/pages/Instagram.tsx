@@ -6,6 +6,7 @@ import { useAcquiredPlatforms } from '../context/AcquiredPlatformsContext';
 import axios from 'axios';
 import { AnimatePresence, motion } from 'framer-motion';
 import { safeNavigate } from '../utils/navigationGuard';
+import PlatformSEO from '../components/seo/PlatformSEO';
 
 const Instagram: React.FC = () => {
   const { currentUser } = useAuth();
@@ -148,17 +149,20 @@ const Instagram: React.FC = () => {
   }
 
   return (
-    <div className="instagram-page">
-      <AnimatePresence mode="wait">
-        <IG_EntryUsernames
-          key="entry"
-          onSubmitSuccess={handleSubmitSuccess}
-          redirectIfCompleted={false}
-          markPlatformAccessed={(id) => markPlatformAsAcquired(id)}
-          onComplete={() => {}}
-        />
-      </AnimatePresence>
-    </div>
+    <>
+      <PlatformSEO platform="instagram" />
+      <div className="instagram-page">
+        <AnimatePresence mode="wait">
+          <IG_EntryUsernames
+            key="entry"
+            onSubmitSuccess={handleSubmitSuccess}
+            redirectIfCompleted={false}
+            markPlatformAccessed={(id) => markPlatformAsAcquired(id)}
+            onComplete={() => {}}
+          />
+        </AnimatePresence>
+      </div>
+    </>
   );
 };
 

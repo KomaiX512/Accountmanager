@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { FaBrain, FaRocket, FaChartLine, FaUsers, FaInstagram, FaFacebook, FaTwitter, FaLinkedin, FaTiktok, FaYoutube, FaClock, FaCrosshairs, FaShieldAlt, FaLightbulb, FaChartBar, FaUserCheck, FaMagic, FaRobot, FaCrown } from 'react-icons/fa';
 import './Homepage.css';
 import NeuralNetwork from './NeuralNetwork';
+import SEOHead from '../seo/SEOHead';
 
 // Feature flag to control neural network rendering
 const ENABLE_NEURAL_NETWORK = false;
@@ -30,6 +31,26 @@ const Homepage: React.FC = () => {
 
   return (
     <>
+      <SEOHead 
+        title="Sentient Marketing - AI-Powered Social Media Management Platform"
+        description="Transform your social media presence with cutting-edge AI that thinks, learns, and grows your brand across Instagram, Twitter, Facebook, and more. Automated content creation, scheduling, and analytics."
+        keywords="social media management, AI marketing, Instagram automation, Twitter automation, Facebook marketing, content creation, social media scheduling, brand growth, digital marketing, AI-powered marketing"
+        canonicalUrl="https://sentientmarketing.com/"
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "WebPage",
+          "name": "Sentient Marketing - AI-Powered Social Media Management Platform",
+          "description": "Transform your social media presence with cutting-edge AI that thinks, learns, and grows your brand across Instagram, Twitter, Facebook, and more.",
+          "url": "https://sentientmarketing.com/",
+          "mainEntity": {
+            "@type": "SoftwareApplication",
+            "name": "Sentient Marketing",
+            "applicationCategory": "BusinessApplication",
+            "operatingSystem": "Web Browser"
+          }
+        }}
+      />
+      
       {/* Neural Network or Static Background */}
       {ENABLE_NEURAL_NETWORK ? (
         <NeuralNetwork mouseX={mousePosition.x} mouseY={mousePosition.y} />

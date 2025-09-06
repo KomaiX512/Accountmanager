@@ -4,6 +4,7 @@ import TW_EntryUsernames from '../components/twitter/TW_EntryUsernames';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { AnimatePresence, motion } from 'framer-motion';
+import PlatformSEO from '../components/seo/PlatformSEO';
 
 const Twitter: React.FC = () => {
   const { currentUser } = useAuth();
@@ -161,16 +162,19 @@ const Twitter: React.FC = () => {
   }
 
   return (
-    <div className="twitter-page">
-      <AnimatePresence mode="wait">
-        <TW_EntryUsernames
-          key="entry"
-          onSubmitSuccess={handleSubmitSuccess}
-          redirectIfCompleted={false}
-          markPlatformAccessed={markPlatformAccessed}
-        />
-      </AnimatePresence>
-    </div>
+    <>
+      <PlatformSEO platform="twitter" />
+      <div className="twitter-page">
+        <AnimatePresence mode="wait">
+          <TW_EntryUsernames
+            key="entry"
+            onSubmitSuccess={handleSubmitSuccess}
+            redirectIfCompleted={false}
+            markPlatformAccessed={markPlatformAccessed}
+          />
+        </AnimatePresence>
+      </div>
+    </>
   );
 };
 

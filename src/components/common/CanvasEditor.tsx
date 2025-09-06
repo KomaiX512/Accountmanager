@@ -214,19 +214,41 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
 
   // Load specific image into the TUI editor
   const loadImageIntoEditor = async (imageUrl: string) => {
-    if (!tuiInstanceRef.current) {
-      console.warn('[Canvas] Editor not ready');
+    if (!tuiInstanceRef.current || !imageUrl) {
+      console.error('[Canvas] TUI instance not ready or no image URL');
       return;
     }
 
     try {
       setIsProcessing(true);
+      
+      // Create a test image to verify URL is accessible
+      const testImg = new Image();
+      testImg.crossOrigin = 'anonymous';
+      
+      await new Promise((resolve, reject) => {
+        testImg.onload = resolve;
+        testImg.onerror = () => reject(new Error('Image URL not accessible'));
+        testImg.src = imageUrl;
+      });
+      
+      // If test passes, load into TUI editor
       await tuiInstanceRef.current.loadImageFromURL(imageUrl, 'user-upload');
       setImageLoaded(true);
       console.log('[Canvas] Image loaded into editor successfully');
     } catch (error) {
       console.error('[Canvas] Error loading image into editor:', error);
-      setNotification('Failed to load image into editor');
+      
+      // Try fallback with CORS proxy if original fails
+      try {
+        const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(imageUrl)}`;
+        await tuiInstanceRef.current.loadImageFromURL(proxyUrl, 'user-upload');
+        setImageLoaded(true);
+        console.log('[Canvas] Image loaded via proxy successfully');
+      } catch (proxyError) {
+        console.error('[Canvas] Proxy loading also failed:', proxyError);
+        setNotification('Failed to load image into editor. Please try uploading manually.');
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -1039,9 +1061,8 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
       // Wait for any ongoing operations to complete
       setTimeout(async () => {
         try {
-          await tuiInstanceRef.current.loadImageFromURL(imageUrl, 'user-upload');
-          console.log('[Canvas] Image loaded successfully');
-          setImageLoaded(true);
+          // Use our enhanced loading function with fallbacks
+          await loadImageIntoEditor(imageUrl);
           
           // Always enable Brand Kit after image is loaded (regardless of source)
           setIsEditorReady(true);
@@ -1051,7 +1072,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
             URL.revokeObjectURL(imageUrl);
           }
         } catch (error) {
-          console.error('[Canvas] Error loading image into editor:', error);
+          console.error('[Canvas] Error in loadImageFromUrl:', error);
           setNotification('Failed to load image. Please try uploading manually.');
           setIsProcessing(false);
         }

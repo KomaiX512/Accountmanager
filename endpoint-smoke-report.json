@@ -1,0 +1,174 @@
+{
+  "timestamp": "2025-09-06T19:44:23.116Z",
+  "baseUrl": "https://sentientm.com",
+  "summary": {
+    "total": 23,
+    "successful": 23,
+    "failed": 0,
+    "successRate": "100.00%",
+    "duration": "13.71s"
+  },
+  "results": [
+    {
+      "method": "POST",
+      "path": "/api/validate-dashboard-access/DOxZvirgIpXdMjAxnFUbwdm78Qy1",
+      "status": 400,
+      "success": true,
+      "response": "{\"success\":false,\"error\":\"Valid platform is required\"}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/engagement-metrics/maccosmetics?platform=instagram",
+      "status": 200,
+      "success": true,
+      "response": "{\"connected\":false,\"message\":\"Please connect with Instagram to view engagement results.\"}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/retrieve-strategies/maccosmetics?platform=instagram",
+      "status": 200,
+      "success": true,
+      "response": "[{\"key\":\"recommendations/instagram/maccosmetics/recommendation_1.json\",\"lastModified\":\"2025-08-30T22:20:50.587Z\",\"data\":{\"module_type\":\"recommendation\",\"platform\":\"instagram\",\"primary_username\":\"macco"
+    },
+    {
+      "method": "GET",
+      "path": "/api/user-instagram-status/DOxZvirgIpXdMjAxnFUbwdm78Qy1",
+      "status": 200,
+      "success": true,
+      "response": "{\"uid\":\"DOxZvirgIpXdMjAxnFUbwdm78Qy1\",\"hasEnteredInstagramUsername\":true,\"instagram_username\":\"maccosmetics\",\"lastUpdated\":\"2025-08-13T16:16:17.774Z\"}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/profile-info/maccosmetics?platform=instagram",
+      "status": 200,
+      "success": true,
+      "response": "{\"username\":\"maccosmetics\",\"fullName\":\"M·A·C Cosmetics\",\"biography\":\"All Ages, All Races, All Genders\",\"followersCount\":23980551,\"followsCount\":1365,\"postsCount\":16094,\"externalUrl\":\"https://m.maccosm"
+    },
+    {
+      "method": "GET",
+      "path": "/api/instagram-connection/DOxZvirgIpXdMjAxnFUbwdm78Qy1",
+      "status": 404,
+      "success": true,
+      "response": "{\"error\":\"No Instagram connection found\"}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/facebook-connection/DOxZvirgIpXdMjAxnFUbwdm78Qy1",
+      "status": 404,
+      "success": true,
+      "response": "{\"error\":\"No Facebook connection found\"}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/user/DOxZvirgIpXdMjAxnFUbwdm78Qy1/usage",
+      "status": 200,
+      "success": true,
+      "response": "{\"userId\":\"DOxZvirgIpXdMjAxnFUbwdm78Qy1\",\"period\":\"2025-09\",\"postsUsed\":0,\"discussionsUsed\":0,\"aiRepliesUsed\":0,\"campaignsUsed\":0,\"resetsUsed\":0,\"lastUpdated\":\"2025-09-05T07:01:43.139Z\",\"totalApiCalls"
+    },
+    {
+      "method": "GET",
+      "path": "/api/news-for-you/maccosmetics?platform=instagram",
+      "status": 200,
+      "success": true,
+      "response": "[{\"key\":\"news_for_you/instagram/maccosmetics/news_20250813_212032_maccosmetics_iteration_1.json\",\"lastModified\":\"2025-08-30T22:13:08.226Z\",\"data\":{\"username\":\"maccosmetics\",\"platform\":\"instagram\",\"exp"
+    },
+    {
+      "method": "GET",
+      "path": "/api/processing-status/DOxZvirgIpXdMjAxnFUbwdm78Qy1",
+      "status": 200,
+      "success": true,
+      "response": "{\"success\":true,\"data\":{}}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/responses/maccosmetics?platform=instagram",
+      "status": 200,
+      "success": true,
+      "response": "[]"
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard",
+      "status": 200,
+      "success": true,
+      "response": "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <link rel=\"icon\" type=\"image/png\" href=\"/Logo/logo.png\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-sca"
+    },
+    {
+      "method": "POST",
+      "path": "/webhook/facebook",
+      "status": 400,
+      "success": true,
+      "response": "Bad Request"
+    },
+    {
+      "method": "POST",
+      "path": "/api/post-generator",
+      "status": 400,
+      "success": true,
+      "response": "{\"error\":\"Username and query are required\"}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/ai-replies/maccosmetics?platform=instagram",
+      "status": 200,
+      "success": true,
+      "response": "{\"replies\":[]}"
+    },
+    {
+      "method": "POST",
+      "path": "/api/discussion",
+      "status": 400,
+      "success": true,
+      "response": "{\"error\":\"Username and query are required\"}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/rules/maccosmetics?platform=instagram",
+      "status": 404,
+      "success": true,
+      "response": "{\"error\":\"Rules not found\"}"
+    },
+    {
+      "method": "POST",
+      "path": "/api/instant-reply",
+      "status": 400,
+      "success": true,
+      "response": "{\"error\":\"Username and notification with text are required\"}"
+    },
+    {
+      "method": "GET",
+      "path": "/posts/maccosmetics?platform=instagram",
+      "status": 200,
+      "success": true,
+      "response": "[{\"key\":\"ready_post/instagram/maccosmetics/ready_post_1752874647950.json\",\"data\":{\"post\":{\"caption\":\"Want to achieve ethereal, red-carpet-ready looks like the stars of @appletv's 'The Buccaneers'? ✨ W"
+    },
+    {
+      "method": "GET",
+      "path": "/api/posts/maccosmetics?platform=instagram",
+      "status": 200,
+      "success": true,
+      "response": "[{\"key\":\"ready_post/instagram/maccosmetics/ready_post_1752874647950.json\",\"data\":{\"post\":{\"caption\":\"Want to achieve ethereal, red-carpet-ready looks like the stars of @appletv's 'The Buccaneers'? ✨ W"
+    },
+    {
+      "method": "GET",
+      "path": "/analytics",
+      "status": 200,
+      "success": true,
+      "response": "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <link rel=\"icon\" type=\"image/png\" href=\"/Logo/logo.png\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-sca"
+    },
+    {
+      "method": "GET",
+      "path": "/profile/maccosmetics",
+      "status": 200,
+      "success": true,
+      "response": "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <link rel=\"icon\" type=\"image/png\" href=\"/Logo/logo.png\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-sca"
+    },
+    {
+      "method": "GET",
+      "path": "/settings",
+      "status": 200,
+      "success": true,
+      "response": "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <link rel=\"icon\" type=\"image/png\" href=\"/Logo/logo.png\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-sca"
+    }
+  ]
+}

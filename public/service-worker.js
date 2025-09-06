@@ -6,10 +6,10 @@ const NOTIFICATION_CACHE_NAME = 'notifications-v2.0';
 const PWA_FILES = ['/manifest.json', '/icons/icon-192x192.png'];
 
 const CACHE_STRATEGIES = {
-  networkOnly: ['/api/sensitive-operation'],
+  networkOnly: ['/api/'],
   cacheFirst: ['/images/'],
-  networkFirst: ['/api/critical-data'],
-  staleWhileRevalidate: ['/api/profile-info']
+  networkFirst: [],
+  staleWhileRevalidate: []
 };
 
 // Install - minimal caching

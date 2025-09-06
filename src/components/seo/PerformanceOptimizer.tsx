@@ -4,12 +4,15 @@ const PerformanceOptimizer: React.FC = () => {
   useEffect(() => {
     // Preload critical resources
     const preloadCriticalResources = () => {
-      // Preload critical CSS
-      const criticalCSS = document.createElement('link');
-      criticalCSS.rel = 'preload';
-      criticalCSS.href = '/src/styles/global-ui-refinements.css';
-      criticalCSS.as = 'style';
-      document.head.appendChild(criticalCSS);
+      // Preload critical CSS only in development. In production, the bundler
+      // injects hashed CSS assets automatically, and this source path does not exist.
+      if (import.meta.env && import.meta.env.DEV) {
+        const criticalCSS = document.createElement('link');
+        criticalCSS.rel = 'preload';
+        criticalCSS.href = '/src/styles/global-ui-refinements.css';
+        criticalCSS.as = 'style';
+        document.head.appendChild(criticalCSS);
+      }
 
       // Preload critical fonts
       const fontPreload = document.createElement('link');

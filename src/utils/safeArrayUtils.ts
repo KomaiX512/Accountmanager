@@ -2,6 +2,8 @@
  * Safe array utilities to prevent crashes when API responses are not arrays
  */
 
+import { smartWarn, hasValidArrayData, extractArray } from './errorSuppression';
+
 /**
  * Safely filters an array, returning empty array if input is not an array
  * @param data - The data to filter (could be any type)
@@ -9,11 +11,14 @@
  * @returns Filtered array or empty array if input is not an array
  */
 export function safeFilter<T>(data: any, filterFn: (item: T, index: number, array: T[]) => boolean): T[] {
-  if (!Array.isArray(data)) {
-    console.warn('API response is not an array:', data);
+  if (!hasValidArrayData(data)) {
+    // Only warn for unexpected structures
+    if (data !== null && data !== undefined && typeof data !== 'object') {
+      smartWarn('API response is not an array or object with array properties:', data);
+    }
     return [];
   }
-  return data.filter(filterFn);
+  return extractArray(data).filter(filterFn);
 }
 
 /**
@@ -23,11 +28,14 @@ export function safeFilter<T>(data: any, filterFn: (item: T, index: number, arra
  * @returns Mapped array or empty array if input is not an array
  */
 export function safeMap<T, U>(data: any, mapFn: (item: T, index: number, array: T[]) => U): U[] {
-  if (!Array.isArray(data)) {
-    console.warn('API response is not an array:', data);
+  if (!hasValidArrayData(data)) {
+    // Only warn for unexpected structures
+    if (data !== null && data !== undefined && typeof data !== 'object') {
+      smartWarn('API response is not an array or object with array properties:', data);
+    }
     return [];
   }
-  return data.map(mapFn);
+  return extractArray(data).map(mapFn);
 }
 
 /**

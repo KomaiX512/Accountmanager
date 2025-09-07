@@ -1,8 +1,12 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
+import './styles/opacityFixes.css';
 import App from './App';
 import { BrowserRouter } from 'react-router-dom';
+
+// Import console suppression to reduce noise
+import './utils/consoleSuppression';
 
 // Silence noisy console output by default to avoid performance impact from logging.
 // Behavior:

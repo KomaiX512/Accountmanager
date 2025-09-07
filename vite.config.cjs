@@ -14,16 +14,47 @@ module.exports = defineConfig({
       '78291997257a.ngrok-free.app' // Specific ngrok host
     ],
     proxy: {
-      // Proxy posts endpoint to the PROXY server (port 3002) where extension detection works
-      '/posts': {
-        target: 'http://127.0.0.1:3002',
+      // Proxy posts endpoint to the MAIN server (port 3000) where it works correctly
+      '/api/posts': {
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
         onError: (err, req, res) => {
           console.warn('[Vite Proxy] Posts endpoint error:', err.message);
           res.writeHead(503, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Service temporarily unavailable' }));
+          res.end(JSON.stringify({ error: 'Posts service temporarily unavailable' }));
         }
+      },
+      // Proxy NON-API endpoints that were missing (like retrieve-strategies, retrieve, campaign-status, etc.)
+      '/retrieve-strategies': {
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/retrieve-strategies/, '/api/retrieve-strategies')
+      },
+      '/retrieve': {
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/retrieve/, '/api/retrieve')
+      },
+      '/campaign-status': {
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/campaign-status/, '/api/campaign-status')
+      },
+      '/instagram-token-check': {
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/instagram-token-check/, '/api/instagram-token-check')
+      },
+      '/posts': {
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/posts/, '/api/posts')
       },
       // Proxy health check to the proxy server to check the correct service
       '/health': {

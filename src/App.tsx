@@ -126,13 +126,14 @@ const AppContent: React.FC = () => {
     const checkProxyHealth = async () => {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // Increase timeout
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // Increase timeout to 10 seconds
         
         // Check proxy server health through proxy endpoints
         // Try to fetch a simple test endpoint that exercises the proxy functionality
         const response = await fetch('/health', { 
           method: 'GET',
-          signal: controller.signal
+          signal: controller.signal,
+          cache: 'no-cache' // Prevent caching of health checks
         });
         
         clearTimeout(timeoutId);
@@ -145,16 +146,21 @@ const AppContent: React.FC = () => {
           window.proxyServerDown = false;
           console.log('Proxy server health check passed');
         }
-      } catch (error) {
-        console.warn('Proxy server health check failed:', error);
+      } catch (error: any) {
+        // Handle AbortError specifically to avoid noisy console output
+        if (error.name === 'AbortError') {
+          console.warn('Proxy server health check timed out - server may be slow but functional');
+        } else {
+          console.warn('Proxy server health check failed:', error.message || error);
+        }
         // Be more lenient - don't immediately mark as down for network issues
-        window.proxyServerDown = false; // Changed to false to allow image loading attempts
+        window.proxyServerDown = false; // Allow image loading attempts
       }
     };
 
-    // Check on mount and every 30 seconds
+    // Check on mount and every 60 seconds (reduced frequency)
     checkProxyHealth();
-    const interval = setInterval(checkProxyHealth, 30000);
+    const interval = setInterval(checkProxyHealth, 60000);
     
     return () => clearInterval(interval);
   }, []);

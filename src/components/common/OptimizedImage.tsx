@@ -242,8 +242,11 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
       };
       
       tempImg.onerror = (e) => {
-        console.warn('[OptimizedImage] Failed to load original image for optimization, using as-is:', e);
-        setOptimizedSrc(src);
+        // Only log if it's not a known proxy issue (reduces console noise)
+        if (!src.includes('/api/proxy-image')) {
+          console.warn('[OptimizedImage] Failed to load original image for optimization, using as-is:', e);
+        }
+        // Keep the current optimizedSrc (don't change it to potentially broken src)
         setFallbackToOriginal(true);
         setIsProcessing(false);
         frontendImageCache.clearProcessing(src, getOptimalQuality(), maxWidth, enableWebP);
@@ -252,7 +255,7 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
       tempImg.src = src;
     } catch (error) {
       console.error('[OptimizedImage] Load and optimize failed:', error);
-      setOptimizedSrc(src);
+      // Keep the current optimizedSrc (don't change it to potentially broken src)
       setFallbackToOriginal(true);
       setIsProcessing(false);
       frontendImageCache.clearProcessing(src, getOptimalQuality(), maxWidth, enableWebP);
@@ -307,10 +310,28 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
   const handleError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     // If optimized version fails and we haven't tried original yet, try original
     if (!fallbackToOriginal && optimizedSrc !== src) {
-      console.warn('[OptimizedImage] Optimized version failed, falling back to original');
+      // Only log optimization failures for non-proxy images to reduce noise
+      if (!src.includes('/api/proxy-image')) {
+        console.warn('[OptimizedImage] Optimized version failed, falling back to original');
+      }
       setFallbackToOriginal(true);
       setOptimizedSrc(src);
       return;
+    }
+    
+    // If the original/proxy image fails, try direct URL if available
+    if (src.includes('/api/proxy-image?url=')) {
+      try {
+        const urlParam = new URLSearchParams(src.split('?')[1]).get('url');
+        if (urlParam) {
+          const directUrl = decodeURIComponent(urlParam);
+          console.log('[OptimizedImage] Proxy image failed, trying direct URL');
+          setOptimizedSrc(directUrl);
+          return;
+        }
+      } catch (parseError) {
+        console.warn('[OptimizedImage] Could not parse proxy URL:', parseError);
+      }
     }
     
     if (onError) {

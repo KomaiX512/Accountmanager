@@ -545,14 +545,17 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
       }
       
       const data = await response.json();
-      console.log(`[${new Date().toISOString()}] Received ${data.length} notifications`);
+      
+      // Ensure data is an array before processing
+      const notifications = Array.isArray(data) ? data : (data?.notifications || data?.items || []);
+      console.log(`[${new Date().toISOString()}] Received ${notifications.length} notifications`);
 
       // Now fetch AI replies separately to merge them
       const aiReplies = await RagService.fetchAIReplies(accountHolder, 'instagram');
       console.log(`[${new Date().toISOString()}] Received ${aiReplies.length} AI replies`);
       
       // Process notifications to include AI replies
-      const processedNotifications = data.map((notif: any) => {
+      const processedNotifications = notifications.map((notif: any) => {
         // Try to find a matching AI reply for this notification
         const matchingAiReply = aiReplies.find(pair => {
           const isMatchingType = pair.type === (notif.type === 'message' ? 'dm' : 'comment');

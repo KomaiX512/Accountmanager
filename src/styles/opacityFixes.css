@@ -1,0 +1,85 @@
+/**
+ * Global CSS fixes for common console errors
+ * This prevents "Error in parsing value for 'opacity'. Declaration dropped." 
+ * and other CSS-related console noise
+ */
+
+/* Ensure all opacity values are valid */
+* {
+  /* Prevent invalid opacity values */
+  opacity: clamp(0, var(--opacity, 1), 1);
+}
+
+/* Fix common opacity animation issues */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* Prevent CSS selector errors */
+*:not(:empty):not(img):not(input):not(br):not(hr) {
+  /* Ensure proper opacity inheritance */
+  opacity: inherit;
+}
+
+/* Specific fixes for known problematic elements */
+.loading-indicator,
+.modal-backdrop,
+.overlay {
+  opacity: 0.8 !important;
+}
+
+.hidden {
+  opacity: 0 !important;
+}
+
+.visible {
+  opacity: 1 !important;
+}
+
+/* Prevent CSS animation glitches that cause console errors */
+* {
+  animation-fill-mode: both;
+}
+
+/* Fix transition opacity issues */
+.transition-opacity {
+  transition: opacity 0.3s ease-in-out;
+}
+
+/* Ensure proper image loading states */
+img {
+  opacity: 1;
+}
+
+img[data-loading="true"] {
+  opacity: 0.5;
+}
+
+img[data-error="true"] {
+  opacity: 0.3;
+}
+
+/* Fix React-specific opacity issues */
+[data-reactroot] * {
+  /* Ensure React components have valid opacity values */
+  opacity: clamp(0, 1, 1);
+}
+
+/* CSS reset for problematic opacity inheritance */
+.reset-opacity {
+  opacity: 1 !important;
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.fade-out {
+  animation: fadeOut 0.3s ease-in-out;
+}

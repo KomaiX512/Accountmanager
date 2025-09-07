@@ -1113,71 +1113,77 @@ async function fetchImageWithFallbacks(key, fallbackImagePath = null, username =
       }
     }
     
-    // If username and filename are provided, check for alternate image names
+    // If username and filename are provided, check for alternate image names and platform directories
     if (username && filename) {
-      // Try different timestamp formats that might exist
-      const timestampMatch = filename.match(/_(\\d+)\.(jpg|jpeg|png|webp)$/i);
-      if (timestampMatch && timestampMatch[1]) {
-        const timestamp = parseInt(timestampMatch[1]);
-        // Derive platform segment (instagram, facebook, etc.) from the original key
-        let platformSeg = 'instagram';
-        if (key.startsWith('ready_post/')) {
-          const segs = key.split('/');
-          if (segs.length >= 2) platformSeg = segs[1];
-        }
-        // Build exhaustive alternative keys covering every valid extension and possible timestamp drift
-        const alternativeKeys = [];
-        const exts = ['jpg','jpeg','png','webp'];
-        const baseDirs = ['ready_post', 'scheduled_posts'];
-        // Derive baseName without extension (if any)
-        const baseName = filename.replace(/\.(jpg|jpeg|png|webp)$/i, '');
-        for (const dir of baseDirs) {
-          for (const ext of exts) {
-            alternativeKeys.push(`${dir}/${platformSeg}/${username}/${baseName}.${ext}`);
-          }
-        }
+      // Derive platform segment (instagram, twitter, facebook) from the original clean key
+      let platformSeg = 'instagram';
+      if (cleanKey.startsWith('ready_post/')) {
+        const segs = cleanKey.split('/');
+        if (segs.length >= 2) platformSeg = segs[1];
+      }
 
-        // If baseName ends with _<digits>, assume timestamp and try +/-1 variants
-        const tsMatch = baseName.match(/_(\d+)$/);
-        if (tsMatch) {
-          const ts = parseInt(tsMatch[1]);
-          for (const dir of baseDirs) {
+      // Build exhaustive alternative keys covering:
+      // - all supported extensions
+      // - both ready_post and scheduled_posts base dirs
+      // - platform fallbacks (instagram, twitter, facebook)
+      // - timestamp drift (+/-1) when applicable
+      const alternativeKeys = [];
+      const exts = ['jpg','jpeg','png','webp'];
+      const baseDirs = ['ready_post', 'scheduled_posts'];
+      const platformCandidates = Array.from(new Set([platformSeg, 'instagram', 'twitter', 'facebook']));
+      
+      // Derive baseName without extension (supports standard and campaign names)
+      const baseName = filename.replace(/\.(jpg|jpeg|png|webp)$/i, '');
+
+      for (const dir of baseDirs) {
+        for (const plat of platformCandidates) {
+          for (const ext of exts) {
+            alternativeKeys.push(`${dir}/${plat}/${username}/${baseName}.${ext}`);
+          }
+        }
+      }
+
+      // If baseName ends with _<digits>, assume timestamp and try +/-1 variants
+      const tsMatch = baseName.match(/_(\d+)$/);
+      if (tsMatch) {
+        const ts = parseInt(tsMatch[1]);
+        for (const dir of baseDirs) {
+          for (const plat of platformCandidates) {
             for (const ext of exts) {
-              alternativeKeys.push(`${dir}/${platformSeg}/${username}/${baseName.replace(/_(\\d+)$/, `_${ts-1}`)}.${ext}`);
-              alternativeKeys.push(`${dir}/${platformSeg}/${username}/${baseName.replace(/_(\\d+)$/, `_${ts+1}`)}.${ext}`);
+              alternativeKeys.push(`${dir}/${plat}/${username}/${baseName.replace(/_(\d+)$/, `_${ts-1}`)}.${ext}`);
+              alternativeKeys.push(`${dir}/${plat}/${username}/${baseName.replace(/_(\d+)$/, `_${ts+1}`)}.${ext}`);
             }
           }
         }
-        
-        // Try alternative keys
-        for (const altKey of alternativeKeys) {
-          if (altKey === key) continue; // Skip the original key
-          
-          try {
-            console.log(`[${new Date().toISOString()}] [IMAGE] Trying alternative key: ${altKey}`);
-            const data = await s3Client.getObject({
-              Bucket: 'tasks',
-              Key: altKey
-            }).promise();
-            
-            // Validate alternative image data
-            if (!data || !data.Body || !Buffer.isBuffer(data.Body) || !validateImageBuffer(data.Body)) {
-              console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid alternative image data: ${altKey}`);
-              continue;
-            }
-            
-            // Cache the successful result
-            const hashedAltKey = Buffer.from(altKey).toString('base64').replace(/[\/\+\=]/g, '_');
-            const localCacheAltPath = path.join(localCacheDir, hashedAltKey);
-            fs.writeFileSync(localCacheAltPath, data.Body);
-            
-            // Also save a copy at the original path for future requests
-            fs.writeFileSync(localCacheFilePath, data.Body);
-            
-            return { data: data.Body, source: 'r2-alternative' };
-          } catch (altError) {
-            // Continue to next alternative
+      }
+
+      // Try alternative keys in order
+      for (const altKey of alternativeKeys) {
+        if (altKey === cleanKey) continue; // Skip the original key
+        try {
+          console.log(`[${new Date().toISOString()}] [IMAGE] Trying alternative key: ${altKey}`);
+          const data = await s3Client.getObject({
+            Bucket: 'tasks',
+            Key: altKey
+          }).promise();
+
+          // Validate alternative image data
+          if (!data || !data.Body || !Buffer.isBuffer(data.Body) || !validateImageBuffer(data.Body)) {
+            console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid alternative image data: ${altKey}`);
+            continue;
           }
+
+          // Cache the successful result
+          const hashedAltKey = Buffer.from(altKey).toString('base64').replace(/[\/\+\=]/g, '_');
+          const localCacheAltPath = path.join(localCacheDir, hashedAltKey);
+          fs.writeFileSync(localCacheAltPath, data.Body);
+
+          // Also save a copy at the original path for future requests
+          fs.writeFileSync(localCacheFilePath, data.Body);
+
+          return { data: data.Body, source: 'r2-alternative' };
+        } catch (altError) {
+          // Continue to next alternative
         }
       }
     }

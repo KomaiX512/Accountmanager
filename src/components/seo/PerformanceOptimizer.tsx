@@ -4,38 +4,70 @@ const PerformanceOptimizer: React.FC = () => {
   useEffect(() => {
     // Preload critical resources
     const preloadCriticalResources = () => {
-      // Preload critical CSS only in development. In production, the bundler
-      // injects hashed CSS assets automatically, and this source path does not exist.
+      // Preload critical CSS only in development and only when actually needed
       if (import.meta.env && import.meta.env.DEV && location.hostname === 'localhost') {
+        // Check if the CSS file exists before preloading
         const criticalCSS = document.createElement('link');
         criticalCSS.rel = 'preload';
         criticalCSS.href = '/src/styles/global-ui-refinements.css';
         criticalCSS.as = 'style';
+        criticalCSS.onload = function() { 
+          // Convert to stylesheet after load to avoid unused preload warning
+          const stylesheet = document.createElement('link');
+          stylesheet.rel = 'stylesheet';
+          stylesheet.href = criticalCSS.href;
+          document.head.appendChild(stylesheet);
+        };
+        criticalCSS.onerror = function() {
+          // Remove failed preload to avoid console warnings
+          document.head.removeChild(criticalCSS);
+        };
         document.head.appendChild(criticalCSS);
       }
 
-      // Preload critical fonts properly
+      // Preload critical fonts with better timing
       const fontPreload = document.createElement('link');
       fontPreload.rel = 'preload';
       fontPreload.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap';
       fontPreload.as = 'style';
-      fontPreload.onload = function() { (this as any).onload = null; (this as any).rel = 'stylesheet'; };
+      fontPreload.onload = function() { 
+        // Immediately convert to stylesheet after preload
+        (this as any).onload = null; 
+        (this as any).rel = 'stylesheet'; 
+      };
       document.head.appendChild(fontPreload);
       
-      // Also add non-blocking stylesheet load
-      const fontStyle = document.createElement('link');
-      fontStyle.rel = 'stylesheet';
-      fontStyle.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap';
-      fontStyle.media = 'print';
-      fontStyle.onload = function() { (this as any).media = 'all'; };
-      document.head.appendChild(fontStyle);
+      // Add non-blocking fallback stylesheet with longer delay
+      setTimeout(() => {
+        const fontStyle = document.createElement('link');
+        fontStyle.rel = 'stylesheet';
+        fontStyle.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap';
+        fontStyle.media = 'print';
+        fontStyle.onload = function() { (this as any).media = 'all'; };
+        document.head.appendChild(fontStyle);
+      }, 100);
 
-      // Preload critical images
-      const logoPreload = document.createElement('link');
-      logoPreload.rel = 'preload';
-      logoPreload.href = '/Logo/logo.png';
-      logoPreload.as = 'image';
-      document.head.appendChild(logoPreload);
+      // Only preload logo if we're on a page that will show it immediately
+      const isMainPage = location.pathname === '/' || 
+                        location.pathname.includes('dashboard') || 
+                        location.pathname.includes('login');
+      
+      // Also check if logo is already visible in DOM
+      const logoExists = document.querySelector('img[src*="logo"]') || 
+                        document.querySelector('img[alt*="logo"]') ||
+                        document.querySelector('[class*="logo"]');
+      
+      if (isMainPage && logoExists) {
+        const logoPreload = document.createElement('link');
+        logoPreload.rel = 'preload';
+        logoPreload.href = '/Logo/logo.png';
+        logoPreload.as = 'image';
+        logoPreload.onload = function() {
+          // Mark logo as loaded for immediate use
+          (window as any).logoPreloaded = true;
+        };
+        document.head.appendChild(logoPreload);
+      }
     };
 
     // Advanced Core Web Vitals optimization

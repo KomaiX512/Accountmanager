@@ -357,9 +357,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log(`[AUTH SYNC] 🔄 Syncing all processing statuses from backend for user ${currentUser.uid}`);
       
-      const response = await fetch(`/api/processing-status/${currentUser.uid}`);
+      // Add timeout and better error handling for the fetch
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+      
+      const response = await fetch(`/api/processing-status/${currentUser.uid}`, {
+        signal: controller.signal,
+        cache: 'no-cache'
+      });
+      
+      clearTimeout(timeoutId);
+      
       if (!response.ok) {
-        console.warn(`[AUTH SYNC] Failed to fetch processing statuses: ${response.status}`);
+        console.warn(`[AUTH SYNC] Failed to fetch processing statuses: ${response.status} ${response.statusText}`);
         return;
       }
 
@@ -406,8 +416,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       console.log(`[AUTH SYNC] ✅ Processing status sync completed`);
-    } catch (error) {
-      console.error(`[AUTH SYNC] Error syncing processing statuses:`, error);
+    } catch (error: any) {
+      // Handle specific error types more gracefully
+      if (error.name === 'AbortError') {
+        console.warn(`[AUTH SYNC] ⏱️ Processing status sync timed out - continuing without sync`);
+      } else if (error.message?.includes('NetworkError')) {
+        console.warn(`[AUTH SYNC] 🌐 Network error during processing status sync - will retry later`);
+      } else {
+        console.error(`[AUTH SYNC] Error syncing processing statuses:`, error.message || error);
+      }
     }
   };
 

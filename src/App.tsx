@@ -216,7 +216,7 @@ const AppContent: React.FC = () => {
         
         // If still no username, set a known good default for Facebook
         if (!username) {
-          const defaultFacebookUsername = 'Autopulse';
+          const defaultFacebookUsername = 'AutoPulseGlobalTrading';
           console.log(`[App.tsx] 🔧 SETTING DEFAULT Facebook username: "${defaultFacebookUsername}"`);
           localStorage.setItem(`${currentUrlPlatform}_username_${currentUser.uid}`, defaultFacebookUsername);
           username = defaultFacebookUsername;

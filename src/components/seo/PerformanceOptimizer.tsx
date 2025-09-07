@@ -14,12 +14,21 @@ const PerformanceOptimizer: React.FC = () => {
         document.head.appendChild(criticalCSS);
       }
 
-      // Preload critical fonts
+      // Preload critical fonts properly
       const fontPreload = document.createElement('link');
       fontPreload.rel = 'preload';
       fontPreload.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap';
       fontPreload.as = 'style';
+      fontPreload.onload = function() { (this as any).onload = null; (this as any).rel = 'stylesheet'; };
       document.head.appendChild(fontPreload);
+      
+      // Also add non-blocking stylesheet load
+      const fontStyle = document.createElement('link');
+      fontStyle.rel = 'stylesheet';
+      fontStyle.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap';
+      fontStyle.media = 'print';
+      fontStyle.onload = function() { (this as any).media = 'all'; };
+      document.head.appendChild(fontStyle);
 
       // Preload critical images
       const logoPreload = document.createElement('link');

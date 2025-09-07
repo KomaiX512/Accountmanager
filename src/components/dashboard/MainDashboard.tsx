@@ -280,14 +280,12 @@ const MainDashboard: React.FC = () => {
               localStorage.setItem(`${pid}_processing_info`, JSON.stringify(info));
             } catch {}
             
-            // CRITICAL FIX: Force clear platform access status while in loading state
-            const accessKey = `${pid}_accessed_${currentUser.uid}`;
-            const wasClaimed = localStorage.getItem(accessKey) === 'true';
-            if (wasClaimed) {
-              localStorage.removeItem(accessKey);
-              hasChanges = true; // Force UI update
-              console.log(`[MainDashboard] 🔥 CRITICAL: Cleared platform access status for ${pid} while in loading state - forcing UI update`);
-            }
+            // STABILITY: Do NOT clear acquired status while loading.
+          // Mark a separate acquiring flag so UI can show "Acquiring" without flipping claimed state.
+          try {
+            const acquiringKey = `${pid}_acquiring_${currentUser.uid}`;
+            localStorage.setItem(acquiringKey, 'true');
+          } catch {}
           } else {
             // Platform not active on server
             if (wasActive) {
@@ -299,6 +297,11 @@ const MainDashboard: React.FC = () => {
               // Also clear localStorage
               localStorage.removeItem(getProcessingCountdownKey(pid));
               localStorage.removeItem(`${pid}_processing_info`);
+              // Clear acquiring flag when loading ends
+              try {
+                const acquiringKey = `${pid}_acquiring_${currentUser.uid}`;
+                localStorage.removeItem(acquiringKey);
+              } catch {}
             }
           }
         });
@@ -537,17 +540,21 @@ const MainDashboard: React.FC = () => {
           const isCurrentlyLoading = stateActive || lsActive;
           
           if (isCurrentlyLoading) {
-            // Platform is in loading state - force clear claimed status
-            if (wasClaimed) {
-              localStorage.removeItem(key);
-              hasChanges = true;
-              console.log(`[MainDashboard] 🔥 CRITICAL: Platform ${pid} in loading state - forced clear claimed status`);
-            }
+            // Platform is in loading state - keep claimed status stable, only mark acquiring
+            try {
+              const acquiringKey = `${pid}_acquiring_${currentUser.uid}`;
+              localStorage.setItem(acquiringKey, 'true');
+            } catch {}
           } else if (isNowClaimed && !wasClaimed) {
             // ✅ CRITICAL FIX: Platform is now claimed on backend but not locally
             localStorage.setItem(key, 'true');
             hasChanges = true;
             console.log(`[MainDashboard] 🔄 Platform ${pid} now claimed (was not claimed) - CROSS-DEVICE SYNC SUCCESS`);
+            // Clear acquiring flag if present
+            try {
+              const acquiringKey = `${pid}_acquiring_${currentUser.uid}`;
+              localStorage.removeItem(acquiringKey);
+            } catch {}
             
             // ✅ CRITICAL FIX: Also sync username and other data to localStorage for complete cross-device sync
             // We need to fetch the platform data again to get username and account type
@@ -612,6 +619,11 @@ const MainDashboard: React.FC = () => {
             localStorage.removeItem(key);
             hasChanges = true;
             console.log(`[MainDashboard] 🔄 Platform ${pid} no longer claimed (was claimed)`);
+            // Also clear acquiring flag
+            try {
+              const acquiringKey = `${pid}_acquiring_${currentUser.uid}`;
+              localStorage.removeItem(acquiringKey);
+            } catch {}
           }
         });
         

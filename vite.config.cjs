@@ -107,6 +107,19 @@ module.exports = defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    // Use Terser to drop console/debug statements in production builds
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+        pure_funcs: ['console.log', 'console.info', 'console.debug']
+      },
+      mangle: true,
+      format: {
+        comments: false
+      }
+    },
     rollupOptions: {
       output: {
         // Add timestamp to asset names to force cache busting

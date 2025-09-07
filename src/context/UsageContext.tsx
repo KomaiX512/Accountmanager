@@ -136,10 +136,20 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
     try {
       console.log(`[UsageContext] 🔄 Refreshing usage for userId: ${uid}`);
       
-      // Get usage from userId-based backend API
-      const response = await fetch(`/api/user/${uid}/usage`);
+      // Always bypass caches and request JSON explicitly
+      const url = `/api/user/${uid}/usage?ts=${Date.now()}`;
+      const response = await fetch(url, {
+        headers: { 'Accept': 'application/json' },
+        cache: 'no-store',
+      });
       
       if (response.ok) {
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+          const preview = await response.text();
+          console.warn(`[UsageContext] ⚠️ Non-JSON response for usage. content-type="${contentType}" preview=`, preview.slice(0, 200));
+          throw new Error('Non-JSON response');
+        }
         const backendUsage = await response.json();
         const normalizedUsage = {
           posts: backendUsage.postsUsed || 0,
@@ -153,7 +163,7 @@ export const UsageProvider: React.FC<UsageProviderProps> = ({ children }) => {
         setUsage(normalizedUsage);
         console.log(`[UsageContext] ✅ Usage loaded from backend:`, normalizedUsage);
       } else {
-        console.warn(`[UsageContext] ⚠️ Backend usage not found, initializing empty stats`);
+        console.warn(`[UsageContext] ⚠️ Backend usage not found (${response.status}), initializing empty stats`);
         // Initialize with empty usage stats instead of localStorage fallback
         setUsage({
           posts: 0,

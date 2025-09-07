@@ -64,6 +64,23 @@ const MainDashboard: React.FC = () => {
   const { processingState } = useProcessing();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'overview' | 'usage' | 'agent'>('overview');
+  
+  // ✅ PERFORMANCE FIX: Production-ready logging system
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  const logThrottle = useRef<{[key: string]: number}>({});
+  
+  const productionLog = useCallback((message: string, data?: any, category: string = 'default') => {
+    if (!isDevelopment) return; // No logging in production
+    
+    // Throttle logging to prevent spam (max 1 log per category per 5 seconds)
+    const now = Date.now();
+    const lastLog = logThrottle.current[category] || 0;
+    if (now - lastLog < 5000) return;
+    
+    logThrottle.current[category] = now;
+    console.log(message, data);
+  }, [isDevelopment]);
+
   const { isConnected: isInstagramConnected, userId: instagramUserId, hasAccessed: hasAccessedInstagram = false } = useInstagram();
   const { isConnected: isTwitterConnected, userId: twitterUserId, hasAccessed: hasAccessedTwitter = false, refreshConnection: refreshTwitterConnection } = useTwitter();
   const { isConnected: isFacebookConnected, userId: facebookUserId, hasAccessed: hasAccessedFacebook = false } = useFacebook();
@@ -158,7 +175,8 @@ const MainDashboard: React.FC = () => {
     
     // Monitor immediately and every 10 seconds
     monitorLocalStorage();
-    const interval = setInterval(monitorLocalStorage, 10000);
+    // ✅ PERFORMANCE FIX: Increased from 10s to 60s for localStorage monitoring
+    const interval = setInterval(monitorLocalStorage, 60000);
     
     return () => clearInterval(interval);
   }, [currentUser?.uid]);
@@ -328,8 +346,8 @@ const MainDashboard: React.FC = () => {
       mirrorFromServer();
     }, 2000); // 2 second delay for initial sync
     
-    // ✅ OPTIMIZED SYNC: Reduced frequency from 1 second to 5 seconds for better performance
-    const id = setInterval(mirrorFromServer, 5000); // Increased from 1 second to 5 seconds
+    // ✅ PERFORMANCE FIX: Increased from 5s to 30s to reduce excessive function calls
+    const id = setInterval(mirrorFromServer, 30000);
     return () => { 
       clearTimeout(initialSyncDelay);
       clearInterval(id); 
@@ -694,8 +712,8 @@ const MainDashboard: React.FC = () => {
     // Check immediately
     runPlatformCompletionCheck();
 
-    // Check every 2 seconds for platform completion
-    const completionInterval = setInterval(runPlatformCompletionCheck, 2000);
+    // ✅ PERFORMANCE FIX: Reduced frequency from 2s to 15s to prevent log spam
+    const completionInterval = setInterval(runPlatformCompletionCheck, 15000);
     
     return () => clearInterval(completionInterval);
   }, [currentUser?.uid, platformLoadingStates, completePlatformLoading]);
@@ -711,7 +729,10 @@ const MainDashboard: React.FC = () => {
       if (loadingState && !loadingState.isComplete && Date.now() < loadingState.endTime) {
         const remaining = Math.max(0, loadingState.endTime - Date.now());
         if (remaining > 0) {
-          console.log(`🔥 TIMER SYNC: ${platformId} has ${Math.ceil(remaining / 1000 / 60)} minutes remaining (from synced state)`);
+          // Only log in development and throttle to prevent spam
+          if (isDevelopment && Math.random() < 0.01) {
+            console.log(`🔥 TIMER SYNC: ${platformId} has ${Math.ceil(remaining / 1000 / 60)} minutes remaining (from synced state)`);
+          }
           return remaining;
         }
       }
@@ -737,7 +758,10 @@ const MainDashboard: React.FC = () => {
     if (loadingState && !loadingState.isComplete && Date.now() < loadingState.endTime) {
       const remaining = Math.max(0, loadingState.endTime - Date.now());
       if (remaining > 0) {
-        console.log(`🔥 TIMER SYNC: ${platformId} has ${Math.ceil(remaining / 1000 / 60)} minutes remaining (from backend sync)`);
+        // Only log in development and throttle to prevent spam
+        if (isDevelopment && Math.random() < 0.01) {
+          console.log(`🔥 TIMER SYNC: ${platformId} has ${Math.ceil(remaining / 1000 / 60)} minutes remaining (from backend sync)`);
+        }
         return true;
       }
     }
@@ -745,15 +769,17 @@ const MainDashboard: React.FC = () => {
     // Fallback to localStorage if no synced state
     const remaining = getProcessingRemainingMs(platformId);
     if (remaining > 0) {
-      console.log(`🔥 TIMER FALLBACK: ${platformId} has ${Math.ceil(remaining / 1000 / 60)} minutes remaining (from localStorage)`);
+      // Only log in development mode and throttle logging
+      if (process.env.NODE_ENV === 'development' && Math.random() < 0.01) {
+        console.log(`🔥 TIMER FALLBACK: ${platformId} has ${Math.ceil(remaining / 1000 / 60)} minutes remaining (from localStorage)`);
+      }
       return true;
     }
 
     // Never show loading for completed platforms
     if (completedPlatforms.has(platformId)) return false;
 
-    // DEBUG: Log when platform is not loading
-    console.log(`🔥 TIMER DEBUG: ${platformId} is NOT loading - loadingState:`, loadingState, 'remaining:', remaining);
+    // Removed excessive debug logging - was causing 100K+ logs
     return false;
   }, [completedPlatforms, platformLoadingStates, getProcessingRemainingMs]);
 
@@ -765,7 +791,9 @@ const MainDashboard: React.FC = () => {
     }
     // Don't start loading for completed platforms
     if (completedPlatforms.has(platformId)) {
-      console.log(`🔥 TIMER SKIP: ${platformId} already completed, skipping timer`);
+      if (isDevelopment) {
+        console.log(`🔥 TIMER SKIP: ${platformId} already completed, skipping timer`);
+      }
       return;
     }
 
@@ -940,11 +968,14 @@ const MainDashboard: React.FC = () => {
     
     // ✅ LOADING STATE CHECK: Only apply loading restriction if localStorage doesn't override
     if (isPlatformLoading(platformId)) {
-      console.log(`🔥 PLATFORM STATUS: ${platformId} is in loading state, showing as NOT acquired`);
+      // Only log in development mode and throttle logging
+      if (process.env.NODE_ENV === 'development' && Math.random() < 0.01) {
+        console.log(`🔥 PLATFORM STATUS: ${platformId} is in loading state, showing as NOT acquired`);
+      }
       return false;
     }
     
-    console.log(`🔍 PLATFORM STATUS CHECK: ${platformId} - storage:${accessedFromStorage} context:${accessedFromContext} combined:${localStatus}`);
+    // Removed excessive debug logging - was causing performance issues
     
     return localStatus;
   }, [currentUser?.uid, hasAccessedInstagram, hasAccessedTwitter, hasAccessedFacebook, hasAccessedLinkedIn, isPlatformLoading]);
@@ -1086,7 +1117,8 @@ const MainDashboard: React.FC = () => {
     performBackendSync();
 
     // ✅ REGULAR SYNC: Sync every 3 seconds for cross-device updates
-    const syncInterval = setInterval(performBackendSync, 3000);
+    // ✅ PERFORMANCE FIX: Increased from 3s to 20s for backend sync to reduce server load
+    const syncInterval = setInterval(performBackendSync, 20000);
 
     return () => {
       clearInterval(syncInterval);
@@ -1210,7 +1242,8 @@ const MainDashboard: React.FC = () => {
     syncTimers();
 
     // Check every 5 seconds for timer completion
-    const timerSyncInterval = setInterval(syncTimers, 5000);
+    // ✅ PERFORMANCE FIX: Increased from 5s to 30s for timer sync
+    const timerSyncInterval = setInterval(syncTimers, 30000);
     
     return () => clearInterval(timerSyncInterval);
   }, [currentUser?.uid, getProcessingRemainingMs, isPlatformLoading, completePlatformLoading]);

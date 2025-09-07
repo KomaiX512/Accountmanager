@@ -120,7 +120,7 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
       if (currentUser?.uid) {
         try {
           // ✅ OPTIMIZED LOGGING: Only log when there are active processing states
-          const globalResp = await fetch(`/api/processing-status/${currentUser.uid}`);
+          const globalResp = await fetch(`/api/processing-status/${currentUser.uid}?ts=${Date.now()}`, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
           if (globalResp.ok) {
             const globalJson = await globalResp.json();
             const states = globalJson?.data || {};
@@ -205,7 +205,8 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
             endpoint = `/api/platform-access/${currentUser.uid}`;
           }
           
-          const accessResp = await fetch(endpoint);
+          const tsEndpoint = `${endpoint}${endpoint.includes('?') ? '&' : '?'}ts=${Date.now()}`;
+          const accessResp = await fetch(tsEndpoint, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
           if (accessResp.ok) {
             const accessJson = await accessResp.json();
             const accessData = accessJson?.data || accessJson; // Handle both response formats

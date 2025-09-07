@@ -6,7 +6,7 @@ const PerformanceOptimizer: React.FC = () => {
     const preloadCriticalResources = () => {
       // Preload critical CSS only in development. In production, the bundler
       // injects hashed CSS assets automatically, and this source path does not exist.
-      if (import.meta.env && import.meta.env.DEV) {
+      if (import.meta.env && import.meta.env.DEV && location.hostname === 'localhost') {
         const criticalCSS = document.createElement('link');
         criticalCSS.rel = 'preload';
         criticalCSS.href = '/src/styles/global-ui-refinements.css';

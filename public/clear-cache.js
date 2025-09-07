@@ -5,14 +5,19 @@
         const params = new URLSearchParams(window.location.search);
         const enabled = params.has('clear-cache') || params.get('clearCache') === '1' || params.get('debug') === 'clear-cache';
         const alreadyCleared = sessionStorage.getItem('cache_cleared_once') === '1';
+        
         // Only run when explicitly requested and not already run in this session
         if (!enabled || alreadyCleared) {
+            console.log('🚫 Clear cache script: Not enabled or already cleared this session');
             return;
         }
+        
         // Mark as run for this session to prevent loops
         sessionStorage.setItem('cache_cleared_once', '1');
+        console.log('✅ Clear cache script: Enabled and proceeding with cache clear');
     } catch (e) {
         // If URL parsing fails, do nothing
+        console.log('🚫 Clear cache script: URL parsing failed, skipping');
         return;
     }
 

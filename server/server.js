@@ -555,6 +555,22 @@ app.use((req, res, next) => {
 
 // Add this after the existing endpoints (around line 9600+)
 
+// ===================== HEALTH ENDPOINTS (JSON) =====================
+// Provide JSON-only health checks for Nginx and deployment scripts
+app.get(['/health', '/api/health'], (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.json({
+    status: 'ok',
+    service: 'main-api',
+    port,
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString()
+  });
+});
+
 // ============================================================
 // USER MANAGEMENT & USAGE TRACKING ENDPOINTS
 // ============================================================
@@ -8867,6 +8883,83 @@ app.options(['/user-facebook-status/:userId', '/api/user-facebook-status/:userId
   setCorsHeaders(res);
   res.status(204).send();
 });
+ 
+ // =================== TWITTER USER STATUS ENDPOINTS ===================
+ // This endpoint checks if a user has entered their Twitter username
+ app.get(['/user-twitter-status/:userId', '/api/user-twitter-status/:userId'], async (req, res) => {
+   setCorsHeaders(res);
+   
+   const { userId } = req.params;
+   
+   try {
+     const key = `UserTwitterStatus/${userId}/status.json`;
+     
+     try {
+       const getCommand = new GetObjectCommand({
+         Bucket: 'tasks',
+         Key: key,
+       });
+       const response = await s3Client.send(getCommand);
+       const body = await streamToString(response.Body);
+       
+       if (!body || body.trim() === '') {
+         return res.json({ hasEnteredTwitterUsername: false });
+       }
+       
+       const userData = JSON.parse(body);
+       return res.json(userData);
+     } catch (error) {
+       if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+         return res.json({ hasEnteredTwitterUsername: false });
+       }
+       throw error;
+     }
+   } catch (error) {
+     console.error(`Error retrieving user Twitter status for ${userId}:`, error);
+     res.status(500).json({ error: 'Failed to retrieve user Twitter status' });
+   }
+ });
+ 
+ // This endpoint updates the user's Twitter username entry state
+ app.post(['/user-twitter-status/:userId', '/api/user-twitter-status/:userId'], async (req, res) => {
+   setCorsHeaders(res);
+   
+   const { userId } = req.params;
+   const { twitter_username } = req.body;
+   
+   if (!twitter_username || !twitter_username.trim()) {
+     return res.status(400).json({ error: 'Twitter username is required' });
+   }
+   
+   try {
+     const key = `UserTwitterStatus/${userId}/status.json`;
+     const userData = {
+       uid: userId,
+       hasEnteredTwitterUsername: true,
+       twitter_username: twitter_username.trim(),
+       lastUpdated: new Date().toISOString()
+     };
+     
+     const putCommand = new PutObjectCommand({
+       Bucket: 'tasks',
+       Key: key,
+       Body: JSON.stringify(userData, null, 2),
+       ContentType: 'application/json',
+     });
+     
+     await s3Client.send(putCommand);
+     res.json({ success: true, message: 'User Twitter status updated successfully' });
+   } catch (error) {
+     console.error(`Error updating user Twitter status for ${userId}:`, error);
+     res.status(500).json({ error: 'Failed to update user Twitter status' });
+   }
+ });
+ 
+ // OPTIONS handlers for Twitter status endpoints
+ app.options(['/user-twitter-status/:userId', '/api/user-twitter-status/:userId'], (req, res) => {
+   setCorsHeaders(res);
+   res.status(204).send();
+ });
 
 app.post(['/instagram-connection/:userId', '/api/instagram-connection/:userId'], async (req, res) => {
   setCorsHeaders(res);
@@ -10850,6 +10943,89 @@ app.options(['/user-twitter-status/:userId', '/api/user-twitter-status/:userId']
 });
 
 // ===============================================================
+// LinkedIn Status Endpoints
+// ===============================================================
+
+app.get(['/user-linkedin-status/:userId', '/api/user-linkedin-status/:userId'], async (req, res) => {
+  // Set CORS headers
+  setCorsHeaders(res);
+  
+  const { userId } = req.params;
+  
+  try {
+    const key = `UserLinkedInStatus/${userId}/status.json`;
+    
+    try {
+      const getCommand = new GetObjectCommand({
+        Bucket: 'tasks',
+        Key: key,
+      });
+      const response = await s3Client.send(getCommand);
+      const body = await streamToString(response.Body);
+      
+      if (!body || body.trim() === '') {
+        return res.json({ hasEnteredLinkedInUsername: false });
+      }
+      
+      const userData = JSON.parse(body);
+      return res.json(userData);
+    } catch (error) {
+      if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+        return res.json({ hasEnteredLinkedInUsername: false });
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error(`Error retrieving user LinkedIn status for ${userId}:`, error);
+    res.status(500).json({ error: 'Failed to retrieve user LinkedIn status' });
+  }
+});
+
+// This endpoint updates the user's LinkedIn username entry state
+app.post(['/user-linkedin-status/:userId', '/api/user-linkedin-status/:userId'], async (req, res) => {
+  // Set CORS headers
+  setCorsHeaders(res);
+  
+  const { userId } = req.params;
+  const { linkedin_username, accountType, competitors } = req.body;
+  
+  if (!linkedin_username || !linkedin_username.trim()) {
+    return res.status(400).json({ error: 'LinkedIn username is required' });
+  }
+  
+  try {
+    const key = `UserLinkedInStatus/${userId}/status.json`;
+    const userData = {
+      uid: userId,
+      hasEnteredLinkedInUsername: true,
+      linkedin_username: linkedin_username.trim(),
+      accountType: accountType || 'professional',
+      competitors: competitors || [],
+      lastUpdated: new Date().toISOString()
+    };
+    
+    const putCommand = new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: key,
+      Body: JSON.stringify(userData, null, 2),
+      ContentType: 'application/json',
+    });
+    
+    await s3Client.send(putCommand);
+    res.json({ success: true, message: 'User LinkedIn status updated successfully' });
+  } catch (error) {
+    console.error(`Error updating user LinkedIn status for ${userId}:`, error);
+    res.status(500).json({ error: 'Failed to update user LinkedIn status' });
+  }
+});
+
+// Add OPTIONS handlers for LinkedIn status endpoints
+app.options(['/user-linkedin-status/:userId', '/api/user-linkedin-status/:userId'], (req, res) => {
+  setCorsHeaders(res);
+  res.status(204).send();
+});
+
+// ===============================================================
 
 app.get(['/check-username-availability/:username', '/api/check-username-availability/:username'], async (req, res) => {
   try {
@@ -10987,6 +11163,88 @@ app.delete(['/twitter-connection/:userId', '/api/twitter-connection/:userId'], a
   }
 });
 
+// LinkedIn Connection Endpoints
+app.get(['/linkedin-connection/:userId', '/api/linkedin-connection/:userId'], async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  const { userId } = req.params;
+  
+  try {
+    const key = `UserLinkedInConnection/${userId}/connection.json`;
+    const getCommand = new GetObjectCommand({
+      Bucket: 'tasks',
+      Key: key
+    });
+    
+    const response = await s3Client.send(getCommand);
+    const body = await streamToString(response.Body);
+    const connectionData = JSON.parse(body);
+    
+    console.log(`[${new Date().toISOString()}] Retrieved LinkedIn connection for user ${userId}`);
+    res.json(connectionData);
+  } catch (error) {
+    if (error.name === 'NoSuchKey' || error.$metadata?.httpStatusCode === 404) {
+      console.log(`[${new Date().toISOString()}] No LinkedIn connection found for user ${userId}`);
+      res.json({ connected: false });
+    } else {
+      console.error(`[${new Date().toISOString()}] Error retrieving LinkedIn connection:`, error);
+      res.status(500).json({ error: 'Failed to retrieve LinkedIn connection' });
+    }
+  }
+});
+
+app.post(['/linkedin-connection/:userId', '/api/linkedin-connection/:userId'], async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  const { userId } = req.params;
+  const connectionData = req.body;
+  
+  try {
+    const key = `UserLinkedInConnection/${userId}/connection.json`;
+    const putCommand = new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: key,
+      Body: JSON.stringify(connectionData),
+      ContentType: 'application/json'
+    });
+    
+    await s3Client.send(putCommand);
+    console.log(`[${new Date().toISOString()}] Stored LinkedIn connection for user ${userId}`);
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error storing LinkedIn connection:`, error);
+    res.status(500).json({ error: 'Failed to store LinkedIn connection' });
+  }
+});
+
+app.delete(['/linkedin-connection/:userId', '/api/linkedin-connection/:userId'], async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  const { userId } = req.params;
+  
+  try {
+    const key = `UserLinkedInConnection/${userId}/connection.json`;
+    const deleteCommand = new DeleteObjectCommand({
+      Bucket: 'tasks',
+      Key: key
+    });
+    
+    await s3Client.send(deleteCommand);
+    console.log(`[${new Date().toISOString()}] Deleted LinkedIn connection for user ${userId}`);
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error deleting LinkedIn connection:`, error);
+    res.status(500).json({ error: 'Failed to delete LinkedIn connection' });
+  }
+});
+
+app.options(['/linkedin-connection/:userId', '/api/linkedin-connection/:userId'], (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  res.status(200).end();
+});
+
 // Helper functions
 async function getExistingData() {
   try {
@@ -11071,8 +11329,8 @@ class PlatformSchemaManager {
     
     // Normalize platform
     const normalizedPlatform = platform.toLowerCase();
-    if (!['instagram', 'twitter', 'facebook'].includes(normalizedPlatform)) {
-      throw new Error(`Unsupported platform: ${platform}. Must be 'instagram', 'twitter', or 'facebook'`);
+    if (!['instagram', 'twitter', 'facebook', 'linkedin'].includes(normalizedPlatform)) {
+      throw new Error(`Unsupported platform: ${platform}. Must be 'instagram', 'twitter', 'facebook', or 'linkedin'`);
     }
     
     // Normalize username according to platform rules (e.g., lowercase for Instagram)
@@ -11105,7 +11363,7 @@ class PlatformSchemaManager {
     return {
       platform: platform.toLowerCase(),
       username: username.trim(),
-      isValidPlatform: ['instagram', 'twitter', 'facebook'].includes(platform.toLowerCase())
+      isValidPlatform: ['instagram', 'twitter', 'facebook', 'linkedin'].includes(platform.toLowerCase())
     };
   }
 
@@ -11135,6 +11393,13 @@ class PlatformSchemaManager {
         normalizeUsername: (username) => username.trim(), // Keep original case for Facebook
         eventPrefix: 'FacebookEvents', 
         tokenPrefix: 'FacebookTokens',
+        maxUsernameLength: 50
+      },
+      linkedin: {
+        name: 'LinkedIn',
+        normalizeUsername: (username) => username.trim(), // Keep original case for LinkedIn
+        eventPrefix: 'LinkedInEvents', 
+        tokenPrefix: 'LinkedInTokens',
         maxUsernameLength: 50
       }
     };
@@ -15068,9 +15333,9 @@ app.post(['/save-goal/:username', '/api/save-goal/:username'], async (req, res) 
     
     // Parse platform from query params
     const platform = (req.query.platform || 'instagram').toLowerCase();
-    if (!['instagram', 'twitter', 'facebook'].includes(platform)) {
+    if (!['instagram', 'twitter', 'facebook', 'linkedin'].includes(platform)) {
       return res.status(400).json({ 
-        error: 'Invalid platform. Must be instagram, twitter, or facebook.' 
+        error: 'Invalid platform. Must be instagram, twitter, facebook, or linkedin.' 
       });
     }
 
@@ -15175,9 +15440,9 @@ app.get(['/goal-summary/:username', '/api/goal-summary/:username'], async (req, 
     
     // Parse platform from query params
     const platform = (req.query.platform || 'instagram').toLowerCase();
-    if (!['instagram', 'twitter', 'facebook'].includes(platform)) {
+    if (!['instagram', 'twitter', 'facebook', 'linkedin'].includes(platform)) {
       return res.status(400).json({ 
-        error: 'Invalid platform. Must be instagram, twitter, or facebook.' 
+        error: 'Invalid platform. Must be instagram, twitter, facebook, or linkedin.' 
       });
     }
     
@@ -15265,9 +15530,9 @@ app.get(['/campaign-posts-count/:username', '/api/campaign-posts-count/:username
     
     // Parse platform from query params
     const platform = (req.query.platform || 'instagram').toLowerCase();
-    if (!['instagram', 'twitter', 'facebook'].includes(platform)) {
+    if (!['instagram', 'twitter', 'facebook', 'linkedin'].includes(platform)) {
       return res.status(400).json({ 
-        error: 'Invalid platform. Must be instagram, twitter, or facebook.' 
+        error: 'Invalid platform. Must be instagram, twitter, facebook, or linkedin.' 
       });
     }
     
@@ -15336,9 +15601,9 @@ app.get(['/engagement-metrics/:username', '/api/engagement-metrics/:username'], 
     
     // Parse platform from query params
     const platform = (req.query.platform || 'instagram').toLowerCase();
-    if (!['instagram', 'twitter', 'facebook'].includes(platform)) {
+    if (!['instagram', 'twitter', 'facebook', 'linkedin'].includes(platform)) {
       return res.status(400).json({ 
-        error: 'Invalid platform. Must be instagram, twitter, or facebook.' 
+        error: 'Invalid platform. Must be instagram, twitter, facebook, or linkedin.' 
       });
     }
     
@@ -15390,7 +15655,7 @@ app.get(['/autopilot-settings/:username', '/api/autopilot-settings/:username'], 
     const { username } = req.params;
     const platform = (req.query.platform || 'instagram').toLowerCase();
     
-    if (!['instagram', 'twitter', 'facebook'].includes(platform)) {
+    if (!['instagram', 'twitter', 'facebook', 'linkedin'].includes(platform)) {
       return res.status(400).json({ error: 'Invalid platform' });
     }
     
@@ -15438,7 +15703,7 @@ app.post(['/autopilot-settings/:username', '/api/autopilot-settings/:username'],
     const { username } = req.params;
     const { platform, settings } = req.body;
     
-    if (!platform || !['instagram', 'twitter', 'facebook'].includes(platform.toLowerCase())) {
+    if (!platform || !['instagram', 'twitter', 'facebook', 'linkedin'].includes(platform.toLowerCase())) {
       return res.status(400).json({ error: 'Invalid platform' });
     }
     
@@ -15724,9 +15989,9 @@ app.get(['/generated-content-summary/:username', '/api/generated-content-summary
     
     // Parse platform from query params
     const platform = (req.query.platform || 'instagram').toLowerCase();
-    if (!['instagram', 'twitter', 'facebook'].includes(platform)) {
+    if (!['instagram', 'twitter', 'facebook', 'linkedin'].includes(platform)) {
       return res.status(400).json({ 
-        error: 'Invalid platform. Must be instagram, twitter, or facebook.' 
+        error: 'Invalid platform. Must be instagram, twitter, facebook, or linkedin.' 
       });
     }
     
@@ -15828,9 +16093,9 @@ app.get(['/campaign-status/:username', '/api/campaign-status/:username'], async 
     
     // Parse platform from query params
     const platform = (req.query.platform || 'instagram').toLowerCase();
-    if (!['instagram', 'twitter', 'facebook'].includes(platform)) {
+    if (!['instagram', 'twitter', 'facebook', 'linkedin'].includes(platform)) {
       return res.status(400).json({ 
-        error: 'Invalid platform. Must be instagram, twitter, or facebook.' 
+        error: 'Invalid platform. Must be instagram, twitter, facebook, or linkedin.' 
       });
     }
     
@@ -15920,9 +16185,9 @@ app.delete(['/stop-campaign/:username', '/api/stop-campaign/:username'], async (
     
     // Parse platform from query params
     const platform = (req.query.platform || 'instagram').toLowerCase();
-    if (!['instagram', 'twitter', 'facebook'].includes(platform)) {
+    if (!['instagram', 'twitter', 'facebook', 'linkedin'].includes(platform)) {
       return res.status(400).json({ 
-        error: 'Invalid platform. Must be instagram, twitter, or facebook.' 
+        error: 'Invalid platform. Must be instagram, twitter, facebook, or linkedin.' 
       });
     }
     
@@ -16131,9 +16396,9 @@ app.get(['/generated-content-timeline/:username', '/api/generated-content-timeli
     
     // Parse platform from query params
     const platform = (req.query.platform || 'instagram').toLowerCase();
-    if (!['instagram', 'twitter', 'facebook'].includes(platform)) {
+    if (!['instagram', 'twitter', 'facebook', 'linkedin'].includes(platform)) {
       return res.status(400).json({ 
-        error: 'Invalid platform. Must be instagram, twitter, or facebook.' 
+        error: 'Invalid platform. Must be instagram, twitter, facebook, or linkedin.' 
       });
     }
     
@@ -16211,9 +16476,9 @@ app.get(['/profit-analysis/:username', '/api/profit-analysis/:username'], async 
     
     // Parse platform from query params
     const platform = (req.query.platform || 'instagram').toLowerCase();
-    if (!['instagram', 'twitter', 'facebook'].includes(platform)) {
+    if (!['instagram', 'twitter', 'facebook', 'linkedin'].includes(platform)) {
       return res.status(400).json({ 
-        error: 'Invalid platform. Must be instagram, twitter, or facebook.' 
+        error: 'Invalid platform. Must be instagram, twitter, facebook, or linkedin.' 
       });
     }
     
@@ -16610,7 +16875,7 @@ app.delete(['/platform-reset/:userId', '/api/platform-reset/:userId'], async (re
   const { userId } = req.params;
   const { platform } = req.body;
   
-  if (!platform || !['instagram', 'twitter', 'facebook'].includes(platform)) {
+  if (!platform || !['instagram', 'twitter', 'facebook', 'linkedin'].includes(platform)) {
     return res.status(400).json({ 
       success: false, 
       error: 'Valid platform (instagram, twitter, facebook) is required' 
@@ -17135,7 +17400,7 @@ app.get(['/platform-access/:userId', '/api/platform-access/:userId'], async (req
   try {
     const { userId } = req.params;
     const platform = (req.query.platform || '').toString();
-    const allowed = ['instagram', 'twitter', 'facebook', 'linkedin'];
+    const allowed = ['instagram', 'twitter', 'facebook', 'linkedin', 'linkedin'];
 
     if (platform) {
       if (!allowed.includes(platform)) {
@@ -17181,7 +17446,7 @@ app.post(['/platform-access/:userId', '/api/platform-access/:userId'], async (re
   try {
     const { userId } = req.params;
     const { platform, claimed, username } = req.body || {};
-    const allowed = ['instagram', 'twitter', 'facebook', 'linkedin'];
+    const allowed = ['instagram', 'twitter', 'facebook', 'linkedin', 'linkedin'];
     if (!platform || !allowed.includes(platform)) {
       return res.status(400).json({ success: false, error: 'Valid platform is required' });
     }
@@ -17233,7 +17498,7 @@ app.delete(['/platform-access/:userId', '/api/platform-access/:userId'], async (
   try {
     const { userId } = req.params;
     const { platform } = req.body || {};
-    const allowed = ['instagram', 'twitter', 'facebook', 'linkedin'];
+    const allowed = ['instagram', 'twitter', 'facebook', 'linkedin', 'linkedin'];
     if (!platform || !allowed.includes(platform)) {
       return res.status(400).json({ success: false, error: 'Valid platform is required' });
     }
@@ -17261,7 +17526,7 @@ app.get(['/processing-status/:userId', '/api/processing-status/:userId'],
     const { userId } = req.params;
     const platform = (req.query.platform || '').toString();
 
-    const allowed = ['instagram', 'twitter', 'facebook', 'linkedin'];
+    const allowed = ['instagram', 'twitter', 'facebook', 'linkedin', 'linkedin'];
 
     // If specific platform requested, return single status
     if (platform) {
@@ -17342,7 +17607,7 @@ app.post(['/processing-status/:userId', '/api/processing-status/:userId'], async
     // 🚀 CACHE INVALIDATION: Clear cache when processing status changes
     cacheManager.invalidate('processingStatus', userId, platform || 'all');
 
-    const allowed = ['instagram', 'twitter', 'facebook', 'linkedin'];
+    const allowed = ['instagram', 'twitter', 'facebook', 'linkedin', 'linkedin'];
     if (!platform || !allowed.includes(platform)) {
       return res.status(400).json({ success: false, error: 'Valid platform is required' });
     }
@@ -17392,7 +17657,7 @@ app.delete(['/processing-status/:userId', '/api/processing-status/:userId'], asy
       cacheManager.invalidate('processingStatus', userId, platform);
       cacheManager.invalidate('processingStatus', userId, 'all');
     }
-    const allowed = ['instagram', 'twitter', 'facebook', 'linkedin'];
+    const allowed = ['instagram', 'twitter', 'facebook', 'linkedin', 'linkedin'];
     if (!platform || !allowed.includes(platform)) {
       return res.status(400).json({ success: false, error: 'Valid platform is required' });
     }
@@ -17439,7 +17704,7 @@ app.post(['/validate-dashboard-access/:userId', '/api/validate-dashboard-access/
     const { userId } = req.params;
     const { platform } = req.body || {};
     
-    const allowed = ['instagram', 'twitter', 'facebook', 'linkedin'];
+    const allowed = ['instagram', 'twitter', 'facebook', 'linkedin', 'linkedin'];
     if (!platform || !allowed.includes(platform)) {
       return res.status(400).json({ 
         success: false, 
@@ -17533,7 +17798,7 @@ app.post(['/validate-dashboard-access/:userId', '/api/validate-dashboard-access/
     const { userId } = req.params;
     const { platform } = req.body || {};
     
-    const allowed = ['instagram', 'twitter', 'facebook', 'linkedin'];
+    const allowed = ['instagram', 'twitter', 'facebook', 'linkedin', 'linkedin'];
     if (!platform || !allowed.includes(platform)) {
       return res.status(400).json({ success: false, error: 'Valid platform is required' });
     }
@@ -17750,6 +18015,27 @@ app.get(['/api/run-status/:platform/:username', '/run-status/:platform/:username
 });
 
 // ===============================================================
+// JSON 404 handler for unknown /api routes (prevents HTML fallback)
+app.use('/api', (req, res, next) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  return res.status(404).json({ error: 'Not Found', path: req.originalUrl });
+});
+
+// JSON error handler only for /api routes
+app.use((err, req, res, next) => {
+  if (req.path && req.path.startsWith('/api')) {
+    console.error(`[${new Date().toISOString()}] [API-ERROR]`, err);
+    setCorsHeaders(res, req.headers.origin || '*');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    return res.status(err.status || 500).json({ error: 'Internal Server Error', message: err.message });
+  }
+  next(err);
+});
 
 app.listen(port, '0.0.0.0', () => {
   console.log(`Server running on port ${port}`);

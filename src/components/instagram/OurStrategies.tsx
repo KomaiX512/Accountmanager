@@ -12,8 +12,8 @@ import { smartContentExtraction, extractFirstThreeSentences, isMeaningfulContent
 
 interface OurStrategiesProps {
   accountHolder: string;
-  accountType: 'branding' | 'non-branding';
-  platform?: 'instagram' | 'twitter' | 'facebook';
+  accountType: 'branding' | 'non-branding' | 'professional' | 'personal';
+  platform?: 'instagram' | 'twitter' | 'facebook' | 'linkedin';
 }
 
 const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountType: _accountType, platform = 'instagram' }) => {

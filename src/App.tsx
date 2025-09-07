@@ -10,6 +10,7 @@ import TopBar from './components/common/TopBar';
 import Instagram from './pages/Instagram';
 import Twitter from './pages/Twitter';
 import Facebook from './pages/Facebook';
+import LinkedIn from './pages/LinkedIn';
 import Dashboard from './components/instagram/Dashboard';
 import PlatformDashboard from './components/dashboard/PlatformDashboard';
 import MainDashboard from './components/dashboard/MainDashboard';
@@ -24,6 +25,7 @@ import { UsageProvider } from './context/UsageContext';
 import { UpgradePopupProvider } from './context/UpgradePopupContext';
 import { TwitterProvider } from './context/TwitterContext';
 import { FacebookProvider } from './context/FacebookContext';
+import { LinkedInProvider } from './context/LinkedInContext';
 import axios from 'axios';
 import { syncInstagramConnection, isInstagramDisconnected } from './utils/instagramSessionManager';
 import ChatModal from './components/common/ChatModal';
@@ -49,8 +51,8 @@ declare global {
   }
 }
 
-// Load optimization tester in development
-if (process.env.NODE_ENV === 'development') {
+// Load optimization tester in development only on localhost
+if (process.env.NODE_ENV === 'development' && location.hostname === 'localhost') {
   import('./utils/imageOptimizationTester.js').then((module) => {
     window.optimizationTester = new module.default();
     console.log('🚀 Image Optimization Tester loaded! Use window.optimizationTester in console.');
@@ -68,9 +70,11 @@ const App: React.FC = () => {
               <InstagramProvider>
                 <TwitterProvider>
                   <FacebookProvider>
-                    <ErrorBoundary>
-                      <AppContent />
-                    </ErrorBoundary>
+                    <LinkedInProvider>
+                      <ErrorBoundary>
+                        <AppContent />
+                      </ErrorBoundary>
+                    </LinkedInProvider>
                   </FacebookProvider>
                 </TwitterProvider>
               </InstagramProvider>
@@ -621,10 +625,11 @@ const AppContent: React.FC = () => {
             : isFacebookDashboard
             ? `/api/user-facebook-status/${currentUser.uid}`
             : `/api/user-instagram-status/${currentUser.uid}`;
+          const tsEndpoint = `${endpoint}${endpoint.includes('?') ? '&' : '?'}ts=${Date.now()}`;
           
           console.log(`[App] 🔄 Loading account info for platform: ${isTwitterDashboard ? 'Twitter' : isFacebookDashboard ? 'Facebook' : 'Instagram'}`);
           
-          const response = await axios.get(endpoint);
+          const response = await axios.get(tsEndpoint, { headers: { 'Accept': 'application/json' } });
           
           // Defensive check for valid response data
           if (!response.data || typeof response.data !== 'object') {
@@ -664,7 +669,8 @@ const AppContent: React.FC = () => {
             let savedCompetitors: string[] = [];
             try {
               const platform = isTwitterDashboard ? 'twitter' : isFacebookDashboard ? 'facebook' : 'instagram';
-              const accountInfoResponse = await axios.get(`/api/retrieve-account-info/${savedUsername}?platform=${platform}`);
+              const accountInfoUrl = `/api/retrieve-account-info/${savedUsername}?platform=${platform}`;
+              const accountInfoResponse = await axios.get(`${accountInfoUrl}&ts=${Date.now()}`, { headers: { 'Accept': 'application/json' } });
               savedCompetitors = accountInfoResponse.data.competitors || [];
               console.log(`[App] ✅ Retrieved competitors for ${savedUsername} on ${platform}:`, savedCompetitors);
               
@@ -1046,6 +1052,14 @@ const AppContent: React.FC = () => {
                 }
               />
               <Route
+                path="/linkedin"
+                element={
+                  <PrivateRoute>
+                    <LinkedIn />
+                  </PrivateRoute>
+                }
+              />
+              <Route
                 path="/dashboard"
                 element={
                   <PrivateRoute>
@@ -1118,6 +1132,34 @@ const AppContent: React.FC = () => {
                       competitors={competitors} 
                       accountType="non-branding"
                       platform="facebook"
+                      onOpenChat={handleOpenChatFromMessages}
+                    />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/linkedin-dashboard"
+                element={
+                  <PrivateRoute>
+                    <PlatformDashboard 
+                      accountHolder={accountHolder} 
+                      competitors={competitors} 
+                      accountType={accountType || 'professional'}
+                      platform="linkedin"
+                      onOpenChat={handleOpenChatFromMessages}
+                    />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/linkedin-non-branding-dashboard"
+                element={
+                  <PrivateRoute>
+                    <PlatformDashboard 
+                      accountHolder={accountHolder} 
+                      competitors={competitors} 
+                      accountType="personal"
+                      platform="linkedin"
                       onOpenChat={handleOpenChatFromMessages}
                     />
                   </PrivateRoute>

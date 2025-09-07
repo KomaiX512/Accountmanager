@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clear Browser Cache - Sentient Marketing</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 40px;
+            max-width: 600px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        h1 {
+            color: #00ff88;
+            margin-bottom: 20px;
+            font-size: 2.5em;
+        }
+        .icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+        .description {
+            font-size: 1.1em;
+            line-height: 1.6;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+        .clear-btn {
+            background: linear-gradient(45deg, #00ff88, #00cc6a);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 1.2em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px;
+        }
+        .clear-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 255, 136, 0.3);
+        }
+        .status {
+            margin-top: 30px;
+            padding: 15px;
+            border-radius: 10px;
+            font-family: monospace;
+            text-align: left;
+            max-height: 400px;
+            overflow-y: auto;
+            display: none;
+        }
+        .status.active {
+            display: block;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .manual-steps {
+            background: rgba(255, 165, 0, 0.1);
+            border: 1px solid rgba(255, 165, 0, 0.3);
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            text-align: left;
+        }
+        .manual-steps h3 {
+            color: #ffaa00;
+            margin-top: 0;
+        }
+        .step {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">🧹</div>
+        <h1>Cache Clearing Tool</h1>
+        
+        <div class="description">
+            This tool will clear all browser caches, service workers, and storage that may be causing JSON parsing errors. 
+            If you're experiencing "Unexpected token '<'" errors, this will force your browser to fetch fresh API responses.
+        </div>
+        
+        <button class="clear-btn" onclick="startCacheClear()">
+            🚀 Clear All Caches Now
+        </button>
+        
+        <button class="clear-btn" onclick="testEndpoints()">
+            🔍 Test API Endpoints
+        </button>
+        
+        <div id="status" class="status"></div>
+        
+        <div class="manual-steps">
+            <h3>📋 Manual Steps (Important!)</h3>
+            <div class="step"><strong>1. Hard Refresh:</strong> Ctrl+Shift+R (Windows/Linux) or Cmd+Shift+R (Mac)</div>
+            <div class="step"><strong>2. Clear Browser Data:</strong> F12 → Application → Storage → Clear site data</div>
+            <div class="step"><strong>3. Disable Cache:</strong> F12 → Network → Check "Disable cache"</div>
+            <div class="step"><strong>4. Test in Incognito:</strong> Use private browsing mode to verify fixes</div>
+        </div>
+    </div>
+
+    <script>
+        function log(message) {
+            const status = document.getElementById('status');
+            status.classList.add('active');
+            status.innerHTML += message + '\n';
+            status.scrollTop = status.scrollHeight;
+            console.log(message);
+        }
+        
+        function clearDisplay() {
+            const status = document.getElementById('status');
+            status.innerHTML = '';
+            status.classList.remove('active');
+        }
+        
+        async function startCacheClear() {
+            clearDisplay();
+            log('🧹 Starting comprehensive cache clearing...');
+            
+            // Clear all storage
+            try {
+                const localCount = localStorage.length;
+                const sessionCount = sessionStorage.length;
+                localStorage.clear();
+                sessionStorage.clear();
+                log(`✅ localStorage cleared (${localCount} items)`);
+                log(`✅ sessionStorage cleared (${sessionCount} items)`);
+            } catch (e) {
+                log(`❌ Storage clear error: ${e.message}`);
+            }
+            
+            // Clear service workers
+            if ('serviceWorker' in navigator) {
+                try {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    log(`🔄 Found ${registrations.length} service workers`);
+                    for (let registration of registrations) {
+                        await registration.unregister();
+                        log(`✅ Service worker unregistered: ${registration.scope}`);
+                    }
+                } catch (e) {
+                    log(`❌ Service worker error: ${e.message}`);
+                }
+            }
+            
+            // Clear browser caches
+            if ('caches' in window) {
+                try {
+                    const cacheNames = await caches.keys();
+                    log(`🔄 Found ${cacheNames.length} browser caches`);
+                    for (let cacheName of cacheNames) {
+                        await caches.delete(cacheName);
+                        log(`✅ Cache deleted: ${cacheName}`);
+                    }
+                } catch (e) {
+                    log(`❌ Browser cache error: ${e.message}`);
+                }
+            }
+            
+            log('🎉 Cache clearing complete!');
+            log('📋 Now perform manual steps below ⬇️');
+        }
+        
+        async function testEndpoints() {
+            clearDisplay();
+            log('🔍 Testing API endpoints...');
+            
+            const endpoints = [
+                '/api/platform-access/test',
+                '/api/user-instagram-status/test',
+                '/api/user-twitter-status/test', 
+                '/api/usage/instagram/test'
+            ];
+            
+            for (let endpoint of endpoints) {
+                try {
+                    const cacheBuster = `?cb=${Date.now()}&r=${Math.random()}`;
+                    const response = await fetch(endpoint + cacheBuster, {
+                        method: 'GET',
+                        headers: {
+                            'Cache-Control': 'no-cache, no-store, must-revalidate',
+                            'Pragma': 'no-cache',
+                            'Accept': 'application/json'
+                        },
+                        cache: 'no-store'
+                    });
+                    
+                    const contentType = response.headers.get('content-type');
+                    const isJSON = contentType && contentType.includes('application/json');
+                    
+                    if (isJSON) {
+                        const data = await response.json();
+                        log(`✅ ${endpoint} → JSON (${response.status})`);
+                    } else {
+                        log(`❌ ${endpoint} → Non-JSON (${response.status})`);
+                    }
+                } catch (e) {
+                    log(`❌ ${endpoint} → Error: ${e.message}`);
+                }
+            }
+            
+            log('🔍 API endpoint testing complete');
+        }
+    </script>
+</body>
+</html>

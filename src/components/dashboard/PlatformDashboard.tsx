@@ -25,6 +25,7 @@ import FacebookRequiredButton from '../common/FacebookRequiredButton';
 import { useInstagram } from '../../context/InstagramContext';
 import { useTwitter } from '../../context/TwitterContext';
 import { useFacebook } from '../../context/FacebookContext';
+import { useLinkedIn } from '../../context/LinkedInContext';
 import ChatModal from '../instagram/ChatModal';
 import RagService from '../../services/RagService';
 import type { ChatMessage as ChatModalMessage, LinkedAccount } from '../instagram/ChatModal';
@@ -60,8 +61,8 @@ interface RagChatMessage {
 interface PlatformDashboardProps {
   accountHolder: string;
   competitors: string[];
-  accountType: 'branding' | 'non-branding';
-  platform: 'instagram' | 'twitter' | 'facebook';
+  accountType: 'branding' | 'non-branding' | 'professional' | 'personal';
+  platform: 'instagram' | 'twitter' | 'facebook' | 'linkedin';
   onOpenChat?: (messageContent: string, platform?: string) => void;
 }
 
@@ -99,6 +100,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const { userId: igUserId, isConnected: isInstagramConnected } = useInstagram();
   const { userId: twitterId, isConnected: isTwitterConnected } = useTwitter();
   const { userId: facebookPageId, isConnected: isFacebookConnected, connectFacebook } = useFacebook();
+  const { userId: linkedinId, isConnected: isLinkedInConnected } = useLinkedIn();
   const { trackRealAIReply, trackRealPostCreation, canUseFeature } = useFeatureTracking();
   const { safeIncrementUsage } = useDefensiveUsageTracking();
   const { showUpgradePopup, blockedFeature, closeUpgradePopup, currentUsage } = useUpgradeHandler();
@@ -1285,6 +1287,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     
     const currentUserId = platform === 'twitter' ? twitterId : 
                          platform === 'facebook' ? facebookPageId :
+                         platform === 'linkedin' ? linkedinId :
                          igUserId;
     
     if (platform === 'facebook') {
@@ -1314,7 +1317,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         eventSourceRef.current = null;
       }
     };
-  }, [isLoading, platform, twitterId, facebookPageId, igUserId]);
+  }, [isLoading, platform, twitterId, facebookPageId, igUserId, linkedinId]);
 
   // Optimized userId effect - Only handle Facebook pageId changes
   useEffect(() => {
@@ -1669,9 +1672,11 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   // Determine current platform connection info
   const userId = platform === 'twitter' ? twitterId : 
                platform === 'facebook' ? facebookPageId : // Use Facebook Page ID
+               platform === 'linkedin' ? linkedinId : // Use LinkedIn ID
                igUserId;
   const isConnected = platform === 'twitter' ? isTwitterConnected : 
                      platform === 'facebook' ? isFacebookConnected : // Use Facebook context connection status
+                     platform === 'linkedin' ? isLinkedInConnected : // Use LinkedIn context connection status
                      isInstagramConnected;
   
   // Platform configuration
@@ -1702,6 +1707,15 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       supportsNotifications: true, // Enable notifications for Facebook
       supportsScheduling: true, // Enable scheduling for Facebook
       supportsInsights: true // Enable insights for Facebook
+    },
+    linkedin: {
+      name: 'LinkedIn',
+      primaryColor: '#0077B5',
+      secondaryColor: '#004471',
+      baseUrl: 'https://linkedin.com/in/',
+      supportsNotifications: true, // Enable notifications for LinkedIn
+      supportsScheduling: false, // Not implemented yet for LinkedIn
+      supportsInsights: true // Enable insights for LinkedIn
     }
   }[platform];
 
@@ -2881,6 +2895,16 @@ Image Description: ${response.post.image_prompt}
                           <span>Compose</span>
                         </FacebookRequiredButton>
                       </>
+                    ) : platform === 'linkedin' ? (
+                      <>
+                        <button
+                          onClick={handleOpenInsights}
+                          className="dashboard-btn insights-btn linkedin"
+                        >
+                          <FaChartLine className="btn-icon" />
+                          <span>Industrial Connections</span>
+                        </button>
+                      </>
                     ) : null}
                     
                     {/* 🚀 AUTOPILOT: Autopilot button with glassmorphism style */}
@@ -3040,6 +3064,20 @@ Image Description: ${response.post.image_prompt}
                     <FaCalendarAlt className="btn-icon" />
                     <span>Compose</span>
                   </FacebookRequiredButton>
+                </>
+              ) : platform === 'linkedin' ? (
+                <>
+                  <button
+                    onClick={() => {
+                      console.log('Mobile LinkedIn Insights clicked');
+                      handleOpenInsights();
+                      setIsMobileProfileMenuOpen(false);
+                    }}
+                    className="dashboard-btn insights-btn linkedin"
+                  >
+                    <FaChartLine className="btn-icon" />
+                    <span>Industrial Connections</span>
+                  </button>
                 </>
               ) : null}
               

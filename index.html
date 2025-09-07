@@ -134,8 +134,21 @@
     <!-- PWA Registration Script -->
     <script src="/pwa-register.js"></script>
     
-    <!-- Cache Management Script (Development) -->
-    <script src="/clear-cache.js"></script>
+    <!-- Cache Management Script (Development) - only load when explicitly requested -->
+    <script>
+      (function(){
+        try {
+          var params = new URLSearchParams(window.location.search);
+          if (params.has('clear-cache') || params.get('clearCache') === '1' || params.get('debug') === 'clear-cache') {
+            var s = document.createElement('script');
+            s.src = '/clear-cache.js';
+            document.head.appendChild(s);
+          }
+        } catch (e) {
+          // fail-safe: do nothing
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

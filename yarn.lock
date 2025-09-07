@@ -2082,7 +2082,7 @@
     semver "^7.3.5"
     tar "^6.1.11"
 
-"@modelcontextprotocol/sdk@^1.11.0":
+"@modelcontextprotocol/sdk@^1.11.0", "@modelcontextprotocol/sdk@^1.16.0":
   version "1.17.4"
   resolved "https://registry.npmjs.org/@modelcontextprotocol/sdk/-/sdk-1.17.4.tgz"
   integrity sha512-zq24hfuAmmlNZvik0FLI58uE5sriN0WWsQzIlYnzSuKDAHFqJtBFrl/LfB1NLgJT5Y7dEBzaX4yAKqOPrcetaw==
@@ -2235,6 +2235,29 @@
   version "0.2.9"
   resolved "https://registry.npmjs.org/@pkgr/core/-/core-0.2.9.tgz"
   integrity sha512-QNqXyfVS2wm9hweSYD2O7F0G06uurj9kZ96TRQE5Y9hU7+tgdZwIkbAKc5Ocy1HxEY2kuDQa6cQ1WRs/O5LFKA==
+
+"@playwright/mcp@^0.0.36":
+  version "0.0.36"
+  resolved "https://registry.npmjs.org/@playwright/mcp/-/mcp-0.0.36.tgz"
+  integrity sha512-dcW3V2xHZ1RD28+E4lb7+fwBluk6A0rWODA0g+slogWaw+O9Ly99+I+kDvlf8Ii6QvDqpmzOw7LlyVBvBCtYcg==
+  dependencies:
+    "@modelcontextprotocol/sdk" "^1.16.0"
+    commander "^13.1.0"
+    debug "^4.4.1"
+    dotenv "^17.2.0"
+    mime "^4.0.7"
+    playwright "1.56.0-alpha-1756505518000"
+    playwright-core "1.56.0-alpha-1756505518000"
+    ws "^8.18.1"
+    zod "^3.24.1"
+    zod-to-json-schema "^3.24.4"
+
+"@playwright/test@^1.55.0":
+  version "1.55.0"
+  resolved "https://registry.npmjs.org/@playwright/test/-/test-1.55.0.tgz"
+  integrity sha512-04IXzPwHrW69XusN/SIdDdKZBzMfOT9UNT/YiJit/xpy2VuAoB8NHc8Aplb96zsWDddLnbkPL3TsmrS04ZU2xQ==
+  dependencies:
+    playwright "1.55.0"
 
 "@pm2/agent@~2.0.0":
   version "2.0.4"
@@ -4379,6 +4402,11 @@ commander@^10.0.1:
   resolved "https://registry.npmjs.org/commander/-/commander-10.0.1.tgz"
   integrity sha512-y4Mg2tXshplEbSGzx7amzPwKKOCGuoSRP/CjEdwwk0FOGlUbq6lKuoyDZTNZkmxHdJtp54hdfY/JUrdL7Xfdug==
 
+commander@^13.1.0:
+  version "13.1.0"
+  resolved "https://registry.npmjs.org/commander/-/commander-13.1.0.tgz"
+  integrity sha512-/rFeCpNJQbhSZjGVwO9RFV3xPqbnERS8MmIQzCtD/zl6gpJuV/bMLuN92oG3F7d8oDEHHRrujSXNUr8fpjntKw==
+
 commander@^2.20.0:
   version "2.20.3"
   resolved "https://registry.npmjs.org/commander/-/commander-2.20.3.tgz"
@@ -4612,10 +4640,10 @@ debug@^3.2.6:
   dependencies:
     ms "^2.1.1"
 
-debug@^4, debug@^4.1.0, debug@^4.1.1, debug@^4.3.1, debug@^4.3.2, debug@^4.3.4, debug@^4.3.5, debug@^4.3.6, debug@^4.4.0, debug@4:
-  version "4.4.0"
-  resolved "https://registry.npmjs.org/debug/-/debug-4.4.0.tgz"
-  integrity sha512-6WTZ/IxCY/T6BALoZHaE4ctp9xm+Z5kY/pzYaCHRFeyVhojxlrm+46y68HA6hr0TcwEssoxNiDEUJQjfPZ/RYA==
+debug@^4, debug@^4.1.0, debug@^4.1.1, debug@^4.3.1, debug@^4.3.2, debug@^4.3.4, debug@^4.3.5, debug@^4.3.6, debug@^4.4.0, debug@^4.4.1, debug@4:
+  version "4.4.1"
+  resolved "https://registry.npmjs.org/debug/-/debug-4.4.1.tgz"
+  integrity sha512-KcKCqiftBJcZr++7ykoDIEwSa3XWowTfNPo92BYxjXiyYEVrUQh2aLyhxBCwww+heortUFxEJYcRzosstTEBYQ==
   dependencies:
     ms "^2.1.3"
 
@@ -4772,6 +4800,11 @@ dotenv@^16.3.1:
   version "16.5.0"
   resolved "https://registry.npmjs.org/dotenv/-/dotenv-16.5.0.tgz"
   integrity sha512-m/C+AwOAr9/W1UOIZUo232ejMNnJAJtYQjUbHoNTBNTJSvqzzDh7vnrei3o3r3m9blf6ZoDkvcw0VmozNRFJxg==
+
+dotenv@^17.2.0:
+  version "17.2.2"
+  resolved "https://registry.npmjs.org/dotenv/-/dotenv-17.2.2.tgz"
+  integrity sha512-Sf2LSQP+bOlhKWWyhFsn0UsfdK/kCWRv1iuA2gXAwt3dyNabr6QSj00I2V10pidqz69soatm9ZwZvpQMTIOd5Q==
 
 dunder-proto@^1.0.1:
   version "1.0.1"
@@ -7340,6 +7373,11 @@ mime-types@^3.0.0, mime-types@^3.0.1:
   dependencies:
     mime-db "^1.54.0"
 
+mime@^4.0.7:
+  version "4.0.7"
+  resolved "https://registry.npmjs.org/mime/-/mime-4.0.7.tgz"
+  integrity sha512-2OfDPL+e03E0LrXaGYOtTFIYhiuzep94NSsuhrNULq+stylcJedcHdzHtz0atMUuGwJfFYs0YL5xeC/Ca2x0eQ==
+
 mime@1.6.0:
   version "1.6.0"
   resolved "https://registry.npmjs.org/mime/-/mime-1.6.0.tgz"
@@ -8036,6 +8074,34 @@ pkg-dir@^4.2.0:
   integrity sha512-HRDzbaKjC+AOWVXxAU/x54COGeIv9eb+6CkDSQoNTt4XyWoIJvuPsXizxu/Fr23EiekbtZwmh1IcIG/l/a10GQ==
   dependencies:
     find-up "^4.0.0"
+
+playwright-core@1.55.0:
+  version "1.55.0"
+  resolved "https://registry.npmjs.org/playwright-core/-/playwright-core-1.55.0.tgz"
+  integrity sha512-GvZs4vU3U5ro2nZpeiwyb0zuFaqb9sUiAJuyrWpcGouD8y9/HLgGbNRjIph7zU9D3hnPaisMl9zG9CgFi/biIg==
+
+playwright-core@1.56.0-alpha-1756505518000:
+  version "1.56.0-alpha-1756505518000"
+  resolved "https://registry.npmjs.org/playwright-core/-/playwright-core-1.56.0-alpha-1756505518000.tgz"
+  integrity sha512-qeM+G9jA+PkA3dSYZmqKrARnIgd53B+7Lm3e52wH3rPyZJ+IBhRvhW369iN8tVJunbmsr7fkU1+05K2c7q9y0g==
+
+playwright@^1.32.1, playwright@1.55.0:
+  version "1.55.0"
+  resolved "https://registry.npmjs.org/playwright/-/playwright-1.55.0.tgz"
+  integrity sha512-sdCWStblvV1YU909Xqx0DhOjPZE4/5lJsIS84IfN9dAZfcl/CIZ5O8l3o0j7hPMjDvqoTF8ZUcc+i/GL5erstA==
+  dependencies:
+    playwright-core "1.55.0"
+  optionalDependencies:
+    fsevents "2.3.2"
+
+playwright@1.56.0-alpha-1756505518000:
+  version "1.56.0-alpha-1756505518000"
+  resolved "https://registry.npmjs.org/playwright/-/playwright-1.56.0-alpha-1756505518000.tgz"
+  integrity sha512-aChIG1Hly/pxzVdwOMArmOMNz4Wo2VyWBxLaMvLJaGWRPPB9+Sl1N8PRm6oH1CbbpFGpPvIeXl83LomkibShRA==
+  dependencies:
+    playwright-core "1.56.0-alpha-1756505518000"
+  optionalDependencies:
+    fsevents "2.3.2"
 
 pm2-axon-rpc@~0.7.0, pm2-axon-rpc@~0.7.1:
   version "0.7.1"
@@ -10118,7 +10184,7 @@ ws@^7.0.0:
   resolved "https://registry.npmjs.org/ws/-/ws-7.5.10.tgz"
   integrity sha512-+dbF1tHwZpXcbOJdVOkzLDxZP1ailvSxM6ZweXTegylPny803bFhA+vqBYw4s31NSAk4S2Qz+AKXK9a4wkdjcQ==
 
-ws@^8.14.2, ws@^8.18.0:
+ws@^8.14.2, ws@^8.18.0, ws@^8.18.1:
   version "8.18.2"
   resolved "https://registry.npmjs.org/ws/-/ws-8.18.2.tgz"
   integrity sha512-DMricUmwGZUVr++AEAe2uiVM7UoO9MAVZMDu05UQOaUII0lp+zOzLLU4Xqh/JvTqklB1T4uELaaPBKyjE1r4fQ==
@@ -10222,7 +10288,7 @@ yocto-queue@^0.1.0:
   resolved "https://registry.npmjs.org/yocto-queue/-/yocto-queue-0.1.0.tgz"
   integrity sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==
 
-zod-to-json-schema@^3.22.3, zod-to-json-schema@^3.22.4, zod-to-json-schema@^3.22.5, zod-to-json-schema@^3.24.1:
+zod-to-json-schema@^3.22.3, zod-to-json-schema@^3.22.4, zod-to-json-schema@^3.22.5, zod-to-json-schema@^3.24.1, zod-to-json-schema@^3.24.4:
   version "3.24.5"
   resolved "https://registry.npmjs.org/zod-to-json-schema/-/zod-to-json-schema-3.24.5.tgz"
   integrity sha512-/AuWwMP+YqiPbsJx5D6TfgRTc4kTLjsh5SOcd4bLsfUg2RcEXrFMJl1DGgdHy2aCfsIA/cr/1JM0xcB2GZji8g==

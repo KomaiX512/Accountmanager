@@ -32,7 +32,7 @@ import {
 import './ProcessingLoadingState.css';
 import { useNavigate } from 'react-router-dom';
 import { safeNavigate } from '../../utils/navigationGuard';
-import { FaChartLine, FaFlag, FaInstagram, FaTwitter, FaFacebook } from 'react-icons/fa';
+import { FaChartLine, FaFlag, FaInstagram, FaTwitter, FaFacebook, FaLinkedin } from 'react-icons/fa';
 import { MdAnalytics } from 'react-icons/md';
 import { BsLightningChargeFill } from 'react-icons/bs';
 import { useProcessing } from '../../context/ProcessingContext';
@@ -88,6 +88,14 @@ const PLATFORM_CONFIGS: Record<string, PlatformConfigType> = {
     secondaryColor: '#42a5f5',
     icon: <FaFacebook />,
     initialMinutes: 20, // Facebook gets 20 minutes initially
+    extensionMinutes: 5  // 5 minutes extension for all platforms
+  },
+  linkedin: {
+    name: 'LinkedIn',
+    primaryColor: '#0077B5',
+    secondaryColor: '#004471',
+    icon: <FaLinkedin />,
+    initialMinutes: 15, // LinkedIn gets 15 minutes initially
     extensionMinutes: 5  // 5 minutes extension for all platforms
   }
 };
@@ -191,7 +199,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     
     const checkPlatformCompletion = async () => {
       try {
-        const accessResp = await fetch(`/api/platform-access/${currentUser.uid}`);
+        const accessResp = await fetch(`/api/platform-access/${currentUser.uid}?ts=${Date.now()}`, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
         if (accessResp.ok) {
           const accessJson = await accessResp.json();
           const accessData = accessJson?.data || accessJson;
@@ -360,7 +368,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
       // ✅ CRITICAL FIX: Check if processing is already complete before creating new timer
       if (currentUser?.uid) {
         // Check if platform is already claimed (completed)
-        fetch(`/api/platform-access/${currentUser.uid}`)
+        fetch(`/api/platform-access/${currentUser.uid}?ts=${Date.now()}`, { cache: 'no-store', headers: { 'Accept': 'application/json' } })
           .then(response => {
             if (response.ok) {
               return response.json();
@@ -702,7 +710,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
       lastSyncTime = now;
 
       try {
-        const resp = await fetch(`/api/processing-status/${currentUser.uid}?platform=${platform}`);
+        const resp = await fetch(`/api/processing-status/${currentUser.uid}?platform=${platform}&ts=${Date.now()}`, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
         if (!resp.ok) return;
         const json = await resp.json();
         const data = json?.data;
@@ -750,7 +758,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
           } else {
             // CRITICAL FIX: Check if platform is completed on server before clearing local timer
             try {
-              const accessResp = await fetch(`/api/platform-access/${currentUser.uid}`);
+              const accessResp = await fetch(`/api/platform-access/${currentUser.uid}?ts=${Date.now()}`, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
               if (accessResp.ok) {
                 const accessJson = await accessResp.json();
                 const accessData = accessJson?.data || accessJson;

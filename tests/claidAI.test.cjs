@@ -234,7 +234,7 @@ describe('Claid AI Generative Editing API Integration', () => {
 
 
 // Export for use in other modules
-export {
+module.exports = {
   testClaidAIAPI,
   testEdgeCases,
   runAllTests

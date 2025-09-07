@@ -9,6 +9,7 @@ import './MainDashboard.css';
 import { useInstagram } from '../../context/InstagramContext';
 import { useTwitter } from '../../context/TwitterContext';
 import { useFacebook } from '../../context/FacebookContext';
+import { useLinkedIn } from '../../context/LinkedInContext';
 import { useAuth } from '../../context/AuthContext';
 import PostScheduler from '../instagram/PostScheduler';
 import TwitterCompose from '../twitter/TwitterCompose';
@@ -66,6 +67,7 @@ const MainDashboard: React.FC = () => {
   const { isConnected: isInstagramConnected, userId: instagramUserId, hasAccessed: hasAccessedInstagram = false } = useInstagram();
   const { isConnected: isTwitterConnected, userId: twitterUserId, hasAccessed: hasAccessedTwitter = false, refreshConnection: refreshTwitterConnection } = useTwitter();
   const { isConnected: isFacebookConnected, userId: facebookUserId, hasAccessed: hasAccessedFacebook = false } = useFacebook();
+  const { isConnected: isLinkedInConnected, userId: linkedinUserId, hasAccessed: hasAccessedLinkedIn = false } = useLinkedIn();
   const { currentUser } = useAuth();
   const { trackRealPostCreation, canUseFeature } = useFeatureTracking();
   const { usage, refreshUsage } = useUsage();
@@ -180,7 +182,7 @@ const MainDashboard: React.FC = () => {
         // ✅ FACEBOOK PRIORITY SYNC: Check Facebook first for faster cross-device sync
         const facebookPriorityCheck = async () => {
           try {
-            const resp = await fetch(`/api/user-facebook-status/${currentUser.uid}`);
+            const resp = await fetch(`/api/user-facebook-status/${currentUser.uid}?ts=${Date.now()}`, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
             if (resp.ok) {
               const json = await resp.json();
               const isFacebookClaimed = json.hasEnteredFacebookUsername === true;
@@ -226,7 +228,7 @@ const MainDashboard: React.FC = () => {
         // Execute Facebook priority check first
         await facebookPriorityCheck();
 
-        const resp = await fetch(`/api/processing-status/${currentUser.uid}`);
+        const resp = await fetch(`/api/processing-status/${currentUser.uid}?ts=${Date.now()}`, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
         if (!resp.ok) return;
         const json = await resp.json();
         const data = json?.data || {};
@@ -487,7 +489,8 @@ const MainDashboard: React.FC = () => {
               endpoint = `/api/platform-access/${currentUser.uid}`;
             }
             
-            const resp = await fetch(endpoint);
+            const tsEndpoint = `${endpoint}${endpoint.includes('?') ? '&' : '?'}ts=${Date.now()}`;
+            const resp = await fetch(tsEndpoint, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
             if (resp.ok) {
               const json = await resp.json();
               const data = json?.data || json;
@@ -561,7 +564,8 @@ const MainDashboard: React.FC = () => {
                   endpoint = `/api/platform-access/${currentUser.uid}`;
                 }
                 
-                const resp = await fetch(endpoint);
+                const tsEndpoint = `${endpoint}${endpoint.includes('?') ? '&' : '?'}ts=${Date.now()}`;
+                const resp = await fetch(tsEndpoint, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
                 if (resp.ok) {
                   const json = await resp.json();
                   const platformData = json?.data || json;
@@ -910,6 +914,7 @@ const MainDashboard: React.FC = () => {
     if (platformId === 'instagram') accessedFromContext = hasAccessedInstagram;
     if (platformId === 'twitter') accessedFromContext = hasAccessedTwitter;
     if (platformId === 'facebook') accessedFromContext = hasAccessedFacebook;
+    if (platformId === 'linkedin') accessedFromContext = hasAccessedLinkedIn;
     
     // ✅ COMBINED STATUS: Use either localStorage or context (whichever is true)
     const localStatus = accessedFromStorage || accessedFromContext;
@@ -930,7 +935,7 @@ const MainDashboard: React.FC = () => {
     console.log(`🔍 PLATFORM STATUS CHECK: ${platformId} - storage:${accessedFromStorage} context:${accessedFromContext} combined:${localStatus}`);
     
     return localStatus;
-  }, [currentUser?.uid, hasAccessedInstagram, hasAccessedTwitter, hasAccessedFacebook, isPlatformLoading]);
+  }, [currentUser?.uid, hasAccessedInstagram, hasAccessedTwitter, hasAccessedFacebook, hasAccessedLinkedIn, isPlatformLoading]);
 
   // ✅ SEPARATE BACKEND SYNC: Dedicated effect for backend synchronization
   useEffect(() => {
@@ -950,7 +955,8 @@ const MainDashboard: React.FC = () => {
           endpoint = `/api/platform-access/${currentUser.uid}`;
         }
         
-        const resp = await fetch(endpoint);
+        const tsEndpoint = `${endpoint}${endpoint.includes('?') ? '&' : '?'}ts=${Date.now()}`;
+        const resp = await fetch(tsEndpoint, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
         if (resp.ok) {
           const json = await resp.json();
           const data = json?.data || json; // Handle both response formats
@@ -1085,11 +1091,11 @@ const MainDashboard: React.FC = () => {
       case 'facebook':
         return isFacebookConnected && Boolean(facebookUserId);
       case 'linkedin':
-        return false; // Not yet implemented
+        return isLinkedInConnected && Boolean(linkedinUserId);
       default:
         return false;
     }
-  }, [isInstagramConnected, isTwitterConnected, isFacebookConnected, instagramUserId, twitterUserId, facebookUserId]);
+  }, [isInstagramConnected, isTwitterConnected, isFacebookConnected, isLinkedInConnected, instagramUserId, twitterUserId, facebookUserId, linkedinUserId]);
 
   // ✅ INSTANT CROSS-DEVICE SYNC: Listen for localStorage changes from other tabs/devices
   useEffect(() => {
@@ -1162,7 +1168,7 @@ const MainDashboard: React.FC = () => {
         if (remaining === 0) {
           try {
             if (currentUser?.uid) {
-              const resp = await fetch(`/api/processing-status/${currentUser.uid}?platform=${platformId}`);
+              const resp = await fetch(`/api/processing-status/${currentUser.uid}?platform=${platformId}&ts=${Date.now()}`, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
               if (resp.ok) {
                 const json = await resp.json();
                 const data = json?.data;
@@ -1270,7 +1276,7 @@ const MainDashboard: React.FC = () => {
           // Real-time notifications (DMs/comments) - only if connected
           if (userId) {
             try {
-              const response = await fetch(`/events-list/${userId}?platform=${platform}`);
+              const response = await fetch(`/api/events-list/${userId}?platform=${platform}&ts=${Date.now()}`, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
               if (response.ok) {
                 const notifications = await response.json();
                 totalCount += notifications.length;
@@ -1285,7 +1291,7 @@ const MainDashboard: React.FC = () => {
           if (dashboardUsername) {
             // Fetch strategies count - using dashboard username for AI content
             try {
-              const strategiesResponse = await fetch(`/api/retrieve-strategies/${dashboardUsername}?platform=${platform}`);
+              const strategiesResponse = await fetch(`/api/retrieve-strategies/${dashboardUsername}?platform=${platform}&ts=${Date.now()}`, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
               if (strategiesResponse.ok) {
                 const strategies = await strategiesResponse.json();
                 // Defensive check: ensure strategies is an array before filtering
@@ -1303,7 +1309,7 @@ const MainDashboard: React.FC = () => {
             
             // Fetch posts count - using dashboard username for AI content
             try {
-              const postsResponse = await fetch(`/api/posts/${dashboardUsername}?platform=${platform}`);
+              const postsResponse = await fetch(`/api/posts/${dashboardUsername}?platform=${platform}&ts=${Date.now()}`, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
               if (postsResponse.ok) {
                 const posts = await postsResponse.json();
                 // Defensive check: ensure posts is an array before filtering
@@ -1321,13 +1327,13 @@ const MainDashboard: React.FC = () => {
             
             // Fetch competitor analysis count - using dashboard username for AI content
             try {
-              const accountInfoResponse = await fetch(`/api/profile-info/${dashboardUsername}?platform=${platform}`);
+              const accountInfoResponse = await fetch(`/api/profile-info/${dashboardUsername}?platform=${platform}&ts=${Date.now()}`, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
               if (accountInfoResponse.ok) {
                 const accountInfo = await accountInfoResponse.json();
                 const competitors = accountInfo.competitors || [];
                 
                 if (competitors.length > 0) {
-                  const competitorResponse = await fetch(`/api/retrieve-multiple/${dashboardUsername}?competitors=${competitors.join(',')}&platform=${platform}`);
+                  const competitorResponse = await fetch(`/api/retrieve-multiple/${dashboardUsername}?competitors=${competitors.join(',')}&platform=${platform}&ts=${Date.now()}`, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
                   if (competitorResponse.ok) {
                     const competitorData = await competitorResponse.json();
                     // Defensive check: ensure competitorData is an array before filtering
@@ -1390,7 +1396,8 @@ const MainDashboard: React.FC = () => {
                 endpoint = `/api/platform-access/${currentUser.uid}`;
               }
               
-              const resp = await fetch(endpoint);
+              const tsEndpoint = `${endpoint}${endpoint.includes('?') ? '&' : '?'}ts=${Date.now()}`;
+              const resp = await fetch(tsEndpoint, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
               if (resp.ok) {
                 const json = await resp.json();
                 const data = json?.data || json;
@@ -1552,7 +1559,8 @@ const MainDashboard: React.FC = () => {
               endpoint = `/api/platform-access/${currentUser.uid}`;
             }
             
-            const resp = await fetch(endpoint);
+            const tsEndpoint = `${endpoint}${endpoint.includes('?') ? '&' : '?'}ts=${Date.now()}`;
+            const resp = await fetch(tsEndpoint, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
             if (resp.ok) {
               const json = await resp.json();
               const data = json?.data || json;
@@ -1630,7 +1638,7 @@ const MainDashboard: React.FC = () => {
             checks.push(
               (async () => {
                 try {
-                  const resp = await fetch(`/api/processing-status/${currentUser.uid}?platform=${platform.id}`);
+                  const resp = await fetch(`/api/processing-status/${currentUser.uid}?platform=${platform.id}&ts=${Date.now()}`, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
                   if (!resp.ok) return;
                   const json = await resp.json();
                   const data = json?.data;

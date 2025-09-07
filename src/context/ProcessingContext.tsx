@@ -4,7 +4,7 @@ import { useAuth } from './AuthContext';
 import { safeNavigate } from '../utils/navigationGuard';
 
 interface ProcessingState {
-  platform: 'instagram' | 'twitter' | 'facebook' | null;
+  platform: 'instagram' | 'twitter' | 'facebook' | 'linkedin' | null;
   username: string | null;
   startTime: number | null;
   duration: number | null; // Duration in milliseconds
@@ -13,9 +13,9 @@ interface ProcessingState {
 
 interface ProcessingContextType {
   processingState: ProcessingState;
-  startProcessing: (platform: 'instagram' | 'twitter' | 'facebook', username: string, durationMinutes: number, preventNavigation?: boolean) => void;
+  startProcessing: (platform: 'instagram' | 'twitter' | 'facebook' | 'linkedin', username: string, durationMinutes: number, preventNavigation?: boolean) => void;
   completeProcessing: () => void;
-  resetDashboard: (platform: 'instagram' | 'twitter' | 'facebook', username: string) => Promise<boolean>;
+  resetDashboard: (platform: 'instagram' | 'twitter' | 'facebook' | 'linkedin', username: string) => Promise<boolean>;
   isProcessingActive: boolean;
   // 🔒 BULLETPROOF USERNAME LOCKING: New functions to prevent username corruption
   isUsernameLocked: (platform: string, username: string) => boolean;
@@ -126,7 +126,7 @@ export const ProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   
   const startProcessing = useCallback((
-    platform: 'instagram' | 'twitter' | 'facebook',
+    platform: 'instagram' | 'twitter' | 'facebook' | 'linkedin',
     username: string,
     durationMinutes: number,
     preventNavigation?: boolean
@@ -472,7 +472,7 @@ export const ProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, []);
 
   const resetDashboard = useCallback(async (
-    platform: 'instagram' | 'twitter' | 'facebook',
+    platform: 'instagram' | 'twitter' | 'facebook' | 'linkedin',
     username: string
   ): Promise<boolean> => {
     try {

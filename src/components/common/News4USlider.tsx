@@ -4,12 +4,11 @@ import { motion } from 'framer-motion';
 import { FaClock, FaExternalLinkAlt, FaPlus, FaSpinner, FaRss, FaRedo, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import axios from 'axios';
 import RagService from '../../services/RagService';
-import OptimizedImage from './OptimizedImage';
 import './News4U.css';
 
 interface News4UProps {
   accountHolder: string;
-  platform: 'instagram' | 'twitter' | 'facebook';
+  platform: 'instagram' | 'twitter' | 'facebook' | 'linkedin';
 }
 
 interface NewsItem {
@@ -578,15 +577,7 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
           <div className="news4u-item-content">
             {item.image_url && (
               <div className="news4u-image">
-                <OptimizedImage 
-                  src={item.image_url} 
-                  alt={item.title} 
-                  onError={handleImageError}
-                  quality={0.6}
-                  maxWidth={42}
-                  maxHeight={42}
-                  enableLazyLoad={true}
-                />
+                <img src={item.image_url} alt={item.title} onError={handleImageError} loading="lazy" />
               </div>
             )}
             <div className="news4u-text-content">

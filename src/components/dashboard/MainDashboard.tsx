@@ -1324,6 +1324,7 @@ const MainDashboard: React.FC = () => {
               const response = await fetch(`/api/events-list/${userId}?platform=${platform}&ts=${Date.now()}`, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
               if (response.ok) {
                 const notifications = await response.json();
+                console.log(`[MainDashboard] 🔔 ${platform} DMs/comments: ${notifications.length}`);
                 totalCount += notifications.length;
               }
             } catch (err) {
@@ -1345,6 +1346,7 @@ const MainDashboard: React.FC = () => {
                   const viewedKey = `viewed_strategies_${platform}_${dashboardUsername}`;
                   const viewedStrategies = JSON.parse(localStorage.getItem(viewedKey) || '[]');
                   const unseenStrategies = safeFilter(strategies, (s: any) => !viewedStrategies.includes(s.key));
+                  console.log(`[MainDashboard] 🔔 ${platform} strategies: ${unseenStrategies.length}`);
                   totalCount += unseenStrategies.length;
                 }
               }
@@ -1363,6 +1365,7 @@ const MainDashboard: React.FC = () => {
                   const viewedKey = `viewed_posts_${platform}_${dashboardUsername}`;
                   const viewedPosts = JSON.parse(localStorage.getItem(viewedKey) || '[]');
                   const unseenPosts = safeFilter(posts, (p: any) => !viewedPosts.includes(p.key));
+                  console.log(`[MainDashboard] 🔔 ${platform} posts: ${unseenPosts.length}`);
                   totalCount += unseenPosts.length;
                 }
               }
@@ -1387,6 +1390,7 @@ const MainDashboard: React.FC = () => {
                       const viewedKey = `viewed_competitor_${platform}_${dashboardUsername}`;
                       const viewedCompetitor = JSON.parse(localStorage.getItem(viewedKey) || '[]');
                       const unseenCompetitor = safeFilter(competitorData, (c: any) => !viewedCompetitor.includes(c.key || `${c.competitor}_${c.timestamp}`));
+                      console.log(`[MainDashboard] 🔔 ${platform} competitor analysis: ${unseenCompetitor.length}`);
                       totalCount += unseenCompetitor.length;
                     }
                   }
@@ -1399,6 +1403,7 @@ const MainDashboard: React.FC = () => {
         }
         
         counts[platform] = totalCount;
+        console.log(`[MainDashboard] 🔔 ${platform} TOTAL notifications: ${totalCount}`);
       } catch (error) {
         console.warn(`Failed to fetch notifications for ${platform}:`, error);
         counts[platform] = 0;
@@ -2336,7 +2341,7 @@ const MainDashboard: React.FC = () => {
         
         // Call the existing schedule functionality
         const result = await schedulePost({
-          platform: platform.id as 'instagram' | 'twitter' | 'facebook',
+          platform: platform.id as 'instagram' | 'twitter' | 'facebook' | 'linkedin',
           userId: currentUser?.uid || '',
           imageBlob: postContent.images[0],
           caption: postContent.text,

@@ -190,13 +190,22 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
       // Create a temporary image to load the original
       const tempImg = new Image();
       
-      // Don't set crossOrigin for same-origin requests or if CORS might fail
-      const isExternalUrl = src.startsWith('http') && !src.includes(window.location.origin);
-      if (!isExternalUrl) {
-        // For same-origin requests, don't set crossOrigin
-        tempImg.crossOrigin = null;
-      } else {
+      // Determine if URL is truly external by comparing origins safely
+      let isExternalUrl = false;
+      try {
+        const parsed = new URL(src, window.location.origin);
+        isExternalUrl = parsed.origin !== window.location.origin;
+      } catch {
+        // If URL can't be parsed, assume same-origin relative path
+        isExternalUrl = false;
+      }
+
+      // Set crossOrigin only for truly external URLs
+      if (isExternalUrl) {
         tempImg.crossOrigin = 'anonymous';
+      } else {
+        // For same-origin requests, do not set crossOrigin to avoid unnecessary CORS behavior
+        tempImg.crossOrigin = null;
       }
       
       tempImg.onload = async () => {
@@ -242,8 +251,8 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
       };
       
       tempImg.onerror = (e) => {
-        // Only log if it's not a known proxy issue (reduces console noise)
-        if (!src.includes('/api/proxy-image')) {
+        // Only log in development and avoid noise for known proxy-image cases
+        if (debug && !src.includes('/api/proxy-image')) {
           console.warn('[OptimizedImage] Failed to load original image for optimization, using as-is:', e);
         }
         // Keep the current optimizedSrc (don't change it to potentially broken src)

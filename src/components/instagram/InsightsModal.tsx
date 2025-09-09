@@ -13,7 +13,7 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 interface InsightsModalProps {
   userId?: string;
   onClose: () => void;
-  platform?: 'instagram' | 'twitter' | 'facebook';
+  platform?: 'instagram' | 'twitter' | 'facebook' | 'linkedin';
   accountHolder?: string; // optional username fallback passed from dashboard
 }
 
@@ -48,17 +48,18 @@ interface ProfitAnalysisData {
 }
 
 const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform = 'instagram', accountHolder }) => {
+  const normalizedPlatform = (platform || 'instagram').toLowerCase() as 'instagram' | 'twitter' | 'facebook' | 'linkedin';
   // Get userId from platform-specific context if not provided as prop
   const { userId: igUserId, isConnected: isInstagramConnected } = useInstagram();
   const { userId: facebookId, username: facebookUsername, isConnected: isFacebookConnected } = useFacebook();
   const { currentUser } = useAuth();
   
   // Use platform-specific context
-  const platformUserId = platform === 'facebook' ? facebookId : igUserId;
+  const platformUserId = normalizedPlatform === 'facebook' ? facebookId : igUserId;
   
   // Enhanced connection detection: consider both context and prop-based connection
   // For Facebook, if we have a userId prop, consider it connected even if context says otherwise
-  const platformConnected = platform === 'facebook' 
+  const platformConnected = normalizedPlatform === 'facebook' 
     ? (isFacebookConnected || !!userId) // Facebook: connected if context says so OR if userId prop is provided
     : isInstagramConnected; // Instagram: use context only
   
@@ -66,7 +67,7 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
   const userIdToUse = userId || userIdFromContext;
   
   // Debug logging for connection detection
-  if (platform === 'facebook') {
+  if (normalizedPlatform === 'facebook') {
     console.log(`[${new Date().toISOString()}] Facebook connection detection:`, {
       isFacebookConnected,
       hasUserIdProp: !!userId,
@@ -108,32 +109,36 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
       if (!currentUser?.uid) return;
       
       try {
-        const statusEndpoint = platform === 'twitter' 
+        const statusEndpoint = normalizedPlatform === 'twitter' 
           ? `/api/user-twitter-status/${currentUser.uid}`
-          : platform === 'facebook'
+          : normalizedPlatform === 'facebook'
           ? `/api/user-facebook-status/${currentUser.uid}`
+          : normalizedPlatform === 'linkedin'
+          ? `/api/user-linkedin-status/${currentUser.uid}`
           : `/api/user-instagram-status/${currentUser.uid}`;
         
         const response = await axios.get(statusEndpoint);
-        const username = platform === 'twitter' 
+        const username = normalizedPlatform === 'twitter' 
           ? response.data.twitter_username 
-          : platform === 'facebook'
+          : normalizedPlatform === 'facebook'
           ? response.data.facebook_username
+          : normalizedPlatform === 'linkedin'
+          ? response.data.linkedin_username
           : response.data.instagram_username;
         
         if (username) {
           setAccountUsername(username);
-          console.log(`[${new Date().toISOString()}] Found ${platform} username: ${username}`);
+          console.log(`[${new Date().toISOString()}] Found ${normalizedPlatform} username: ${username}`);
         } else {
           // No username means no analysis is possible; stop loading state
           setAnalysisLoading(false);
         }
       } catch (err: any) {
-        console.error(`[${new Date().toISOString()}] Error fetching ${platform} username:`, err);
+    console.error(`[${new Date().toISOString()}] Error fetching ${normalizedPlatform} username:`, err);
         // Show descriptive error and ensure the loader stops
         setAnalysisError(
           err.response?.data?.message ||
-            `Unable to retrieve your ${platform} username. Please reconnect your account.`
+      `Unable to retrieve your ${normalizedPlatform} username. Please reconnect your account.`
         );
         setAnalysisLoading(false);
       }
@@ -144,7 +149,7 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
     if (!currentUser?.uid) {
       setAnalysisLoading(false);
     }
-  }, [currentUser?.uid, platform]);
+  }, [currentUser?.uid, normalizedPlatform]);
 
   // Fetch statistical analysisdata (works without connection)
   useEffect(() => {
@@ -187,7 +192,7 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
     if (accountUsername) {
       fetchProfitAnalysis();
     }
-  }, [accountUsername, platform]);
+  }, [accountUsername, normalizedPlatform]);
 
   // Fetch Instagram insights (only when connected)
   useEffect(() => {
@@ -199,13 +204,13 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
       }
 
       try {
-        console.log(`[${new Date().toISOString()}] Fetching ${platform} insights for user ${userIdToUse}`);
-        const response = await axios.get(`/api/insights/${userIdToUse}?platform=${platform}`);
-        setInsights(response.data);
-        console.log(`[${new Date().toISOString()}] ${platform} insights fetched:`, response.data);
+  console.log(`[${new Date().toISOString()}] Fetching ${normalizedPlatform} insights for user ${userIdToUse}`);
+  const response = await axios.get(`/api/insights/${userIdToUse}?platform=${normalizedPlatform}`);
+  setInsights(response.data);
+  console.log(`[${new Date().toISOString()}] ${normalizedPlatform} insights fetched:`, response.data);
       } catch (err: any) {
-        console.error(`[${new Date().toISOString()}] Error fetching ${platform} insights:`, err);
-        setError(err.response?.data?.error || `Failed to load ${platform} insights.`);
+  console.error(`[${new Date().toISOString()}] Error fetching ${normalizedPlatform} insights:`, err);
+  setError(err.response?.data?.error || `Failed to load ${normalizedPlatform} insights.`);
       } finally {
         setLoading(false);
       }
@@ -216,7 +221,7 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
     } else {
       setLoading(false);
     }
-  }, [userIdToUse, activeTab]);
+  }, [userIdToUse, activeTab, normalizedPlatform]);
 
   const renderChart = (data: { value: number; end_time: string }[], title: string) => {
     const labels = data.map(d => new Date(d.end_time).toLocaleDateString());
@@ -421,7 +426,7 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
       return (
         <div className="insights-error">
           {!accountUsername 
-            ? `Please set up your ${platform === 'instagram' ? 'Instagram' : platform === 'twitter' ? 'Twitter' : 'Facebook'} account to view prophet analysis.`
+            ? `Please set up your ${normalizedPlatform === 'instagram' ? 'Instagram' : normalizedPlatform === 'twitter' ? 'Twitter' : normalizedPlatform === 'linkedin' ? 'LinkedIn' : 'Facebook'} account to view prophet analysis.`
             : 'No Prophet analysis data available for this account.'
           }
         </div>
@@ -433,7 +438,7 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
         <div className="analysis-header">
           <h2>STATISTICAL ANALYSIS</h2>
           <p className="analysis-subtitle">
-            Comprehensive insights for @{accountUsername} on {platform === 'instagram' ? 'Instagram' : platform === 'twitter' ? 'Twitter' : 'Facebook'}
+            Comprehensive insights for @{accountUsername} on {normalizedPlatform === 'instagram' ? 'Instagram' : normalizedPlatform === 'twitter' ? 'Twitter' : normalizedPlatform === 'linkedin' ? 'LinkedIn' : 'Facebook'}
           </p>
         </div>
         
@@ -457,7 +462,7 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
       <div className="connection-required">
         <div className="connection-icon">🔗</div>
         <h3>Platform Connection Required</h3>
-        <p>Please connect your {platform === 'instagram' ? 'Instagram' : platform === 'twitter' ? 'Twitter' : 'Facebook'} account to view these detailed insights.</p>
+  <p>Please connect your {normalizedPlatform === 'instagram' ? 'Instagram' : normalizedPlatform === 'twitter' ? 'Twitter' : normalizedPlatform === 'linkedin' ? 'LinkedIn' : 'Facebook'} account to view these detailed insights.</p>
         <div className="connection-benefits">
           <h4>What you'll get after connecting:</h4>
           <ul>
@@ -489,7 +494,7 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
         onClick={(e) => e.stopPropagation()}
       >
         <button className="insights-close-btn" onClick={onClose}>×</button>
-        <h2>{platform === 'instagram' ? 'Instagram' : platform === 'twitter' ? 'Twitter' : 'Facebook'} Stats</h2>
+  <h2>{normalizedPlatform === 'instagram' ? 'Instagram' : normalizedPlatform === 'twitter' ? 'Twitter' : normalizedPlatform === 'linkedin' ? 'LinkedIn' : 'Facebook'} Stats</h2>
         
         <div className="insights-tabs">
           <button

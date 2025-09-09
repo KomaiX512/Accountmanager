@@ -40,7 +40,8 @@ const useR2Fetch = <T>(url: string, expectedPlatform?: string, section?: string)
         if (accountHolder && expectedPlatform) {
           const currentPath = window.location.pathname;
           const currentPlatform = currentPath.includes('twitter') ? 'twitter' : 
-                                 currentPath.includes('facebook') ? 'facebook' : 'instagram';
+                                 currentPath.includes('facebook') ? 'facebook' :
+                                 currentPath.includes('linkedin') ? 'linkedin' : 'instagram';
           
           if (expectedPlatform === currentPlatform) {
             // Try to get user ID from auth context or localStorage

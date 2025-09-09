@@ -8,7 +8,7 @@ import axios from 'axios';
 // Test configuration
 const TEST_CONFIG = {
   baseURL: process.env.NODE_ENV === 'production' ? 'https://your-production-url.com' : 'http://127.0.0.1:3000',
-  platforms: ['instagram', 'twitter', 'facebook'],
+  platforms: ['instagram', 'twitter', 'facebook', 'linkedin'],
   testUsername: 'testuser123',
   timeout: 30000
 };

@@ -1,0 +1,143 @@
+/* LinkedIn Connect Button Styling */
+.linkedin-connect-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.linkedin-connect-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 119, 181, 0.12);
+  border: 1.5px solid rgba(0, 119, 181, 0.3);
+  border-radius: 12px;
+  padding: 10px 16px;
+  color: #0077B5;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(15px);
+  box-shadow: 
+    0 4px 20px rgba(0, 0, 0, 0.15),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+  text-decoration: none;
+  min-height: 44px;
+  position: relative;
+  overflow: hidden;
+}
+
+.linkedin-connect-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 119, 181, 0.4), transparent);
+  opacity: 0.6;
+}
+
+.linkedin-connect-button:hover:not(:disabled) {
+  background: rgba(0, 119, 181, 0.2);
+  border-color: rgba(0, 119, 181, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 30px rgba(0, 0, 0, 0.25),
+    0 0 0 1px rgba(0, 119, 181, 0.1) inset;
+}
+
+.linkedin-connect-button:active {
+  transform: translateY(0);
+  box-shadow: 
+    0 4px 15px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(0, 119, 181, 0.2) inset;
+}
+
+.linkedin-connect-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: 
+    0 4px 20px rgba(0, 0, 0, 0.15),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+}
+
+.linkedin-icon {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+  flex-shrink: 0;
+}
+
+/* Connected Status Styling */
+.linkedin-connected-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.connection-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  backdrop-filter: blur(15px);
+  box-shadow: 
+    0 4px 15px rgba(0, 0, 0, 0.1),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+}
+
+.connection-indicator.connected {
+  background: rgba(40, 167, 69, 0.15);
+  border: 1px solid rgba(40, 167, 69, 0.3);
+  color: #28a745;
+}
+
+.connection-icon {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+/* Dark theme compatibility */
+@media (prefers-color-scheme: dark) {
+  .linkedin-connect-button {
+    background: rgba(0, 119, 181, 0.08);
+    border-color: rgba(0, 119, 181, 0.25);
+  }
+  
+  .linkedin-connect-button:hover:not(:disabled) {
+    background: rgba(0, 119, 181, 0.15);
+    border-color: rgba(0, 119, 181, 0.4);
+  }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .linkedin-connect-button {
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    min-height: 40px;
+  }
+  
+  .linkedin-icon {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .connection-indicator {
+    padding: 6px 10px;
+    font-size: 0.8rem;
+  }
+  
+  .connection-icon {
+    width: 14px;
+    height: 14px;
+  }
+}

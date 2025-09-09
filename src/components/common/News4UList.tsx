@@ -9,7 +9,7 @@ import './News4U.css';
 
 interface News4UProps {
   accountHolder: string;
-  platform: 'instagram' | 'twitter' | 'facebook';
+  platform: 'instagram' | 'twitter' | 'facebook' | 'linkedin';
 }
 
 interface NewsItem {

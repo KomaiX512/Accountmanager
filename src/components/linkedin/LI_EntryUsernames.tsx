@@ -17,8 +17,14 @@ const LI_EntryUsernames: React.FC<LI_EntryUsernamesProps> = ({
 }) => {
   const [username, setUsername] = useState<string>('');
   const [accountType, setAccountType] = useState<'professional' | 'personal' | ''>('professional');
+  const [profileUrl, setProfileUrl] = useState<string>('');
   const [professionalFocus, setProfessionalFocus] = useState<string>('');
-  const [industryConnections, setIndustryConnections] = useState<string[]>(['', '', '']);
+  // Competitors (username + URL) to mirror Facebook format
+  const [competitors, setCompetitors] = useState<Array<{ name: string; url: string }>>([
+    { name: '', url: '' },
+    { name: '', url: '' },
+    { name: '', url: '' }
+  ]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
@@ -31,6 +37,7 @@ const LI_EntryUsernames: React.FC<LI_EntryUsernamesProps> = ({
   const [usernameMessage, setUsernameMessage] = useState<string>('');
   const [usernameValid, setUsernameValid] = useState<boolean>(true);
   const [usernameTouched, setUsernameTouched] = useState<boolean>(false);
+  const [urlTouched, setUrlTouched] = useState<boolean>(false);
   
   // New state for pre-submission confirmation
   const [showConfirmation, setShowConfirmation] = useState<boolean>(false);
@@ -44,6 +51,8 @@ const LI_EntryUsernames: React.FC<LI_EntryUsernamesProps> = ({
 
   // LinkedIn username validation regex (alphanumeric, hyphens, and underscores)
   const linkedinUsernameRegex = /^[a-zA-Z0-9-_]+$/;
+  // LinkedIn URL validation (supports profiles and company pages)
+  const linkedinUrlRegex = /^https?:\/\/(www\.)?linkedin\.com\/(in|company)\/[A-Za-z0-9._%\-]+(\/|$)/;
 
   // Initialize component
   useEffect(() => {
@@ -69,6 +78,9 @@ const LI_EntryUsernames: React.FC<LI_EntryUsernamesProps> = ({
             const info = JSON.parse(processingInfo);
             if (info.username) {
               setUsername(info.username);
+            }
+            if (info.accountData?.url) {
+              setProfileUrl(info.accountData.url);
             }
           }
         } catch (error) {
@@ -140,26 +152,49 @@ const LI_EntryUsernames: React.FC<LI_EntryUsernamesProps> = ({
     }
   };
 
-  // Function to validate industry connection usernames
-  const validateConnectionUsername = (value: string): boolean => {
-    return value.trim() === '' || linkedinUsernameRegex.test(value);
+  const handleUrlChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setProfileUrl(e.target.value);
+    if (!urlTouched) setUrlTouched(true);
   };
 
-  // Updated industry connection change handler
-  const handleConnectionChange = (index: number, value: string) => {
-    const newConnections = [...industryConnections];
-    newConnections[index] = value;
-    setIndustryConnections(newConnections);
+  const validateLinkedInUrl = (value: string): boolean => {
+    if (!value.trim()) return false; // required
+    return linkedinUrlRegex.test(value.trim());
+  };
+
+  // (removed) validateConnectionUsername was used for old industry connections flow
+
+  // Competitor change handler (name or url)
+  const handleCompetitorChange = (
+    index: number,
+    field: 'name' | 'url',
+    value: string
+  ) => {
+    const newCompetitors = [...competitors];
+    if (field === 'name') {
+      // Enforce username format like Facebook (no spaces, allowed chars)
+      const cleaned = value.replace(/\s+/g, '').replace(/[^a-zA-Z0-9._-]/g, '');
+      newCompetitors[index] = { ...newCompetitors[index], name: cleaned };
+    } else {
+      newCompetitors[index] = { ...newCompetitors[index], url: value };
+    }
+    setCompetitors(newCompetitors);
   };
 
   const isValidForSubmission = (): boolean => {
     if (!username.trim() || !accountType || !professionalFocus.trim()) return false;
+    if (!profileUrl.trim() || !validateLinkedInUrl(profileUrl)) return false;
     if (!usernameValid) return false;
-    
-    // Require industry connections for both account types
-    return industryConnections.length >= 3 && 
-           industryConnections.slice(0, 3).every(conn => conn.trim() !== '') &&
-           industryConnections.every(validateConnectionUsername);
+
+    // Competitors validation mirrored from Facebook (first 3 required with valid formats)
+    if (competitors.length < 3) return false;
+    const usernameRegex = /^[a-zA-Z0-9._-]+$/;
+    // First 3 must have both fields and valid username
+    if (!competitors.slice(0, 3).every(c => c.name.trim() !== '' && c.url.trim() !== '')) return false;
+    if (!competitors.slice(0, 3).every(c => usernameRegex.test(c.name.trim()))) return false;
+    // All competitor URLs must be valid when provided
+    if (!competitors.every(c => !c.url.trim() || validateLinkedInUrl(c.url))) return false;
+    return true;
   };
 
   const validationErrors = (): string[] => {
@@ -168,39 +203,54 @@ const LI_EntryUsernames: React.FC<LI_EntryUsernamesProps> = ({
     else if (!usernameValid) errors.push('Username format is invalid');
     
     if (!accountType) errors.push('Account type is required');
+    if (!profileUrl.trim()) errors.push('LinkedIn URL is required');
+    else if (!validateLinkedInUrl(profileUrl)) errors.push('LinkedIn URL format is invalid');
     if (!professionalFocus.trim()) errors.push('Professional focus is required');
     
-    // Require industry connections for both account types
-    if (industryConnections.length < 3) errors.push('At least 3 industry connections are required');
-    industryConnections.forEach((conn, index) => {
-      if (index < 3 && !conn.trim()) {
-        errors.push(`Industry connection ${index + 1} username is required`);
-      } else if (conn.trim() && !validateConnectionUsername(conn)) {
-        errors.push(`Industry connection ${index + 1} username format is invalid`);
+    // Competitors validation
+    if (competitors.length < 3) errors.push('At least 3 competitors are required');
+    const usernameRegex = /^[a-zA-Z0-9._-]+$/;
+    competitors.forEach((c, index) => {
+      if (index < 3) {
+        if (!c.name.trim()) errors.push(`Competitor ${index + 1} username is required`);
+        if (!c.url.trim()) errors.push(`Competitor ${index + 1} URL is required`);
+        if (c.name.trim() && !usernameRegex.test(c.name.trim())) {
+          errors.push(`Competitor ${index + 1} username format is invalid`);
+        }
+      }
+      if (c.url.trim() && !validateLinkedInUrl(c.url)) {
+        errors.push(`Competitor ${index + 1} URL format is invalid`);
       }
     });
     
     return errors;
   };
 
-  const addConnection = () => {
-    setIndustryConnections([...industryConnections, '']);
+  const addCompetitor = () => {
+    if (competitors.length >= 10) return;
+    setCompetitors([...competitors, { name: '', url: '' }]);
   };
 
-  const removeConnection = (index: number) => {
-    if (industryConnections.length > 3) {
-      setIndustryConnections(industryConnections.filter((_, i) => i !== index));
+  const removeCompetitor = (index: number) => {
+    if (competitors.length > 3) {
+      setCompetitors(competitors.filter((_, i) => i !== index));
     }
   };
 
   const resetForm = () => {
     setUsername('');
     setAccountType('professional');
+    setProfileUrl('');
     setProfessionalFocus('');
-    setIndustryConnections(['', '', '']);
+    setCompetitors([
+      { name: '', url: '' },
+      { name: '', url: '' },
+      { name: '', url: '' }
+    ]);
     setUsernameAvailable(null);
     setUsernameMessage('');
     setUsernameTouched(false);
+    setUrlTouched(false);
   };
 
   const showMessage = (msg: string, type: 'info' | 'success' | 'error' = 'info') => {
@@ -239,12 +289,20 @@ const LI_EntryUsernames: React.FC<LI_EntryUsernamesProps> = ({
     }
 
     // Show confirmation dialog before proceeding
-    const finalConnections = industryConnections.filter(conn => conn.trim() !== '');
+    const finalCompetitors = competitors.filter(comp => comp.name.trim() !== '' && comp.url.trim() !== '');
     const dataToConfirm = {
+      // New structure aligned with Facebook for primary account mapping
+      accountData: {
+        name: username.trim(),
+        url: profileUrl.trim()
+      },
+      // Backward-compatible fields
       username: username.trim(),
       accountType,
-      competitors: finalConnections, // Keep as 'competitors' for backend compatibility
-      postingStyle: professionalFocus.trim() || 'General professional focus', // Keep as 'postingStyle' for backend compatibility
+      competitors: finalCompetitors.map(c => c.name), // names only for compatibility
+      // Include full competitor data for confirmation modal display
+      competitor_data: finalCompetitors,
+      postingStyle: professionalFocus.trim() || 'General professional focus',
       platform: 'linkedin'
     };
     
@@ -260,7 +318,10 @@ const LI_EntryUsernames: React.FC<LI_EntryUsernamesProps> = ({
 
     try {
       // Save to account info API
-      const response = await axios.post('/api/save-account-info', confirmationData, {
+      const response = await axios.post('/api/save-account-info', {
+        ...confirmationData,
+        platform: 'linkedin',
+      }, {
         headers: { 'Content-Type': 'application/json' },
         timeout: 30000,
       });
@@ -272,15 +333,27 @@ const LI_EntryUsernames: React.FC<LI_EntryUsernamesProps> = ({
           accountType: confirmationData.accountType,
           competitors: confirmationData.competitors
         });
-        
+
         // Save to localStorage immediately for future use
         localStorage.setItem(`linkedin_accessed_${currentUser.uid}`, 'true');
         localStorage.setItem(`linkedin_username_${currentUser.uid}`, confirmationData.username);
         localStorage.setItem(`linkedin_account_type_${currentUser.uid}`, confirmationData.accountType);
         localStorage.setItem(`linkedin_competitors_${currentUser.uid}`, JSON.stringify(confirmationData.competitors));
-        
+        // Preserve full competitor objects for LI-specific flows
+        try {
+          localStorage.setItem(
+            `linkedin_competitor_data_${currentUser.uid}`,
+            JSON.stringify(confirmationData.competitor_data || [])
+          );
+        } catch {}
+        // Store accountData like Facebook for consistent structure
+        localStorage.setItem(
+          `linkedin_account_data_${currentUser.uid}`,
+          JSON.stringify(confirmationData.accountData)
+        );
+
         showMessage('Submission successful', 'success');
-        
+
         // Start the processing phase using unified ProcessingContext
         startProcessing('linkedin', confirmationData.username, 15); // 15 minutes duration
       }
@@ -327,9 +400,9 @@ const LI_EntryUsernames: React.FC<LI_EntryUsernamesProps> = ({
                   type="text"
                   id="linkedin-username"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  onChange={handleUsernameChange}
                   placeholder="e.g., john-doe-123 (from your LinkedIn URL)"
-                  className="form-input"
+                  className={`form-input ${usernameTouched && !usernameValid ? 'invalid' : ''}`}
                   disabled={isLoading}
                 />
                 <div className="username-counter">
@@ -338,13 +411,31 @@ const LI_EntryUsernames: React.FC<LI_EntryUsernamesProps> = ({
                     <span className="counter-warning"> (Username getting long)</span>
                   )}
                 </div>
+                <div className="form-group" style={{ marginTop: '12px' }}>
+                  <label htmlFor="linkedin-url">
+                    Your LinkedIn Profile/Company URL * 
+                    <span className="critical-field">CRITICAL</span>
+                  </label>
+                  <input
+                    type="url"
+                    id="linkedin-url"
+                    value={profileUrl}
+                    onChange={handleUrlChange}
+                    placeholder="https://linkedin.com/in/your-username or https://linkedin.com/company/your-company"
+                    className={`form-input ${urlTouched && (!profileUrl.trim() || !validateLinkedInUrl(profileUrl)) ? 'invalid' : ''}`}
+                    disabled={isLoading}
+                  />
+                  {urlTouched && (!profileUrl.trim() || !validateLinkedInUrl(profileUrl)) && (
+                    <div className="error-message">Please enter a valid LinkedIn URL (profile: /in/..., company: /company/...)</div>
+                  )}
+                </div>
                 <div className="field-description">
                   <p><strong>LinkedIn Username:</strong> This is the unique identifier from your LinkedIn profile URL (linkedin.com/in/your-username).</p>
                   <ul>
                     <li>✓ Must be a valid LinkedIn username</li>
                     <li>✓ Can contain letters, numbers, hyphens, and underscores</li>
                     <li>✓ Used for AI analysis and industry research</li>
-                    <li>✓ This will be used for 15 minutes of AI processing</li>
+                    <li>✓ URL will be scraped for 15 minutes of AI processing</li>
                   </ul>
                   <div className="format-example">
                     <strong>Examples:</strong> "john-doe", "jane-smith-123", "professional_name"
@@ -409,52 +500,67 @@ const LI_EntryUsernames: React.FC<LI_EntryUsernamesProps> = ({
             </div>
 
             <div className="form-section">
-              <h2>Industry Connections</h2>
-              <div className="competitors-section">
-                <div className="competitors-header">
-                  <h3>Add Industry Professionals</h3>
-                  <p>Add up to 5 industry professionals or companies for AI-powered analysis and insights</p>
+              <h2>Competitor Analysis</h2>
+              <div className="section-description">
+                <p><strong>Strategic Intelligence:</strong> These competitors will be analyzed to understand market trends, content strategies, and engagement patterns.</p>
+                <div className="competitor-format-notice">
+                  <strong>⚠️ Important:</strong> Competitor names must follow username format (no spaces, only letters, numbers, dots, underscores, and hyphens)
                 </div>
-                
-                {industryConnections.map((connection, index) => (
+              </div>
+
+              <div className="competitors-container">
+                {competitors.map((competitor, index) => (
                   <div key={index} className="competitor-input-group">
-                    <input
-                      type="text"
-                      value={connection}
-                      onChange={(e) => handleConnectionChange(index, e.target.value)}
-                      placeholder={`Industry connection ${index + 1} username`}
-                      className="form-input"
-                      disabled={isLoading}
-                    />
-                    {industryConnections.length > 3 && (
-                      <button
-                        type="button"
-                        onClick={() => removeConnection(index)}
-                        className="remove-competitor-btn"
+                    <div className="competitor-header">
+                      <span>Competitor {index + 1}</span>
+                      {competitors.length > 3 && (
+                        <button
+                          type="button"
+                          onClick={() => removeCompetitor(index)}
+                          className="remove-competitor-btn"
+                          disabled={isLoading}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="competitor-input-wrapper">
+                      <input
+                        type="text"
+                        value={competitor.name}
+                        onChange={(e) => handleCompetitorChange(index, 'name', e.target.value)}
+                        placeholder={`Competitor ${index + 1} username`}
+                        className="form-input"
                         disabled={isLoading}
-                      >
-                        ✕
-                      </button>
+                      />
+                      <input
+                        type="url"
+                        value={competitor.url}
+                        onChange={(e) => handleCompetitorChange(index, 'url', e.target.value)}
+                        placeholder="https://linkedin.com/in/... or https://linkedin.com/company/..."
+                        className={`form-input ${competitor.url && !validateLinkedInUrl(competitor.url) ? 'error' : ''}`}
+                        disabled={isLoading}
+                      />
+                    </div>
+
+                    {competitor.url && !validateLinkedInUrl(competitor.url) && (
+                      <div className="error-message">Please enter a valid LinkedIn URL for this competitor.</div>
                     )}
                   </div>
                 ))}
-                
-                {industryConnections.length < 5 && (
-                  <button
-                    type="button"
-                    onClick={addConnection}
-                    className="add-competitor-btn"
-                    disabled={isLoading}
-                  >
-                    + Add Industry Connection
-                  </button>
-                )}
-                
-                <div className="field-description">
-                  <p><strong>Industry Analysis:</strong> These professionals help our AI understand your industry landscape and create relevant content.</p>
-                  <p><em>Examples:</em> Thought leaders, competitors, industry influencers, or companies in your field</p>
-                </div>
               </div>
+
+              {competitors.length < 10 && (
+                <button
+                  type="button"
+                  onClick={addCompetitor}
+                  className="add-competitor"
+                  disabled={isLoading}
+                >
+                  + Add Another Competitor
+                </button>
+              )}
             </div>
 
             {message && (
@@ -562,13 +668,40 @@ const LI_EntryUsernames: React.FC<LI_EntryUsernamesProps> = ({
                   <span className="counter-warning"> (Username getting long)</span>
                 )}
               </div>
+              <div className="form-group" style={{ marginTop: '12px' }}>
+                <label htmlFor="linkedin-url">
+                  Your LinkedIn Profile/Company URL * 
+                  <span className="critical-field">CRITICAL</span>
+                </label>
+                <input
+                  type="url"
+                  id="linkedin-url"
+                  value={profileUrl}
+                  onChange={handleUrlChange}
+                  placeholder="https://linkedin.com/in/your-username or https://linkedin.com/company/your-company"
+                  className={`form-input ${urlTouched && (!profileUrl.trim() || !validateLinkedInUrl(profileUrl)) ? 'invalid' : ''}`}
+                  disabled={isLoading}
+                />
+                {urlTouched && (!profileUrl.trim() || !validateLinkedInUrl(profileUrl)) && (
+                  <div className="error-message">Please enter a valid LinkedIn URL (profile: /in/..., company: /company/...)</div>
+                )}
+                <div className="field-description">
+                  <p><strong>LinkedIn URL:</strong> This is the actual LinkedIn profile or company page URL that will be scraped for AI analysis.</p>
+                  <ul>
+                    <li>✓ Must be a valid LinkedIn URL</li>
+                    <li>✓ Format: https://linkedin.com/in/your-username or https://linkedin.com/company/your-company</li>
+                    <li>✓ Profile must not be locked/private</li>
+                    <li>✓ This URL will be scraped during processing</li>
+                  </ul>
+                </div>
+              </div>
               <div className="field-description">
                 <p><strong>LinkedIn Username:</strong> This is the unique identifier from your LinkedIn profile URL (linkedin.com/in/your-username).</p>
                 <ul>
                   <li>✓ Must be a valid LinkedIn username</li>
                   <li>✓ Can contain letters, numbers, hyphens, and underscores</li>
                   <li>✓ Used for AI analysis and industry research</li>
-                  <li>✓ This will be used for 15 minutes of AI processing</li>
+                  <li>✓ URL will be scraped for 15 minutes of AI processing</li>
                 </ul>
                 <div className="format-example">
                   <strong>Examples:</strong> "john-doe", "jane-smith-123", "professional_name"
@@ -633,52 +766,67 @@ const LI_EntryUsernames: React.FC<LI_EntryUsernamesProps> = ({
           </div>
 
           <div className="form-section">
-            <h2>Industry Connections</h2>
-            <div className="competitors-section">
-              <div className="competitors-header">
-                <h3>Add Industry Professionals</h3>
-                <p>Add up to 5 industry professionals or companies for AI-powered analysis and insights</p>
+            <h2>Competitor Analysis</h2>
+            <div className="section-description">
+              <p><strong>Strategic Intelligence:</strong> These competitors will be analyzed to understand market trends, content strategies, and engagement patterns.</p>
+              <div className="competitor-format-notice">
+                <strong>⚠️ Important:</strong> Competitor names must follow username format (no spaces, only letters, numbers, dots, underscores, and hyphens)
               </div>
-              
-              {industryConnections.map((connection, index) => (
+            </div>
+
+            <div className="competitors-container">
+              {competitors.map((competitor, index) => (
                 <div key={index} className="competitor-input-group">
-                  <input
-                    type="text"
-                    value={connection}
-                    onChange={(e) => handleConnectionChange(index, e.target.value)}
-                    placeholder={`Industry connection ${index + 1} username`}
-                    className={`form-input ${connection.trim() && !validateConnectionUsername(connection) ? 'invalid' : ''}`}
-                    disabled={isLoading}
-                  />
-                  {industryConnections.length > 3 && (
-                    <button
-                      type="button"
-                      onClick={() => removeConnection(index)}
-                      className="remove-competitor-btn"
+                  <div className="competitor-header">
+                    <span>Competitor {index + 1}</span>
+                    {competitors.length > 3 && (
+                      <button
+                        type="button"
+                        onClick={() => removeCompetitor(index)}
+                        className="remove-competitor-btn"
+                        disabled={isLoading}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="competitor-input-wrapper">
+                    <input
+                      type="text"
+                      value={competitor.name}
+                      onChange={(e) => handleCompetitorChange(index, 'name', e.target.value)}
+                      placeholder={`Competitor ${index + 1} username`}
+                      className="form-input"
                       disabled={isLoading}
-                    >
-                      ✕
-                    </button>
+                    />
+                    <input
+                      type="url"
+                      value={competitor.url}
+                      onChange={(e) => handleCompetitorChange(index, 'url', e.target.value)}
+                      placeholder="https://linkedin.com/in/... or https://linkedin.com/company/..."
+                      className={`form-input ${competitor.url && !validateLinkedInUrl(competitor.url) ? 'error' : ''}`}
+                      disabled={isLoading}
+                    />
+                  </div>
+
+                  {competitor.url && !validateLinkedInUrl(competitor.url) && (
+                    <div className="error-message">Please enter a valid LinkedIn URL for this competitor.</div>
                   )}
                 </div>
               ))}
-              
-              {industryConnections.length < 5 && (
-                <button
-                  type="button"
-                  onClick={addConnection}
-                  className="add-competitor-btn"
-                  disabled={isLoading}
-                >
-                  + Add Industry Connection
-                </button>
-              )}
-              
-              <div className="field-description">
-                <p><strong>Industry Analysis:</strong> These professionals help our AI understand your industry landscape and create relevant content.</p>
-                <p><em>Examples:</em> Thought leaders, competitors, industry influencers, or companies in your field</p>
-              </div>
             </div>
+
+            {competitors.length < 10 && (
+              <button
+                type="button"
+                onClick={addCompetitor}
+                className="add-competitor"
+                disabled={isLoading}
+              >
+                + Add Another Competitor
+              </button>
+            )}
           </div>
 
           {message && (
@@ -725,13 +873,14 @@ const LI_EntryUsernames: React.FC<LI_EntryUsernamesProps> = ({
           <div className="confirmation-modal">
             <h3>Confirm Your LinkedIn Setup</h3>
             <div className="confirmation-details">
-              <p><strong>Username:</strong> {confirmationData.username}</p>
+              <p><strong>Username:</strong> {confirmationData.accountData?.name || confirmationData.username}</p>
+              <p><strong>URL:</strong> {confirmationData.accountData?.url}</p>
               <p><strong>Account Type:</strong> {confirmationData.accountType === 'professional' ? 'Professional Account' : 'Personal Account'}</p>
               <p><strong>Professional Focus:</strong> {confirmationData.postingStyle}</p>
-              <p><strong>Industry Connections:</strong></p>
+              <p><strong>Competitors ({confirmationData.competitor_data?.length || 0}):</strong></p>
               <ul>
-                {confirmationData.competitors.map((connection: string, index: number) => (
-                  <li key={index}>{connection}</li>
+                {(confirmationData.competitor_data || []).map((comp: { name: string; url: string }, index: number) => (
+                  <li key={index}><strong>{comp.name}</strong> — {comp.url}</li>
                 ))}
               </ul>
             </div>

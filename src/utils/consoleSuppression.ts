@@ -15,7 +15,9 @@ const suppressedPatterns = [
   /The resource.*preloaded.*not used within a few seconds/,
   /Ruleset ignored due to bad selector/,
   /No competitor data found for/,
-  /Image failed to load.*proxy-image/
+  /Image failed to load.*proxy-image/,
+  /\[OptimizedImage\] Failed to load original image for optimization/,
+  /\[OptimizedImage\] Optimization failed, using original/
 ];
 
 // Track suppressed messages

@@ -48,13 +48,41 @@ module.exports = defineConfig({
         target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/instagram-token-check/, '/api/instagram-token-check')
+        // Server route is '/instagram-token-check/:graphId' (no /api prefix)
+        // Do not rewrite to /api/* or it will 404 locally
+        rewrite: (path) => path
       },
       '/posts': {
         target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/posts/, '/api/posts')
+      },
+      // Notifications and related actions used by dashboards without /api prefix
+      '/events-list': {
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+        secure: false
+      },
+      '/send-dm-reply': {
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+        secure: false
+      },
+      '/send-comment-reply': {
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+        secure: false
+      },
+      '/mark-notification-handled': {
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+        secure: false
+      },
+      '/ignore-notification': {
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+        secure: false
       },
       // Proxy health check to the proxy server to check the correct service
       '/health': {

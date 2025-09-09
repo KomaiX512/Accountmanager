@@ -39,7 +39,11 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform, onClose, onSu
   const [showCampaignButton, setShowCampaignButton] = useState(false);
   const [campaignStatus, setCampaignStatus] = useState<CampaignStatus | null>(null);
   const normalizedPlatform = (platform || 'instagram').toLowerCase();
-  const displayPlatform = platform || 'Instagram';
+  const displayPlatform = normalizedPlatform === 'instagram' ? 'Instagram' :
+                         normalizedPlatform === 'twitter' ? 'Twitter' :
+                         normalizedPlatform === 'facebook' ? 'Facebook' :
+                         normalizedPlatform === 'linkedin' ? 'LinkedIn' :
+                         'Instagram';
 
   const MAX_TRIAL_DAYS = 3; // Non-premium cap
 
@@ -61,7 +65,7 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform, onClose, onSu
 
   useEffect(() => {
     checkCampaignStatus();
-  }, [username, platform]);
+  }, [username, normalizedPlatform]);
 
   // Refresh campaign status once when the modal mounts
   useEffect(() => {
@@ -97,7 +101,7 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform, onClose, onSu
     return () => {
       window.removeEventListener('campaignStopped', handleCampaignStoppedEvent);
     };
-  }, [username, platform, normalizedPlatform]);
+  }, [username, normalizedPlatform]);
 
   const checkCampaignStatus = async () => {
     // ✅ BACKGROUND VALIDATION - Start validation but don't block UI

@@ -3972,3 +3972,149 @@ h2 {
     border-radius: 3px !important;
   }
 }
+
+/* ✨ LINKEDIN PLATFORM STYLING */
+.dashboard-btn.linkedin {
+  border-color: #005c8f;
+  background: #0077B5; /* solid LinkedIn blue */
+  color: #ffffff;
+}
+
+.dashboard-btn.linkedin:hover {
+  border-color: #004d78;
+  background: #0069a8;
+  box-shadow: 0 4px 16px rgba(0, 119, 181, 0.35);
+}
+
+.dashboard-btn.insights-btn.linkedin {
+  border-color: #005c8f;
+  background: #0077B5;
+  color: #ffffff;
+}
+
+.dashboard-btn.insights-btn.linkedin:hover {
+  border-color: #004d78;
+  background: #0069a8;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 119, 181, 0.35);
+}
+
+.dashboard-btn.autopilot-btn.linkedin {
+  border-color: #005c8f;
+  background: #0077B5;
+  color: #ffffff;
+}
+
+.dashboard-btn.autopilot-btn.linkedin:hover {
+  border-color: #004d78;
+  background: #0069a8;
+  box-shadow: 0 4px 16px rgba(0, 119, 181, 0.35);
+}
+
+.dashboard-btn.goal-btn.linkedin {
+  border-color: #005c8f;
+  background: #0077B5;
+  color: #ffffff;
+}
+
+.dashboard-btn.goal-btn.linkedin:hover {
+  border-color: #004d78;
+  background: #0069a8;
+  box-shadow: 0 4px 16px rgba(0, 119, 181, 0.35);
+}
+
+.dashboard-btn.reset-btn.linkedin {
+  border-color: #005c8f;
+  background: #0077B5;
+  color: #ffffff;
+}
+
+.dashboard-btn.reset-btn.linkedin:hover {
+  border-color: #004d78;
+  background: #0069a8;
+  box-shadow: 0 4px 16px rgba(0, 119, 181, 0.35);
+}
+
+.dashboard-btn.compose-btn.linkedin {
+  border-color: #005c8f;
+  background: #0077B5;
+  color: #ffffff;
+}
+
+.dashboard-btn.compose-btn.linkedin:hover {
+  border-color: #004d78;
+  background: #0069a8;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 119, 181, 0.35);
+}
+
+/* LinkedIn Connect Wrapper Styling */
+.linkedin-connect-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto; /* prevent stretching causing big gaps */
+}
+
+/* Make LinkedIn Connect button match dashboard button style */
+.linkedin-connect-wrapper .linkedin-connect-button {
+  width: auto;
+  min-width: 90px; /* align with dashboard-btn clamp system */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #0077B5; /* solid */
+  border: 1.5px solid #005c8f;
+  border-radius: 12px;
+  padding: 10px 14px;
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(15px);
+  box-shadow: 
+    0 2px 8px rgba(0, 0, 0, 0.1),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+  text-decoration: none;
+  min-height: 44px;
+  position: relative;
+  overflow: hidden;
+}
+
+.linkedin-connect-wrapper .linkedin-connect-button:hover:not(:disabled) {
+  background: #0069a8;
+  border-color: #004d78;
+  transform: translateY(-2px);
+  box-shadow: 
+    0 4px 16px rgba(0, 119, 181, 0.35),
+    0 0 0 1px rgba(0, 119, 181, 0.15) inset;
+}
+
+.linkedin-connect-wrapper .linkedin-connected-status {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  background: #0077B5; /* LinkedIn solid theme for connected state */
+  border: 1.5px solid #005c8f;
+  border-radius: 12px;
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  min-height: 44px;
+}
+
+/* Ensure LinkedIn icons render consistently like other platforms */
+.linkedin-connect-wrapper .btn-icon,
+.linkedin-connect-wrapper .linkedin-icon,
+.linkedin-connect-wrapper .connection-icon,
+.dashboard-btn.linkedin .btn-icon,
+.dashboard-btn.compose-btn.linkedin .btn-icon,
+.dashboard-btn.insights-btn.linkedin .btn-icon {
+  color: #ffffff; /* white icons on solid LI blue */
+  width: 16px;
+  height: 16px;
+}

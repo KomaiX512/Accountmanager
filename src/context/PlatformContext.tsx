@@ -1,6 +1,6 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 
-type Platform = 'instagram' | 'twitter' | 'facebook';
+type Platform = 'instagram' | 'twitter' | 'facebook' | 'linkedin';
 
 interface PlatformContextType {
   platform: Platform;

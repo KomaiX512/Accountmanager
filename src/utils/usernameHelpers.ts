@@ -14,7 +14,7 @@
  *    - Retrieved from context hooks: igUserId, twitterId, facebookPageId
  */
 
-export type Platform = 'instagram' | 'twitter' | 'facebook';
+export type Platform = 'instagram' | 'twitter' | 'facebook' | 'linkedin';
 
 /**
  * Gets the dashboard username (accountHolder) for AI content operations

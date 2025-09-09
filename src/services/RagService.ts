@@ -141,7 +141,7 @@ class RagService {
   ];
   
   private static readonly AI_REPLIES_URLS = [
-    '/ai-replies',  // Use correct AI replies endpoint
+    '',  // Use relative URLs to go through vite proxy - will use /api/ai-replies
   ];
   
   // Request deduplication to prevent multiple identical requests
@@ -395,7 +395,7 @@ class RagService {
     const hasDataReferences = /\d+ (followers|posts|engagement|likes|comments|shares)/i.test(response);
     
     // Check for platform-specific insights
-    const hasPlatformInsights = /(instagram|twitter|facebook|social media) (strategy|insights|analysis|performance)/i.test(response);
+    const hasPlatformInsights = /(instagram|twitter|facebook|linkedin|social media) (strategy|insights|analysis|performance)/i.test(response);
     
     return hasEnhancedIndicators || hasDataReferences || hasPlatformInsights;
   }
@@ -523,7 +523,7 @@ class RagService {
     platform: string = 'instagram'
   ): Promise<ChatMessage[]> {
     try {
-      const response = await this.tryServerUrls(`/api/rag/conversations/${username}?platform=${platform}`, (url) => 
+      const response = await this.tryServerUrls(`/api/conversations/${username}?platform=${platform}`, (url) => 
         axios.get(url, {
           timeout: 10000, // 10 second timeout
           withCredentials: false, // Disable sending cookies
@@ -545,7 +545,7 @@ class RagService {
     platform: string = 'instagram'
   ): Promise<void> {
     try {
-      await this.tryServerUrls(`/api/rag/conversations/${username}`, (url) => 
+      await this.tryServerUrls(`/api/conversations/${username}`, (url) => 
         axios.post(url, {
           messages,
           platform

@@ -1,6 +1,4 @@
-@import './styles/global-ui-refinements.css';
-@import './styles/global-scrollbar-styles.css';
-@import './styles/responsive-refinements.css';
+/* Reverted: remove global overrides that affected layout across platforms */
 
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
@@ -14,7 +12,6 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
 a {
@@ -27,9 +24,8 @@ a:hover {
 }
 
 body {
-  margin: 0 auto;
-  display: flex;
-  place-items: center;
+  margin: 0;
+  display: block;
   min-width: 320px;
   min-height: 100vh;
   background: transparent; /* No background override */

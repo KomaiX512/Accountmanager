@@ -3,6 +3,7 @@ import './Dms_Comments.css';
 import { useInstagram } from '../../context/InstagramContext';
 import { useTwitter } from '../../context/TwitterContext';
 import { useFacebook } from '../../context/FacebookContext';
+import { useLinkedIn } from '../../context/LinkedInContext';
 import { Notification } from '../../types/notifications';
 import { safeFilter } from '../../utils/safeArrayUtils';
 
@@ -85,7 +86,7 @@ interface DmsCommentsProps {
   onAutoReplyAll?: (notifications: Notification[]) => void;
   onStopAutoReply?: () => void; // 🛑 STOP OPERATION: Add stop callback prop
   isAutoReplying?: boolean; // 🛑 STOP OPERATION: Add auto-reply status prop
-  platform?: 'instagram' | 'twitter' | 'facebook';
+  platform?: 'instagram' | 'twitter' | 'facebook' | 'linkedin';
   onEditAIReply?: (notification: Notification, editedReply: string) => void; // NEW: Edit AI reply functionality
   autoReplyProgress?: { current: number; total: number; nextReplyIn?: number }; // NEW: Auto-reply progress
 }
@@ -117,6 +118,7 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
   const { isConnected: isInstagramConnected } = useInstagram();
   const { userId: twitterId } = useTwitter();
   const { isConnected: isFacebookConnected } = useFacebook();
+  const { isConnected: isLinkedInConnected } = useLinkedIn();
 
   // State hooks in consistent order
   const [replyText, setReplyText] = useState<Record<string, string>>({});
@@ -336,6 +338,16 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
     });
   }, [notifications, platform, username, igBusinessId, propTwitterId, twitterId, facebookPageId]);
 
+  // Unified Auto-Reply eligibility (used for both label and action)
+  const autoReplyEligibleNotifications = React.useMemo(() => {
+    return validNotifications.filter((n: any) => {
+      const hasId = !!(n.message_id || n.comment_id);
+      const isSupportedType = n.type === 'message' || n.type === 'comment';
+      const isEligibleStatus = !n.status || n.status === 'pending' || n.status === 'ai_reply_ready';
+      return hasId && isSupportedType && isEligibleStatus;
+    });
+  }, [validNotifications]);
+
   // Auto-scroll to bottom when new notifications arrive - ENHANCED: Improved DM arrival detection and visibility
   useEffect(() => {
     if (validNotifications.length > 0 && scrollContainerRef.current) {
@@ -379,6 +391,7 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
   console.log(`[${new Date().toISOString()}] [${platform.toUpperCase()}] Dms_Comments render:`, {
     originalCount: notifications?.length || 0, 
     validCount: validNotifications.length,
+    eligibleCount: autoReplyEligibleNotifications.length,
     ownUsername: username,
     filteredOut: (notifications?.length || 0) - validNotifications.length,
     platform,
@@ -488,37 +501,30 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
 
   const handleAutoReplyAll = async () => {
     if (!onAutoReplyAll || isAutoReplying) return;
-    
-    // Filter notifications that can be auto-replied (not already replied/ignored)
-    const pendingNotifications = safeFilter(notifications, (notif: any) => 
-      !notif.status || notif.status === 'pending'
-    );
-    
-    // 🛡️ DEFENSIVE FILTER: Remove own notifications from auto-reply candidates
-    const filteredForAutoReply = safeFilter(pendingNotifications, (notif: any) => {
-      // Skip if this is our own notification
+
+    // Use the same eligibility used for the label to keep UI consistent
+    const eligible = safeFilter(autoReplyEligibleNotifications, (notif: any) => {
+      // Extra safety: Skip if this is our own notification (should already be filtered by validNotifications)
       if (username && notif.username) {
-        const isOwnNotification = notif.username.toLowerCase() === username.toLowerCase() ||
-                                 notif.username.replace(/^@/, '').toLowerCase() === username.replace(/^@/, '').toLowerCase();
-        if (isOwnNotification) {
+        const cleanNotif = notif.username.replace(/^@/, '').toLowerCase();
+        const cleanOwn = username.replace(/^@/, '').toLowerCase();
+        if (cleanNotif === cleanOwn) {
           console.log(`[${platform.toUpperCase()}] 🛡️ SKIPPING auto-reply to own notification from ${notif.username}`);
           return false;
         }
       }
       return true;
     });
-    
-    if (filteredForAutoReply.length === 0) {
+
+    if (eligible.length === 0) {
       console.log(`[${platform.toUpperCase()}] No valid notifications to auto-reply after filtering`);
       return;
     }
 
-    console.log(`[${platform.toUpperCase()}] Auto-replying to ${filteredForAutoReply.length} notifications (filtered from ${pendingNotifications.length} pending)`);
+    console.log(`[${platform.toUpperCase()}] Auto-replying to ${eligible.length} notifications`);
 
     try {
-      // 🛑 STOP OPERATION: Just call parent's auto-reply function
-      // Parent handles the state management
-      await onAutoReplyAll(filteredForAutoReply);
+      await onAutoReplyAll(eligible);
     } catch (error) {
       console.error('Error in handleAutoReplyAll:', error);
       setError('Auto-reply failed. Please try again.');
@@ -560,6 +566,13 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
       return (
         <div className="not-connected-message">
           Please connect your Facebook account to view notifications
+        </div>
+      );
+    }
+    if (platform === 'linkedin' && !isLinkedInConnected) {
+      return (
+        <div className="not-connected-message">
+          Please connect your LinkedIn account to view notifications
         </div>
       );
     }
@@ -642,7 +655,7 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
             className="auto-reply-all-btn"
             title="AI will reply to all pending Comments and Dms based on rule set and according to yours personalization."
           >
-            {isAutoReplying ? 'Auto-Replying...' : `Auto-Reply All (${safeFilter(validNotifications, (n: any) => !n.status || n.status === 'pending').length})`}
+            {isAutoReplying ? 'Auto-Replying...' : `Auto-Reply All (${autoReplyEligibleNotifications.length})`}
           </button>
         </div>
       )}

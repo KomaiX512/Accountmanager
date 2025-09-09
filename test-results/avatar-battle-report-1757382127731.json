@@ -1,0 +1,277 @@
+{
+  "timestamp": "2025-09-09T01:42:07.675Z",
+  "battleSuites": [
+    {
+      "name": "Edge Case Matrix",
+      "tests": [
+        {
+          "name": "Avatar endpoint variations",
+          "success": false,
+          "duration": 20.24101096391678,
+          "analysis": "Some scenarios failed",
+          "details": [
+            {
+              "success": false,
+              "error": "fetch failed",
+              "duration": 18.57853800058365,
+              "scenario": {
+                "username": "maccosmetics",
+                "platform": "instagram",
+                "expected": "success"
+              },
+              "analysis": "Expected success, got error"
+            },
+            {
+              "success": false,
+              "error": "fetch failed",
+              "duration": 0.6985079944133759,
+              "scenario": {
+                "username": "narsissist",
+                "platform": "instagram",
+                "expected": "alias_resolution"
+              },
+              "analysis": "Expected alias_resolution, got error"
+            },
+            {
+              "success": false,
+              "error": "fetch failed",
+              "duration": 0.5495639741420746,
+              "scenario": {
+                "username": "nonexistent_user_12345",
+                "platform": "instagram",
+                "expected": "generated_fallback"
+              },
+              "analysis": "Expected generated_fallback, got error"
+            },
+            {
+              "success": false,
+              "error": "fetch failed",
+              "duration": 0.41440099477767944,
+              "scenario": {
+                "username": "user_with_expired_token",
+                "platform": "instagram",
+                "expected": "profileinfo_fallback"
+              },
+              "analysis": "Expected profileinfo_fallback, got error"
+            }
+          ]
+        }
+      ],
+      "startTime": 19.444606006145477,
+      "memoryStart": {
+        "rss": 44433408,
+        "heapTotal": 5611520,
+        "heapUsed": 5249032,
+        "external": 712629,
+        "arrayBuffers": 22572
+      },
+      "success": false,
+      "endTime": 40.18742099404335,
+      "memoryEnd": {
+        "rss": 55140352,
+        "heapTotal": 8495104,
+        "heapUsed": 7245848,
+        "external": 2865719,
+        "arrayBuffers": 73104
+      }
+    },
+    {
+      "name": "Production Load Simulation",
+      "tests": [
+        {
+          "name": "Concurrent avatar requests (60 total)",
+          "success": false,
+          "duration": 4.169293999671936,
+          "analysis": "Performance issues: 0/60 success, 6ms avg latency",
+          "details": {
+            "successCount": 0,
+            "cacheHits": 0,
+            "avgLatency": 5.61183863033851,
+            "totalRequests": 60
+          }
+        },
+        {
+          "name": "Memory leak detection",
+          "success": true,
+          "duration": 0,
+          "analysis": "Memory stable: -0.9MB growth",
+          "details": {
+            "initialMemory": {
+              "rss": 58286080,
+              "heapTotal": 12427264,
+              "heapUsed": 9270976,
+              "external": 2810269,
+              "arrayBuffers": 17654
+            },
+            "finalMemory": {
+              "rss": 59858944,
+              "heapTotal": 12951552,
+              "heapUsed": 8359032,
+              "external": 2810269,
+              "arrayBuffers": 17654
+            },
+            "heapGrowth": -911944
+          }
+        }
+      ],
+      "startTime": 40.25031399726868,
+      "memoryStart": {
+        "rss": 55140352,
+        "heapTotal": 8495104,
+        "heapUsed": 7249808,
+        "external": 2865719,
+        "arrayBuffers": 73104
+      },
+      "success": false,
+      "endTime": 73.68047600984573,
+      "memoryEnd": {
+        "rss": 59858944,
+        "heapTotal": 12951552,
+        "heapUsed": 8363384,
+        "external": 2810269,
+        "arrayBuffers": 17654
+      }
+    },
+    {
+      "name": "Architectural Stress",
+      "tests": [],
+      "startTime": 73.70730400085449,
+      "memoryStart": {
+        "rss": 59858944,
+        "heapTotal": 12951552,
+        "heapUsed": 8366856,
+        "external": 2810269,
+        "arrayBuffers": 17654
+      },
+      "success": false,
+      "endTime": 73.80304801464081,
+      "memoryEnd": {
+        "rss": 59858944,
+        "heapTotal": 12951552,
+        "heapUsed": 8373424,
+        "external": 2810269,
+        "arrayBuffers": 17654
+      }
+    }
+  ],
+  "systemMetrics": {
+    "totalRequests": 164,
+    "successRate": 0.3333333333333333,
+    "averageLatency": 8.136768321196238,
+    "memorLeaks": [
+      {
+        "iteration": 0,
+        "memory": {
+          "rss": 58286080,
+          "heapTotal": 12427264,
+          "heapUsed": 9315760,
+          "external": 2810269,
+          "arrayBuffers": 17654
+        },
+        "timestamp": 1757382127710
+      },
+      {
+        "iteration": 10,
+        "memory": {
+          "rss": 58548224,
+          "heapTotal": 12427264,
+          "heapUsed": 7829520,
+          "external": 2810269,
+          "arrayBuffers": 17654
+        },
+        "timestamp": 1757382127712
+      },
+      {
+        "iteration": 20,
+        "memory": {
+          "rss": 58548224,
+          "heapTotal": 12689408,
+          "heapUsed": 8474416,
+          "external": 2810269,
+          "arrayBuffers": 17654
+        },
+        "timestamp": 1757382127714
+      },
+      {
+        "iteration": 30,
+        "memory": {
+          "rss": 58548224,
+          "heapTotal": 12689408,
+          "heapUsed": 8874608,
+          "external": 2810269,
+          "arrayBuffers": 17654
+        },
+        "timestamp": 1757382127716
+      },
+      {
+        "iteration": 40,
+        "memory": {
+          "rss": 58548224,
+          "heapTotal": 12689408,
+          "heapUsed": 9274776,
+          "external": 2810269,
+          "arrayBuffers": 17654
+        },
+        "timestamp": 1757382127718
+      },
+      {
+        "iteration": 50,
+        "memory": {
+          "rss": 58548224,
+          "heapTotal": 12689408,
+          "heapUsed": 8039672,
+          "external": 2810269,
+          "arrayBuffers": 17654
+        },
+        "timestamp": 1757382127720
+      },
+      {
+        "iteration": 60,
+        "memory": {
+          "rss": 58810368,
+          "heapTotal": 12689408,
+          "heapUsed": 8439784,
+          "external": 2810269,
+          "arrayBuffers": 17654
+        },
+        "timestamp": 1757382127722
+      },
+      {
+        "iteration": 70,
+        "memory": {
+          "rss": 58810368,
+          "heapTotal": 12689408,
+          "heapUsed": 8840176,
+          "external": 2810269,
+          "arrayBuffers": 17654
+        },
+        "timestamp": 1757382127725
+      },
+      {
+        "iteration": 80,
+        "memory": {
+          "rss": 58810368,
+          "heapTotal": 12689408,
+          "heapUsed": 9242216,
+          "external": 2810269,
+          "arrayBuffers": 17654
+        },
+        "timestamp": 1757382127727
+      },
+      {
+        "iteration": 90,
+        "memory": {
+          "rss": 59858944,
+          "heapTotal": 12689408,
+          "heapUsed": 9680464,
+          "external": 2810269,
+          "arrayBuffers": 17654
+        },
+        "timestamp": 1757382127729
+      }
+    ],
+    "errorPatterns": {},
+    "performanceProfile": {}
+  },
+  "totalDuration": 56.08781599998474
+}

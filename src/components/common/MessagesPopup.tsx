@@ -10,7 +10,7 @@ interface MessagesPopupProps {
   onClose: () => void;
   setHasNewMessages: (value: boolean) => void;
   onOpenChat?: (messageContent: string, platform?: string) => void;
-  platform?: 'instagram' | 'twitter' | 'facebook';
+  platform?: 'instagram' | 'twitter' | 'facebook' | 'linkedin';
 }
 
 const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHasNewMessages, onOpenChat, platform = 'instagram' }) => {
@@ -24,6 +24,7 @@ const MessagesPopup: React.FC<MessagesPopupProps> = ({ username, onClose, setHas
 
   const platformName = platform === 'twitter' ? 'X (Twitter)' : 
                       platform === 'facebook' ? 'Facebook' : 
+                      platform === 'linkedin' ? 'LinkedIn' :
                       'Instagram';
 
   useEffect(() => {

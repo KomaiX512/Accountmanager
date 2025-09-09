@@ -10,14 +10,14 @@
  * - Smart comparison to detect actual new items
  * - Automatic frontend refresh when new items found
  * - Memory efficient with minimal API calls
- * - Cross-platform support (Instagram, Twitter, Facebook)
+ * - Cross-platform support (Instagram, Twitter, Facebook, LinkedIn)
  */
 
 import axios from 'axios';
 
 interface WatchdogConfig {
   accountHolder: string;
-  platform: 'instagram' | 'twitter' | 'facebook';
+  platform: 'instagram' | 'twitter' | 'facebook' | 'linkedin';
   intervalHours: number; // 4-5 hours
   onNewItemsDetected: (newItems: any[]) => void;
   onError?: (error: string) => void;

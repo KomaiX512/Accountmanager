@@ -102,9 +102,6 @@ cloudflared.deb
 local_storage/
 
 # Nginx configs (keep only the main ones)
-nginx-*.conf
-ultimate-nginx-*.conf
-sentientm.nginx.conf
 
 # Scripts that are temporary
 !start-*.sh

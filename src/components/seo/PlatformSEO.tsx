@@ -2,7 +2,7 @@ import React from 'react';
 import SEOHead from './SEOHead';
 
 interface PlatformSEOProps {
-  platform: 'instagram' | 'twitter' | 'facebook';
+  platform: 'instagram' | 'twitter' | 'facebook' | 'linkedin';
 }
 
 const PlatformSEO: React.FC<PlatformSEOProps> = ({ platform }) => {
@@ -83,6 +83,33 @@ const PlatformSEO: React.FC<PlatformSEOProps> = ({ platform }) => {
             "Page optimization",
             "Engagement analytics",
             "Ad content generation",
+            "Audience insights"
+          ]
+        }
+      }
+    },
+    linkedin: {
+      title: "LinkedIn Marketing Automation - AI-Powered B2B Growth | Sentient Marketing",
+      description: "Automate your LinkedIn presence with AI-powered content creation, scheduling, and analytics. Grow your professional brand and B2B reach with intelligent automation.",
+      keywords: "LinkedIn automation, LinkedIn marketing, LinkedIn AI, LinkedIn content creation, LinkedIn scheduling, LinkedIn analytics, B2B growth, professional branding",
+      canonicalUrl: "https://sentientmarketing.com/linkedin",
+      structuredData: {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "name": "LinkedIn Marketing Automation - Sentient Marketing",
+        "description": "Automate your LinkedIn presence with AI-powered content creation, scheduling, and analytics.",
+        "url": "https://sentientmarketing.com/linkedin",
+        "mainEntity": {
+          "@type": "SoftwareApplication",
+          "name": "LinkedIn Marketing Automation",
+          "applicationCategory": "BusinessApplication",
+          "operatingSystem": "Web Browser",
+          "featureList": [
+            "LinkedIn content creation",
+            "Automated posting",
+            "Engagement analytics",
+            "Company page optimization",
+            "Thought leadership planning",
             "Audience insights"
           ]
         }

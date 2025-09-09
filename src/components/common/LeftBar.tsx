@@ -11,7 +11,7 @@ import RagService from '../../services/RagService';
 interface LeftBarProps {
   accountHolder: string;
   userId?: string;
-  platform?: 'instagram' | 'twitter' | 'facebook';
+  platform?: 'instagram' | 'twitter' | 'facebook' | 'linkedin';
   onOpenChat?: (messageContent: string, platform?: string) => void;
 }
 

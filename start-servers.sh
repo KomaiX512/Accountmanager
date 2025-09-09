@@ -44,7 +44,7 @@ cleanup() {
 # Set up trap for cleanup
 trap cleanup SIGINT SIGTERM
 
-echo -e "${GREEN}Starting Instagram Account Manager Servers...${NC}"
+echo -e "${GREEN}Starting Account Manager Servers (Instagram, Twitter, Facebook, LinkedIn)...${NC}"
 echo -e "${GREEN}Press Ctrl+C to stop all servers${NC}"
 
 # Ports to check for our JS servers
@@ -194,11 +194,11 @@ echo ""
 echo "Usage Instructions:"
 echo "1. Access the app at http://localhost:3000"
 echo "2. Chat with RAG in Discussion Mode for conversational assistance"
-echo "3. Use Post Mode to generate Instagram posts with images"
+echo "3. Use Post Mode to generate posts for Instagram, Twitter, Facebook, or LinkedIn (images where supported)"
 echo "   - Post Mode will create captions, hashtags, and images"
 echo "   - Generated posts will appear in the PostCooked module"
 echo ""
 echo "All servers are now running. Press Ctrl+C to stop all servers."
 
 # Wait for all background processes
-wait 
+wait

@@ -76,11 +76,11 @@ initializeChromaDB();
 
 // Configure AWS SDK v3 for R2 (Enterprise-grade)
 const R2_CONFIG = {
-  endpoint: 'https://f049515e642b0c91e7679c3d80962686.r2.cloudflarestorage.com',
+  endpoint: 'https://570f213f1410829ee9a733a77a5f40e3.r2.cloudflarestorage.com',
   region: 'auto',
   credentials: {
-    accessKeyId: '7e15d4a51abb43fff3a7da4a8813044f',
-    secretAccessKey: '8fccd5540c85304347cbbd25d8e1f67776a8473c73c4a8811e83d0970bd461e2',
+    accessKeyId: '18f60c98e08f1a24040de7cb7aab646c',
+    secretAccessKey: '0a8c50865ecab3c410baec4d751f35493fd981f4851203fe205fe0f86063a5f6',
   },
   maxAttempts: 5,
   requestHandler: {
@@ -375,6 +375,11 @@ const FALLBACK_RESPONSES = {
     general: "I'm ready to boost your X (Twitter) presence! While I'm temporarily at capacity, here are some powerful X strategies:\n\n• Tweet 3-5 times daily\n• Join trending conversations\n• Use 1-3 relevant hashtags\n• Share quick insights and tips\n• Retweet with thoughtful comments\n• Create Twitter threads for complex topics\n• Engage quickly with mentions\n• Use Twitter Spaces for live discussions\n\nI'll provide tailored X strategies when fully operational!",
     competitors: "For X (Twitter) competitor analysis:\n\n• Track their tweeting frequency and timing\n• Analyze their most retweeted content\n• Monitor hashtags they use effectively\n• Study their thread strategies\n• Check their engagement patterns\n• Look at their Twitter Spaces activity\n• Note their brand voice and tone\n• Observe their community interactions\n\nI'll deliver comprehensive competitor insights when back online!",
     content: "X (Twitter) content that gets engagement:\n\n• Quick tips and insights\n• Industry observations\n• Controversial but thoughtful takes\n• Thread tutorials\n• Live-tweeting events\n• Polls and questions\n• Memes and humor (when appropriate)\n• News commentary and analysis\n\nI'll help craft specific tweets when I'm fully operational again!"
+  },
+  linkedin: {
+    general: "I'm here to enhance your LinkedIn professional presence! While I'm temporarily at capacity, here are proven LinkedIn strategies:\n\n• Post consistently 2-3 times per week\n• Share industry insights and thought leadership\n• Use 3-5 relevant hashtags\n• Engage meaningfully with your network\n• Write detailed posts that provide value\n• Share behind-the-scenes professional content\n• Comment thoughtfully on others' posts\n• Use LinkedIn articles for long-form content\n\nI'll provide personalized LinkedIn strategies when fully operational!",
+    competitors: "For LinkedIn competitor analysis:\n\n• Monitor their posting frequency and timing\n• Analyze their most engaging content types\n• Study their thought leadership topics\n• Check their engagement rates and comments\n• Look at their LinkedIn article performance\n• Monitor their hashtag strategies\n• Note their professional tone and voice\n• Observe their network growth patterns\n\nI'll deliver comprehensive LinkedIn competitive insights when back online!",
+    content: "LinkedIn content that drives professional engagement:\n\n• Industry insights and analysis\n• Professional experiences and lessons learned\n• Thought leadership pieces\n• Behind-the-scenes business content\n• Team achievements and celebrations\n• Industry trends and predictions\n• How-to guides and tutorials\n• Professional development tips\n\nI'll help create specific LinkedIn content when I'm fully operational again!"
   }
 };
 
@@ -1670,6 +1675,7 @@ function determineResponseStrategy(query, profileData, username) {
 async function createPersonalizedRagPrompt(profileData, rulesData, query, platform = 'instagram', usingFallbackProfile = false, username = 'user', responseStrategy = null) {
   const platformName = platform === 'twitter' ? 'X (Twitter)' : 
                       platform === 'facebook' ? 'Facebook' : 
+                      platform === 'linkedin' ? 'LinkedIn' : 
                       'Instagram';
   
   console.log(`[RAG-Server] 🎯 Creating PERSONALIZED prompt using strategy: ${responseStrategy?.strategy || 'default'} for ${platform}/${username}`);
@@ -2160,6 +2166,7 @@ function sanitizeAssistantResponseForContext(text) {
 function createTraditionalRagPrompt(profileData, rulesData, query, platform = 'instagram', usingFallbackProfile = false, username = 'user') {
   const platformName = platform === 'twitter' ? 'X (Twitter)' : 
                       platform === 'facebook' ? 'Facebook' : 
+                      platform === 'linkedin' ? 'LinkedIn' : 
                       'Instagram';
   
   // Extract REAL profile insights from scraped data
@@ -2580,6 +2587,7 @@ function analyzePostThemes(postTexts) {
 function generateIntelligentRAGResponse(profileData, query, platform = 'instagram', username = 'user') {
   const platformName = platform === 'twitter' ? 'X (Twitter)' : 
                       platform === 'facebook' ? 'Facebook' : 
+                      platform === 'linkedin' ? 'LinkedIn' : 
                       'Instagram';
   
   // Extract comprehensive data
@@ -3144,6 +3152,7 @@ app.all(['/api/rag/discussion', '/api/discussion', '/api/rag/discussion/', '/api
           
           const platformName = platform === 'twitter' ? 'X (Twitter)' : 
                               platform === 'facebook' ? 'Facebook' : 
+                              platform === 'linkedin' ? 'LinkedIn' : 
                               'Instagram';
           
           // Extract only the safest data - just numbers
@@ -3303,6 +3312,7 @@ Your metrics indicate a well-established ${platformName} presence with good grow
 async function createEnhancedPostGenerationPrompt(profileData, rulesData, query, platform = 'instagram', username = 'user') {
   const platformName = platform === 'twitter' ? 'X (Twitter)' : 
                       platform === 'facebook' ? 'Facebook' : 
+                      platform === 'linkedin' ? 'LinkedIn' : 
                       'Instagram';
   
   console.log(`[RAG-Server] 🚀 Creating ENHANCED POST GENERATION prompt with ChromaDB semantic search for ${platform}/${username}`);
@@ -3329,14 +3339,17 @@ async function createEnhancedPostGenerationPrompt(profileData, rulesData, query,
   
   const characterLimit = platform === 'twitter' ? 270 : 
                         platform === 'instagram' ? 2200 : 
+                        platform === 'linkedin' ? 3000 :
                         63206; // Facebook
   
   const hashtagGuidance = platform === 'twitter' ? '1-3 hashtags (Twitter best practice)' :
                          platform === 'instagram' ? '5-10 hashtags' :
+                         platform === 'linkedin' ? '3-5 hashtags (LinkedIn best practice)' :
                          '3-5 hashtags (Facebook best practice)';
   
   const contentGuidance = platform === 'twitter' ? 'Write naturally at the length that fits your message - can be short, medium, or long like the real examples. Match the natural flow and style of the profile.' :
                          platform === 'instagram' ? 'Make it visually appealing and Instagram-friendly' :
+                         platform === 'linkedin' ? 'Make it professional and thought-provoking, suitable for LinkedIn\'s business network' :
                          'Make it suitable for Facebook\'s diverse audience';
 
   // 🔥 STEP 2: If we have enhanced context, use it; otherwise fallback to traditional approach
@@ -3559,8 +3572,8 @@ app.post('/api/reimagine-image', async (req, res) => {
       imageFilename: newImageFilename,
       image_prompt: enhancedImagePrompt,
       imagePrompt: enhancedImagePrompt,
-      image_url: `https://f049515e642b0c91e7679c3d80962686.r2.cloudflarestorage.com/structuredb/ready_post/${platform}/${username}/${newImageFilename}`,
-      r2_image_url: `https://f049515e642b0c91e7679c3d80962686.r2.cloudflarestorage.com/structuredb/ready_post/${platform}/${username}/${newImageFilename}`,
+      image_url: `https://570f213f1410829ee9a733a77a5f40e3.r2.cloudflarestorage.com/structuredb/ready_post/${platform}/${username}/${newImageFilename}`,
+      r2_image_url: `https://570f213f1410829ee9a733a77a5f40e3.r2.cloudflarestorage.com/structuredb/ready_post/${platform}/${username}/${newImageFilename}`,
       reimagined_at: new Date().toISOString(),
       reimagined_from: originalPostData.image_filename || originalPostData.imageFilename,
       extra_prompt_used: extraPrompt || null
@@ -3618,14 +3631,17 @@ app.post(['/api/post-generator', '/api/rag/post-generator'], async (req, res) =>
     
     const platformName = platform === 'twitter' ? 'X (Twitter)' : 
                         platform === 'facebook' ? 'Facebook' : 
+                        platform === 'linkedin' ? 'LinkedIn' : 
                         'Instagram';
     
     const characterLimit = platform === 'twitter' ? 280 : 
                           platform === 'instagram' ? 2200 : 
+                          platform === 'linkedin' ? 3000 :
                           63206; // Facebook
     
     const hashtagGuidance = platform === 'twitter' ? '1-3 hashtags (Twitter best practice)' :
                            platform === 'instagram' ? '5-10 hashtags' :
+                           platform === 'linkedin' ? '3-5 hashtags (LinkedIn best practice)' :
                            '3-5 hashtags (Facebook best practice)';
     
     // 🚀 Get profile and rules data for enhanced RAG
@@ -3707,6 +3723,7 @@ app.post(['/api/post-generator', '/api/rag/post-generator'], async (req, res) =>
           const fallbackContent = getFallbackResponse(query, platform);
           const platformName = platform === 'twitter' ? 'X (Twitter)' : 
                               platform === 'facebook' ? 'Facebook' : 
+                              platform === 'linkedin' ? 'LinkedIn' : 
                               'Instagram';
           
           response = `Caption:
@@ -4188,6 +4205,26 @@ app.get('/health', (req, res) => {
   res.json(health);
 });
 
+// API-style health endpoint for production validators
+app.get('/api/health', (req, res) => {
+  const health = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    buckets: {
+      tasks: 'connected',
+      structuredb: 'connected'
+    },
+    cacheStatus: {
+      profiles: profileCache.size,
+      rules: rulesCache.size
+    }
+  };
+  
+  res.json(health);
+});
+
 // Endpoint to clear caches (useful for testing)
 app.post('/admin/clear-cache', (req, res) => {
   profileCache.clear();
@@ -4305,7 +4342,7 @@ app.post('/admin/test-chromadb', async (req, res) => {
 // Get ChromaDB statistics
 app.get('/admin/chromadb-stats', async (req, res) => {
   try {
-    const platforms = ['instagram', 'twitter', 'facebook'];
+    const platforms = ['instagram', 'twitter', 'facebook', 'linkedin'];
     const stats = {};
     
     for (const platform of platforms) {
@@ -4595,16 +4632,18 @@ async function createEnhancedAIReplyPrompt(profileData, rulesData, notification,
   const isMessage = notification.type === 'message';
   const platformName = platform === 'twitter' ? 'X (Twitter)' : 
                       platform === 'facebook' ? 'Facebook' : 
+                      platform === 'linkedin' ? 'LinkedIn' : 
                       'Instagram';
   
   const messageType = isMessage ? 
-    (platform === 'twitter' ? 'direct message' : platform === 'facebook' ? 'private message' : 'direct message') : 
-    (platform === 'twitter' ? 'mention' : platform === 'facebook' ? 'comment' : 'comment');
+    (platform === 'twitter' ? 'direct message' : platform === 'facebook' ? 'private message' : platform === 'linkedin' ? 'LinkedIn message' : 'direct message') : 
+    (platform === 'twitter' ? 'mention' : platform === 'facebook' ? 'comment' : platform === 'linkedin' ? 'LinkedIn comment' : 'comment');
   
   const senderInfo = notification.username ? `from username @${notification.username}` : 'from a user';
   
   const characterLimit = platform === 'twitter' ? 280 : 
                         platform === 'instagram' ? 2200 : 
+                        platform === 'linkedin' ? 8000 :
                         8000; // Facebook DM limit
 
   // Enhanced profile data analysis with intelligent personality detection
@@ -4952,92 +4991,11 @@ function getMessageAnalysis(text) {
 app.post('/api/instant-reply', async (req, res) => {
   const { username, notification, platform = 'instagram' } = req.body;
   
-  // 🔍 DEBUG: Log all incoming notification details
-  console.log(`[RAG-Server] 🔍 =================================`);
-  console.log(`[RAG-Server] 🔍 INCOMING NOTIFICATION DEBUG:`);
-  console.log(`[RAG-Server] 🔍 Platform: ${platform}`);
-  console.log(`[RAG-Server] 🔍 Username: ${username}`);
-  console.log(`[RAG-Server] 🔍 Text: "${notification?.text || 'NO TEXT'}"`);
-  console.log(`[RAG-Server] 🔍 Sender ID: ${notification?.sender_id || notification?.from?.id || 'unknown'}`);
-  console.log(`[RAG-Server] 🔍 Sender Username: ${notification?.from?.username || notification?.username || 'unknown'}`);
-  console.log(`[RAG-Server] 🔍 Notification ID: ${notification?.message_id || notification?.comment_id || notification?.id || 'unknown'}`);
-  console.log(`[RAG-Server] 🔍 Notification Type: ${notification?.type || 'unknown'}`);
-  console.log(`[RAG-Server] 🔍 Full Notification Object:`, JSON.stringify(notification, null, 2));
-  console.log(`[RAG-Server] 🔍 =================================`);
-  
   if (!username || !notification || !notification.text) {
     return res.status(400).json({ error: 'Username and notification with text are required' });
   }
 
-  // � CRITICAL FILTER: Detect and reject AI-generated replies to prevent loops
-  const notificationText = notification.text.toLowerCase().trim();
-  const textLength = notification.text.length;
-  
-  // Check for AI-generated reply patterns
-  const aiReplyPatterns = [
-    // Emoji-heavy patterns typical of AI replies
-    /^(thanks?|thank you|great|awesome|love|amazing|perfect).*[!🔥💖✨🥰😍😘🫶💭]+/i,
-    
-    // Specific phrases our AI commonly uses
-    /thanks for (engaging|commenting|the|sharing)/i,
-    /i'll (share|respond|get back|reply)/i,
-    /more (detailed|insights|thoughts)/i,
-    /(soon|shortly|in a bit).*[!💭🎯]+/i,
-    /love (this|seeing) (interaction|engagement)/i,
-    
-    // Business/brand voice patterns
-    /we('re| are) (all about|living for)/i,
-    /keep (those|them|the).*coming/i,
-    /(fenty face|soft'lit|glow)/i,
-    
-    // Generic AI assistant patterns
-    /i appreciate you taking the time/i,
-    /thanks for being (part of|the best)/i,
-    /seeing (you all|interactions like this)/i,
-    
-    // Emoji combinations typical of AI
-    /[🔥✨💖🥰😍😘🫶💭🎯]{3,}/,
-    
-    // Length and structure patterns of AI replies
-    textLength > 100 && /^[A-Z][^.!?]*[!💭🎯🔥✨💖🥰😍😘🫶]\s*$/
-  ];
-  
-  // Check if text matches AI-generated patterns
-  const isLikelyAIReply = aiReplyPatterns.some(pattern => pattern.test(notificationText)) ||
-    (textLength > 80 && textLength < 300 && /[🔥✨💖🥰😍😘🫶💭🎯]{2,}/.test(notification.text));
-  
-  // Additional checks for sender information
-  let isOwnReply = false;
-  
-  // Check if sender info indicates it's from the account owner
-  if (notification.sender_id || notification.from) {
-    const senderId = notification.sender_id || notification.from?.id || notification.from?.username;
-    const senderUsername = notification.from?.username || notification.username;
-    
-    // Check if sender matches the account we're replying for
-    if (senderId && (senderId === username || senderUsername === username)) {
-      isOwnReply = true;
-    }
-  }
-  
-  // Check if the notification text was previously generated by us
-  const generatedReplyKey = `generated_reply_${platform}_${username}_${notificationText.substring(0, 50)}`;
-  if (processedNotifications.has(generatedReplyKey)) {
-    isOwnReply = true;
-  }
-  
-  // Reject if it looks like an AI-generated reply or own content
-  if (isLikelyAIReply || isOwnReply) {
-    console.log(`[RAG-Server] 🚫 BLOCKING AI-GENERATED REPLY: "${notification.text.substring(0, 100)}..." (isAI: ${isLikelyAIReply}, isOwn: ${isOwnReply})`);
-    return res.status(400).json({ 
-      error: 'AI-generated reply detected - preventing loop',
-      blocked: true,
-      reason: isOwnReply ? 'own_content' : 'ai_pattern_detected',
-      textPreview: notification.text.substring(0, 100)
-    });
-  }
-
-  // �🚀 CRITICAL FIX: Check for duplicate notification processing
+  // 🚀 CRITICAL FIX: Check for duplicate notification processing
   const notificationId = notification.message_id || notification.comment_id || notification.id;
   if (notificationId) {
     const dedupKey = `${platform}_${username}_${notificationId}`;
@@ -5283,17 +5241,6 @@ app.post('/api/instant-reply', async (req, res) => {
       });
       console.log(`[RAG-Server] ✅ Stored processed notification: ${dedupKey}`);
     }
-    
-    // 🚫 TRACK GENERATED REPLY: Store generated reply text to prevent future processing
-    if (reply && reply.length > 20) {
-      const generatedReplyKey = `generated_reply_${platform}_${username}_${reply.substring(0, 50)}`;
-      processedNotifications.set(generatedReplyKey, {
-        timestamp: Date.now(),
-        type: 'generated_reply',
-        fullText: reply
-      });
-      console.log(`[RAG-Server] 🔒 Tracked generated reply to prevent loops: "${reply.substring(0, 50)}..."`);
-    }
 
     // Mark original event as replied to prevent duplicate processing (fire-and-forget)
     markEventAsReplied(notification, platform).catch(err => {
@@ -5368,58 +5315,7 @@ app.post('/api/auto-reply-all', async (req, res) => {
       const notification = notifications[i];
       const notificationId = notification.message_id || notification.comment_id || `unknown_${i}`;
 
-      // � CRITICAL FILTER: Detect and reject AI-generated replies in auto-reply
-      const notificationText = notification.text ? notification.text.toLowerCase().trim() : '';
-      const textLength = notification.text ? notification.text.length : 0;
-      
-      // Check for AI-generated reply patterns (same as instant-reply)
-      const aiReplyPatterns = [
-        /^(thanks?|thank you|great|awesome|love|amazing|perfect).*[!🔥💖✨🥰😍😘🫶💭]+/i,
-        /thanks for (engaging|commenting|the|sharing)/i,
-        /i'll (share|respond|get back|reply)/i,
-        /more (detailed|insights|thoughts)/i,
-        /(soon|shortly|in a bit).*[!💭🎯]+/i,
-        /love (this|seeing) (interaction|engagement)/i,
-        /we('re| are) (all about|living for)/i,
-        /keep (those|them|the).*coming/i,
-        /(fenty face|soft'lit|glow)/i,
-        /i appreciate you taking the time/i,
-        /thanks for being (part of|the best)/i,
-        /seeing (you all|interactions like this)/i,
-        /[🔥✨💖🥰😍😘🫶💭🎯]{3,}/,
-        textLength > 100 && /^[A-Z][^.!?]*[!💭🎯🔥✨💖🥰😍😘🫶]\s*$/
-      ];
-      
-      const isLikelyAIReply = aiReplyPatterns.some(pattern => pattern.test(notificationText)) ||
-        (textLength > 80 && textLength < 300 && /[🔥✨💖🥰😍😘🫶💭🎯]{2,}/.test(notification.text || ''));
-      
-      // Check for own content
-      let isOwnReply = false;
-      if (notification.sender_id || notification.from) {
-        const senderId = notification.sender_id || notification.from?.id || notification.from?.username;
-        const senderUsername = notification.from?.username || notification.username;
-        if (senderId && (senderId === username || senderUsername === username)) {
-          isOwnReply = true;
-        }
-      }
-      
-      // Skip AI-generated or own replies
-      if (isLikelyAIReply || isOwnReply) {
-        console.log(`[RAG-Server] 🚫 BLOCKING AI REPLY IN AUTO-REPLY: "${(notification.text || '').substring(0, 100)}..." (isAI: ${isLikelyAIReply}, isOwn: ${isOwnReply})`);
-        
-        results.push({
-          notificationId,
-          success: false,
-          error: 'AI-generated reply blocked',
-          blocked: true,
-          reason: isOwnReply ? 'own_content' : 'ai_pattern_detected'
-        });
-        
-        errorCount++;
-        continue; // Skip to next notification
-      }
-
-      // �🚀 CRITICAL FIX: Check for duplicate notification processing in auto-reply
+      // 🚀 CRITICAL FIX: Check for duplicate notification processing in auto-reply
       if (notificationId && notificationId !== `unknown_${i}`) {
         const dedupKey = `${platform}_${username}_${notificationId}`;
         const now = Date.now();
@@ -5850,6 +5746,7 @@ function getFallbackResponse(query, platform = 'instagram') {
   const queryLower = query.toLowerCase();
   const platformName = platform === 'twitter' ? 'X (Twitter)' : 
                       platform === 'facebook' ? 'Facebook' : 
+                      platform === 'linkedin' ? 'LinkedIn' : 
                       'Instagram';
   
   // More specific keyword matching for better contextual responses

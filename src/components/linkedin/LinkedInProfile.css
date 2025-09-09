@@ -1,0 +1,48 @@
+/* Basic LinkedIn dashboard styles to satisfy import and keep consistent visuals */
+.linkedin-dashboard-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: #0c111a;
+  color: #e6f1ff;
+}
+
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(100, 255, 218, 0.15);
+  background: rgba(10, 15, 25, 0.9);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.header-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dashboard-logo {
+  height: 32px;
+  width: 32px;
+  object-fit: contain;
+}
+
+.linkedin-dashboard-content {
+  padding: 20px;
+}
+
+.close-button {
+  background: transparent;
+  border: none;
+  color: #e6f1ff;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.platform-dashboard-wrapper {
+  margin-top: 20px;
+}

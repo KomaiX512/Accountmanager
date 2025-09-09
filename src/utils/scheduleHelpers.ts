@@ -1,7 +1,7 @@
 import { getApiUrl, API_CONFIG } from '../config/api';
 
 export interface ScheduleOptions {
-  platform: 'instagram' | 'twitter' | 'facebook';
+  platform: 'instagram' | 'twitter' | 'facebook' | 'linkedin';
   userId: string;
   imageBlob?: Blob;
   caption: string;

@@ -152,14 +152,14 @@ export function safeEvery<T>(data: any, predicate: (item: T, index: number, arra
  * 🛡️ DEFENSIVE: Filter notifications excluding user's own messages (ANTI-LOOP PROTECTION)
  * @param notifications - Array of notifications to filter
  * @param username - Current user's username
- * @param platform - Platform (instagram, twitter, facebook)
+ * @param platform - Platform (instagram, twitter, facebook, linkedin)
  * @param additionalFilter - Optional additional filter function
  * @returns Filtered notifications excluding user's own messages
  */
 export function safeFilterOwnMessages(
   notifications: any[], 
   username: string | undefined,
-  platform: 'instagram' | 'twitter' | 'facebook' = 'instagram',
+  platform: 'instagram' | 'twitter' | 'facebook' | 'linkedin' = 'instagram',
   additionalFilter?: (item: any) => boolean
 ): any[] {
   if (!Array.isArray(notifications)) {

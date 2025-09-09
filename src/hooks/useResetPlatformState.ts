@@ -15,6 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import { useInstagram } from '../context/InstagramContext';
 import { useTwitter } from '../context/TwitterContext';
 import { useFacebook } from '../context/FacebookContext';
+import { useLinkedIn } from '../context/LinkedInContext';
 import { useAcquiredPlatforms } from '../context/AcquiredPlatformsContext';
 import { 
   clearInstagramConnection, 
@@ -30,7 +31,7 @@ import {
 } from '../utils/facebookSessionManager';
 
 export interface PlatformResetOptions {
-  platform: 'instagram' | 'twitter' | 'facebook';
+  platform: 'instagram' | 'twitter' | 'facebook' | 'linkedin';
   username: string;
   navigateToMain?: boolean;
   clearBrowserHistory?: boolean;
@@ -47,6 +48,7 @@ export const useResetPlatformState = () => {
   const { resetInstagramAccess } = useInstagram();
   const { resetTwitterAccess } = useTwitter();
   const { resetFacebookAccess } = useFacebook();
+  const { resetLinkedInAccess } = useLinkedIn();
   
   // Acquired platforms context for refreshing main dashboard status
   const { refreshPlatforms } = useAcquiredPlatforms();
@@ -127,8 +129,14 @@ export const useResetPlatformState = () => {
         clearFacebookConnection(userId);
         resetFacebookAccess(); // 🔥 Reset context state to update main dashboard
         break;
+      case 'linkedin':
+        // Clear LinkedIn connection data (assuming similar session manager exists)
+        console.log(`[ResetPlatformState] 🧹 Clearing LinkedIn session data for ${userId}`);
+        resetLinkedInAccess(); // 🔥 Reset context state to update main dashboard
+        // Note: LinkedIn session manager functions would be added here when available
+        break;
     }
-  }, [resetInstagramAccess, resetTwitterAccess, resetFacebookAccess]);
+  }, [resetInstagramAccess, resetTwitterAccess, resetFacebookAccess, resetLinkedInAccess]);
 
   /**
    * Manipulates browser history to prevent back navigation to reset dashboard
@@ -379,7 +387,7 @@ export const useResetPlatformState = () => {
   /**
    * Quick reset function for immediate use (with sensible defaults)
    */
-  const quickReset = useCallback(async (platform: 'instagram' | 'twitter' | 'facebook', username: string): Promise<boolean> => {
+  const quickReset = useCallback(async (platform: 'instagram' | 'twitter' | 'facebook' | 'linkedin', username: string): Promise<boolean> => {
     return resetPlatformState({
       platform,
       username,
@@ -392,7 +400,7 @@ export const useResetPlatformState = () => {
    * Reset platform and clear disconnected flags (for allowing future reconnection)
    * 🔥 BULLETPROOF: This ensures main dashboard status updates immediately
    */
-  const resetAndAllowReconnection = useCallback(async (platform: 'instagram' | 'twitter' | 'facebook', username: string): Promise<boolean> => {
+  const resetAndAllowReconnection = useCallback(async (platform: 'instagram' | 'twitter' | 'facebook' | 'linkedin', username: string): Promise<boolean> => {
     if (!currentUser?.uid) return false;
 
     console.log(`[ResetPlatformState] 🔄 Starting bulletproof reset for ${platform} with reconnection capability`);

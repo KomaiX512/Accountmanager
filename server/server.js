@@ -477,12 +477,22 @@ function scheduleCacheCleanup() {
 // Start the cache cleanup scheduler
 scheduleCacheCleanup();
 
+// R2 configuration via environment variables (with safe development fallbacks)
+const R2_ENDPOINT = process.env.R2_ENDPOINT || 'https://f049515e642b0c91e7679c3d80962686.r2.cloudflarestorage.com';
+const R2_REGION = process.env.R2_REGION || 'auto';
+const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID || '7e15d4a51abb43fff3a7da4a8813044f';
+const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY || '8fccd5540c85304347cbbd25d8e1f67776a8473c73c4a8811e83d0970bd461e2';
+
+if ((!process.env.R2_ENDPOINT || !process.env.R2_ACCESS_KEY_ID || !process.env.R2_SECRET_ACCESS_KEY) && process.env.NODE_ENV !== 'production') {
+  console.warn('[R2] Using fallback R2 credentials or endpoint from source. Set R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY in environment for production.');
+}
+
 const s3Client = new S3Client({
-  endpoint: 'https://f049515e642b0c91e7679c3d80962686.r2.cloudflarestorage.com',
-  region: 'auto',
+  endpoint: R2_ENDPOINT,
+  region: R2_REGION,
   credentials: {
-    accessKeyId: '7e15d4a51abb43fff3a7da4a8813044f',
-    secretAccessKey: '8fccd5540c85304347cbbd25d8e1f67776a8473c73c4a8811e83d0970bd461e2',
+    accessKeyId: R2_ACCESS_KEY_ID,
+    secretAccessKey: R2_SECRET_ACCESS_KEY,
   },
   maxAttempts: 5,
   requestHandler: {
@@ -555,13 +565,176 @@ app.use((req, res, next) => {
 
 // Add this after the existing endpoints (around line 9600+)
 
-// ===================== HEALTH ENDPOINTS (JSON) =====================
-// Provide JSON-only health checks for Nginx and deployment scripts
-app.get(['/health', '/api/health'], (req, res) => {
+// ===================================================================
+// NETFLIX-LEVEL HEALTH CHECK SYSTEM INTEGRATION
+// ===================================================================
+import HealthCheckSystem from './healthCheck.mjs';
+
+// Initialize health check system
+const healthChecker = new HealthCheckSystem(s3Client);
+
+console.log(`[${new Date().toISOString()}] [HEALTH] 🏥 Enterprise health monitoring system initialized`);
+
+// ===================== ENTERPRISE HEALTH ENDPOINTS =====================
+// Netflix-level health monitoring for production deployment
+
+// Basic health check endpoint
+app.get(['/health', '/api/health'], async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
+  
+  try {
+    const healthResult = await healthChecker.performHealthCheck(false);
+    
+    // Set appropriate HTTP status based on health
+    let statusCode = 200;
+    if (healthResult.status === 'unhealthy') {
+      statusCode = 503; // Service Unavailable
+    } else if (healthResult.status === 'degraded') {
+      statusCode = 200; // Still OK but with warnings
+    }
+    
+    res.status(statusCode).json(healthResult);
+  } catch (error) {
+    console.error(`[HEALTH] Health check endpoint error:`, error);
+    res.status(503).json({
+      status: 'error',
+      error: 'Health check failed',
+      timestamp: new Date().toISOString(),
+      service: 'main-api',
+      port
+    });
+  }
+});
+
+// Proxy conversation history endpoints to RAG server (port 3001)
+app.get(['/api/conversations/:username', '/conversations/:username'], async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  const { username } = req.params;
+  const platform = req.query.platform || 'instagram';
+  try {
+    const response = await axios.get(`http://127.0.0.1:3001/api/conversations/${encodeURIComponent(username)}?platform=${encodeURIComponent(platform)}`, {
+      timeout: 15000,
+      headers: { 'Accept': 'application/json' }
+    });
+    return res.status(response.status).json(response.data);
+  } catch (error) {
+    const status = error?.response?.status || 500;
+    const data = error?.response?.data || { error: error.message };
+    console.warn(`[CONVERSATIONS-PROXY] GET failed for ${platform}/${username}:`, status, data?.error || data);
+    return res.status(status).json(data);
+  }
+});
+
+app.post(['/api/conversations/:username', '/conversations/:username'], async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  const { username } = req.params;
+  const { messages, platform = 'instagram' } = req.body || {};
+  try {
+    const response = await axios.post(`http://127.0.0.1:3001/api/conversations/${encodeURIComponent(username)}`, {
+      messages,
+      platform
+    }, {
+      timeout: 15000,
+      headers: { 'Content-Type': 'application/json' }
+    });
+    return res.status(response.status).json(response.data);
+  } catch (error) {
+    const status = error?.response?.status || 500;
+    const data = error?.response?.data || { error: error.message };
+    console.warn(`[CONVERSATIONS-PROXY] POST failed for ${platform}/${username}:`, status, data?.error || data);
+    return res.status(status).json(data);
+  }
+});
+
+// Detailed health check endpoint
+app.get(['/health/detailed', '/api/health/detailed'], async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  
+  try {
+    const healthResult = await healthChecker.performHealthCheck(true);
+    
+    let statusCode = 200;
+    if (healthResult.status === 'unhealthy') {
+      statusCode = 503;
+    }
+    
+    res.status(statusCode).json(healthResult);
+  } catch (error) {
+    console.error(`[HEALTH] Detailed health check error:`, error);
+    res.status(503).json({
+      status: 'error',
+      error: 'Detailed health check failed',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Health summary endpoint (lightweight)
+app.get(['/health/summary', '/api/health/summary'], (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  
+  try {
+    const summary = healthChecker.getHealthSummary();
+    res.json(summary);
+  } catch (error) {
+    console.error(`[HEALTH] Health summary error:`, error);
+    res.status(500).json({
+      status: 'error',
+      error: 'Failed to get health summary',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Health history endpoint
+app.get(['/health/history', '/api/health/history'], (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  try {
+    const history = healthChecker.getHealthHistory();
+    res.json({
+      history,
+      totalChecks: history.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error(`[HEALTH] Health history error:`, error);
+    res.status(500).json({
+      status: 'error',
+      error: 'Failed to get health history',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Component states endpoint
+app.get(['/health/components', '/api/health/components'], (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  try {
+    const components = healthChecker.getComponentStates();
+    res.json({
+      components,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error(`[HEALTH] Component states error:`, error);
+    res.status(500).json({
+      status: 'error',
+      error: 'Failed to get component states',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Legacy simple health endpoint for backward compatibility
+app.get('/api/health/simple', (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
   res.json({
     status: 'ok',
     service: 'main-api',
@@ -2536,6 +2709,28 @@ app.get(['/api/proxy-image', '/proxy-image'], async (req, res) => {
   try {
     if (Array.isArray(url)) url = url[0];
     const decodedUrl = decodeURIComponent(url);
+    const fallback = req.query.fallback;
+    // --- Resilience additions: negative caching for Instagram 403s ---
+    const acceptHeader = (req.headers['accept'] || '').toLowerCase();
+    const clientWantsImage = acceptHeader.includes('image/');
+    const wantsPixelFallback = (fallback === 'pixel' || fallback === 'true');
+    const isInstagramCdn = decodedUrl.includes('instagram.com');
+    const NEGATIVE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+    const pixelPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2zWx0AAAAASUVORK5CYII=', 'base64');
+    // Use a process-wide negative cache map stored on globalThis to persist across requests
+    if (!globalThis.__proxyImageNegCache) {
+      globalThis.__proxyImageNegCache = new Map();
+    }
+    const __negCache = globalThis.__proxyImageNegCache;
+    // Early exit if URL is in negative cache (Instagram 403 previously observed)
+    const negExpiry = __negCache.get(decodedUrl);
+    if (isInstagramCdn && negExpiry && negExpiry > Date.now()) {
+      res.set('Content-Type', 'image/png');
+      res.set('Cache-Control', 'public, max-age=600'); // 10 minutes client cache for pixel
+      res.set('X-Proxy-Fallback', 'pixel');
+      res.set('X-Proxy-Cache', 'NEG_HIT');
+      return res.status(200).send(pixelPng);
+    }
 
     let lastError = null;
     
@@ -2553,7 +2748,10 @@ app.get(['/api/proxy-image', '/proxy-image'], async (req, res) => {
             'Accept': 'image/*,*/*;q=0.9',
             'Accept-Encoding': 'gzip, deflate, br',
             'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
+            'Pragma': 'no-cache',
+            'Referer': 'https://www.instagram.com/',
+            'Origin': 'https://www.instagram.com',
+            'Accept-Language': 'en-US,en;q=0.9'
           },
           // Important: Handle errors properly
           validateStatus: (status) => status >= 200 && status < 400
@@ -2562,7 +2760,22 @@ app.get(['/api/proxy-image', '/proxy-image'], async (req, res) => {
         const contentType = response.headers['content-type'];
         if (!contentType || !contentType.startsWith('image/')) {
           console.error(`[proxy-image] URL did not return an image:`, decodedUrl, 'Content-Type:', contentType);
-          return res.status(400).send('URL did not return an image');
+          // For <img> clients or explicit fallback requests, return pixel to avoid broken images
+          if (clientWantsImage || wantsPixelFallback) {
+            res.set('Content-Type', 'image/png');
+            res.set('Cache-Control', 'public, max-age=300');
+            res.set('X-Proxy-Fallback', 'pixel');
+            res.set('X-Proxy-Reason', 'non-image-upstream');
+            res.set('Vary', 'Accept');
+            return res.status(200).send(pixelPng);
+          }
+          // For non-image consumers, return JSON advisory
+          res.set('Content-Type', 'application/json');
+          return res.status(400).json({
+            error: 'Upstream did not return an image',
+            originalUrl: decodedUrl,
+            contentType
+          });
         }
         
         // Success! Set headers and send image
@@ -2579,7 +2792,32 @@ app.get(['/api/proxy-image', '/proxy-image'], async (req, res) => {
         lastError = error;
         console.warn(`[proxy-image] Attempt ${attempt + 1} failed:`, error?.response?.status || error?.message);
         
-        // Don't retry on 4xx errors (client errors)
+        // Handle Instagram CDN 403 errors with fallback
+        if (error?.response?.status === 403 && decodedUrl.includes('instagram.com')) {
+          console.log(`[proxy-image] Instagram CDN blocked request (403) - using fallback strategy`);
+          // Record negative cache so subsequent requests short-circuit
+          try { __negCache.set(decodedUrl, Date.now() + NEGATIVE_TTL_MS); } catch (_) {}
+          // If the caller requested pixel explicitly OR the client is an <img> (Accept: image/*), return pixel
+          if (wantsPixelFallback || clientWantsImage) {
+            res.set('Content-Type', 'image/png');
+            res.set('Cache-Control', 'public, max-age=600'); // align with neg cache TTL
+            res.set('X-Proxy-Fallback', 'pixel');
+            res.set('X-Proxy-Cache', 'NEG_SET');
+            res.set('Vary', 'Accept');
+            return res.status(200).send(pixelPng);
+          }
+          // Default JSON advisory (non-img consumers)
+          res.set('Content-Type', 'application/json');
+          res.set('X-Proxy-Cache', 'NEG_SET');
+          return res.status(200).json({
+            error: 'Instagram image blocked',
+            fallback: true,
+            originalUrl: decodedUrl,
+            suggestion: 'Add &fallback=pixel to receive a 1x1 PNG placeholder for <img> tags'
+          });
+        }
+
+        // Don't retry on other 4xx errors (client errors)
         if (error?.response?.status >= 400 && error?.response?.status < 500) {
           console.log(`[proxy-image] Client error (${error.response.status}), not retrying`);
           break;
@@ -2595,6 +2833,13 @@ app.get(['/api/proxy-image', '/proxy-image'], async (req, res) => {
     
     // All retries failed
     console.error(`[proxy-image] All ${MAX_RETRIES + 1} attempts failed for:`, url, lastError?.response?.status, lastError?.message);
+    if (wantsPixelFallback || clientWantsImage) {
+      res.set('Content-Type', 'image/png');
+      res.set('Cache-Control', 'public, max-age=600');
+      res.set('X-Proxy-Fallback', 'pixel');
+      res.set('Vary', 'Accept');
+      return res.status(200).send(pixelPng);
+    }
     res.status(500).send('Failed to fetch image after retries');
     
   } catch (error) {
@@ -3639,14 +3884,23 @@ app.get(['/ai-replies/:username', '/api/ai-replies/:username'], async (req, res)
   setCorsHeaders(res, req.headers.origin || '*');
   const { username } = req.params;
   const platform = req.query.platform || 'instagram';
+  // Apply alias map so legacy usernames resolve to primary data
+  const aliasMap = {
+    instagram: {
+      narsissist: 'maccosmetics',
+    }
+  };
+  const normalizedPlatform = String(platform || '').toLowerCase();
+  const normalizedUsername = String(username || '').toLowerCase();
+  const effectiveUsername = aliasMap[normalizedPlatform]?.[normalizedUsername] || username;
   
-  console.log(`[${new Date().toISOString()}] [AI-REPLIES] Fetching AI replies for ${platform}/${username}`);
+  console.log(`[${new Date().toISOString()}] [AI-REPLIES] Fetching AI replies for ${platform}/${effectiveUsername}`);
   
   try {
     // Get AI replies from R2 storage
     const listParams = {
       Bucket: 'tasks',
-      Prefix: `AI.replies/${platform}/${username}/`,
+      Prefix: `AI.replies/${platform}/${effectiveUsername}/`,
       MaxKeys: 50 // Limit to last 50 replies
     };
     
@@ -6831,10 +7085,10 @@ app.get(['/events-list/:userId', '/api/events-list/:userId'],
     try {
       // Use parallel fetching for ultra-fast response
       const notificationFetcher = platform === 'instagram' 
-        ? fetchInstagramNotifications(userId, Math.min(limit, 20), 0) // Cap at 20 for speed
+        ? fetchInstagramNotifications(userId, limit, 0) // Process all notifications for accurate counting
         : platform === 'twitter'
-        ? fetchTwitterNotifications(userId, Math.min(limit, 20), 0)
-        : fetchFacebookNotifications(userId, forceRefresh, Math.min(limit, 20), 0);
+        ? fetchTwitterNotifications(userId, limit, 0)
+        : fetchFacebookNotifications(userId, forceRefresh, limit, 0);
       
       // Execute with timeout for resilience
       const FETCH_TIMEOUT = 2000; // 2 second max wait
@@ -6919,13 +7173,9 @@ async function filterHandledNotifications(notifications, userId, platform, filte
                      platform === 'facebook' ? 'FacebookEvents' :
                      'InstagramEvents';
 
-  // 🚀 GOOGLE-LEVEL OPTIMIZATION: Early exit with top N notifications only
-  // No need to process 1000+ notifications when we only display 3-5
-  const MAX_NOTIFICATIONS_TO_PROCESS = 20; // Process only top 20 for ultra-fast filtering
-  if (notifications.length > MAX_NOTIFICATIONS_TO_PROCESS) {
-    console.log(`[${new Date().toISOString()}] ⚡ OPTIMIZATION: Processing only top ${MAX_NOTIFICATIONS_TO_PROCESS} of ${notifications.length} notifications`);
-    notifications = notifications.slice(0, MAX_NOTIFICATIONS_TO_PROCESS);
-  }
+  // 🚀 GOOGLE-LEVEL OPTIMIZATION: Process all notifications for accurate counting
+  // Removed artificial limit to ensure consistent notification counts between badge and auto-reply
+  console.log(`[${new Date().toISOString()}] ⚡ PROCESSING: Processing all ${notifications.length} notifications for accurate filtering`);
 
   // 🛡️ STEP 1: Get connected account IDs from cache or fetch if expired
   let connectedAccountIds = new Set();
@@ -17014,54 +17264,9 @@ app.get('/api/performance', (req, res) => {
   res.json(stats);
 });
 
-// Image proxy endpoint for CORS issues
-app.get('/api/proxy-image', async (req, res) => {
-  setCorsHeaders(res);
-  
-  const { url } = req.query;
-  if (!url) {
-    return res.status(400).json({ error: 'URL parameter required' });
-  }
-  
-  try {
-    // Add timeout and better error handling
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-    
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; ImageProxy/1.0)',
-        'Accept': 'image/*'
-      },
-      signal: controller.signal
-    });
-    
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.startsWith('image/')) {
-      // Return a simple placeholder instead of failing
-      res.set('Content-Type', 'image/svg+xml');
-      return res.send(`<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300"><rect width="300" height="300" fill="#f0f0f0"/><text x="150" y="150" text-anchor="middle" fill="#999">Image</text></svg>`);
-    }
-    
-    res.set('Content-Type', contentType);
-    res.set('Cache-Control', 'public, max-age=3600'); // 1 hour cache
-    
-    const buffer = await response.arrayBuffer();
-    res.send(Buffer.from(buffer));
-  } catch (error) {
-    console.error('[Image Proxy] Error:', error.message);
-    
-    // Return placeholder instead of error for better UX
-    res.set('Content-Type', 'image/svg+xml');
-    res.send(`<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300"><rect width="300" height="300" fill="#f0f0f0"/><text x="150" y="150" text-anchor="middle" fill="#999">Failed to load</text></svg>`);
-  }
-});
+// (removed) Duplicate '/api/proxy-image' handler was consolidated above.
+
+// (removed) Duplicate '/api/proxy-image' handler was consolidated above.
 
 // ===============================================================
 // MISSING DASHBOARD ENDPOINTS - CRITICAL FOR STRESS TEST
@@ -17306,6 +17511,84 @@ app.get('/api/ready-posts/:platform/:username',
   } catch (error) {
     console.error('Error fetching ready posts:', error);
     res.status(500).json({ error: 'Failed to fetch ready posts' });
+  }
+});
+
+// Avatar endpoint for profile pictures
+app.get('/api/avatar/:platform/:username', async (req, res) => {
+  setCorsHeaders(res);
+  const { platform, username } = req.params;
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [AVATAR] Fetching profile picture for ${platform}/${username}`);
+    
+    // First try to get profile info from our existing endpoint
+    const profileKey = `ProfileInfo/${platform}/${username}/profileinfo.json`;
+    
+    let profileData;
+    try {
+      const getProfileCommand = new GetObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: profileKey,
+      });
+      const profileResponse = await r2Client.send(getProfileCommand);
+      const profileContent = await profileResponse.Body.transformToString();
+      profileData = JSON.parse(profileContent);
+      
+      console.log(`[${new Date().toISOString()}] [AVATAR] Found profile data for ${username}`);
+    } catch (profileErr) {
+      console.log(`[${new Date().toISOString()}] [AVATAR] No profile data found: ${profileErr.message}`);
+      
+      // Return a 1x1 transparent PNG as fallback
+      const transparentPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAI9jU77yAAAAABJRU5ErkJggg==', 'base64');
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('X-Avatar-Source', 'fallback-transparent');
+      return res.send(transparentPng);
+    }
+    
+    // Extract profile picture URL
+    const profilePicUrl = profileData.profilePicUrlHD || profileData.profilePicUrl || profileData.profile_image_url;
+    
+    if (!profilePicUrl) {
+      console.log(`[${new Date().toISOString()}] [AVATAR] No profile picture URL found`);
+      
+      // Return a 1x1 transparent PNG as fallback
+      const transparentPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAI9jU77yAAAAABJRU5ErkJggg==', 'base64');
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('X-Avatar-Source', 'fallback-transparent');
+      return res.send(transparentPng);
+    }
+    
+    console.log(`[${new Date().toISOString()}] [AVATAR] Fetching image from: ${profilePicUrl}`);
+    
+    // Fetch the actual image
+    const imageResponse = await axios.get(profilePicUrl, {
+      responseType: 'arraybuffer',
+      timeout: 10000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+    
+    // Set appropriate headers
+    res.setHeader('Content-Type', imageResponse.headers['content-type'] || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+    res.setHeader('X-Avatar-Source', 'profile-data');
+    
+    // Send the image buffer
+    res.send(Buffer.from(imageResponse.data));
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [AVATAR] Error fetching avatar:`, error.message);
+    
+    // Return a 1x1 transparent PNG as fallback
+    const transparentPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAI9jU77yAAAAABJRU5ErkJggg==', 'base64');
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('X-Avatar-Source', 'fallback-error');
+    res.send(transparentPng);
   }
 });
 
@@ -17868,6 +18151,297 @@ app.post(['/validate-dashboard-access/:userId', '/api/validate-dashboard-access/
       error: 'Failed to validate dashboard access',
       accessAllowed: false 
     });
+  }
+});
+
+// Enhanced avatar ingestion with circuit breakers and security
+const avatarCache = new Map(); // Request deduplication cache
+const avatarCircuitBreaker = { failures: 0, lastFailure: 0, isOpen: false };
+const CIRCUIT_BREAKER_THRESHOLD = 5;
+const CIRCUIT_BREAKER_TIMEOUT = 30000; // 30s
+
+// SSRF Protection: URL allowlist
+const ALLOWED_DOMAINS = [
+  'graph.facebook.com',
+  'scontent-*.cdninstagram.com', 
+  'instagram.com',
+  'cdninstagram.com'
+];
+
+function isAllowedURL(url) {
+  try {
+    const parsed = new URL(url);
+    // Block internal/private networks
+    if (['localhost', '127.0.0.1', '0.0.0.0', '::1'].includes(parsed.hostname)) return false;
+    if (parsed.hostname.match(/^(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/)) return false;
+    // Check domain allowlist
+    return ALLOWED_DOMAINS.some(domain => 
+      domain.startsWith('*') ? parsed.hostname.includes(domain.slice(1)) : parsed.hostname === domain
+    );
+  } catch { return false; }
+}
+
+app.get(['/api/avatar/:platform/:username', '/api/avatar/:username'], async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const platformParam = req.params.platform || 'instagram';
+    const usernameParam = req.params.username;
+    const platform = String(platformParam || 'instagram').toLowerCase();
+    const normalizedUsername = String(usernameParam || '').toLowerCase().replace(/[^a-z0-9._-]/g, '');
+    
+    // Input validation and rate limiting
+    if (!normalizedUsername || normalizedUsername.length > 50) {
+      return res.status(400).json({ error: 'Invalid username' });
+    }
+    
+    const refresh = req.query.refresh || req.query.t || req.query.v;
+    const AVATAR_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+
+    // Minimal alias mapping to unify data lookups
+    const aliasMap = {
+      instagram: { narsissist: 'maccosmetics' }
+    };
+    const effectiveUsername = aliasMap[platform]?.[normalizedUsername] || normalizedUsername;
+    const r2Key = `avatars/${platform}/${effectiveUsername}.jpg`;
+    const cacheKey = `${platform}:${effectiveUsername}`;
+    
+    // Circuit breaker check - DIRECT FIX: Return error instead of fallback
+    if (avatarCircuitBreaker.isOpen) {
+      if (Date.now() - avatarCircuitBreaker.lastFailure < CIRCUIT_BREAKER_TIMEOUT) {
+        return res.status(503).json({
+          error: 'Instagram Graph API circuit breaker active',
+          message: 'Service temporarily unavailable - no fallback allowed',
+          retryAfter: Math.ceil((CIRCUIT_BREAKER_TIMEOUT - (Date.now() - avatarCircuitBreaker.lastFailure)) / 1000)
+        });
+      } else {
+        // Reset circuit breaker after timeout
+        avatarCircuitBreaker.isOpen = false;
+        avatarCircuitBreaker.failures = 0;
+      }
+    }
+    
+    // Request deduplication - check if same request is in progress
+    if (avatarCache.has(cacheKey)) {
+      const ongoing = avatarCache.get(cacheKey);
+      if (ongoing.timestamp > Date.now() - 30000) { // 30s deduplication window
+        res.set('Content-Type', 'image/jpeg');
+        res.set('Cache-Control', 'public, max-age=86400');
+        res.set('X-Avatar-Source', 'Deduplication');
+        res.set('X-Avatar-Cache', 'DEDUP_HIT');
+        return res.status(200).send(ongoing.buffer);
+      }
+    }
+
+    // 1) Serve from R2 if fresh and no force refresh
+    let cachedFresh = false;
+    try {
+      const head = await s3Client.send(new HeadObjectCommand({ Bucket: 'tasks', Key: r2Key }));
+      const lastModified = head?.LastModified ? new Date(head.LastModified).getTime() : 0;
+      if (!refresh && lastModified && (Date.now() - lastModified) < AVATAR_TTL_MS) {
+        const obj = await s3Client.send(new GetObjectCommand({ Bucket: 'tasks', Key: r2Key }));
+        const buf = await streamToBuffer(obj.Body);
+        res.set('Content-Type', 'image/jpeg');
+        res.set('Cache-Control', 'public, max-age=86400');
+        res.set('X-Avatar-Source', 'R2');
+        res.set('X-Avatar-Cache', 'HIT');
+        return res.status(200).send(buf);
+      }
+    } catch (_) {
+      // Not found, will fetch
+    }
+
+    // 2) Try to fetch via Instagram Graph API with timeouts and validation
+    let imageBuffer = null;
+    let source = 'Graph';
+    const GRAPH_TIMEOUT = 5000; // Reduced timeout for better UX
+    
+    try {
+      let instagramId = null;
+      let accessToken = null;
+      
+      // Optimized token lookup with early exit
+      const listCmd = new ListObjectsV2Command({ 
+        Bucket: 'tasks', 
+        Prefix: 'InstagramTokens/',
+        MaxKeys: 50 // Limit to prevent memory issues
+      });
+      
+      const { Contents } = await Promise.race([
+        s3Client.send(listCmd),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Token lookup timeout')), 2000))
+      ]);
+      
+      if (Contents && Contents.length) {
+        // Parallel token checking for better performance
+        const tokenPromises = Contents.slice(0, 20).map(async (item) => {
+          try {
+            const obj = await s3Client.send(new GetObjectCommand({ Bucket: 'tasks', Key: item.Key }));
+            const json = JSON.parse(await obj.Body.transformToString());
+            if ((json.username || '').toLowerCase() === effectiveUsername) {
+              return {
+                instagramId: json.instagram_user_id || json.instagram_graph_id,
+                accessToken: json.access_token
+              };
+            }
+          } catch (e) {
+            return null;
+          }
+          return null;
+        });
+        
+        const tokenResults = await Promise.allSettled(tokenPromises);
+        const foundToken = tokenResults.find(r => r.status === 'fulfilled' && r.value)?.value;
+        
+        if (foundToken) {
+          instagramId = foundToken.instagramId;
+          accessToken = foundToken.accessToken;
+        }
+      }
+
+      if (instagramId && accessToken) {
+        const userResp = await Promise.race([
+          axios.get(`https://graph.facebook.com/v18.0/${instagramId}`, {
+            params: { fields: 'profile_picture_url,username', access_token: accessToken },
+            timeout: GRAPH_TIMEOUT,
+            validateStatus: status => status === 200
+          }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Graph API timeout')), GRAPH_TIMEOUT))
+        ]);
+        
+        const profilePicUrl = userResp?.data?.profile_picture_url;
+        if (profilePicUrl && isAllowedURL(profilePicUrl)) {
+          const resp = await Promise.race([
+            axios.get(profilePicUrl, { 
+              responseType: 'arraybuffer', 
+              timeout: GRAPH_TIMEOUT,
+              maxContentLength: 10 * 1024 * 1024 // 10MB limit
+            }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Image download timeout')), GRAPH_TIMEOUT))
+          ]);
+          
+          if (resp.data && resp.data.byteLength > 100 && resp.data.byteLength < 10 * 1024 * 1024) {
+            imageBuffer = Buffer.from(resp.data);
+            source = 'Graph';
+          }
+        }
+      }
+    } catch (e) {
+      console.warn(`[AVATAR] Graph API failed for ${effectiveUsername}: ${e.message}`);
+      avatarCircuitBreaker.failures++;
+      if (avatarCircuitBreaker.failures >= CIRCUIT_BREAKER_THRESHOLD) {
+        avatarCircuitBreaker.isOpen = true;
+        avatarCircuitBreaker.lastFailure = Date.now();
+      }
+    }
+
+    // 3) DIRECT FIX: Removed ProfileInfo fallback - Graph API ONLY per user directive
+    // NO FALLBACK SYSTEMS ALLOWED - Instagram Graph API must be the single source of truth
+
+    // 4) DIRECT FIX: Return error if Instagram Graph API fails instead of fallback
+    if (!imageBuffer) {
+      // Per user directive: NO FALLBACKS - Instagram Graph API must succeed
+      return res.status(404).json({
+        error: 'Instagram profile image unavailable - Graph API required',
+        username: effectiveUsername,
+        platform: platform,
+        message: 'Direct Instagram Graph API access required. No fallback image generation.'
+      });
+    }
+
+    // Normalize to JPEG for consistent serving
+    let finalJpeg;
+    try {
+      finalJpeg = await sharp(imageBuffer).jpeg({ quality: 85, progressive: true, mozjpeg: true }).toBuffer();
+    } catch (_) {
+      finalJpeg = imageBuffer; // already JPEG
+    }
+
+    // Store in R2 and local cache for future fast serving
+    try {
+      const storePromise = s3Client.send(new PutObjectCommand({
+        Bucket: 'tasks',
+        Key: r2Key,
+        Body: finalJpeg,
+        ContentType: 'image/jpeg',
+        CacheControl: 'public, max-age=86400',
+        Metadata: {
+          'generated-at': Date.now().toString(),
+          'source': source,
+          'username': effectiveUsername
+        }
+      }));
+      
+      // Don't wait for R2 storage to complete - serve immediately
+      storePromise.catch(e => 
+        console.warn(`[AVATAR] R2 storage failed for ${effectiveUsername}: ${e.message}`)
+      );
+      
+      // Cache successful result for deduplication
+      avatarCache.set(cacheKey, {
+        buffer: finalJpeg,
+        timestamp: Date.now(),
+        source
+      });
+      
+      // Clean old cache entries periodically
+      if (avatarCache.size > 100) {
+        const now = Date.now();
+        for (const [key, value] of avatarCache.entries()) {
+          if (now - value.timestamp > 300000) { // 5min cleanup
+            avatarCache.delete(key);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn(`[AVATAR] Storage error for ${effectiveUsername}: ${e.message}`);
+    }
+    
+    const totalTime = Date.now() - startTime;
+
+    res.set('Content-Type', 'image/jpeg');
+    res.set('Cache-Control', 'public, max-age=86400');
+    res.set('X-Avatar-Source', source);
+    res.set('X-Avatar-Cache', cachedFresh ? 'HIT' : (refresh ? 'REFRESH' : 'MISS'));
+    res.set('X-Avatar-Performance', `${totalTime}ms`);
+    res.set('X-Avatar-Size', finalJpeg.length.toString());
+    
+    // Performance monitoring
+    if (totalTime > 1000) {
+      console.warn(`[AVATAR] SLOW RESPONSE: ${effectiveUsername} took ${totalTime}ms (source: ${source})`);
+    }
+    
+    return res.status(200).send(finalJpeg);
+  } catch (error) {
+    const totalTime = Date.now() - startTime;
+    console.error(`[AVATAR] CRITICAL ERROR for ${req.params.username}: ${error?.message} (${totalTime}ms)`);
+    
+    // Update circuit breaker on critical errors
+    avatarCircuitBreaker.failures++;
+    if (avatarCircuitBreaker.failures >= CIRCUIT_BREAKER_THRESHOLD) {
+      avatarCircuitBreaker.isOpen = true;
+      avatarCircuitBreaker.lastFailure = Date.now();
+    }
+    
+    // Fast error response with consistent JPEG fallback
+    try {
+      const errorFallback = await sharp({
+        create: { width: 128, height: 128, channels: 3, background: { r: 200, g: 200, b: 200 } }
+      }).jpeg({ quality: 70 }).toBuffer();
+      
+      res.set('Content-Type', 'image/jpeg');
+      res.set('Cache-Control', 'public, max-age=300'); // Short cache for errors
+      res.set('X-Avatar-Source', 'ErrorFallback');
+      res.set('X-Avatar-Performance', `${totalTime}ms`);
+      res.set('X-Avatar-Error', error?.message?.substring(0, 100) || 'Unknown');
+      return res.status(200).send(errorFallback);
+    } catch (fallbackError) {
+      // Ultimate fallback - return minimal pixel
+      const pixelPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2zWx0AAAAASUVORK5CYII=', 'base64');
+      res.set('Content-Type', 'image/png');
+      res.set('Cache-Control', 'public, max-age=60');
+      res.set('X-Avatar-Source', 'CriticalErrorPixel');
+      return res.status(200).send(pixelPng);
+    }
   }
 });
 

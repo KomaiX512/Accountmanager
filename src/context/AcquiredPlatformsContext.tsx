@@ -3,6 +3,7 @@ import { useAuth } from './AuthContext';
 import { useInstagram } from './InstagramContext';
 import { useTwitter } from './TwitterContext';
 import { useFacebook } from './FacebookContext';
+import { useLinkedIn } from './LinkedInContext';
 
 export interface PlatformInfo {
   id: string;
@@ -35,6 +36,7 @@ export const AcquiredPlatformsProvider: React.FC<{ children: React.ReactNode }> 
   const { hasAccessed: hasAccessedInstagram } = useInstagram();
   const { hasAccessed: hasAccessedTwitter } = useTwitter();
   const { hasAccessed: hasAccessedFacebook } = useFacebook();
+  const { hasAccessed: hasAccessedLinkedIn } = useLinkedIn();
 
   const refreshPlatforms = () => {
     if (!currentUser?.uid) {
@@ -110,11 +112,12 @@ export const AcquiredPlatformsProvider: React.FC<{ children: React.ReactNode }> 
       });
     }
     
-    // LinkedIn access - only localStorage (no context available)
+    // LinkedIn access - prioritize localStorage for persistence
     const linkedinAccessed = 
       localStorage.getItem(`linkedin_accessed_${currentUser.uid}`) === 'true' ||
       sessionStorage.getItem(`linkedin_accessed_${currentUser.uid}`) === 'true' ||
-      consolidatedList.includes('linkedin');
+      consolidatedList.includes('linkedin') ||
+      hasAccessedLinkedIn;
     
     if (linkedinAccessed) {
       localStorage.setItem(`linkedin_accessed_${currentUser.uid}`, 'true');
@@ -146,7 +149,7 @@ export const AcquiredPlatformsProvider: React.FC<{ children: React.ReactNode }> 
     if (currentUser?.uid) {
       refreshPlatforms();
     }
-  }, [hasAccessedInstagram, hasAccessedTwitter, hasAccessedFacebook]);
+  }, [hasAccessedInstagram, hasAccessedTwitter, hasAccessedFacebook, hasAccessedLinkedIn]);
 
   // Listen for localStorage changes (cross-tab synchronization)
   useEffect(() => {

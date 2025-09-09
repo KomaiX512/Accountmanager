@@ -5,11 +5,11 @@ const PerformanceOptimizer: React.FC = () => {
     // Preload critical resources
     const preloadCriticalResources = () => {
       // Preload critical CSS only in development and only when actually needed
-      if (import.meta.env && import.meta.env.DEV && location.hostname === 'localhost') {
+  if (false) {
         // Check if the CSS file exists before preloading
         const criticalCSS = document.createElement('link');
         criticalCSS.rel = 'preload';
-        criticalCSS.href = '/src/styles/global-ui-refinements.css';
+  criticalCSS.href = '';
         criticalCSS.as = 'style';
         criticalCSS.onload = function() { 
           // Convert to stylesheet after load to avoid unused preload warning

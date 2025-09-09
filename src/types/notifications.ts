@@ -33,7 +33,7 @@ export interface Notification {
     sendStatus?: string;
     sendError?: string;
   };
-  platform?: 'instagram' | 'twitter' | 'facebook';
+  platform?: 'instagram' | 'twitter' | 'facebook' | 'linkedin';
 }
 
 export interface ProfileInfo {

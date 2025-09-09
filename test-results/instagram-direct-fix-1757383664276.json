@@ -1,0 +1,160 @@
+{
+  "timestamp": "2025-09-09T02:07:44.276Z",
+  "testSuites": [
+    {
+      "name": "Direct Graph API Access",
+      "tests": [
+        {
+          "username": "maccosmetics",
+          "status": "error",
+          "duration": 8,
+          "passed": false,
+          "reason": "connect ECONNREFUSED ::1:3000",
+          "error": "ECONNREFUSED"
+        },
+        {
+          "username": "fentybeauty",
+          "status": "error",
+          "duration": 1,
+          "passed": false,
+          "reason": "connect ECONNREFUSED ::1:3000",
+          "error": "ECONNREFUSED"
+        },
+        {
+          "username": "nonexistent_account_xyz",
+          "status": "error",
+          "duration": 1,
+          "passed": false,
+          "reason": "connect ECONNREFUSED ::1:3000",
+          "error": "ECONNREFUSED"
+        },
+        {
+          "username": "narsissist",
+          "status": "error",
+          "duration": 1,
+          "passed": false,
+          "reason": "connect ECONNREFUSED ::1:3000",
+          "error": "ECONNREFUSED"
+        }
+      ],
+      "summary": {
+        "passed": 0,
+        "failed": 4,
+        "totalTime": 10.575136005878448
+      }
+    },
+    {
+      "name": "Alias Mapping Validation",
+      "tests": [
+        {
+          "test": "narsissist → maccosmetics mapping",
+          "duration": 0,
+          "passed": false,
+          "reason": "connect ECONNREFUSED ::1:3000",
+          "error": "ECONNREFUSED"
+        }
+      ],
+      "summary": {
+        "passed": 0,
+        "failed": 1,
+        "totalTime": 0
+      }
+    },
+    {
+      "name": "Circuit Breaker Validation",
+      "tests": [
+        {
+          "test": "Circuit breaker behavior",
+          "totalRequests": 10,
+          "errorResponses": 0,
+          "circuitBreakerTriggered": false,
+          "fallbacksDetected": false,
+          "duration": 4,
+          "passed": true,
+          "reason": "No fallbacks detected - correct behavior"
+        }
+      ],
+      "summary": {
+        "passed": 1,
+        "failed": 0,
+        "totalTime": 3.967539995908737
+      }
+    },
+    {
+      "name": "Concurrent Request Handling",
+      "tests": [
+        {
+          "test": "Concurrent requests",
+          "duration": 0,
+          "passed": false,
+          "reason": "connect ECONNREFUSED ::1:3000",
+          "error": "ECONNREFUSED"
+        }
+      ],
+      "summary": {
+        "passed": 0,
+        "failed": 1,
+        "totalTime": 0
+      }
+    },
+    {
+      "name": "Cache Behavior Validation",
+      "tests": [
+        {
+          "test": "Cache behavior",
+          "duration": 0,
+          "passed": false,
+          "reason": "connect ECONNREFUSED ::1:3000",
+          "error": "ECONNREFUSED"
+        }
+      ],
+      "summary": {
+        "passed": 0,
+        "failed": 1,
+        "totalTime": 0
+      }
+    },
+    {
+      "name": "Error Handling Validation",
+      "tests": [
+        {
+          "scenario": "Empty username",
+          "username": "",
+          "duration": 1,
+          "passed": false,
+          "reason": "connect ECONNREFUSED ::1:3000",
+          "error": "ECONNREFUSED"
+        },
+        {
+          "scenario": "Extremely long username",
+          "username": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "duration": 0,
+          "passed": false,
+          "reason": "connect ECONNREFUSED ::1:3000",
+          "error": "ECONNREFUSED"
+        },
+        {
+          "scenario": "Invalid characters in username",
+          "username": "invalid@username!",
+          "duration": 0,
+          "passed": false,
+          "reason": "connect ECONNREFUSED ::1:3000",
+          "error": "ECONNREFUSED"
+        }
+      ],
+      "summary": {
+        "passed": 0,
+        "failed": 3,
+        "totalTime": 0
+      }
+    }
+  ],
+  "metrics": {
+    "totalRequests": 11,
+    "successfulRequests": 1,
+    "failedRequests": 10,
+    "averageResponseTime": 1,
+    "graphApiSuccessRate": 9,
+    "fallbackAttempts": 0
+  }
+}

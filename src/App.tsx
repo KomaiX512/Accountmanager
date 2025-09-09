@@ -13,6 +13,7 @@ import Facebook from './pages/Facebook';
 import LinkedIn from './pages/LinkedIn';
 import Dashboard from './components/instagram/Dashboard';
 import PlatformDashboard from './components/dashboard/PlatformDashboard';
+import LinkedInDashboard from './components/linkedin/LinkedInDashboard';
 import MainDashboard from './components/dashboard/MainDashboard';
 import Homepage from './components/homepage/Homepage';
 import PrivacyPolicy from './components/legal/PrivacyPolicy';
@@ -326,7 +327,7 @@ const AppContent: React.FC = () => {
   const [chatModalData, setChatModalData] = useState<{
     isOpen: boolean;
     messages: ChatModalMessage[];
-    platform: 'instagram' | 'twitter' | 'facebook';
+    platform: 'instagram' | 'twitter' | 'facebook' | 'linkedin';
     isProcessing?: boolean;
     quotaInfo?: {
       exhausted: boolean;
@@ -349,7 +350,7 @@ const AppContent: React.FC = () => {
   // Function to handle opening chat from MessagesPopup
   const handleOpenChatFromMessages = (messageContent: string, platform?: string) => {
     // Use the platform passed from component, or fall back to current platform
-    const targetPlatform = platform || (currentPlatform as 'instagram' | 'twitter' | 'facebook') || 'instagram';
+    const targetPlatform = platform || (currentPlatform as 'instagram' | 'twitter' | 'facebook' | 'linkedin') || 'instagram';
     
     if (messageContent.trim() === '') {
       
@@ -365,7 +366,7 @@ const AppContent: React.FC = () => {
           setChatModalData({
             isOpen: true,
             messages: convertedMessages,
-            platform: targetPlatform as 'instagram' | 'twitter' | 'facebook',
+            platform: targetPlatform as 'instagram' | 'twitter' | 'facebook' | 'linkedin',
             quotaInfo: null,
             usingFallbackProfile: false
           });
@@ -376,7 +377,7 @@ const AppContent: React.FC = () => {
           setChatModalData({
             isOpen: true,
             messages: [],
-            platform: targetPlatform as 'instagram' | 'twitter' | 'facebook',
+            platform: targetPlatform as 'instagram' | 'twitter' | 'facebook' | 'linkedin',
             quotaInfo: null,
             usingFallbackProfile: false
           });
@@ -402,7 +403,7 @@ const AppContent: React.FC = () => {
           setChatModalData({
             isOpen: true,
             messages: allMessages,
-            platform: targetPlatform as 'instagram' | 'twitter' | 'facebook',
+            platform: targetPlatform as 'instagram' | 'twitter' | 'facebook' | 'linkedin',
             quotaInfo: null,
             usingFallbackProfile: false
           });
@@ -418,7 +419,7 @@ const AppContent: React.FC = () => {
           setChatModalData({
             isOpen: true,
             messages: [assistantMessage],
-            platform: targetPlatform as 'instagram' | 'twitter' | 'facebook',
+            platform: targetPlatform as 'instagram' | 'twitter' | 'facebook' | 'linkedin',
             quotaInfo: null,
             usingFallbackProfile: false
           });
@@ -463,7 +464,7 @@ const AppContent: React.FC = () => {
   const shouldHideLeftBar = !isPlatformDashboard;
 
   // Determine current platform based on route with more robust detection
-  const getCurrentPlatform = (): 'instagram' | 'twitter' | 'facebook' => {
+  const getCurrentPlatform = (): 'instagram' | 'twitter' | 'facebook' | 'linkedin' => {
     const path = location.pathname;
     
     // Exact matches first (most reliable)
@@ -473,6 +474,9 @@ const AppContent: React.FC = () => {
     if (path === '/twitter' || path === '/twitter-dashboard' || path === '/twitter-non-branding-dashboard') {
       return 'twitter';
     }
+    if (path === '/linkedin' || path === '/linkedin-dashboard' || path === '/linkedin-non-branding-dashboard') {
+      return 'linkedin';
+    }
     if (path === '/instagram' || path === '/dashboard' || path === '/non-branding-dashboard') {
       return 'instagram';
     }
@@ -480,6 +484,7 @@ const AppContent: React.FC = () => {
     // Fallback to includes check with proper order (more specific first)
     if (path.includes('facebook')) return 'facebook';
     if (path.includes('twitter')) return 'twitter';
+    if (path.includes('linkedin')) return 'linkedin';
     
     // Default to instagram for any other case
     return 'instagram';
@@ -604,7 +609,8 @@ const AppContent: React.FC = () => {
     
     // ✅ CRITICAL FIX: Detect platform mismatch to trigger account reload
     const currentUrlPlatform = location.pathname.includes('twitter') ? 'twitter' : 
-                              location.pathname.includes('facebook') ? 'facebook' : 'instagram';
+                              location.pathname.includes('facebook') ? 'facebook' : 
+                              location.pathname.includes('linkedin') ? 'linkedin' : 'instagram';
     
     const accountPlatform = location.state?.platform || getCurrentPlatform();
     
@@ -614,6 +620,33 @@ const AppContent: React.FC = () => {
                               !location.state?.accountHolder;
     
     if (needsAccountReload) {
+      // ✅ LINKEDIN OPTIMIZATION: Skip account loading if LinkedIn and we have complete local data
+      const isLinkedInDashboard = location.pathname.includes('linkedin');
+      if (isLinkedInDashboard) {
+        const uid = currentUser?.uid;
+        const localLinkedInUsername = uid ? localStorage.getItem(`linkedin_username_${uid}`) : null;
+        const localLinkedInAccessed = uid ? localStorage.getItem(`linkedin_accessed_${uid}`) : null;
+        
+        // Only skip if we have BOTH username AND accessed flag (indicating complete setup)
+        if (localLinkedInUsername && localLinkedInAccessed && localLinkedInUsername.trim() !== '') {
+          console.log(`[App] ⚡ LinkedIn optimization: Using cached data for direct dashboard access`);
+          const localCompetitors = uid ? JSON.parse(localStorage.getItem(`linkedin_competitors_${uid}`) || '[]') : [];
+          const localAccountType = uid ? localStorage.getItem(`linkedin_account_type_${uid}`) || 'branding' : 'branding';
+          
+          safeNavigate(navigate, location.pathname, {
+            state: {
+              accountHolder: localLinkedInUsername,
+              competitors: localCompetitors,
+              accountType: localAccountType,
+              platform: 'linkedin'
+            }
+          });
+          return;
+        } else {
+          console.log(`[App] 🔄 LinkedIn needs account setup: username=${localLinkedInUsername}, accessed=${localLinkedInAccessed}`);
+        }
+      }
+      
       reloadCountRef.current += 1;
       console.log(`[App] 🔄 Triggering account reload #${reloadCountRef.current}: accountHolder=${accountHolder}, urlPlatform=${currentUrlPlatform}, accountPlatform=${accountPlatform}`);
       reloadInProgressRef.current = true;
@@ -625,15 +658,18 @@ const AppContent: React.FC = () => {
           // ✅ ENHANCED: Determine which platform to check based on URL
           const isTwitterDashboard = location.pathname.includes('twitter');
           const isFacebookDashboard = location.pathname.includes('facebook');
+          const isLinkedInDashboard = location.pathname.includes('linkedin');
           
           const endpoint = isTwitterDashboard 
             ? `/api/user-twitter-status/${currentUser.uid}`
             : isFacebookDashboard
             ? `/api/user-facebook-status/${currentUser.uid}`
+            : isLinkedInDashboard
+            ? `/api/user-linkedin-status/${currentUser.uid}`
             : `/api/user-instagram-status/${currentUser.uid}`;
           const tsEndpoint = `${endpoint}${endpoint.includes('?') ? '&' : '?'}ts=${Date.now()}`;
           
-          console.log(`[App] 🔄 Loading account info for platform: ${isTwitterDashboard ? 'Twitter' : isFacebookDashboard ? 'Facebook' : 'Instagram'}`);
+          console.log(`[App] 🔄 Loading account info for platform: ${isTwitterDashboard ? 'Twitter' : isFacebookDashboard ? 'Facebook' : isLinkedInDashboard ? 'LinkedIn' : 'Instagram'}`);
           
           const response = await axios.get(tsEndpoint, { headers: { 'Accept': 'application/json' } });
           
@@ -646,6 +682,8 @@ const AppContent: React.FC = () => {
             ? response.data.hasEnteredTwitterUsername
             : isFacebookDashboard
             ? response.data.hasEnteredFacebookUsername
+            : isLinkedInDashboard
+            ? response.data.hasEnteredLinkedInUsername
             : response.data.hasEnteredInstagramUsername;
           
           if (hasEnteredUsername) {
@@ -653,11 +691,13 @@ const AppContent: React.FC = () => {
               ? response.data.twitter_username
               : isFacebookDashboard
               ? response.data.facebook_username
+              : isLinkedInDashboard
+              ? response.data.linkedin_username
               : response.data.instagram_username;
             
             // ✅ CRITICAL FIX: Immediately sync backend claimed status to localStorage for cross-device sync
             // This prevents the issue where Device B shows entry form while Device A shows dashboard
-            const platformKey = isTwitterDashboard ? 'twitter' : isFacebookDashboard ? 'facebook' : 'instagram';
+            const platformKey = isTwitterDashboard ? 'twitter' : isFacebookDashboard ? 'facebook' : isLinkedInDashboard ? 'linkedin' : 'instagram';
             const uid = currentUser.uid;
             localStorage.setItem(`${platformKey}_accessed_${uid}`, 'true');
             console.log(`[App] 🔄 CROSS-DEVICE SYNC: Platform ${platformKey} marked as accessed in localStorage for user ${uid}`);
@@ -674,7 +714,7 @@ const AppContent: React.FC = () => {
             // ✅ ENHANCED: Get competitors from AccountInfo for all platforms
             let savedCompetitors: string[] = [];
             try {
-              const platform = isTwitterDashboard ? 'twitter' : isFacebookDashboard ? 'facebook' : 'instagram';
+              const platform = isTwitterDashboard ? 'twitter' : isFacebookDashboard ? 'facebook' : isLinkedInDashboard ? 'linkedin' : 'instagram';
               const accountInfoUrl = `/api/retrieve-account-info/${savedUsername}?platform=${platform}`;
               const accountInfoResponse = await axios.get(`${accountInfoUrl}&ts=${Date.now()}`, { headers: { 'Accept': 'application/json' } });
               savedCompetitors = accountInfoResponse.data.competitors || [];
@@ -694,7 +734,7 @@ const AppContent: React.FC = () => {
             localStorage.setItem(`${platformKey}_account_type_${uid}`, savedAccountType);
             console.log(`[App] 🔄 CROSS-DEVICE SYNC: Account type ${savedAccountType} synced to localStorage for ${platformKey}`);
             
-            console.log(`[App] ✅ Retrieved saved ${isTwitterDashboard ? 'Twitter' : isFacebookDashboard ? 'Facebook' : 'Instagram'} data for ${currentUser.uid}:`, {
+            console.log(`[App] ✅ Retrieved saved ${isTwitterDashboard ? 'Twitter' : isFacebookDashboard ? 'Facebook' : isLinkedInDashboard ? 'LinkedIn' : 'Instagram'} data for ${currentUser.uid}:`, {
               username: savedUsername,
               accountType: savedAccountType,
               competitors: savedCompetitors
@@ -706,13 +746,13 @@ const AppContent: React.FC = () => {
                 accountHolder: savedUsername,
                 competitors: savedCompetitors,
                 accountType: savedAccountType,
-                platform: isTwitterDashboard ? 'twitter' : isFacebookDashboard ? 'facebook' : 'instagram'
+                platform: isTwitterDashboard ? 'twitter' : isFacebookDashboard ? 'facebook' : isLinkedInDashboard ? 'linkedin' : 'instagram'
               },
               replace: true
             }, 5); // Medium priority for user data loading
           } else {
             // Backend says not set up; fall back to local cache before redirecting
-            const platformKey = isTwitterDashboard ? 'twitter' : isFacebookDashboard ? 'facebook' : 'instagram';
+            const platformKey = isTwitterDashboard ? 'twitter' : isFacebookDashboard ? 'facebook' : isLinkedInDashboard ? 'linkedin' : 'instagram';
             const uid = currentUser.uid;
             try {
               const hasAccessed = localStorage.getItem(`${platformKey}_accessed_${uid}`) === 'true';
@@ -788,12 +828,12 @@ const AppContent: React.FC = () => {
             // ✅ CRITICAL FIX: If we reach here, the platform is truly not set up
             // Redirect to setup page
             console.log(`[App] 🚫 Platform ${platformKey} not set up on backend or in local cache - redirecting to setup`);
-            safeNavigate(navigate, location.pathname.includes('twitter') ? '/twitter' : location.pathname.includes('facebook') ? '/facebook' : '/instagram', {}, 5);
+            safeNavigate(navigate, location.pathname.includes('twitter') ? '/twitter' : location.pathname.includes('facebook') ? '/facebook' : location.pathname.includes('linkedin') ? '/linkedin' : '/instagram', {}, 5);
           }
         } catch (error) {
           console.error(`[App] ❌ Error fetching user status:`, error);
           // Network or server error; fall back to cached platform state before redirecting
-          const platformKey = location.pathname.includes('twitter') ? 'twitter' : location.pathname.includes('facebook') ? 'facebook' : 'instagram';
+          const platformKey = location.pathname.includes('twitter') ? 'twitter' : location.pathname.includes('facebook') ? 'facebook' : location.pathname.includes('linkedin') ? 'linkedin' : 'instagram';
           const uid = currentUser.uid;
           try {
             const hasAccessed = localStorage.getItem(`${platformKey}_accessed_${uid}`) === 'true';
@@ -855,7 +895,7 @@ const AppContent: React.FC = () => {
           // ✅ CRITICAL FIX: If we reach here, the platform is truly not set up
           // Redirect to setup page
           console.log(`[App] 🚫 Platform ${platformKey} not set up in local cache - redirecting to setup`);
-          safeNavigate(navigate, location.pathname.includes('twitter') ? '/twitter' : location.pathname.includes('facebook') ? '/facebook' : '/instagram', {}, 5);
+          safeNavigate(navigate, location.pathname.includes('twitter') ? '/twitter' : location.pathname.includes('facebook') ? '/facebook' : location.pathname.includes('linkedin') ? '/linkedin' : '/instagram', {}, 5);
         } finally {
           setIsLoadingUserData(false);
           reloadInProgressRef.current = false; // Reset the flag
@@ -878,7 +918,8 @@ const AppContent: React.FC = () => {
   if (isLoadingUserData) {
     // ✅ ENHANCED: Show which platform is being loaded
     const currentPlatformName = location.pathname.includes('twitter') ? 'Twitter' : 
-                               location.pathname.includes('facebook') ? 'Facebook' : 'Instagram';
+                               location.pathname.includes('facebook') ? 'Facebook' : 
+                               location.pathname.includes('linkedin') ? 'LinkedIn' : 'Instagram';
     
     // Platform-specific colors and icons
     const getPlatformStyles = () => {
@@ -898,6 +939,14 @@ const AppContent: React.FC = () => {
             accentColor: '#E7F3FF',
             icon: '/icons/facebook.svg',
             gradient: 'linear-gradient(135deg, #1877F2 0%, #0D5BB8 100%)'
+          };
+        case 'linkedin':
+          return {
+            primaryColor: '#0A66C2',
+            secondaryColor: '#0B1F2A',
+            accentColor: '#E8F0FE',
+            icon: '/icons/linkedin.svg',
+            gradient: 'linear-gradient(135deg, #0A66C2 0%, #004182 100%)'
           };
         default: // Instagram
           return {
@@ -939,7 +988,8 @@ const AppContent: React.FC = () => {
                   color: ${platformStyles.primaryColor};
                 `;
                 fallback.textContent = currentPlatformName === 'Twitter' ? '🐦' : 
-                                      currentPlatformName === 'Facebook' ? '📘' : '📷';
+                                      currentPlatformName === 'Facebook' ? '📘' :
+                                      currentPlatformName === 'LinkedIn' ? '🔗' : '📷';
                 target.parentNode?.appendChild(fallback);
               }}
             />
@@ -1147,11 +1197,8 @@ const AppContent: React.FC = () => {
                 path="/linkedin-dashboard"
                 element={
                   <PrivateRoute>
-                    <PlatformDashboard 
+                    <LinkedInDashboard 
                       accountHolder={accountHolder} 
-                      competitors={competitors} 
-                      accountType={accountType || 'professional'}
-                      platform="linkedin"
                       onOpenChat={handleOpenChatFromMessages}
                     />
                   </PrivateRoute>
@@ -1161,11 +1208,8 @@ const AppContent: React.FC = () => {
                 path="/linkedin-non-branding-dashboard"
                 element={
                   <PrivateRoute>
-                    <PlatformDashboard 
+                    <LinkedInDashboard 
                       accountHolder={accountHolder} 
-                      competitors={competitors} 
-                      accountType="personal"
-                      platform="linkedin"
                       onOpenChat={handleOpenChatFromMessages}
                     />
                   </PrivateRoute>

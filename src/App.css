@@ -1,3 +1,6 @@
+/* === CSS IMPORTS (must be first) === */
+@import url('./styles/image-optimization.css');
+
 .app-container {
   display: flex;
   width: 100%;
@@ -7,7 +10,7 @@
   box-sizing: border-box;
 }
 
-/* DEPRECATED: Left bar styles moved to LeftBar.css for professional implementation */F
+/* DEPRECATED: Left bar styles moved to LeftBar.css for professional implementation */
 /* These legacy styles are disabled to prevent conflicts with the new viewport-locked design */
 
 .left-bar svg {
@@ -33,8 +36,7 @@
   box-sizing: border-box;
 }
 
-/* === CSS IMPORTS === */
-@import url('./styles/image-optimization.css');
+/* imports moved to top to satisfy CSS rules */
 
 .App {
   display: flex;
@@ -75,17 +77,15 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh;
+  min-height: 300px;
   width: 100%;
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
   color: #e0e0ff;
   font-size: 1.2rem;
   font-weight: 500;
   text-align: center;
-  z-index: 1000;
-  position: fixed;
-  top: 0;
-  left: 0;
+  z-index: 1;
+  position: relative;
   margin: 0 auto;
   overflow: hidden;
 }

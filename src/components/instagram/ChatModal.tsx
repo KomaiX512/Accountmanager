@@ -21,7 +21,7 @@ export interface ChatModalProps {
   username?: string;
   isProcessing?: boolean;
   linkedAccounts?: LinkedAccount[];
-  platform?: 'instagram' | 'twitter' | 'facebook';
+  platform?: 'instagram' | 'twitter' | 'facebook' | 'linkedin';
 }
 
 const ChatModal: React.FC<ChatModalProps> = ({
@@ -62,6 +62,13 @@ const ChatModal: React.FC<ChatModalProps> = ({
       urlPattern: /https:\/\/facebook\.com\/([A-Za-z0-9_.-]+)/g,
       usernamePrefix: '',
       displayName: 'Facebook Profile'
+  },
+    linkedin: {
+      name: 'LinkedIn',
+      baseUrl: 'https://www.linkedin.com/in/',
+      urlPattern: /https:\/\/www\.linkedin\.com\/(in|company)\/([A-Za-z0-9_.-]+)/g,
+      usernamePrefix: '',
+      displayName: 'LinkedIn Profile'
     }
   }[platform];
 
@@ -90,6 +97,11 @@ const ChatModal: React.FC<ChatModalProps> = ({
         `What are trending Facebook topics for ${username}?`,
         `How can we increase Facebook engagement?`,
         `Suggest Facebook post ideas for ${username}`
+  ],
+      linkedin: [
+        `Draft a LinkedIn post for ${username} that positions us as thought leaders`,
+        `What LinkedIn content would engage B2B audiences for ${username}?`,
+        `Propose 3 ideas for a LinkedIn article for ${username}`
       ]
     };
 

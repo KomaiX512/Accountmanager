@@ -3,7 +3,7 @@
 
 export type ScheduleJob = {
   id?: string;
-  platform?: 'instagram' | 'twitter' | 'facebook' | string;
+  platform?: 'instagram' | 'twitter' | 'facebook' | 'linkedin' | string;
   time?: string | number | Date;
   payload?: any;
 };

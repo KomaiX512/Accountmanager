@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useInstagram } from '../context/InstagramContext';
 import { useTwitter } from '../context/TwitterContext';
 import { useFacebook } from '../context/FacebookContext';
+import { useLinkedIn } from '../context/LinkedInContext';
 
 /**
  * Hook for getting platform acquisition status directly matching MainDashboard logic
@@ -14,6 +15,7 @@ export const usePlatformStatus = () => {
   const { hasAccessed: hasAccessedInstagram, isConnected: isInstagramConnected, userId: instagramUserId } = useInstagram();
   const { hasAccessed: hasAccessedTwitter, isConnected: isTwitterConnected, userId: twitterUserId } = useTwitter();
   const { hasAccessed: hasAccessedFacebook, isConnected: isFacebookConnected, userId: facebookUserId } = useFacebook();
+  const { hasAccessed: hasAccessedLinkedIn, isConnected: isLinkedInConnected, userId: linkedInUserId } = useLinkedIn();
   
   // ✅ CRITICAL FIX: Force re-render when platform status changes
   const [forceUpdate, setForceUpdate] = useState(0);
@@ -21,7 +23,7 @@ export const usePlatformStatus = () => {
   // ✅ PLATFORM RESET EVENT LISTENER: Listen for platform reset events from loading state exit
   useEffect(() => {
     const handlePlatformReset = (event: CustomEvent) => {
-      const { platform, reason, timestamp } = event.detail;
+      const { platform, reason } = event.detail;
       console.log(`[usePlatformStatus] 🔥 Platform reset event received: ${platform} (${reason})`);
       
       if (currentUser?.uid) {
@@ -49,10 +51,11 @@ export const usePlatformStatus = () => {
     if (platformId === 'instagram') accessedFromContext = hasAccessedInstagram;
     if (platformId === 'twitter') accessedFromContext = hasAccessedTwitter;
     if (platformId === 'facebook') accessedFromContext = hasAccessedFacebook;
+    if (platformId === 'linkedin') accessedFromContext = hasAccessedLinkedIn;
     
     // If either localStorage or context shows accessed, return true
     return accessedFromStorage || accessedFromContext;
-  }, [currentUser?.uid, hasAccessedInstagram, hasAccessedTwitter, hasAccessedFacebook, forceUpdate]); // ✅ Added forceUpdate dependency
+  }, [currentUser?.uid, hasAccessedInstagram, hasAccessedTwitter, hasAccessedFacebook, hasAccessedLinkedIn, forceUpdate]); // ✅ Added forceUpdate dependency
 
   // ✅ EXACT SAME LOGIC AS MAINDASHBOARD - Platform connection status
   const getPlatformConnectionStatus = useCallback((platformId: string): boolean => {
@@ -64,11 +67,11 @@ export const usePlatformStatus = () => {
       case 'facebook':
         return isFacebookConnected && Boolean(facebookUserId);
       case 'linkedin':
-        return false; // Not yet implemented
+        return isLinkedInConnected && Boolean(linkedInUserId);
       default:
         return false;
     }
-  }, [isInstagramConnected, isTwitterConnected, isFacebookConnected, instagramUserId, twitterUserId, facebookUserId, forceUpdate]); // ✅ Added forceUpdate dependency
+  }, [isInstagramConnected, isTwitterConnected, isFacebookConnected, isLinkedInConnected, instagramUserId, twitterUserId, facebookUserId, linkedInUserId, forceUpdate]); // ✅ Added forceUpdate dependency
 
   // ✅ GET ACQUIRED PLATFORMS - Simple logic: claimed = acquired
   const getAcquiredPlatforms = useCallback(() => {

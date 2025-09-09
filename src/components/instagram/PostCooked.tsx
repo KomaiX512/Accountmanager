@@ -12,6 +12,7 @@ import FacebookRequiredButton from '../common/FacebookRequiredButton';
 import { useInstagram } from '../../context/InstagramContext';
 import { useTwitter } from '../../context/TwitterContext';
 import { useFacebook } from '../../context/FacebookContext';
+import { useLinkedIn } from '../../context/LinkedInContext';
 import { schedulePost, fetchImageFromR2 } from '../../utils/scheduleHelpers';
 import axios from 'axios';
 import { safeFilter } from '../../utils/safeArrayUtils';
@@ -34,7 +35,7 @@ interface PostCookedProps {
   profilePicUrl: string;
   posts?: { key: string; data: { post: any; status: string; image_url: string; r2_image_url?: string; image_path?: string; isEdited?: boolean }; imageFailed?: boolean }[];
   userId?: string;
-  platform?: 'instagram' | 'twitter' | 'facebook';
+  platform?: 'instagram' | 'twitter' | 'facebook' | 'linkedin';
 }
 
 // Define an interface for image error state
@@ -54,11 +55,24 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   const { isConnected: isInstagramConnected, userId: instagramUserId } = useInstagram();
   const { isConnected: isTwitterConnected, userId: twitterUserId } = useTwitter();
   const { isConnected: isFacebookConnected, userId: facebookUserId } = useFacebook();
+  const { isConnected: isLinkedInConnected, userId: linkedinUserId } = useLinkedIn();
   const { trackRealPostCreation, canUseFeature } = useFeatureTracking();
   
   // Determine platform-specific values
-  const isConnected = platform === 'twitter' ? isTwitterConnected : platform === 'facebook' ? isFacebookConnected : isInstagramConnected;
-  const contextUserId = platform === 'twitter' ? twitterUserId : platform === 'facebook' ? facebookUserId : instagramUserId;
+  const isConnected = platform === 'twitter'
+    ? isTwitterConnected
+    : platform === 'facebook'
+    ? isFacebookConnected
+    : platform === 'linkedin'
+    ? isLinkedInConnected
+    : isInstagramConnected;
+  const contextUserId = platform === 'twitter'
+    ? twitterUserId
+    : platform === 'facebook'
+    ? facebookUserId
+    : platform === 'linkedin'
+    ? linkedinUserId
+    : instagramUserId;
   const userId = propUserId || (isConnected ? (contextUserId ?? undefined) : undefined);
 
   const [localPosts, setLocalPosts] = useState<typeof posts>([]);
@@ -1538,7 +1552,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
 
     // ✅ PRE-VALIDATION: Check if user is connected for this platform
     if (!isConnected) {
-      setToastMessage(`❌ Please connect your ${platform === 'twitter' ? 'Twitter' : platform === 'facebook' ? 'Facebook' : 'Instagram'} account first.`);
+  setToastMessage(`❌ Please connect your ${platform === 'twitter' ? 'Twitter' : platform === 'facebook' ? 'Facebook' : platform === 'linkedin' ? 'LinkedIn' : 'Instagram'} account first.`);
       return;
     }
 
@@ -2639,10 +2653,6 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                           minHeight: '450px'
                         }}
                         // Smart optimization settings
-                        quality={0.8}
-                        maxWidth={window.innerWidth <= 768 ? 600 : 800}
-                        enableOptimization={true}
-                        enableWebP={true}
                       />
                     );
                   })()}

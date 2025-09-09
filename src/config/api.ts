@@ -48,7 +48,6 @@ export const API_CONFIG = {
     INSTAGRAM_CONNECTION: '/api/instagram-connection',
     TWITTER_CONNECTION: '/api/twitter-connection',
     FACEBOOK_CONNECTION: '/api/facebook-connection',
-    LINKEDIN_CONNECTION: '/api/linkedin-connection',
     // Scheduling and posting
     SCHEDULE_TWEET: '/api/schedule-tweet',
     SCHEDULE_TWEET_WITH_IMAGE: '/api/schedule-tweet-with-image',

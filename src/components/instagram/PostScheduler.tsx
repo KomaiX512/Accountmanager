@@ -11,7 +11,7 @@ import useFeatureTracking from '../../hooks/useFeatureTracking';
 interface PostSchedulerProps {
   userId: string;
   onClose: () => void;
-  platform?: 'instagram' | 'twitter' | 'facebook';
+  platform?: 'instagram' | 'twitter' | 'facebook' | 'linkedin';
 }
 
 interface FormData {
@@ -132,7 +132,7 @@ const PostScheduler: React.FC<PostSchedulerProps> = ({ userId, onClose, platform
         </h2>
         {!userIdToUse ? (
           <div className="instagram-not-connected">
-            <p>Connect your Instagram account to schedule posts.</p>
+            <p>Connect your {platform === 'instagram' ? 'Instagram' : platform === 'twitter' ? 'Twitter' : platform === 'linkedin' ? 'LinkedIn' : 'Facebook'} account to schedule posts.</p>
             <button
               type="button"
               onClick={onClose}

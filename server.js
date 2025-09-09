@@ -24,6 +24,8 @@ if (DEBUG_LOGS) console.log('Setting up server with proxy endpoints...');
 // Enterprise-grade process management
 let server;
 let isShuttingDown = false;
+// Circuit breaker for R2 availability to avoid repeated thrashing
+let r2UnavailableUntil = 0;
 
 // Graceful shutdown handler
 const gracefulShutdown = (signal) => {
@@ -98,12 +100,21 @@ const checkPortInUse = (port) => {
 };
 
 // Configure AWS SDK v3 (Enterprise-grade with connection pooling)
+const R2_ENDPOINT = process.env.R2_ENDPOINT || 'https://f049515e642b0c91e7679c3d80962686.r2.cloudflarestorage.com';
+const R2_REGION = process.env.R2_REGION || 'auto';
+const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID || '7e15d4a51abb43fff3a7da4a8813044f';
+const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY || '8fccd5540c85304347cbbd25d8e1f67776a8473c73c4a8811e83d0970bd461e2';
+
+if ((!process.env.R2_ENDPOINT || !process.env.R2_ACCESS_KEY_ID || !process.env.R2_SECRET_ACCESS_KEY) && DEBUG_LOGS) {
+  console.warn('[R2] Using fallback R2 credentials or endpoint from source. Set R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY in environment for production.');
+}
+
 const S3_CONFIG = {
-  endpoint: 'https://570f213f1410829ee9a733a77a5f40e3.r2.cloudflarestorage.com',
-  region: 'auto',
+  endpoint: R2_ENDPOINT,
+  region: R2_REGION,
   credentials: {
-    accessKeyId: '18f60c98e08f1a24040de7cb7aab646c',
-    secretAccessKey: '0a8c50865ecab3c410baec4d751f35493fd981f4851203fe205fe0f86063a5f6',
+    accessKeyId: R2_ACCESS_KEY_ID,
+    secretAccessKey: R2_SECRET_ACCESS_KEY,
   },
   maxAttempts: 5,
   requestHandler: {
@@ -383,11 +394,13 @@ app.use((req, res, next) => {
   // Define allowed paths for proxy server (whitelist approach)
   const allowedPaths = [
     '/health',
+    '/api/health',  // Added for production monitoring
     // '/fix-image', // disabled
     '/r2-images',
     '/proxy-image',
     '/api/r2-image',
     '/api/signed-image-url',
+    '/api/avatar',  // Profile picture endpoint
     '/posts/',
     '/api/posts/',
     '/api/save-edited-post',
@@ -986,14 +999,23 @@ async function fetchImageWithFallbacks(key, fallbackImagePath = null, username =
   const shouldBypassCache = Boolean(cacheBustMatch) || key.toLowerCase().includes('nuclear') || key.toLowerCase().includes('reimagined') || key.toLowerCase().includes('force');
   
   // DEBUG: Log cache-busting detection
-  console.log(`[${new Date().toISOString()}] [IMAGE] 🔍 Cache-busting check for key: ${key}`);
-  console.log(`[${new Date().toISOString()}] [IMAGE] 🔍 Cache-busting match: ${cacheBustMatch ? 'YES' : 'NO'}`);
-  console.log(`[${new Date().toISOString()}] [IMAGE] 🔍 Has query params: ${hasQueryParams ? 'YES' : 'NO'}`);
-  console.log(`[${new Date().toISOString()}] [IMAGE] 🔍 Should bypass cache: ${shouldBypassCache ? 'YES' : 'NO'}`);
+  if (DEBUG_LOGS) {
+    console.log(`[${new Date().toISOString()}] [IMAGE] 🔍 Cache-busting check for key: ${key}`);
+    console.log(`[${new Date().toISOString()}] [IMAGE] 🔍 Cache-busting match: ${cacheBustMatch ? 'YES' : 'NO'}`);
+    console.log(`[${new Date().toISOString()}] [IMAGE] 🔍 Has query params: ${hasQueryParams ? 'YES' : 'NO'}`);
+    console.log(`[${new Date().toISOString()}] [IMAGE] 🔍 Should bypass cache: ${shouldBypassCache ? 'YES' : 'NO'}`);
+  }
   
   // Extract the clean key without cache-busting parameters
   const cleanKey = key.split('?')[0];
   const cacheKey = `r2_${cleanKey}`;
+
+  // Short-circuit if R2 is currently marked unavailable
+  if (r2UnavailableUntil > Date.now()) {
+    if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [IMAGE] R2 marked unavailable until ${new Date(r2UnavailableUntil).toISOString()} — returning placeholder for ${cleanKey}`);
+    const placeholderImage = generatePlaceholderImage(`R2 Unavailable`);
+    return { data: placeholderImage, source: 'placeholder-r2-unavailable' };
+  }
   
   // NUCLEAR CACHE-BUSTING: Skip cache if cache-busting parameters are present
   if (shouldBypassCache) {
@@ -1006,24 +1028,24 @@ async function fetchImageWithFallbacks(key, fallbackImagePath = null, username =
     const localCacheFilePath = path.join(localCacheDir, hashedKey);
     if (fs.existsSync(localCacheFilePath)) {
       fs.unlinkSync(localCacheFilePath);
-      console.log(`[${new Date().toISOString()}] [IMAGE] 🧹 Removed local cache file: ${localCacheFilePath}`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE] 🧹 Removed local cache file: ${localCacheFilePath}`);
     }
   } else {
     // Normal cache check
     if (imageCache.has(cacheKey)) {
       const { data, timestamp } = imageCache.get(cacheKey);
       if (Date.now() - timestamp < IMAGE_CACHE_TTL) {
-        console.log(`[${new Date().toISOString()}] [IMAGE] Using cached image for ${cleanKey}`);
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE] Using cached image for ${cleanKey}`);
         // Validate that cached data is a proper Buffer
         if (Buffer.isBuffer(data) && data.length > 0) {
           return { data, source: 'memory-cache' };
         } else {
-          console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid cached data type for ${cleanKey}, removing from cache`);
+          if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid cached data type for ${cleanKey}, removing from cache`);
           imageCache.delete(cacheKey);
         }
       } else {
         // Cache expired - remove it
-        console.log(`[${new Date().toISOString()}] [IMAGE] Cache expired for ${cleanKey}, removing`);
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE] Cache expired for ${cleanKey}, removing`);
         imageCache.delete(cacheKey);
       }
     }
@@ -1036,7 +1058,7 @@ async function fetchImageWithFallbacks(key, fallbackImagePath = null, username =
   try {
     // Try local file cache first (only if not bypassing cache)
     if (!shouldBypassCache && fs.existsSync(localCacheFilePath)) {
-      console.log(`[${new Date().toISOString()}] [IMAGE] Using local cached image for ${cleanKey}`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE] Using local cached image for ${cleanKey}`);
       const data = fs.readFileSync(localCacheFilePath);
       
       // Validate the cached file is a proper Buffer
@@ -1061,7 +1083,7 @@ async function fetchImageWithFallbacks(key, fallbackImagePath = null, username =
     }
     
     // If not in cache, fetch from R2 using the proper s3Client wrapper
-    console.log(`[${new Date().toISOString()}] [IMAGE] Fetching from R2: ${cleanKey}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE] Fetching from R2: ${cleanKey}`);
     
     // Use the s3Client wrapper (not getS3Client) for proper Buffer handling
     const data = await s3Client.getObject({
@@ -1077,7 +1099,7 @@ async function fetchImageWithFallbacks(key, fallbackImagePath = null, username =
     // Validate image data integrity (check for valid image headers)
     const isValidImage = validateImageBuffer(data.Body);
     if (!isValidImage) {
-      console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid image data detected for ${cleanKey}, not caching`);
+      if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid image data detected for ${cleanKey}, not caching`);
       return { data: data.Body, source: 'r2-invalid' };
     }
     
@@ -1100,9 +1122,22 @@ async function fetchImageWithFallbacks(key, fallbackImagePath = null, username =
   } catch (error) {
     console.error(`[${new Date().toISOString()}] [IMAGE] Error fetching from R2: ${cleanKey}`, error.message);
     
+    // If the failure indicates R2 is unavailable/misconfigured, avoid thrashing through hundreds of alternative keys.
+    try {
+      const rawMsg = (error && (error.message || (typeof error === 'string' ? error : ''))) + '';
+      const isR2Unavailable = /please enable r2|unknownendpoint|getaddrinfo\s+enotfound|econnrefused|invalidaccesskeyid|signaturedoesnotmatch|credentials|authentication/i.test(rawMsg);
+      if (isR2Unavailable) {
+        console.warn(`[${new Date().toISOString()}] [IMAGE] R2 appears unavailable ("${rawMsg.split('\n')[0]}") — skipping alternative key scanning`);
+        // Trip the circuit breaker for 2 minutes
+        r2UnavailableUntil = Date.now() + 2 * 60 * 1000;
+        const placeholderImage = generatePlaceholderImage(`R2 Unavailable`);
+        return { data: placeholderImage, source: 'placeholder-r2-unavailable' };
+      }
+    } catch { /* ignore detection errors and continue with normal fallbacks */ }
+
     // Try fallback image path if provided
     if (fallbackImagePath && fs.existsSync(fallbackImagePath)) {
-      console.log(`[${new Date().toISOString()}] [IMAGE] Using fallback image: ${fallbackImagePath}`);
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE] Using fallback image: ${fallbackImagePath}`);
       const data = fs.readFileSync(fallbackImagePath);
       
       // Validate fallback image
@@ -1132,13 +1167,25 @@ async function fetchImageWithFallbacks(key, fallbackImagePath = null, username =
       const baseDirs = ['ready_post', 'scheduled_posts'];
       const platformCandidates = Array.from(new Set([platformSeg, 'instagram', 'twitter', 'facebook']));
       
+      // Try multiple username case variants to handle case-sensitive R2 keys
+      const uname = String(username || '');
+      const titleCase = uname ? uname.charAt(0).toUpperCase() + uname.slice(1) : uname;
+      const usernameCandidates = Array.from(new Set([
+        uname,
+        uname.toLowerCase(),
+        uname.toUpperCase(),
+        titleCase,
+      ])).filter(Boolean);
+      
       // Derive baseName without extension (supports standard and campaign names)
       const baseName = filename.replace(/\.(jpg|jpeg|png|webp)$/i, '');
 
       for (const dir of baseDirs) {
         for (const plat of platformCandidates) {
-          for (const ext of exts) {
-            alternativeKeys.push(`${dir}/${plat}/${username}/${baseName}.${ext}`);
+          for (const userVariant of usernameCandidates) {
+            for (const ext of exts) {
+              alternativeKeys.push(`${dir}/${plat}/${userVariant}/${baseName}.${ext}`);
+            }
           }
         }
       }
@@ -1149,9 +1196,11 @@ async function fetchImageWithFallbacks(key, fallbackImagePath = null, username =
         const ts = parseInt(tsMatch[1]);
         for (const dir of baseDirs) {
           for (const plat of platformCandidates) {
-            for (const ext of exts) {
-              alternativeKeys.push(`${dir}/${plat}/${username}/${baseName.replace(/_(\d+)$/, `_${ts-1}`)}.${ext}`);
-              alternativeKeys.push(`${dir}/${plat}/${username}/${baseName.replace(/_(\d+)$/, `_${ts+1}`)}.${ext}`);
+            for (const userVariant of usernameCandidates) {
+              for (const ext of exts) {
+                alternativeKeys.push(`${dir}/${plat}/${userVariant}/${baseName.replace(/_(\d+)$/, `_${ts-1}`)}.${ext}`);
+                alternativeKeys.push(`${dir}/${plat}/${userVariant}/${baseName.replace(/_(\d+)$/, `_${ts+1}`)}.${ext}`);
+              }
             }
           }
         }
@@ -1161,7 +1210,7 @@ async function fetchImageWithFallbacks(key, fallbackImagePath = null, username =
       for (const altKey of alternativeKeys) {
         if (altKey === cleanKey) continue; // Skip the original key
         try {
-          console.log(`[${new Date().toISOString()}] [IMAGE] Trying alternative key: ${altKey}`);
+          if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE] Trying alternative key: ${altKey}`);
           const data = await s3Client.getObject({
             Bucket: 'tasks',
             Key: altKey
@@ -1169,7 +1218,7 @@ async function fetchImageWithFallbacks(key, fallbackImagePath = null, username =
 
           // Validate alternative image data
           if (!data || !data.Body || !Buffer.isBuffer(data.Body) || !validateImageBuffer(data.Body)) {
-            console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid alternative image data: ${altKey}`);
+            if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [IMAGE] Invalid alternative image data: ${altKey}`);
             continue;
           }
 
@@ -1189,7 +1238,7 @@ async function fetchImageWithFallbacks(key, fallbackImagePath = null, username =
     }
     
     // Generate placeholder as last resort
-    console.log(`[${new Date().toISOString()}] [IMAGE] Generating placeholder image for ${key}`);
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE] Generating placeholder image for ${key}`);
     const placeholderText = `Image Not Available${username ? `\n${username}` : ''}`;
     const placeholderImage = generatePlaceholderImage(placeholderText);
     return { data: placeholderImage, source: 'placeholder' };
@@ -1763,9 +1812,22 @@ app.get('/api/signed-image-url/:username/:imageKey', async (req, res) => {
 
 // Enhanced R2 Image Renderer with white image prevention
 app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
-  const { username, imageKey } = req.params;
-  const platform = req.query.platform || 'instagram';
-  
+  // Resolve parameters defensively to avoid case/route mismatches
+  let { username, imageKey } = req.params;
+  let platform = (req.query.platform || 'instagram').toString().trim();
+
+  try {
+    // If frontend provides original post key, use it to derive canonical platform/username
+    const postKeyRaw = req.query.post ? decodeURIComponent(String(req.query.post)) : '';
+    const postMatch = postKeyRaw.match(/ready_post\/(instagram|twitter|facebook|linkedin)\/([^\/]+)\/[A-Za-z0-9_]+\.json$/i);
+    if (postMatch) {
+      const derivedPlatform = postMatch[1];
+      const derivedUsername = postMatch[2];
+      if (derivedPlatform) platform = derivedPlatform; // prefer canonical from post key
+      if (derivedUsername) username = derivedUsername; // preserve exact case used in R2 keys
+    }
+  } catch { /* non-fatal */ }
+
   // ENHANCED FORCE REFRESH DETECTION: Detect all cache-busting parameters
   const forceRefresh = req.query.t || req.query.v || req.query.refresh || 
                       req.query.force || req.query.edited || req.query.refreshKey || 
@@ -1780,7 +1842,7 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
   }
   
   try {
-    // Construct the R2 key path with cache-busting parameters
+    // Construct the R2 key path with cache-busting parameters (use resolved platform/username)
     const r2Key = `ready_post/${platform}/${username}/${imageKey}`;
     
     // NUCLEAR CACHE-BUSTING: Pass the full URL with query parameters to detect cache-busting
@@ -2011,11 +2073,84 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
   }
 });
 
+// Avatar endpoint for profile pictures
+app.get('/api/avatar/:platform/:username', async (req, res) => {
+  const { platform, username } = req.params;
+  
+  try {
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [AVATAR] Fetching profile picture for ${platform}/${username}`);
+    
+    // First try to get profile info from our existing endpoint
+    const profileKey = `ProfileInfo/${platform}/${username}/profileinfo.json`;
+    
+    let profileData;
+    try {
+      const getProfileCommand = new GetObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: profileKey,
+      });
+      const profileResponse = await r2Client.send(getProfileCommand);
+      const profileContent = await profileResponse.Body.transformToString();
+      profileData = JSON.parse(profileContent);
+      
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [AVATAR] Found profile data for ${username}`);
+    } catch (profileErr) {
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [AVATAR] No profile data found: ${profileErr.message}`);
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+    
+    // Extract profile picture URL
+    const profilePicUrl = profileData.profilePicUrlHD || profileData.profilePicUrl || profileData.profile_image_url;
+    
+    if (!profilePicUrl) {
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [AVATAR] No profile picture URL found`);
+      return res.status(404).json({ error: 'No profile picture available' });
+    }
+    
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [AVATAR] Fetching image from: ${profilePicUrl}`);
+    
+    // Fetch the actual image
+    const imageResponse = await axios.get(profilePicUrl, {
+      responseType: 'stream',
+      timeout: 10000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+    
+    // Set appropriate headers
+    res.setHeader('Content-Type', imageResponse.headers['content-type'] || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    
+    // Pipe the image response
+    imageResponse.data.pipe(res);
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [AVATAR] Error fetching avatar:`, error.message);
+    res.status(500).json({ error: 'Failed to fetch profile picture' });
+  }
+});
+
 // HEAD handler for R2 image endpoint (for testing accessibility)
 app.head('/api/r2-image/:username/:imageKey', async (req, res) => {
-  const { username, imageKey } = req.params;
-  const platform = req.query.platform || 'instagram';
-  
+  // Resolve parameters defensively to avoid case/route mismatches
+  let { username, imageKey } = req.params;
+  let platform = (req.query.platform || 'instagram').toString().trim();
+
+  try {
+    // If frontend provides original post key, use it to derive canonical platform/username
+    const postKeyRaw = req.query.post ? decodeURIComponent(String(req.query.post)) : '';
+    const postMatch = postKeyRaw.match(/ready_post\/(instagram|twitter|facebook|linkedin)\/([^\/]+)\/[A-Za-z0-9_]+\.json$/i);
+    if (postMatch) {
+      const derivedPlatform = postMatch[1];
+      const derivedUsername = postMatch[2];
+      if (derivedPlatform) platform = derivedPlatform; // prefer canonical from post key
+      if (derivedUsername) username = derivedUsername; // preserve exact case used in R2 keys
+    }
+  } catch { /* non-fatal */ }
+
   try {
     const r2Key = `ready_post/${platform}/${username}/${imageKey}`;
     

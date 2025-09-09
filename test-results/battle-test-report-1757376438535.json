@@ -1,0 +1,214 @@
+{
+  "timestamp": "2025-09-09T00:07:03.388Z",
+  "testSuites": [
+    {
+      "name": "Critical Path Tests",
+      "tests": [
+        {
+          "name": "Negative cache core functionality",
+          "success": false,
+          "duration": 1.0580590069293976,
+          "details": {
+            "firstDuration": 7.5397549867630005,
+            "secondDuration": 1.0580590069293976,
+            "isCacheHit": false,
+            "fasterResponse": true,
+            "bothSuccessful": false,
+            "bothPixels": false,
+            "firstHeaders": {},
+            "secondHeaders": {}
+          }
+        },
+        {
+          "name": "Instagram CDN blocking behavior",
+          "success": false,
+          "duration": 1.808487981557846,
+          "details": {
+            "totalRequests": 3,
+            "successfulRequests": 0,
+            "pixelResponses": 0,
+            "negativeCache": {
+              "NEG_SET": 0,
+              "NEG_HIT": 0
+            },
+            "results": [
+              {
+                "success": false,
+                "error": "connect ECONNREFUSED ::1:3000",
+                "duration": 0.647489994764328,
+                "status": 0,
+                "headers": {}
+              },
+              {
+                "success": false,
+                "error": "connect ECONNREFUSED ::1:3000",
+                "duration": 0.5825989842414856,
+                "status": 0,
+                "headers": {}
+              },
+              {
+                "success": false,
+                "error": "connect ECONNREFUSED ::1:3000",
+                "duration": 0.5783990025520325,
+                "status": 0,
+                "headers": {}
+              }
+            ]
+          }
+        },
+        {
+          "name": "Pixel fallback core functionality",
+          "success": false,
+          "duration": 0.9703879952430725,
+          "details": {
+            "isPixel": false,
+            "hasCorrectHeaders": false,
+            "correctSize": false,
+            "headers": {}
+          }
+        },
+        {
+          "name": "Concurrent request deduplication (20 requests)",
+          "success": false,
+          "duration": 2.1454260051250458,
+          "details": {
+            "concurrency": 20,
+            "successfulRequests": 0,
+            "cacheHits": 0,
+            "cacheEffectiveness": 0,
+            "avgResponseTime": 3.7848081976175307
+          }
+        }
+      ],
+      "startTime": 55.104324012994766,
+      "endTime": 74.3614529967308,
+      "success": false
+    },
+    {
+      "name": "Load & Stress Tests",
+      "tests": [
+        {
+          "name": "Sustained load (75 requests)",
+          "success": false,
+          "duration": 15116.95627900958,
+          "details": {
+            "totalRequests": 75,
+            "successRate": 0,
+            "avgResponseTime": 0.6948973866303761,
+            "cacheHitRate": 0,
+            "duration": 15116.95627900958
+          }
+        },
+        {
+          "name": "Concurrent Instagram requests",
+          "success": false,
+          "duration": 0.45893701910972595,
+          "details": {
+            "totalRequests": 3,
+            "successfulRequests": 0,
+            "pixelResponses": 0
+          }
+        },
+        {
+          "name": "Cache storm prevention",
+          "success": false,
+          "duration": 0,
+          "details": {
+            "firstWaveSuccessful": 0,
+            "secondWaveSuccessful": 0,
+            "secondWaveCacheHits": 0,
+            "cacheStormPrevented": false,
+            "expectedCacheHits": 10
+          }
+        }
+      ],
+      "startTime": 74.3870609998703,
+      "endTime": 15198.638184010983,
+      "success": false
+    },
+    {
+      "name": "Edge Case Tests",
+      "tests": [
+        {
+          "name": "Malformed URL handling",
+          "success": false,
+          "duration": 1.8694649934768677,
+          "details": {
+            "results": [
+              {
+                "success": false,
+                "error": "connect ECONNREFUSED ::1:3000",
+                "duration": 0.4653329849243164,
+                "status": 0,
+                "headers": {}
+              },
+              {
+                "success": false,
+                "error": "connect ECONNREFUSED ::1:3000",
+                "duration": 0.3725840151309967,
+                "status": 0,
+                "headers": {}
+              },
+              {
+                "success": false,
+                "error": "connect ECONNREFUSED ::1:3000",
+                "duration": 0.31136298179626465,
+                "status": 0,
+                "headers": {}
+              },
+              {
+                "success": false,
+                "error": "connect ECONNREFUSED ::1:3000",
+                "duration": 0.31958600878715515,
+                "status": 0,
+                "headers": {}
+              },
+              {
+                "success": false,
+                "error": "connect ECONNREFUSED ::1:3000",
+                "duration": 0.40059900283813477,
+                "status": 0,
+                "headers": {}
+              }
+            ]
+          }
+        },
+        {
+          "name": "Timeout behavior",
+          "success": false,
+          "duration": 0.6196800172328949,
+          "details": {
+            "timedOut": false,
+            "fastResponse": true,
+            "error": "connect ECONNREFUSED ::1:3000",
+            "duration": 0.6196800172328949
+          }
+        },
+        {
+          "name": "Header consistency",
+          "success": false,
+          "duration": 0.3390029966831207,
+          "details": {
+            "hasRequiredHeaders": false,
+            "correctCORS": false,
+            "headers": {}
+          }
+        }
+      ],
+      "startTime": 15198.652956008911,
+      "endTime": 15201.87054002285,
+      "success": false
+    }
+  ],
+  "metrics": {
+    "totalRequests": 131,
+    "successfulRequests": 0,
+    "failedRequests": 131,
+    "averageResponseTime": 1512.6225725024938,
+    "cacheHitRate": 0,
+    "instagramBlockRate": 0,
+    "negCacheEffectiveness": 0
+  },
+  "totalDuration": 15147.545047014952,
+  "endTime": "2025-09-09T00:07:18.535Z"
+}

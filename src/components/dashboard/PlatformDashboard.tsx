@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import '../instagram/Dashboard.css'; // Reuse the same styles
 import Cs_Analysis from '../instagram/Cs_Analysis';
 import OurStrategies from '../instagram/OurStrategies';
 import PostCooked from '../instagram/PostCooked';
 import { getApiUrl } from '../../config/api';
-import { PlatformProvider } from '../../context/PlatformContext';
 import InstagramConnect from '../instagram/InstagramConnect';
 import TwitterConnect from '../twitter/TwitterConnect';
 import FacebookConnect from '../facebook/FacebookConnect';
+import LinkedInConnect from '../linkedin/LinkedInConnect';
 import TwitterCompose from '../twitter/TwitterCompose';
 import DmsComments from '../instagram/Dms_Comments';
 import PostScheduler from '../instagram/PostScheduler';
@@ -17,7 +16,7 @@ import GoalModal from '../instagram/GoalModal';
 import CampaignModal from '../instagram/CampaignModal';
 import News4U from '../common/News4U';
 import { motion } from 'framer-motion';
-import axios, { AxiosError } from 'axios';
+import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import InstagramRequiredButton from '../common/InstagramRequiredButton';
 import TwitterRequiredButton from '../common/TwitterRequiredButton';
@@ -29,28 +28,25 @@ import { useLinkedIn } from '../../context/LinkedInContext';
 import ChatModal from '../instagram/ChatModal';
 import RagService from '../../services/RagService';
 import type { ChatMessage as ChatModalMessage, LinkedAccount } from '../instagram/ChatModal';
-import { Notification, ProfileInfo } from '../../types/notifications';
+import { Notification } from '../../types/notifications';
 // Import icons from react-icons
-import { FaChartLine, FaCalendarAlt, FaFlag, FaBullhorn, FaTwitter, FaInstagram, FaPen, FaFacebook, FaBell, FaUndo, FaInfoCircle, FaPencilAlt, FaRobot, FaNewspaper, FaRss } from 'react-icons/fa';
-import { MdAnalytics, MdOutlineSchedule, MdOutlineAutoGraph } from 'react-icons/md';
-import { BsLightningChargeFill, BsBinoculars, BsLightbulb } from 'react-icons/bs';
-import { IoMdAnalytics } from 'react-icons/io';
+import { FaChartLine, FaCalendarAlt, FaBullhorn, FaPen, FaBell, FaUndo, FaInfoCircle, FaPencilAlt, FaRobot, FaRss } from 'react-icons/fa';
+import { BsLightbulb } from 'react-icons/bs';
 import { TbTargetArrow } from 'react-icons/tb';
 import { GiSpy } from 'react-icons/gi';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
-import useDefensiveUsageTracking from '../../hooks/useDefensiveUsageTracking';
 import useUpgradeHandler from '../../hooks/useUpgradeHandler';
 import AccessControlPopup from '../common/AccessControlPopup';
 import { useNavigate } from 'react-router-dom';
 import useProcessingGuard from '../../hooks/useProcessingGuard';
 import { useProcessing } from '../../context/ProcessingContext';
-import { safeFilter, safeMap, safeLength } from '../../utils/safeArrayUtils';
+import { safeFilter, safeLength } from '../../utils/safeArrayUtils';
 import useDashboardRefresh from '../../hooks/useDashboardRefresh';
 import useResetPlatformState from '../../hooks/useResetPlatformState';
 import AutopilotPopup from '../common/AutopilotPopup';
 import ProfilePopup from '../common/ProfilePopup';
 import ManualGuidance from '../common/ManualGuidance';
-import CacheManager, { appendBypassParam } from '../../utils/cacheManager';
+import { appendBypassParam } from '../../utils/cacheManager';
 
 // Define RagService compatible ChatMessage
 interface RagChatMessage {
@@ -64,14 +60,15 @@ interface PlatformDashboardProps {
   accountType: 'branding' | 'non-branding' | 'professional' | 'personal';
   platform: 'instagram' | 'twitter' | 'facebook' | 'linkedin';
   onOpenChat?: (messageContent: string, platform?: string) => void;
+  // Optional: show or hide the generic welcome banner (hide for LinkedIn)
+  showWelcome?: boolean;
 }
 
 const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ 
-  accountHolder: propAccountHolder, // Keep prop but override with localStorage
   competitors, 
   accountType, 
   platform = 'instagram',
-  onOpenChat 
+  showWelcome = true
 }) => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
@@ -102,32 +99,29 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const { userId: facebookPageId, isConnected: isFacebookConnected, connectFacebook } = useFacebook();
   const { userId: linkedinId, isConnected: isLinkedInConnected } = useLinkedIn();
   const { trackRealAIReply, trackRealPostCreation, canUseFeature } = useFeatureTracking();
-  const { safeIncrementUsage } = useDefensiveUsageTracking();
   const { showUpgradePopup, blockedFeature, closeUpgradePopup, currentUsage } = useUpgradeHandler();
   const { resetAndAllowReconnection } = useResetPlatformState();
 
   // ALL STATE HOOKS
   const [query, setQuery] = useState('');
   const [toast, setToast] = useState<string | null>(null);
-  const [toastType, setToastType] = useState<'info'|'success'|'error'|'warn'>('info');
-  const [responses, setResponses] = useState<{ key: string; data: any }[]>([]);
+  const [, setResponses] = useState<{ key: string; data: any }[]>([]);
   const [strategies, setStrategies] = useState<{ key: string; data: any }[]>([]);
   const [posts, setPosts] = useState<{ key: string; data: any }[]>([]);
   const [competitorData, setCompetitorData] = useState<{ key: string; data: any }[]>([]);
-  const [news, setNews] = useState<{ key: string; data: any }[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [profileInfo, setProfileInfo] = useState<any | null>(null);
-  const [profileError, setProfileError] = useState<string | null>(null);
+  const [, setProfileError] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
   // ✅ FIX 2: Remove chat mode selector - chatbar is now dedicated to post creation only
   const [isProcessing, setIsProcessing] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatModalMessage[]>([]);
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
-  const [result, setResult] = useState('');
-  const [linkedAccounts, setLinkedAccounts] = useState<LinkedAccount[]>([]);
+  const [, setResult] = useState('');
+  const [linkedAccounts] = useState<LinkedAccount[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [aiProcessingNotifications, setAiProcessingNotifications] = useState<Record<string, boolean>>({});
+  const [aiProcessingNotifications] = useState<Record<string, boolean>>({});
   const [showInitialText, setShowInitialText] = useState(true);
   const [showBio, setShowBio] = useState(false);
   const [typedBio, setTypedBio] = useState('');
@@ -143,8 +137,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     type: 'dm' | 'comment';
     id: string;
   }[]>([]);
-  const [aiRepliesRefreshKey, setAiRepliesRefreshKey] = useState(0);
-  const [processingNotifications, setProcessingNotifications] = useState<Record<string, boolean>>({});
   const [isAutoReplying, setIsAutoReplying] = useState(false);
   
   // 🛑 STOP OPERATION: Add stop flag and timeout reference for PlatformDashboard
@@ -170,8 +162,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   
   // DEBUG: Log when component renders
   console.log(`[DEBUG] PlatformDashboard rendering - Platform: ${platform}, User: ${accountHolder}, Autopilot Popup Open: ${isAutopilotPopupOpen}`);
-  // ✅ ADDED: Track auto-replied notifications to prevent redundancy
-  const [autoRepliedNotifications, setAutoRepliedNotifications] = useState<Set<string>>(new Set());
+  // ✅ Auto-replied notifications were managed elsewhere; local state removed to satisfy lint rules
 
   // 🍎 Mobile profile menu state
   const [isMobileProfileMenuOpen, setIsMobileProfileMenuOpen] = useState(false);
@@ -273,19 +264,15 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   };
 
   // ALL REF HOOKS
-  const firstLoadRef = useRef(true);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectAttempts = useRef(0);
-  const lastProfilePicRenderTimeRef = useRef<number>(0);
-  const imageRetryAttemptsRef = useRef(0);
   const lastProfileFetchRef = useRef<{[key: string]: number}>({});
   // Prevent redundant Facebook fallback attempts & log spam
-  const facebookProfileFallbackTriedRef = useRef(false);
+  // Removed unused refs
 
   // CONSTANTS
   const maxReconnectAttempts = 5;
   const baseReconnectDelay = 5000;
-  const maxImageRetryAttempts = 3;
 
   // Initialize viewed sets from localStorage
   const [viewedStrategies, setViewedStrategies] = useState<Set<string>>(() => {
@@ -305,6 +292,8 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     const stored = localStorage.getItem(storageKey);
     return stored ? new Set(JSON.parse(stored)) : new Set();
   });
+
+  // Auto-replied notifications tracking removed; managed server-side
 
   // Define functions FIRST to avoid dependency hoisting issues
   // ✅ BULLETPROOF FIX: Convert to useCallback for proper dependency tracking
@@ -449,8 +438,9 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     
     try {
       // ✅ PLATFORM-USERNAME VALIDATION: Ensure accountHolder matches current platform
-      const currentUrlPlatform = location.pathname.includes('twitter') ? 'twitter' : 
-                                location.pathname.includes('facebook') ? 'facebook' : 'instagram';
+  const currentUrlPlatform = location.pathname.includes('twitter') ? 'twitter' : 
+            location.pathname.includes('facebook') ? 'facebook' : 
+            location.pathname.includes('linkedin') ? 'linkedin' : 'instagram';
       
       if (platform !== currentUrlPlatform) {
         console.error(`[PlatformDashboard] ❌ PLATFORM MISMATCH: prop=${platform}, URL=${currentUrlPlatform}`);
@@ -601,8 +591,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     };
   }, [platform]);
 
-  // Helper function to get viewed storage key
-  const getViewedStorageKey = (section: string) => `viewed_${section}_${platform}_${accountHolder}`;
+  // Removed unused helper function
 
   // 🚀 POST DROPDOWN: Portal setup and positioning logic
   useEffect(() => {
@@ -873,6 +862,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const fetchNotifications = async (attempt = 1, maxAttempts = 3) => {
     const currentUserId = platform === 'twitter' ? twitterId : 
                          platform === 'facebook' ? facebookPageId :
+                         platform === 'linkedin' ? linkedinId :
                          igUserId;
     
     // CRITICAL FIX: For Facebook, if facebookPageId is not available yet, try to fetch it
@@ -1205,6 +1195,8 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           // This prevents the issue where notifications don't load on direct refresh
           console.log(`[${new Date().toISOString()}] [FACEBOOK-LOAD-FIX] Setting Facebook dashboard as loaded without waiting for pageId`);
           setIsLoading(false);
+        } else if (platform === 'linkedin' && linkedinId) {
+          setIsLoading(false);
         } else if (loadingCheckRef.current) {
           // If we've already checked and still loading, stop checking
           setIsLoading(false);
@@ -1215,7 +1207,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       };
       checkLoadingState();
     }
-  }, [isLoading, platform, igUserId, twitterId, facebookPageId]);
+  }, [isLoading, platform, igUserId, twitterId, facebookPageId, linkedinId]);
 
   useEffect(() => {
     let lastFocusTime = 0;
@@ -1256,12 +1248,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     }
   }, [toast]);
 
-  // Helper to show toast with type and filter out false notification
-  const showToast = (msg: string, type: 'info'|'success'|'error'|'warn' = 'info') => {
-    if (msg && /Failed to initialize .* after many retries/i.test(msg)) return;
-    setToast(msg);
-    setToastType(type);
-  };
+  // Helper to show toast removed (setToast used directly)
 
   // Load previous conversations when the component mounts
   useEffect(() => {
@@ -1338,20 +1325,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     return () => clearInterval(cleanInterval);
   }, []);
 
-  // ✅ ADDED: Clean old auto-replied notifications to prevent memory bloat
-  useEffect(() => {
-    const cleanInterval = setInterval(() => {
-      setAutoRepliedNotifications(prev => {
-        if (prev.size > 1000) {
-          console.log(`[${new Date().toISOString()}] Clearing auto-replied notifications set (size: ${prev.size})`);
-          return new Set();
-        }
-        return prev;
-      });
-    }, 300000); // Clean every 5 minutes
-    
-    return () => clearInterval(cleanInterval);
-  }, []);
+  // Removed auto-replied notifications cleaner (not used)
 
   // Optimized Facebook connection handling
   useEffect(() => {
@@ -1594,14 +1568,13 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
             const remainingMinutes = Math.ceil((endTime - now) / 1000 / 60);
             
             // 🔒 BULLETPROOF USERNAME PROTECTION: Check if username is locked before navigation
-            let shouldNavigate = true;
-            let navigationUsername = null;
+            // Navigation username variables removed to avoid unused warnings
             
             try {
               // Check if there's a locked username that should be preserved
               if (info.usernameLocked === true && info.username && info.username.trim()) {
                 console.log(`🔒 LOCKED USERNAME PROTECTED: Username '${info.username}' is locked for ${platform} - preserving during navigation`);
-                navigationUsername = info.username;
+                // preserve locked username via localStorage; no variable assignment needed
                 
                 // 🔒 CRITICAL: Ensure the locked username is not overwritten by current accountHolder
                 if (accountHolder && accountHolder.trim() && accountHolder !== info.username) {
@@ -1610,15 +1583,15 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
                 }
               } else if (info.username && info.username.trim()) {
                 console.log(`📝 UNLOCKED USERNAME: Using unlocked username '${info.username}' for ${platform} navigation`);
-                navigationUsername = info.username;
+                // use unlocked username internally; no variable assignment needed
               } else {
                 console.log(`⚠️ NO USERNAME IN PROCESSING INFO: Using current accountHolder '${accountHolder}' for ${platform}`);
-                navigationUsername = accountHolder;
+                // fallback to current accountHolder; no variable assignment needed
               }
             } catch (error) {
               console.error('Error checking username lock status:', error);
               // Fallback to current accountHolder
-              navigationUsername = accountHolder;
+              // fallback to current accountHolder; no variable assignment needed
             }
             
             // ✅ CRITICAL FIX: NEVER pass username when re-navigating to prevent overwriting inter-username form data
@@ -1719,8 +1692,49 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     }
   }[platform];
 
-  // Platform-specific query parameter
-  const platformParam = `?platform=${platform}`;
+  // Platform-specific query parameter handled in individual requests
+
+  // Platform-specific styling injection
+  useEffect(() => {
+    // Add platform-specific CSS class to body for platform-aware styling
+    document.body.classList.remove('platform-instagram', 'platform-twitter', 'platform-facebook', 'platform-linkedin');
+    document.body.classList.add(`platform-${platform}`);
+    
+    // Platform-specific CSS variables
+    const root = document.documentElement;
+    const platformColors = {
+      instagram: {
+        primary: '#E4405F',
+        secondary: '#F56565',
+        accent: '#00ffcc'
+      },
+      twitter: {
+        primary: '#1DA1F2',
+        secondary: '#4A9EE7',
+        accent: '#00ffcc'
+      },
+      facebook: {
+        primary: '#1877F2',
+        secondary: '#42A5F5',
+        accent: '#00ffcc'
+      },
+      linkedin: {
+        primary: '#0077B5',
+        secondary: '#004471',
+        accent: '#00B4A6'
+      }
+    };
+    
+    const colors = platformColors[platform];
+    root.style.setProperty('--platform-primary-color', colors.primary);
+    root.style.setProperty('--platform-secondary-color', colors.secondary);
+    root.style.setProperty('--platform-accent-color', colors.accent);
+    
+    // Cleanup on unmount
+    return () => {
+      document.body.classList.remove(`platform-${platform}`);
+    };
+  }, [platform]);
 
   // Show loading indicator while checking state
   if (isLoading) {
@@ -1751,34 +1765,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     );
   }
 
-  const handleOpenChatFromMessages = (messageContent: string) => {
-    console.log(`[PlatformDashboard] Opening chat for ${platform} with message: "${messageContent}"`);
-    
-    // If parent provides onOpenChat, use it and ALWAYS pass the platform
-    if (onOpenChat) {
-      // CRITICAL FIX: Pass the platform to ensure correct platform context
-      if (onOpenChat.length >= 2) {
-        // New signature: (messageContent: string, platform?: string) => void
-        (onOpenChat as any)(messageContent, platform);
-      } else {
-        // Fallback for old signature
-        onOpenChat(messageContent);
-      }
-    } else {
-      // ✅ FIX 2: Chat bar is now dedicated to post creation, so open chat modal for discussions
-      
-      // Add the message content to chat messages as an assistant message
-      const assistantMessage: ChatModalMessage = {
-        role: 'assistant',
-        content: messageContent
-      };
-      
-      setChatMessages(prev => [...prev, assistantMessage]);
-      
-      // Open the chat modal
-      setIsChatModalOpen(true);
-    }
-  };
+  // Removed unused handler: handleOpenChatFromMessages
 
   // Platform-specific notification handlers
   const handleReply = async (notification: any, replyText: string) => {
@@ -2657,10 +2644,7 @@ Image Description: ${response.post.image_prompt}
     setIsAutopilotPopupOpen(false);
   };
 
-  const handleOpenTwitterScheduler = () => {
-    console.log(`[${new Date().toISOString()}] Opening Twitter PostScheduler for user ${twitterId}`);
-    setIsTwitterSchedulerOpen(true);
-  };
+  // Removed unused handler: handleOpenTwitterScheduler
 
   const handleOpenTwitterInsights = () => {
     console.log(`[${new Date().toISOString()}] Opening Twitter InsightsModal for user ${twitterId}`);
@@ -2683,9 +2667,15 @@ Image Description: ${response.post.image_prompt}
     setIsFacebookInsightsOpen(true);
   };
 
-  const handleOpenFacebookCompose = () => {
-    console.log(`[${new Date().toISOString()}] Opening Facebook Compose for user ${facebookPageId}`);
-    setIsFacebookComposeOpen(true);
+  // Removed unused handler: handleOpenFacebookCompose
+
+  // LinkedIn handlers
+  const handleOpenPostCooked = () => {
+    console.log(`[${new Date().toISOString()}] Opening LinkedIn Compose (PostCooked) for user ${linkedinId}`);
+    setExpandedModules(prev => ({
+      ...prev,
+      postCooked: !prev.postCooked
+    }));
   };
 
   // Reset functionality handlers
@@ -2725,11 +2715,7 @@ Image Description: ${response.post.image_prompt}
     }
   };
 
-  // Legacy function kept for backward compatibility but no longer used
-  const clearPlatformFrontendData = () => {
-    // This function is now handled by the bulletproof reset hook
-    console.log(`[${new Date().toISOString()}] ⚠️ clearPlatformFrontendData called - replaced by bulletproof reset`);
-  };
+  // Removed legacy clearPlatformFrontendData (replaced by bulletproof reset)
 
   return (
     <>
@@ -2739,54 +2725,56 @@ Image Description: ${response.post.image_prompt}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <div className="welcome-header">
-          <h1 className="welcome-text">
-            Welcome {accountHolder}!
-          </h1>
-          <div className="welcome-subtext-container" style={{ position: 'relative', minHeight: '48px' }}>
-            <motion.p 
-              className="welcome-subtext"
-              animate={{ 
-                opacity: showInitialText ? 1 : 0,
-                y: showInitialText ? 0 : -10
-              }}
-              transition={{ duration: 0.5, ease: 'easeInOut' }}
-            >
-              Congrats! You are listed on top initial users of Sentient Marketing AI-powered Management!
-            </motion.p>
-            
-            {profileInfo?.biography && profileInfo.biography.trim() && (
-              <motion.div
-                className="bio-text"
+        {showWelcome && (
+          <div className="welcome-header">
+            <h1 className="welcome-text">
+              Welcome {accountHolder}!
+            </h1>
+            <div className="welcome-subtext-container" style={{ position: 'relative', minHeight: '48px' }}>
+              <motion.p 
+                className="welcome-subtext"
                 animate={{ 
-                  opacity: showBio ? 1 : 0,
-                  y: showBio ? 0 : 10
+                  opacity: showInitialText ? 1 : 0,
+                  y: showInitialText ? 0 : -10
                 }}
-                transition={{ duration: 0.5, ease: 'easeInOut', delay: showBio ? 0.2 : 0 }}
+                transition={{ duration: 0.5, ease: 'easeInOut' }}
               >
-                {typedBio}
-                {showBio && !bioAnimationComplete && (
-                  <motion.span
-                    animate={{ opacity: [1, 0] }}
-                    transition={{ 
-                      duration: 0.5,
-                      repeat: Infinity,
-                      repeatType: 'reverse'
-                    }}
-                    style={{ 
-                      display: 'inline-block',
-                      width: '2px',
-                      height: '16px',
-                      backgroundColor: '#00ffcc',
-                      marginLeft: '2px',
-                      verticalAlign: 'text-bottom'
-                    }}
-                  />
-                )}
-              </motion.div>
-            )}
+                Congrats! You are listed on top initial users of Sentient Marketing AI-powered Management!
+              </motion.p>
+              
+              {profileInfo?.biography && profileInfo.biography.trim() && (
+                <motion.div
+                  className="bio-text"
+                  animate={{ 
+                    opacity: showBio ? 1 : 0,
+                    y: showBio ? 0 : 10
+                  }}
+                  transition={{ duration: 0.5, ease: 'easeInOut', delay: showBio ? 0.2 : 0 }}
+                >
+                  {typedBio}
+                  {showBio && !bioAnimationComplete && (
+                    <motion.span
+                      animate={{ opacity: [1, 0] }}
+                      transition={{ 
+                        duration: 0.5,
+                        repeat: Infinity,
+                        repeatType: 'reverse'
+                      }}
+                      style={{ 
+                        display: 'inline-block',
+                        width: '2px',
+                        height: '16px',
+                        backgroundColor: '#00ffcc',
+                        marginLeft: '2px',
+                        verticalAlign: 'text-bottom'
+                      }}
+                    />
+                  )}
+                </motion.div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
         <div className="modules-container">
           <div className="dashboard-grid">
             <div className="profile-metadata">
@@ -2798,7 +2786,7 @@ Image Description: ${response.post.image_prompt}
                     <>
                       {(profileInfo?.profilePicUrlHD || profileInfo?.profilePicUrl) && !imageError ? (
                         <img
-                          src={`/api/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD || profileInfo.profilePicUrl)}`}
+                          src={`/api/avatar/${platform}/${accountHolder}`}
                           alt={`${accountHolder}'s profile picture`}
                           className="profile-pic-bar"
                           onError={() => {
@@ -2897,12 +2885,22 @@ Image Description: ${response.post.image_prompt}
                       </>
                     ) : platform === 'linkedin' ? (
                       <>
+                        <div className="linkedin-connect-wrapper">
+                          <LinkedInConnect />
+                        </div>
+                        <button
+                          onClick={handleOpenPostCooked}
+                          className="dashboard-btn compose-btn linkedin"
+                        >
+                          <FaPen className="btn-icon" />
+                          <span>Compose</span>
+                        </button>
                         <button
                           onClick={handleOpenInsights}
                           className="dashboard-btn insights-btn linkedin"
                         >
                           <FaChartLine className="btn-icon" />
-                          <span>Industrial Connections</span>
+                          <span>Insights</span>
                         </button>
                       </>
                     ) : null}
@@ -2974,6 +2972,8 @@ Image Description: ${response.post.image_prompt}
                   <TwitterConnect onConnected={handleTwitterConnected} />
                 ) : platform === 'facebook' ? (
                   <FacebookConnect onConnected={handleFacebookConnected} />
+                ) : platform === 'linkedin' ? (
+                  <LinkedInConnect />
                 ) : null}
               </div>
               
@@ -3076,7 +3076,18 @@ Image Description: ${response.post.image_prompt}
                     className="dashboard-btn insights-btn linkedin"
                   >
                     <FaChartLine className="btn-icon" />
-                    <span>Industrial Connections</span>
+                    <span>Insights</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      console.log('Mobile LinkedIn Compose clicked');
+                      handleOpenPostCooked();
+                      setIsMobileProfileMenuOpen(false);
+                    }}
+                    className="dashboard-btn compose-btn linkedin"
+                  >
+                    <FaPencilAlt className="btn-icon" />
+                    <span>Compose</span>
                   </button>
                 </>
               ) : null}
@@ -3200,9 +3211,9 @@ Image Description: ${response.post.image_prompt}
             <div className="post-cooked">
               <PostCooked
                 username={accountHolder}
-                profilePicUrl=""
+                profilePicUrl={profileInfo?.profilePicUrlHD ? `/api/avatar/${platform}/${accountHolder}` : ''}
                 posts={posts}
-                userId={userId || undefined}
+                userId={(platform === 'instagram' ? igUserId : platform === 'twitter' ? twitterId : platform === 'facebook' ? facebookPageId : platform === 'linkedin' ? linkedinId : undefined) || undefined}
                 platform={platform}
               />
             </div>
@@ -3357,7 +3368,7 @@ Image Description: ${response.post.image_prompt}
           </div>
         )}
         
-        <ToastNotification toast={toast} type={toastType} />
+  <ToastNotification toast={toast} />
       </motion.div>
       
       {isGoalModalOpen && (

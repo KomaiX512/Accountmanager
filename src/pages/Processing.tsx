@@ -951,7 +951,7 @@ const ensureBackendProcessingStatus = async (plat: string) => {
           onNavigateHome={() => safeNavigate(navigate, '/account', {}, 1)}
         >
           <ProcessingLoadingState 
-            platform={targetPlatform as 'instagram' | 'twitter' | 'facebook'}
+            platform={targetPlatform as 'instagram' | 'twitter' | 'facebook' | 'linkedin'}
             username={username}
             onComplete={handleComplete}
             remainingMinutes={remainingMinutes}
@@ -982,7 +982,7 @@ const ensureBackendProcessingStatus = async (plat: string) => {
       onNavigateHome={() => safeNavigate(navigate, '/account', {}, 1)}
     >
       <ProcessingLoadingState 
-        platform={targetPlatform as 'instagram' | 'twitter' | 'facebook'}
+        platform={targetPlatform as 'instagram' | 'twitter' | 'facebook' | 'linkedin'}
         username={username}
         onComplete={handleComplete}
         remainingMinutes={remainingMinutes}

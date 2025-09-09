@@ -1110,22 +1110,20 @@ Image Description: ${response.post.image_prompt}
       return;
     }
     
-    // CRITICAL FIX: Filter only pending notifications and prevent duplicates
-    const pendingNotifications = notifications.filter((notif: any) => {
+    // Unified eligibility: include pending and ai_reply_ready, messages & comments only, avoid duplicates
+    const eligibleNotifications = notifications.filter((notif: any) => {
       const notificationId = notif.message_id || notif.comment_id || '';
       // Skip if already processed in this session
       if (processedNotificationIds.current.has(notificationId)) {
         console.log(`[Instagram] 🚫 Skipping already processed notification: ${notificationId}`);
         return false;
       }
-      // Skip if already handled
-      if (notif.status && notif.status !== 'pending') {
-        return false;
-      }
-      return true;
+      const isSupportedType = notif.type === 'message' || notif.type === 'comment';
+      const isEligibleStatus = !notif.status || notif.status === 'pending' || notif.status === 'ai_reply_ready';
+      return isSupportedType && isEligibleStatus;
     });
     
-    if (pendingNotifications.length === 0) {
+    if (eligibleNotifications.length === 0) {
       return;
     }
     
@@ -1137,25 +1135,25 @@ Image Description: ${response.post.image_prompt}
     console.log(`[Instagram] 🧹 Cleared processed notification IDs for fresh auto-reply session`);
     
     // NEW: Initialize progress tracking
-    setAutoReplyProgress({ current: 0, total: pendingNotifications.length, nextReplyIn: 0 });
+    setAutoReplyProgress({ current: 0, total: eligibleNotifications.length, nextReplyIn: 0 });
     
     let successCount = 0;
     let failCount = 0;
     
     try {
-      console.log(`[Instagram] 🔄 Starting auto-reply for ${pendingNotifications.length} notifications`);
+      console.log(`[Instagram] 🔄 Starting auto-reply for ${eligibleNotifications.length} notifications`);
       
       // 🛡️ CRITICAL BUG FIX: Process notifications ONE AT A TIME with proper rate limiting
       // This prevents the simultaneous sending bug that we fixed for Facebook
-      for (let i = 0; i < pendingNotifications.length; i++) {
+      for (let i = 0; i < eligibleNotifications.length; i++) {
         // 🛑 STOP OPERATION: Check if user requested to stop
         if (shouldStopAutoReply) {
-          console.log(`[Instagram] Auto-reply stopped by user at ${i + 1}/${pendingNotifications.length}`);
-          setToast(`Auto-reply stopped (${i}/${pendingNotifications.length} completed)`);
+          console.log(`[Instagram] Auto-reply stopped by user at ${i + 1}/${eligibleNotifications.length}`);
+          setToast(`Auto-reply stopped (${i}/${eligibleNotifications.length} completed)`);
           break;
         }
         
-        const notification = pendingNotifications[i];
+        const notification = eligibleNotifications[i];
         const notificationId = notification.message_id || notification.comment_id || '';
         
         // 🛡️ CRITICAL BUG FIX: Mark as processed immediately to prevent duplicates
@@ -1170,7 +1168,7 @@ Image Description: ${response.post.image_prompt}
         }
         
         try {
-          console.log(`[Instagram] 🔄 Processing notification ${i + 1}/${pendingNotifications.length}`);
+          console.log(`[Instagram] 🔄 Processing notification ${i + 1}/${eligibleNotifications.length}`);
           
           // NEW: Update progress - processing current
           setAutoReplyProgress(prev => ({ ...prev, current: i + 1 }));
@@ -1178,30 +1176,40 @@ Image Description: ${response.post.image_prompt}
           // 🛑 STOP OPERATION: Check stop flag before making RAG request
           if (shouldStopAutoReply) break;
           
-          // Generate AI reply using the enhanced RAG server
-          const response = await axios.post(getApiUrl('/api/instant-reply'), {
-            username: accountHolder,
-            notification: {
-              type: notification.type,
-              message_id: notification.message_id,
-              comment_id: notification.comment_id,
-              text: notification.text,
-              username: notification.username,
-              timestamp: notification.timestamp,
+          let replyText: string | null = null;
+          // If AI reply is already prepared, use it directly; otherwise generate
+          if (notification.status === 'ai_reply_ready' && notification.aiReply?.reply) {
+            replyText = notification.aiReply.reply;
+          } else {
+            // Generate AI reply using the enhanced RAG server
+            const response = await axios.post(getApiUrl('/api/instant-reply'), {
+              username: accountHolder,
+              notification: {
+                type: notification.type,
+                message_id: notification.message_id,
+                comment_id: notification.comment_id,
+                text: notification.text,
+                username: notification.username,
+                timestamp: notification.timestamp,
+                platform: 'instagram'
+              },
               platform: 'instagram'
-            },
-            platform: 'instagram'
-          });
+            });
 
-          // 🛑 STOP OPERATION: Check stop flag after RAG response
-          if (shouldStopAutoReply) break;
+            // 🛑 STOP OPERATION: Check stop flag after RAG response
+            if (shouldStopAutoReply) break;
 
-          if (response.data.success && response.data.reply) {
+            if (response.data.success && response.data.reply) {
+              replyText = response.data.reply;
+            }
+          }
+
+          if (replyText) {
             // Send the generated reply
             if (notification.type === 'message' && notification.sender_id) {
               await axios.post(`/api/send-dm-reply/${igBusinessId}`, {
                 sender_id: notification.sender_id,
-                text: response.data.reply,
+                text: replyText,
                 message_id: notification.message_id,
                 platform: 'instagram',
               });
@@ -1222,7 +1230,7 @@ Image Description: ${response.post.image_prompt}
             } else if (notification.type === 'comment' && notification.comment_id) {
               await axios.post(`/api/send-comment-reply/${igBusinessId}`, {
                 comment_id: notification.comment_id,
-                text: response.data.reply,
+                text: replyText,
                 platform: 'instagram',
               });
               
@@ -1272,11 +1280,11 @@ Image Description: ${response.post.image_prompt}
           
           // 🚀 CRITICAL RATE LIMITING FIX: Wait between requests to prevent simultaneous sending
           // This is the key fix that prevents the simultaneous sending bug
-          if (i < pendingNotifications.length - 1) {
+          if (i < eligibleNotifications.length - 1) {
             const delay = 45000; // 45 seconds for Instagram
             
-            console.log(`[Instagram] ⏱️ Waiting ${delay/1000}s before next reply (${i + 1}/${pendingNotifications.length} completed)`);
-            setToast(`Processing ${i + 1}/${pendingNotifications.length} - waiting ${delay/1000}s before next reply...`);
+            console.log(`[Instagram] ⏱️ Waiting ${delay/1000}s before next reply (${i + 1}/${eligibleNotifications.length} completed)`);
+            setToast(`Processing ${i + 1}/${eligibleNotifications.length} - waiting ${delay/1000}s before next reply...`);
             
             // NEW: Countdown timer for next reply
             let remainingTime = Math.floor(delay / 1000);
@@ -1324,7 +1332,7 @@ Image Description: ${response.post.image_prompt}
           if (shouldStopAutoReply) break;
           
           // Continue with next notification even if one fails, but still respect rate limiting
-          if (i < pendingNotifications.length - 1) {
+          if (i < eligibleNotifications.length - 1) {
             const delay = 15000; // Shorter delay on errors
             console.log(`[Instagram] ⚠️ Error occurred, waiting ${delay/1000}s before next attempt`);
             
@@ -1382,10 +1390,10 @@ Image Description: ${response.post.image_prompt}
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        // ✅ FIX: Use correct competitor analysis endpoint with platform parameter
+        // ✅ FIX: Use correct retrieve-multiple endpoint with platform parameter
         Promise.all(
           competitors.map(comp =>
-            axios.get(`/api/competitor-analysis/${accountHolder}/${comp}?platform=instagram`).catch(err => {
+            axios.get(`/api/retrieve-multiple/${accountHolder}?platform=instagram&competitors=${comp}`).catch(err => {
               if (err.response?.status === 404) {
                 console.warn(`No competitor data found for ${comp}`);
                 return { data: [] };
@@ -1393,7 +1401,7 @@ Image Description: ${response.post.image_prompt}
               throw err;
             })
           )
-        )
+        ),
       ]);
 
       // Defensive checks for array data before setting state
@@ -1484,25 +1492,6 @@ Image Description: ${response.post.image_prompt}
           }).catch(err => {
             console.error('Error fetching posts:', err);
           });
-        }
-        if (prefix.startsWith(`competitor_analysis/${accountHolder}/`)) {
-          // ✅ FIX: Use correct competitor analysis endpoint with platform parameter
-          Promise.all(
-            competitors.map(comp =>
-              axios.get(`/api/competitor-analysis/${accountHolder}/${comp}?platform=instagram`).catch(err => {
-                if (err.response?.status === 404) return { data: [] };
-                throw err;
-              })
-            )
-          )
-            .then(res => {
-              const flatData = res.flatMap(r => r.data);
-              setCompetitorData(flatData);
-              setToast('New competitor analysis available!');
-            })
-            .catch(err => {
-              console.error('Error fetching competitor data:', err);
-            });
         }
       }
 
@@ -2191,7 +2180,7 @@ Image Description: ${response.post.image_prompt}
                   {profileInfo?.profilePicUrlHD && !imageError ? (
                     <div className="profile-pic-bar">
                       <img
-                        src={`/api/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}`}
+                        src={`/api/avatar/instagram/${accountHolder}`}
                         alt={`${accountHolder}'s profile picture`}
                         onError={(e) => {
                           console.error(`Failed to load profile picture for ${accountHolder} ${imageRetryAttemptsRef.current + 1}`);
@@ -2209,7 +2198,7 @@ Image Description: ${response.post.image_prompt}
                               // Final retry: try proxy again
                               console.log(`Final retry with proxy, attempt ${imageRetryAttemptsRef.current}/${maxImageRetryAttempts.current}`);
                               setTimeout(() => {
-                                imgElement.src = `/api/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}&t=${Date.now()}`;
+                                imgElement.src = `/api/avatar/instagram/${accountHolder}?refresh=1`;
                               }, 1000);
                             }
                           } else {
@@ -2470,7 +2459,7 @@ Image Description: ${response.post.image_prompt}
           <div className="post-cooked post-cooked-always-expanded">
             <PostCooked
               username={accountHolder}
-              profilePicUrl={profileInfo?.profilePicUrlHD ? `/api/proxy-image?url=${encodeURIComponent(profileInfo.profilePicUrlHD)}` : ''}
+              profilePicUrl={profileInfo?.profilePicUrlHD ? `/api/avatar/instagram/${accountHolder}` : ''}
               posts={posts}
               userId={igBusinessId || undefined}
             />

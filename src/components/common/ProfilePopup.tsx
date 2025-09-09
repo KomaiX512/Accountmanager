@@ -24,10 +24,11 @@ import {
 interface ProfilePopupProps {
   username: string;
   onClose: () => void;
-  platform?: 'instagram' | 'twitter' | 'facebook';
+  platform?: 'instagram' | 'twitter' | 'facebook' | 'linkedin';
 }
 
 const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose, platform = 'instagram' }) => {
+  const normalizedPlatform = (platform || 'instagram').toLowerCase() as 'instagram' | 'twitter' | 'facebook' | 'linkedin';
   const [activeTab, setActiveTab] = useState<'Rules' | 'Billing Method' | 'Name' | 'Account'>('Rules');
   const [rules, setRules] = useState<string | null>(null);
   const [savedRules, setSavedRules] = useState<string | null>(null);
@@ -40,7 +41,7 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose, platform
   
   // Billing method states
   const [showAddPaymentMethod, setShowAddPaymentMethod] = useState(false);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
+  const [_selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
   
   // Platform-specific connection states
   const [isConnectedToInstagram, setIsConnectedToInstagram] = useState(false);
@@ -50,9 +51,10 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose, platform
   const { isConnected: isFacebookConnectedContext, disconnectFacebook } = useFacebook();
   const { isConnected: isTwitterConnectedContext, disconnectTwitter } = useTwitter();
 
-  // Get platform display name
-  const platformName = platform === 'twitter' ? 'X (Twitter)' : 
-                      platform === 'facebook' ? 'Facebook' : 
+  // Get platform display name (normalized)
+  const platformName = normalizedPlatform === 'twitter' ? 'X (Twitter)' : 
+                      normalizedPlatform === 'facebook' ? 'Facebook' : 
+                      normalizedPlatform === 'linkedin' ? 'LinkedIn' : 
                       'Instagram';
 
   // Dummy billing data - in production this would come from your payment provider
@@ -117,8 +119,8 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose, platform
         setIsLoading(true);
         setError(null);
         try {
-          // Make platform-aware request to server
-          const response = await axios.get(`/api/rules/${username}?platform=${platform}`);
+          // Make platform-aware request to server using normalized platform
+          const response = await axios.get(`/api/rules/${username}?platform=${normalizedPlatform}`);
           setRules(response.data.rules || '');
           setSavedRules(response.data.rules || '');
           setIsEditingRules(false);
@@ -179,8 +181,8 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose, platform
     setIsLoading(true);
     setError(null);
     try {
-      // Make platform-aware request to server
-      await axios.post(`/api/rules/${username}?platform=${platform}`, { rules });
+  // Make platform-aware request to server using normalized platform
+  await axios.post(`/api/rules/${username}?platform=${normalizedPlatform}`, { rules });
       setSavedRules(rules);
       setIsEditingRules(false);
       setShowPreview(true);
@@ -256,13 +258,15 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose, platform
 
   // Get current platform connection status
   const getCurrentPlatformConnectionStatus = () => {
-    switch (platform) {
+    switch (normalizedPlatform) {
       case 'instagram':
         return isConnectedToInstagram;
       case 'facebook':
         return isConnectedToFacebook;
       case 'twitter':
         return isConnectedToTwitter;
+      case 'linkedin':
+        return false; // LinkedIn connection status not yet supported here
       default:
         return false;
     }
@@ -287,12 +291,12 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose, platform
     setToastMessage('Default payment method updated!');
   };
 
-  const handleDeletePaymentMethod = (methodId: string) => {
+  const handleDeletePaymentMethod = (_methodId: string) => {
     // In production, this would delete the payment method
     setToastMessage('Payment method removed successfully!');
   };
 
-  const handleDownloadInvoice = (invoiceUrl: string) => {
+  const handleDownloadInvoice = (_invoiceUrl: string) => {
     // In production, this would download the actual invoice
     setToastMessage('Invoice download started!');
   };

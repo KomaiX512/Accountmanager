@@ -17,7 +17,7 @@ interface AutopilotSettings {
 
 interface AutopilotPopupProps {
   username: string;
-  platform: 'instagram' | 'twitter' | 'facebook';
+  platform: 'instagram' | 'twitter' | 'facebook' | 'linkedin';
   isConnected: boolean;
   onClose: () => void;
 }
@@ -199,7 +199,8 @@ const AutopilotPopup: React.FC<AutopilotPopupProps> = ({
   const platformColors = {
     instagram: '#E4405F',
     twitter: '#1DA1F2',
-    facebook: '#1877F2'
+  facebook: '#1877F2',
+  linkedin: '#0A66C2'
   };
 
   const platformColor = platformColors[platform] || '#8a2be2';

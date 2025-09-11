@@ -1375,7 +1375,11 @@ const MainDashboard: React.FC = () => {
             
             // Fetch competitor analysis count - using dashboard username for AI content
             try {
-              const accountInfoResponse = await fetch(`/api/profile-info/${dashboardUsername}?platform=${platform}&ts=${Date.now()}`, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
+              // Use correct endpoint format for LinkedIn
+              const profileInfoUrl = platform === 'linkedin' 
+                ? `/api/profile-info/${platform}/${dashboardUsername}`
+                : `/api/profile-info/${dashboardUsername}?platform=${platform}`;
+              const accountInfoResponse = await fetch(`${profileInfoUrl}&ts=${Date.now()}`, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
               if (accountInfoResponse.ok) {
                 const accountInfo = await accountInfoResponse.json();
                 const competitors = accountInfo.competitors || [];

@@ -76,11 +76,11 @@ initializeChromaDB();
 
 // Configure AWS SDK v3 for R2 (Enterprise-grade)
 const R2_CONFIG = {
-  endpoint: 'https://570f213f1410829ee9a733a77a5f40e3.r2.cloudflarestorage.com',
+  endpoint: 'https://f049515e642b0c91e7679c3d80962686.r2.cloudflarestorage.com',
   region: 'auto',
   credentials: {
-    accessKeyId: '18f60c98e08f1a24040de7cb7aab646c',
-    secretAccessKey: '0a8c50865ecab3c410baec4d751f35493fd981f4851203fe205fe0f86063a5f6',
+    accessKeyId: '7e15d4a51abb43fff3a7da4a8813044f',
+    secretAccessKey: '8fccd5540c85304347cbbd25d8e1f67776a8473c73c4a8811e83d0970bd461e2',
   },
   maxAttempts: 5,
   requestHandler: {
@@ -255,7 +255,7 @@ async function streamToString(stream) {
 const GEMINI_CONFIG = {
   apiKey: 'AIzaSyDIpv14PCIuAukCFV4CILMhYk0OzpNI6EE',
   model: 'gemini-2.0-flash',
-  maxTokens: 2000, // Restored to 2000 for better responses
+  maxTokens: 4000, // Increased for comprehensive LinkedIn responses
   temperature: 0.2,
   topP: 0.95,
   topK: 40
@@ -376,11 +376,6 @@ const FALLBACK_RESPONSES = {
     competitors: "For X (Twitter) competitor analysis:\n\n• Track their tweeting frequency and timing\n• Analyze their most retweeted content\n• Monitor hashtags they use effectively\n• Study their thread strategies\n• Check their engagement patterns\n• Look at their Twitter Spaces activity\n• Note their brand voice and tone\n• Observe their community interactions\n\nI'll deliver comprehensive competitor insights when back online!",
     content: "X (Twitter) content that gets engagement:\n\n• Quick tips and insights\n• Industry observations\n• Controversial but thoughtful takes\n• Thread tutorials\n• Live-tweeting events\n• Polls and questions\n• Memes and humor (when appropriate)\n• News commentary and analysis\n\nI'll help craft specific tweets when I'm fully operational again!"
   },
-  linkedin: {
-    general: "I'm here to enhance your LinkedIn professional presence! While I'm temporarily at capacity, here are proven LinkedIn strategies:\n\n• Post consistently 2-3 times per week\n• Share industry insights and thought leadership\n• Use 3-5 relevant hashtags\n• Engage meaningfully with your network\n• Write detailed posts that provide value\n• Share behind-the-scenes professional content\n• Comment thoughtfully on others' posts\n• Use LinkedIn articles for long-form content\n\nI'll provide personalized LinkedIn strategies when fully operational!",
-    competitors: "For LinkedIn competitor analysis:\n\n• Monitor their posting frequency and timing\n• Analyze their most engaging content types\n• Study their thought leadership topics\n• Check their engagement rates and comments\n• Look at their LinkedIn article performance\n• Monitor their hashtag strategies\n• Note their professional tone and voice\n• Observe their network growth patterns\n\nI'll deliver comprehensive LinkedIn competitive insights when back online!",
-    content: "LinkedIn content that drives professional engagement:\n\n• Industry insights and analysis\n• Professional experiences and lessons learned\n• Thought leadership pieces\n• Behind-the-scenes business content\n• Team achievements and celebrations\n• Industry trends and predictions\n• How-to guides and tutorials\n• Professional development tips\n\nI'll help create specific LinkedIn content when I'm fully operational again!"
-  }
 };
 
 // Create data directories if they don't exist
@@ -437,6 +432,38 @@ async function getProfileData(username, platform = 'instagram') {
   
   console.log(`[RAG-Server] Retrieving profile data for ${platform}/${username}`);
   try {
+    // For LinkedIn, use direct HTTP access to public R2 bucket
+    if (platform === 'linkedin') {
+      const publicUrl = `https://pub-c3143958898d491f80f5f87572a64ddc.r2.dev/${platform}/${username}/${username}.json`;
+      console.log(`[RAG-Server] 🌐 Fetching LinkedIn profile via HTTP: ${publicUrl}`);
+      
+      const response = await fetch(publicUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const profileData = await response.json();
+      console.log(`[RAG-Server] ✅ Successfully retrieved LinkedIn profile via HTTP for ${platform}/${username}`);
+      
+      // Store in ChromaDB and cache
+      try {
+        console.log(`[RAG-Server] 🚀 Storing profile data in ChromaDB for ${platform}/${username}`);
+        const chromaStored = await chromaDBService.storeProfileData(username, platform, profileData);
+        if (chromaStored) {
+          console.log(`[RAG-Server] ✅ Profile data successfully indexed in ChromaDB for ${platform}/${username}`);
+        }
+      } catch (chromaError) {
+        console.error(`[RAG-Server] ChromaDB storage error for ${platform}/${username}:`, chromaError.message);
+      }
+      
+      // Update caches
+      profileCache.set(cacheKey, { data: profileData, timestamp: Date.now() });
+      fs.writeFileSync(cacheFilePath, JSON.stringify({ data: profileData, timestamp: new Date().toISOString() }, null, 2));
+      
+      return profileData;
+    }
+    
+    // For other platforms, use AWS SDK
     const data = await s3Operations.getObject(structuredbS3, {
       Bucket: 'structuredb',
       Key: `${platform}/${username}/${username}.json`
@@ -1579,15 +1606,10 @@ function analyzeQuestionComplexity(query) {
 }
 
 // Function to determine optimal response strategy
-function determineResponseStrategy(query, profileData, username) {
-  const needsWebSearch = shouldUseWebSearch(query);
-  const userDomain = analyzeUserDomain(profileData, username);
-  const questionComplexity = analyzeQuestionComplexity(query);
-  
-  const queryLower = query.toLowerCase();
-  
-  // Strategy types
+function determineResponseStrategy(query, profileData, username, platform = 'instagram') {
+  // Strategy types (moved to top to avoid initialization errors)
   const strategies = {
+    LINKEDIN_FACTUAL: 'linkedin_factual',                // LinkedIn factual data extraction
     DIRECT_ANSWER: 'direct_answer',                       // Quick, direct response
     PERSONALIZED_WEB_SEARCH: 'web_search_personalized',  // Web search + personal context
     INTELLIGENT_ANALYSIS: 'intelligent_analysis',        // Smart analysis of profile data
@@ -1595,6 +1617,72 @@ function determineResponseStrategy(query, profileData, username) {
     ENGAGEMENT_ANALYSIS: 'engagement_analysis',          // Deep dive into engagement patterns
     TRADITIONAL_RAG: 'traditional_rag'                   // Standard RAG response
   };
+
+  const needsWebSearch = shouldUseWebSearch(query);
+  const userDomain = analyzeUserDomain(profileData, username);
+  const questionComplexity = analyzeQuestionComplexity(query);
+  
+  const queryLower = query.toLowerCase();
+  
+  // LinkedIn-specific factual query detection
+  if (platform === 'linkedin') {
+    const isFactualQuery = 
+      queryLower.includes('what job') ||
+      queryLower.includes('what was') ||
+      queryLower.includes('where did') ||
+      queryLower.includes('what company') ||
+      queryLower.includes('what position') ||
+      queryLower.includes('when did') ||
+      queryLower.includes('how many likes') ||
+      queryLower.includes('how many comments') ||
+      queryLower.includes('engagement metrics') ||
+      queryLower.includes('exact number') ||
+      queryLower.includes('specific metrics') ||
+      queryLower.includes('most engaging post') ||
+      queryLower.includes('highest engaging') ||
+      queryLower.includes('high engaging post') ||
+      queryLower.includes('lowest engaging') ||
+      queryLower.includes('least engaging') ||
+      queryLower.includes('number of posts') ||
+      queryLower.includes('how many posts') ||
+      queryLower.includes('tell me my followers') ||
+      queryLower.includes('my followers and') ||
+      queryLower.includes('followers and following') ||
+      queryLower.includes('connections and') ||
+      queryLower.includes('in 20') || // year queries like "in 2018", "in 2020"
+      queryLower.includes('from 20') || // range queries like "from 2018 to 2020"
+      queryLower.includes('during 20') ||
+      queryLower.includes('between 20') ||
+      queryLower.includes('what degree') ||
+      queryLower.includes('what university') ||
+      queryLower.includes('phd') ||
+      queryLower.includes('master') ||
+      queryLower.includes('university of') ||
+      queryLower.includes('degree in') ||
+      queryLower.includes('studied at') ||
+      queryLower.includes('graduated from') ||
+      queryLower.includes('what skills') ||
+      queryLower.includes('top skills') ||
+      queryLower.includes('education background') ||
+      queryLower.includes('work experience') ||
+      queryLower.includes('current role') ||
+      queryLower.includes('current job') ||
+      queryLower.includes('work at') ||
+      queryLower.includes('worked at');
+    
+    // For LinkedIn, only force factual strategy for clearly factual queries
+    if (isFactualQuery) {
+      return {
+        strategy: strategies.LINKEDIN_FACTUAL,
+        useWebSearch: false,
+        focusOnDomain: userDomain.primaryDomain,
+        includePersonalization: false,
+        includeMetrics: true,
+        expectedLength: 'short',
+        responseType: 'factual_extraction'
+      };
+    }
+  }
   
   // For simple questions, use direct answer strategy
   if (questionComplexity.isSimple) {
@@ -1702,6 +1790,9 @@ async function createPersonalizedRagPrompt(profileData, rulesData, query, platfo
   
      // Create strategy-specific prompts
    switch (responseStrategy?.strategy) {
+     case 'linkedin_factual':
+       return createLinkedInFactualPrompt(enhancedContext, query, platform, username, userDomain);
+       
      case 'direct_answer':
        return createDirectAnswerPrompt(enhancedContext, query, platform, username, userDomain);
        
@@ -1720,6 +1811,56 @@ async function createPersonalizedRagPrompt(profileData, rulesData, query, platfo
      default:
        return createTraditionalSmartPrompt(enhancedContext, query, platform, username, userDomain);
    }
+}
+
+// 🎯 LinkedIn Factual Data Extraction Prompt
+function createLinkedInFactualPrompt(context, query, platform, username, userDomain) {
+  console.log(`[RAG-Server] 🔍 LinkedIn Factual Prompt Context Preview:`, context.substring(0, 500));
+  return `You are a LinkedIn profile data analyst. Your job is to extract EXACT factual information from the provided profile data.
+
+PROFILE DATA CONTEXT:
+${context}
+
+USER QUESTION: "${query}"
+
+CRITICAL INSTRUCTIONS:
+1. ANSWER ONLY WITH FACTUAL DATA from the profile context above
+2. If asking about specific metrics, dates, jobs, education - give EXACT numbers, dates, companies
+3. If asking about timeline (what job in 2018-2020) - extract the EXACT position and dates
+4. If asking about engagement metrics - give EXACT like/comment/share numbers
+5. If asking about education - give EXACT degree, institution, dates
+6. If asking about experience - give EXACT job title, company, duration
+7. If asking about skills - list EXACT skills mentioned in profile
+8. If asking about most/least engaging posts - identify EXACT post and metrics
+9. If asking about followers and you see "1 follower" - note this is likely outdated cached data
+
+DO NOT:
+- Give generic LinkedIn advice
+- Suggest improvements or strategies  
+- Talk about "building your LinkedIn presence"
+- Give vague responses like "based on your profile..."
+- Make up or guess follower/connection numbers
+- Report outdated data as current without noting limitations
+
+SPECIAL NOTE FOR FOLLOWER/CONNECTION QUERIES:
+- The profile data may contain outdated follower/connection counts
+- If follower count seems unusually low (like 1-10), note this as potentially outdated data
+- For LinkedIn accounts, follower data in stored profiles may not reflect current live counts
+- When asked about followers/connections, explain data limitations honestly
+
+ANSWER FORMAT:
+- Start directly with the factual answer
+- Use specific numbers, dates, companies, titles
+- Be precise and concise
+- If the exact data isn't in the context, say "This specific information is not available in the profile data"
+
+EXAMPLE GOOD RESPONSES:
+- "You were Assistant Professor at Al Jouf University from September 2018 to August 2020"
+- "Your post about machine learning got 87 likes, 12 comments, and 5 shares"
+- "You have a PhD in Mathematical Statistics from Lund University, awarded in 2011"
+- "Your top skills by endorsements are: LaTeX, Matlab, Signal Processing, Mathematical Modeling, Simulations"
+
+Answer the question with EXACT factual data only:`;
 }
 
 // 🎯 Direct answer prompt for simple questions
@@ -3018,8 +3159,11 @@ app.all(['/api/rag/discussion', '/api/discussion', '/api/rag/discussion/', '/api
     let usingFallbackProfile = false;
     
     try {
+      console.log(`[RAG-Server] 🔍 ATTEMPTING to get profile data for ${platform}/${username}`);
       profileData = await getProfileData(username, platform);
+      console.log(`[RAG-Server] ✅ SUCCESS: Got profile data for ${platform}/${username}`, Object.keys(profileData));
     } catch (profileError) {
+      console.error(`[RAG-Server] ❌ FAILED to get profile data for ${platform}/${username}:`, profileError.message);
       console.log(`[RAG-Server] No profile data found for ${platform}/${username}, using fallback profile`);
       usingFallbackProfile = true;
       // Create a basic fallback profile
@@ -3048,7 +3192,7 @@ app.all(['/api/rag/discussion', '/api/discussion', '/api/rag/discussion/', '/api
     }
     
     // 🎯 INTELLIGENT STRATEGY DETERMINATION
-    const responseStrategy = determineResponseStrategy(query, profileData, username);
+    const responseStrategy = determineResponseStrategy(query, profileData, username, platform);
     console.log(`[RAG-Server] 🧠 Strategy: ${responseStrategy.strategy}, Domain: ${responseStrategy.focusOnDomain}, WebSearch: ${responseStrategy.useWebSearch}`);
     
     // 🚀 Create PERSONALIZED RAG prompt based on strategy
@@ -3246,6 +3390,12 @@ Your metrics indicate a well-established ${platformName} presence with good grow
             }
           } catch (thirdError) {
             console.log(`[RAG-Server] All AI strategies failed for ${platform}/${username}: ${thirdError.message}`);
+            
+            // LinkedIn must never use template responses - always fail gracefully with real data
+            if (platform === 'linkedin') {
+              throw new Error(`LinkedIn RAG failed - profile data exists but AI generation unavailable. Real data: ${Object.keys(profileData).length} profile fields available.`);
+            }
+            
             console.log(`[RAG-Server] 🧠 Using Intelligent RAG Response Generator for ${platform}/${username}`);
             response = generateIntelligentRAGResponse(profileData, query, platform, username);
             console.log(`[RAG-Server] ✅ Generated intelligent response using real data for ${platform}/${username}`);
@@ -5741,12 +5891,16 @@ function detectQuotaExhaustion(error) {
   return false;
 }
 
-// Function to get appropriate fallback response
+// Function to get appropriate fallback response (LinkedIn excluded - uses dynamic RAG only)
 function getFallbackResponse(query, platform = 'instagram') {
+  // LinkedIn never uses fallback responses - always uses dynamic RAG data
+  if (platform === 'linkedin') {
+    throw new Error('LinkedIn must use dynamic RAG data - no fallback responses allowed');
+  }
+  
   const queryLower = query.toLowerCase();
   const platformName = platform === 'twitter' ? 'X (Twitter)' : 
                       platform === 'facebook' ? 'Facebook' : 
-                      platform === 'linkedin' ? 'LinkedIn' : 
                       'Instagram';
   
   // More specific keyword matching for better contextual responses

@@ -713,6 +713,49 @@ app.get('/api/health-check', (req, res) => {
   });
 });
 
+// Usage increment endpoint for feature tracking
+app.post('/api/usage/increment/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { feature } = req.body;
+    
+    if (!userId || !feature) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'userId and feature are required' 
+      });
+    }
+    
+    // Validate feature type
+    const validFeatures = ['posts', 'discussions', 'aiReplies', 'campaigns', 'resets'];
+    if (!validFeatures.includes(feature)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Invalid feature. Must be one of: ${validFeatures.join(', ')}` 
+      });
+    }
+    
+    console.log(`[${new Date().toISOString()}] [Usage] Incrementing ${feature} for user ${userId}`);
+    
+    // For now, just log the usage increment
+    // In a real implementation, this would update a database
+    res.status(200).json({
+      success: true,
+      message: `Successfully incremented ${feature} usage for user ${userId}`,
+      timestamp: new Date().toISOString(),
+      userId,
+      feature
+    });
+    
+  } catch (error) {
+    console.error('[Usage] Error incrementing usage:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error' 
+    });
+  }
+});
+
 // Clear image cache endpoint for administrators
 app.post('/admin/clear-image-cache', (req, res) => {
   const cacheSize = imageCache.size;

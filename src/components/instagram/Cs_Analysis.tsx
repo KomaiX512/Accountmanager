@@ -283,7 +283,11 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
         console.warn(`[Cs_Analysis] ⚠️ Could not fetch account info for ${normalizedAccountHolder}:`, error.response?.status);
         // Fallback to profile-info for basic account details
         try {
-          const profileResponse = await axios.get(`/api/profile-info/${normalizedAccountHolder}?platform=${platform}`);
+          // Use correct endpoint format for LinkedIn
+          const profileInfoUrl = platform === 'linkedin' 
+            ? `/api/profile-info/${platform}/${normalizedAccountHolder}`
+            : `/api/profile-info/${normalizedAccountHolder}?platform=${platform}`;
+          const profileResponse = await axios.get(profileInfoUrl);
           const profileInfo = profileResponse.data;
           if (profileInfo.accountType || profileInfo.account_type) setAccountType(profileInfo.accountType || profileInfo.account_type);
           if (profileInfo.postingStyle || profileInfo.posting_style) setPostingStyle(profileInfo.postingStyle || profileInfo.posting_style);
@@ -360,7 +364,11 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
       if (now - lastFetchTime < 1800000 && competitorProfiles[competitor]) {
         return;
       }
-      const response = await axios.get(`/api/profile-info/${competitor}?platform=${platform}`);
+      // Use correct endpoint format for LinkedIn
+      const profileInfoUrl = platform === 'linkedin' 
+        ? `/api/profile-info/${platform}/${competitor}`
+        : `/api/profile-info/${competitor}?platform=${platform}`;
+      const response = await axios.get(profileInfoUrl);
       console.log(`Profile info for ${platform} competitor ${competitor}:`, response.data);
       setCompetitorProfiles(prev => ({
         ...prev,

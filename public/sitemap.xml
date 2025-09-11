@@ -6,109 +6,204 @@
   
   <!-- Homepage -->
   <url>
-    <loc>https://sentientmarketing.com/</loc>
-    <lastmod>2024-12-19</lastmod>
+    <loc>https://sentientm.com/</loc>
+    <lastmod>2025-01-10</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   
   <!-- Home page alternative -->
   <url>
-    <loc>https://sentientmarketing.com/home</loc>
-    <lastmod>2024-12-19</lastmod>
+    <loc>https://sentientm.com/home</loc>
+    <lastmod>2025-01-10</lastmod>
     <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+  
+  <!-- SentientM Brand Pages -->
+  <url>
+    <loc>https://sentientm.com/sentientm</loc>
+    <lastmod>2025-01-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  
+  <url>
+    <loc>https://sentientm.com/sentient-ai</loc>
+    <lastmod>2025-01-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  
+  <url>
+    <loc>https://sentientm.com/sentient-marketing</loc>
+    <lastmod>2025-01-10</lastmod>
+    <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   
   <!-- Pricing page -->
   <url>
-    <loc>https://sentientmarketing.com/pricing</loc>
-    <lastmod>2024-12-19</lastmod>
+    <loc>https://sentientm.com/pricing</loc>
+    <lastmod>2025-01-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   
   <!-- Privacy Policy -->
   <url>
-    <loc>https://sentientmarketing.com/privacy</loc>
-    <lastmod>2024-12-19</lastmod>
+    <loc>https://sentientm.com/privacy</loc>
+    <lastmod>2025-01-10</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
   
   <!-- Platform pages (public landing) -->
   <url>
-    <loc>https://sentientmarketing.com/instagram</loc>
-    <lastmod>2024-12-19</lastmod>
+    <loc>https://sentientm.com/instagram</loc>
+    <lastmod>2025-01-10</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
+    <priority>0.8</priority>
   </url>
-  
+
   <url>
-    <loc>https://sentientmarketing.com/twitter</loc>
-    <lastmod>2024-12-19</lastmod>
+    <loc>https://sentientm.com/twitter</loc>
+    <lastmod>2025-01-10</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
+    <priority>0.8</priority>
   </url>
-  
+
   <url>
-    <loc>https://sentientmarketing.com/facebook</loc>
-    <lastmod>2024-12-19</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  
-  <!-- Comparison page for competitive keywords -->
-  <url>
-    <loc>https://sentientmarketing.com/comparison</loc>
-    <lastmod>2024-12-19</lastmod>
+    <loc>https://sentientm.com/facebook</loc>
+    <lastmod>2025-01-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   
+  <!-- Enhanced Platform-Specific AI Pages -->
+  <url>
+    <loc>https://sentientm.com/instagram-ai-automation</loc>
+    <lastmod>2025-01-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <url>
+    <loc>https://sentientm.com/twitter-ai-management</loc>
+    <lastmod>2025-01-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <url>
+    <loc>https://sentientm.com/facebook-ai-marketing</loc>
+    <lastmod>2025-01-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <!-- Comparison page for competitive keywords -->
+  <url>
+    <loc>https://sentientm.com/comparison</loc>
+    <lastmod>2025-01-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
   <!-- Alternative URLs for competitor comparisons -->
   <url>
-    <loc>https://sentientmarketing.com/vs-hootsuite</loc>
-    <lastmod>2024-12-19</lastmod>
+    <loc>https://sentientm.com/vs-hootsuite</loc>
+    <lastmod>2025-01-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
-  
+
   <url>
-    <loc>https://sentientmarketing.com/vs-buffer</loc>
-    <lastmod>2024-12-19</lastmod>
+    <loc>https://sentientm.com/vs-buffer</loc>
+    <lastmod>2025-01-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
-  
+
   <url>
-    <loc>https://sentientmarketing.com/vs-sprout-social</loc>
-    <lastmod>2024-12-19</lastmod>
+    <loc>https://sentientm.com/vs-sprout-social</loc>
+    <lastmod>2025-01-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   
   <!-- Blog section for content authority -->
   <url>
-    <loc>https://sentientmarketing.com/blog</loc>
-    <lastmod>2024-12-19</lastmod>
+    <loc>https://sentientm.com/blog</loc>
+    <lastmod>2025-01-10</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.6</priority>
   </url>
-  
-  <!-- AI-specific landing pages -->
+
+  <!-- Enhanced AI-specific landing pages -->
   <url>
-    <loc>https://sentientmarketing.com/ai-social-media-management</loc>
-    <lastmod>2024-12-19</lastmod>
+    <loc>https://sentientm.com/ai-social-media-management</loc>
+    <lastmod>2025-01-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <url>
+    <loc>https://sentientm.com/social-media-automation</loc>
+    <lastmod>2025-01-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  
+  <!-- Sentient AI Specific Pages -->
+  <url>
+    <loc>https://sentientm.com/sentient-ai-platform</loc>
+    <lastmod>2025-01-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  
+  <url>
+    <loc>https://sentientm.com/sentient-social-media-management</loc>
+    <lastmod>2025-01-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  
+  <url>
+    <loc>https://sentientm.com/sentient-content-creation</loc>
+    <lastmod>2025-01-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   
   <url>
-    <loc>https://sentientmarketing.com/social-media-automation</loc>
-    <lastmod>2024-12-19</lastmod>
+    <loc>https://sentientm.com/sentient-automation-platform</loc>
+    <lastmod>2025-01-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
+  </url>
+  
+  <!-- Long-tail Keyword Pages -->
+  <url>
+    <loc>https://sentientm.com/best-ai-social-media-management-platform</loc>
+    <lastmod>2025-01-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  
+  <url>
+    <loc>https://sentientm.com/artificial-intelligence-marketing-automation</loc>
+    <lastmod>2025-01-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  
+  <url>
+    <loc>https://sentientm.com/smart-social-media-ai-assistant</loc>
+    <lastmod>2025-01-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
   </url>
   
 </urlset>

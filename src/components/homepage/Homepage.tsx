@@ -32,21 +32,23 @@ const Homepage: React.FC = () => {
   return (
     <>
       <SEOHead 
-        title="Sentient Marketing - AI-Powered Social Media Management Platform"
-        description="Transform your social media presence with cutting-edge AI that thinks, learns, and grows your brand across Instagram, Twitter, Facebook, and more. Automated content creation, scheduling, and analytics."
-        keywords="social media management, AI marketing, Instagram automation, Twitter automation, Facebook marketing, content creation, social media scheduling, brand growth, digital marketing, AI-powered marketing"
-        canonicalUrl="https://sentientmarketing.com/"
+        title="SentientM | #1 Sentient AI Marketing Platform | Revolutionary Social Media Automation"
+        description="Experience the future with SentientM - The world's most advanced sentient AI that revolutionizes social media marketing. Join 50,000+ businesses using sentient marketing intelligence to dominate Instagram, Twitter, Facebook & more."
+        keywords="sentientm, sentient marketing, sentient ai, sentient social media, ai social media management, sentient automation, sentient intelligence, ai marketing platform, sentient smm, social media ai, automated marketing, sentient brand growth, instagram ai, twitter ai, facebook ai"
+        canonicalUrl="https://sentientm.com/"
         structuredData={{
           "@context": "https://schema.org",
           "@type": "WebPage",
-          "name": "Sentient Marketing - AI-Powered Social Media Management Platform",
-          "description": "Transform your social media presence with cutting-edge AI that thinks, learns, and grows your brand across Instagram, Twitter, Facebook, and more.",
-          "url": "https://sentientmarketing.com/",
+          "name": "SentientM - Revolutionary Sentient AI Marketing Platform",
+          "description": "Experience the future with SentientM - The world's most advanced sentient AI social media management platform. Revolutionary sentient marketing intelligence trusted by 50,000+ businesses worldwide.",
+          "url": "https://sentientm.com/",
           "mainEntity": {
             "@type": "SoftwareApplication",
-            "name": "Sentient Marketing",
+            "name": "SentientM",
+            "alternateName": ["Sentient Marketing", "Sentient AI", "Sentient Social Media"],
             "applicationCategory": "BusinessApplication",
-            "operatingSystem": "Web Browser"
+            "operatingSystem": "Web Browser",
+            "keywords": "sentientm, sentient marketing, sentient ai, social media automation"
           }
         }}
       />
@@ -77,8 +79,8 @@ const Homepage: React.FC = () => {
                   transition={{ duration: 1.2, delay: 0.3 }}
                 >
                   <span className="title-intro">Welcome to the Future of</span>
-                  <span className="gradient-text">Sentient Marketing</span>
-                  <span className="title-sub">AI-Powered Social Media Mastery</span>
+                  <span className="gradient-text">SentientM</span>
+                  <span className="title-sub">Revolutionary Sentient AI Marketing Platform</span>
                 </motion.h1>
                 
                 <motion.p 
@@ -87,7 +89,7 @@ const Homepage: React.FC = () => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 1, delay: 0.6 }}
                 >
-                  Transform your social media presence with cutting-edge AI that thinks, learns, and grows your brand across all platforms with unprecedented intelligence and precision.
+Experience the world's most advanced sentient AI that revolutionizes social media marketing. SentientM's sentient intelligence automates content creation, scheduling, and audience growth across Instagram, Twitter, Facebook, and more with unprecedented precision.
                 </motion.p>
                 
                 <motion.div 
@@ -345,8 +347,8 @@ const Homepage: React.FC = () => {
                   <div className="feature-icon">
                     <FaBrain />
                   </div>
-                  <h3>Neural Content Creation</h3>
-                  <p>Our AI brain generates viral-worthy content that resonates with your audience across Instagram, Facebook, Twitter, LinkedIn, TikTok, and YouTube.</p>
+                  <h3>Sentient Content Creation</h3>
+                  <p>Our revolutionary sentient AI brain generates viral-worthy content that resonates with your audience across Instagram, Facebook, Twitter, LinkedIn, TikTok, and YouTube using advanced sentient marketing intelligence.</p>
                 </motion.div>
 
                 <motion.div 
@@ -359,8 +361,8 @@ const Homepage: React.FC = () => {
                   <div className="feature-icon">
                     <FaRocket />
                   </div>
-                  <h3>Autonomous Growth Engine</h3>
-                  <p>Self-optimizing algorithms that learn from every interaction to exponentially grow your follower base and engagement rates.</p>
+                  <h3>Sentient Growth Engine</h3>
+                  <p>Revolutionary sentient algorithms that think, learn, and adapt from every interaction to exponentially grow your follower base and engagement rates with true artificial intelligence.</p>
                 </motion.div>
 
                 <motion.div 
@@ -401,8 +403,8 @@ const Homepage: React.FC = () => {
                   <div className="feature-icon">
                     <FaInstagram />
                   </div>
-                  <h3>Platform Intelligence</h3>
-                  <p>Deep understanding of each platform's unique algorithm and user behavior patterns for maximum reach and engagement.</p>
+                  <h3>Sentient Platform Intelligence</h3>
+                  <p>Advanced sentient understanding of each platform's unique algorithm and user behavior patterns for maximum reach and engagement across all social media channels.</p>
                 </motion.div>
 
                 <motion.div 

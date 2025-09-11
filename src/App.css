@@ -38,6 +38,70 @@
 
 /* imports moved to top to satisfy CSS rules */
 
+/* Bio text styles for single-line display with expansion */
+.bio-text {
+  font-size: 0.95rem;
+  color: #a0a0a0;
+  text-align: center;
+  line-height: 1.2;
+  font-style: italic;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 40px;
+  box-sizing: border-box;
+  position: absolute;
+  top: 24px;
+  left: 0;
+  right: 0;
+  transition: all 0.3s ease;
+}
+
+.bio-text.collapsed {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-height: 1.2em;
+}
+
+.bio-text.expanded {
+  white-space: pre-wrap;
+  overflow: visible;
+  max-height: none;
+}
+
+/* Bio text responsive adjustments */
+@media (max-width: 1200px) {
+  .bio-text {
+    max-width: 1000px;
+    font-size: 0.9rem;
+    padding: 0 30px;
+  }
+}
+
+@media (max-width: 1000px) {
+  .bio-text {
+    max-width: 800px;
+    font-size: 0.85rem;
+    padding: 0 25px;
+  }
+}
+
+@media (max-width: 800px) {
+  .bio-text {
+    max-width: 600px;
+    font-size: 0.8rem;
+    padding: 0 20px;
+  }
+}
+
+@media (max-width: 600px) {
+  .bio-text {
+    max-width: 400px;
+    font-size: 0.75rem;
+    padding: 0 15px;
+  }
+}
+
 .App {
   display: flex;
   flex-direction: column;

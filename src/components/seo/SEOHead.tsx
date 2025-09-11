@@ -14,11 +14,11 @@ interface SEOHeadProps {
 }
 
 const SEOHead: React.FC<SEOHeadProps> = ({
-  title = "Sentient Marketing - AI-Powered Social Media Management Platform",
-  description = "Transform your social media presence with cutting-edge AI that thinks, learns, and grows your brand across Instagram, Twitter, Facebook, and more. Automated content creation, scheduling, and analytics.",
-  keywords = "social media management, AI marketing, Instagram automation, Twitter automation, Facebook marketing, content creation, social media scheduling, brand growth, digital marketing, AI-powered marketing",
-  canonicalUrl = "https://sentientmarketing.com",
-  ogImage = "https://sentientmarketing.com/Logo/logo.png",
+  title = "SentientM | #1 Sentient AI Marketing Platform | Revolutionary Social Media Automation",
+  description = "Experience the future with SentientM - The world's most advanced sentient AI that revolutionizes social media marketing. Join 50,000+ businesses using sentient marketing intelligence to dominate Instagram, Twitter, Facebook & more.",
+  keywords = "sentientm, sentient marketing, sentient ai, sentient social media, ai social media management, sentient automation, sentient intelligence, ai marketing platform, sentient smm, social media ai, automated marketing, sentient brand growth, instagram ai, twitter ai, facebook ai",
+  canonicalUrl = "https://sentientm.com",
+  ogImage = "https://sentientm.com/Logo/logo.png",
   ogType = "website",
   twitterCard = "summary_large_image",
   noIndex = false,
@@ -46,7 +46,9 @@ const SEOHead: React.FC<SEOHeadProps> = ({
       <meta property="og:image:width" content="1200" />
       <meta property="og:image:height" content="630" />
       <meta property="og:image:alt" content={title} />
-      <meta property="og:site_name" content="Sentient Marketing" />
+      <meta property="og:site_name" content="SentientM" />
+      <meta property="og:brand" content="SentientM" />
+      <meta name="twitter:domain" content="sentientm.com" />
       <meta property="og:locale" content="en_US" />
       
       {/* Twitter */}
@@ -58,6 +60,20 @@ const SEOHead: React.FC<SEOHeadProps> = ({
       <meta property="twitter:image:alt" content={title} />
       <meta property="twitter:creator" content="@sentientmarketing" />
       <meta property="twitter:site" content="@sentientmarketing" />
+      
+      {/* Enhanced SEO Meta Tags */}
+      <meta name="brand" content="SentientM" />
+      <meta name="category" content="AI Marketing Platform" />
+      <meta name="coverage" content="Worldwide" />
+      <meta name="target" content="all" />
+      <meta name="HandheldFriendly" content="True" />
+      <meta name="MobileOptimized" content="320" />
+      <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+      
+      {/* AI and Machine Learning specific tags */}
+      <meta name="ai-platform" content="true" />
+      <meta name="machine-learning" content="social media automation" />
+      <meta name="artificial-intelligence" content="content creation, scheduling, analytics" />
       
       {/* Structured Data */}
       {structuredData && (

@@ -111,7 +111,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const [competitorData, setCompetitorData] = useState<{ key: string; data: any }[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [profileInfo, setProfileInfo] = useState<any | null>(null);
-  const [, setProfileError] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
   // ✅ FIX 2: Remove chat mode selector - chatbar is now dedicated to post creation only
@@ -126,6 +125,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const [showBio, setShowBio] = useState(false);
   const [typedBio, setTypedBio] = useState('');
   const [bioAnimationComplete, setBioAnimationComplete] = useState(false);
+  const [isBioExpanded, setIsBioExpanded] = useState(false);
   const [isSchedulerOpen, setIsSchedulerOpen] = useState(false);
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
@@ -266,7 +266,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   // ALL REF HOOKS
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectAttempts = useRef(0);
-  const lastProfileFetchRef = useRef<{[key: string]: number}>({});
   // Prevent redundant Facebook fallback attempts & log spam
   // Removed unused refs
 
@@ -302,12 +301,10 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       return;
     }
     try {
-      console.log(`[PlatformDashboard] ⚡ PERFORMANCE: Fetching all data in parallel for ${platform}`);
-      const startTime = performance.now();
       const platformParam = `?platform=${platform}`;
       
       // 🚀 PERFORMANCE OPTIMIZATION: Execute ALL requests in parallel
-      const [responsesData, strategiesData, postsData, competitorData, profileData, notificationsData] = await Promise.all([
+      const [responsesData, strategiesData, postsData, competitorData, notificationsData] = await Promise.all([
         axios.get(appendBypassParam(`/api/responses/${accountHolder}${platformParam}`, platform, accountHolder, 'responses')).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
@@ -332,11 +329,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
             })
           )
         ),
-        // 🚀 PARALLEL PROFILE FETCH - No more sequential blocking
-        axios.get(appendBypassParam(`/api/profile-info/${accountHolder}${platformParam}`, platform, accountHolder, 'profile')).catch(err => {
-          console.warn(`Profile info fetch failed:`, err);
-          return { data: null };
-        }),
         // 🚀 PARALLEL NOTIFICATIONS FETCH with pagination
         (() => {
           const currentUserId = platform === 'twitter' ? twitterId : 
@@ -361,38 +353,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         })()
       ]);
 
-      const endTime = performance.now();
-      console.log(`[PlatformDashboard] ⚡ PERFORMANCE: All data fetched in ${(endTime - startTime).toFixed(0)}ms`);
 
-      // Process profile data
-      if (profileData.data) {
-        const rawData = profileData.data;
-        let processedProfileData = null;
-        
-        if (platform === 'twitter' && rawData && rawData.username) {
-          processedProfileData = {
-            username: rawData.username,
-            fullName: rawData.name || rawData.username,
-            biography: rawData.bio || rawData.description || '',
-            followersCount: rawData.follower_count ?? rawData.followersCount ?? 0,
-            followsCount: rawData.following_count ?? rawData.followsCount ?? 0,
-            postsCount: rawData.tweet_count ?? rawData.postsCount ?? 0,
-            externalUrl: rawData.website || rawData.externalUrl || '',
-            profilePicUrl: rawData.profile_image_url || rawData.profilePicUrl || '',
-            profilePicUrlHD: rawData.profile_image_url || rawData.profilePicUrlHD || rawData.profilePicUrl || '',
-            private: rawData.protected ?? false,
-            verified: rawData.verified ?? false,
-            platform: 'twitter',
-            extractedAt: new Date().toISOString()
-          };
-        } else {
-          processedProfileData = rawData;
-        }
-        
-        if (processedProfileData && (processedProfileData.fullName || processedProfileData.followersCount !== undefined)) {
-          setProfileInfo(processedProfileData);
-        }
-      }
 
       // Process notifications
       if (Array.isArray(notificationsData) && notificationsData.length > 0) {
@@ -415,129 +376,70 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     }
   }, [accountHolder, platform, accountType, competitors, twitterId, facebookPageId, igUserId]);
 
-  const fetchProfileInfo = useCallback(async (retryCount = 0, forceRefresh = false) => {
-    const maxRetries = 3;
-    const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // Cache for 1 day (24 hours) to prevent excessive API calls
-    const cacheKey = `${platform}_${accountHolder}`;
-    const now = Date.now();
-    
-    // Check cache unless force refresh is requested
-    if (!forceRefresh && lastProfileFetchRef.current[cacheKey]) {
-      const timeSinceLastFetch = now - lastProfileFetchRef.current[cacheKey];
-      if (timeSinceLastFetch < CACHE_DURATION_MS) {
-        console.log(`[PlatformDashboard] 🚀 Skipping profile fetch for ${platform}/${accountHolder} (cached for ${Math.round(timeSinceLastFetch/1000/60/60)}h)`);
-        return;
-      }
-    }
-    
-    // Update cache timestamp
-    lastProfileFetchRef.current[cacheKey] = now;
+  const fetchProfileInfo = useCallback(async () => {
+    if (!accountHolder || !platform) return;
     
     setProfileLoading(true);
-    setProfileError(null);
     
     try {
-      // ✅ PLATFORM-USERNAME VALIDATION: Ensure accountHolder matches current platform
-  const currentUrlPlatform = location.pathname.includes('twitter') ? 'twitter' : 
-            location.pathname.includes('facebook') ? 'facebook' : 
-            location.pathname.includes('linkedin') ? 'linkedin' : 'instagram';
-      
-      if (platform !== currentUrlPlatform) {
-        console.error(`[PlatformDashboard] ❌ PLATFORM MISMATCH: prop=${platform}, URL=${currentUrlPlatform}`);
-        setProfileError(`Platform mismatch detected. Expected ${currentUrlPlatform}, got ${platform}`);
-        return;
-      }
-      
-      // ✅ USERNAME VALIDATION: Removed - accountHolder now comes directly from localStorage
-      
-      console.log(`[${new Date().toISOString()}] 🔍 Fetching ${platform} profile info for: ${accountHolder} (attempt ${retryCount + 1}/${maxRetries}) ✅ VALIDATED`);
-      
       let response;
-      let profileData = null;
-      const platformParam = `?platform=${platform}`;
-      response = await axios.get(appendBypassParam(`/api/profile-info/${accountHolder}${platformParam}`, platform, accountHolder, 'profile'));
-      const rawData = response.data;
-      if (platform === 'twitter' && rawData && rawData.username) {
-        profileData = {
-          username: rawData.username,
-          fullName: rawData.name || rawData.username,
-          biography: rawData.bio || rawData.description || '',
-          followersCount: rawData.follower_count ?? rawData.followersCount ?? 0,
-          followsCount: rawData.following_count ?? rawData.followsCount ?? 0,
-          postsCount: rawData.tweet_count ?? rawData.postsCount ?? 0,
-          externalUrl: rawData.website || rawData.externalUrl || '',
-          profilePicUrl: rawData.profile_image_url || rawData.profilePicUrl || '',
-          profilePicUrlHD: rawData.profile_image_url || rawData.profilePicUrlHD || rawData.profilePicUrl || '',
-          private: rawData.protected ?? false,
-          verified: rawData.verified ?? false,
-          platform: 'twitter',
-          extractedAt: new Date().toISOString()
-        };
+      
+      if (platform === 'linkedin') {
+        response = await axios.get(`/api/profile-info/${platform}/${accountHolder}`);
       } else {
-        profileData = rawData;
+        response = await axios.get(`/api/profile-info/${accountHolder}?platform=${platform}`);
       }
       
-      console.log(`[PlatformDashboard] Raw response for ${platform}:`, profileData);
+      const profileData = response.data;
       
-      // 🎯 ENHANCED VALIDATION: Check if response contains actual profile fields
-      if (profileData && typeof profileData === 'object' && !Array.isArray(profileData)) {
-        // Validate that this is actually profile data, not account config
-        const hasProfileFields = profileData.fullName || profileData.followersCount !== undefined || 
-                                 profileData.biography || profileData.profilePicUrl || profileData.profilePicUrlHD;
+      if (profileData && typeof profileData === 'object' && Object.keys(profileData).length > 0) {
+        // Platform-specific data transformation
+        let processedProfileData = profileData;
         
-        if (hasProfileFields) {
-          setProfileInfo(profileData);
-          console.log(`[${platform.toUpperCase()}] Profile Info Successfully Fetched:`, {
-            fullName: profileData.fullName,
-            followersCount: profileData.followersCount,
-            biography: profileData.biography?.substring(0, 50) + '...',
-            profilePicUrl: profileData.profilePicUrl ? 'Available' : 'N/A'
-          });
+        if (platform === 'twitter' && profileData.username) {
+          // Transform Twitter API fields to standard format
+          processedProfileData = {
+            username: profileData.username,
+            fullName: profileData.name || profileData.username,
+            biography: profileData.bio || profileData.description || '',
+            followersCount: profileData.follower_count ?? profileData.followersCount ?? 0,
+            followsCount: profileData.following_count ?? profileData.followsCount ?? 0,
+            postsCount: profileData.tweet_count ?? profileData.postsCount ?? 0,
+            externalUrl: profileData.website || profileData.externalUrl || '',
+            profilePicUrl: profileData.profile_image_url || profileData.profilePicUrl || '',
+            profilePicUrlHD: profileData.profile_image_url || profileData.profilePicUrlHD || profileData.profilePicUrl || '',
+            private: profileData.protected ?? false,
+            verified: profileData.verified ?? false,
+            platform: 'twitter',
+            extractedAt: new Date().toISOString()
+          };
+        } else if (platform === 'linkedin') {
+          // LinkedIn data is already in correct format
+          processedProfileData = profileData;
         } else {
-          console.warn(`[${platform.toUpperCase()}] Response contains account config, not profile data:`, profileData);
-          setProfileInfo(null);
-          if (platform === 'twitter') {
-            setProfileError(`Twitter profile data not found. Connect your Twitter account and scrape data to see profile information.`);
-          } else {
-            setProfileError(`Profile data not found for ${platform}. Please ensure profile info is scraped.`);
-          }
+          // Instagram, Facebook use raw data
+          processedProfileData = profileData;
         }
+        
+        setProfileInfo(processedProfileData);
       } else {
         setProfileInfo(null);
-        if (platform === 'twitter') {
-          setProfileError(`Twitter profile data not available. Connect your Twitter account and scrape data to see profile information.`);
-        } else {
-          setProfileError(`Invalid profile data received for ${platform}.`);
-        }
       }
-    } catch (err: any) {
-      // Improved error handling for Twitter - don't log 404 as error
-      if (platform === 'twitter' && err.response?.status === 404) {
-        console.log(`[TWITTER] Profile info not available yet, this is expected for new Twitter accounts`);
-        setProfileInfo(null);
-        setProfileError(`Twitter profile info not available. Connect your Twitter account and scrape data to see profile information.`);
-      } else {
-        console.error(`[${platform.toUpperCase()}] Profile info fetch error:`, err);
-        if (err.response?.status === 404) {
-          setProfileInfo(null);
-          setProfileError(`Profile info not available for ${platform}.`);
-        } else {
-          setProfileError(`Failed to load ${platform} profile info.`);
-        }
-      }
+      
+    } catch (error) {
+      console.error(`Error fetching ${platform} profile:`, error);
+      setProfileInfo(null);
     } finally {
       setProfileLoading(false);
     }
-  }, [accountHolder, platform]);
+  }, [platform, accountHolder]);
 
   // Simple refresh handler for regular data updates (defined after functions)
   const handleDataRefresh = useCallback(() => {
     if (!accountHolder || !platform) return;
     
-    console.log(`[PlatformDashboard] 🔄 Refreshing data for ${platform}`);
     refreshAllData();
-    fetchProfileInfo(0, true); // Force refresh when user manually refreshes
-  }, [platform, accountHolder, refreshAllData]); // Removed fetchProfileInfo from dependencies to avoid circular dependency
+  }, [platform, accountHolder, refreshAllData]);
 
   // ✅ BULLET-PROOF F5 INTEGRATION: Simple hook usage
   useDashboardRefresh({
@@ -545,32 +447,14 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     onRefresh: handleDataRefresh
   });
 
-  // Initial load effect
+  // Initial load and platform change effect - fetch profile once
   useEffect(() => {
     if (accountHolder && platform) {
-      console.log(`[PlatformDashboard] 🚀 Initial load for ${platform}`);
-      handleDataRefresh();
+      setNotifications([]);
+      fetchProfileInfo();
     }
-  }, [platform, accountHolder, handleDataRefresh]);
+  }, [platform, accountHolder]);
 
-  // ✅ CRITICAL FIX: Force profile reset when switching platforms
-  useEffect(() => {
-    console.log(`[PlatformDashboard] 🔄 Platform or accountHolder changed, resetting profile state`);
-    
-    // Reset profile state immediately to prevent stale data display
-    setProfileInfo(null);
-    setProfileError(null);
-    setProfileLoading(false);
-    setImageError(false);
-    
-    // Reset notifications and other platform-specific data
-    setNotifications([]);
-    
-    // Force immediate profile fetch for new platform
-    if (accountHolder && platform) {
-      fetchProfileInfo(0, true); // Force refresh when switching platforms
-    }
-  }, [platform, accountHolder]); // Removed fetchProfileInfo from dependencies to avoid circular dependency
 
   // ✅ CLEANUP: Reset state when component unmounts
   useEffect(() => {
@@ -1223,7 +1107,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
           if (accountHolder) {
             console.log(`[PlatformDashboard] 👁️ User returned to tab after ${FOCUS_THROTTLE_MS/1000/60}m+ - refreshing data`);
             refreshAllData();
-            fetchProfileInfo(0, true); // Force refresh when user returns to tab after long absence
+            fetchProfileInfo(); // Refresh profile info when user returns to tab after long absence
           }
         } else {
           console.log(`[PlatformDashboard] 👁️ User returned to tab but skipping refresh (throttled)`);
@@ -1374,31 +1258,42 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     };
   }, [accountHolder]);
 
-  // Bio typing animation effect
+  // Simplified bio animation effect - only run once per bio content
   useEffect(() => {
     if (!profileInfo?.biography || !profileInfo.biography.trim()) {
+      // Reset animation states for empty bio
+      setShowInitialText(true);
+      setShowBio(false);
+      setTypedBio('');
+      setBioAnimationComplete(false);
       return;
     }
 
-    // Start the initial animation sequence
+    // Only start animation if bio content has actually changed
+    const currentBio = profileInfo.biography.trim();
+    if (typedBio === currentBio && bioAnimationComplete) {
+      return; // Animation already complete for this bio content
+    }
+
+    // Reset animation states for new bio content
+    setShowInitialText(true);
+    setShowBio(false);
+    setTypedBio('');
+    setBioAnimationComplete(false);
+
+    // Start animation sequence
     const timer1 = setTimeout(() => {
-      // Fade out initial text after 5 seconds
       setShowInitialText(false);
       
-      // Start showing bio with typing effect after fade out completes
       setTimeout(() => {
         setShowBio(true);
         
         // Start typing animation
-        const bio = profileInfo.biography!; // Non-null assertion since we already checked
         let currentIndex = 0;
-        
         const typeNextChar = () => {
-          if (currentIndex < bio.length) {
-            setTypedBio(bio.substring(0, currentIndex + 1));
+          if (currentIndex < currentBio.length) {
+            setTypedBio(currentBio.substring(0, currentIndex + 1));
             currentIndex++;
-            
-            // Fast typing speed - 50ms per character
             setTimeout(typeNextChar, 50);
           } else {
             setBioAnimationComplete(true);
@@ -1406,21 +1301,11 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         };
         
         typeNextChar();
-      }, 500); // Wait for fade out to complete
-    }, 5000); // Initial 5 second delay
+      }, 500);
+    }, 5000);
 
     return () => clearTimeout(timer1);
-  }, [profileInfo?.biography]);
-
-  // Reset animation states when profile info changes
-  useEffect(() => {
-    if (profileInfo?.biography && profileInfo.biography.trim()) {
-      setShowInitialText(true);
-      setShowBio(false);
-      setTypedBio('');
-      setBioAnimationComplete(false);
-    }
-  }, [profileInfo]);
+  }, [profileInfo?.biography]); // Only depend on biography content
 
   // [ADDED] ensure campaign button persists across refreshes by checking backend on mount
   useEffect(() => {
@@ -2687,6 +2572,10 @@ Image Description: ${response.post.image_prompt}
     setIsResetConfirmOpen(false);
   };
 
+  const handleBioClick = () => {
+    setIsBioExpanded(!isBioExpanded);
+  };
+
   const handleConfirmReset = async () => {
     if (!currentUser) {
       setToast('User not authenticated');
@@ -2728,7 +2617,7 @@ Image Description: ${response.post.image_prompt}
         {showWelcome && (
           <div className="welcome-header">
             <h1 className="welcome-text">
-              Welcome {accountHolder}!
+              Welcome {profileInfo?.fullName || accountHolder}!
             </h1>
             <div className="welcome-subtext-container" style={{ position: 'relative', minHeight: '48px' }}>
               <motion.p 
@@ -2744,14 +2633,16 @@ Image Description: ${response.post.image_prompt}
               
               {profileInfo?.biography && profileInfo.biography.trim() && (
                 <motion.div
-                  className="bio-text"
+                  className={`bio-text ${isBioExpanded ? 'expanded' : 'collapsed'}`}
                   animate={{ 
                     opacity: showBio ? 1 : 0,
                     y: showBio ? 0 : 10
                   }}
                   transition={{ duration: 0.5, ease: 'easeInOut', delay: showBio ? 0.2 : 0 }}
+                  onClick={handleBioClick}
+                  style={{ cursor: 'pointer' }}
                 >
-                  {typedBio}
+{typedBio}
                   {showBio && !bioAnimationComplete && (
                     <motion.span
                       animate={{ opacity: [1, 0] }}
@@ -2784,19 +2675,17 @@ Image Description: ${response.post.image_prompt}
                     <div className="profile-loading">Loading...</div>
                   ) : (
                     <>
-                      {(profileInfo?.profilePicUrlHD || profileInfo?.profilePicUrl) && !imageError ? (
+                      {profileInfo?.profilePicUrl && !imageError ? (
                         <img
-                          src={`/api/avatar/${platform}/${accountHolder}`}
-                          alt={`${accountHolder}'s profile picture`}
+                          src={profileInfo.profilePicUrl}
+                          alt={`${profileInfo?.fullName || accountHolder}'s profile picture`}
                           className="profile-pic-bar"
-                          onError={() => {
-                            setImageError(true);
-                          }}
+                          onError={() => setImageError(true)}
                         />
                       ) : (
                         <div className="profile-pic-bar">
                           <div className="profile-pic-fallback">
-                            {accountHolder.charAt(0).toUpperCase()}
+                            {(profileInfo?.fullName || accountHolder).charAt(0).toUpperCase()}
                           </div>
                         </div>
                       )}
@@ -3386,10 +3275,15 @@ Image Description: ${response.post.image_prompt}
         }} />
       )}
       {isInsightsOpen && config.supportsInsights && (
-        <InsightsModal userId={userId!} accountHolder={accountHolder} onClose={() => {
-          console.log(`[${new Date().toISOString()}] Closing InsightsModal`);
-          setIsInsightsOpen(false);
-        }} />
+        <InsightsModal 
+          userId={userId!} 
+          platform={platform}
+          accountHolder={accountHolder} 
+          onClose={() => {
+            console.log(`[${new Date().toISOString()}] Closing InsightsModal`);
+            setIsInsightsOpen(false);
+          }} 
+        />
       )}
       {isChatModalOpen && (
         <ChatModal 

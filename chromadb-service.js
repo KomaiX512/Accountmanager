@@ -25,6 +25,34 @@ class ChromaDBService {
     };
   }
 
+  // Robust content sanitization for ChromaDB JSON compatibility
+  sanitizeForChromaDB(content) {
+    if (!content || typeof content !== 'string') return '';
+    
+    try {
+      // Remove or escape problematic characters
+      let sanitized = content
+        // Remove control characters except newlines and tabs
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+        // Fix common Unicode issues
+        .replace(/[\uD800-\uDFFF]/g, '') // Remove unpaired surrogates
+        // Escape backslashes that might break JSON
+        .replace(/\\/g, '\\\\')
+        // Normalize whitespace
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      // Test if it's valid JSON-serializable
+      JSON.stringify(sanitized);
+      
+      return sanitized;
+    } catch (error) {
+      console.warn(`[ChromaDB] Content sanitization failed, using fallback:`, error.message);
+      // Fallback: only keep ASCII printable characters and basic punctuation
+      return content.replace(/[^\x20-\x7E]/g, '').slice(0, 1000);
+    }
+  }
+
   // Simple local embedding using text features (fallback)
   generateLocalEmbedding(text) {
     const cleaned = text.toLowerCase().replace(/[^\w\s]/g, ' ').trim();
@@ -134,13 +162,14 @@ class ChromaDBService {
       if (normalizedData.profile) {
         const profileDoc = this.createProfileDocument(normalizedData.profile, platform, username);
         if (profileDoc) {
+          console.log(`[ChromaDB] 🔍 DEBUG: Creating profile doc with metadata:`, JSON.stringify(profileDoc.metadata, null, 2));
           documents.push(profileDoc.content);
           metadatas.push(profileDoc.metadata);
           ids.push(`${username}_${platform}_profile`);
         }
       }
 
-      // Process posts/content
+      // Process posts/content with enhanced detail for LinkedIn
       if (normalizedData.posts && normalizedData.posts.length > 0) {
         normalizedData.posts.forEach((post, index) => {
           const postDoc = this.createPostDocument(post, platform, username, index);
@@ -149,7 +178,49 @@ class ChromaDBService {
             metadatas.push(postDoc.metadata);
             ids.push(`${username}_${platform}_post_${index}`);
           }
+
+          // For LinkedIn, create additional detailed post metric documents
+          if (platform === 'linkedin' && post.engagement) {
+            const metricDoc = this.createPostMetricsDocument(post, platform, username, index);
+            if (metricDoc) {
+              documents.push(metricDoc.content);
+              metadatas.push(metricDoc.metadata);
+              ids.push(`${username}_${platform}_post_${index}_metrics`);
+            }
+          }
+
+          // Create post ranking document for engagement analysis
+          if (platform === 'linkedin') {
+            const rankingDoc = this.createPostRankingDocument(post, index, normalizedData.posts, platform, username);
+            if (rankingDoc) {
+              documents.push(rankingDoc.content);
+              metadatas.push(rankingDoc.metadata);
+              ids.push(`${username}_${platform}_post_${index}_ranking`);
+            }
+          }
         });
+      } else if (platform === 'linkedin') {
+        // Create a specific document to acknowledge no posts for LinkedIn
+        const noPostsDoc = {
+          content: this.sanitizeForChromaDB(`Content Activity Status:
+No posts currently available on this LinkedIn profile.
+Post Count: 0 posts
+Content Status: This profile does not have any public posts or content shared.
+Profile Type: Professional LinkedIn profile without posted content.
+Engagement Data: No engagement metrics available due to absence of posts.
+
+Note: This is a professional LinkedIn profile that focuses on networking and professional presence rather than content creation. The profile contains comprehensive professional information, education, skills, and experience details, but does not include posted content or engagement metrics.`),
+          metadata: {
+            type: 'content_activity',
+            platform,
+            username,
+            postCount: 0,
+            hasContent: false
+          }
+        };
+        documents.push(noPostsDoc.content);
+        metadatas.push(noPostsDoc.metadata);
+        ids.push(`${username}_${platform}_content_status`);
       }
 
       // Process bio/description if available
@@ -169,6 +240,94 @@ class ChromaDBService {
           documents.push(engagementDoc.content);
           metadatas.push(engagementDoc.metadata);
           ids.push(`${username}_${platform}_engagement`);
+        }
+      }
+
+        // Process LinkedIn-specific data
+      if (platform === 'linkedin') {
+        // Process experiences
+        if (normalizedData.experiences && normalizedData.experiences.length > 0) {
+          normalizedData.experiences.forEach((experience, index) => {
+            const expDoc = this.createExperienceDocument(experience, platform, username, index);
+            if (expDoc) {
+              documents.push(expDoc.content);
+              metadatas.push(expDoc.metadata);
+              ids.push(`${username}_${platform}_experience_${index}`);
+            }
+          });
+        }
+
+        // Process education
+        if (normalizedData.education && normalizedData.education.length > 0) {
+          console.log(`[ChromaDB] 🔍 DEBUG: Processing ${normalizedData.education.length} education items for ${username}`);
+          normalizedData.education.forEach((education, index) => {
+            console.log(`[ChromaDB] 🔍 DEBUG: Education ${index}:`, JSON.stringify(education, null, 2));
+            const eduDoc = this.createEducationDocument(education, platform, username, index);
+            if (eduDoc) {
+              console.log(`[ChromaDB] 🔍 DEBUG: Created education doc with content preview:`, eduDoc.content.substring(0, 200));
+              documents.push(eduDoc.content);
+              metadatas.push(eduDoc.metadata);
+              ids.push(`${username}_${platform}_education_${index}`);
+            }
+          });
+        } else {
+          console.log(`[ChromaDB] 🔍 DEBUG: No education data found for ${username}`);
+        }
+
+        // Process skills
+        if (normalizedData.skills && normalizedData.skills.length > 0) {
+          normalizedData.skills.forEach((skill, index) => {
+            const skillDoc = this.createSkillDocument(skill, platform, username, index);
+            if (skillDoc) {
+              documents.push(skillDoc.content);
+              metadatas.push(skillDoc.metadata);
+              ids.push(`${username}_${platform}_skill_${index}`);
+            }
+          });
+        }
+
+        // Process certifications
+        if (normalizedData.certifications && normalizedData.certifications.length > 0) {
+          normalizedData.certifications.forEach((cert, index) => {
+            const certDoc = this.createCertificationDocument(cert, platform, username, index);
+            if (certDoc) {
+              documents.push(certDoc.content);
+              metadatas.push(certDoc.metadata);
+              ids.push(`${username}_${platform}_certification_${index}`);
+            }
+          });
+        }
+
+        // Process publications
+        if (normalizedData.publications && normalizedData.publications.length > 0) {
+          normalizedData.publications.forEach((pub, index) => {
+            const pubDoc = this.createPublicationDocument(pub, platform, username, index);
+            if (pubDoc) {
+              documents.push(pubDoc.content);
+              metadatas.push(pubDoc.metadata);
+              ids.push(`${username}_${platform}_publication_${index}`);
+            }
+          });
+        }
+
+        // Process languages
+        if (normalizedData.languages && normalizedData.languages.length > 0) {
+          const langDoc = this.createLanguagesDocument(normalizedData.languages, platform, username);
+          if (langDoc) {
+            documents.push(langDoc.content);
+            metadatas.push(langDoc.metadata);
+            ids.push(`${username}_${platform}_languages`);
+          }
+        }
+
+        // Process interests and following
+        if (normalizedData.interests && normalizedData.interests.length > 0) {
+          const interestDoc = this.createInterestsDocument(normalizedData.interests, platform, username);
+          if (interestDoc) {
+            documents.push(interestDoc.content);
+            metadatas.push(interestDoc.metadata);
+            ids.push(`${username}_${platform}_interests`);
+          }
         }
       }
 
@@ -243,8 +402,79 @@ class ChromaDBService {
         }
       } else if (typeof data === 'object') {
         // Handle object format
+        // LinkedIn format (profileInfo + posts + experiences + skills + education)
+        if (data.profileInfo && platform === 'linkedin') {
+          const profileObj = data.profileInfo;
+          // Normalize LinkedIn profile fields
+          normalized.profile = {
+            ...profileObj,
+            username: profileObj.publicIdentifier || profileObj.username || '',
+            fullName: profileObj.fullName || profileObj.firstName + ' ' + profileObj.lastName || '',
+            followersCount: profileObj.followers || profileObj.connections || 0,
+            biography: profileObj.about || profileObj.headline || '',
+            jobTitle: profileObj.jobTitle || '',
+            companyName: profileObj.companyName || '',
+            location: profileObj.addressWithCountry || profileObj.addressWithoutCountry || '',
+            industry: profileObj.companyIndustry || '',
+            skills: profileObj.topSkillsByEndorsements || ''
+          };
+
+          // Process LinkedIn posts with correct engagement mapping and debug logging
+          normalized.posts = (data.posts || []).map((post, index) => {
+            const engagementData = {
+              likes: post.engagement?.likes || 0,
+              comments: post.engagement?.comments || 0,
+              shares: post.engagement?.shares || 0
+            };
+            
+            // Debug log for first few posts to verify engagement mapping
+            if (index < 3) {
+              console.log(`[ChromaDB] 🔍 DEBUG: LinkedIn Post ${index + 1} engagement mapping:`, {
+                sourceEngagement: post.engagement,
+                normalizedEngagement: engagementData,
+                content: (post.content || '').substring(0, 50) + '...'
+              });
+            }
+            
+            return {
+              content: post.content || post.text || '',
+              timestamp: post.postedAt?.timestamp || post.timestamp,
+              engagement: engagementData,
+              hashtags: this.extractHashtags(post.content || post.text || ''),
+              mentions: this.extractMentions(post.content || post.text || ''),
+              type: post.type || 'post'
+            };
+          });
+
+          // Fallback: Some LinkedIn datasets expose posts under `updates` instead of `posts`
+          // Map `updates` to normalized posts if no posts were found
+          if ((!normalized.posts || normalized.posts.length === 0) && Array.isArray(data.updates) && data.updates.length > 0) {
+            normalized.posts = data.updates.map(update => ({
+              content: update.postText || update.text || '',
+              timestamp: update.timestamp || null,
+              engagement: {
+                likes: update.numLikes || 0,
+                comments: update.numComments || 0,
+                // LinkedIn updates often don't expose share counts in this structure
+                shares: 0
+              },
+              hashtags: this.extractHashtags(update.postText || update.text || ''),
+              mentions: this.extractMentions(update.postText || update.text || ''),
+              type: 'post'
+            })).filter(p => p.content && p.content.trim().length > 0);
+          }
+
+          // Add LinkedIn-specific data for indexing
+          normalized.experiences = data.experiences || [];
+          normalized.education = data.educations || []; // Fixed: educations not education
+          normalized.skills = data.skills || [];
+          normalized.certifications = data.licenseAndCertificates || [];
+          normalized.publications = data.publications || [];
+          normalized.languages = data.languages || [];
+          normalized.interests = data.interests || [];
+        } 
         // Facebook Page format (profileInfo + posts)
-        if (data.profileInfo && Array.isArray(data.posts)) {
+        else if (data.profileInfo && Array.isArray(data.posts)) {
           const profileObj = data.profileInfo;
           // Normalize profile fields for consistency
           normalized.profile = {
@@ -326,6 +556,62 @@ class ChromaDBService {
   // Create semantic documents for different data types
   createProfileDocument(profile, platform, username) {
     try {
+      // LinkedIn-specific profile document with comprehensive data
+      if (platform === 'linkedin') {
+        const content = `LinkedIn Professional Profile: ${profile.fullName || profile.firstName + ' ' + profile.lastName || username}
+Username: @${profile.publicIdentifier || username}
+Platform: LinkedIn Professional Network
+
+Personal Information:
+Name: ${profile.fullName || profile.firstName + ' ' + profile.lastName || 'Name not available'}
+Professional Headline: ${profile.headline || 'Headline not available'}
+Connections: ${profile.connections === null ? 'connections data not available' : profile.connections + ' connections'}
+Followers: ${(profile.followers || 0).toLocaleString()} followers
+About Section: ${profile.about || profile.biography || 'No about section available'}
+LinkedIn URL: ${profile.linkedinUrl || 'Not available'}
+Location: ${profile.addressWithCountry || 'Location not specified'}
+Industry: ${profile.companyIndustry || 'Industry not specified'}
+Top Skills: ${profile.topSkillsByEndorsements || 'Skills not available'}
+
+Current Professional Role:
+Position: ${profile.jobTitle || 'Position not specified'}
+Company: ${profile.companyName || 'Company not specified'}
+Company Website: ${profile.companyWebsite || 'Not available'}
+Company LinkedIn: ${profile.companyLinkedin || 'Not available'}
+Company Founded: ${profile.companyFoundedIn || 'Not available'}
+Company Size: ${profile.companySize || 'Not available'}
+Current Role Duration: ${profile.currentJobDuration || 'Not specified'}
+Duration in Years: ${profile.currentJobDurationInYrs || 'Not specified'}
+
+Profile Images:
+Profile Picture: ${profile.profilePic || 'Not available'}
+High Quality Profile Picture: ${profile.profilePicHighQuality || 'Not available'}
+
+Professional Network:
+Connections: ${profile.connections || 'Not available'} connections
+Followers: ${profile.followers || 'Not available'} followers
+Open to Connect: ${profile.openConnection || 'Not specified'}
+URN: ${profile.urn || 'Not available'}`;
+
+        return {
+          content: this.sanitizeForChromaDB(content),
+          metadata: {
+            type: 'profile',
+            platform,
+            username,
+            followerCount: profile.followers || 0,
+            connectionCount: profile.connections || 0,
+            verified: false,
+            businessAccount: false,
+            category: 'professional',
+            jobTitle: profile.jobTitle || '',
+            company: profile.companyName || '',
+            location: profile.location || profile.addressWithCountry || ''
+          }
+        };
+      }
+
+      // Original logic for other platforms
       const content = `Profile: ${profile.fullName || profile.name || username}
 Username: @${profile.username || username}
 Platform: ${platform}
@@ -339,7 +625,7 @@ Category: ${profile.businessCategoryName || profile.category || 'Personal'}
 Website: ${profile.externalUrls?.[0]?.url || 'None'}`;
 
       return {
-        content,
+        content: this.sanitizeForChromaDB(content),
         metadata: {
           type: 'profile',
           platform,
@@ -373,7 +659,7 @@ Total Engagement: ${((post.engagement?.likes || 0) + (post.engagement?.comments 
 Posted: ${post.timestamp || 'Recent'}`;
 
       return {
-        content,
+        content: this.sanitizeForChromaDB(content),
         metadata: {
           type: 'post',
           platform,
@@ -450,6 +736,601 @@ Performance: ${this.categorizePerformance(engagement.engagementRate)}`;
       };
     } catch (error) {
       console.error('[ChromaDB] Error creating engagement document:', error);
+      return null;
+    }
+  }
+
+  // LinkedIn-specific document creation functions
+  createExperienceDocument(experience, platform, username, index) {
+    try {
+      if (!experience.title && !experience.subtitle) {
+        return null; // Skip empty experiences
+      }
+
+      // Extract detailed date information for timeline queries
+      const caption = experience.caption || '';
+      const dateMatch = caption.match(/(\w{3}\s\d{4})\s*-\s*(\w{3}\s\d{4}|\w+)/);
+      let startDate = '', endDate = '', years = [];
+      
+      if (dateMatch) {
+        startDate = dateMatch[1];
+        endDate = dateMatch[2];
+        
+        // Extract years for searchability
+        const startYear = parseInt(startDate.split(' ')[1]);
+        const endYear = endDate.includes('Present') ? new Date().getFullYear() : parseInt(endDate.split(' ')[1]);
+        
+        if (startYear && endYear) {
+          for (let year = startYear; year <= endYear; year++) {
+            years.push(year);
+          }
+        }
+      }
+
+      const companyName = experience.subtitle ? experience.subtitle.split(' · ')[0] : '';
+      const jobType = experience.subtitle ? experience.subtitle.split(' · ')[1] || '' : '';
+
+      const content = `EXPERIENCE RECORD:
+Position: ${experience.title || 'Position'}
+Company: ${companyName}
+Employment Type: ${jobType}
+Duration: ${caption}
+Start Date: ${startDate}
+End Date: ${endDate}
+Years Active: ${years.join(', ')}
+Location: ${experience.metadata || 'Location'}
+Description: ${experience.subComponents?.[0]?.description?.join(' ') || 'No description'}
+Skills: ${experience.skills || 'Not specified'}
+Industry: ${experience.industry || 'Not specified'}
+
+TIMELINE SEARCHABILITY:
+Job in ${years.map(y => `${y}: ${experience.title} at ${companyName}`).join(' | ')}
+Career timeline: ${startDate} to ${endDate} as ${experience.title}`;
+
+      return {
+        content: this.sanitizeForChromaDB(content),
+        metadata: {
+          type: 'experience',
+          platform,
+          username,
+          title: experience.title || '',
+          company: companyName,
+          jobType: jobType,
+          duration: caption,
+          startDate: startDate,
+          endDate: endDate,
+          years: years,
+          location: experience.metadata || '',
+          index
+        }
+      };
+    } catch (error) {
+      console.error('[ChromaDB] Error creating experience document:', error);
+      return null;
+    }
+  }
+
+  createEducationDocument(education, platform, username, index) {
+    try {
+      // Handle LinkedIn education structure
+      if (platform === 'linkedin') {
+        if (!education.title && !education.subtitle) {
+          return null; // Skip empty education
+        }
+
+        // Extract degree details from LinkedIn structure
+        const institution = education.title || 'Institution';
+        const degreeInfo = education.subtitle || 'Degree';
+        const duration = education.caption || 'Duration not specified';
+        const grade = education.subComponents?.[0]?.description?.[0]?.text || 'Grade not specified';
+        
+        // Parse PhD/degree information for better searchability
+        let degreeType = '';
+        let field = '';
+        if (degreeInfo.includes('PhD') || degreeInfo.includes('Doctor of Philosophy')) {
+          degreeType = 'PhD (Doctor of Philosophy)';
+          if (degreeInfo.includes(',')) {
+            field = degreeInfo.split(',')[1].trim();
+          }
+        } else if (degreeInfo.includes('Master') || degreeInfo.includes('MPhil')) {
+          degreeType = 'Master\'s Degree';
+          if (degreeInfo.includes(',')) {
+            field = degreeInfo.split(',')[1].trim();
+          }
+        } else {
+          degreeType = degreeInfo;
+        }
+
+        const content = `Education Background:
+Degree: ${degreeType}
+Field of Study: ${field || degreeInfo}
+Institution: ${institution}
+Duration: ${duration}
+Grade/Performance: ${grade}
+Full Degree Description: ${degreeInfo}
+Location: ${education.metadata || 'Location not specified'}
+
+Key Details:
+- Completed ${degreeType} at ${institution}
+- Specialized in ${field || 'the specified field'}
+- Academic performance: ${grade}
+- Study period: ${duration}`;
+
+        return {
+          content: this.sanitizeForChromaDB(content),
+          metadata: {
+            type: 'education',
+            platform,
+            username,
+            degree: degreeType,
+            school: institution,
+            field: field || degreeInfo,
+            fullDescription: degreeInfo,
+            duration: duration,
+            grade: grade,
+            index
+          }
+        };
+      }
+
+      // Handle other platforms (original logic)
+      if (!education.schoolName && !education.degreeName) {
+        return null; // Skip empty education
+      }
+
+      const content = `Education: ${education.degreeName || education.fieldOfStudy || 'Degree'}
+Institution: ${education.schoolName || 'School'}
+Duration: ${education.timePeriod?.startDate?.year || ''} - ${education.timePeriod?.endDate?.year || 'Present'}
+Field: ${education.fieldOfStudy || 'Field of Study'}
+Description: ${education.description || 'No description'}
+Grade: ${education.grade || 'Not specified'}`;
+
+      return {
+        content: this.sanitizeForChromaDB(content),
+        metadata: {
+          type: 'education',
+          platform,
+          username,
+          degree: education.degreeName || '',
+          school: education.schoolName || '',
+          field: education.fieldOfStudy || '',
+          startYear: education.timePeriod?.startDate?.year || null,
+          endYear: education.timePeriod?.endDate?.year || null,
+          index
+        }
+      };
+    } catch (error) {
+      console.error('[ChromaDB] Error creating education document:', error);
+      return null;
+    }
+  }
+
+  createSkillDocument(skill, platform, username, index) {
+    try {
+      if (!skill.name && !skill.title) {
+        return null; // Skip empty skills
+      }
+
+      const skillName = skill.name || skill.title || skill;
+      const endorsements = skill.endorsements || skill.endorsementCount || 0;
+      
+      const content = `Skill: ${skillName}
+Endorsements: ${endorsements}
+Category: ${skill.category || 'Professional Skill'}
+Level: ${skill.level || 'Proficient'}
+Years of Experience: ${skill.yearsOfExperience || 'Not specified'}
+Related Skills: ${skill.relatedSkills?.join(', ') || 'None listed'}`;
+
+      return {
+        content,
+        metadata: {
+          type: 'skill',
+          platform,
+          username,
+          skillName: skillName,
+          endorsements: parseInt(endorsements) || 0,
+          category: skill.category || '',
+          level: skill.level || '',
+          index
+        }
+      };
+    } catch (error) {
+      console.error('[ChromaDB] Error creating skill document:', error);
+      return null;
+    }
+  }
+
+  createCertificationDocument(certification, platform, username, index) {
+    try {
+      if (!certification.name && !certification.title) {
+        return null; // Skip empty certifications
+      }
+
+      const content = `Certification: ${certification.name || certification.title}
+Issuing Organization: ${certification.authority || certification.organization || 'Organization'}
+Issue Date: ${certification.timePeriod?.startDate?.month || ''}/${certification.timePeriod?.startDate?.year || ''}
+Expiry Date: ${certification.timePeriod?.endDate?.month || ''}/${certification.timePeriod?.endDate?.year || 'No expiry'}
+Credential ID: ${certification.credentialId || 'Not provided'}
+Skills: ${certification.skills?.join(', ') || 'Not specified'}
+Description: ${certification.description || 'No description'}`;
+
+      return {
+        content,
+        metadata: {
+          type: 'certification',
+          platform,
+          username,
+          name: certification.name || certification.title || '',
+          organization: certification.authority || certification.organization || '',
+          issueYear: certification.timePeriod?.startDate?.year || null,
+          expiryYear: certification.timePeriod?.endDate?.year || null,
+          credentialId: certification.credentialId || '',
+          index
+        }
+      };
+    } catch (error) {
+      console.error('[ChromaDB] Error creating certification document:', error);
+      return null;
+    }
+  }
+
+  createPublicationDocument(publication, platform, username, index) {
+    try {
+      if (!publication.name && !publication.title) {
+        return null; // Skip empty publications
+      }
+
+      const content = `Publication: ${publication.name || publication.title}
+Authors: ${publication.authors?.join(', ') || 'Authors not listed'}
+Publication Date: ${publication.date?.month || ''}/${publication.date?.year || ''}
+Publisher: ${publication.publisher || 'Publisher not specified'}
+Description: ${publication.description || 'No description'}
+URL: ${publication.url || 'No URL provided'}
+Type: ${publication.type || 'Publication'}`;
+
+      return {
+        content,
+        metadata: {
+          type: 'publication',
+          platform,
+          username,
+          title: publication.name || publication.title || '',
+          authors: publication.authors || [],
+          year: publication.date?.year || null,
+          publisher: publication.publisher || '',
+          type: publication.type || 'publication',
+          index
+        }
+      };
+    } catch (error) {
+      console.error('[ChromaDB] Error creating publication document:', error);
+      return null;
+    }
+  }
+
+  // LinkedIn Post Metrics Document for detailed engagement analysis
+  createPostMetricsDocument(post, platform, username, index) {
+    try {
+      if (!post.engagement) {
+        return null;
+      }
+
+      const engagement = post.engagement;
+      const totalEngagement = (engagement.likes || 0) + (engagement.comments || 0) + (engagement.shares || 0);
+      const postDate = new Date(post.timestamp || Date.now());
+      
+      const content = `POST METRICS ANALYSIS:
+Post #${index + 1} Detailed Metrics
+Content Preview: "${(post.content || '').substring(0, 100)}..."
+Likes: ${engagement.likes || 0}
+Comments: ${engagement.comments || 0}
+Shares/Reposts: ${engagement.shares || 0}
+Total Engagement: ${totalEngagement}
+Post Date: ${postDate.toDateString()}
+Post Type: ${post.type || 'standard'}
+
+ENGAGEMENT BREAKDOWN:
+Reactions received: ${engagement.likes || 0} likes
+Discussion generated: ${engagement.comments || 0} comments  
+Reach amplification: ${engagement.shares || 0} shares
+Overall performance: ${totalEngagement > 50 ? 'High' : totalEngagement > 10 ? 'Medium' : 'Low'} engagement
+
+SEARCHABLE METRICS:
+Post ${index + 1} metrics: ${engagement.likes || 0} likes, ${engagement.comments || 0} comments, ${engagement.shares || 0} shares
+Exact engagement numbers for post ${index + 1}: likes=${engagement.likes || 0}, comments=${engagement.comments || 0}, shares=${engagement.shares || 0}`;
+
+      return {
+        content,
+        metadata: {
+          type: 'post_metrics',
+          platform,
+          username,
+          postIndex: index,
+          likes: engagement.likes || 0,
+          comments: engagement.comments || 0,
+          shares: engagement.shares || 0,
+          totalEngagement: totalEngagement,
+          postDate: postDate.toISOString(),
+          performance: totalEngagement > 50 ? 'High' : totalEngagement > 10 ? 'Medium' : 'Low'
+        }
+      };
+    } catch (error) {
+      console.error('[ChromaDB] Error creating post metrics document:', error);
+      return null;
+    }
+  }
+
+  // LinkedIn Post Ranking Document for comparative analysis
+  createPostRankingDocument(post, index, allPosts, platform, username) {
+    try {
+      if (!allPosts || allPosts.length === 0) {
+        return null;
+      }
+
+      // Calculate engagement rankings
+      const postsWithEngagement = allPosts.map((p, i) => ({
+        index: i,
+        totalEngagement: (p.engagement?.likes || 0) + (p.engagement?.comments || 0) + (p.engagement?.shares || 0),
+        likes: p.engagement?.likes || 0,
+        comments: p.engagement?.comments || 0,
+        shares: p.engagement?.shares || 0,
+        content: p.content || ''
+      }));
+
+      // Sort by total engagement
+      const sortedPosts = [...postsWithEngagement].sort((a, b) => b.totalEngagement - a.totalEngagement);
+      const currentPostRank = sortedPosts.findIndex(p => p.index === index) + 1;
+      
+      // Sort by likes only
+      const likesSorted = [...postsWithEngagement].sort((a, b) => b.likes - a.likes);
+      const likesRank = likesSorted.findIndex(p => p.index === index) + 1;
+
+      // Find most and least engaging posts
+      const mostEngaging = sortedPosts[0];
+      const leastEngaging = sortedPosts[sortedPosts.length - 1];
+      const isHighest = currentPostRank === 1;
+      const isLowest = currentPostRank === sortedPosts.length;
+
+      const content = `POST RANKING ANALYSIS:
+Post #${index + 1} Performance Ranking
+Overall Engagement Rank: ${currentPostRank} of ${allPosts.length} posts
+Likes Rank: ${likesRank} of ${allPosts.length} posts
+Performance Category: ${isHighest ? 'HIGHEST ENGAGING' : isLowest ? 'LOWEST ENGAGING' : 'MEDIUM PERFORMING'}
+
+COMPARATIVE ANALYSIS:
+${isHighest ? 'This is your MOST engaging post' : `This post ranks #${currentPostRank} in engagement`}
+${isLowest ? 'This is your LEAST engaging post' : ''}
+Most engaging post has ${mostEngaging.totalEngagement} total engagement
+Least engaging post has ${leastEngaging.totalEngagement} total engagement
+This post has ${postsWithEngagement[index].totalEngagement} total engagement
+
+SEARCHABLE RANKINGS:
+${isHighest ? 'Highest engaging post, most engaging post, best performing post' : ''}
+${isLowest ? 'Lowest engaging post, least engaging post, worst performing post' : ''}
+${currentPostRank === 2 ? 'Second most engaging post, second highest post' : ''}
+${currentPostRank === 3 ? 'Third most engaging post, third highest post' : ''}
+Post ranking: ${currentPostRank} out of ${allPosts.length}`;
+
+      return {
+        content,
+        metadata: {
+          type: 'post_ranking',
+          platform,
+          username,
+          postIndex: index,
+          overallRank: currentPostRank,
+          likesRank: likesRank,
+          totalPosts: allPosts.length,
+          isHighest: isHighest,
+          isLowest: isLowest,
+          engagementScore: postsWithEngagement[index].totalEngagement
+        }
+      };
+    } catch (error) {
+      console.error('[ChromaDB] Error creating post ranking document:', error);
+      return null;
+    }
+  }
+
+  // LinkedIn Experience Document Creator
+  createExperienceDocument(experience, platform, username, index) {
+    try {
+      const content = `Professional Experience ${index + 1}:
+Company: ${experience.subtitle || experience.companyName || 'Not specified'}
+Position: ${experience.title || 'Not specified'}
+Duration: ${experience.caption || 'Not specified'}
+Location: ${experience.metadata || 'Not specified'}
+Company ID: ${experience.companyId || 'Not specified'}
+Experience Type: ${experience.breakdown ? 'Multiple Roles' : 'Single Role'}
+${experience.subComponents && experience.subComponents.length > 0 ? 
+  'Role Details:\n' + experience.subComponents.map(sub => 
+    `- ${sub.title || ''} ${sub.caption || ''}`
+  ).join('\n') : ''}`;
+
+      return {
+        content: this.sanitizeForChromaDB(content),
+        metadata: {
+          type: 'experience',
+          platform,
+          username,
+          experienceIndex: index,
+          companyName: experience.subtitle || experience.companyName || '',
+          position: experience.title || '',
+          duration: experience.caption || '',
+          hasMultipleRoles: experience.breakdown || false
+        }
+      };
+    } catch (error) {
+      console.error('[ChromaDB] Error creating experience document:', error);
+      return null;
+    }
+  }
+
+  // LinkedIn Education Document Creator
+  createEducationDocument(education, platform, username, index) {
+    try {
+      const content = `Education ${index + 1}:
+Institution: ${education.title || 'Not specified'}
+Degree: ${education.subtitle || 'Not specified'}
+Duration: ${education.caption || 'Not specified'}
+Institution ID: ${education.companyId || 'Not specified'}
+Education Type: ${education.breakdown ? 'Multiple Programs' : 'Single Program'}`;
+
+      return {
+        content: this.sanitizeForChromaDB(content),
+        metadata: {
+          type: 'education',
+          platform,
+          username,
+          educationIndex: index,
+          institution: education.title || '',
+          degree: education.subtitle || '',
+          duration: education.caption || ''
+        }
+      };
+    } catch (error) {
+      console.error('[ChromaDB] Error creating education document:', error);
+      return null;
+    }
+  }
+
+  // LinkedIn Skills Document Creator
+  createSkillDocument(skill, platform, username, index) {
+    try {
+      const endorsementCount = skill.subComponents && skill.subComponents[0] && skill.subComponents[0].description ?
+        skill.subComponents[0].description.find(desc => desc.text && desc.text.includes('endorsement')) : null;
+      
+      const endorsements = endorsementCount ? 
+        endorsementCount.text.match(/(\d+)\s+endorsement/i)?.[1] || '0' : '0';
+
+      const content = `Professional Skill ${index + 1}:
+Skill Name: ${skill.title || 'Not specified'}
+Endorsements: ${endorsements}
+Skill Category: Professional Competency
+Endorsement Details: ${endorsementCount ? endorsementCount.text : 'No endorsement data'}`;
+
+      return {
+        content: this.sanitizeForChromaDB(content),
+        metadata: {
+          type: 'skill',
+          platform,
+          username,
+          skillIndex: index,
+          skillName: skill.title || '',
+          endorsementCount: parseInt(endorsements) || 0
+        }
+      };
+    } catch (error) {
+      console.error('[ChromaDB] Error creating skill document:', error);
+      return null;
+    }
+  }
+
+  // LinkedIn Certification Document Creator
+  createCertificationDocument(certification, platform, username, index) {
+    try {
+      const content = `Certification ${index + 1}:
+Title: ${certification.title || 'Not specified'}
+Details: ${certification.subtitle || 'Not specified'}
+${certification.caption ? `Duration: ${certification.caption}` : ''}`;
+
+      return {
+        content: this.sanitizeForChromaDB(content),
+        metadata: {
+          type: 'certification',
+          platform,
+          username,
+          certificationIndex: index,
+          title: certification.title || '',
+          details: certification.subtitle || ''
+        }
+      };
+    } catch (error) {
+      console.error('[ChromaDB] Error creating certification document:', error);
+      return null;
+    }
+  }
+
+  // LinkedIn Publication Document Creator
+  createPublicationDocument(publication, platform, username, index) {
+    try {
+      const content = `Publication ${index + 1}:
+Title: ${publication.title || 'Not specified'}
+Details: ${publication.subtitle || 'Not specified'}`;
+
+      return {
+        content: this.sanitizeForChromaDB(content),
+        metadata: {
+          type: 'publication',
+          platform,
+          username,
+          publicationIndex: index,
+          title: publication.title || ''
+        }
+      };
+    } catch (error) {
+      console.error('[ChromaDB] Error creating publication document:', error);
+      return null;
+    }
+  }
+
+  // LinkedIn Languages Document Creator
+  createLanguagesDocument(languages, platform, username) {
+    try {
+      const languageList = languages.map(lang => lang.title).join(', ');
+      const content = `Languages:
+Spoken Languages: ${languageList}
+Total Languages: ${languages.length}
+Language Proficiency: Professional multilingual capability`;
+
+      return {
+        content: this.sanitizeForChromaDB(content),
+        metadata: {
+          type: 'languages',
+          platform,
+          username,
+          languageCount: languages.length,
+          languages: languages.map(lang => lang.title)
+        }
+      };
+    } catch (error) {
+      console.error('[ChromaDB] Error creating languages document:', error);
+      return null;
+    }
+  }
+
+  // LinkedIn Interests Document Creator
+  createInterestsDocument(interests, platform, username) {
+    try {
+      const interestSections = interests.map(section => {
+        const sectionName = section.section_name || 'Professional Interests';
+        const components = section.section_components || [];
+        const topInfluencers = components.map(comp => 
+          `${comp.titleV2} (${comp.caption})`
+        ).join(', ');
+        
+        return `${sectionName}: ${topInfluencers}`;
+      }).join('\n');
+
+      const content = `Professional Interests and Following:
+${interestSections}
+Interest Categories: ${interests.length}
+Professional Network: Following industry leaders and influencers`;
+
+      return {
+        content: this.sanitizeForChromaDB(content),
+        metadata: {
+          type: 'interests',
+          platform,
+          username,
+          interestSections: interests.length,
+          topInfluencers: interests.flatMap(section => 
+            (section.section_components || []).map(comp => comp.titleV2)
+          ).filter(Boolean)
+        }
+      };
+    } catch (error) {
+      console.error('[ChromaDB] Error creating interests document:', error);
       return null;
     }
   }
@@ -749,12 +1630,14 @@ Performance: ${this.categorizePerformance(engagement.engagementRate)}`;
       const queryEmbedding = await this.embeddings.embedQuery(query);
 
       // Search with user filter
+      console.log(`[ChromaDB] 🔍 DEBUG: Searching for username="${username}" in collection ${collectionName}`);
       const results = await collection.query({
         queryEmbeddings: [queryEmbedding],
         nResults: limit,
         where: { username: username },
         include: ['documents', 'metadatas', 'distances']
       });
+      console.log(`[ChromaDB] 🔍 DEBUG: Found ${results.documents[0]?.length || 0} documents for username="${username}"`);
 
       // Format results
       const formattedResults = [];
@@ -788,9 +1671,32 @@ Performance: ${this.categorizePerformance(engagement.engagementRate)}`;
     try {
       console.log(`[ChromaDB] Creating enhanced context for: "${query}"`);
       
-      // Always use ChromaDB semantic search - no fallback
-      const relevantDocs = await this.semanticSearch(query, username, platform, 8);
+      // For LinkedIn, get more comprehensive documents to ensure complete context
+      const searchLimit = platform === 'linkedin' ? 15 : 8;
+      const relevantDocs = await this.semanticSearch(query, username, platform, searchLimit);
       
+      // For LinkedIn, if we don't have enough diverse document types, fetch additional ones
+      if (platform === 'linkedin' && relevantDocs.length < 10) {
+        console.log(`[ChromaDB] LinkedIn context enhancement: Found ${relevantDocs.length} docs, fetching additional comprehensive data`);
+        try {
+          const allUserDocs = await this.semanticSearch('profile education experience skills LinkedIn professional', username, platform, 20);
+          console.log(`[ChromaDB] LinkedIn enhancement: Retrieved ${allUserDocs.length} additional documents`);
+          
+          // Merge with existing docs, avoiding duplicates
+          const existingIds = new Set(relevantDocs.map(doc => doc.metadata.id || doc.content.substring(0, 50)));
+          allUserDocs.forEach(doc => {
+            const docId = doc.metadata.id || doc.content.substring(0, 50);
+            if (!existingIds.has(docId)) {
+              relevantDocs.push(doc);
+              existingIds.add(docId);
+            }
+          });
+          console.log(`[ChromaDB] LinkedIn final context: ${relevantDocs.length} total documents`);
+        } catch (enhanceError) {
+          console.log(`[ChromaDB] LinkedIn enhancement failed:`, enhanceError.message);
+        }
+      }
+
       if (relevantDocs.length === 0) {
         console.log(`[ChromaDB] No relevant documents found for ${platform}/${username}, checking for any available data`);
         
@@ -835,7 +1741,11 @@ Performance: ${this.categorizePerformance(engagement.engagementRate)}`;
         profile: [],
         posts: [],
         bio: [],
-        engagement: []
+        engagement: [],
+        education: [],
+        experience: [],
+        skills: [],
+        content_activity: []
       };
 
       relevantDocs.forEach(doc => {
@@ -844,6 +1754,11 @@ Performance: ${this.categorizePerformance(engagement.engagementRate)}`;
           groupedDocs.posts.push(doc);
         } else if (groupedDocs[type]) {
           groupedDocs[type].push(doc);
+        } else {
+          // Add unknown types to ensure no data is lost
+          console.log(`[ChromaDB] Unknown document type: ${type}, adding to general context`);
+          if (!groupedDocs.other) groupedDocs.other = [];
+          groupedDocs.other.push(doc);
         }
       });
 
@@ -916,6 +1831,51 @@ Performance: ${this.categorizePerformance(engagement.engagementRate)}`;
           context += `Performance: ${mostEngaging.metadata.likes.toLocaleString()} likes, ${mostEngaging.metadata.comments.toLocaleString()} comments\n`;
           context += `Total Engagement: ${mostEngaging.metadata.totalEngagement.toLocaleString()}\n\n`;
         }
+      }
+
+      // Education context - crucial for LinkedIn
+      if (groupedDocs.education.length > 0) {
+        context += "Educational Background:\n";
+        groupedDocs.education.forEach(doc => {
+          context += `${doc.content}\n`;
+        });
+        context += "\n";
+      }
+
+      // Experience context - crucial for LinkedIn
+      if (groupedDocs.experience.length > 0) {
+        context += "Professional Experience:\n";
+        groupedDocs.experience.forEach(doc => {
+          context += `${doc.content}\n`;
+        });
+        context += "\n";
+      }
+
+      // Skills context - important for LinkedIn
+      if (groupedDocs.skills.length > 0) {
+        context += "Skills and Expertise:\n";
+        groupedDocs.skills.forEach(doc => {
+          context += `${doc.content}\n`;
+        });
+        context += "\n";
+      }
+
+      // Content activity context - important for post queries
+      if (groupedDocs.content_activity.length > 0) {
+        context += "Content Activity Information:\n";
+        groupedDocs.content_activity.forEach(doc => {
+          context += `${doc.content}\n`;
+        });
+        context += "\n";
+      }
+
+      // Other unknown document types
+      if (groupedDocs.other && groupedDocs.other.length > 0) {
+        context += "Additional Information:\n";
+        groupedDocs.other.forEach(doc => {
+          context += `${doc.content}\n`;
+        });
+        context += "\n";
       }
 
       // Engagement context - just the numbers

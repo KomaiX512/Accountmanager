@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { getApiUrl } from '../config/api';
+import UserService from './UserService';
 
 interface ChatMessage {
   role: string;
@@ -332,6 +333,17 @@ class RagService {
               console.warn(`[RagService] ⚠️ Short response received for ${platform}/${username}: ${result.response?.substring(0, 50)}`);
             }
 
+            // Track usage for successful discussion
+            try {
+              const currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
+              if (currentUser?.uid && result.response) {
+                await UserService.getInstance().incrementUsage(currentUser.uid, 'discussions');
+                console.log(`[RagService] ✅ Tracked discussion usage for ${platform}/${username}`);
+              }
+            } catch (usageError) {
+              console.warn('[RagService] Failed to track discussion usage:', usageError);
+            }
+
             return {
               response: result.response || 'Unable to generate response at this time.',
               usedFallback: result.usedFallback || false,
@@ -463,6 +475,17 @@ class RagService {
         }
       } catch (eventError) {
         console.warn('[RagService] Failed to emit newPostCreated event:', eventError);
+      }
+      
+      // Track usage for successful post creation
+      try {
+        const currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
+        if (currentUser?.uid && postData) {
+          await UserService.getInstance().incrementUsage(currentUser.uid, 'posts');
+          console.log(`[RagService] ✅ Tracked post creation usage for ${platform}/${username}`);
+        }
+      } catch (usageError) {
+        console.warn('[RagService] Failed to track post usage:', usageError);
       }
       
       return {

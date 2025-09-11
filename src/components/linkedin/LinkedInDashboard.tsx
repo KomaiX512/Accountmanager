@@ -66,27 +66,11 @@ const LinkedInDashboard: React.FC<LinkedInDashboardProps> = ({ accountHolder, on
   // Show loading while initializing
   if (isInitializing) {
     return (
-      <div className="dashboard-container">
-        <div className="dashboard-header">
-          <div className="header-logo">
-            <img 
-              src="/Logo/logo.png" 
-              alt="Logo" 
-              className="dashboard-logo"
-            />
-            {/* Removed redundant LinkedIn title to allow hero welcome to be primary */}
-          </div>
-          {onOpenChat && (
-            <button onClick={() => onOpenChat('', 'linkedin')} className="close-button">×</button>
-          )}
-        </div>
-        
-        <div className="connection-container">
-          <div className="connection-card">
-            <h2>Initializing LinkedIn Dashboard...</h2>
-            <p>Setting up your professional workspace...</p>
-            <div className="loading-spinner"></div>
-          </div>
+      <div className="connection-container">
+        <div className="connection-card">
+          <h2>Initializing LinkedIn Dashboard...</h2>
+          <p>Setting up your professional workspace...</p>
+          <div className="loading-spinner"></div>
         </div>
       </div>
     );
@@ -95,27 +79,11 @@ const LinkedInDashboard: React.FC<LinkedInDashboardProps> = ({ accountHolder, on
   // Render connection screen if not connected (fallback)
   if (!isConnected && !hasSetupLinkedIn) {
     return (
-      <div className="dashboard-container">
-        <div className="dashboard-header">
-          <div className="header-logo">
-            <img 
-              src="/Logo/logo.png" 
-              alt="Logo" 
-              className="dashboard-logo"
-            />
-            {/* Removed redundant LinkedIn title to allow hero welcome to be primary */}
-          </div>
-          {onOpenChat && (
-            <button onClick={() => onOpenChat('', 'linkedin')} className="close-button">×</button>
-          )}
-        </div>
-        
-        <div className="connection-container">
-          <div className="connection-card">
-            <h2>Connect Your LinkedIn Account</h2>
-            <p>Connect your LinkedIn account to access professional insights, networking features, and industry connections.</p>
-            <LinkedInConnect />
-          </div>
+      <div className="connection-container">
+        <div className="connection-card">
+          <h2>Connect Your LinkedIn Account</h2>
+          <p>Connect your LinkedIn account to access professional insights, networking features, and industry connections.</p>
+          <LinkedInConnect />
         </div>
       </div>
     );
@@ -123,37 +91,17 @@ const LinkedInDashboard: React.FC<LinkedInDashboardProps> = ({ accountHolder, on
 
   // LinkedIn-specific dashboard with profile display
   return (
-    <div className="linkedin-dashboard-container">
-      <div className="dashboard-header">
-        <div className="header-logo">
-          <img 
-            src="/Logo/logo.png" 
-            alt="Logo" 
-            className="dashboard-logo"
-          />
-            {/* Removed redundant LinkedIn title to allow hero welcome to be primary */}
-        </div>
-        {onOpenChat && (
-          <button onClick={() => onOpenChat('', 'linkedin')} className="close-button">×</button>
-        )}
-      </div>
-      
-      <div className="linkedin-dashboard-content">
-        {/* LinkedIn Profile Bar */}
-        
-        {/* LinkedIn Profile Details */}
- 
-    {/* Platform Dashboard for other features */}
-        <div className="platform-dashboard-wrapper">
-          <PlatformDashboard 
-            platform="linkedin"
-            accountHolder={currentUser?.uid ? (localStorage.getItem(`linkedin_username_${currentUser.uid}`) || accountHolder) : accountHolder}
-            competitors={[]} // LinkedIn competitors would be set separately
-            accountType="professional" // Default to professional for LinkedIn
-            // Show the standard hero welcome like other platforms
-            onOpenChat={onOpenChat}
-          />
-        </div>
+    <div className="linkedin-dashboard-content">
+      {/* Platform Dashboard for other features */}
+      <div className="platform-dashboard-wrapper">
+        <PlatformDashboard 
+          platform="linkedin"
+          accountHolder={currentUser?.uid ? (localStorage.getItem(`linkedin_username_${currentUser.uid}`) || accountHolder) : accountHolder}
+          competitors={[]} // LinkedIn competitors would be set separately
+          accountType="professional" // Default to professional for LinkedIn
+          // Show the standard hero welcome like other platforms
+          onOpenChat={onOpenChat}
+        />
       </div>
     </div>
   );

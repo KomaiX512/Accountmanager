@@ -2473,9 +2473,21 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
     }
 
     // Sort and process as before
-    // ✅ NEW: Sort files by LastModified date to get most recent items
-    const sortedFiles = files
-      .sort((a, b) => new Date(b.LastModified).getTime() - new Date(a.LastModified).getTime());
+    // ✅ ENHANCED: Prioritize content-rich files over fallback files for recommendations
+    const sortedFiles = files.sort((a, b) => {
+      // Special handling for recommendation files - prioritize content quality over recency
+      if (module === 'recommendations') {
+        // If one file contains "zero_data_account" and another doesn't, prioritize the one without
+        const aIsZeroData = a.Key.includes('recommendation_2') || a.Key.includes('zero_data') || a.Key.includes('fallback');
+        const bIsZeroData = b.Key.includes('recommendation_2') || b.Key.includes('zero_data') || b.Key.includes('fallback');
+        
+        if (aIsZeroData && !bIsZeroData) return 1; // b comes first (better content)
+        if (!aIsZeroData && bIsZeroData) return -1; // a comes first (better content)
+      }
+      
+      // Default: Sort by LastModified date (newest first)
+      return new Date(b.LastModified).getTime() - new Date(a.LastModified).getTime();
+    });
     
     // 🔍 ENHANCED LOGGING: Show R2 bucket sorting details for news module
     if (module === 'news_for_you') {
@@ -2555,9 +2567,35 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
           }
 
           const parsedData = JSON.parse(body);
+          
+          // ✅ CONTENT-RICH DETECTION: For recommendations, mark files with actual content
+          let isContentRich = true;
+          if (module === 'recommendations') {
+            // Check if this is a zero-data fallback file
+            const personalAccountAnalysis = parsedData?.personal_intelligence?.account_analysis;
+            const contentAccountAnalysis = parsedData?.content_intelligence?.account_analysis;
+            
+            const hasZeroDataStatus = 
+              (typeof personalAccountAnalysis === 'object' && personalAccountAnalysis?.data_status === 'zero_data_account') ||
+              (typeof contentAccountAnalysis === 'object' && contentAccountAnalysis?.data_status === 'zero_data_account') ||
+              parsedData?.zero_data_notice ||
+              (parsedData?.tactical_recommendations && Array.isArray(parsedData.tactical_recommendations) && parsedData.tactical_recommendations.length === 0);
+            
+            // Rich content means we have meaningful strings, not empty arrays or zero-data objects
+            const hasRichContent = 
+              (typeof personalAccountAnalysis === 'string' && personalAccountAnalysis.length > 100) ||
+              (typeof contentAccountAnalysis === 'string' && contentAccountAnalysis.length > 100) ||
+              (parsedData?.tactical_recommendations && Array.isArray(parsedData.tactical_recommendations) && parsedData.tactical_recommendations.length > 0);
+            
+            isContentRich = !hasZeroDataStatus && hasRichContent;
+            
+            console.log(`[${new Date().toISOString()}] [CONTENT-FILTER] File ${file.Key}: isContentRich=${isContentRich}, hasZeroDataStatus=${hasZeroDataStatus}, hasRichContent=${hasRichContent}`);
+          }
+          
           return { 
             key: file.Key, 
             lastModified: file.LastModified,
+            isContentRich,
             data: {
               ...parsedData,
               platform: platform
@@ -2572,11 +2610,23 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
 
     const validData = data.filter(item => item !== null);
     
+    // ✅ FINAL CONTENT PRIORITIZATION: For recommendations, return content-rich files first
+    let finalData = validData;
+    if (module === 'recommendations' && validData.length > 1) {
+      const contentRichFiles = validData.filter(item => item.isContentRich !== false);
+      const fallbackFiles = validData.filter(item => item.isContentRich === false);
+      
+      if (contentRichFiles.length > 0) {
+        console.log(`[${new Date().toISOString()}] [CONTENT-PRIORITY] Prioritizing ${contentRichFiles.length} content-rich files over ${fallbackFiles.length} fallback files`);
+        finalData = [...contentRichFiles, ...fallbackFiles]; // Content-rich files first
+      }
+    }
+    
     // Update cache with fresh data
-    cache.set(prefix, validData);
+    cache.set(prefix, finalData);
     cacheTimestamps.set(prefix, Date.now());
     
-    return validData;
+    return finalData;
   } catch (error) {
     console.error(`Error fetching ${platform} data for prefix ${prefix}:`, error);
     return [];
@@ -3093,12 +3143,12 @@ app.post('/api/ai-image-approve', async (req, res) => {
 });
 
 // Apply intelligent caching for profile info (5 minute TTL)
-app.get(['/profile-info/:username', '/api/profile-info/:username'], 
-  cacheMiddleware('profileInfo', (req) => [req.params.username, req.query.platform || 'instagram']),
-  async (req, res) => {
+app.get(['/api/profile-info/:username', '/api/profileinfo/:username'], async (req, res) => {
   const { username } = req.params;
   const forceRefresh = req.query.forceRefresh === 'true';
   const platform = req.query.platform || 'instagram'; // Default to Instagram
+  
+  console.log(`[${new Date().toISOString()}] 🚀 ENTRY: ProfileInfo endpoint hit for username='${username}', platform='${platform}', forceRefresh=${forceRefresh}`);
   
   try {
     // 🚀 SMART USERNAME RESOLUTION: Try multiple username formats intelligently
@@ -3140,50 +3190,149 @@ app.get(['/profile-info/:username', '/api/profile-info/:username'],
       }
     }
     
+    console.log(`[${new Date().toISOString()}] 🔍 DEBUG: Platform = ${normalizedPlatform}, Username variants = [${usernameVariants.join(', ')}]`);
+    
     // 🔍 SMART SEARCH: Try each variant until we find profile data
     for (let i = 0; i < usernameVariants.length; i++) {
       const candidateUsername = usernameVariants[i];
-      const candidateKey = `ProfileInfo/${normalizedPlatform}/${candidateUsername}.json`;
+      console.log(`[${new Date().toISOString()}] 🔍 DEBUG: Processing variant ${i + 1}/${usernameVariants.length}: '${candidateUsername}'`);
       
-      console.log(`[${new Date().toISOString()}] [${i + 1}/${usernameVariants.length}] Trying ProfileInfo for ${normalizedPlatform}/${candidateUsername}: ${candidateKey}`);
+      // 🎯 MULTIPLE KEY FORMATS: Try legacy, new schema, and LinkedIn-specific formats
+      const candidateKeys = [
+        `ProfileInfo/${normalizedPlatform}/${candidateUsername}.json`, // Legacy flat format
+        PlatformSchemaManager.buildPath('ProfileInfo', normalizedPlatform, candidateUsername, 'profile.json'), // New schema profile.json
+        // LinkedIn public bucket convention: ProfileInfo/linkedin/{username}/{username}.json
+        ...(normalizedPlatform === 'linkedin' ? [`ProfileInfo/linkedin/${candidateUsername}/${candidateUsername}.json`] : [])
+      ];
       
-      try {
-        const getCommand = new GetObjectCommand({
-          Bucket: 'tasks',
-          Key: candidateKey,
-        });
+      // Remove duplicates
+      const uniqueKeys = [...new Set(candidateKeys)];
+      
+      for (let j = 0; j < uniqueKeys.length; j++) {
+        const candidateKey = uniqueKeys[j];
+        console.log(`[${new Date().toISOString()}] [${i + 1}/${usernameVariants.length}] [${j + 1}/${uniqueKeys.length}] Trying ProfileInfo for ${normalizedPlatform}/${candidateUsername}: ${candidateKey}`);
         
-        const response = await s3Client.send(getCommand);
-        const body = await streamToString(response.Body);
+        try {
+          const getCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: candidateKey,
+          });
+          
+          const response = await s3Client.send(getCommand);
+          const body = await streamToString(response.Body);
 
-        if (!body || body.trim() === '') {
-          console.warn(`[${new Date().toISOString()}] Empty profile info file at ${candidateKey}`);
-          continue; // Try next variant
-        }
+          if (!body || body.trim() === '') {
+            console.warn(`[${new Date().toISOString()}] Empty profile info file at ${candidateKey}`);
+            continue; // Try next key format
+          }
 
-        const data = JSON.parse(body);
-        
-        // 🎯 VALIDATE: Check if this is actual profile data
-        const hasProfileFields = data.fullName || data.followersCount !== undefined || 
-                                 data.biography || data.profilePicUrl || data.profilePicUrlHD ||
-                                 data.followsCount !== undefined || data.postsCount !== undefined ||
-                                 data.verified !== undefined || data.private !== undefined;
-        
-        if (hasProfileFields) {
-          console.log(`[${new Date().toISOString()}] ✅ PROFILE FOUND: Successfully resolved ${normalizedPlatform} profile for variant '${candidateUsername}' (attempt ${i + 1}/${usernameVariants.length})`);
-          return res.json(data);
-        } else {
-          console.warn(`[${new Date().toISOString()}] Account config detected (not profile data) at ${candidateKey}, trying next variant`);
-          continue; // Try next variant
+          const data = JSON.parse(body);
+          
+          // 🎯 LINKEDIN NESTED DATA HANDLING: Extract profileInfo if present
+          let profileData = data;
+          if (normalizedPlatform === 'linkedin' && data.profileInfo && typeof data.profileInfo === 'object') {
+            console.log(`[${new Date().toISOString()}] 🔄 LinkedIn nested data detected, extracting profileInfo`);
+            profileData = data.profileInfo;
+          }
+          
+          // 🎯 VALIDATE: Check if this is actual profile data
+          const hasProfileFields = profileData.fullName || profileData.followersCount !== undefined || 
+                                   profileData.biography || profileData.profilePicUrl || profileData.profilePicUrlHD ||
+                                   profileData.followsCount !== undefined || profileData.postsCount !== undefined ||
+                                   profileData.verified !== undefined || profileData.private !== undefined ||
+                                   // LinkedIn-specific fields
+                                   (normalizedPlatform === 'linkedin' && (profileData.linkedinUrl || profileData.headline || profileData.jobTitle));
+          
+          if (hasProfileFields) {
+            console.log(`[${new Date().toISOString()}] ✅ PROFILE FOUND: Successfully resolved ${normalizedPlatform} profile for variant '${candidateUsername}' using key '${candidateKey}'`);
+            return res.json(profileData);
+          } else {
+            console.warn(`[${new Date().toISOString()}] Account config detected (not profile data) at ${candidateKey}, trying next key format`);
+            continue; // Try next key format
+          }
+          
+        } catch (variantError) {
+          if (variantError.name === 'NoSuchKey' || variantError.$metadata?.httpStatusCode === 404) {
+            console.log(`[${new Date().toISOString()}] Key '${candidateKey}' not found, trying next key format...`);
+            continue; // Try next key format
+          } else {
+            console.error(`[${new Date().toISOString()}] Error checking key '${candidateKey}':`, variantError.message);
+            continue; // Try next key format
+          }
         }
+      }
+      
+      // 🎯 FALLBACK: Check local cache directory for LinkedIn profiles
+      if (normalizedPlatform === 'linkedin') {
+        console.log(`[${new Date().toISOString()}] 🔄 FALLBACK: Checking local cache for LinkedIn profile '${candidateUsername}'`);
+        console.log(`[${new Date().toISOString()}] 🔍 DEBUG: __dirname = ${__dirname}`);
         
-      } catch (variantError) {
-        if (variantError.name === 'NoSuchKey' || variantError.$metadata?.httpStatusCode === 404) {
-          console.log(`[${new Date().toISOString()}] Variant '${candidateUsername}' not found, trying next...`);
-          continue; // Try next variant
-        } else {
-          console.error(`[${new Date().toISOString()}] Error checking variant '${candidateUsername}':`, variantError.message);
-          continue; // Try next variant
+        try {
+          const fs = require('fs');
+          const path = require('path');
+          
+          // Try different cache file formats (using absolute paths from server directory)
+          const cacheFiles = [
+            path.join(__dirname, '..', 'data', 'cache', `linkedin_${candidateUsername}_profile.json`),
+            path.join(__dirname, '..', 'data', 'cache', `linkedin_${candidateUsername.toLowerCase()}_profile.json`),
+            path.join(__dirname, '..', 'data', 'cache', `linkedin_${candidateUsername.toUpperCase()}_profile.json`)
+          ];
+          
+          console.log(`[${new Date().toISOString()}] 🔍 DEBUG: Trying ${cacheFiles.length} cache files:`, cacheFiles);
+          
+          for (const cacheFile of cacheFiles) {
+            console.log(`[${new Date().toISOString()}] 🔍 DEBUG: Checking file existence: ${cacheFile}`);
+            console.log(`[${new Date().toISOString()}] 🔍 DEBUG: File exists: ${fs.existsSync(cacheFile)}`);
+            
+            if (fs.existsSync(cacheFile)) {
+              console.log(`[${new Date().toISOString()}] 📁 Found local cache file: ${cacheFile}`);
+              
+              const cacheData = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+              console.log(`[${new Date().toISOString()}] 🔍 DEBUG: Cache data keys:`, Object.keys(cacheData));
+              
+              // Extract profileInfo from nested structure
+              let profileData = cacheData;
+              if (cacheData.data && cacheData.data.profileInfo) {
+                console.log(`[${new Date().toISOString()}] 🔍 DEBUG: Found nested profileInfo, extracting...`);
+                profileData = cacheData.data.profileInfo;
+                console.log(`[${new Date().toISOString()}] 🔍 DEBUG: ProfileInfo keys:`, Object.keys(profileData));
+              } else {
+                console.log(`[${new Date().toISOString()}] 🔍 DEBUG: No nested structure, using root data`);
+              }
+              
+              // Transform to expected format - FIXED LinkedIn field mapping
+              const transformedProfile = {
+                username: candidateUsername,
+                fullName: profileData.fullName || `${profileData.firstName || ''} ${profileData.lastName || ''}`.trim(),
+                biography: profileData.about || profileData.headline || '',
+                followersCount: profileData.followers ?? 0,
+                followsCount: profileData.connections ?? 0,
+                postsCount: profileData.postsCount ?? 0,
+                profilePicUrl: profileData.profilePic || '',
+                profilePicUrlHD: profileData.profilePicHighQuality || profileData.profilePic || '',
+                verified: profileData.verified ?? false,
+                private: profileData.private ?? false,
+                platform: 'linkedin',
+                extractedAt: new Date().toISOString(),
+                // LinkedIn-specific fields
+                linkedinUrl: profileData.linkedinUrl,
+                headline: profileData.headline,
+                jobTitle: profileData.jobTitle,
+                companyName: profileData.companyName,
+                companyIndustry: profileData.companyIndustry,
+                addressWithCountry: profileData.addressWithCountry,
+                topSkillsByEndorsements: profileData.topSkillsByEndorsements
+              };
+              
+              console.log(`[${new Date().toISOString()}] ✅ PROFILE FOUND: Successfully loaded LinkedIn profile from local cache for '${candidateUsername}'`);
+              return res.json(transformedProfile);
+            }
+          }
+          
+          console.log(`[${new Date().toISOString()}] ❌ No local cache file found for LinkedIn profile '${candidateUsername}'`);
+          
+        } catch (cacheError) {
+          console.error(`[${new Date().toISOString()}] Error checking local cache for '${candidateUsername}':`, cacheError.message);
         }
       }
     }
@@ -3272,8 +3421,8 @@ app.post(['/save-account-info', '/api/save-account-info'], async (req, res) => {
       timestamp: new Date().toISOString(),
     };
 
-    // Facebook-specific: persist full accountData and competitor_data with URLs untouched
-    if (platformParam.toLowerCase() === 'facebook') {
+    // Facebook and LinkedIn: persist full accountData and competitor_data with URLs untouched
+    if (platformParam.toLowerCase() === 'facebook' || platformParam.toLowerCase() === 'linkedin') {
       try {
         if (req.body && typeof req.body.accountData === 'object' && req.body.accountData) {
           // Preserve exactly as sent (name and url)
@@ -17592,6 +17741,80 @@ app.get('/api/avatar/:platform/:username', async (req, res) => {
   }
 });
 
+// LinkedIn profile info save endpoint
+app.post(['/save-linkedin-profile-info', '/api/save-linkedin-profile-info'], async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  try {
+    const { username, profileData } = req.body;
+    
+    if (!username || !profileData) {
+      return res.status(400).json({ error: 'Username and profile data are required' });
+    }
+    
+    // Normalize username for LinkedIn
+    const normalizedUsername = PlatformSchemaManager.getPlatformConfig('linkedin').normalizeUsername(username);
+    
+    // Create LinkedIn profile info structure
+    const linkedinProfileInfo = {
+      // Standard profile fields that match Instagram/Twitter format
+      fullName: profileData.fullName || `${profileData.firstName || ''} ${profileData.lastName || ''}`.trim(),
+      followersCount: profileData.followers || 0,
+      followsCount: profileData.connections || 0, // LinkedIn uses "connections" instead of "following"
+      biography: profileData.about || profileData.headline || '',
+      profilePicUrl: profileData.profilePic || '',
+      profilePicUrlHD: profileData.profilePicHighQuality || profileData.profilePic || '',
+      verified: false, // LinkedIn doesn't have verification like Instagram/Twitter
+      private: false, // LinkedIn profiles are generally public
+      postsCount: 0, // This would need to be calculated from actual posts
+      
+      // LinkedIn-specific fields
+      linkedinUrl: profileData.linkedinUrl || `https://www.linkedin.com/in/${normalizedUsername}/`,
+      firstName: profileData.firstName || '',
+      lastName: profileData.lastName || '',
+      headline: profileData.headline || '',
+      jobTitle: profileData.jobTitle || '',
+      companyName: profileData.companyName || '',
+      companyIndustry: profileData.companyIndustry || '',
+      addressWithCountry: profileData.addressWithCountry || '',
+      topSkillsByEndorsements: profileData.topSkillsByEndorsements || '',
+      
+      // Platform identification
+      platform: 'linkedin',
+      username: normalizedUsername,
+      
+      // Timestamps
+      lastUpdated: new Date().toISOString(),
+      createdAt: new Date().toISOString()
+    };
+    
+    // Save to R2 using the correct key format
+    const key = PlatformSchemaManager.buildPath('ProfileInfo', 'linkedin', normalizedUsername, 'profile.json');
+    
+    const putCommand = new PutObjectCommand({
+      Bucket: 'tasks',
+      Key: key,
+      Body: JSON.stringify(linkedinProfileInfo, null, 2),
+      ContentType: 'application/json'
+    });
+    
+    await s3Client.send(putCommand);
+    
+    console.log(`[${new Date().toISOString()}] ✅ LinkedIn profile info saved: ${key}`);
+    
+    res.json({ 
+      success: true, 
+      message: 'LinkedIn profile info saved successfully',
+      key: key,
+      profile: linkedinProfileInfo
+    });
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error saving LinkedIn profile info:`, error);
+    res.status(500).json({ error: 'Failed to save LinkedIn profile info' });
+  }
+});
+
 // Enhanced profile info endpoint with platform parameter
 app.get('/api/profile-info/:platform/:username', 
   cacheMiddleware('profileInfo', (req) => [req.params.platform, req.params.username]),
@@ -17600,6 +17823,55 @@ app.get('/api/profile-info/:platform/:username',
   const { platform, username } = req.params;
   
   try {
+    // For LinkedIn, fetch real data from R2 bucket
+    if (platform === 'linkedin') {
+      const key = `ProfileInfo/linkedin/${username}/${username}.json`;
+      
+      try {
+        const getCommand = new GetObjectCommand({
+          Bucket: 'tasks',
+          Key: key,
+        });
+        
+        const response = await s3Client.send(getCommand);
+        const body = await streamToString(response.Body);
+        const linkedinData = JSON.parse(body);
+        
+        // Transform LinkedIn data to expected format
+        const profile = {
+          platform: 'linkedin',
+          username: linkedinData.publicIdentifier || username,
+          fullName: linkedinData.fullName || `${linkedinData.firstName || ''} ${linkedinData.lastName || ''}`.trim(),
+          biography: linkedinData.about || linkedinData.headline || '',
+          followersCount: linkedinData.followers || 0,
+          followsCount: linkedinData.connections || 0,
+          postsCount: 0,
+          profilePicUrl: linkedinData.profilePic || '',
+          profilePicUrlHD: linkedinData.profilePicHighQuality || linkedinData.profilePic || '',
+          verified: false,
+          private: false,
+          platform: 'linkedin',
+          extractedAt: new Date().toISOString(),
+          // LinkedIn-specific fields
+          linkedinUrl: linkedinData.linkedinUrl,
+          headline: linkedinData.headline,
+          jobTitle: linkedinData.jobTitle,
+          companyName: linkedinData.companyName,
+          companyIndustry: linkedinData.companyIndustry,
+          addressWithCountry: linkedinData.addressWithCountry,
+          topSkillsByEndorsements: linkedinData.topSkillsByEndorsements
+        };
+        
+        console.log(`[LinkedIn] Fetched real data for ${username}:`, profile);
+        return res.json(profile);
+        
+      } catch (r2Error) {
+        console.error(`[LinkedIn] Error fetching from R2:`, r2Error);
+        // Fallback to mock data if R2 fails
+      }
+    }
+    
+    // Fallback mock data for other platforms or if R2 fails
     const profile = {
       platform,
       username,

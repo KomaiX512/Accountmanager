@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
  * - Facebook: 20 minutes initial setup
  * - Instagram: 15 minutes initial setup  
  * - Twitter: 15 minutes initial setup
+ * - LinkedIn: 15 minutes initial setup
  * - All platforms: 5 minutes extension when running statistics not found
  * 
  * The component automatically detects whether it's an initial setup or extension

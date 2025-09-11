@@ -25,6 +25,7 @@
     0 0 0 1px rgba(255, 255, 255, 0.05) inset;
   text-decoration: none;
   min-height: 44px;
+  min-width: 140px; /* ensure adequate width for text and icon */
   position: relative;
   overflow: hidden;
 }
@@ -124,6 +125,7 @@
     padding: 8px 14px;
     font-size: 0.85rem;
     min-height: 40px;
+    min-width: 120px; /* ensure adequate width on mobile too */
   }
   
   .linkedin-icon {

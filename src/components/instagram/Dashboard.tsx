@@ -167,6 +167,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const [showBio, setShowBio] = useState(false);
   const [typedBio, setTypedBio] = useState('');
   const [bioAnimationComplete, setBioAnimationComplete] = useState(false);
+  const [isBioExpanded, setIsBioExpanded] = useState(false);
 
   // 🍎 Mobile expandable modules state
   const [expandedModules, setExpandedModules] = useState<{
@@ -462,7 +463,8 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
     try {
       const now = Date.now();
       // Single canonical path: always pass explicit platform to avoid confusion
-      console.log(`[${new Date().toISOString()}] Fetching Instagram profile info for ${accountHolder}`);
+      console.log(`[${new Date().toISOString()}] Fetching profile info for ${accountHolder} on instagram`);
+      // Instagram Dashboard always uses query param format
       const response = await axios.get(`/api/profile-info/${accountHolder}?platform=instagram`);
       
       // 🎯 CRITICAL DEBUG: Log the exact response to understand data structure
@@ -1653,6 +1655,10 @@ Image Description: ${response.post.image_prompt}
     setIsResetConfirmOpen(false);
   };
 
+  const handleBioClick = () => {
+    setIsBioExpanded(!isBioExpanded);
+  };
+
   const handleConfirmReset = async () => {
     if (!currentUser) {
       setToast('User not authenticated');
@@ -2139,12 +2145,14 @@ Image Description: ${response.post.image_prompt}
           
           {profileInfo?.biography && profileInfo.biography.trim() && (
             <motion.div
-              className="bio-text"
+              className={`bio-text ${isBioExpanded ? 'expanded' : 'collapsed'}`}
               animate={{ 
                 opacity: showBio ? 1 : 0,
                 y: showBio ? 0 : 10
               }}
               transition={{ duration: 0.5, ease: 'easeInOut', delay: showBio ? 0.2 : 0 }}
+              onClick={handleBioClick}
+              style={{ cursor: 'pointer' }}
             >
               {typedBio}
               {showBio && !bioAnimationComplete && (

@@ -1,0 +1,28 @@
+User-agent: *
+Allow: /
+
+# Enhanced SEO Directives
+Allow: /sentientm
+Allow: /sentient-ai
+Allow: /sentient-marketing
+Allow: /ai-social-media-management
+Allow: /social-media-automation
+Allow: /sentient-ai-platform
+Allow: /sentient-social-media-management
+Allow: /instagram-ai-automation
+Allow: /twitter-ai-management
+Allow: /facebook-ai-marketing
+
+# Block admin and private areas
+Disallow: /admin/
+Disallow: /api/
+Disallow: /dashboard/
+Disallow: /account/
+Disallow: /processing/
+Disallow: /clear-cache.html
+
+# Sitemap location
+Sitemap: https://sentientm.com/sitemap.xml
+
+# Crawl delay for better server performance
+Crawl-delay: 1

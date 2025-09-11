@@ -86,19 +86,30 @@ body:has(.dashboard-wrapper) {
   color: #a0a0a0;
   text-align: center;
   line-height: 1.2;
-  white-space: pre-wrap;
-  overflow: visible;
   font-style: italic;
-  max-width: 800px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 0 20px;
+  padding: 0 40px;
   box-sizing: border-box;
   position: absolute;
   top: 24px;
   left: 0;
   right: 0;
-  z-index: 10;
-  }
+  transition: all 0.3s ease;
+}
+
+.bio-text.collapsed {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-height: 1.2em;
+}
+
+.bio-text.expanded {
+  white-space: pre-wrap;
+  overflow: visible;
+  max-height: none;
+}
 
 /* ✨ COMPACT PREMIUM MODULES CONTAINER - MINIMALIST */
 .modules-container {
@@ -2246,23 +2257,25 @@ h2 {
 /* ✨ BIO TEXT RESPONSIVE ADJUSTMENTS */
 @media (max-width: 1200px) {
   .bio-text {
-    max-width: 700px;
+    max-width: 1000px;
     font-size: 0.9rem;
+    padding: 0 30px;
   }
 }
 
 @media (max-width: 1000px) {
   .bio-text {
-    max-width: 600px;
+    max-width: 800px;
     font-size: 0.85rem;
+    padding: 0 25px;
   }
 }
 
 @media (max-width: 800px) {
   .bio-text {
-    max-width: 500px;
+    max-width: 600px;
     font-size: 0.8rem;
-    padding: 0 16px;
+    padding: 0 20px;
   }
 }
 
@@ -2270,7 +2283,7 @@ h2 {
   .bio-text {
     max-width: 400px;
     font-size: 0.75rem;
-    padding: 0 12px;
+    padding: 0 15px;
   }
 }
 
@@ -4058,8 +4071,9 @@ h2 {
 
 /* Make LinkedIn Connect button match dashboard button style */
 .linkedin-connect-wrapper .linkedin-connect-button {
-  width: auto;
-  min-width: 90px; /* align with dashboard-btn clamp system */
+  width: auto !important;
+  min-width: 160px !important; /* increased width to accommodate "Connect LinkedIn" text and icon */
+  max-width: none !important; /* override profile-actions max-width constraint */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4067,7 +4081,7 @@ h2 {
   background: #0077B5; /* solid */
   border: 1.5px solid #005c8f;
   border-radius: 12px;
-  padding: 10px 14px;
+  padding: 10px 16px; /* increased padding for better spacing */
   color: #ffffff;
   font-size: 0.9rem;
   font-weight: 600;
@@ -4081,6 +4095,8 @@ h2 {
   min-height: 44px;
   position: relative;
   overflow: hidden;
+  white-space: nowrap !important; /* prevent text wrapping */
+  flex-shrink: 0 !important; /* prevent shrinking */
 }
 
 .linkedin-connect-wrapper .linkedin-connect-button:hover:not(:disabled) {
@@ -4093,11 +4109,13 @@ h2 {
 }
 
 .linkedin-connect-wrapper .linkedin-connected-status {
-  width: auto;
+  width: auto !important;
+  min-width: 160px !important; /* match the connect button width */
+  max-width: none !important; /* override profile-actions max-width constraint */
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 10px 14px;
+  padding: 10px 16px; /* increased padding for better spacing */
   background: #0077B5; /* LinkedIn solid theme for connected state */
   border: 1.5px solid #005c8f;
   border-radius: 12px;
@@ -4105,6 +4123,8 @@ h2 {
   font-size: 0.9rem;
   font-weight: 600;
   min-height: 44px;
+  white-space: nowrap !important; /* prevent text wrapping */
+  flex-shrink: 0 !important; /* prevent shrinking */
 }
 
 /* Ensure LinkedIn icons render consistently like other platforms */
@@ -4117,4 +4137,23 @@ h2 {
   color: #ffffff; /* white icons on solid LI blue */
   width: 16px;
   height: 16px;
+}
+
+/* Responsive styling for LinkedIn Connect button */
+@media (max-width: 768px) {
+  .linkedin-connect-wrapper .linkedin-connect-button,
+  .linkedin-connect-wrapper .linkedin-connected-status {
+    min-width: 140px !important;
+    padding: 8px 14px;
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .linkedin-connect-wrapper .linkedin-connect-button,
+  .linkedin-connect-wrapper .linkedin-connected-status {
+    min-width: 120px !important;
+    padding: 6px 12px;
+    font-size: 0.8rem;
+  }
 }

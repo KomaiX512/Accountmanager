@@ -1,9 +1,21 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { motion } from 'framer-motion';
-import { FaBrain, FaRocket, FaChartLine, FaUsers, FaInstagram, FaFacebook, FaTwitter, FaLinkedin, FaTiktok, FaYoutube, FaClock, FaCrosshairs, FaShieldAlt, FaLightbulb, FaChartBar, FaUserCheck, FaMagic, FaRobot, FaCrown } from 'react-icons/fa';
-import './Homepage.css';
-import NeuralNetwork from './NeuralNetwork';
+import { 
+  FaMagic, FaClock, FaCrosshairs, FaChartBar, FaCrown, FaUserCheck, 
+  FaRocket, FaShieldAlt, FaLightbulb, FaRobot, FaBrain, FaChartLine, 
+  FaUsers, FaInstagram, FaYoutube, FaFacebook, FaTwitter, FaLinkedin, FaTiktok 
+} from 'react-icons/fa';
 import SEOHead from '../seo/SEOHead';
+import AdvancedSEO from '../seo/AdvancedSEO';
+import ContentOptimizer from '../seo/ContentOptimizer';
+import PerformanceOptimizer from '../seo/PerformanceOptimizer';
+import BillionDollarSEO from '../seo/BillionDollarSEO';
+import SemanticSEO from '../seo/SemanticSEO';
+import TechnicalSEO from '../seo/TechnicalSEO';
+import CompetitorSEO from '../seo/CompetitorSEO';
+import './Homepage.css';
 
 // Feature flag to control neural network rendering
 const ENABLE_NEURAL_NETWORK = false;
@@ -52,6 +64,67 @@ const Homepage: React.FC = () => {
           }
         }}
       />
+
+      {/* BILLION DOLLAR SEO ENHANCEMENT STACK */}
+      <BillionDollarSEO 
+        pageType="homepage"
+        targetKeywords={['sentient marketing', 'ai social media management', 'social media automation', 'sentientm', 'ai marketing platform']}
+        semanticCluster="intelligence"
+        competitorTarget="hootsuite"
+        industryFocus="ecommerce"
+      />
+      
+      <SemanticSEO 
+        content={{
+          mainTopic: "AI Social Media Management",
+          subtopics: ["Content Automation", "Predictive Analytics", "Brand Voice Learning", "Multi-Platform Publishing"],
+          entities: ["SentientM", "Artificial Intelligence", "Social Media Marketing", "Content Creation"],
+          semanticKeywords: ["ai automation", "social media intelligence", "predictive marketing", "content optimization"],
+          contentClusters: ["automation", "intelligence", "efficiency", "performance"]
+        }}
+        pageContext="homepage"
+        targetAudience="business-owners"
+        competitorContext={['hootsuite', 'buffer', 'sprout-social']}
+      />
+      
+      <TechnicalSEO 
+        pageType="homepage"
+        criticalResources={['/api/dashboard', '/api/user/profile']}
+        imageOptimization={true}
+        coreWebVitalsOptimization={true}
+      />
+      
+      <CompetitorSEO 
+        targetCompetitors={['hootsuite', 'buffer', 'sprout-social', 'later', 'meetedgar']}
+        competitiveKeywords={['hootsuite alternative', 'buffer alternative', 'sprout social alternative', 'ai social media tool', 'best social media management software']}
+        marketPosition="disruptor"
+      />
+      
+      <AdvancedSEO 
+        pageType="homepage"
+        targetKeywords={['sentient marketing', 'ai social media management', 'social media automation']}
+        location="global"
+        contentType="landing-page"
+      />
+      
+      <ContentOptimizer 
+        pageContent={{
+          keyPoints: [
+            "World's most advanced AI social media management platform",
+            "Automates content creation with sentient intelligence", 
+            "50,000+ businesses trust SentientM for social media growth",
+            "300% better engagement rates with AI optimization",
+            "Cross-platform automation for Instagram, Twitter, Facebook, LinkedIn"
+          ]
+        }}
+        aiOverviewOptimization={{
+          quickAnswer: "SentientM is the world's most advanced AI social media management platform that automates content creation, scheduling, and analytics across all major platforms with revolutionary sentient intelligence technology.",
+          featuredSnippetTarget: "AI social media management platform with automated content creation",
+          voiceSearchOptimized: true
+        }}
+      />
+      
+      <PerformanceOptimizer />
       
       {/* Neural Network or Static Background */}
       {ENABLE_NEURAL_NETWORK ? (

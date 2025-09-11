@@ -255,7 +255,8 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         if (debug && !src.includes('/api/proxy-image')) {
           console.warn('[OptimizedImage] Failed to load original image for optimization, using as-is:', e);
         }
-        // Keep the current optimizedSrc (don't change it to potentially broken src)
+        // CRITICAL FIX: Set optimizedSrc to original src to ensure fallback displays
+        setOptimizedSrc(src);
         setFallbackToOriginal(true);
         setIsProcessing(false);
         frontendImageCache.clearProcessing(src, getOptimalQuality(), maxWidth, enableWebP);
@@ -264,7 +265,8 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
       tempImg.src = src;
     } catch (error) {
       console.error('[OptimizedImage] Load and optimize failed:', error);
-      // Keep the current optimizedSrc (don't change it to potentially broken src)
+      // CRITICAL FIX: Set optimizedSrc to original src to ensure fallback displays
+      setOptimizedSrc(src);
       setFallbackToOriginal(true);
       setIsProcessing(false);
       frontendImageCache.clearProcessing(src, getOptimalQuality(), maxWidth, enableWebP);

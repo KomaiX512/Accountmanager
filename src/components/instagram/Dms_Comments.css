@@ -92,7 +92,7 @@
   scroll-snap-stop: always;
 }
 
-/* Hide scrollbar on mobile for cleaner look */
+/* Enhanced mobile scrolling - FIXED: Proper touch scrolling */
 @media (max-width: 768px) {
   .notifications-scroll-container {
     scrollbar-width: none;
@@ -100,10 +100,25 @@
     padding-right: 0;
     margin-right: 0;
     padding-bottom: 60px; /* Adjusted for mobile */
+    /* FIXED: Ensure proper mobile scrolling */
+    -webkit-overflow-scrolling: touch; /* Enable momentum scrolling on iOS */
+    overflow-y: scroll; /* Force scroll behavior */
+    height: 100%; /* Ensure full height */
+    min-height: 0; /* Allow flex shrinking */
+    /* Mobile-specific scroll behavior */
+    overscroll-behavior: contain; /* Prevent overscroll */
+    scroll-behavior: smooth;
   }
   
   .notifications-scroll-container::-webkit-scrollbar {
     display: none;
+  }
+  
+  /* FIXED: Ensure container allows proper mobile scrolling */
+  .dms-comments-container {
+    height: 100vh; /* Use viewport height for mobile */
+    min-height: 100vh;
+    overflow: hidden; /* Prevent container overflow */
   }
 }
 
@@ -892,19 +907,24 @@
 /* Mobile Responsive Adjustments */
 @media (max-width: 768px) {
   .ai-reply-edit-actions {
-    flex-direction: column;
+    flex-direction: row; /* FIXED: Keep AI reply edit buttons in one row */
     gap: 4px;
+    flex-wrap: wrap;
+    justify-content: space-between;
   }
   
   .ai-reply-actions {
-    flex-direction: column;
+    flex-direction: row; /* FIXED: Keep AI reply buttons in one row */
     gap: 4px;
+    flex-wrap: wrap;
+    justify-content: space-between;
   }
   
   .save-ai-reply-btn,
   .cancel-ai-reply-edit-btn {
-    width: 100%;
-    padding: 6px 12px;
+    flex: 1; /* FIXED: Equal width buttons in one row */
+    min-width: 0;
+    padding: 6px 8px; /* Reduced padding for mobile */
     font-size: 11px;
   }
   
@@ -944,18 +964,22 @@
   
   .reply-buttons,
   .notification-actions {
-    flex-direction: column;
+    flex-direction: row; /* FIXED: Keep buttons in one row on mobile */
     gap: 4px;
     width: 100%;
+    flex-wrap: wrap; /* Allow wrapping if needed */
+    justify-content: space-between; /* Distribute buttons evenly */
   }
   
   .reply-btn,
   .ai-reply-btn,
   .ignore-btn {
-    width: 100%;
-    padding: 8px 12px;
-    font-size: 12px;
+    flex: 1; /* FIXED: Equal width buttons that fit in one row */
+    min-width: 0; /* Allow shrinking */
+    padding: 6px 8px; /* Reduced padding for mobile */
+    font-size: 11px; /* Slightly smaller font for mobile */
     justify-content: center;
+    text-align: center;
   }
 }
 

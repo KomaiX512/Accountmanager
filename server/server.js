@@ -556,12 +556,12 @@ const s3Client = new S3Client({
     accessKeyId: R2_ACCESS_KEY_ID,
     secretAccessKey: R2_SECRET_ACCESS_KEY,
   },
-  maxAttempts: 1, // PERFORMANCE: No retries for fast fallback
+  maxAttempts: 3, // Increase tolerance for transient network slowness
   requestHandler: {
-    connectionTimeout: 2000, // 2 seconds max connection
-    requestTimeout: 3000,    // 3 seconds max request
+    connectionTimeout: 10000, // 10 seconds to establish connection (R2 under load)
+    requestTimeout: 15000,    // 15 seconds max per request
   },
-  retryMode: 'standard'
+  retryMode: 'adaptive'
 });
 
 // R2 public URL for direct image access
@@ -975,17 +975,12 @@ app.get(['/api/user/:userId/usage', '/user/:userId/usage'], async (req, res) => 
     
     let foundAnyUsage = false;
     
-    // Try to get usage data directly by Firebase UID from admin bucket
+    // Try to get usage data directly by Firebase UID using getUserUsageStats (with local storage fallback)
     try {
       console.log(`[${new Date().toISOString()}] [USER-API] Checking usage for ${isFirebaseUID ? 'Firebase UID' : 'Platform ID'}: ${userId}`);
-      const params = {
-        Bucket: 'admin',
-        Key: `usage/${userId}/${currentPeriod}.json`
-      };
       
-      const getCommand = new GetObjectCommand(params);
-      const data = await s3Client.send(getCommand);
-      const usage = JSON.parse(await streamToString(data.Body));
+      // Use getUserUsageStats function which has proper R2 + local storage fallback
+      const usage = await getUserUsageStats(userId);
       
       // Use the Firebase UID-based usage data directly
       aggregatedUsage = {
@@ -2252,6 +2247,29 @@ async function getUserUsageStats(userId) {
     const getCommand = new GetObjectCommand(params);
     const data = await s3Client.send(getCommand);
     const stats = JSON.parse(await streamToString(data.Body));
+    
+    // Check if R2 data is all zeros - if so, check local storage for more recent data
+    const totalUsage = (stats.postsUsed || 0) + (stats.discussionsUsed || 0) + (stats.aiRepliesUsed || 0) + (stats.campaignsUsed || 0) + (stats.resetsUsed || 0);
+    if (totalUsage === 0) {
+      // Check local storage for more recent data
+      const localStorageDir = path.join(process.cwd(), 'local_storage', 'usage', userId);
+      const localStorageFile = path.join(localStorageDir, `${currentPeriod}.json`);
+      
+      if (fs.existsSync(localStorageFile)) {
+        try {
+          const localData = JSON.parse(fs.readFileSync(localStorageFile, 'utf8'));
+          const localTotalUsage = (localData.postsUsed || 0) + (localData.discussionsUsed || 0) + (localData.aiRepliesUsed || 0) + (localData.campaignsUsed || 0) + (localData.resetsUsed || 0);
+          
+          if (localTotalUsage > 0) {
+            console.log(`[${new Date().toISOString()}] [USER-API] Using local storage data instead of R2 zeros for ${userId}/${currentPeriod}`);
+            return localData;
+          }
+        } catch (localError) {
+          console.warn(`[${new Date().toISOString()}] [USER-API] Error reading local storage:`, localError);
+        }
+      }
+    }
+    
     console.log(`[${new Date().toISOString()}] [USER-API] Retrieved individual usage stats from R2 for ${userId}/${currentPeriod}`);
     return stats;
   } catch (r2Error) {

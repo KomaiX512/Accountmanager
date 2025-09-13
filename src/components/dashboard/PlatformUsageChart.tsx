@@ -42,6 +42,12 @@ const PlatformUsageChart: React.FC<PlatformUsageChartProps> = ({ className }) =>
       name: 'Twitter',
       color: '#000000ff', 
       icon: '/icons/twitter.svg'
+    },
+    // Fallback aggregate when platform-specific mapping is unavailable
+    account: {
+      name: 'Total',
+      color: '#6c757d',
+      icon: '/icons/default.svg'
     }
   };
 
@@ -55,39 +61,47 @@ const PlatformUsageChart: React.FC<PlatformUsageChartProps> = ({ className }) =>
       );
       
       const data = response.data;
-      
-      // Filter out 'account' platform since it represents general account activity, not actual Twitter usage
-      // Only show actual social media platform usage (instagram, facebook, twitter)
-      const filteredPlatforms = { ...data.platforms };
-      if (filteredPlatforms.account) {
-        delete filteredPlatforms.account;
+      // Determine if we have any non-account platform entries
+      const rawPlatforms = data.platforms || {};
+      const hasNonAccount = Object.keys(rawPlatforms).some(k => k !== 'account' && (rawPlatforms as any)[k]?.count > 0);
+
+      // Build working set: if we have platform-specific data, drop 'account'.
+      // Otherwise, keep 'account' to show the total instead of empty state.
+      let workingPlatforms: Record<string, PlatformUsageData> = {};
+      if (hasNonAccount) {
+        const cloned: Record<string, PlatformUsageData> = { ...(rawPlatforms as any) };
+        if ((cloned as any).account) {
+          delete (cloned as any).account;
+        }
+        workingPlatforms = cloned;
+      } else if ((rawPlatforms as any).account) {
+        // Preserve aggregate as 'account' and set 100%
+        workingPlatforms = {
+          account: {
+            count: (rawPlatforms as any).account.count || 0,
+            percentage: (rawPlatforms as any).account.count > 0 ? 100 : 0
+          }
+        };
       }
-      
-      // Recalculate total activity and percentages without account platform
-      const filteredTotal = Object.values(filteredPlatforms).reduce((sum: number, platform: any) => sum + platform.count, 0);
-      
-      // Recalculate percentages based on filtered total
+
+      // Recalculate totals and percentages for non-account platforms
+      const filteredTotal = Object.values(workingPlatforms).reduce((sum: number, p: PlatformUsageData) => sum + (p?.count || 0), 0);
       const recalculatedPlatforms: Record<string, PlatformUsageData> = {};
-      for (const [platform, data] of Object.entries(filteredPlatforms)) {
-        const platformData = data as PlatformUsageData;
+
+      for (const [platform, pdata] of Object.entries(workingPlatforms)) {
+        const count = (pdata as PlatformUsageData).count || 0;
+        const isAccount = platform === 'account';
         recalculatedPlatforms[platform] = {
-          count: platformData.count,
-          percentage: filteredTotal > 0 ? Math.round((platformData.count / filteredTotal) * 100) : 0
+          count,
+          percentage: isAccount
+            ? (count > 0 ? 100 : 0)
+            : (filteredTotal > 0 ? Math.round((count / filteredTotal) * 100) : 0)
         };
       }
-      
-      // Add Twitter with 0 usage if not present
-      if (!recalculatedPlatforms.twitter) {
-        recalculatedPlatforms.twitter = {
-          count: 0,
-          percentage: 0
-        };
-      }
-      
+
       setPlatformUsage(recalculatedPlatforms);
       setTotalActivity(filteredTotal);
-      
-      console.log('[PlatformUsageChart] Fetched platform usage data (filtered):', { platforms: recalculatedPlatforms, totalActivity: filteredTotal });
+      console.log('[PlatformUsageChart] Fetched platform usage data:', { platforms: recalculatedPlatforms, totalActivity: filteredTotal });
     } catch (error) {
       console.error('[PlatformUsageChart] Error fetching platform usage:', error);
       // Set empty data on error

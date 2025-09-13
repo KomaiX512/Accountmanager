@@ -2629,9 +2629,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                         maxWidth={600}
                         quality={0.5}
                         isLCP={index === 0}
-                        aspectRatio="1/1"
-                        width={600}
-                        height={600}
+                        sizes="(max-width: 768px) 100vw, 600px"
                         onLoadStart={() => {
                           console.log(`[PostCooked] Image load started for ${post.key}: ${imageUrl}`);
                           handleImageLoadStart(post.key);

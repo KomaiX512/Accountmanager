@@ -78,7 +78,7 @@ class ChromaDBService {
 
   async initialize() {
     try {
-      // Determine ChromaDB endpoint (allows overriding the default when port 8000 is busy)
+      // Determine ChromaDB endpoint (prioritize port 8000 where ChromaDB is running)
       const chromaPath =
         // Highest-priority: explicit full URL
         process.env.CHROMADB_URL ||
@@ -94,12 +94,17 @@ class ChromaDBService {
         'http://localhost:8000';
 
       const candidatePaths = [];
-      // 1) Provided path
-      if (chromaPath) candidatePaths.push(chromaPath);
+      // 1) Always try port 8000 first (where ChromaDB is actually running)
+      candidatePaths.push('http://localhost:8000');
+      
+      // 2) Add provided path if different from default
+      if (chromaPath && chromaPath !== 'http://localhost:8000') {
+        candidatePaths.push(chromaPath);
+      }
 
-      // 2) If only port given, scan common alternatives up to 8010
+      // 3) Only scan alternative ports if default fails
       const defaultHost = 'http://localhost';
-      for (let p = 8000; p <= 8010; p++) {
+      for (let p = 8001; p <= 8010; p++) {
         const alt = `${defaultHost}:${p}`;
         if (!candidatePaths.includes(alt)) candidatePaths.push(alt);
       }

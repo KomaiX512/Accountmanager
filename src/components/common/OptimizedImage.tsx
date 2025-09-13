@@ -26,6 +26,8 @@ interface OptimizedImageProps {
   height?: number; // Known height to prevent layout shift
   aspectRatio?: string; // CSS aspect-ratio (e.g., "16/9", "1/1")
   isLCP?: boolean; // Mark as LCP element to skip heavy optimization
+  // Responsive delivery
+  sizes?: string; // e.g. "(max-width: 768px) 100vw, 600px"
 }
 
 const OptimizedImage: React.FC<OptimizedImageProps> = ({
@@ -48,6 +50,7 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
   height,
   aspectRatio,
   isLCP = false,
+  sizes,
   ...props
 }) => {
   const [optimizedSrc, setOptimizedSrc] = useState<string>(src);
@@ -330,6 +333,34 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
     }
   }, [onLoad, enableProgressiveLoading, showBlur]);
 
+  // Build responsive srcset for our R2 endpoint if applicable
+  const buildResponsiveSources = useCallback((baseSrc: string) => {
+    try {
+      // Only build srcset for our image endpoint to avoid third-party URLs
+      if (!baseSrc || !/\/api\/r2-image\//.test(baseSrc)) {
+        return { src: baseSrc, srcSet: undefined, sizes: undefined };
+      }
+
+      const url = new URL(baseSrc, window.location.origin);
+      const widths = [320, 480, 640, 768, 960, 1200];
+      const q = isMobile() ? 70 : 82;
+      const format = 'webp';
+      const srcSetEntries: string[] = widths.map(w => {
+        const u = new URL(url.toString());
+        u.searchParams.set('w', String(w));
+        u.searchParams.set('q', String(q));
+        u.searchParams.set('format', format);
+        return `${u.toString()} ${w}w`;
+      });
+
+      // Prefer eager load for LCP image
+      const computedSizes = sizes || '(max-width: 768px) 100vw, 600px';
+      return { src: baseSrc, srcSet: srcSetEntries.join(', '), sizes: computedSizes };
+    } catch {
+      return { src: baseSrc, srcSet: undefined, sizes: undefined };
+    }
+  }, [sizes, isMobile]);
+
   // Handle image error event with HTTP2 retry logic
   const handleError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.target as HTMLImageElement;
@@ -424,6 +455,14 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         data-original-src={preserveOriginalForActions ? originalSrc : undefined}
         {...(isLCP && { fetchpriority: 'high' })}
         decoding={isLCP ? 'sync' : 'async'}
+        loading={isLCP ? 'eager' : 'lazy'}
+        {...(() => {
+          const r = buildResponsiveSources(optimizedSrc);
+          const dynProps: any = {};
+          if (r.srcSet) dynProps.srcSet = r.srcSet;
+          if (r.sizes) dynProps.sizes = r.sizes;
+          return dynProps;
+        })()}
         {...props}
       />
     </>

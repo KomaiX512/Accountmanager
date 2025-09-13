@@ -2188,34 +2188,100 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.setHeader('Access-Control-Expose-Headers', 'X-Image-Source, X-Image-Format, X-Image-Valid, X-Image-Size, X-Cache-Mode');
     
-    // Convert WebP to JPEG for better compatibility
+    // Responsive transform (resize/compress) when requested via query
+    // Supports: w (width), h (height), q (quality 40-90), format (webp|jpeg)
     let finalData = data;
     let finalContentType = contentType;
-    
-    if (contentType === 'image/webp') {
-      try {
-        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] Attempting WebP→JPEG conversion: ${imageKey}`);
-        const jpegBuffer = await sharp(data, { failOnError: false })
-          .jpeg({ quality: 90 })
-          .toBuffer();
 
-        // CRITICAL FIX: Accept smaller valid JPEGs (don't require 1KB minimum)
-        if (jpegBuffer && jpegBuffer.length > 200 && jpegBuffer[0] === 0xFF && jpegBuffer[1] === 0xD8) {
-          finalData = jpegBuffer;
-          finalContentType = 'image/jpeg';
-          if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] ✅ WebP→JPEG conversion succeeded for ${imageKey}`);
-        } else {
-          if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [R2-IMAGE] WebP→JPEG conversion produced invalid result for ${imageKey}; serving original WebP`);
+    const requestedWidth = Number.isFinite(Number(req.query.w)) ? Math.max(1, parseInt(String(req.query.w), 10)) : undefined;
+    const requestedHeight = Number.isFinite(Number(req.query.h)) ? Math.max(1, parseInt(String(req.query.h), 10)) : undefined;
+    const requestedQualityRaw = Number.isFinite(Number(req.query.q)) ? parseInt(String(req.query.q), 10) : undefined;
+    const requestedQuality = requestedQualityRaw ? Math.min(90, Math.max(40, requestedQualityRaw)) : undefined;
+    const requestedFormat = typeof req.query.format === 'string' ? String(req.query.format).toLowerCase() : undefined;
+    const acceptHeader = req.get('accept') || '';
+
+    const shouldTransform = Boolean(requestedWidth || requestedHeight || requestedQuality || requestedFormat);
+
+    try {
+      if (shouldTransform) {
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] ▶ Transforming image ${imageKey} (w=${requestedWidth||'-'}, h=${requestedHeight||'-'}, q=${requestedQuality||'-'}, fmt=${requestedFormat||'-'})`);
+        let transformer = sharp(data, { failOnError: false }).rotate();
+        if (requestedWidth || requestedHeight) {
+          transformer = transformer.resize({
+            width: requestedWidth,
+            height: requestedHeight,
+            fit: 'cover',
+            withoutEnlargement: true
+          });
         }
-      } catch (conversionError) {
-        if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [R2-IMAGE] WebP→JPEG conversion error for ${imageKey}: ${conversionError.message}; serving original WebP`);
+
+        // Decide output format
+        let outputFormat = 'jpeg';
+        if (requestedFormat === 'webp') outputFormat = 'webp';
+        else if (requestedFormat === 'jpeg' || requestedFormat === 'jpg') outputFormat = 'jpeg';
+        else if (!requestedFormat) {
+          // Heuristic: If browser accepts WebP, prefer WebP for transformed assets
+          if (acceptHeader.includes('image/avif') || acceptHeader.includes('image/webp')) {
+            outputFormat = 'webp';
+          } else {
+            outputFormat = 'jpeg';
+          }
+        }
+
+        const quality = requestedQuality ?? (outputFormat === 'webp' ? 80 : 82);
+        if (outputFormat === 'webp') {
+          finalData = await transformer.webp({ quality }).toBuffer();
+          finalContentType = 'image/webp';
+        } else {
+          finalData = await transformer.jpeg({ quality }).toBuffer();
+          finalContentType = 'image/jpeg';
+        }
+
+        // Set Vary so caches differentiate by UA hints
+        res.setHeader('Vary', 'Accept, DPR, Width, Viewport-Width');
+      } else if (contentType === 'image/webp') {
+        // Backward-compat: convert WebP to JPEG for clients expecting JPEG
+        try {
+          if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] Attempting WebP→JPEG conversion: ${imageKey}`);
+          const jpegBuffer = await sharp(data, { failOnError: false })
+            .jpeg({ quality: 90 })
+            .toBuffer();
+
+          if (jpegBuffer && jpegBuffer.length > 200 && jpegBuffer[0] === 0xFF && jpegBuffer[1] === 0xD8) {
+            finalData = jpegBuffer;
+            finalContentType = 'image/jpeg';
+            if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] ✅ WebP→JPEG conversion succeeded for ${imageKey}`);
+          } else {
+            if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [R2-IMAGE] WebP→JPEG conversion produced invalid result for ${imageKey}; serving original WebP`);
+          }
+        } catch (conversionError) {
+          if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [R2-IMAGE] WebP→JPEG conversion error for ${imageKey}: ${conversionError.message}; serving original WebP`);
+        }
       }
+    } catch (transformError) {
+      if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [R2-IMAGE] ⚠ Transform failed for ${imageKey}: ${transformError.message}. Serving original.`);
+      // Keep original finalData/finalContentType
     }
-    
+
     // Update headers with final content type
     res.setHeader('Content-Type', finalContentType);
     res.setHeader('X-Image-Format', finalContentType.split('/')[1]);
     res.setHeader('Content-Length', finalData.length);
+
+    // Recompute ETag to include transform parameters (stable in normal mode)
+    try {
+      const widthTag = requestedWidth ? `-w${requestedWidth}` : '';
+      const heightTag = requestedHeight ? `-h${requestedHeight}` : '';
+      const qualityTag = requestedQuality ? `-q${requestedQuality}` : '';
+      const formatTag = (requestedFormat || finalContentType.split('/')[1]) ? `-f${requestedFormat || finalContentType.split('/')[1]}` : '';
+      if (forceRefresh) {
+        const dynamicEtag = `"${imageKey}-${finalData.length}-edited${widthTag}${heightTag}${qualityTag}${formatTag}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}"`;
+        res.setHeader('ETag', dynamicEtag);
+      } else {
+        const stableEtag = `"${imageKey}-${finalData.length}${widthTag}${heightTag}${qualityTag}${formatTag}-v2"`;
+        res.setHeader('ETag', stableEtag);
+      }
+    } catch {}
     
     // Send the validated image buffer
     res.send(finalData);

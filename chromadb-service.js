@@ -469,14 +469,14 @@ Note: This is a professional LinkedIn profile that focuses on networking and pro
             })).filter(p => p.content && p.content.trim().length > 0);
           }
 
-          // Add LinkedIn-specific data for indexing
-          normalized.experiences = data.experiences || [];
-          normalized.education = data.educations || []; // Fixed: educations not education
-          normalized.skills = data.skills || [];
-          normalized.certifications = data.licenseAndCertificates || [];
-          normalized.publications = data.publications || [];
-          normalized.languages = data.languages || [];
-          normalized.interests = data.interests || [];
+          // Add LinkedIn-specific data for indexing - use profileInfo nested structure
+          normalized.experiences = data.profileInfo.experiences || [];
+          normalized.education = data.profileInfo.educations || []; // LinkedIn uses educations plural
+          normalized.skills = data.profileInfo.skills || [];
+          normalized.certifications = data.profileInfo.licenseAndCertificates || [];
+          normalized.publications = data.profileInfo.publications || [];
+          normalized.languages = data.profileInfo.languages || [];
+          normalized.interests = data.profileInfo.interests || [];
         } 
         // Facebook Page format (profileInfo + posts)
         else if (data.profileInfo && Array.isArray(data.posts)) {
@@ -650,13 +650,33 @@ Website: ${profile.externalUrls?.[0]?.url || 'None'}`;
   createPostDocument(post, platform, username, index) {
     try {
       if (!post.content || post.content.trim().length === 0) {
+        console.log(`[ChromaDB] 🔍 DEBUG: Skipping post ${index + 1} - empty content:`, {
+          hasContent: !!post.content,
+          contentLength: post.content ? post.content.length : 0,
+          contentPreview: post.content ? post.content.substring(0, 50) + '...' : 'NO CONTENT'
+        });
         return null; // Skip empty posts
+      }
+
+      // Ensure hashtags and mentions are arrays to prevent join() errors
+      const hashtags = Array.isArray(post.hashtags) ? post.hashtags : [];
+      const mentions = Array.isArray(post.mentions) ? post.mentions : [];
+      
+      // Debug log for LinkedIn posts to track content mapping
+      if (platform === 'linkedin' && index < 3) {
+        console.log(`[ChromaDB] 🔍 DEBUG: Creating LinkedIn Post ${index + 1} document:`, {
+          contentLength: post.content.length,
+          contentPreview: post.content.substring(0, 100) + '...',
+          hashtagsCount: hashtags.length,
+          mentionsCount: mentions.length,
+          engagement: post.engagement
+        });
       }
 
       const content = `Post ${index + 1} on ${platform}:
 Content: ${post.content}
-Hashtags: ${post.hashtags.join(' ')}
-Mentions: ${post.mentions.join(' ')}
+Hashtags: ${hashtags.join(' ')}
+Mentions: ${mentions.join(' ')}
 Likes: ${(post.engagement?.likes || 0).toLocaleString()}
 Comments: ${(post.engagement?.comments || 0).toLocaleString()}
 Retweets: ${(post.engagement?.shares || 0).toLocaleString()}
@@ -674,13 +694,14 @@ Posted: ${post.timestamp || 'Recent'}`;
           comments: post.engagement?.comments || 0,
           shares: post.engagement?.shares || 0,
           totalEngagement: (post.engagement?.likes || 0) + (post.engagement?.comments || 0) + (post.engagement?.shares || 0),
-          hashtagCount: post.hashtags.length,
-          mentionCount: post.mentions.length,
+          hashtagCount: hashtags.length,
+          mentionCount: mentions.length,
           wordCount: post.content.split(/\s+/).length
         }
       };
     } catch (error) {
-      console.error('[ChromaDB] Error creating post document:', error);
+      console.error(`[ChromaDB] Error creating post document for ${platform}/${username} post ${index + 1}:`, error);
+      console.error('[ChromaDB] Post data causing error:', JSON.stringify(post, null, 2));
       return null;
     }
   }

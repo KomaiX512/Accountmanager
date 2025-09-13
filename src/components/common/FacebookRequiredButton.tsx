@@ -47,7 +47,7 @@ const FacebookRequiredButton: React.FC<FacebookRequiredButtonProps> = ({
       borderRadius: '6px',
       fontSize: '12px',
       whiteSpace: 'nowrap',
-      zIndex: 1000,
+      zIndex: 10001,
       border: '1px solid #4267b2',
       boxShadow: '0 2px 8px rgba(24,119,242,0.3)'
     };

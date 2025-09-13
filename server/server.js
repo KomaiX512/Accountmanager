@@ -32,6 +32,9 @@ if (!globalThis.fetch) {
   globalThis.fetch = fetch;
 }
 
+// Define DEBUG_LOGS for S3 operation logging
+const DEBUG_LOGS = process.env.DEBUG_LOGS === 'true' || false;
+
 const verificationCodes = new Map();
 // Clean up expired verification codes every 10 minutes
 setInterval(() => {
@@ -1009,7 +1012,7 @@ app.get(['/api/user/:userId/usage', '/user/:userId/usage'], async (req, res) => 
             
             // Check if any platform account has higher usage
             let shouldSync = false;
-            let maxUsage = { ...aggregatedUsage };
+            let maxUsage = { ...aggregatedUsage }; // Start with complete Firebase UID data
             
             for (const platformUserId of connections.platformUserIds) {
               try {
@@ -1021,14 +1024,29 @@ app.get(['/api/user/:userId/usage', '/user/:userId/usage'], async (req, res) => 
                       platformUsage.aiRepliesUsed > maxUsage.aiRepliesUsed ||
                       platformUsage.campaignsUsed > maxUsage.campaignsUsed) {
                     shouldSync = true;
-                    maxUsage = {
-                      postsUsed: Math.max(maxUsage.postsUsed, platformUsage.postsUsed),
-                      discussionsUsed: Math.max(maxUsage.discussionsUsed, platformUsage.discussionsUsed),
-                      aiRepliesUsed: Math.max(maxUsage.aiRepliesUsed, platformUsage.aiRepliesUsed),
-                      campaignsUsed: Math.max(maxUsage.campaignsUsed, platformUsage.campaignsUsed),
-                      resetsUsed: Math.max(maxUsage.resetsUsed, platformUsage.resetsUsed),
-                      lastUpdated: new Date().toISOString()
-                    };
+                    
+                    // Only update specific fields that are higher, preserve complete data from Firebase UID
+                    if (platformUsage.postsUsed > maxUsage.postsUsed) {
+                      console.log(`[${new Date().toISOString()}] [USER-API] 🔄 Syncing postsUsed: ${maxUsage.postsUsed} -> ${platformUsage.postsUsed} from ${platformUserId}`);
+                      maxUsage.postsUsed = platformUsage.postsUsed;
+                    }
+                    if (platformUsage.discussionsUsed > maxUsage.discussionsUsed) {
+                      console.log(`[${new Date().toISOString()}] [USER-API] 🔄 Syncing discussionsUsed: ${maxUsage.discussionsUsed} -> ${platformUsage.discussionsUsed} from ${platformUserId}`);
+                      maxUsage.discussionsUsed = platformUsage.discussionsUsed;
+                    }
+                    if (platformUsage.aiRepliesUsed > maxUsage.aiRepliesUsed) {
+                      console.log(`[${new Date().toISOString()}] [USER-API] 🔄 Syncing aiRepliesUsed: ${maxUsage.aiRepliesUsed} -> ${platformUsage.aiRepliesUsed} from ${platformUserId}`);
+                      maxUsage.aiRepliesUsed = platformUsage.aiRepliesUsed;
+                    }
+                    if (platformUsage.campaignsUsed > maxUsage.campaignsUsed) {
+                      console.log(`[${new Date().toISOString()}] [USER-API] 🔄 Syncing campaignsUsed: ${maxUsage.campaignsUsed} -> ${platformUsage.campaignsUsed} from ${platformUserId}`);
+                      maxUsage.campaignsUsed = platformUsage.campaignsUsed;
+                    }
+                    if (platformUsage.resetsUsed > maxUsage.resetsUsed) {
+                      console.log(`[${new Date().toISOString()}] [USER-API] 🔄 Syncing resetsUsed: ${maxUsage.resetsUsed} -> ${platformUsage.resetsUsed} from ${platformUserId}`);
+                      maxUsage.resetsUsed = platformUsage.resetsUsed;
+                    }
+                    maxUsage.lastUpdated = new Date().toISOString();
                   }
                 }
               } catch (platError) {

@@ -49,7 +49,7 @@ const TwitterRequiredButton: React.FC<TwitterRequiredButtonProps> = ({
       borderRadius: '6px',
       fontSize: '12px',
       whiteSpace: 'nowrap',
-      zIndex: 1000,
+      zIndex: 10001,
       border: '1px solid #333333',
       boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
     };

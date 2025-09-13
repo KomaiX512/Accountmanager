@@ -39,7 +39,7 @@ const ButtonNotification: React.FC<ButtonNotificationProps> = ({
         fontSize: '12px',
         fontWeight: 'bold',
         whiteSpace: 'nowrap',
-        zIndex: 1000,
+        zIndex: 10001,
         boxShadow: '0 2px 10px rgba(0, 0, 0, 0.2)',
         border: '1px solid #ff2e63',
         ...getPositionStyles()

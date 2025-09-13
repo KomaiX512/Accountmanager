@@ -218,7 +218,7 @@ else
     print_info "Creating minimal working Nginx configuration..."
     
     # Create a minimal working configuration
-    cat > "$NGINX_CONFIG_TARGET" << 'EOF'
+    cat > "$NGINX_CONFIG_TARGET" << 'NGINXEOF'
 server {
     listen 80;
     listen [::]:80;
@@ -247,7 +247,7 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
     
-    # Proxy server endpoints
+    # Proxy server endpoints  
     location ^~ /api/r2-image/ {
         proxy_pass http://127.0.0.1:3002;
         proxy_http_version 1.1;
@@ -262,7 +262,7 @@ server {
         try_files $uri $uri/ /index.html;
     }
 }
-EOF
+NGINXEOF
     
     # Enable site
     ln -sf "$NGINX_CONFIG_TARGET" "$NGINX_ENABLED_LINK"

@@ -1,1 +1,0 @@
-{"error":"Endpoint not available on proxy server","message":"This endpoint should be handled by the main server (port 3000)","redirectTo":"http://localhost:3000/api/proxy-image?url=https%3A%2F%2Fpbs.twimg.com%2Fprofile_images%2F1887065642261737472%2FQdLiAFfD_normal.jpg"}

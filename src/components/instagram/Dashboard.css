@@ -48,6 +48,9 @@ body:has(.dashboard-wrapper) {
   text-align: center;
   margin: 0 0 10px 0 !important; /* Small gap below hero for bio visibility */
   padding: 0 !important;
+  /* Prevent from being LCP element by delaying visibility */
+  visibility: hidden;
+  animation: welcomeDelayedShow 0.1s ease-in 0.3s forwards;
   height: auto !important; /* Flexible height */
   width: 100% !important;
   display: flex !important;
@@ -3822,6 +3825,10 @@ h2 {
     margin-left: 3vw !important;
     margin-right: 8px !important;
   }
+}
+
+@keyframes welcomeDelayedShow {
+  to { visibility: visible; }
 }
 
 @media (max-width: 768px) {

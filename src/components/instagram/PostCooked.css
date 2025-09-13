@@ -336,6 +336,10 @@
   flex-direction: column;
   min-height: 100%; /* Ensure card takes full available height */
   height: 100%; /* Force full height utilization */
+  /* Performance: CSS containment to reduce rendering scope */
+  contain: layout paint style;
+  content-visibility: auto;
+  contain-intrinsic-size: 450px 450px;
 }
 
 .post-card::before {

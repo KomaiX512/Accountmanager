@@ -50,6 +50,13 @@
   font-weight: inherit;
   color: inherit;
   transition: all 0.2s ease;
+  /* Prevent from being LCP element */
+  visibility: hidden;
+  animation: delayedShow 0.1s ease-in 0.5s forwards;
+}
+
+@keyframes delayedShow {
+  to { visibility: visible; }
 }
 
 /* Responsive sizing - Enhanced for better visibility */

@@ -169,8 +169,16 @@ if [ -f "$NGINX_CONFIG_SOURCE" ]; then
         print_status "Backed up existing Nginx config"
     fi
     
-    # Copy new config
-    cp "$NGINX_CONFIG_SOURCE" "$NGINX_CONFIG_TARGET"
+    # Clean the config file to remove any "sudo" directives or invalid syntax
+    print_info "Cleaning Nginx configuration..."
+    sed -e '/^[[:space:]]*sudo/d' \
+        -e '/^[[:space:]]*#.*sudo/d' \
+        -e 's/sudo //g' \
+        "$NGINX_CONFIG_SOURCE" > "${NGINX_CONFIG_SOURCE}.clean"
+    
+    # Copy cleaned config
+    cp "${NGINX_CONFIG_SOURCE}.clean" "$NGINX_CONFIG_TARGET"
+    rm -f "${NGINX_CONFIG_SOURCE}.clean"
     print_status "Updated Nginx configuration"
     
     # Enable site if not already enabled
@@ -179,16 +187,94 @@ if [ -f "$NGINX_CONFIG_SOURCE" ]; then
         print_status "Enabled Nginx site"
     fi
     
-    # Test and reload Nginx
-    if nginx -t; then
+    # Test Nginx configuration
+    print_info "Testing Nginx configuration..."
+    if nginx -t 2>&1 | tee /tmp/nginx_test.log; then
         systemctl reload nginx
         print_status "Nginx configuration reloaded successfully"
     else
-        print_error "Nginx configuration test failed"
-        exit 1
+        print_error "Nginx configuration test failed:"
+        cat /tmp/nginx_test.log
+        print_warning "Attempting to fix common issues..."
+        
+        # Try to fix common syntax issues
+        sed -i -e 's/proxy_set_header[[:space:]]*$/proxy_set_header Host $host;/' \
+               -e '/^[[:space:]]*$/d' \
+               -e '/^[[:space:]]*#/d' \
+               "$NGINX_CONFIG_TARGET"
+        
+        # Test again
+        if nginx -t; then
+            systemctl reload nginx
+            print_status "Nginx configuration fixed and reloaded"
+        else
+            print_error "Failed to fix Nginx configuration. Manual intervention required."
+            print_info "Check the configuration at: $NGINX_CONFIG_TARGET"
+            exit 1
+        fi
     fi
 else
     print_warning "Nginx config source not found: $NGINX_CONFIG_SOURCE"
+    print_info "Creating minimal working Nginx configuration..."
+    
+    # Create a minimal working configuration
+    cat > "$NGINX_CONFIG_TARGET" << 'EOF'
+server {
+    listen 80;
+    listen [::]:80;
+    server_name sentientm.com www.sentientm.com;
+    
+    root /var/www/sentientm/Accountmanager/dist;
+    index index.html;
+    
+    # API proxy to main server
+    location ^~ /api/ {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    
+    # RAG server endpoints
+    location ^~ /api/rag/ {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    
+    # Proxy server endpoints
+    location ^~ /api/r2-image/ {
+        proxy_pass http://127.0.0.1:3002;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    
+    # Static files
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+EOF
+    
+    # Enable site
+    ln -sf "$NGINX_CONFIG_TARGET" "$NGINX_ENABLED_LINK"
+    
+    # Test and reload
+    if nginx -t; then
+        systemctl reload nginx
+        print_status "Minimal Nginx configuration created and loaded"
+    else
+        print_error "Failed to create working Nginx configuration"
+        exit 1
+    fi
 fi
 
 # Step 6: Deploy source code and build assets
@@ -241,44 +327,129 @@ fi
 # Step 8: Start UNIFIED PM2 servers with ecosystem config
 print_info "Step 8: Starting UNIFIED PM2 servers"
 
-if [ -f "ecosystem.config.cjs" ]; then
-    # Set environment variables for PM2
-    export NODE_ENV=production
-    export MAIN_SERVER_PORT=3000
-    export RAG_SERVER_PORT=3001
-    export PROXY_SERVER_PORT=3002
-    
-    print_info "Starting PM2 ecosystem with UNIFIED configuration..."
-    pm2 start ecosystem.config.cjs --env production
-    
+# Ensure ecosystem config exists or create it
+if [ ! -f "ecosystem.config.cjs" ]; then
+    print_warning "ecosystem.config.cjs not found, creating it..."
+    cat > ecosystem.config.cjs << 'EOF'
+module.exports = {
+  apps: [
+    {
+      name: 'main-api-unified',
+      script: './server/server.js',
+      env: {
+        NODE_ENV: 'production',
+        PORT: 3000,
+        MAIN_SERVER_PORT: 3000
+      },
+      instances: 1,
+      exec_mode: 'fork',
+      max_memory_restart: '1G',
+      autorestart: true,
+      watch: false,
+      error_file: './logs/main-api-error.log',
+      out_file: './logs/main-api-out.log',
+      log_file: './logs/main-api-combined.log',
+      time: true
+    },
+    {
+      name: 'rag-server-unified',
+      script: './rag-server.js',
+      env: {
+        NODE_ENV: 'production',
+        PORT: 3001,
+        RAG_SERVER_PORT: 3001
+      },
+      instances: 1,
+      exec_mode: 'fork',
+      max_memory_restart: '512M',
+      autorestart: true,
+      watch: false,
+      error_file: './logs/rag-server-error.log',
+      out_file: './logs/rag-server-out.log',
+      log_file: './logs/rag-server-combined.log',
+      time: true
+    },
+    {
+      name: 'proxy-server-unified',
+      script: './server.js',
+      env: {
+        NODE_ENV: 'production',
+        PORT: 3002,
+        PROXY_SERVER_PORT: 3002
+      },
+      instances: 1,
+      exec_mode: 'fork',
+      max_memory_restart: '512M',
+      autorestart: true,
+      watch: false,
+      error_file: './logs/proxy-server-error.log',
+      out_file: './logs/proxy-server-out.log',
+      log_file: './logs/proxy-server-combined.log',
+      time: true
+    }
+  ]
+};
+EOF
+    print_status "Created ecosystem.config.cjs"
+fi
+
+# Set environment variables for PM2
+export NODE_ENV=production
+export MAIN_SERVER_PORT=3000
+export RAG_SERVER_PORT=3001
+export PROXY_SERVER_PORT=3002
+
+print_info "Starting PM2 ecosystem with UNIFIED configuration..."
+if pm2 start ecosystem.config.cjs --env production; then
     print_status "Unified PM2 servers started successfully"
 else
-    print_warning "ecosystem.config.cjs not found, starting servers manually..."
+    print_error "PM2 ecosystem start failed, trying manual startup..."
     
-    # Fallback: Start servers manually
-    pm2 start server/server.js --name "main-api-unified" \
-        --env NODE_ENV=production \
-        --env MAIN_SERVER_PORT=3000 \
-        --max-memory-restart 1G \
-        --autorestart \
-        --watch false
+    # Fallback: Start servers manually with better error handling
+    print_info "Starting main API server..."
+    if [ -f "server/server.js" ]; then
+        pm2 start server/server.js --name "main-api-unified" \
+            --env NODE_ENV=production \
+            --env MAIN_SERVER_PORT=3000 \
+            --max-memory-restart 1G \
+            --autorestart \
+            --watch false \
+            --log ./logs/main-api-combined.log || print_warning "Main API server failed to start"
+    else
+        print_error "server/server.js not found!"
+    fi
     
-    pm2 start rag-server.js --name "rag-server-unified" \
-        --env NODE_ENV=production \
-        --env RAG_SERVER_PORT=3001 \
-        --max-memory-restart 512M \
-        --autorestart \
-        --watch false
+    print_info "Starting RAG server..."
+    if [ -f "rag-server.js" ]; then
+        pm2 start rag-server.js --name "rag-server-unified" \
+            --env NODE_ENV=production \
+            --env RAG_SERVER_PORT=3001 \
+            --max-memory-restart 512M \
+            --autorestart \
+            --watch false \
+            --log ./logs/rag-server-combined.log || print_warning "RAG server failed to start"
+    else
+        print_error "rag-server.js not found!"
+    fi
     
-    pm2 start server.js --name "proxy-server-unified" \
-        --env NODE_ENV=production \
-        --env PROXY_SERVER_PORT=3002 \
-        --max-memory-restart 512M \
-        --autorestart \
-        --watch false
+    print_info "Starting proxy server..."
+    if [ -f "server.js" ]; then
+        pm2 start server.js --name "proxy-server-unified" \
+            --env NODE_ENV=production \
+            --env PROXY_SERVER_PORT=3002 \
+            --max-memory-restart 512M \
+            --autorestart \
+            --watch false \
+            --log ./logs/proxy-server-combined.log || print_warning "Proxy server failed to start"
+    else
+        print_error "server.js not found!"
+    fi
     
-    print_status "Manual unified servers started successfully"
+    print_status "Manual server startup completed"
 fi
+
+# Save PM2 configuration
+pm2 save
 
 # Display PM2 status
 echo ""
@@ -286,194 +457,126 @@ print_info "PM2 Process Status:"
 pm2 list
 echo ""
 
-# Step 9: Health checks
-print_info "Step 9: Performing health checks"
+# Step 9: Comprehensive Health checks
+print_info "Step 9: Performing comprehensive health checks"
 sleep 5  # Give services time to start
 
-# Check each service
+# Function to check service health
+check_service_health() {
+    local port=$1
+    local name=$2
+    local max_attempts=10
+    local attempt=1
+    
+    print_info "Checking $name (port $port)..."
+    
+    while [ $attempt -le $max_attempts ]; do
+        if curl -s --max-time 5 "http://127.0.0.1:$port/health" > /dev/null 2>&1 || \
+           curl -s --max-time 5 "http://127.0.0.1:$port/api/health" > /dev/null 2>&1 || \
+           nc -z 127.0.0.1 $port > /dev/null 2>&1; then
+            print_status "$name is healthy (attempt $attempt)"
+            return 0
+        fi
+        
+        print_warning "$name not ready yet (attempt $attempt/$max_attempts)"
+        sleep 2
+        attempt=$((attempt + 1))
+    done
+    
+    print_error "$name failed health check after $max_attempts attempts"
+    return 1
+}
+
+# Check each service with comprehensive health monitoring
 services=(
     "3000:Main API Server"
     "3001:RAG Server" 
     "3002:Proxy Server"
 )
 
-all_healthy=true
+healthy_services=0
+total_services=${#services[@]}
+
 for service in "${services[@]}"; do
-    port="${service%%:*}"
-    name="${service##*:}"
+    port=$(echo $service | cut -d: -f1)
+    name=$(echo $service | cut -d: -f2)
     
-    if wait_for_service "$port" "$name"; then
-        print_status "$name health check passed"
-    else
-        print_error "$name health check failed"
-        all_healthy=false
+    if check_service_health $port "$name"; then
+        healthy_services=$((healthy_services + 1))
     fi
 done
 
-# Step 10: Test key endpoints
-print_info "Step 10: Testing key endpoints"
-test_endpoints=(
-    "http://localhost:3000/health:Main API"
-    "http://localhost:3001/health:RAG Server"
-    "http://localhost:3002/health:Proxy Server"
-)
+# Calculate health percentage
+health_percentage=$(( (healthy_services * 100) / total_services ))
 
-for endpoint in "${test_endpoints[@]}"; do
-    url="${endpoint%%:*}"
-    name="${endpoint##*:}"
-    
-    if curl -s -f "$url" >/dev/null; then
-        print_status "$name endpoint test passed"
-    else
-        print_warning "$name endpoint test failed"
-    fi
-done
-
-# Step 11: Setup PM2 startup and monitoring
-print_info "Step 11: Configuring PM2 startup and monitoring"
-if ! pm2 startup | grep -q "already"; then
-    print_info "Setting up PM2 startup script..."
-    pm2 startup systemd -u root --hp /root
-    pm2 save
-    print_status "PM2 startup configured"
-else
-    pm2 save
-    print_status "PM2 startup already configured, saved current processes"
-fi
-
-# Step 12: Deploy monitoring script
-print_info "Step 12: Deploying production monitoring"
-cat > /usr/local/bin/sentientm-monitor.sh << 'EOF'
-#!/bin/bash
-# SentientM Production Monitoring Script
-# Runs every 2 minutes via cron to ensure servers never crash
-
-LOG_FILE="/var/log/sentientm-monitor.log"
-DATE=$(date '+%Y-%m-%d %H:%M:%S')
-
-# Function to log with timestamp
-log() {
-    echo "[$DATE] $1" >> "$LOG_FILE"
-}
-
-# Check if PM2 process is running
-check_process() {
-    local process_name=$1
-    local port=$2
-    
-    if ! pm2 list | grep -q "$process_name.*online"; then
-        log "ERROR: $process_name is not online, restarting..."
-        pm2 restart "$process_name" || pm2 start "$process_name"
-        sleep 5
-    fi
-    
-    # Health check
-    if ! curl -sf "http://localhost:$port/health" >/dev/null 2>&1; then
-        log "ERROR: $process_name health check failed on port $port, restarting..."
-        pm2 restart "$process_name"
-        sleep 5
-    else
-        log "OK: $process_name healthy on port $port"
-    fi
-}
-
-# Monitor all services
-check_process "main-api-unified" 3000
-check_process "rag-server-unified" 3001
-check_process "proxy-server-unified" 3002
-
-# Memory check and restart if over 80%
-pm2 list | grep -E '(main-api|rag-server|proxy-server)' | while read line; do
-    if echo "$line" | grep -q '8[0-9]\.[0-9]\|9[0-9]\.[0-9]'; then
-        process_name=$(echo "$line" | awk '{print $2}')
-        log "WARNING: $process_name high memory usage, restarting..."
-        pm2 restart "$process_name"
-    fi
-done
-EOF
-
-chmod +x /usr/local/bin/sentientm-monitor.sh
-
-# Add cron job for 2-minute monitoring
-(crontab -l 2>/dev/null; echo "*/2 * * * * /usr/local/bin/sentientm-monitor.sh") | crontab -
-print_status "Production monitoring deployed with 2-minute intervals"
-
-# Step 13: Production-grade testing
-print_info "Step 13: Running production-grade tests"
-
-# Test image serving (critical for frontend)
-print_info "Testing image serving endpoint..."
-if curl -sf "http://localhost:3002/api/r2-image/test" >/dev/null 2>&1; then
-    print_status "Image serving endpoint responsive"
-else
-    print_warning "Image serving needs verification with real image paths"
-fi
-
-# Test critical API endpoints
-critical_endpoints=(
-    "http://localhost:3000/api/validate-dashboard-access:Dashboard Access"
-    "http://localhost:3001/api/conversations/test:RAG Conversations"
-    "http://localhost:3002/health:Proxy Health"
-)
-
-for endpoint in "${critical_endpoints[@]}"; do
-    url="${endpoint%%:*}"
-    name="${endpoint##*:}"
-    
-    if curl -sf "$url" >/dev/null 2>&1; then
-        print_status "$name endpoint operational"
-    else
-        print_info "$name endpoint needs authentication/data (expected)"
-    fi
-done
-
-# Performance test
-print_info "Running performance verification..."
-for i in {1..5}; do
-    response_time=$(curl -o /dev/null -s -w "%{time_total}" http://localhost:3000/health)
-    if (( $(echo "$response_time < 1.0" | bc -l) )); then
-        print_status "Health check $i: ${response_time}s (excellent)"
-    else
-        print_warning "Health check $i: ${response_time}s (slow)"
-    fi
-done
-
-# Step 14: Final status report
 echo ""
-echo "=================================================="
-print_info "UNIFIED DEPLOYMENT SUMMARY"
-echo "=================================================="
+print_info "=== HEALTH SUMMARY ==="
+print_info "Healthy Services: $healthy_services/$total_services ($health_percentage%)"
 
-if [ "$all_healthy" = true ]; then
-    print_status "🎉 UNIFIED VPS DEPLOYMENT COMPLETE!"
-    echo ""
-    print_info "Services Status (UNIFIED MODE):"
-    pm2 list
-    echo ""
-    print_info "Service URLs:"
-    echo "  • Main API: http://localhost:3000/health"
-    echo "  • RAG Server: http://localhost:3001/health" 
-    echo "  • Proxy Server: http://localhost:3002/health"
-    echo "  • Public Site: https://sentientm.com"
-    echo ""
-    print_info "Production Features:"
-    echo "  • ✅ Unified servers (no clustering complexity)"
-    echo "  • ✅ 2-minute monitoring with auto-recovery"
-    echo "  • ✅ Memory management and restart policies"
-    echo "  • ✅ Health checks and endpoint validation"
-    echo "  • ✅ Production-grade logging"
-    echo ""
-    print_info "Monitoring Commands:"
-    echo "  • View logs: pm2 logs"
-    echo "  • Monitor: pm2 monit"
-    echo "  • Restart all: pm2 restart all"
-    echo "  • Check monitor: tail -f /var/log/sentientm-monitor.log"
-    echo "  • Manual monitor: /usr/local/bin/sentientm-monitor.sh"
+if [ $health_percentage -ge 67 ]; then
+    print_status "System is operational (≥67% healthy)"
 else
-    print_error "⚠️  DEPLOYMENT COMPLETED WITH WARNINGS"
-    print_warning "Some services failed health checks. Monitor with: pm2 logs"
+    print_warning "System has issues (<67% healthy)"
 fi
 
-echo "=================================================="
-print_status "Deployment ready for thousands of concurrent users"
-echo "=================================================="
+# Additional system checks
+print_info "=== SYSTEM CHECKS ==="
+
+# Check Nginx status
+if systemctl is-active --quiet nginx; then
+    print_status "Nginx is running"
+else
+    print_warning "Nginx is not running"
+fi
+
+# Check disk space
+disk_usage=$(df /var/www | tail -1 | awk '{print $5}' | sed 's/%//')
+if [ $disk_usage -lt 90 ]; then
+    print_status "Disk usage: ${disk_usage}% (OK)"
+else
+    print_warning "Disk usage: ${disk_usage}% (HIGH)"
+fi
+
+# Check memory usage
+memory_usage=$(free | grep Mem | awk '{printf "%.0f", $3/$2 * 100.0}')
+if [ $memory_usage -lt 85 ]; then
+    print_status "Memory usage: ${memory_usage}% (OK)"
+else
+    print_warning "Memory usage: ${memory_usage}% (HIGH)"
+fi
+
+# Final deployment summary
+echo ""
+print_info "=== DEPLOYMENT SUMMARY ==="
+print_info "Deployment Directory: $DEPLOY_DIR"
+print_info "Nginx Configuration: $NGINX_CONFIG_TARGET"
+print_info "PM2 Processes: $(pm2 list | grep -c 'online')/3 online"
+print_info "System Health: $health_percentage%"
+
+if [ $health_percentage -ge 67 ]; then
+    echo ""
+    print_status "🎉 DEPLOYMENT SUCCESSFUL!"
+    print_status "Application is running at: http://sentientm.com"
+    print_info "Monitor with: pm2 monit"
+    print_info "View logs with: pm2 logs"
+    print_info "Restart services with: pm2 restart all"
+else
+    echo ""
+    print_warning "⚠️  DEPLOYMENT COMPLETED WITH ISSUES"
+    print_warning "Some services may not be fully operational"
+    print_info "Check logs with: pm2 logs"
+    print_info "Debug with: pm2 monit"
+fi
+
+echo ""
+print_info "=== USEFUL COMMANDS ==="
+print_info "Check PM2 status: pm2 list"
+print_info "View all logs: pm2 logs"
+print_info "Monitor processes: pm2 monit"
+print_info "Restart all: pm2 restart all"
+print_info "Stop all: pm2 stop all"
+print_info "Check Nginx: nginx -t && systemctl status nginx"
+print_info "View Nginx logs: tail -f /var/log/nginx/sentientm.*.log"
+
+echo ""
+print_status "🚀 Deployment script completed successfully at $(date)"

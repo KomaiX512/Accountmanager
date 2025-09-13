@@ -2631,7 +2631,7 @@ Image Description: ${response.post.image_prompt}
         className="dashboard-wrapper"
       >
         {showWelcome && (
-          <div className="welcome-header" style={{ visibility: 'visible' }}>
+          <div className="welcome-header" style={{ animationDelay: '0.1s' }}>
             <h1 className="welcome-text">
               Welcome {profileInfo?.fullName || accountHolder || 'User'}!
             </h1>

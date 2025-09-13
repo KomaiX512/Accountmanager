@@ -137,3 +137,7 @@ server-monitor.js
 create-fallback.js
 
 # Ecosystem configs (keep only the main one)
+
+# Large profile files
+Profile-*.json
+*.profile.json

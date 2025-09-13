@@ -21,6 +21,11 @@ interface OptimizedImageProps {
   preserveOriginalForActions?: boolean; // Keep original URL for preview/download, default false
   aggressiveMobileOptimization?: boolean; // Extra aggressive mobile compression, default false
   enableProgressiveLoading?: boolean; // Blur-to-sharp transition, default false
+  // PERFORMANCE: CLS Prevention
+  width?: number; // Known width to prevent layout shift
+  height?: number; // Known height to prevent layout shift
+  aspectRatio?: string; // CSS aspect-ratio (e.g., "16/9", "1/1")
+  isLCP?: boolean; // Mark as LCP element to skip heavy optimization
 }
 
 const OptimizedImage: React.FC<OptimizedImageProps> = ({
@@ -39,16 +44,20 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
   preserveOriginalForActions = false,
   aggressiveMobileOptimization = false,
   enableProgressiveLoading = false,
+  width,
+  height,
+  aspectRatio,
+  isLCP = false,
   ...props
 }) => {
   const [optimizedSrc, setOptimizedSrc] = useState<string>(src);
   const [originalSrc] = useState<string>(src); // Store original for actions
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [fallbackToOriginal, setFallbackToOriginal] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [showBlur, setShowBlur] = useState(enableProgressiveLoading);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [fallbackToOriginal, setFallbackToOriginal] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Debug logging
   const debug = process.env.NODE_ENV === 'development';
@@ -166,7 +175,11 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
 
   // Load and optimize image
   const loadAndOptimize = useCallback(async () => {
-    if (!enableOptimization || fallbackToOriginal) {
+    // PERFORMANCE: Skip heavy optimization for LCP images to improve INP
+    if (!enableOptimization || fallbackToOriginal || isLCP) {
+      if (debug && isLCP) {
+        console.log('[OptimizedImage] Skipping optimization for LCP image to improve performance');
+      }
       setOptimizedSrc(src);
       return;
     }
@@ -317,8 +330,11 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
     }
   }, [onLoad, enableProgressiveLoading, showBlur]);
 
-  // Handle image error event
+  // Handle image error event with HTTP2 retry logic
   const handleError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.target as HTMLImageElement;
+    const currentSrc = img.src;
+    
     // If optimized version fails and we haven't tried original yet, try original
     if (!fallbackToOriginal && optimizedSrc !== src) {
       // Only log optimization failures for non-proxy images to reduce noise
@@ -328,6 +344,34 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
       setFallbackToOriginal(true);
       setOptimizedSrc(src);
       return;
+    }
+    
+    // HTTP2 Protocol Error Retry Logic
+    // If this is an API image that failed, try adding cache-busting parameters
+    if (currentSrc.includes('/api/r2-image/') || currentSrc.includes('/api/proxy-image')) {
+      try {
+        const url = new URL(currentSrc);
+        
+        // Add retry parameter if not already present
+        if (!url.searchParams.has('retry')) {
+          console.log('[OptimizedImage] HTTP2 error detected, retrying with cache-busting');
+          url.searchParams.set('retry', '1');
+          url.searchParams.set('t', Date.now().toString());
+          setOptimizedSrc(url.toString());
+          return;
+        }
+        
+        // If already retried once, try removing query params for simpler request
+        if (url.searchParams.has('retry') && !url.searchParams.has('simple')) {
+          console.log('[OptimizedImage] Retry failed, trying simplified request');
+          const basePath = url.pathname;
+          const simpleUrl = `${url.origin}${basePath}?simple=1&t=${Date.now()}`;
+          setOptimizedSrc(simpleUrl);
+          return;
+        }
+      } catch (urlError) {
+        console.warn('[OptimizedImage] Could not parse URL for retry:', urlError);
+      }
     }
     
     // If the original/proxy image fails, try direct URL if available
@@ -344,6 +388,8 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         console.warn('[OptimizedImage] Could not parse proxy URL:', parseError);
       }
     }
+    
+    console.error('[OptimizedImage] All fallback attempts failed for:', currentSrc);
     
     if (onError) {
       onError(e);
@@ -362,9 +408,12 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         ref={imgRef}
         src={optimizedSrc}
         alt={alt}
-        className={`optimized-image ${className} ${isProcessing ? 'optimizing' : ''} ${enableProgressiveLoading && showBlur ? 'blur-loading' : ''} ${isLoaded ? 'loaded' : ''}`}
+        width={width}
+        height={height}
+        className={`optimized-image ${className} ${isProcessing ? 'optimizing' : ''} ${enableProgressiveLoading && showBlur ? 'blur-loading' : ''} ${isLoaded ? 'loaded' : ''} ${isLCP ? 'lcp-image' : ''}`}
         style={{
           ...style,
+          aspectRatio: aspectRatio,
           filter: enableProgressiveLoading && showBlur ? 'blur(8px)' : 'none',
           transition: enableProgressiveLoading ? 'filter 0.3s ease-out' : 'none'
         }}
@@ -373,6 +422,8 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         onLoadStart={onLoadStart}
         onContextMenu={onContextMenu}
         data-original-src={preserveOriginalForActions ? originalSrc : undefined}
+        {...(isLCP && { fetchpriority: 'high' })}
+        decoding={isLCP ? 'sync' : 'async'}
         {...props}
       />
     </>

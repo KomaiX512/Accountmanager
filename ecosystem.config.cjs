@@ -4,7 +4,7 @@ module.exports = {
   apps: [
     {
       name: 'main-api-unified',
-      script: 'server/server.js',
+      script: 'server.js',
       instances: 1,  // UNIFIED: Single instance
       exec_mode: 'fork',  // Fork mode for better stability
       cwd: __dirname,

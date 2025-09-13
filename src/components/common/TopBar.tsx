@@ -21,18 +21,16 @@ const TopBar: React.FC = () => {
   const acquiredPlatforms = getAcquiredPlatforms();
 
   // ✅ REAL-TIME PLATFORM STATUS SYNC: Force re-render every 5 seconds to catch status changes
-  const [forceUpdate, setForceUpdate] = useState(0);
-  
   useEffect(() => {
     if (!currentUser?.uid) return;
 
     const syncInterval = setInterval(() => {
-      // Force re-render to catch any platform status changes
-      setForceUpdate(prev => prev + 1);
+      // Force re-render to catch any platform status changes by updating acquired platforms
+      getAcquiredPlatforms();
     }, 5000);
 
     return () => clearInterval(syncInterval);
-  }, [currentUser?.uid]);
+  }, [currentUser?.uid, getAcquiredPlatforms]);
 
   // Platform configuration (EXACT same as MainDashboard)
   const platformConfig = [
@@ -158,8 +156,8 @@ const TopBar: React.FC = () => {
         )}
 
         <div className="right-controls">
-          {/* PWA Install Button - Show for all users */}
-          <PWAInstallButton forceShow={true} />
+          {/* PWA Install Button - Only show when install prompt is available */}
+          <PWAInstallButton />
           
           {/* Mobile Hamburger Menu - Only show on desktop (for non-mobile users) */}
           {!isMobile && (

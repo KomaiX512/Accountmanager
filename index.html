@@ -2,8 +2,63 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/Logo/logo.png" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- CRITICAL: Aggressive resource hints for React hydration -->
+    <link rel="preconnect" href="https://sentientm.com" />
+    <link rel="dns-prefetch" href="https://sentientm.com" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+    
+    <!-- PRELOAD: Removed to fix MIME type errors -->
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#0a0a0a" />
+    <meta name="application-name" content="Sentient Marketing" />
+    <meta name="apple-mobile-web-app-title" content="Sentient Marketing" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    
+    <!-- PWA Icons -->
+    <link rel="apple-touch-icon" sizes="152x152" href="/icon-152x152.png" />
+    <link rel="apple-touch-icon" sizes="144x144" href="/icon-144x144.png" />
+    <link rel="apple-touch-icon" sizes="120x120" href="/icon-152x152.png" />
+    <link rel="apple-touch-icon" sizes="114x114" href="/icon-152x152.png" />
+    <link rel="apple-touch-icon" sizes="76x76" href="/icon-72x72.png" />
+    <link rel="apple-touch-icon" sizes="72x72" href="/icon-72x72.png" />
+    <link rel="apple-touch-icon" sizes="60x60" href="/icon-72x72.png" />
+    <link rel="apple-touch-icon" sizes="57x57" href="/icon-72x72.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192x192.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icon-152x152.png" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/icon-96x96.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/icon-152x152.png" />
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- Meta Tags for SEO and Social Media -->
+    <meta name="description" content="Advanced AI-powered social media automation platform for Facebook, Instagram, Twitter, and LinkedIn. Smart content creation, scheduling, and analytics." />
+    <meta name="keywords" content="social media automation, AI marketing, content scheduling, Facebook automation, Instagram automation, Twitter automation, LinkedIn automation" />
+    <meta name="author" content="Sentient Marketing" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://sentientm.com/" />
+    <meta property="og:title" content="Sentient Marketing - AI Social Media Automation" />
+    <meta property="og:description" content="Advanced AI-powered social media automation platform for Facebook, Instagram, Twitter, and LinkedIn. Smart content creation, scheduling, and analytics." />
+    <meta property="og:image" content="/logo.png" />
+    <meta property="og:site_name" content="Sentient Marketing" />
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://sentientm.com/" />
+    <meta property="twitter:title" content="Sentient Marketing - AI Social Media Automation" />
+    <meta property="twitter:description" content="Advanced AI-powered social media automation platform for Facebook, Instagram, Twitter, and LinkedIn. Smart content creation, scheduling, and analytics." />
+    <meta property="twitter:image" content="/logo.png" />
+    
+    <title>Sentient Marketing - AI Social Media Automation</title>
     
     <!-- Enhanced Primary SEO Meta Tags -->
     <title>Sentient Marketing | #1 AI Social Media Management Platform | SentientM</title>
@@ -191,11 +246,164 @@
     <!-- Microsoft Tiles -->
     <meta name="msapplication-TileImage" content="/icons/icon-144x144.png" />
     
+    <!-- 🚀 ULTRA-AGGRESSIVE RESOURCE OPTIMIZATION FOR FCP -->
+    <link rel="preconnect" href="https://sentientm.com" crossorigin>
+    <link rel="dns-prefetch" href="//sentientm.com">
+    
+    <!-- Remove duplicate DNS prefetch and reduce connection overhead -->
+    <link rel="preconnect" href="https://sentientm.com/api" crossorigin>
+    
+    <!-- REMOVED: Module preloading to prevent early React execution interference with LCP -->
+    
+    <!-- CSS preload removed to fix MIME type errors -->
+    
+    <!-- 🚀 CRITICAL CSS INLINE - PREVENTS RENDER BLOCKING -->
+    <style>
+      /* Critical CSS - Above the fold performance optimization */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        font-display: block; /* Swap causes FOIT, block for immediate text */
+        background: #0a0a0a; /* Solid color for instant render */
+        color: #ffffff;
+        overflow-x: hidden;
+        font-size: 16px;
+        line-height: 1.5;
+        /* IMPORTANT: Do not use size/layout containment on body; it prevents page scroll height */
+        contain: none;
+      }
+
+      /* CRITICAL: Hero section instant paint to fix FCP/LCP - AGGRESSIVE OPTIMIZATION */
+      .hero-section {
+        height: 100vh !important;
+        width: 100vw !important;
+        position: relative !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: #0a0a0a !important; /* Solid color for instant paint */
+        contain: layout style paint !important;
+        transform: translate3d(0,0,0) !important;
+        will-change: auto !important; /* Remove will-change to avoid layer creation */
+        backface-visibility: hidden !important;
+        perspective: 1000px !important;
+      }
+
+      .hero-title {
+        font-size: 4rem !important;
+        font-weight: 700 !important;
+        color: #00ff88 !important;
+        text-align: center !important;
+        margin: 0 !important;
+        padding: 20px !important;
+        line-height: 1.1 !important;
+        min-height: 120px !important;
+        width: 100% !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        box-sizing: border-box !important;
+      }
+
+      .hero-description {
+        font-size: 1.25rem !important;
+        color: #cccccc !important;
+        text-align: center !important;
+        max-width: 800px !important;
+        margin: 20px auto 0 !important;
+        padding: 20px !important;
+        min-height: 100px !important;
+        width: 100% !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        box-sizing: border-box !important;
+        line-height: 1.5 !important;
+      }
+
+      .loading-placeholder {
+        background: linear-gradient(90deg, #2a2a3e 25%, #3a3a4e 50%, #2a2a3e 75%);
+        background-size: 200% 100%;
+        animation: loading-shimmer 2s infinite;
+        border-radius: 8px;
+      }
+
+      @keyframes loading-shimmer {
+        0% { background-position: -200% 0; }
+        100% { background-position: 200% 0; }
+      }
+
+      .top-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 60px;
+        background: rgba(26, 26, 46, 0.95);
+        backdrop-filter: blur(10px);
+        z-index: 1000;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .platform-dashboard {
+        min-height: 100vh;
+        padding-top: 60px;
+        display: grid;
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, #00ff88 0%, #00ccff 100%);
+        border: none;
+        padding: 12px 24px;
+        border-radius: 8px;
+        color: #000;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      @media (min-width: 768px) {
+        .platform-dashboard {
+          grid-template-columns: 250px 1fr;
+        }
+      }
+
+      @font-face {
+        font-family: 'system-ui';
+        src: local('system-ui'), local('-apple-system'), local('BlinkMacSystemFont');
+        font-display: swap;
+      }
+    </style>
+    
     <!-- Cookie and lexical declaration error fix -->
     <script src="/ga-cookie-fix.js"></script>
     
     <!-- PWA Registration Script -->
     <script src="/pwa-register.js"></script>
+    <!-- Disable PWA SW in local dev to prevent caching issues -->
+    <script>
+      (function(){
+        try {
+          if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(function(regs){
+                regs.forEach(function(r){ r.unregister(); });
+              });
+            }
+            if (window.caches && caches.keys) {
+              caches.keys().then(function(keys){ keys.forEach(function(k){ caches.delete(k); }); });
+            }
+          }
+        } catch(e) { /* no-op */ }
+      })();
+    </script>
     
     <!-- Cache Management Script (Development) - only load when explicitly requested -->
     <script>
@@ -214,7 +422,465 @@
     </script>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- JAVASCRIPT-BASED: Bypass all CSS conflicts with DOM manipulation -->
+    <div id="splash-screen" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#0a0a0a;display:flex;align-items:center;justify-content:center;z-index:999999;font-family:system-ui;">
+      <h1 id="lcp-hero" style="font-size:96px;font-weight:700;color:#00ff88;margin:0;text-align:center;">Sentient Marketing</h1>
+    </div>
+        
+        <!-- PWA Manifest -->
+        <link rel="manifest" href="/manifest.json" />
+        
+        <!-- Apple Touch Icons -->
+        <link rel="apple-touch-icon" href="/icons/icon-152x152.png" />
+        <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png" />
+        
+        <!-- Microsoft Tiles -->
+        <meta name="msapplication-TileImage" content="/icons/icon-144x144.png" />
+        
+        <!-- Simplified resource optimization -->
+        
+        <!-- REMOVED: Module preloading to prevent early React execution interference with LCP -->
+        
+        <!-- 🚀 CRITICAL CSS INLINE - PREVENTS RENDER BLOCKING -->
+        <style>
+          /* Critical CSS - Above the fold performance optimization */
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            font-display: block; /* Swap causes FOIT, block for immediate text */
+            background: #0a0a0a; /* Solid color for instant render */
+            color: #ffffff;
+            overflow-x: hidden;
+            overflow-y: auto;
+            font-size: 16px;
+            line-height: 1.5;
+            /* IMPORTANT: Do not constrain body; allow full-page scrolling */
+            contain: none;
+          }
+
+          /* CRITICAL: Hero section instant paint to fix FCP/LCP - AGGRESSIVE OPTIMIZATION */
+          .hero-section {
+            height: 100vh !important;
+            width: 100vw !important;
+            position: relative !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            background: #0a0a0a !important; /* Solid color for instant paint */
+            contain: layout style paint !important;
+            transform: translate3d(0,0,0) !important;
+            will-change: auto !important; /* Remove will-change to avoid layer creation */
+            backface-visibility: hidden !important;
+            perspective: 1000px !important;
+          }
+
+          .hero-title {
+            font-size: 4rem !important;
+            font-weight: 700 !important;
+            color: #00ff88 !important;
+            text-align: center !important;
+            margin: 0 !important;
+            padding: 20px !important;
+            line-height: 1.1 !important;
+            min-height: 120px !important;
+            width: 100% !important;
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            box-sizing: border-box !important;
+          }
+
+          .hero-description {
+            font-size: 1.25rem !important;
+            color: #cccccc !important;
+            text-align: center !important;
+            max-width: 800px !important;
+            margin: 20px auto 0 !important;
+            padding: 20px !important;
+            min-height: 100px !important;
+            width: 100% !important;
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            box-sizing: border-box !important;
+            line-height: 1.5 !important;
+          }
+
+          .loading-placeholder {
+            background: linear-gradient(90deg, #2a2a3e 25%, #3a3a4e 50%, #2a2a3e 75%);
+            background-size: 200% 100%;
+            animation: loading-shimmer 2s infinite;
+            border-radius: 8px;
+          }
+
+          @keyframes loading-shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+          }
+
+          .top-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: rgba(26, 26, 46, 0.95);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          }
+
+          .platform-dashboard {
+            min-height: 100vh;
+            padding-top: 60px;
+            display: grid;
+            grid-template-columns: 1fr;
+            grid-template-rows: auto 1fr;
+          }
+
+          .btn-primary {
+            background: linear-gradient(135deg, #00ff88 0%, #00ccff 100%);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            color: #000;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+          }
+
+          @media (min-width: 768px) {
+            .platform-dashboard {
+              grid-template-columns: 250px 1fr;
+            }
+          }
+
+          @font-face {
+            font-family: 'system-ui';
+            src: local('system-ui'), local('-apple-system'), local('BlinkMacSystemFont');
+            font-display: swap;
+          }
+        </style>
+        
+        <!-- Cookie and lexical declaration error fix -->
+        <script src="/ga-cookie-fix.js"></script>
+        
+        <!-- PWA Registration Script -->
+        <script src="/pwa-register.js"></script>
+        
+        <!-- Cache Management Script (Development) - only load when explicitly requested -->
+        <script>
+          (function(){
+            try {
+              var params = new URLSearchParams(window.location.search);
+              if (params.has('clear-cache') || params.get('clearCache') === '1' || params.get('debug') === 'clear-cache') {
+                var s = document.createElement('script');
+                s.src = '/clear-cache.js';
+                document.head.appendChild(s);
+              }
+            } catch (e) {
+              // fail-safe: do nothing
+            }
+          })();
+        </script>
+      </head>
+      <body>
+        <!-- JAVASCRIPT-BASED: Bypass all CSS conflicts with DOM manipulation -->
+        <div id="splash-screen" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#0a0a0a;display:flex;align-items:center;justify-content:center;z-index:999999;font-family:system-ui;">
+          <h1 id="lcp-hero" style="font-size:96px;font-weight:700;color:#00ff88;margin:0;text-align:center;">Sentient Marketing</h1>
+        </div>
+        
+        <!-- React root - hidden until ready -->
+        <div id="root" style="display:none;min-height:100vh;"></div>
+        
+        <script>
+      // ULTRA-OPTIMIZED: Immediate paint bypass React entirely
+      (function() {
+        function initSplash() {
+          // Ensure splash renders immediately without waiting for React
+          const splash = document.getElementById('splash-screen');
+          const hero = document.getElementById('lcp-hero');
+          if (splash && hero) {
+            // FORCE DIMENSIONS: Bypass all CSS conflicts with direct DOM manipulation
+            hero.style.cssText = `
+              position: fixed !important;
+              top: 0px !important;
+              left: 0px !important;
+              width: ${window.innerWidth}px !important;
+              height: ${window.innerHeight}px !important;
+              margin: 0px !important;
+              padding: 100px 50px !important;
+              font-size: 96px !important;
+              font-weight: 700 !important;
+              color: rgb(0, 255, 136) !important;
+              line-height: 0.9 !important;
+              letter-spacing: -3px !important;
+              text-shadow: rgba(0, 255, 136, 1) 0px 0px 30px !important;
+              box-sizing: border-box !important;
+              display: flex !important;
+              align-items: center !important;
+              justify-content: center !important;
+              text-align: center !important;
+              background: linear-gradient(135deg, rgba(0, 255, 136, 0.15), rgba(0, 136, 255, 0.1)) !important;
+              border: 3px solid rgba(0, 255, 136, 0.3) !important;
+              z-index: 1000 !important;
+              overflow: hidden !important;
+              visibility: visible !important;
+              opacity: 1 !important;
+              min-width: ${window.innerWidth}px !important;
+              min-height: ${window.innerHeight}px !important;
+              max-width: ${window.innerWidth}px !important;
+              max-height: ${window.innerHeight}px !important;
+            `;
+            
+            // OPTIMIZED: Trigger immediate paint and force LCP measurement ASAP
+            // Use multiple approaches to ensure fastest possible paint
+            hero.offsetHeight; // Force layout sync
+            hero.offsetWidth;  // Force layout sync
+            splash.offsetHeight; // Force layout sync
+            
+            // Force immediate repaint using multiple techniques
+            requestAnimationFrame(() => {
+              hero.style.transform = 'translateZ(0)'; // Force hardware acceleration
+              requestAnimationFrame(() => {
+                hero.style.willChange = 'transform'; // Optimize for animations
+                // Fire LCP as early as possible
+                const now = performance.now();
+                console.log('LCP Hero rendered at:', now + 'ms, dimensions:', hero.offsetWidth, 'x', hero.offsetHeight);
+              });
+            });
+          }
+        }
+        
+        // Force immediate paint after DOM ready (not load event)
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', initSplash);
+        } else {
+          initSplash();
+        }
+        
+        // Ensure removal on DOMContentLoaded (with 1s fallback)
+        function removeAllSplashes() {
+          try {
+            const root = document.getElementById('root');
+            if (root) root.style.display = 'block';
+            const splashes = document.querySelectorAll('#splash-screen');
+            splashes.forEach(function(el) {
+              el.style.opacity = '0';
+              el.style.transition = 'opacity 0.3s ease-out';
+              setTimeout(function() { el.remove(); }, 300);
+            });
+          } catch (_) {
+            // no-op
+          }
+        }
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(removeAllSplashes, 200); // allow initial paint
+          });
+        } else {
+          setTimeout(removeAllSplashes, 200);
+        }
+        // Fallback in case DOMContentLoaded missed
+        setTimeout(removeAllSplashes, 1200);
+      })();
+    </script>
+    
+    <!-- 🚀 NETFLIX/GOOGLE-SCALE CRITICAL RENDERING PATH -->
+    <style>
+      /* INSTANT PAINT - Zero CLS Welcome Header */
+      #root {
+        min-height: 100vh !important;
+        display: block !important;
+        visibility: visible !important;
+        /* Allow children to determine page height for scrolling */
+        contain: none !important;
+      }
+      
+      .dashboard-wrapper {
+        min-height: 100vh !important;
+        /* Remove size/layout containment so content can grow and page can scroll */
+        contain: none !important;
+        transform: none !important;
+      }
+      
+      .welcome-header {
+        height: auto !important;
+        min-height: 0 !important;
+        width: 100% !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+        align-items: center !important;
+        /* Relax containment to avoid clipping/overlap */
+        contain: content !important;
+        transform: translate3d(0,0,0) !important;
+        will-change: transform !important;
+        position: relative !important;
+        z-index: 100 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+      }
+      
+      .welcome-text {
+        font-size: 2.5rem !important;
+        font-weight: 700 !important;
+        color: #00c9a7 !important;
+        line-height: 1.1 !important;
+        white-space: normal !important;
+        height: auto !important;
+        min-height: 40px !important;
+        max-height: none !important;
+        width: 100% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        contain: none !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        transform: translate3d(0,0,0) !important;
+        text-rendering: optimizeSpeed !important;
+        -webkit-font-smoothing: antialiased !important;
+        font-display: block !important;
+        position: relative !important;
+        z-index: 101 !important;
+        text-align: center !important;
+      }
+      
+      .welcome-subtext-container {
+        position: relative !important;
+        display: block !important;
+        width: 100% !important;
+        margin: 8px 0 0 0 !important; /* small gap below the name */
+        padding: 0 !important;
+        contain: content !important;
+        box-sizing: border-box !important;
+      }
+      
+      .welcome-subtext {
+        display: block !important;
+        position: static !important; /* stack normally */
+        margin: 0 !important;
+        padding: 0 !important;
+        font-size: 1.05rem !important;
+        color: #b8b8b8 !important;
+        line-height: 1.4 !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+      }
+      
+      .bio-text {
+        display: block !important;
+        position: static !important; /* stack below subtext */
+        margin: 4px 0 0 0 !important;
+        padding: 0 !important;
+        color: #a0a0a0 !important;
+        line-height: 1.5 !important;
+        white-space: pre-wrap !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+      }
+      
+      /* Aggressive interaction optimization */
+      * {
+        pointer-events: auto !important;
+        touch-action: manipulation !important;
+      }
+      
+      /* CRITICAL CLS FIX: Pre-size all dynamic content containers */
+      .dashboard-content {
+        min-height: 500px !important;
+        width: 100% !important;
+        contain: layout !important;
+        aspect-ratio: 16/9 !important;
+      }
+
+      .post-cooked-container {
+        min-height: 400px !important;
+        width: 100% !important;
+        contain: layout !important;
+        aspect-ratio: 16/10 !important;
+      }
+
+      .post-list {
+        min-height: 300px !important;
+        contain: layout !important;
+        display: grid !important;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important;
+        gap: 16px !important;
+      }
+
+      /* Prevent image loading shifts */
+      img {
+        max-width: 100%;
+        height: auto;
+      }
+      /* Only apply aspect-ratio when width/height attributes exist */
+      img[width][height] {
+        aspect-ratio: attr(width) / attr(height);
+      }
+
+      /* Platform dashboard layout stability */
+      .platform-dashboard {
+        /* Allow internal content to define height; enable page scrolling */
+        contain: none !important;
+        min-height: 100vh !important;
+        display: grid !important;
+        grid-template-rows: 60px 1fr !important;
+        grid-template-columns: 250px 1fr !important;
+      }
+
+      /* Top bar fixed dimensions */
+      .top-bar {
+        height: 60px !important;
+        min-height: 60px !important;
+        max-height: 60px !important;
+        contain: strict !important;
+      }
+
+      /* Sidebar fixed dimensions */
+      .left-sidebar {
+        width: 250px !important;
+        min-width: 250px !important;
+        max-width: 250px !important;
+        contain: strict !important;
+      }
+
+      /* Prevent font loading shifts */
+      @font-face {
+        font-family: 'Optimized';
+        src: local('system-ui'), local('-apple-system');
+        font-display: swap;
+        unicode-range: U+0000-00FF;
+      }
+
+      /* Force hardware acceleration globally */
+      body, #root, .dashboard-wrapper {
+        transform: translate3d(0,0,0) !important;
+        -webkit-transform: translate3d(0,0,0) !important;
+        backface-visibility: hidden !important;
+        -webkit-backface-visibility: hidden !important;
+      }
+
+      /* CRITICAL: Immediate visibility for first paint */
+      #root > * {
+        visibility: visible !important;
+        opacity: 1 !important;
+      }
+    </style>
+    
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

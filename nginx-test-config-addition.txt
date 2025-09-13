@@ -1,0 +1,10 @@
+    # PERFORMANCE TEST: Pure HTML test file (no JS/CSS blocking)
+    location = /index-nojs.html {
+        root /var/www/sentientm;
+        expires -1;
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Pragma "no-cache";
+        add_header Expires "0";
+        add_header Content-Type "text/html; charset=utf-8";
+        try_files $uri =404;
+    }

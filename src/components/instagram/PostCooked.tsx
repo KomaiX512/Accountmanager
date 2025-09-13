@@ -17,7 +17,7 @@ import { schedulePost, fetchImageFromR2 } from '../../utils/scheduleHelpers';
 import axios from 'axios';
 import { safeFilter } from '../../utils/safeArrayUtils';
 import { BsLightbulb } from 'react-icons/bs';
-import { FaBell, FaPalette, FaDownload, FaRobot } from 'react-icons/fa';
+import { FaBell, FaPalette, FaDownload } from 'react-icons/fa';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
 import { getApiUrl } from '../../config/api';
 import CacheManager from '../../utils/cacheManager';
@@ -485,15 +485,15 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     // 🎯 PRIORITY CHECK: Look for edited image URLs first (highest priority)
     if (post.data?.image_url && post.data.image_url.includes('edited_')) {
       console.log(`[ImageURL] 🎯 Found edited image URL in post data: ${post.data.image_url}`);
-      // 🔧 FIX 1: ALWAYS apply cache busting for edited images
-      const timestamp = `&edited=true&v=${Date.now()}&t=${imageRefreshKey.current}`;
+      // 🔧 FIX 1: Use content-based versioning instead of timestamp for edited images
+      const timestamp = `&edited=true&v=${imageRefreshKey.current}`;
       return post.data.image_url + timestamp;
     }
     
     if (post.data?.r2_image_url && post.data.r2_image_url.includes('edited_')) {
       console.log(`[ImageURL] 🎯 Found edited R2 image URL in post data: ${post.data.r2_image_url}`);
-      // 🔧 FIX 1: ALWAYS apply cache busting for edited images
-      const timestamp = `&edited=true&v=${Date.now()}&t=${imageRefreshKey.current}`;
+      // 🔧 FIX 1: Use content-based versioning instead of timestamp for edited images
+      const timestamp = `&edited=true&v=${imageRefreshKey.current}`;
       return post.data.r2_image_url + timestamp;
     }
     
@@ -501,8 +501,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     const existingImageUrl = post.data?.image_url || post.data?.r2_image_url || '';
     if (existingImageUrl.includes('/edited_')) {
       console.log(`[ImageURL] 🎯 Found edited filename in existing URL: ${existingImageUrl}`);
-      // 🔧 FIX 1: ALWAYS apply cache busting for edited images
-      const timestamp = `&edited=true&v=${Date.now()}&t=${imageRefreshKey.current}`;
+      // 🔧 FIX 1: Use content-based versioning instead of timestamp for edited images
+      const timestamp = `&edited=true&v=${imageRefreshKey.current}`;
       return existingImageUrl + timestamp;
     }
     
@@ -567,8 +567,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         const editedFilename = `edited_campaign_ready_post_${campaignId}.png`;
         const editedUrl = `${API_BASE_URL}/api/r2-image/${username}/${editedFilename}?platform=${platform}&v=${imageRefreshKey.current}&post=${encodeURIComponent(postKey)}&edited=true`;
         
-        // 🔧 FIX 2: ALWAYS check edited version first with aggressive cache busting
-        const editedUrlWithCacheBust = `${editedUrl}&nuclear=${Date.now()}&bypass=1&nocache=1`;
+        // 🔧 FIX 2: Use content-based versioning for edited images to enable caching
+        const editedUrlWithCacheBust = `${editedUrl}&edited=true&v=${imageRefreshKey.current}`;
         
         // 🔧 CONSISTENT DISPLAY FIX: Always show edited version if post is marked as edited OR if edited version exists
         if (forceRefresh || 
@@ -2569,7 +2569,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             onScroll={handleScroll}
           >
             <div className="post-list">
-              {filteredPosts.map((post) => (
+              {filteredPosts.map((post, index) => (
               <motion.div
                 key={post.key}
                 className="post-card"
@@ -2584,6 +2584,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                         src={profilePicUrl}
                         alt={`${username}'s profile picture`}
                         className="profile-pic"
+                        width={24}
+                        height={24}
                         aggressiveMobileOptimization={true}
                         maxWidth={60}
                         quality={0.6}
@@ -2626,6 +2628,10 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                         preserveOriginalForActions={true}
                         maxWidth={600}
                         quality={0.5}
+                        isLCP={index === 0}
+                        aspectRatio="1/1"
+                        width={600}
+                        height={600}
                         onLoadStart={() => {
                           console.log(`[PostCooked] Image load started for ${post.key}: ${imageUrl}`);
                           handleImageLoadStart(post.key);

@@ -144,10 +144,8 @@ const TechnicalSEO: React.FC<TechnicalSEOProps> = ({
 
   const preloadCriticalResources = () => {
     const criticalAssets = [
-      { href: '/critical.css', as: 'style' },
-      { href: '/logo.png', as: 'image' },
-      { href: '/api/user/dashboard', as: 'fetch' },
-      ...criticalResources.map(resource => ({ href: resource, as: 'fetch' }))
+      { href: '/Logo/logo.png', as: 'image' },
+      // Removed critical.css and API preloads to fix MIME type errors
     ];
 
     criticalAssets.forEach(asset => {
@@ -275,13 +273,9 @@ const TechnicalSEO: React.FC<TechnicalSEOProps> = ({
         <link rel="preconnect" href="https://api.sentientm.com" crossOrigin="anonymous" />
         
         {/* Preload critical resources */}
-        <link rel="preload" href="/fonts/Inter-var.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
-        <link rel="preload" href="/critical.css" as="style" />
-        <link rel="preload" href="/logo.webp" as="image" />
+        <link rel="preload" href="/Logo/logo.png" as="image" />
         
-        {/* Module preload for critical JavaScript */}
-        <link rel="modulepreload" href="/src/main.tsx" />
-        <link rel="modulepreload" href="/src/App.tsx" />
+        {/* Module preload removed to prevent MIME errors */}
         
         {/* Prefetch next likely pages */}
         <link rel="prefetch" href="/dashboard" />

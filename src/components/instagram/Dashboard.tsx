@@ -2121,59 +2121,22 @@ Image Description: ${response.post.image_prompt}
   // Add debug log before return
   console.log('DmsComments username prop:', accountHolder);
   return (
-    <motion.div
+    <div 
       className="dashboard-wrapper"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
     >
       <div className="welcome-header">
         <h1 className="welcome-text">
           Welcome {profileInfo?.fullName || accountHolder}!
         </h1>
-                  <div className="welcome-subtext-container" style={{ position: 'relative', minHeight: '48px' }}>
-                      <motion.p 
-              className="welcome-subtext"
-              animate={{ 
-                opacity: showInitialText ? 1 : 0,
-                y: showInitialText ? 0 : -10
-              }}
-              transition={{ duration: 0.5, ease: 'easeInOut' }}
-            >
-            Congrats! You are listed as a top initial user of AI powered Account Management!
-          </motion.p>
-          
+        <div className="welcome-subtext-container">
           {profileInfo?.biography && profileInfo.biography.trim() && (
-            <motion.div
+            <div
               className={`bio-text ${isBioExpanded ? 'expanded' : 'collapsed'}`}
-              animate={{ 
-                opacity: showBio ? 1 : 0,
-                y: showBio ? 0 : 10
-              }}
-              transition={{ duration: 0.5, ease: 'easeInOut', delay: showBio ? 0.2 : 0 }}
-              onClick={handleBioClick}
+              onClick={() => setIsBioExpanded(!isBioExpanded)}
               style={{ cursor: 'pointer' }}
             >
-              {typedBio}
-              {showBio && !bioAnimationComplete && (
-                <motion.span
-                  animate={{ opacity: [1, 0] }}
-                  transition={{ 
-                    duration: 0.5,
-                    repeat: Infinity,
-                    repeatType: 'reverse'
-                  }}
-                  style={{ 
-                    display: 'inline-block',
-                    width: '2px',
-                    height: '16px',
-                    backgroundColor: '#00ffcc',
-                    marginLeft: '2px',
-                    verticalAlign: 'text-bottom'
-                  }}
-                />
-              )}
-            </motion.div>
+              {typedBio || profileInfo.biography}
+            </div>
           )}
         </div>
       </div>
@@ -2852,7 +2815,7 @@ Image Description: ${response.post.image_prompt}
       {isMobileManualOpen && (
         <ManualGuidance onClose={() => setIsMobileManualOpen(false)} />
       )}
-    </motion.div>
+    </div>
   );
 };
 

@@ -58,7 +58,12 @@ export const FacebookProvider: React.FC<FacebookProviderProps> = ({ children }) 
       }
 
       // Background API sync without blocking UI
-      const response = await axios.get(`/api/facebook-connection/${currentUser.uid}`);
+      const response = await axios.get(`/api/facebook-connection/${currentUser.uid}`, {
+        timeout: 10000, // 10 second timeout
+        validateStatus: function (status) {
+          return status < 500; // Resolve only if the status code is less than 500
+        }
+      });
       
       console.log(`[${new Date().toISOString()}] Facebook connection response:`, response.data);
       
@@ -102,13 +107,21 @@ export const FacebookProvider: React.FC<FacebookProviderProps> = ({ children }) 
     } catch (error: any) {
       if (error.response?.status === 404) {
         console.log(`[${new Date().toISOString()}] No existing Facebook connection found for user ${currentUser.uid}`);
+        // Keep cached data if API fails
+        if (!userId && !isConnected) {
+          setUserId(null);
+          setUsername(null);
+          setIsConnected(false);
+        }
       } else {
         console.error(`[${new Date().toISOString()}] Error checking existing Facebook connection:`, error);
+        // Only reset if we don't have cached data
+        if (!userId && !isConnected) {
+          setUserId(null);
+          setUsername(null);
+          setIsConnected(false);
+        }
       }
-      // Reset state on error
-      setUserId(null);
-      setUsername(null);
-      setIsConnected(false);
     }
   }, [currentUser?.uid]);
 

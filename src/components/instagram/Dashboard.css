@@ -36,79 +36,140 @@ body:has(.dashboard-wrapper) {
   backface-visibility: visible;
 }
 
-/* ✨ MINIMALIST WELCOME HEADER */
+/* Ensure content starts below fixed TopBar on desktop */
+@media (min-width: 768px) {
+  .dashboard-wrapper {
+    padding-top: 70px !important; /* Align directly under 70px TopBar */
+  }
+}
+
+/* 🔥 NETFLIX-SCALE ZERO-CLS WELCOME HEADER */
 .welcome-header {
   text-align: center;
-  margin-bottom: 8px;
-  min-height: 80px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
+  margin: 0 0 10px 0 !important; /* Small gap below hero for bio visibility */
+  padding: 0 !important;
+  height: auto !important; /* Flexible height */
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: center !important;
+  /* Relax containment to avoid clipping/stacking issues */
+  contain: content !important;
+  transform: translate3d(0,0,0) !important; /* HARDWARE ACCELERATION */
+  will-change: transform !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: relative !important;
+  z-index: 100 !important; /* ensure it renders above the modules container */
+  box-sizing: border-box !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  /* Transparent hero container as before */
+  background: transparent !important;
+  backdrop-filter: none !important;
+  border-bottom: none !important;
+  /* Be explicit: do not create new stacking/paint contexts, keep above modules */
+  contain: none !important;
+  z-index: 900000 !important; /* below TopBar (999999) but above everything else */
+  overflow: visible !important;
 }
 
 .welcome-text {
-  font-size: 2.5rem;
-  font-weight: 700;
-  background: linear-gradient(135deg, #00c9a7, #00b4e6);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  text-shadow: 0 0 20px rgba(0, 255, 204, 0.3);
-  margin-bottom: 4px;
+  font-size: 2.5rem !important;
+  font-weight: 700 !important;
+  color: #00c9a7 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  height: auto !important;
+  min-height: 0 !important; /* no forced minimum */
+  width: 100% !important;
+  line-height: 1.2 !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  contain: none !important;
+  transform: translate3d(0,0,0) !important;
+  will-change: transform !important;
+  font-display: block !important; /* INSTANT FONT RENDER */
+  text-rendering: optimizeSpeed !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  font-synthesis: none !important;
+  max-height: none !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  z-index: 900001 !important; /* Sit above subtext/bio and module chrome if overlapping */
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5) !important;
+  text-align: center !important;
 }
 
-.welcome-subtext {
-  font-size: 1.1rem;
-  color: #b8b8b8;
-  font-weight: 400;
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 5;
-  margin: 0;
-  text-align: center;
+/* Highest-specificity guardrail to defeat inline critical CSS if needed */
+.dashboard-wrapper > .welcome-header {
+  position: relative !important;
+  top: auto !important;
+  contain: none !important;
+  z-index: 900000 !important;
+}
+
+.dashboard-wrapper > .welcome-header .welcome-text {
+  z-index: 900001 !important;
 }
 
 .welcome-subtext-container {
-  position: relative;
-  min-height: 48px;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 0;
+  position: relative !important;
+  display: block !important;
+  width: 100% !important;
+  margin: 6px 0 0 0 !important; /* small gap under the welcome name */
+  padding: 0 !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  contain: content !important;
+  box-sizing: border-box !important;
+}
+
+.welcome-subtext {
+  display: block !important;
+  position: static !important; /* stack normally */
+  font-size: 1.05rem !important;
+  color: #b8b8b8 !important;
+  font-weight: 400 !important;
+  line-height: 1.4 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
 }
 
 .bio-text {
-  font-size: 0.95rem;
-  color: #a0a0a0;
-  text-align: center;
-  line-height: 1.2;
-  font-style: italic;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 40px;
-  box-sizing: border-box;
-  position: absolute;
-  top: 24px;
-  left: 0;
-  right: 0;
-  transition: all 0.3s ease;
+  display: block !important;
+  position: static !important; /* stack below subtext */
+  font-size: 0.95rem !important;
+  color: #a0a0a0 !important;
+  line-height: 1.5 !important;
+  margin: 4px 0 0 0 !important;
+  padding: 0 !important;
+  white-space: pre-wrap !important; /* allow wrapping */
+  overflow: visible !important;
+  text-overflow: clip !important;
+  max-height: none !important;
 }
 
-.bio-text.collapsed {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-height: 1.2em;
+.bio-text.collapsed { /* keep collapsed style if used */
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-height: 1.2em !important;
 }
 
 .bio-text.expanded {
-  white-space: pre-wrap;
-  overflow: visible;
-  max-height: none;
+  white-space: pre-wrap !important;
+  overflow: visible !important;
+  max-height: none !important;
 }
 
 /* ✨ COMPACT PREMIUM MODULES CONTAINER - MINIMALIST */
@@ -473,22 +534,25 @@ body:has(.dashboard-wrapper) {
   justify-content: flex-start;
 }
 
-/* ✨ COMPACT PROFILE PICTURE */
+/* ✨ COMPACT PROFILE PICTURE - CLS PREVENTION */
 .profile-pic-bar {
   width: 44px;
   height: 44px;
+  min-width: 44px; /* Prevent shrinking */
+  min-height: 44px; /* Prevent shrinking */
   border-radius: 50%;
-  overflow: hidden;
-  border: 2px solid rgba(0, 255, 204, 0.4);
-  background-color: rgba(74, 74, 106, 0.4);
-  display: inline-block;
-  vertical-align: middle;
-  flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(0, 255, 204, 0.2);
-  position: relative;
-  /* Ensure the container maintains its circular shape */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(0, 255, 204, 0.3);
   flex-shrink: 0;
   flex-grow: 0;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 2px 8px rgba(0, 255, 204, 0.15);
+  transition: all 0.3s ease;
+  contain: layout size; /* CSS containment for performance */
   box-sizing: border-box;
   /* Prevent any parent transformations from affecting the circular shape */
   transform: none !important;
@@ -3318,7 +3382,7 @@ h2 {
   /* Fixed values for landscape - no responsive behavior */
   .dashboard-wrapper {
     max-width: 1400px;
-    margin: 0 auto;
+    margin: 0 auto; /* No extra band above content */
     transform-origin: center top;
   }
   

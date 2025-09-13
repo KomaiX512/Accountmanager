@@ -3,8 +3,8 @@ import './CanvasEditor.css';
 import { motion } from 'framer-motion';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import 'tui-image-editor/dist/tui-image-editor.css';
-import axios from 'axios';
+// TUI Image Editor CSS will be loaded dynamically to prevent render blocking
+// Axios removed - not needed in this component
 import InstagramRequiredButton from './InstagramRequiredButton';
 import TwitterRequiredButton from './TwitterRequiredButton';
 import FacebookRequiredButton from './FacebookRequiredButton';
@@ -309,6 +309,12 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
   useEffect(() => {
     const loadEditor = async () => {
       try {
+        // Dynamically load TUI Image Editor CSS to prevent render blocking
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = '/node_modules/tui-image-editor/dist/tui-image-editor.css';
+        document.head.appendChild(link);
+        
         // Dynamically import tui-image-editor to avoid SSR issues
         const ImageEditor = (await import('tui-image-editor')).default;
         

@@ -92,12 +92,13 @@ class HealthCheckSystem {
   async checkS3Health() {
     try {
       const result = await s3HealthCircuit.execute(async () => {
+        const startTime = Date.now();
         const command = new ListObjectsV2Command({
           Bucket: 'tasks',
           MaxKeys: 1
         });
         await this.s3Client.send(command);
-        return { status: 'healthy', latency: Date.now() };
+        return { status: 'healthy', latency: Date.now() - startTime };
       });
       
       this.componentStates['s3'] = {

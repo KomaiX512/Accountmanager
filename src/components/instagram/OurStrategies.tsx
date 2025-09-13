@@ -181,9 +181,9 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
     <ErrorBoundary>
       <motion.div
         className="strategies-container"
-        initial={{ opacity: 0, y: 20 }}
+        initial={false}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
+        transition={{ duration: 0.2 }}
       >
         {loading && (
           <div className="futuristic-loading">
@@ -203,9 +203,9 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
                 <motion.div
                   key={index}
                   className={`strategy-sub-container ${data ? 'loaded' : ''}`}
-                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                  initial={false}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
-                  transition={{ duration: 0.2, delay: index * 0.1 }}
+                  transition={{ duration: 0.15 }}
                   whileHover={{ scale: 1.02 }}
                 >
                   {/* ✅ SIMPLIFIED: Just preview text and button */}
@@ -234,9 +234,9 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
             // Fallback when no data is available
             <motion.div
               className={`strategy-sub-container ${data ? 'loaded' : ''}`}
-              initial={{ opacity: 0, scale: 0.9 }}
+              initial={false}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.2 }}
+              transition={{ duration: 0.15 }}
               whileHover={{ scale: 1.02 }}
             >
               <div className="strategy-simple-content">

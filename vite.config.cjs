@@ -13,6 +13,10 @@ module.exports = defineConfig({
       '.ngrok-free.app', // Allow all ngrok-free.app subdomains
       '78291997257a.ngrok-free.app' // Specific ngrok host
     ],
+    headers: {
+      'Cache-Control': 'no-cache',
+    },
+    middlewareMode: false,
     proxy: {
       // Proxy posts endpoint to the MAIN server (port 3000) where it works correctly
       '/api/posts': {
@@ -165,23 +169,142 @@ module.exports = defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true,
-    // Use Terser to drop console/debug statements in production builds
-    minify: 'terser',
+    target: 'es2020', // Modern browsers for better performance
+    sourcemap: false, // Disable sourcemaps in production for smaller files
+    minify: 'terser', // Use terser for better compression
+    // Aggressive unused code elimination
     terserOptions: {
       compress: {
         drop_console: true,
         drop_debugger: true,
-        pure_funcs: ['console.log', 'console.info', 'console.debug']
+        pure_funcs: ['console.log', 'console.info', 'console.debug', 'console.warn'],
+        unused: true,
+        dead_code: true, // Remove dead code
+        side_effects: false, // Assume no side effects for better tree-shaking
+        passes: 3 // Multiple passes for better optimization
       },
-      mangle: true,
+      mangle: {
+        safari10: true,
+        toplevel: true // Mangle top-level names for smaller bundles
+      },
       format: {
         comments: false
       }
     },
+    chunkSizeWarningLimit: 1000, // Increase limit but still warn for huge chunks
     rollupOptions: {
+      // Balanced tree-shaking - preserve functionality
+      treeshake: {
+        preset: 'recommended',
+        manualPureFunctions: ['console.log', 'console.warn', 'console.error']
+      },
       output: {
-        // Add timestamp to asset names to force cache busting
+        // Fixed chunking order - React must load first
+        manualChunks(id) {
+          // ULTRA-AGGRESSIVE SPLITTING - Target <500KB main bundle
+          
+          // Only absolute React essentials in main bundle
+          if (id.includes('react-dom/client')) {
+            return 'react-dom-client';
+          }
+          
+          if (id.includes('react-dom') && !id.includes('client')) {
+            return 'react-dom';
+          }
+          
+          if (id.includes('react/jsx-runtime')) {
+            return 'jsx-runtime';
+          }
+          
+          // React core - minimal
+          if (id.includes('react') && !id.includes('react-router') && !id.includes('react-dom') && !id.includes('jsx-runtime')) {
+            return 'react';
+          }
+          
+          // Defer ALL routing
+          if (id.includes('react-router')) {
+            return 'router';
+          }
+          
+          // Context providers - separate chunk
+          if (id.includes('/context/') || id.includes('Context.tsx')) {
+            return 'contexts';
+          }
+          
+          // Heavy component chunks - defer all
+          if (id.includes('/components/dashboard/') || id.includes('PlatformDashboard')) {
+            return 'dashboard-components';
+          }
+          
+          if (id.includes('/components/instagram/') && !id.includes('InstagramConnect')) {
+            return 'instagram-components';
+          }
+          
+          if (id.includes('/components/twitter/') && !id.includes('TwitterConnect')) {
+            return 'twitter-components';
+          }
+          
+          if (id.includes('/components/facebook/') && !id.includes('FacebookConnect')) {
+            return 'facebook-components';
+          }
+          
+          // Services - separate
+          if (id.includes('/services/') || id.includes('Service.ts')) {
+            return 'services';
+          }
+          
+          // Utils - separate  
+          if (id.includes('/utils/') && !id.includes('navigationGuard')) {
+            return 'utils';
+          }
+          
+          // Firebase - defer completely
+          if (id.includes('firebase') || id.includes('@firebase')) {
+            return 'firebase';
+          }
+          
+          // TUI Editor - massive, defer
+          if (id.includes('tui-image-editor') || id.includes('@toast-ui')) {
+            return 'tui-editor';
+          }
+          
+          // Animations - defer
+          if (id.includes('framer-motion') || id.includes('motion')) {
+            return 'animations';
+          }
+          
+          // Icons - defer
+          if (id.includes('react-icons') || id.includes('/icons')) {
+            return 'icons';
+          }
+          
+          // MUI - defer
+          if (id.includes('@mui') || id.includes('material-ui')) {
+            return 'mui';
+          }
+          
+          // Axios
+          if (id.includes('axios')) {
+            return 'http';
+          }
+          
+          // Langchain - defer
+          if (id.includes('langchain') || id.includes('@langchain')) {
+            return 'ai';
+          }
+          
+          // Helmet/SEO
+          if (id.includes('helmet') || id.includes('seo')) {
+            return 'seo';
+          }
+          
+          // All other vendor
+          if (id.includes('node_modules')) {
+            return 'vendor';
+          }
+          
+          return null;
+        },
         assetFileNames: (assetInfo) => {
           const info = assetInfo.name.split('.');
           const ext = info[info.length - 1];

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, memo, useMemo } from 'react';
 import '../instagram/Dashboard.css'; // Reuse the same styles
 import Cs_Analysis from '../instagram/Cs_Analysis';
 import OurStrategies from '../instagram/OurStrategies';
@@ -17,6 +17,8 @@ import CampaignModal from '../instagram/CampaignModal';
 import News4U from '../common/News4U';
 import { motion } from 'framer-motion';
 import axios from 'axios';
+// Removed performanceOptimizer - using React optimizations instead
+import { useWebVitals } from '../../hooks/useWebVitals';
 import { useAuth } from '../../context/AuthContext';
 import InstagramRequiredButton from '../common/InstagramRequiredButton';
 import TwitterRequiredButton from '../common/TwitterRequiredButton';
@@ -54,24 +56,21 @@ interface RagChatMessage {
   content: string;
 }
 
-interface PlatformDashboardProps {
-  accountHolder: string;
-  competitors: string[];
-  accountType: 'branding' | 'non-branding' | 'professional' | 'personal';
-  platform: 'instagram' | 'twitter' | 'facebook' | 'linkedin';
-  onOpenChat?: (messageContent: string, platform?: string) => void;
-  // Optional: show or hide the generic welcome banner (hide for LinkedIn)
-  showWelcome?: boolean;
-}
 
-const PlatformDashboard: React.FC<PlatformDashboardProps> = ({ 
-  competitors, 
-  accountType, 
-  platform = 'instagram',
-  showWelcome = true
-}) => {
+const PlatformDashboard: React.FC = memo(() => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
+  
+  // Determine platform from URL pathname
+  const platform = window.location.pathname.includes('/instagram') ? 'instagram' :
+                  window.location.pathname.includes('/twitter') ? 'twitter' :
+                  window.location.pathname.includes('/facebook') ? 'facebook' :
+                  window.location.pathname.includes('/linkedin') ? 'linkedin' : 'instagram';
+  
+  // Basic props for component compatibility
+  const accountType = 'branding';
+  const competitors: string[] = [];
+  const showWelcome = true;
   
   // ✅ CRITICAL FIX: Always read username from platform-specific localStorage
   const accountHolder = currentUser?.uid 
@@ -121,6 +120,11 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const [linkedAccounts] = useState<LinkedAccount[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [aiProcessingNotifications] = useState<Record<string, boolean>>({});
+  
+  // Web Vitals monitoring for performance measurement
+  useWebVitals((vitals) => {
+    console.log('[Platform Dashboard] Web Vitals Update:', vitals);
+  });
   const [showInitialText, setShowInitialText] = useState(true);
   const [showBio, setShowBio] = useState(false);
   const [typedBio, setTypedBio] = useState('');
@@ -224,27 +228,24 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
     }
   ];
 
-  // 🍎 Mobile profile dropdown click outside handler
+  // 🍎 Mobile profile dropdown click outside handler - OPTIMIZED FOR INP
+  const handleClickOutside = useCallback((e: MouseEvent) => {
+    const target = e.target as Node;
+    if (!hamburgerButtonRef.current?.contains(target) && 
+        !document.querySelector('.mobile-profile-dropdown')?.contains(target)) {
+      setIsMobileProfileMenuOpen(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (isMobileProfileMenuOpen) {
-      const handleClickOutside = (e: MouseEvent) => {
-        const target = e.target as Node;
-        if (!hamburgerButtonRef.current?.contains(target) && 
-            !document.querySelector('.mobile-profile-dropdown')?.contains(target)) {
-          setIsMobileProfileMenuOpen(false);
-        }
-      };
-      
-      document.addEventListener('click', handleClickOutside);
-      
-      return () => {
-        document.removeEventListener('click', handleClickOutside);
-      };
+      document.addEventListener('click', handleClickOutside, { passive: true });
+      return () => document.removeEventListener('click', handleClickOutside);
     }
-  }, [isMobileProfileMenuOpen]);
+  }, [isMobileProfileMenuOpen, handleClickOutside]);
 
-  // 🍎 Mobile module click handler for expandable modules
-  const handleMobileModuleClick = (moduleKey: keyof typeof expandedModules, e: React.MouseEvent) => {
+  // 🍎 Mobile module click handler for expandable modules - INP OPTIMIZED
+  const handleMobileModuleClick = useCallback((moduleKey: keyof typeof expandedModules, e: React.MouseEvent) => {
     // Only handle clicks on mobile (portrait mode)
     if (window.innerWidth > 767 || window.innerHeight < window.innerWidth) return;
     
@@ -261,7 +262,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
         [moduleKey]: !prev[moduleKey]
       }));
     }
-  };
+  }, []);
 
   // ALL REF HOOKS
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -273,22 +274,23 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
   const maxReconnectAttempts = 5;
   const baseReconnectDelay = 5000;
 
-  // Initialize viewed sets from localStorage
+  // Initialize viewed sets from localStorage - MEMOIZED FOR INP
+  const viewedStrategiesKey = useMemo(() => `viewed_strategies_${platform}_${accountHolder}`, [platform, accountHolder]);
+  const viewedCompetitorKey = useMemo(() => `viewed_competitor_${platform}_${accountHolder}`, [platform, accountHolder]);
+  const viewedPostsKey = useMemo(() => `viewed_posts_${platform}_${accountHolder}`, [platform, accountHolder]);
+
   const [viewedStrategies, setViewedStrategies] = useState<Set<string>>(() => {
-    const storageKey = `viewed_strategies_${platform}_${accountHolder}`;
-    const stored = localStorage.getItem(storageKey);
+    const stored = localStorage.getItem(viewedStrategiesKey);
     return stored ? new Set(JSON.parse(stored)) : new Set();
   });
   
   const [viewedCompetitorData, setViewedCompetitorData] = useState<Set<string>>(() => {
-    const storageKey = `viewed_competitor_${platform}_${accountHolder}`;
-    const stored = localStorage.getItem(storageKey);
+    const stored = localStorage.getItem(viewedCompetitorKey);
     return stored ? new Set(JSON.parse(stored)) : new Set();
   });
   
   const [viewedPosts, setViewedPosts] = useState<Set<string>>(() => {
-    const storageKey = `viewed_posts_${platform}_${accountHolder}`;
-    const stored = localStorage.getItem(storageKey);
+    const stored = localStorage.getItem(viewedPostsKey);
     return stored ? new Set(JSON.parse(stored)) : new Set();
   });
 
@@ -414,11 +416,32 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
             extractedAt: new Date().toISOString()
           };
         } else if (platform === 'linkedin') {
-          // LinkedIn data is already in correct format
-          processedProfileData = profileData;
+          // Normalize common fields for LinkedIn
+          processedProfileData = {
+            ...profileData,
+            fullName: profileData.fullName || [profileData.firstName, profileData.lastName].filter(Boolean).join(' ') || profileData.username || '',
+            biography: profileData.about || profileData.headline || profileData.description || profileData.summary || '',
+            profilePicUrl: profileData.profilePic || profileData.profilePicHighQuality || profileData.profilePicUrl || '',
+            profilePicUrlHD: profileData.profilePicHighQuality || profileData.profilePic || profileData.profilePicUrlHD || ''
+          };
+        } else if (platform === 'facebook') {
+          // Normalize for Facebook pages/profiles
+          processedProfileData = {
+            ...profileData,
+            fullName: profileData.name || profileData.fullName || profileData.username || '',
+            biography: profileData.bio || profileData.about || profileData.description || '',
+            profilePicUrl: profileData.profilePicUrl || profileData.picture || '',
+            profilePicUrlHD: profileData.profilePicUrlHD || profileData.profilePicUrl || profileData.picture || ''
+          };
         } else {
-          // Instagram, Facebook use raw data
-          processedProfileData = profileData;
+          // Instagram normalization
+          processedProfileData = {
+            ...profileData,
+            fullName: profileData.full_name || profileData.fullName || profileData.username || '',
+            biography: profileData.biography || profileData.bio || '',
+            profilePicUrl: profileData.profilePicUrl || profileData.profile_pic_url || '',
+            profilePicUrlHD: profileData.profilePicUrlHD || profileData.profile_pic_url_hd || profileData.profilePicUrl || ''
+          };
         }
         
         setProfileInfo(processedProfileData);
@@ -627,17 +650,13 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       // Initial positioning
       updatePosition();
       
-      const handleResize = () => {
-        // ✅ IMPROVED: Debounced resize handler for better performance
-        clearTimeout((window as any).resizeTimeout);
-        (window as any).resizeTimeout = setTimeout(updatePosition, 100);
-      };
-      
-      const handleScroll = () => {
-        // ✅ IMPROVED: Debounced scroll handler
-        clearTimeout((window as any).scrollTimeout);
-        (window as any).scrollTimeout = setTimeout(updatePosition, 50);
-      };
+      const handleResize = useCallback(() => {
+        updatePosition();
+      }, []);
+
+      const handleScroll = useCallback(() => {
+        updatePosition();
+      }, []);
       
       const handleClickOutside = (e: MouseEvent) => {
         const inputElement = postInputRef.current;
@@ -659,7 +678,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = ({
       window.addEventListener('resize', handleResize, { passive: true });
       window.addEventListener('scroll', handleScroll, { passive: true });
       window.addEventListener('orientationchange', handleOrientationChange);
-      document.addEventListener('click', handleClickOutside);
+      document.addEventListener('click', handleClickOutside, { passive: true });
 
       return () => {
         window.removeEventListener('resize', handleResize);
@@ -2608,41 +2627,22 @@ Image Description: ${response.post.image_prompt}
 
   return (
     <>
-      <motion.div
+      <div 
         className="dashboard-wrapper"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
       >
         {showWelcome && (
-          <div className="welcome-header">
+          <div className="welcome-header" style={{ visibility: 'visible' }}>
             <h1 className="welcome-text">
-              Welcome {profileInfo?.fullName || accountHolder}!
+              Welcome {profileInfo?.fullName || accountHolder || 'User'}!
             </h1>
-            <div className="welcome-subtext-container" style={{ position: 'relative', minHeight: '48px' }}>
-              <motion.p 
-                className="welcome-subtext"
-                animate={{ 
-                  opacity: showInitialText ? 1 : 0,
-                  y: showInitialText ? 0 : -10
-                }}
-                transition={{ duration: 0.5, ease: 'easeInOut' }}
-              >
-                Congrats! You are listed on top initial users of Sentient Marketing AI-powered Management!
-              </motion.p>
-              
+            <div className="welcome-subtext-container">
               {profileInfo?.biography && profileInfo.biography.trim() && (
-                <motion.div
+                <div
                   className={`bio-text ${isBioExpanded ? 'expanded' : 'collapsed'}`}
-                  animate={{ 
-                    opacity: showBio ? 1 : 0,
-                    y: showBio ? 0 : 10
-                  }}
-                  transition={{ duration: 0.5, ease: 'easeInOut', delay: showBio ? 0.2 : 0 }}
                   onClick={handleBioClick}
-                  style={{ cursor: 'pointer' }}
+                  style={{ cursor: 'pointer', opacity: 1 }}
                 >
-{typedBio}
+                  {typedBio || profileInfo?.biography}
                   {showBio && !bioAnimationComplete && (
                     <motion.span
                       animate={{ opacity: [1, 0] }}
@@ -2661,7 +2661,7 @@ Image Description: ${response.post.image_prompt}
                       }}
                     />
                   )}
-                </motion.div>
+                </div>
               )}
             </div>
           </div>
@@ -2680,7 +2680,10 @@ Image Description: ${response.post.image_prompt}
                           src={profileInfo.profilePicUrl}
                           alt={`${profileInfo?.fullName || accountHolder}'s profile picture`}
                           className="profile-pic-bar"
+                          width="44"
+                          height="44"
                           onError={() => setImageError(true)}
+                          style={{ display: 'block' }}
                         />
                       ) : (
                         <div className="profile-pic-bar">
@@ -3036,8 +3039,7 @@ Image Description: ${response.post.image_prompt}
             </div>
           )}
 
-              <div 
-                className={`news4u ${expandedModules.news4u ? 'mobile-expanded' : ''}`}
+              <div
                 onClick={(e) => handleMobileModuleClick('news4u', e)}
               >
                 <h2>
@@ -3257,8 +3259,8 @@ Image Description: ${response.post.image_prompt}
           </div>
         )}
         
-  <ToastNotification toast={toast} />
-      </motion.div>
+      <ToastNotification toast={toast} />
+      </div>
       
       {isGoalModalOpen && (
         <GoalModal 
@@ -3581,7 +3583,7 @@ Image Description: ${response.post.image_prompt}
       )}
     </>
   );
-};
+});
 
 export default PlatformDashboard;
 

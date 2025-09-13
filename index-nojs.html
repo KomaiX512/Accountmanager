@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/Logo/logo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    
+    <title>Sentient Marketing | #1 AI Social Media Management Platform | SentientM</title>
+    <meta name="description" content="SentientM - The world's most advanced AI social media management platform." />
+    
+    <!-- ULTRA-CRITICAL: Immediate render CSS with hardware acceleration -->
+    <style>
+      /* RESET: Zero browser delays */
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      
+      /* BODY: Immediate paint foundation */
+      html, body {
+        width: 100%;
+        height: 100%;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: #0a0a0a;
+        color: #ffffff;
+        overflow: hidden;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeSpeed;
+        contain: layout style paint;
+        transform: translateZ(0);
+        will-change: auto;
+      }
+
+      /* SPLASH: Full viewport immediate paint with GPU acceleration */
+      #splash-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: #0a0a0a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 999999;
+        contain: strict;
+        transform: translate3d(0,0,0);
+        backface-visibility: hidden;
+      }
+
+      /* CONTENT: Minimal container - LCP should be h1, not this div */
+      .splash-content {
+        text-align: center;
+        width: 100%;
+        max-width: 100vw;
+        padding: 0;
+        margin: 0;
+        contain: none;
+        transform: none;
+        /* Make container smaller than h1 */
+        display: contents;
+      }
+
+      /* HERO: ABSOLUTE LCP DOMINANCE - largest possible element */
+      #lcp-hero {
+        font-size: 96px;
+        font-weight: 700;
+        color: #00ff88;
+        margin: 0;
+        padding: 100px 50px;
+        line-height: 0.9;
+        letter-spacing: -3px;
+        text-shadow: 0 0 30px rgba(0,255,136,1);
+        /* CRITICAL: Absolute positioning to dominate viewport */
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        min-width: 100vw;
+        min-height: 100vh;
+        max-width: 100vw;
+        max-height: 100vh;
+        box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        /* Force maximum render area */
+        background: linear-gradient(135deg, rgba(0,255,136,0.15), rgba(0,136,255,0.1));
+        border: 3px solid rgba(0,255,136,0.3);
+        /* Hardware acceleration */
+        contain: layout style paint;
+        transform: translate3d(0,0,0);
+        backface-visibility: hidden;
+        will-change: auto;
+        z-index: 1000;
+        /* FORCE BROWSER TO MEASURE THIS AS LARGEST */
+        overflow: hidden;
+      }
+
+      /* DESCRIPTION: Secondary content */
+      .splash-description {
+        font-size: 32px;
+        color: #cccccc;
+        margin: 0 0 40px 0;
+        line-height: 1.3;
+        font-weight: 300;
+        opacity: 0.9;
+        contain: layout style;
+        transform: translateZ(0);
+      }
+
+      /* ACCENT: Visual separator */
+      .splash-accent {
+        width: 120px;
+        height: 6px;
+        background: linear-gradient(90deg, #00ff88, #0088ff);
+        margin: 0 auto;
+        border-radius: 3px;
+        box-shadow: 0 0 15px rgba(0,255,136,0.3);
+        contain: strict;
+        transform: translateZ(0);
+      }
+
+      /* LOADING: GPU-accelerated animation */
+      .loading-dots {
+        display: flex;
+        justify-content: center;
+        margin-top: 40px;
+        contain: layout style;
+        transform: translateZ(0);
+      }
+
+      .loading-dots span {
+        width: 8px;
+        height: 8px;
+        background: #00ff88;
+        border-radius: 50%;
+        margin: 0 4px;
+        animation: pulse 1.5s infinite;
+        opacity: 0.3;
+        contain: strict;
+        transform: translateZ(0);
+        will-change: opacity, transform;
+      }
+
+      .loading-dots span:nth-child(1) { animation-delay: 0s; }
+      .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+      .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+      /* ANIMATION: Hardware-accelerated pulse */
+      @keyframes pulse {
+        0%, 100% { 
+          opacity: 0.3; 
+          transform: translate3d(0,0,0) scale(1); 
+        }
+        50% { 
+          opacity: 1; 
+          transform: translate3d(0,0,0) scale(1.2); 
+        }
+      }
+
+      /* MEDIA QUERIES: Responsive optimization */
+      @media (max-width: 1200px) {
+        #lcp-hero { font-size: 80px; height: 100px; min-height: 100px; }
+        .splash-description { font-size: 28px; }
+      }
+      
+      @media (max-width: 768px) {
+        #lcp-hero { font-size: 64px; height: 80px; min-height: 80px; }
+        .splash-description { font-size: 24px; }
+        .splash-content { padding: 40px 20px; }
+      }
+      
+      @media (max-width: 480px) {
+        #lcp-hero { font-size: 48px; height: 60px; min-height: 60px; }
+        .splash-description { font-size: 20px; }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- PURE HTML/CSS - NO JAVASCRIPT INTERFERENCE -->
+    <div id="splash-screen">
+      <div class="splash-content">
+        <!-- CRITICAL: This h1 must be the LCP element -->
+        <h1 id="lcp-hero">Sentient Marketing</h1>
+        <p class="splash-description">Revolutionary AI Social Media Management</p>
+        <div class="splash-accent"></div>
+        <div class="loading-dots">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

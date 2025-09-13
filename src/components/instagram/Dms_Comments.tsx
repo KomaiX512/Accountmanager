@@ -20,23 +20,43 @@ const useSenderUsername = (senderId: string | undefined, platform: string) => {
 
     const cachedUsername = localStorage.getItem(`sender_username_${senderId}`);
     if (cachedUsername) {
-      setSenderUsername(cachedUsername);
+      // Don't display "not_found" cached values
+      if (cachedUsername !== 'not_found') {
+        setSenderUsername(cachedUsername);
+      }
       return;
     }
 
     const fetchSenderUsername = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`/api/instagram-sender-username/${senderId}`);
+        const response = await fetch(`/api/instagram-sender-username/${senderId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          signal: AbortSignal.timeout(8000) // 8 second timeout
+        });
+        
         if (response.ok) {
           const data = await response.json();
           if (data.username) {
             setSenderUsername(data.username);
             localStorage.setItem(`sender_username_${senderId}`, data.username);
           }
+        } else if (response.status === 404) {
+          console.log(`[Instagram] Sender username not found for ID: ${senderId}`);
+          // Cache empty result to avoid repeated requests
+          localStorage.setItem(`sender_username_${senderId}`, 'not_found');
+        } else {
+          console.warn(`[Instagram] Failed to fetch sender username: ${response.status}`);
         }
-      } catch (error) {
-        console.error('Error fetching sender username:', error);
+      } catch (error: any) {
+        if (error.name === 'TimeoutError' || error.name === 'AbortError') {
+          console.log(`[Instagram] Timeout fetching sender username for ID: ${senderId}`);
+        } else {
+          console.error('Error fetching sender username:', error);
+        }
       } finally {
         setLoading(false);
       }
@@ -347,6 +367,86 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
       return hasId && isSupportedType && isEligibleStatus;
     });
   }, [validNotifications]);
+
+  // DIAGNOSTICS: Provide hard-proof analysis of counts mismatch between header and Auto-Reply
+  useEffect(() => {
+    try {
+      const totalIncoming = Array.isArray(notifications) ? notifications.length : 0;
+      const validCount = validNotifications.length;
+      const eligibleCount = autoReplyEligibleNotifications.length;
+
+      const typeCountsAll: Record<string, number> = {};
+      const typeCountsValid: Record<string, number> = {};
+      const statusCountsValid: Record<string, number> = {};
+
+      (Array.isArray(notifications) ? notifications : []).forEach((n: any) => {
+        const t = (n?.type || 'unknown').toString();
+        typeCountsAll[t] = (typeCountsAll[t] || 0) + 1;
+      });
+
+      validNotifications.forEach((n: any) => {
+        const t = (n?.type || 'unknown').toString();
+        const s = (n?.status || 'undefined').toString();
+        typeCountsValid[t] = (typeCountsValid[t] || 0) + 1;
+        statusCountsValid[s] = (statusCountsValid[s] || 0) + 1;
+      });
+
+      let excludedByType = 0;
+      let excludedByStatus = 0;
+      let excludedByMissingId = 0;
+      const unsupportedTypeSamples: Array<{ id: string | undefined; type: string; status?: string; text?: string }> = [];
+
+      const excludedSamples: Array<{ id: string | undefined; type: string; status?: string; hasId: boolean; text?: string; reason: string }>= [];
+
+      validNotifications.forEach((n: any) => {
+        const id = n.message_id || n.comment_id;
+        const hasId = !!id;
+        const isSupportedType = n.type === 'message' || n.type === 'comment';
+        const isEligibleStatus = !n.status || n.status === 'pending' || n.status === 'ai_reply_ready';
+
+        if (!hasId) {
+          excludedByMissingId += 1;
+          excludedSamples.push({ id, type: n.type, status: n.status, hasId, text: n.text?.slice(0, 80), reason: 'missing_id' });
+          return;
+        }
+        if (!isSupportedType) {
+          excludedByType += 1;
+          if (unsupportedTypeSamples.length < 5) {
+            unsupportedTypeSamples.push({ id, type: n.type, status: n.status, text: n.text?.slice(0, 80) });
+          }
+          excludedSamples.push({ id, type: n.type, status: n.status, hasId, text: n.text?.slice(0, 80), reason: 'unsupported_type' });
+          return;
+        }
+        if (!isEligibleStatus) {
+          excludedByStatus += 1;
+          if (excludedSamples.length < 10) {
+            excludedSamples.push({ id, type: n.type, status: n.status, hasId, text: n.text?.slice(0, 80), reason: 'ineligible_status' });
+          }
+          return;
+        }
+      });
+
+      console.group(`[${new Date().toISOString()}] [${platform.toUpperCase()}] DM Eligibility Diagnostics`);
+      console.log('Counts:', { totalIncoming, validAfterDefensiveFilter: validCount, eligibleForAutoReply: eligibleCount });
+      console.log('Type counts (ALL incoming):', typeCountsAll);
+      console.log('Type counts (VALID after filters):', typeCountsValid);
+      console.log('Status counts (VALID after filters):', statusCountsValid);
+      console.log('Exclusions among VALID ->', {
+        byUnsupportedType: excludedByType,
+        byIneligibleStatus: excludedByStatus,
+        byMissingId: excludedByMissingId
+      });
+      if (unsupportedTypeSamples.length > 0) {
+        console.log('Samples excluded due to unsupported type (only "message" and "comment" are eligible):', unsupportedTypeSamples);
+      }
+      if (excludedSamples.length > 0) {
+        console.log('Sample excluded items with reasons:', excludedSamples.slice(0, 10));
+      }
+      console.groupEnd();
+    } catch (e) {
+      // No-op diagnostics failure
+    }
+  }, [notifications, validNotifications, autoReplyEligibleNotifications, platform]);
 
   // Auto-scroll to bottom when new notifications arrive - ENHANCED: Improved DM arrival detection and visibility
   useEffect(() => {

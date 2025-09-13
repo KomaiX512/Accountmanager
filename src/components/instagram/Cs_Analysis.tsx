@@ -298,9 +298,9 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
   }, [normalizedAccountHolder, platform]);
 
   const competitorsQuery = localCompetitors.length > 0 ? localCompetitors.join(',') : '';
-  // Build endpoint and apply cache-bypass rules (15m after competitor edit, 12h global)
+  // Build endpoint: rely on CacheManager in useR2Fetch to decide cache bypass; keep URL stable during background refreshes
   const baseCompetitorEndpoint = competitorsQuery 
-    ? `/api/retrieve-multiple/${normalizedAccountHolder}?competitors=${encodeURIComponent(competitorsQuery)}&platform=${platform}&forceRefresh=true&_t=${refreshKey}`
+    ? `/api/retrieve-multiple/${normalizedAccountHolder}?competitors=${encodeURIComponent(competitorsQuery)}&platform=${platform}${refreshKey ? `&_t=${refreshKey}` : ''}`
     : '';
   const competitorEndpoint = baseCompetitorEndpoint || '';
   
@@ -991,9 +991,9 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
       <ErrorBoundary>
         <motion.div
           className="cs-analysis-container"
-          initial={{ opacity: 0, y: 20 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: 0.2 }}
         >
           {error && (
             <div className="error-message">
@@ -1062,9 +1062,9 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
                 <motion.div
                   key={competitor}
                   className={`competitor-sub-container ${fetch.data && fetch.data.length > 0 ? 'loaded' : ''} ${(!fetch.data || fetch.data.length === 0) && !isInSmartLoading ? 'no-data' : ''} ${isInSmartLoading ? 'smart-loading' : ''}`}
-                  initial={{ opacity: 0, scale: 0.9 }}
+                  initial={false}
                   animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: index * 0.1, duration: 0.2 }}
+                  transition={{ duration: 0.15 }}
                   whileHover={{ scale: 1.02 }}
                   onMouseEnter={() => handleLoadingTooltipShow(competitor)}
                   onMouseLeave={handleLoadingTooltipHide}
@@ -1201,7 +1201,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
                     </div>
                   )}
                   {/* ✅ UPDATED: Only show regular loading if not in smart loading */}
-                  {fetch.loading && !isInSmartLoading && (
+                  {fetch.loading && !isInSmartLoading && (!fetch.data || fetch.data.length === 0) && (
                     <div className="futuristic-loading">
                       <span className="loading-text">Analyzing {competitor}...</span>
                       <div className="particle-effect" />

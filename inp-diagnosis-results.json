@@ -1,0 +1,36 @@
+{
+  "timestamp": "2025-09-11T23:47:10.744Z",
+  "averageInteractionTime": 74,
+  "interactionResults": [
+    {
+      "selector": "button",
+      "description": "First button click",
+      "time": 112,
+      "success": true
+    },
+    {
+      "selector": "a",
+      "description": "Link click",
+      "time": 111,
+      "success": true
+    },
+    {
+      "selector": "input",
+      "description": "Input focus",
+      "error": "Execution context was destroyed, most likely because of a navigation.",
+      "success": false
+    }
+  ],
+  "performanceIssues": {
+    "longTasks": [],
+    "slowInteractions": [],
+    "blockingScripts": [],
+    "heavyComponents": []
+  },
+  "javascriptStats": {
+    "totalKB": 2,
+    "usedKB": 1,
+    "unusedKB": 2,
+    "unusedPercentage": 71.3
+  }
+}

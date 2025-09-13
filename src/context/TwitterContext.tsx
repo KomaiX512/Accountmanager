@@ -42,7 +42,12 @@ export const TwitterProvider: React.FC<TwitterProviderProps> = ({ children }) =>
     
     try {
       console.log(`[${new Date().toISOString()}] Checking for existing Twitter connection for user ${currentUser.uid}`);
-      const response = await axios.get(`/api/twitter-connection/${currentUser.uid}`);
+      const response = await axios.get(`/api/twitter-connection/${currentUser.uid}`, {
+        timeout: 10000, // 10 second timeout
+        validateStatus: function (status) {
+          return status < 500; // Resolve only if the status code is less than 500
+        }
+      });
       
       if (response.data.twitter_user_id) {
         setUserId(response.data.twitter_user_id);
@@ -58,13 +63,21 @@ export const TwitterProvider: React.FC<TwitterProviderProps> = ({ children }) =>
     } catch (error: any) {
       if (error.response?.status === 404) {
         console.log(`[${new Date().toISOString()}] No existing Twitter connection found for user ${currentUser.uid}`);
+        // Keep existing state if 404 and we have cached data
+        if (!userId && !isConnected) {
+          setUserId(null);
+          setUsername(null);
+          setIsConnected(false);
+        }
       } else {
         console.error(`[${new Date().toISOString()}] Error checking existing Twitter connection:`, error);
+        // Only reset if we don't have existing state
+        if (!userId && !isConnected) {
+          setUserId(null);
+          setUsername(null);
+          setIsConnected(false);
+        }
       }
-      // Reset state on error
-      setUserId(null);
-      setUsername(null);
-      setIsConnected(false);
     } finally {
       isCheckingRef.current = false;
     }

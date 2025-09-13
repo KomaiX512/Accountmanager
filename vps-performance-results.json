@@ -1,0 +1,68 @@
+[
+  {
+    "iteration": 1,
+    "timestamp": "2025-09-11T23:07:14.840Z",
+    "totalTestTime": 8484,
+    "vitals": {
+      "LCP": 4300,
+      "FID": null,
+      "CLS": 0,
+      "INP": null,
+      "FCP": 3826,
+      "TTFB": 327,
+      "loadTime": null,
+      "domContentLoaded": null
+    },
+    "network": {
+      "totalRequests": 37,
+      "totalResponses": 36,
+      "requestSizes": 132,
+      "responseSizes": 584198
+    },
+    "errors": []
+  },
+  {
+    "iteration": 2,
+    "timestamp": "2025-09-11T23:07:22.143Z",
+    "totalTestTime": 5277,
+    "vitals": {
+      "LCP": 2126,
+      "FID": null,
+      "CLS": null,
+      "INP": null,
+      "FCP": 868,
+      "TTFB": 327,
+      "loadTime": null,
+      "domContentLoaded": null
+    },
+    "network": {
+      "totalRequests": 35,
+      "totalResponses": 34,
+      "requestSizes": 0,
+      "responseSizes": 583700
+    },
+    "errors": []
+  },
+  {
+    "iteration": 3,
+    "timestamp": "2025-09-11T23:07:29.123Z",
+    "totalTestTime": 4954,
+    "vitals": {
+      "LCP": 1286,
+      "FID": null,
+      "CLS": null,
+      "INP": null,
+      "FCP": 790,
+      "TTFB": 327,
+      "loadTime": null,
+      "domContentLoaded": null
+    },
+    "network": {
+      "totalRequests": 35,
+      "totalResponses": 34,
+      "requestSizes": 0,
+      "responseSizes": 583700
+    },
+    "errors": []
+  }
+]

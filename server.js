@@ -280,10 +280,16 @@ const s3Client = {
   }
 };
 
-// CRITICAL FIX: Setup enhanced memory cache for images with proper TTL management
+// 🚀 NETFLIX-GRADE PERFORMANCE: Enhanced multi-layer caching system
 const imageCache = new Map();
-const IMAGE_CACHE_TTL = 1000 * 60 * 60; // 1 hour
-const IMAGE_CACHE_MAX_SIZE = 100; // Maximum number of images to cache
+const processedImageCache = new Map(); // Cache for processed images (WebP conversions, etc.)
+const s3OperationCache = new Map(); // Cache for S3 list operations
+const IMAGE_CACHE_TTL = 1000 * 60 * 30; // 30 minutes (reduced for fresher content)
+const PROCESSED_IMAGE_TTL = 1000 * 60 * 60 * 4; // 4 hours for processed images
+const S3_OPERATION_TTL = 1000 * 60 * 10; // 10 minutes for S3 list operations
+const IMAGE_CACHE_MAX_SIZE = 500; // Increased cache size for better hit rate
+const PROCESSED_CACHE_MAX_SIZE = 200;
+const S3_CACHE_MAX_SIZE = 100;
 
 // Set up CORS completely permissively (no restrictions)
 app.use((req, res, next) => {
@@ -673,11 +679,21 @@ app.use((req, res, next) => {
 // Enhanced health check endpoint with S3 connection test
 app.get('/health', async (req, res) => {
   try {
-    // Test S3 connection by listing a bucket with a small limit
-    const testResult = await s3Client.listObjectsV2({
-      Bucket: 'tasks',
-      MaxKeys: 1
-    }).promise().catch(err => ({ error: err.message }));
+    const s3StartTime = Date.now();
+    
+    // Test S3 connection by listing a bucket with a small limit (AWS SDK v3 syntax)
+    let testResult;
+    try {
+      const listCommand = new ListObjectsV2Command({
+        Bucket: 'tasks',
+        MaxKeys: 1
+      });
+      testResult = await s3Client.send(listCommand);
+    } catch (err) {
+      testResult = { error: err.message };
+    }
+    
+    const s3Latency = Date.now() - s3StartTime;
     
     const s3Status = testResult.error ? 'error' : 'connected';
     
@@ -685,6 +701,7 @@ app.get('/health', async (req, res) => {
       status: 'ok', 
       timestamp: new Date().toISOString(),
       s3Status,
+      s3LatencyMs: s3Latency,
       imageCache: {
         size: imageCache.size,
         maxSize: IMAGE_CACHE_MAX_SIZE
@@ -756,12 +773,71 @@ app.post('/api/usage/increment/:userId', async (req, res) => {
   }
 });
 
+// 🚀 PERFORMANCE: Advanced cache management with multi-layer clearing
+function intelligentCacheEviction() {
+  const now = Date.now();
+  let evicted = 0;
+
+  // Evict expired images
+  for (const [key, value] of imageCache.entries()) {
+    if (now - value.timestamp > IMAGE_CACHE_TTL) {
+      imageCache.delete(key);
+      evicted++;
+    }
+  }
+
+  // Evict expired processed images
+  for (const [key, value] of processedImageCache.entries()) {
+    if (now - value.timestamp > PROCESSED_IMAGE_TTL) {
+      processedImageCache.delete(key);
+      evicted++;
+    }
+  }
+
+  // Evict expired S3 operations
+  for (const [key, value] of s3OperationCache.entries()) {
+    if (now - value.timestamp > S3_OPERATION_TTL) {
+      s3OperationCache.delete(key);
+      evicted++;
+    }
+  }
+
+  // LRU eviction if over limits
+  if (imageCache.size > IMAGE_CACHE_MAX_SIZE) {
+    const entries = Array.from(imageCache.entries());
+    entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
+    for (let i = 0; i < entries.length - IMAGE_CACHE_MAX_SIZE; i++) {
+      imageCache.delete(entries[i][0]);
+      evicted++;
+    }
+  }
+
+  return evicted;
+}
+
+// Run cache eviction every 5 minutes
+setInterval(intelligentCacheEviction, 5 * 60 * 1000);
+
 // Clear image cache endpoint for administrators
 app.post('/admin/clear-image-cache', (req, res) => {
-  const cacheSize = imageCache.size;
+  const imageCacheSize = imageCache.size;
+  const processedCacheSize = processedImageCache.size;
+  const s3CacheSize = s3OperationCache.size;
+  
   imageCache.clear();
-  if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] Image cache cleared (${cacheSize} items)`);
-  res.json({ success: true, message: `Image cache cleared (${cacheSize} items)` });
+  processedImageCache.clear();
+  s3OperationCache.clear();
+  
+  if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] All caches cleared - Image: ${imageCacheSize}, Processed: ${processedCacheSize}, S3: ${s3CacheSize}`);
+  res.json({ 
+    success: true, 
+    message: `All caches cleared`,
+    cleared: {
+      images: imageCacheSize,
+      processed: processedCacheSize,
+      s3Operations: s3CacheSize
+    }
+  });
 });
 
 // 🚀 NUCLEAR CACHE DESTRUCTION DEBUG ENDPOINT
@@ -865,8 +941,90 @@ app.get('/admin/inspect-cache/:platform/:username/:imageKey', (req, res) => {
 
 // Placeholder and special debug handlers removed for production safety
 
-// Function to convert WebP to JPEG for Instagram compatibility
-async function convertWebPToJPEG(webpBuffer) {
+// 🚀 NETFLIX-GRADE OPTIMIZATION: S3 Operation Batching System
+async function batchedS3ListOperation(bucket, prefix, maxKeys = 1000) {
+  const cacheKey = `s3_list_${bucket}_${prefix}_${maxKeys}`;
+  
+  // Check cache first
+  if (s3OperationCache.has(cacheKey)) {
+    const cached = s3OperationCache.get(cacheKey);
+    if (Date.now() - cached.timestamp < S3_OPERATION_TTL) {
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [S3-CACHE-HIT] Using cached S3 list for ${prefix}`);
+      return cached.data;
+    }
+    s3OperationCache.delete(cacheKey);
+  }
+
+  try {
+    const startTime = Date.now();
+    const result = await s3Client.listObjectsV2({
+      Bucket: bucket,
+      Prefix: prefix,
+      MaxKeys: maxKeys
+    }).promise();
+    
+    const duration = Date.now() - startTime;
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [S3-FETCH] Fetched ${result.Contents?.length || 0} objects in ${duration}ms`);
+    
+    // Cache the result
+    s3OperationCache.set(cacheKey, {
+      data: result,
+      timestamp: Date.now()
+    });
+    
+    // Intelligent cache size management
+    if (s3OperationCache.size > S3_CACHE_MAX_SIZE) {
+      const oldestKey = Array.from(s3OperationCache.keys())[0];
+      s3OperationCache.delete(oldestKey);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [S3-ERROR] Failed to list objects for ${prefix}:`, error);
+    throw error;
+  }
+}
+
+// 🚀 PERFORMANCE: Optimized image processing with caching
+async function processImageWithCache(buffer, cacheKey, processingFunction) {
+  // Check processed image cache
+  if (processedImageCache.has(cacheKey)) {
+    const cached = processedImageCache.get(cacheKey);
+    if (Date.now() - cached.timestamp < PROCESSED_IMAGE_TTL) {
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [PROCESS-CACHE-HIT] Using cached processed image`);
+      return cached.data;
+    }
+    processedImageCache.delete(cacheKey);
+  }
+
+  try {
+    const startTime = Date.now();
+    const processedBuffer = await processingFunction(buffer);
+    const duration = Date.now() - startTime;
+    
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-PROCESS] Processed image in ${duration}ms`);
+    
+    // Cache processed image
+    processedImageCache.set(cacheKey, {
+      data: processedBuffer,
+      timestamp: Date.now()
+    });
+    
+    // Manage cache size
+    if (processedImageCache.size > PROCESSED_CACHE_MAX_SIZE) {
+      const oldestKey = Array.from(processedImageCache.keys())[0];
+      processedImageCache.delete(oldestKey);
+    }
+    
+    return processedBuffer;
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [IMAGE-PROCESS-ERROR] Failed to process image:`, error);
+    throw error;
+  }
+}
+
+// 🚀 PERFORMANCE: Optimized WebP to JPEG conversion with aggressive caching
+async function convertWebPToJPEG(webpBuffer, imageKey = null) {
   try {
     // Validate that the buffer is actually a valid WebP file
     if (!webpBuffer || webpBuffer.length < 12) {
@@ -894,14 +1052,20 @@ async function convertWebPToJPEG(webpBuffer) {
       if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] RIFF detected without WEBP signature, forcing conversion attempt`);
     }
     
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Converting WebP/RIFF to JPEG (${webpBuffer.length} bytes)`);
+    // Create cache key for processed conversion
+    const bufferHash = require('crypto').createHash('md5').update(webpBuffer).digest('hex').substring(0, 8);
+    const cacheKey = `webp_to_jpeg_${imageKey || bufferHash}_${webpBuffer.length}`;
     
-    // 🔥 BATTLE-TESTED MULTI-STRATEGY CONVERSION
-    let jpegBuffer;
+    // Use cached processing with multi-strategy conversion
+    return await processImageWithCache(webpBuffer, cacheKey, async (buffer) => {
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Converting WebP/RIFF to JPEG (${buffer.length} bytes)`);
     
-    // Strategy 1: Standard high-quality conversion 
-    try {
-      jpegBuffer = await sharp(webpBuffer)
+      // 🔥 BATTLE-TESTED MULTI-STRATEGY CONVERSION
+      let jpegBuffer;
+      
+      // Strategy 1: Standard high-quality conversion 
+      try {
+        jpegBuffer = await sharp(buffer)
         .jpeg({ 
           quality: 90,
           progressive: true,
@@ -909,71 +1073,55 @@ async function convertWebPToJPEG(webpBuffer) {
         })
         .toBuffer();
       
-      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] ✅ Strategy 1 SUCCESS: WebP to JPEG (${webpBuffer.length} -> ${jpegBuffer.length} bytes)`);
-      return jpegBuffer;
-    } catch (error) {
-      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] ❌ Strategy 1 failed: ${error.message}`);
-    }
-    
-    // Strategy 2: Tolerant conversion with error recovery
-    try {
-      jpegBuffer = await sharp(webpBuffer, { 
-        failOnError: false,
-        sequentialRead: true 
-      })
-        .jpeg({ 
-          quality: 85, 
-          progressive: true,
-          force: true  // Force JPEG output
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] ✅ Strategy 1 SUCCESS: WebP to JPEG (${buffer.length} -> ${jpegBuffer.length} bytes)`);
+        return jpegBuffer;
+      } catch (error) {
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] ❌ Strategy 1 failed: ${error.message}`);
+      }
+      
+      // Strategy 2: Tolerant conversion with error recovery
+      try {
+        jpegBuffer = await sharp(buffer, { 
+          failOnError: false,
+          sequentialRead: true 
         })
-        .toBuffer();
+          .jpeg({ 
+            quality: 85, 
+            progressive: true,
+            force: true  // Force JPEG output
+          })
+          .toBuffer();
+        
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 2 successful (${buffer.length} -> ${jpegBuffer.length} bytes)`);
+        return jpegBuffer;
+      } catch (error) {
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 2 failed: ${error.message}`);
+      }
       
-      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 2 successful (${webpBuffer.length} -> ${jpegBuffer.length} bytes)`);
-      return jpegBuffer;
-    } catch (error) {
-      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 2 failed: ${error.message}`);
-    }
-    
-    // Strategy 3: Try to clean the buffer first
-    try {
-      // Remove potential corruption by creating a clean buffer
-      const cleanBuffer = Buffer.from(webpBuffer);
-      jpegBuffer = await sharp(cleanBuffer, { failOnError: false })
-        .jpeg({ quality: 80 })
-        .toBuffer();
+      // Strategy 3: Try to clean the buffer first
+      try {
+        // Remove potential corruption by creating a clean buffer
+        const cleanBuffer = Buffer.from(buffer);
+        jpegBuffer = await sharp(cleanBuffer, { failOnError: false })
+          .jpeg({ quality: 80 })
+          .toBuffer();
+        
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 3 successful (${buffer.length} -> ${jpegBuffer.length} bytes)`);
+        return jpegBuffer;
+      } catch (error) {
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 3 failed: ${error.message}`);
+      }
       
-      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 3 successful (${webpBuffer.length} -> ${jpegBuffer.length} bytes)`);
-      return jpegBuffer;
-    } catch (error) {
-      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 3 failed: ${error.message}`);
-    }
-    
-    // Strategy 4: Try to extract and convert as raw image data
-    try {
-      // Try to process as raw image data
-      jpegBuffer = await sharp(webpBuffer, { 
-        failOnError: false,
-        limitInputPixels: false 
-      })
-        .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
-        .jpeg({ quality: 75 })
-        .toBuffer();
+      // If all strategies fail, check if the original buffer might actually be JPEG
+      if (buffer.length >= 2 && buffer[0] === 0xFF && buffer[1] === 0xD8) {
+        if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Buffer appears to be JPEG already, returning as-is`);
+        return buffer;
+      }
       
-      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 4 successful (${webpBuffer.length} -> ${jpegBuffer.length} bytes)`);
-      return jpegBuffer;
-    } catch (error) {
-      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Strategy 4 failed: ${error.message}`);
-    }
-    
-    // If all strategies fail, check if the original buffer might actually be JPEG
-    if (webpBuffer.length >= 2 && webpBuffer[0] === 0xFF && webpBuffer[1] === 0xD8) {
-      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] Buffer appears to be JPEG already, returning as-is`);
-      return webpBuffer;
-    }
-    
-    // Last resort: Generate placeholder
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] All conversion strategies failed, generating placeholder`);
-    return generatePlaceholderImage('Image Conversion Failed');
+      // Last resort: Generate placeholder
+      if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [IMAGE-CONVERT] All conversion strategies failed, generating placeholder`);
+      return generatePlaceholderImage('Image Conversion Failed');
+    });
     
   } catch (error) {
     if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [IMAGE-CONVERT] Critical error in conversion:`, error.message);

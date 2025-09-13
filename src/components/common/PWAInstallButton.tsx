@@ -22,14 +22,18 @@ const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ className = '', for
       return;
     }
 
-    // Always show button for PWA-capable browsers
-    setShowInstallButton(true);
+    // Only show button when install prompt is available or on mobile browsers
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobile) {
+      setShowInstallButton(true);
+    }
 
     // Listen for beforeinstallprompt event
     const handleBeforeInstallPrompt = (e: Event) => {
       console.log('PWA: Browser install prompt available');
       e.preventDefault();
       setDeferredPrompt(e);
+      setShowInstallButton(true); // Show button when prompt becomes available
     };
 
     // Listen for app installed event
@@ -54,8 +58,13 @@ const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ className = '', for
       // First try the deferred prompt from browser
       if (deferredPrompt) {
         console.log('PWA: Using browser install prompt');
-        deferredPrompt.prompt();
+        
+        // Call prompt() to show the install banner
+        const promptResult = await deferredPrompt.prompt();
+        console.log('PWA: Prompt result:', promptResult);
+        
         const { outcome } = await deferredPrompt.userChoice;
+        console.log('PWA: User choice outcome:', outcome);
         
         if (outcome === 'accepted') {
           console.log('PWA: User accepted the install prompt');

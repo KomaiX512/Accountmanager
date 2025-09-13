@@ -1,0 +1,78 @@
+/* 🚀 CRITICAL CSS - ABOVE THE FOLD PERFORMANCE OPTIMIZATION */
+/* Load this inline in HTML to prevent render blocking */
+
+/* Essential reset and base styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-display: swap;
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+  color: #ffffff;
+  overflow-x: hidden;
+}
+
+/* Critical loading states to prevent layout shift */
+.loading-placeholder {
+  background: linear-gradient(90deg, #2a2a3e 25%, #3a3a4e 50%, #2a2a3e 75%);
+  background-size: 200% 100%;
+  animation: loading-shimmer 2s infinite;
+  border-radius: 8px;
+}
+
+@keyframes loading-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Critical navigation layout */
+.top-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: rgba(26, 26, 46, 0.95);
+  backdrop-filter: blur(10px);
+  z-index: 1000;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Critical dashboard layout to prevent CLS */
+.platform-dashboard {
+  min-height: 100vh;
+  padding-top: 60px;
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr;
+}
+
+/* Critical button styles */
+.btn-primary {
+  background: linear-gradient(135deg, #00ff88 0%, #00ccff 100%);
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  color: #000;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+/* Critical responsive breakpoints */
+@media (min-width: 768px) {
+  .platform-dashboard {
+    grid-template-columns: 250px 1fr;
+  }
+}
+
+/* Font preload optimization */
+@font-face {
+  font-family: 'system-ui';
+  src: local('system-ui'), local('-apple-system'), local('BlinkMacSystemFont');
+  font-display: swap;
+}

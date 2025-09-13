@@ -390,7 +390,6 @@ const BillionDollarSEO: React.FC<BillionDollarSEOProps> = ({
       <meta name="twitter:data2" content="50,000+ Businesses" />
       
       {/* Core Web Vitals Optimization Hints */}
-      <link rel="preload" href="https://sentientm.com/critical.css" as="style" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       <link rel="dns-prefetch" href="//api.sentientm.com" />
       

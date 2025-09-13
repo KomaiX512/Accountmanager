@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
@@ -23,12 +23,12 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { currentUser, checkLoadingStateForPlatform } = useAuth();
-  const [isChecking, setIsChecking] = useState(false); // Changed to false for background mode
+  // Removed unused isChecking state for background mode
   const inFlightRef = useRef(false);
   const lastRedirectRef = useRef<string | null>(null);
   const backgroundCheckRef = useRef<NodeJS.Timeout | null>(null);
   const lastValidationRef = useRef<number>(0);
-  const validationCooldownRef = useRef<number>(5000); // 5 second cooldown between validations
+  const validationCooldownRef = useRef<number>(10000); // 10 second cooldown between validations
 
   // Platform route mappings
   const platformRoutes: Record<string, string> = {

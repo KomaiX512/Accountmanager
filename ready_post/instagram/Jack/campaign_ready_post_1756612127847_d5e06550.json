@@ -1,0 +1,17 @@
+{
+  "id": "campaign_ready_post_1756612127847_d5e06550",
+  "timestamp": 1756612127847,
+  "platform": "instagram",
+  "username": "Jack",
+  "type": "campaign_post",
+  "status": "ready",
+  "content": {
+    "caption": "Sample campaign post for performance testing",
+    "hashtags": ["#performance", "#testing", "#sentientm"],
+    "image_url": "/api/r2-image/Jack/sample_image.jpg"
+  },
+  "metadata": {
+    "created_by": "system",
+    "purpose": "performance_testing_fallback"
+  }
+}

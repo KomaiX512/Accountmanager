@@ -387,6 +387,45 @@ body:has(.canvas-editor-overlay) {
   scrollbar-color: rgba(0, 255, 204, 0.6) rgba(45, 45, 66, 0.3) !important;
 }
 
+/* Ensure left toolbar buttons have visible boundaries and clear states */
+.tui-image-editor-container .tui-image-editor-menu .tui-image-editor-item {
+  width: 40px !important;
+  height: 40px !important;
+  border: 2px solid rgba(255, 255, 255, 0.25) !important;
+  border-radius: 8px !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #e0e0ff !important;
+}
+
+.tui-image-editor-container .tui-image-editor-menu .tui-image-editor-item:hover {
+  border-color: rgba(0, 255, 204, 0.6) !important;
+  box-shadow: 0 0 0 2px rgba(0, 255, 204, 0.15) inset !important;
+}
+
+.tui-image-editor-container .tui-image-editor-menu .tui-image-editor-item.active,
+.tui-image-editor-container .tui-image-editor-menu .tui-image-editor-item:focus,
+.tui-image-editor-container .tui-image-editor-menu .tui-image-editor-item:focus-visible {
+  border-color: rgba(0, 255, 204, 0.9) !important;
+  outline: none !important;
+}
+
+/* Show text labels using available attributes so users can see which tool it is */
+.tui-image-editor-container .tui-image-editor-menu .tui-image-editor-item::after {
+  content: attr(data-tooltip);
+  display: block !important;
+  margin-top: 6px !important;
+  font-size: 10px !important;
+  color: #cfd8ff !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+}
+.tui-image-editor-container .tui-image-editor-menu .tui-image-editor-item[aria-label]::after {
+  content: attr(aria-label);
+}
+
 /* Webkit scrollbar for left menu */
 .tui-image-editor-container .tui-image-editor-menu::-webkit-scrollbar {
   width: 4px !important;
@@ -638,11 +677,13 @@ body:has(.canvas-editor-overlay) {
   justify-content: center !important;
   cursor: pointer !important;
   transition: all 0.2s ease !important;
+  border: 2px solid rgba(255, 255, 255, 0.25) !important;
 }
 
 .tui-image-editor-container .tui-image-editor-right-toolbar .tui-image-editor-item:hover {
   background: rgba(255, 165, 0, 0.2) !important;
   transform: scale(1.05) !important;
+  border-color: rgba(255, 165, 0, 0.8) !important;
 }
 
 .tui-image-editor-container .tui-image-editor-right-toolbar .tui-image-editor-item.active {

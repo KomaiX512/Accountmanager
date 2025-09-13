@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import CacheManager from '../utils/cacheManager';
 
@@ -14,10 +14,23 @@ const useR2Fetch = <T>(url: string, expectedPlatform?: string, section?: string)
     loading: true,
     error: null,
   });
+  // Track active request to avoid race conditions
+  const requestIdRef = useRef(0);
+  // Abort controller to cancel in-flight requests on URL change
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
-      setState({ data: null, loading: true, error: null });
+      // Stale-while-revalidate: keep previous data to avoid UI flicker
+      setState(prev => ({ data: prev.data, loading: true, error: null }));
+      
+      // Cancel any in-flight request for previous URL
+      if (abortRef.current) {
+        try { abortRef.current.abort(); } catch {}
+      }
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const currentRequestId = ++requestIdRef.current;
       
       // ✅ BULLETPROOF FIX: Only validate platform if explicitly different, not just missing
       if (expectedPlatform && url) {
@@ -75,15 +88,21 @@ const useR2Fetch = <T>(url: string, expectedPlatform?: string, section?: string)
           finalUrl = CacheManager.appendBypassParam(url, expectedPlatform, accountHolder, section);
         }
         
-        const response = await axios.get(finalUrl);
+        const response = await axios.get(finalUrl, { signal: controller.signal });
+        // Ignore late responses from outdated requests
+        if (currentRequestId !== requestIdRef.current) return;
         setState({ data: response.data, loading: false, error: null });
       } catch (error: any) {
+        if (axios.isCancel?.(error) || error?.name === 'CanceledError' || error?.name === 'AbortError') {
+          // Swallow abort errors; a new request is in-flight
+          return;
+        }
         console.error(`Error fetching from ${url}:`, error);
-        setState({
-          data: null,
+        setState(prev => ({
+          data: prev.data, // Preserve last good data to avoid flicker
           loading: false,
-          error: error.response?.data?.error || 'Failed to fetch data',
-        });
+          error: error?.response?.data?.error || 'Failed to fetch data',
+        }));
       }
     };
 
@@ -92,6 +111,12 @@ const useR2Fetch = <T>(url: string, expectedPlatform?: string, section?: string)
     } else {
       setState({ data: null, loading: false, error: 'No URL provided' });
     }
+    // Cleanup: abort on unmount or dependency change
+    return () => {
+      if (abortRef.current) {
+        try { abortRef.current.abort(); } catch {}
+      }
+    };
   }, [url, expectedPlatform, section]);
 
   return state;

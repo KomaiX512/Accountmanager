@@ -50,6 +50,7 @@ interface PlatformData {
   supportsImages?: boolean;
   supportsVideo?: boolean;
   loadingState?: PlatformLoadingState;
+  comingSoon?: boolean; // Platform is coming soon
 }
 
 // Content data structure for instant posts
@@ -108,6 +109,12 @@ const MainDashboard: React.FC = () => {
   const [showMetaAdsModal, setShowMetaAdsModal] = useState<boolean>(false);
   const [isMetaAdsWishlisted, setIsMetaAdsWishlisted] = useState<boolean>(false);
   const [showMetaAdsWishlistConfirmation, setShowMetaAdsWishlistConfirmation] = useState<boolean>(false);
+  
+  // New platforms coming soon states
+  const [showComingSoonModal, setShowComingSoonModal] = useState<boolean>(false);
+  const [currentComingSoonPlatform, setCurrentComingSoonPlatform] = useState<string>('');
+  const [isPlatformWishlisted, setIsPlatformWishlisted] = useState<boolean>(false);
+  const [showPlatformWishlistConfirmation, setShowPlatformWishlistConfirmation] = useState<boolean>(false);
   
   // Real-time notification counts
   const [realTimeNotifications, setRealTimeNotifications] = useState<Record<string, number>>({
@@ -946,6 +953,28 @@ const MainDashboard: React.FC = () => {
   const getPlatformAccessStatus = useCallback((platformId: string): boolean => {
     if (!currentUser?.uid) return false;
     
+    // 🛡️ RESET SENTINEL: If a recent reset occurred, suppress acquired status briefly
+    try {
+      const sentinelKey = `${platformId}_reset_pending_${currentUser.uid}`;
+      const resetTsRaw = localStorage.getItem(sentinelKey);
+      if (resetTsRaw) {
+        const resetTs = parseInt(resetTsRaw, 10);
+        const TTL_MS = 15000; // 15s suppression window
+        if (Number.isFinite(resetTs)) {
+          const age = Date.now() - resetTs;
+          if (age < TTL_MS) {
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`[MainDashboard] 🛡️ RESET SENTINEL: Suppressing '${platformId}' acquired state for ${(TTL_MS - age)}ms`);
+            }
+            return false;
+          } else {
+            // Clear expired sentinel
+            localStorage.removeItem(sentinelKey);
+          }
+        }
+      }
+    } catch {}
+    
     // ✅ PRIMARY SOURCE: Check localStorage for immediate response
     const accessedFromStorage = localStorage.getItem(`${platformId}_accessed_${currentUser.uid}`) === 'true';
     
@@ -1580,6 +1609,175 @@ const MainDashboard: React.FC = () => {
       characterLimit: 3000,
       supportsImages: true,
       supportsVideo: true
+    },
+    // Coming Soon Platforms
+    {
+      id: 'youtube',
+      name: 'YouTube',
+      icon: '/icons/youtube.svg',
+      claimed: false, // Coming soon platforms are always false
+      connected: false,
+      notifications: {
+        total: 0,
+        breakdown: {
+          cs_analysis: 0,
+          our_strategies: 0,
+          dms_comments: 0,
+          cooked_posts: 0
+        }
+      },
+      route: 'youtube-dashboard',
+      characterLimit: 5000,
+      supportsImages: true,
+      supportsVideo: true,
+      comingSoon: true
+    },
+    {
+      id: 'pinterest',
+      name: 'Pinterest',
+      icon: '/icons/pinterest.svg',
+      claimed: false,
+      connected: false,
+      notifications: {
+        total: 0,
+        breakdown: {
+          cs_analysis: 0,
+          our_strategies: 0,
+          dms_comments: 0,
+          cooked_posts: 0
+        }
+      },
+      route: 'pinterest-dashboard',
+      characterLimit: 500,
+      supportsImages: true,
+      supportsVideo: false,
+      comingSoon: true
+    },
+    {
+      id: 'tiktok',
+      name: 'TikTok',
+      icon: '/icons/tiktok.svg',
+      claimed: false,
+      connected: false,
+      notifications: {
+        total: 0,
+        breakdown: {
+          cs_analysis: 0,
+          our_strategies: 0,
+          dms_comments: 0,
+          cooked_posts: 0
+        }
+      },
+      route: 'tiktok-dashboard',
+      characterLimit: 300,
+      supportsImages: false,
+      supportsVideo: true,
+      comingSoon: true
+    },
+    {
+      id: 'snapchat',
+      name: 'Snapchat',
+      icon: '/icons/snapchat.svg',
+      claimed: false,
+      connected: false,
+      notifications: {
+        total: 0,
+        breakdown: {
+          cs_analysis: 0,
+          our_strategies: 0,
+          dms_comments: 0,
+          cooked_posts: 0
+        }
+      },
+      route: 'snapchat-dashboard',
+      characterLimit: 250,
+      supportsImages: true,
+      supportsVideo: true,
+      comingSoon: true
+    },
+    {
+      id: 'discord',
+      name: 'Discord',
+      icon: '/icons/discord.svg',
+      claimed: false,
+      connected: false,
+      notifications: {
+        total: 0,
+        breakdown: {
+          cs_analysis: 0,
+          our_strategies: 0,
+          dms_comments: 0,
+          cooked_posts: 0
+        }
+      },
+      route: 'discord-dashboard',
+      characterLimit: 2000,
+      supportsImages: true,
+      supportsVideo: false,
+      comingSoon: true
+    },
+    {
+      id: 'reddit',
+      name: 'Reddit',
+      icon: '/icons/reddit.svg',
+      claimed: false,
+      connected: false,
+      notifications: {
+        total: 0,
+        breakdown: {
+          cs_analysis: 0,
+          our_strategies: 0,
+          dms_comments: 0,
+          cooked_posts: 0
+        }
+      },
+      route: 'reddit-dashboard',
+      characterLimit: 10000,
+      supportsImages: true,
+      supportsVideo: true,
+      comingSoon: true
+    },
+    {
+      id: 'whatsapp',
+      name: 'WhatsApp',
+      icon: '/icons/whatsapp.svg',
+      claimed: false,
+      connected: false,
+      notifications: {
+        total: 0,
+        breakdown: {
+          cs_analysis: 0,
+          our_strategies: 0,
+          dms_comments: 0,
+          cooked_posts: 0
+        }
+      },
+      route: 'whatsapp-dashboard',
+      characterLimit: 4096,
+      supportsImages: true,
+      supportsVideo: true,
+      comingSoon: true
+    },
+    {
+      id: 'threads',
+      name: 'Threads',
+      icon: '/icons/threads.svg',
+      claimed: false,
+      connected: false,
+      notifications: {
+        total: 0,
+        breakdown: {
+          cs_analysis: 0,
+          our_strategies: 0,
+          dms_comments: 0,
+          cooked_posts: 0
+        }
+      },
+      route: 'threads-dashboard',
+      characterLimit: 500,
+      supportsImages: true,
+      supportsVideo: true,
+      comingSoon: true
     }
   ]);
 
@@ -2066,6 +2264,13 @@ const MainDashboard: React.FC = () => {
   }, [currentUser?.uid]);
 
   const navigateToPlatform = (platform: PlatformData) => {
+    // Check if platform is coming soon
+    if (platform.comingSoon) {
+      setCurrentComingSoonPlatform(platform.id);
+      setShowComingSoonModal(true);
+      return;
+    }
+    
     const remainingMs = getProcessingRemainingMs(platform.id);
     
     // ✅ CRITICAL SAFETY CHECK: Ensure platform is actually claimed
@@ -2125,6 +2330,14 @@ const MainDashboard: React.FC = () => {
   };
 
   const navigateToSetup = (platformId: string) => {
+    // Check if platform is coming soon
+    const platform = platforms.find(p => p.id === platformId);
+    if (platform?.comingSoon) {
+      setCurrentComingSoonPlatform(platformId);
+      setShowComingSoonModal(true);
+      return;
+    }
+    
     // ✅ CRITICAL FIX: Check if platform is currently in loading state BEFORE navigating to setup
     if (isPlatformLoading(platformId)) {
       const remainingMs = getProcessingRemainingMs(platformId);
@@ -2416,7 +2629,7 @@ const MainDashboard: React.FC = () => {
       ...prev,
       [platformId]: new Set() // Reset viewed content when clicking notification
     }));
-    
+
     // Navigate to platform
     const platform = platforms.find(p => p.id === platformId);
     if (platform?.claimed) {
@@ -2424,6 +2637,22 @@ const MainDashboard: React.FC = () => {
     } else {
       navigateToSetup(platformId);
     }
+  };
+
+  // Handle coming soon platform wishlist
+  const handlePlatformWishlist = () => {
+    setIsPlatformWishlisted(true);
+    setShowPlatformWishlistConfirmation(true);
+    
+    // Store wishlist preference in localStorage
+    if (currentUser?.uid) {
+      localStorage.setItem(`platform_wishlist_${currentComingSoonPlatform}_${currentUser.uid}`, 'true');
+    }
+    
+    // Auto-hide confirmation after 3 seconds
+    setTimeout(() => {
+      setShowPlatformWishlistConfirmation(false);
+    }, 3000);
   };
 
 
@@ -2475,50 +2704,53 @@ const MainDashboard: React.FC = () => {
 
                 {activeTab === 'overview' && (
           <div className="dashboard-content-grid">
-            {/* Meta Ads Coming Soon Section */}
-            <div className="meta-ads-section">
-              <button 
-                className="meta-ads-button"
-                onClick={() => setShowMetaAdsModal(true)}
-                title="Run Meta Ads campaigns with AI"
-              >
-                <div className="meta-ads-icon">
-                  <svg viewBox="0 0 24 24">
-                    <path d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4M12,6A6,6 0 0,1 18,12A6,6 0 0,1 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6M12,8A4,4 0 0,0 8,12A4,4 0 0,0 12,16A4,4 0 0,0 16,12A4,4 0 0,0 12,8Z" />
-                  </svg>
+            {/* Ad Campaign Section */}
+            <div className="ad-campaign-section">
+              <div className="section-header">
+                <h3>Run Ads Campaign with few clicks</h3>
+              </div>
+              <div className="ads-platforms-container">
+                <div className="ads-platform-item">
+                  <div className="platform-icon">
+                    <i className="fab fa-meta"></i>
+                  </div>
+                  <div className="coming-soon-tag">Coming Soon</div>
                 </div>
-                <div className="meta-ads-text">
-                  <h3>Run Meta Ads</h3>
-                  <p>Launch AI-powered ad campaigns with just a few clicks</p>
+                <div className="ads-platform-item">
+                  <div className="platform-icon">
+                    <i className="fab fa-twitter"></i>
+                  </div>
+                  <div className="coming-soon-tag">Coming Soon</div>
                 </div>
-                <div className="meta-ads-status">
-                  <span>Coming Soon</span>
+                <div className="ads-platform-item">
+                  <div className="platform-icon">
+                    <i className="fab fa-tiktok"></i>
+                  </div>
+                  <div className="coming-soon-tag">Coming Soon</div>
                 </div>
-              </button>
+              </div>
             </div>
-            
-            {/* Action Buttons Section - Premium Layout */}
-            <div className="instant-post-section">
-              <button 
-                className="instant-post-button"
-                onClick={openInstantPostModal}
-                title="Create a post for your platforms"
-              >
+
+            {/* Instant Post Section */}
+            <div className="instant-post-section" onClick={openInstantPostModal}>
+              <div className="section-header">
+                <h3>Post Across All Acquired platform with one click</h3>
+              </div>
+              <div className="instant-post-container">
                 <div className="instant-post-icon">
                   <svg viewBox="0 0 24 24">
                     <path d="M3,20V4A1,1 0 0,1 4,3H20A1,1 0 0,1 21,4V20A1,1 0 0,1 20,21H4A1,1 0 0,1 3,20M5,19H19V5H5V19M7.5,17L9.5,14L11.5,16.5L14.5,12.5L18.5,17H7.5Z" />
                   </svg>
                 </div>
-                <div className="instant-post-text">
-                  <h3>Instant Post</h3>
-                  <p>Create one post for all your acquired and connected platforms</p>
+                <div className="instant-post-content">
+                  <div className="instant-post-label">Instant Post</div>
+                  {connectedPlatforms.length > 0 && (
+                    <div className="connected-platforms-count">
+                      <span>{connectedPlatforms.length} ready</span>
+                    </div>
+                  )}
                 </div>
-                {connectedPlatforms.length > 0 && (
-                  <div className="connected-platforms-count">
-                    <span>{connectedPlatforms.length} ready</span>
-                  </div>
-                )}
-              </button>
+              </div>
             </div>
               
             {/* Platform Cards Grid - Perfect Square Layout */}
@@ -2596,7 +2828,7 @@ const MainDashboard: React.FC = () => {
                       
                       <div 
                         className={`connection-indicator ${
-                          platform.id === 'linkedin' && !platform.connected 
+                          platform.comingSoon || (platform.id === 'linkedin' && !platform.connected)
                             ? 'coming-soon' 
                             : platform.claimed 
                               ? (platform.connected ? 'connected' : 'disconnected')
@@ -2620,12 +2852,19 @@ const MainDashboard: React.FC = () => {
                             return; // Exit early - don't proceed to connection action
                           }
                           
+                          // Handle coming soon platforms
+                          if (platform.comingSoon) {
+                            setCurrentComingSoonPlatform(platform.id);
+                            setShowComingSoonModal(true);
+                            return;
+                          }
+                          
                           // Normal connection logic
                           platform.claimed && !platform.connected && platform.id !== 'linkedin' && handleConnectionButtonClick(platform);
                         }}
-                        style={{ cursor: platform.claimed && !platform.connected && platform.id !== 'linkedin' ? 'pointer' : 'default' }}
+                        style={{ cursor: (platform.comingSoon || (platform.claimed && !platform.connected && platform.id !== 'linkedin')) ? 'pointer' : 'default' }}
                       >
-                        {platform.id === 'linkedin' && !platform.connected 
+                        {platform.comingSoon || (platform.id === 'linkedin' && !platform.connected)
                           ? 'Coming Soon' 
                           : !platform.claimed 
                             ? 'Not Applicable'
@@ -2654,6 +2893,13 @@ const MainDashboard: React.FC = () => {
                             }
                           }, 6);
                           return; // Exit early - don't proceed to notification action
+                        }
+                        
+                        // Handle coming soon platforms
+                        if (platform.comingSoon) {
+                          setCurrentComingSoonPlatform(platform.id);
+                          setShowComingSoonModal(true);
+                          return;
                         }
                         
                         // Normal notification logic
@@ -3090,6 +3336,78 @@ const MainDashboard: React.FC = () => {
           </div>
         </div>,
         document.body
+      )}
+      
+      {/* Coming Soon Platform Modal */}
+      {showComingSoonModal && (
+        <div className="coming-soon-modal">
+          <div className="coming-soon-content">
+            <div className="coming-soon-header">
+              <h3>{platforms.find(p => p.id === currentComingSoonPlatform)?.name} Integration</h3>
+              <button 
+                className="coming-soon-close-btn"
+                onClick={() => setShowComingSoonModal(false)}
+              >
+                <svg viewBox="0 0 24 24">
+                  <path d="M18.3 5.71a1 1 0 0 0-1.42 0L12 10.59 7.11 5.7A1 1 0 0 0 5.7 7.11L10.59 12 5.7 16.89a1 1 0 1 0 1.41 1.41L12 13.41l4.89 4.89a1 1 0 0 0 1.41-1.41L13.41 12l4.89-4.89a1 1 0 0 0 0-1.4z"/>
+                </svg>
+              </button>
+            </div>
+            
+            <div className="coming-soon-icon">
+              <img 
+                src={platforms.find(p => p.id === currentComingSoonPlatform)?.icon} 
+                alt={`${platforms.find(p => p.id === currentComingSoonPlatform)?.name} icon`}
+              />
+            </div>
+            
+            <h4>Coming Soon</h4>
+            <p>
+              Thank you so much for waiting! The {platforms.find(p => p.id === currentComingSoonPlatform)?.name} integration 
+              will be available soon. We're working hard to bring you the most comprehensive social media management experience.
+            </p>
+            
+            <div className="coming-soon-features">
+              <h5>What to expect:</h5>
+              <ul>
+                <li>AI-powered content creation</li>
+                <li>Automated posting and scheduling</li>
+                <li>Analytics and insights</li>
+                <li>Cross-platform management</li>
+              </ul>
+            </div>
+            
+            <div className="coming-soon-actions">
+              <button 
+                className="wishlist-button"
+                onClick={handlePlatformWishlist}
+                disabled={isPlatformWishlisted}
+              >
+                {isPlatformWishlisted ? 'Added to Wishlist!' : 'Add to Wishlist'}
+              </button>
+              <button 
+                className="close-button"
+                onClick={() => setShowComingSoonModal(false)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Platform Wishlist Confirmation */}
+      {showPlatformWishlistConfirmation && (
+        <div className="wishlist-confirmation">
+          <div className="wishlist-confirmation-content">
+            <div className="wishlist-confirmation-icon">
+              <svg viewBox="0 0 24 24" fill="#4CAF50">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+              </svg>
+            </div>
+            <p>Great! We'll notify you when {platforms.find(p => p.id === currentComingSoonPlatform)?.name} becomes available.</p>
+          </div>
+        </div>
       )}
       
       {/* Privacy Policy Footer */}

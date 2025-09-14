@@ -4,7 +4,7 @@ module.exports = {
   apps: [
     {
       name: 'main-api-unified',
-      script: 'server.js',
+      script: 'server/server.js',
       instances: 1,  // UNIFIED: Single instance
       exec_mode: 'fork',  // Fork mode for better stability
       cwd: __dirname,
@@ -16,11 +16,15 @@ module.exports = {
       min_uptime: '10s',    // Minimum uptime before considering stable
       env: {
         NODE_ENV: 'production',
-        MAIN_SERVER_PORT: 3000
+        PORT: 3000,
+        MAIN_SERVER_PORT: 3000,
+        SERVER_TYPE: 'main'
       },
       env_production: {
         NODE_ENV: 'production',
-        MAIN_SERVER_PORT: 3000
+        PORT: 3000,
+        MAIN_SERVER_PORT: 3000,
+        SERVER_TYPE: 'main'
       },
       out_file: './logs/main-api.out.log',
       error_file: './logs/main-api.err.log',
@@ -41,11 +45,15 @@ module.exports = {
       min_uptime: '10s',
       env: {
         NODE_ENV: 'production',
-        RAG_SERVER_PORT: 3001
+        PORT: 3001,
+        RAG_SERVER_PORT: 3001,
+        SERVER_TYPE: 'rag'
       },
       env_production: {
         NODE_ENV: 'production',
-        RAG_SERVER_PORT: 3001
+        PORT: 3001,
+        RAG_SERVER_PORT: 3001,
+        SERVER_TYPE: 'rag'
       },
       out_file: './logs/rag-server.out.log',
       error_file: './logs/rag-server.err.log',
@@ -66,11 +74,15 @@ module.exports = {
       min_uptime: '10s',
       env: {
         NODE_ENV: 'production',
-        PROXY_SERVER_PORT: 3002
+        PORT: 3002,
+        PROXY_SERVER_PORT: 3002,
+        SERVER_TYPE: 'proxy'
       },
       env_production: {
         NODE_ENV: 'production',
-        PROXY_SERVER_PORT: 3002
+        PORT: 3002,
+        PROXY_SERVER_PORT: 3002,
+        SERVER_TYPE: 'proxy'
       },
       out_file: './logs/proxy-server.out.log',
       error_file: './logs/proxy-server.err.log',

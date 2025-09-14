@@ -4493,7 +4493,11 @@ app.get(['/posts/:username', '/api/posts/:username'], async (req, res) => {
     
     // First, collect all files
     const jsonFiles = files.filter(file => file.Key.endsWith('.json'));
-    const imageFiles = files.filter(file => file.Key.endsWith('.jpg') || file.Key.endsWith('.png'));
+    // Include all common image extensions and make the match case-insensitive to avoid slow HEAD fallbacks on non-Instagram platforms
+    const imageFiles = files.filter(file => {
+      const key = (file.Key || '').toLowerCase();
+      return key.endsWith('.jpg') || key.endsWith('.jpeg') || key.endsWith('.png') || key.endsWith('.webp');
+    });
     
     console.log(`[${new Date().toISOString()}] Found ${jsonFiles.length} JSON files and ${imageFiles.length} image files in ${prefix}/ for ${platform}`);
     

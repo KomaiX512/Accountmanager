@@ -23,7 +23,7 @@ NC='\033[0m' # No Color
 # Configuration
 DEPLOY_DIR="/var/www/sentientm/Accountmanager"
 SOURCE_DIR="$(pwd)"
-NGINX_CONFIG_SOURCE="./VPS.conf"
+NGINX_CONFIG_SOURCE="./VPS-clean.conf"
 NGINX_CONFIG_TARGET="/etc/nginx/sites-available/sentientm.com"
 NGINX_ENABLED_LINK="/etc/nginx/sites-enabled/sentientm.com"
 LOG_DIR="./logs"
@@ -169,17 +169,10 @@ if [ -f "$NGINX_CONFIG_SOURCE" ]; then
         print_status "Backed up existing Nginx config"
     fi
     
-    # Clean the config file to remove any "sudo" directives or invalid syntax
-    print_info "Cleaning Nginx configuration..."
-    sed -e '/^[[:space:]]*sudo/d' \
-        -e '/^[[:space:]]*#.*sudo/d' \
-        -e 's/sudo //g' \
-        "$NGINX_CONFIG_SOURCE" > "${NGINX_CONFIG_SOURCE}.clean"
-    
-    # Copy cleaned config
-    cp "${NGINX_CONFIG_SOURCE}.clean" "$NGINX_CONFIG_TARGET"
-    rm -f "${NGINX_CONFIG_SOURCE}.clean"
-    print_status "Updated Nginx configuration"
+    # Copy VPS.conf directly without any processing
+    print_info "Using VPS.conf directly without modifications..."
+    cp "$NGINX_CONFIG_SOURCE" "$NGINX_CONFIG_TARGET"
+    print_status "Updated Nginx configuration from VPS.conf"
     
     # Enable site if not already enabled
     if [ ! -L "$NGINX_ENABLED_LINK" ]; then
@@ -195,23 +188,10 @@ if [ -f "$NGINX_CONFIG_SOURCE" ]; then
     else
         print_error "Nginx configuration test failed:"
         cat /tmp/nginx_test.log
-        print_warning "Attempting to fix common issues..."
-        
-        # Try to fix common syntax issues
-        sed -i -e 's/proxy_set_header[[:space:]]*$/proxy_set_header Host $host;/' \
-               -e '/^[[:space:]]*$/d' \
-               -e '/^[[:space:]]*#/d' \
-               "$NGINX_CONFIG_TARGET"
-        
-        # Test again
-        if nginx -t; then
-            systemctl reload nginx
-            print_status "Nginx configuration fixed and reloaded"
-        else
-            print_error "Failed to fix Nginx configuration. Manual intervention required."
-            print_info "Check the configuration at: $NGINX_CONFIG_TARGET"
-            exit 1
-        fi
+        print_error "VPS.conf contains syntax errors. Please check the file manually."
+        print_info "Configuration file: $NGINX_CONFIG_TARGET"
+        print_info "Source file: $NGINX_CONFIG_SOURCE"
+        exit 1
     fi
 else
     print_warning "Nginx config source not found: $NGINX_CONFIG_SOURCE"

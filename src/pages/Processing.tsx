@@ -771,6 +771,31 @@ const Processing: React.FC = () => {
       localStorage.removeItem(accessedKey);
       console.log(`🔥 EXIT: Cleared platform access status: ${accessedKey}`);
       
+      // ✅ Also remove this platform from consolidated acquired lists (LS + SS)
+      try {
+        const consolidatedKey = `acquired_platforms_${currentUser.uid}`;
+        const lsRaw = localStorage.getItem(consolidatedKey);
+        if (lsRaw) {
+          const list = Array.isArray(JSON.parse(lsRaw)) ? JSON.parse(lsRaw).filter((p: string) => p !== targetPlatform) : [];
+          localStorage.setItem(consolidatedKey, JSON.stringify(list));
+          console.log(`🔥 EXIT: Updated localStorage consolidated list:`, list);
+        }
+        const ssRaw = sessionStorage.getItem(consolidatedKey);
+        if (ssRaw) {
+          const list = Array.isArray(JSON.parse(ssRaw)) ? JSON.parse(ssRaw).filter((p: string) => p !== targetPlatform) : [];
+          sessionStorage.setItem(consolidatedKey, JSON.stringify(list));
+          console.log(`🔥 EXIT: Updated sessionStorage consolidated list:`, list);
+        }
+      } catch (e) {
+        console.warn(`🔥 EXIT: Failed updating consolidated acquired list:`, e);
+      }
+
+      // ✅ Set a short-lived reset sentinel so MainDashboard suppresses acquired state during backend propagation
+      try {
+        localStorage.setItem(`${targetPlatform}_reset_pending_${currentUser.uid}`, Date.now().toString());
+        console.log(`🔥 EXIT: Set reset sentinel: ${targetPlatform}_reset_pending_${currentUser.uid}`);
+      } catch {}
+
       // Clear any platform-specific username/account data
       const allKeys = Object.keys(localStorage);
       const platformLower = targetPlatform.toLowerCase();

@@ -1,5 +1,4 @@
-import { ChromaClient } from 'chromadb';
-import { OpenAIEmbeddings } from '@langchain/openai';
+import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 
@@ -78,78 +77,94 @@ class ChromaDBService {
 
   async initialize() {
     try {
-      // Determine ChromaDB endpoint (prioritize port 8000 where ChromaDB is running)
-      const chromaPath =
-        // Highest-priority: explicit full URL
-        process.env.CHROMADB_URL ||
-        // Host + Port combination
-        (process.env.CHROMA_DB_HOST && process.env.CHROMA_DB_PORT
-          ? `http://${process.env.CHROMA_DB_HOST}:${process.env.CHROMA_DB_PORT}`
-          : null) ||
-        // Only custom port (assume localhost)
-        (process.env.CHROMA_DB_PORT || process.env.CHROMA_DB_PORT_HOST
-          ? `http://localhost:${process.env.CHROMA_DB_PORT || process.env.CHROMA_DB_PORT_HOST}`
-          : null) ||
-        // Fallback to default
-        'http://localhost:8000';
-
-      const candidatePaths = [];
-      // 1) Always try port 8000 first (where ChromaDB is actually running)
-      candidatePaths.push('http://localhost:8000');
+      // Use environment variable or default to port 8000 (force IPv4)
+      this.baseURL = process.env.CHROMADB_URL || 'http://127.0.0.1:8000';
       
-      // 2) Add provided path if different from default
-      if (chromaPath && chromaPath !== 'http://localhost:8000') {
-        candidatePaths.push(chromaPath);
-      }
-
-      // 3) Only scan alternative ports if default fails
-      const defaultHost = 'http://localhost';
-      for (let p = 8001; p <= 8010; p++) {
-        const alt = `${defaultHost}:${p}`;
-        if (!candidatePaths.includes(alt)) candidatePaths.push(alt);
-      }
-
-      // Helper to test a given path
-      const testPath = async (pathToTest) => {
-        try {
-          const testClient = new ChromaClient({ path: pathToTest });
-          // Prefer version call but fallback to heartbeat
-          try {
-            await testClient.version();
-          } catch (_) {
-            await testClient.heartbeat();
-          }
-          // If succeeded, set as active client
-          this.client = testClient;
-          console.log(`[ChromaDB] Connected to ChromaDB at ${pathToTest}`);
-          return true;
-        } catch (err) {
-          return false;
-        }
-      };
-
-      let connected = false;
-      for (const pathToTry of candidatePaths) {
-        console.log(`[ChromaDB] Attempting to connect at ${pathToTry} ...`);
-         
-        if (await testPath(pathToTry)) {
-          connected = true;
-          break;
-        }
-      }
-
-      if (!connected) {
-        throw new Error('All connection attempts failed');
-      }
-
+      console.log(`[ChromaDB] Connecting to ChromaDB at ${this.baseURL}...`);
+      
+      // Test connection with direct HTTP request
+      const response = await axios.get(`${this.baseURL}/api/v2/version`, { timeout: 5000 });
+      console.log(`[ChromaDB] Version check successful - ChromaDB v${response.data}`);
+      
       this.isInitialized = true;
-      console.log('[ChromaDB] Successfully connected to ChromaDB server');
+      console.log(`[ChromaDB] Successfully connected to ChromaDB at ${this.baseURL}`);
 
       return true;
     } catch (error) {
-      console.warn('[ChromaDB] ChromaDB server not available, using in-memory fallback:', error.message);
+      console.error('[ChromaDB] Failed to connect to ChromaDB server:', error.message);
       this.isInitialized = false;
       return false;
+    }
+  }
+
+  // HTTP-based collection management methods
+  async getCollection(name) {
+    try {
+      const response = await axios.get(`${this.baseURL}/api/v2/collections/${name}`);
+      return { name, ...response.data };
+    } catch (error) {
+      throw new Error(`Collection ${name} not found`);
+    }
+  }
+
+  async createCollection(options) {
+    try {
+      const response = await axios.post(`${this.baseURL}/api/v2/collections`, {
+        name: options.name,
+        metadata: options.metadata || {}
+      });
+      return { name: options.name, ...response.data };
+    } catch (error) {
+      throw new Error(`Failed to create collection ${options.name}: ${error.message}`);
+    }
+  }
+
+  async addDocuments(collectionName, documents, metadatas, ids) {
+    try {
+      const embeddings = await Promise.all(documents.map(doc => this.generateLocalEmbedding(doc)));
+      
+      await axios.post(`${this.baseURL}/api/v2/collections/${collectionName}/add`, {
+        documents,
+        metadatas,
+        ids,
+        embeddings
+      });
+      return true;
+    } catch (error) {
+      throw new Error(`Failed to add documents to ${collectionName}: ${error.message}`);
+    }
+  }
+
+  async queryCollection(collectionName, queryTexts, nResults = 8) {
+    try {
+      const queryEmbeddings = await Promise.all(queryTexts.map(text => this.generateLocalEmbedding(text)));
+      
+      const response = await axios.post(`${this.baseURL}/api/v2/collections/${collectionName}/query`, {
+        query_embeddings: queryEmbeddings,
+        n_results: nResults
+      });
+      
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to query collection ${collectionName}: ${error.message}`);
+    }
+  }
+
+  async getDocuments(collectionName, options = {}) {
+    try {
+      const response = await axios.post(`${this.baseURL}/api/v2/collections/${collectionName}/get`, options);
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to get documents from ${collectionName}: ${error.message}`);
+    }
+  }
+
+  async countDocuments(collectionName) {
+    try {
+      const response = await axios.get(`${this.baseURL}/api/v2/collections/${collectionName}/count`);
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to count documents in ${collectionName}: ${error.message}`);
     }
   }
 
@@ -1459,15 +1474,13 @@ Professional Network: Following industry leaders and influencers`;
       let collection;
       try {
         // First try to get existing collection
-        collection = await this.client.getCollection({
-          name: collectionName
-        });
+        collection = await this.getCollection(collectionName);
         console.log(`[ChromaDB] Using existing collection: ${collectionName}`);
       } catch (error) {
         // Collection doesn't exist, create it
         console.log(`[ChromaDB] Creating new collection: ${collectionName}`);
         try {
-          collection = await this.client.createCollection({
+          collection = await this.createCollection({
             name: collectionName,
             metadata: { platform, created: new Date().toISOString() }
           });
@@ -1530,7 +1543,7 @@ Professional Network: Following industry leaders and influencers`;
 
       // Check existing data count before adding
       try {
-        const existingCount = await collection.count();
+        const existingCount = await this.countDocuments(collectionName);
         console.log(`[ChromaDB] Collection ${collectionName} currently has ${existingCount} documents`);
       } catch (countError) {
         console.log(`[ChromaDB] Could not get existing count: ${countError.message}`);
@@ -1548,18 +1561,13 @@ Professional Network: Following industry leaders and influencers`;
       } catch (upsertError) {
         console.error(`[ChromaDB] Upsert failed, trying add: ${upsertError.message}`);
         // Fallback to add if upsert fails
-      await collection.add({
-        ids: validIds,
-        embeddings: embeddings,
-        documents: documents,
-        metadatas: cleanMetadatas
-      });
+      await this.addDocuments(collectionName, documents, cleanMetadatas, validIds);
         console.log(`[ChromaDB] Successfully added ${documents.length} documents for ${platform}/${username}`);
       }
 
       // Verify the data was stored
       try {
-        const finalCount = await collection.count();
+        const finalCount = await this.countDocuments(collectionName);
         console.log(`[ChromaDB] Collection ${collectionName} now has ${finalCount} documents`);
       } catch (countError) {
         console.log(`[ChromaDB] Could not verify final count: ${countError.message}`);
@@ -1623,13 +1631,13 @@ Professional Network: Following industry leaders and influencers`;
       let collection;
       try {
         // First try to get existing collection
-        collection = await this.client.getCollection({ name: collectionName });
+        collection = await this.getCollection(collectionName);
         console.log(`[ChromaDB] Found existing collection: ${collectionName}`);
       } catch (error) {
         // Collection doesn't exist, try to create it
         console.log(`[ChromaDB] Collection ${collectionName} not found, attempting to create...`);
         try {
-          collection = await this.client.createCollection({
+          collection = await this.createCollection({
             name: collectionName,
             metadata: { platform, created: new Date().toISOString() }
           });
@@ -1642,14 +1650,13 @@ Professional Network: Following industry leaders and influencers`;
 
       // Check if collection has any data
       try {
-        const count = await collection.count();
+        const count = await this.countDocuments(collectionName);
         if (count === 0) {
           console.log(`[ChromaDB] Collection ${collectionName} is empty, but continuing with search`);
         }
         console.log(`[ChromaDB] Collection ${collectionName} has ${count} documents`);
       } catch (countError) {
-        console.error(`[ChromaDB] Error checking collection count:`, countError.message);
-        // Continue anyway, don't fallback
+        console.log(`[ChromaDB] Could not check collection count: ${countError.message}`);
       }
 
       // Generate query embedding
@@ -1657,12 +1664,7 @@ Professional Network: Following industry leaders and influencers`;
 
       // Search with user filter
       console.log(`[ChromaDB] 🔍 DEBUG: Searching for username="${username}" in collection ${collectionName}`);
-      const results = await collection.query({
-        queryEmbeddings: [queryEmbedding],
-        nResults: limit,
-        where: { username: username },
-        include: ['documents', 'metadatas', 'distances']
-      });
+      const results = await this.queryCollection(collectionName, [query], limit);
       console.log(`[ChromaDB] 🔍 DEBUG: Found ${results.documents[0]?.length || 0} documents for username="${username}"`);
 
       // Format results
@@ -1729,10 +1731,10 @@ Professional Network: Following industry leaders and influencers`;
         // Try to get any documents for this user/platform combination
         try {
           const collectionName = `${platform}_profiles`;
-          const collection = await this.client.getCollection({ name: collectionName });
+          const collection = await this.getCollection(collectionName);
           
           // Get all documents for this user
-          const allDocs = await collection.get({
+          const allDocs = await this.getDocuments(collectionName, {
             where: { username: username }
           });
           
@@ -1942,8 +1944,8 @@ Professional Network: Following industry leaders and influencers`;
       
       let collection;
       try {
-        collection = await this.client.getCollection({ name: collectionName });
-        const count = await collection.count();
+        collection = await this.getCollection(collectionName);
+        const count = await this.countDocuments(collectionName);
         
         return {
           platform,

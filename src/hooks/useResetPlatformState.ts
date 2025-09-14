@@ -83,6 +83,25 @@ export const useResetPlatformState = () => {
     });
     
     console.log(`[ResetPlatformState] ✅ Removed ${platformKeys.length} localStorage entries`);
+
+    // Also remove this platform from the consolidated acquired list in BOTH storages
+    try {
+      const consolidatedKey = `acquired_platforms_${userId}`;
+      const lsRaw = localStorage.getItem(consolidatedKey);
+      if (lsRaw) {
+        const list = Array.isArray(JSON.parse(lsRaw)) ? JSON.parse(lsRaw).filter((p: string) => p !== platform) : [];
+        localStorage.setItem(consolidatedKey, JSON.stringify(list));
+        console.log(`[ResetPlatformState] ✅ Updated localStorage consolidated list:`, list);
+      }
+      const ssRaw = sessionStorage.getItem(consolidatedKey);
+      if (ssRaw) {
+        const list = Array.isArray(JSON.parse(ssRaw)) ? JSON.parse(ssRaw).filter((p: string) => p !== platform) : [];
+        sessionStorage.setItem(consolidatedKey, JSON.stringify(list));
+        console.log(`[ResetPlatformState] ✅ Updated sessionStorage consolidated list:`, list);
+      }
+    } catch (e) {
+      console.warn(`[ResetPlatformState] ⚠️ Failed updating consolidated acquired list:`, e);
+    }
   }, []);
 
   /**
@@ -337,6 +356,12 @@ export const useResetPlatformState = () => {
       clearPlatformSessionStorage(platform, userId);
       clearSessionManagerData(platform, userId);
 
+      // Step 1.1: Set a short-lived reset sentinel to suppress re-claim mirrors while backend settles
+      try {
+        localStorage.setItem(`${platform}_reset_pending_${userId}`, Date.now().toString());
+        console.log(`[ResetPlatformState] 🛡️ Set reset sentinel: ${platform}_reset_pending_${userId}`);
+      } catch {}
+
       // Step 2: Call backend reset API
       const backendSuccess = await performBackendReset(platform, userId);
       if (!backendSuccess) {
@@ -350,6 +375,18 @@ export const useResetPlatformState = () => {
         return false;
       }
 
+      // Step 2.2: Proactively mark claimed=false on backend so future mirrors don't re-acquire
+      try {
+        await fetch(`/api/platform-access/${userId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ platform, claimed: false })
+        });
+        console.log(`[ResetPlatformState] 📡 Backend platform-access set to claimed=false for ${platform}`);
+      } catch (err) {
+        console.warn(`[ResetPlatformState] ⚠️ Failed to set claimed=false on backend for ${platform}:`, err);
+      }
+
       // Step 3: Prevent back navigation if requested
       if (clearBrowserHistory) {
         preventBackNavigation();
@@ -360,6 +397,17 @@ export const useResetPlatformState = () => {
       // Allow a short tick to let state propagate
       await new Promise(resolve => setTimeout(resolve, 50));
       console.log(`[ResetPlatformState] 🔄 Refreshed acquired platforms - dashboard will reflect reset`);
+
+      // Step 4.1: Broadcast a platformReset event so MainDashboard updates immediately
+      try {
+        window.dispatchEvent(new CustomEvent('platformReset', {
+          detail: {
+            platform,
+            reason: 'manual_reset',
+            timestamp: Date.now()
+          }
+        }));
+      } catch {}
 
       // Step 5: Navigate to main dashboard if requested
       if (navigateToMain) {

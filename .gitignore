@@ -63,9 +63,6 @@ Desktop.ini
 # Debug and backup files
 data/debug/
 data/backup_*
-data/cache/
-data/chroma/
-data/conversations/
 data/vector_fallback/
 data/users/
 data/posts/
@@ -137,7 +134,3 @@ server-monitor.js
 create-fallback.js
 
 # Ecosystem configs (keep only the main one)
-
-# Large profile files
-Profile-*.json
-*.profile.json

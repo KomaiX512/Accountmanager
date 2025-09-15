@@ -15,6 +15,7 @@ import PostScheduler from '../instagram/PostScheduler';
 import TwitterCompose from '../twitter/TwitterCompose';
 import UsageDashboard from './UsageDashboard';
 // import PlatformUsageChart from './PlatformUsageChart'; // Temporarily commented out
+import Leaderboard from './Leaderboard';
 
 import { schedulePost } from '../../utils/scheduleHelpers';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
@@ -64,7 +65,7 @@ interface PostContent {
 const MainDashboard: React.FC = () => {
   const { processingState } = useProcessing();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'overview' | 'usage' | 'agent'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'usage' | 'agent' | 'leaderboard'>('overview');
   
   // ✅ PERFORMANCE FIX: Production-ready logging system
   const isDevelopment = process.env.NODE_ENV === 'development';
@@ -724,6 +725,28 @@ const MainDashboard: React.FC = () => {
     
     return () => clearInterval(completionInterval);
   }, [currentUser?.uid, platformLoadingStates, completePlatformLoading]);
+
+  // Helper functions for Leaderboard component
+  const getAcquiredPlatforms = useCallback((): string[] => {
+    const acquired: string[] = [];
+    
+    // Check each platform's accessed status
+    if (hasAccessedInstagram) acquired.push('instagram');
+    if (hasAccessedTwitter) acquired.push('twitter');
+    if (hasAccessedFacebook) acquired.push('facebook');
+    if (hasAccessedLinkedIn) acquired.push('linkedin');
+    
+    return acquired;
+  }, [hasAccessedInstagram, hasAccessedTwitter, hasAccessedFacebook, hasAccessedLinkedIn]);
+
+  const getAllPlatformConnectionStatus = useCallback((): Record<string, boolean> => {
+    return {
+      instagram: isInstagramConnected,
+      twitter: isTwitterConnected, 
+      facebook: isFacebookConnected,
+      linkedin: isLinkedInConnected
+    };
+  }, [isInstagramConnected, isTwitterConnected, isFacebookConnected, isLinkedInConnected]);
 
   const getProcessingRemainingMs = useCallback((platformId: string): number => {
     // Never show timer for completed platforms
@@ -2699,6 +2722,12 @@ const MainDashboard: React.FC = () => {
             >
               Account Agent
             </button>
+            <button 
+              className={`tab ${activeTab === 'leaderboard' ? 'active' : ''}`}
+              onClick={() => setActiveTab('leaderboard')}
+            >
+              🏆 Leaderboard
+            </button>
           </div>
         </div>
 
@@ -3119,6 +3148,15 @@ const MainDashboard: React.FC = () => {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {activeTab === 'leaderboard' && (
+          <div className="leaderboard-tab-container">
+            <Leaderboard 
+              acquiredPlatforms={getAcquiredPlatforms()}
+              platformConnectionStatus={getAllPlatformConnectionStatus()}
+            />
           </div>
         )}
       </motion.div>

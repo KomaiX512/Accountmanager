@@ -3112,6 +3112,137 @@ Your ${platformName} account shows strong fundamentals:
 Your ${platformName} account demonstrates strong performance with **${followerCount} followers**, **${postCount} posts**, and **${avgEngagement.toLocaleString()} average engagement** - excellent foundation for continued growth.`;
 }
 
+// Helper: Extract exact caption/content from a ChromaDB-stored post document string
+function extractCaptionFromChromaDocument(docText) {
+  try {
+    if (!docText) return '';
+    let text = String(docText);
+    // Normalize whitespace and remove zero-width/control characters
+    text = text.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+    // Primary: Content:
+    const tryExtractByMarker = (full, marker) => {
+      const i = full.indexOf(marker);
+      if (i < 0) return '';
+      let rem = full.slice(i + marker.length).trim();
+      const terminators = ['Hashtags:', 'Mentions:', 'Likes:', 'Comments:', 'Retweets:', 'Shares:', 'Total Engagement:', 'Posted:'];
+      let end = rem.length;
+      for (const t of terminators) {
+        const j = rem.indexOf(t);
+        if (j >= 0 && j < end) end = j;
+      }
+      return rem.slice(0, end).trim();
+    };
+    // 1) Exact content after 'Content:'
+    let caption = tryExtractByMarker(text, 'Content:');
+    // 2) If empty, try 'Content Preview:' which appears in metrics docs
+    if (!caption) {
+      caption = tryExtractByMarker(text, 'Content Preview:');
+      // Remove wrapping quotes if present in preview
+      caption = caption.replace(/^"+|"+$/g, '').trim();
+    }
+    // 3) If still empty, capture first non-empty line after the header 'Post X on <platform>:'
+    if (!caption) {
+      const headerMatch = text.match(/Post\s+\d+\s+on\s+[^:]+:\s*(.*)/i);
+      if (headerMatch) {
+        caption = headerMatch[1].split(/\r?\n/)[0].trim();
+        // If this line starts with 'Content', strip that label
+        caption = caption.replace(/^Content:\s*/i, '').trim();
+      }
+    }
+    // Clean up markdown artifacts and excessive spaces
+    caption = caption.replace(/\*\*|__|`/g, '').replace(/\s{2,}/g, ' ').trim();
+    return caption;
+  } catch (_) {
+    return '';
+  }
+}
+
+// Helper: Normalize metrics labels and values
+function formatTopPostMetrics(meta, platform) {
+  const likes = meta?.likes || 0;
+  const comments = meta?.comments || 0;
+  const shares = meta?.shares || 0;
+  const total = Number.isFinite(meta?.totalEngagement)
+    ? meta.totalEngagement
+    : (likes + comments + shares);
+  const shareLabel = platform === 'twitter' ? 'Retweets' : 'Shares';
+  return { likes, comments, shares, total, shareLabel };
+}
+
+// Helper: Query ChromaDB for the user's top-engagement post and return exact caption + metrics
+async function getTopEngagementPostQuote(username, platform) {
+  try {
+    const collectionName = `${platform}_profiles`;
+    const collection = await chromaDBService.httpGetCollection(collectionName);
+    if (!collection) return null;
+
+    // Attempt server-side filtering; fallback to client-side if empty
+    let result = await collection.get({
+      where: { username, platform, type: 'post' },
+      include: ['documents', 'metadatas'],
+      limit: 1000
+    });
+    if (!result || !Array.isArray(result.documents) || result.documents.length === 0) {
+      result = await collection.get({ include: ['documents', 'metadatas'], limit: 1000 });
+    }
+
+    const docs = result.documents || [];
+    const metas = result.metadatas || [];
+    const candidates = [];
+    for (let i = 0; i < docs.length; i++) {
+      const m = metas[i] || {};
+      if ((m.username === username || String(m.username || '').toLowerCase() === String(username).toLowerCase())
+          && m.platform === platform && m.type === 'post') {
+        const te = Number.isFinite(m.totalEngagement)
+          ? m.totalEngagement
+          : ((m.likes || 0) + (m.comments || 0) + (m.shares || 0));
+        candidates.push({ doc: docs[i], meta: m, te });
+      }
+    }
+    // Fallback: use semantic search if direct GET didn't surface any post docs (common on some platforms)
+    if (candidates.length === 0) {
+      try {
+        const semResults = await chromaDBService.semanticSearch('highest engaging post', username, platform, 50);
+        for (const r of semResults) {
+          const m = r.metadata || {};
+          if ((m.username === username || String(m.username || '').toLowerCase() === String(username).toLowerCase()) &&
+              m.platform === platform && m.type === 'post') {
+            // Compute TE from metadata if available, otherwise attempt to parse from content
+            let te = Number.isFinite(m.totalEngagement)
+              ? m.totalEngagement
+              : ((m.likes || 0) + (m.comments || 0) + (m.shares || 0));
+            if (!Number.isFinite(te) || te === 0) {
+              // Parse from content lines e.g., "Likes: 1,234", "Comments: 56", "Retweets:"/"Shares:"
+              const text = String(r.content || '');
+              const likeMatch = text.match(/Likes:\s*([0-9,]+)/i);
+              const commentMatch = text.match(/Comments:\s*([0-9,]+)/i);
+              const sharesMatch = text.match(/(?:Retweets|Shares):\s*([0-9,]+)/i);
+              const likes = likeMatch ? parseInt(likeMatch[1].replace(/,/g, ''), 10) : 0;
+              const comments = commentMatch ? parseInt(commentMatch[1].replace(/,/g, ''), 10) : 0;
+              const shares = sharesMatch ? parseInt(sharesMatch[1].replace(/,/g, ''), 10) : 0;
+              te = likes + comments + shares;
+              // Construct a meta clone with parsed metrics for consistent formatting below
+              r.metadata = { ...m, likes, comments, shares, totalEngagement: te };
+            }
+            candidates.push({ doc: r.content, meta: r.metadata || m, te });
+          }
+        }
+      } catch (e) {
+        console.log(`[RAG-Server] Semantic search fallback failed: ${e.message}`);
+      }
+    }
+    if (candidates.length === 0) return null;
+    candidates.sort((a, b) => b.te - a.te);
+    const top = candidates[0];
+    const caption = extractCaptionFromChromaDocument(top.doc);
+    const metrics = formatTopPostMetrics(top.meta, platform);
+    return { caption, metrics, meta: top.meta };
+  } catch (e) {
+    console.log(`[RAG-Server] Top engagement extraction failed: ${e.message}`);
+    return null;
+  }
+}
+
 // API endpoint for discussion mode
 // Support both POST and GET for discussion queries to avoid 404 on GET
 // Also handle trailing slash for GET requests to /api/rag/discussion/ and /api/discussion/

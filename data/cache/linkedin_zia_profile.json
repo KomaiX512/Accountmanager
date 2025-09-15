@@ -1,0 +1,385 @@
+{
+  "data": {
+    "profileInfo": {
+      "linkedinUrl": "https://www.linkedin.com/in/ziaul-haq-abbas-47b5a9276/",
+      "firstName": "Ziaul Haq",
+      "lastName": "Abbas",
+      "fullName": "Ziaul Haq Abbas",
+      "headline": "ICT",
+      "connections": null,
+      "followers": 1,
+      "email": null,
+      "mobileNumber": null,
+      "jobTitle": "Associate Professor",
+      "companyName": "Ghulam Ishaq Khan Institute Of Engineering Sciences And Technology",
+      "companyIndustry": null,
+      "companyWebsite": null,
+      "companyLinkedin": "linkedin.com/company/ghulam-ishaq-khan-institute-of-engineering-sciences-and-technology",
+      "companyFoundedIn": null,
+      "companySize": "1-10",
+      "currentJobDuration": null,
+      "currentJobDurationInYrs": 0,
+      "topSkillsByEndorsements": null,
+      "addressCountryOnly": "Pakistan",
+      "addressWithCountry": "Swabi, Khyber Pakhtunkhwa, Pakistan",
+      "addressWithoutCountry": "Swabi, Khyber Pakhtunkhwa",
+      "profilePic": "https://media.licdn.com/dms/image/v2/D4D03AQF_FIMnVa4FmA/profile-displayphoto-shrink_100_100/profile-displayphoto-shrink_100_100/0/1732361425146?e=1760572800&v=beta&t=IJLHmbJI7eTtHwY9vRiyx2Vlt4i0_HWODuvAErSnkhE",
+      "profilePicHighQuality": "https://media.licdn.com/dms/image/v2/D4D03AQF_FIMnVa4FmA/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1732361425172?e=1760572800&v=beta&t=bUaOkhTdV526rEpk4nXuibLB1zEHT0tKscyMc6Q5fG8",
+      "about": null,
+      "publicIdentifier": "ziaul-haq-abbas-47b5a9276",
+      "openConnection": null,
+      "urn": "ACoAAENdBV8BAYF3qkZ-7DuZqVR1BXGMgO7nEa8",
+      "experiences": [
+        {
+          "companyId": "15138073",
+          "companyUrn": "urn:li:fsd_company:15138073",
+          "companyLink1": "https://www.linkedin.com/company/15138073/",
+          "logo": "https://media.licdn.com/dms/image/v2/C4D0BAQHvFepQq9oAlw/company-logo_200_200/company-logo_200_200/0/1643172732809/officialgiki_logo?e=1760572800&v=beta&t=ewVL5UqJ5UVcPXZCGv2sECGK4o5TYPeEIoKitZP5H2s",
+          "title": "Associate Professor",
+          "subtitle": "Ghulam Ishaq Khan Institute of Engineering Sciences and Technology",
+          "breakdown": false,
+          "subComponents": [
+            {
+              "description": []
+            }
+          ]
+        },
+        {
+          "companyId": "15138073",
+          "companyUrn": "urn:li:fsd_company:15138073",
+          "companyLink1": "https://www.linkedin.com/company/15138073/",
+          "logo": "https://media.licdn.com/dms/image/v2/C4D0BAQHvFepQq9oAlw/company-logo_200_200/company-logo_200_200/0/1643172732809/officialgiki_logo?e=1760572800&v=beta&t=ewVL5UqJ5UVcPXZCGv2sECGK4o5TYPeEIoKitZP5H2s",
+          "title": "Professor",
+          "subtitle": "Ghulam Ishaq Khan Institute of Engineering Sciences and Technology · Full-time",
+          "caption": "Jan 2024 - Present · 1 yr 9 mos",
+          "metadata": "Pakistan · On-site",
+          "breakdown": false,
+          "subComponents": [
+            {
+              "description": []
+            }
+          ]
+        },
+        {
+          "companyId": "250638",
+          "companyUrn": "urn:li:fsd_company:250638",
+          "companyLink1": "https://www.linkedin.com/company/250638/",
+          "logo": "https://media.licdn.com/dms/image/v2/C4D0BAQGDzfL8l8Er9Q/company-logo_200_200/company-logo_200_200/0/1630923475346/university_of_agder_logo?e=1760572800&v=beta&t=QH_MKJ8ApGfzS-SYWq-IUov9_WjkmYQf1rmBVHXNSDE",
+          "title": "PHD Candidate",
+          "subtitle": "University of Agder (UiA) · Full-time",
+          "caption": "Aug 2008 - Aug 2012 · 4 yrs 1 mo",
+          "metadata": "Grimstad, Agder, Norway · On-site",
+          "breakdown": false,
+          "subComponents": [
+            {
+              "description": []
+            }
+          ]
+        },
+        {
+          "companyId": "3181",
+          "companyUrn": "urn:li:fsd_company:3181",
+          "companyLink1": "https://www.linkedin.com/company/3181/",
+          "logo": "https://media.licdn.com/dms/image/v2/D560BAQEKTpIfhAXtlw/company-logo_200_200/company-logo_200_200/0/1719939334329/university_of_minnesota_logo?e=1760572800&v=beta&t=xMR3xz-bn6B94piiurlmJFdvQKfweY-7RXbnFO-qR4M",
+          "title": "Visiting Researcher",
+          "subtitle": "University of Minnesota · Seasonal",
+          "caption": "Mar 2012 - Jul 2012 · 5 mos",
+          "metadata": "Minneapolis–Saint Paul, Wisconsin, United States · On-site",
+          "breakdown": false,
+          "subComponents": [
+            {
+              "description": []
+            }
+          ]
+        }
+      ],
+      "updates": [],
+      "skills": [
+        {
+          "title": "Research Design",
+          "subComponents": [
+            {
+              "description": [
+                {
+                  "type": "insightComponent",
+                  "text": "Visiting Researcher at University of Minnesota"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Academic Publishing",
+          "subComponents": [
+            {
+              "description": [
+                {
+                  "type": "insightComponent",
+                  "text": "PHD Candidate at University of Agder (UiA)"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Academic Research",
+          "subComponents": [
+            {
+              "description": [
+                {
+                  "type": "insightComponent",
+                  "text": "2 experiences across University of Agder (UiA) and 1 other company"
+                },
+                {
+                  "type": "insightComponent",
+                  "text": "University of Agder (UiA)"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Higher Education Leadership",
+          "subComponents": [
+            {
+              "description": [
+                {
+                  "type": "insightComponent",
+                  "text": "Associate Professor at Ghulam Ishaq Khan Institute of Engineering Sciences and Technology"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "University Teaching",
+          "subComponents": [
+            {
+              "description": [
+                {
+                  "type": "insightComponent",
+                  "text": "University of Agder (UiA)"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Higher Education Teaching",
+          "subComponents": [
+            {
+              "description": [
+                {
+                  "type": "insightComponent",
+                  "text": "2 experiences across Ghulam Ishaq Khan Institute of Engineering Sciences and Technology and 1 other company"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Guest Lecturing",
+          "subComponents": [
+            {
+              "description": [
+                {
+                  "type": "insightComponent",
+                  "text": "Professor at Ghulam Ishaq Khan Institute of Engineering Sciences and Technology"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Higher Education Research",
+          "subComponents": [
+            {
+              "description": [
+                {
+                  "type": "insightComponent",
+                  "text": "3 experiences across Ghulam Ishaq Khan Institute of Engineering Sciences and Technology and 2 other companies"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "University Lecturing",
+          "subComponents": [
+            {
+              "description": [
+                {
+                  "type": "insightComponent",
+                  "text": "Professor at Ghulam Ishaq Khan Institute of Engineering Sciences and Technology"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Research Skills",
+          "subComponents": [
+            {
+              "description": [
+                {
+                  "type": "insightComponent",
+                  "text": "3 experiences across Ghulam Ishaq Khan Institute of Engineering Sciences and Technology and 2 other companies"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Research and Development (R&D)",
+          "subComponents": [
+            {
+              "description": [
+                {
+                  "type": "insightComponent",
+                  "text": "Professor at Ghulam Ishaq Khan Institute of Engineering Sciences and Technology"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Analytical Skills",
+          "subComponents": [
+            {
+              "description": [
+                {
+                  "type": "insightComponent",
+                  "text": "Professor at Ghulam Ishaq Khan Institute of Engineering Sciences and Technology"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "profilePicAllDimensions": [
+        {
+          "width": 100,
+          "height": 100,
+          "url": "https://media.licdn.com/dms/image/v2/D4D03AQF_FIMnVa4FmA/profile-displayphoto-shrink_100_100/profile-displayphoto-shrink_100_100/0/1732361425146?e=1760572800&v=beta&t=IJLHmbJI7eTtHwY9vRiyx2Vlt4i0_HWODuvAErSnkhE"
+        },
+        {
+          "width": 200,
+          "height": 200,
+          "url": "https://media.licdn.com/dms/image/v2/D4D03AQF_FIMnVa4FmA/profile-displayphoto-shrink_200_200/profile-displayphoto-shrink_200_200/0/1732361425146?e=1760572800&v=beta&t=MKGBtP-eBe0dqjrERNyZM0hhTOY5Cx0_uP1N7BDF9NU"
+        },
+        {
+          "width": 400,
+          "height": 400,
+          "url": "https://media.licdn.com/dms/image/v2/D4D03AQF_FIMnVa4FmA/profile-displayphoto-shrink_400_400/profile-displayphoto-shrink_400_400/0/1732361425146?e=1760572800&v=beta&t=M8ss_oqC9-ycYErLXkgeCpzcliQ437wKG-6MkBM8QRY"
+        },
+        {
+          "width": 800,
+          "height": 800,
+          "url": "https://media.licdn.com/dms/image/v2/D4D03AQF_FIMnVa4FmA/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1732361425172?e=1760572800&v=beta&t=bUaOkhTdV526rEpk4nXuibLB1zEHT0tKscyMc6Q5fG8"
+        }
+      ],
+      "educations": [
+        {
+          "companyId": "250638",
+          "companyUrn": "urn:li:fsd_company:250638",
+          "companyLink1": "https://www.linkedin.com/company/250638/",
+          "logo": "https://media.licdn.com/dms/image/v2/C4D0BAQGDzfL8l8Er9Q/company-logo_200_200/company-logo_200_200/0/1630923475346/university_of_agder_logo?e=1760572800&v=beta&t=QH_MKJ8ApGfzS-SYWq-IUov9_WjkmYQf1rmBVHXNSDE",
+          "title": "University of Agder (UiA)",
+          "subtitle": "Doctor of Philosophy - PhD, Electrical, Electronics and Communications Engineering",
+          "caption": "Aug 2008 - Aug 2012",
+          "breakdown": false,
+          "subComponents": [
+            {
+              "description": [
+                {
+                  "type": "insightComponent",
+                  "text": "Grade: A"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "companyId": "15130493",
+          "companyUrn": "urn:li:fsd_company:15130493",
+          "companyLink1": "https://www.linkedin.com/company/15130493/",
+          "logo": "https://media.licdn.com/dms/image/v2/C4E0BAQGLuJPmu5KcKQ/company-logo_200_200/company-logo_200_200/0/1631351087177?e=1760572800&v=beta&t=-vjUwDixAdvJ5iBzblZK4G24pGvJ1vaai1YLghltXhw",
+          "title": "Quaid-i-Azam University, Islamabad",
+          "subtitle": "Master of Philosophy - MPhil, Electronics (Digital Image Processing)",
+          "caption": "Mar 1998 - Apr 2001",
+          "breakdown": false,
+          "subComponents": [
+            {
+              "description": []
+            }
+          ]
+        }
+      ],
+      "licenseAndCertificates": [],
+      "honorsAndAwards": [],
+      "languages": [],
+      "volunteerAndAwards": [],
+      "verifications": [],
+      "promos": [],
+      "highlights": [],
+      "projects": [],
+      "publications": [],
+      "patents": [],
+      "courses": [],
+      "testScores": [],
+      "organizations": [],
+      "volunteerCauses": [],
+      "interests": [
+        {
+          "section_name": "Companies",
+          "section_components": [
+            {
+              "titleV2": "University of Agder (UiA)",
+              "caption": "48,595 followers",
+              "size": "LARGE",
+              "textActionTarget": "https://www.linkedin.com/company/250638/",
+              "subComponents": []
+            },
+            {
+              "titleV2": "University of Peshawar",
+              "caption": "95,330 followers",
+              "size": "LARGE",
+              "textActionTarget": "https://www.linkedin.com/company/15095722/",
+              "subComponents": []
+            }
+          ]
+        },
+        {
+          "section_name": "Schools",
+          "section_components": [
+            {
+              "titleV2": "Quaid-i-Azam University, Islamabad",
+              "caption": "34,495 followers",
+              "size": "LARGE",
+              "textActionTarget": "https://www.linkedin.com/school/15130493/",
+              "subComponents": []
+            },
+            {
+              "titleV2": "Faculty of Electrical Engineering at GIKI",
+              "caption": "1,967 followers",
+              "size": "LARGE",
+              "textActionTarget": "https://www.linkedin.com/school/101607109/",
+              "subComponents": []
+            }
+          ]
+        }
+      ],
+      "recommendations": []
+    },
+    "posts": [],
+    "metadata": {
+      "username": "zia",
+      "platform": "linkedin",
+      "scrape_timestamp": "2025-09-10T07:09:53.089209",
+      "profile_info_available": true,
+      "posts_count": 0,
+      "source_url": "https://www.linkedin.com/in/ziaul-haq-abbas-47b5a9276/"
+    }
+  },
+  "timestamp": "2025-09-14T09:55:29.200Z"
+}

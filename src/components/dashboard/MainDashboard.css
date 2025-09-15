@@ -76,6 +76,21 @@
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Agent container styles */
+.agent-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--module-padding);
+}
+
+/* Leaderboard tab container styles */
+.leaderboard-tab-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--module-padding);
+  box-sizing: border-box;
+}
+
 /* Disable transform scaling for Instagram dashboard to allow for independent layout control */
 body.instagram-dashboard-active .main-dashboard-wrapper {
   transform: none !important;

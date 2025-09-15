@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import './ChatModal.css';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
@@ -37,6 +38,7 @@ const ChatModal: React.FC<ChatModalProps> = ({
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const [conversationTracked, setConversationTracked] = useState(false);
   const { trackRealDiscussion, canUseFeature } = useFeatureTracking();
 
@@ -124,6 +126,33 @@ const ChatModal: React.FC<ChatModalProps> = ({
     }
   }, [open]);
 
+  // Lock background scroll when modal opens/closes
+  useEffect(() => {
+    const html = document.documentElement;
+    if (open) {
+      document.body.classList.add('modal-open');
+      html.classList.add('modal-open');
+      // Ensure overlay starts at top
+      requestAnimationFrame(() => {
+        if (overlayRef.current) {
+          try {
+            overlayRef.current.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+          } catch {
+            overlayRef.current.scrollTop = 0;
+            overlayRef.current.scrollLeft = 0;
+          }
+        }
+      });
+    } else {
+      document.body.classList.remove('modal-open');
+      html.classList.remove('modal-open');
+    }
+    return () => {
+      document.body.classList.remove('modal-open');
+      html.classList.remove('modal-open');
+    };
+  }, [open]);
+
   // Reset tracking state when modal closes so a new session can be tracked next time
   useEffect(() => {
     if (!open) {
@@ -207,18 +236,24 @@ const ChatModal: React.FC<ChatModalProps> = ({
 
   if (!open) return null;
 
+  // Debug logging to verify modal rendering
+  console.log('[ChatModal] Rendering modal - open:', open, 'portal target:', document.body);
+  console.log('[ChatModal] Modal should be visible with classes: instagram-chat-overlay, instagram-chat-content');
+
   return (
     <AnimatePresence>
-      {open && (
+      {open && createPortal(
         <motion.div
-          className="chat-modal-overlay"
+          className="instagram-chat-overlay"
+          ref={overlayRef}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
         >
+          
           <motion.div
-            className="chat-modal-content"
+            className="instagram-chat-content"
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
@@ -349,7 +384,8 @@ const ChatModal: React.FC<ChatModalProps> = ({
               </form>
             )}
           </motion.div>
-        </motion.div>
+        </motion.div>,
+        document.body
       )}
     </AnimatePresence>
   );

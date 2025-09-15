@@ -143,7 +143,8 @@ export class CacheManager {
    */
   static appendBypassParam(url: string, platform: string, accountHolder: string, section?: string): string {
     // --- NEW: Always bust cache for critical real-time sections ---
-    const ALWAYS_BYPASS_SECTIONS = ['news', 'strategies'];
+    // Only force-bypass truly real-time modules. Allow strategies to be cached.
+    const ALWAYS_BYPASS_SECTIONS = ['news'];
 
     try {
       if (!url) return url;

@@ -27,6 +27,13 @@
   overflow-y: auto !important;
 }
 
+/* Lock background scroll whenever any modal/popup is open */
+body.modal-open,
+html.modal-open {
+  overflow: hidden !important;
+  touch-action: none !important;
+}
+
 /* Mobile-specific modal overlay fixes */
 @media (max-width: 768px) {
   .popup-overlay,

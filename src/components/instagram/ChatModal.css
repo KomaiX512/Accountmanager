@@ -1,6 +1,6 @@
 /* ✨ CLEAN CHAT MODAL CSS - PREEMPTIVE QUESTIONS ALWAYS VISIBLE */
 
-.chat-modal-overlay {
+.instagram-chat-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -8,7 +8,7 @@
   bottom: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.2);
   backdrop-filter: blur(8px);
   z-index: 2147483647;
   display: flex;
@@ -19,12 +19,13 @@
   box-sizing: border-box;
 }
 
-.chat-modal-content {
+.instagram-chat-content {
   background: rgba(255, 255, 255, 0.06);
   border-radius: 20px;
   width: 95%;
   max-width: 900px;
-  height: 92vh;
+  height: auto;
+  max-height: 92vh;
   display: flex;
   flex-direction: column;
   border: 1px solid rgba(255, 255, 255, 0.12);

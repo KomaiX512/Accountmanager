@@ -33,6 +33,7 @@ const ChatModal: React.FC<ChatModalProps> = ({
   const [message, setMessage] = useState('');
   const [conversationTracked, setConversationTracked] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { trackRealDiscussion, canUseFeature } = useFeatureTracking();
 
@@ -207,6 +208,23 @@ const ChatModal: React.FC<ChatModalProps> = ({
     }
   }, [open]);
 
+  // Lock background scroll when modal opens
+  useEffect(() => {
+    const html = document.documentElement;
+    if (open) {
+      document.body.classList.add('modal-open');
+      html.classList.add('modal-open');
+    } else {
+      document.body.classList.remove('modal-open');
+      html.classList.remove('modal-open');
+    }
+    
+    return () => {
+      document.body.classList.remove('modal-open');
+      html.classList.remove('modal-open');
+    };
+  }, [open]);
+
   // Model variables removed
 
   return (
@@ -214,6 +232,7 @@ const ChatModal: React.FC<ChatModalProps> = ({
       {open && (
         <motion.div
           className="chat-modal-overlay"
+          ref={overlayRef}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

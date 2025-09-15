@@ -369,11 +369,32 @@ const Dms_Comments: React.FC<DmsCommentsProps> = ({
   }, [validNotifications]);
 
   // DIAGNOSTICS: Provide hard-proof analysis of counts mismatch between header and Auto-Reply
+  // Throttle to avoid console flooding; only log when counts change or at most once every 2s
+  const diagPrevRef = useRef<{ totalIncoming: number; validCount: number; eligibleCount: number }>({ totalIncoming: 0, validCount: 0, eligibleCount: 0 });
+  const diagLastLogRef = useRef<number>(0);
+  const DIAG_THROTTLE_MS = 2000;
+
   useEffect(() => {
     try {
       const totalIncoming = Array.isArray(notifications) ? notifications.length : 0;
       const validCount = validNotifications.length;
       const eligibleCount = autoReplyEligibleNotifications.length;
+
+      const now = Date.now();
+      const sameCounts = (
+        totalIncoming === diagPrevRef.current.totalIncoming &&
+        validCount === diagPrevRef.current.validCount &&
+        eligibleCount === diagPrevRef.current.eligibleCount
+      );
+
+      // If nothing changed and we're within throttle window, skip logging
+      if (sameCounts && (now - diagLastLogRef.current) < DIAG_THROTTLE_MS) {
+        return;
+      }
+
+      // Update refs for next comparison
+      diagPrevRef.current = { totalIncoming, validCount, eligibleCount };
+      diagLastLogRef.current = now;
 
       const typeCountsAll: Record<string, number> = {};
       const typeCountsValid: Record<string, number> = {};

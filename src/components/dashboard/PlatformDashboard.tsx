@@ -27,9 +27,9 @@ import { useInstagram } from '../../context/InstagramContext';
 import { useTwitter } from '../../context/TwitterContext';
 import { useFacebook } from '../../context/FacebookContext';
 import { useLinkedIn } from '../../context/LinkedInContext';
-import ChatModal from '../instagram/ChatModal';
+import ChatModal from '../common/ChatModal';
 import RagService from '../../services/RagService';
-import type { ChatMessage as ChatModalMessage, LinkedAccount } from '../instagram/ChatModal';
+import type { ChatMessage as ChatModalMessage, LinkedAccount } from '../common/ChatModal';
 import { Notification } from '../../types/notifications';
 // Import icons from react-icons
 import { FaChartLine, FaCalendarAlt, FaBullhorn, FaPen, FaBell, FaUndo, FaInfoCircle, FaPencilAlt, FaRobot, FaRss } from 'react-icons/fa';
@@ -56,26 +56,43 @@ interface RagChatMessage {
   content: string;
 }
 
+// Define props interface for PlatformDashboard
+interface PlatformDashboardProps {
+  platform?: 'instagram' | 'twitter' | 'facebook' | 'linkedin';
+  accountHolder?: string;
+  competitors?: string[];
+  accountType?: 'branding' | 'non-branding' | 'professional' | 'personal';
+  onOpenChat?: (messageContent: string, platform?: string) => void;
+}
 
-const PlatformDashboard: React.FC = memo(() => {
+const PlatformDashboard: React.FC<PlatformDashboardProps> = memo(({ 
+  platform: platformProp, 
+  accountHolder: accountHolderProp,
+  competitors: competitorsProp,
+  accountType: accountTypeProp,
+  onOpenChat
+}) => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   
-  // Determine platform from URL pathname
-  const platform = window.location.pathname.includes('/instagram') ? 'instagram' :
-                  window.location.pathname.includes('/twitter') ? 'twitter' :
-                  window.location.pathname.includes('/facebook') ? 'facebook' :
-                  window.location.pathname.includes('/linkedin') ? 'linkedin' : 'instagram';
+  // Determine platform from prop or URL pathname
+  const platform: 'instagram' | 'twitter' | 'facebook' | 'linkedin' = platformProp || (
+    window.location.pathname.includes('/instagram') ? 'instagram' :
+    window.location.pathname.includes('/twitter') ? 'twitter' :
+    window.location.pathname.includes('/facebook') ? 'facebook' :
+    window.location.pathname.includes('/linkedin') ? 'linkedin' : 'instagram'
+  );
   
   // Basic props for component compatibility
-  const accountType = 'branding';
-  const competitors: string[] = [];
+  const accountType: 'branding' | 'non-branding' | 'professional' | 'personal' = accountTypeProp || 'branding';
+  // IMPORTANT: Memoize competitors to keep prop reference stable across renders
+  const competitors: string[] = useMemo(() => competitorsProp || [], [competitorsProp]);
   const showWelcome = true;
   
-  // ✅ CRITICAL FIX: Always read username from platform-specific localStorage
-  const accountHolder = currentUser?.uid 
+  // ✅ CRITICAL FIX: Use prop accountHolder if available, otherwise read from localStorage
+  const accountHolder = accountHolderProp || (currentUser?.uid 
     ? localStorage.getItem(`${platform}_username_${currentUser.uid}`) || ''
-    : '';
+    : '');
   
   console.log(`[PlatformDashboard] 🔄 Platform=${platform}, Username=${accountHolder} (from localStorage)`);
   
@@ -298,31 +315,38 @@ const PlatformDashboard: React.FC = memo(() => {
 
   // Define functions FIRST to avoid dependency hoisting issues
   // ✅ BULLETPROOF FIX: Convert to useCallback for proper dependency tracking
+  const isRefreshingRef = useRef(false);
+
   const refreshAllData = useCallback(async () => {
     if (!accountHolder) {
       return;
     }
+    if (isRefreshingRef.current) {
+      console.log('[PlatformDashboard] ⏳ Skipping refreshAllData - already in progress');
+      return;
+    }
+    isRefreshingRef.current = true;
     try {
       const platformParam = `?platform=${platform}`;
       
       // 🚀 PERFORMANCE OPTIMIZATION: Execute ALL requests in parallel
       const [responsesData, strategiesData, postsData, competitorData, notificationsData] = await Promise.all([
-        axios.get(appendBypassParam(`/api/responses/${accountHolder}${platformParam}`, platform, accountHolder, 'responses')).catch(err => {
+        axios.get(appendBypassParam(`/api/responses/${accountHolder}${platformParam}`, platform, accountHolder, 'responses'), { timeout: 8000 }).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        axios.get(appendBypassParam(getApiUrl(`/${accountType === 'branding' ? 'retrieve-strategies' : 'retrieve-engagement-strategies'}/${accountHolder}${platformParam}`), platform, accountHolder, 'strategies')).catch(err => {
+        axios.get(appendBypassParam(getApiUrl(`/${accountType === 'branding' ? 'retrieve-strategies' : 'retrieve-engagement-strategies'}/${accountHolder}${platformParam}`), platform, accountHolder, 'strategies'), { timeout: 8000 }).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        axios.get(appendBypassParam(`/api/posts/${accountHolder}${platformParam}`, platform, accountHolder, 'posts')).catch(err => {
+        axios.get(appendBypassParam(`/api/posts/${accountHolder}${platformParam}&limit=12`, platform, accountHolder, 'posts'), { timeout: 8000 }).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
         // Always fetch competitor data for both account types
         Promise.all(
           competitors.map(comp =>
-            axios.get(appendBypassParam(getApiUrl(`/retrieve/${accountHolder}/${comp}${platformParam}`), platform, accountHolder, 'competitor')).catch(err => {
+            axios.get(appendBypassParam(getApiUrl(`/retrieve/${accountHolder}/${comp}${platformParam}`), platform, accountHolder, 'competitor'), { timeout: 8000 }).catch(err => {
               if (err.response?.status === 404) {
                 console.warn(`No ${platform} competitor data found for ${comp}`);
                 return { data: [] };
@@ -337,7 +361,7 @@ const PlatformDashboard: React.FC = memo(() => {
                                platform === 'facebook' ? facebookPageId :
                                igUserId;
           if (currentUserId) {
-            return fetch(`/events-list/${currentUserId}?platform=${platform}&limit=50`).then(res => res.json()).then(data => {
+            return fetch(`/events-list/${currentUserId}?platform=${platform}&limit=50`, { cache: 'no-store' }).then(res => res.json()).then(data => {
               // Handle both old array format and new paginated format
               if (Array.isArray(data)) {
                 return data;
@@ -375,6 +399,8 @@ const PlatformDashboard: React.FC = memo(() => {
     } catch (error: any) {
       console.error(`Error refreshing ${platform} data:`, error);
       setToast(`Failed to load ${platform} dashboard data.`);
+    } finally {
+      isRefreshingRef.current = false;
     }
   }, [accountHolder, platform, accountType, competitors, twitterId, facebookPageId, igUserId]);
 
@@ -387,9 +413,9 @@ const PlatformDashboard: React.FC = memo(() => {
       let response;
       
       if (platform === 'linkedin') {
-        response = await axios.get(`/api/profile-info/${platform}/${accountHolder}`);
+        response = await axios.get(`/api/profile-info/${platform}/${accountHolder}`, { timeout: 8000 });
       } else {
-        response = await axios.get(`/api/profile-info/${accountHolder}?platform=${platform}`);
+        response = await axios.get(`/api/profile-info/${accountHolder}?platform=${platform}`, { timeout: 8000 });
       }
       
       const profileData = response.data;
@@ -470,13 +496,15 @@ const PlatformDashboard: React.FC = memo(() => {
     onRefresh: handleDataRefresh
   });
 
-  // Initial load and platform change effect - fetch profile once
+  // Initial load and platform change effect - fetch profile and all modules in parallel
   useEffect(() => {
     if (accountHolder && platform) {
       setNotifications([]);
-      fetchProfileInfo();
+      // Fire both without awaiting to achieve true parallelism
+      void fetchProfileInfo();
+      void refreshAllData();
     }
-  }, [platform, accountHolder]);
+  }, [platform, accountHolder, fetchProfileInfo, refreshAllData]);
 
 
   // ✅ CLEANUP: Reset state when component unmounts
@@ -531,7 +559,7 @@ const PlatformDashboard: React.FC = memo(() => {
     }
   }, [isPostDropdownOpen]);
 
-  // 🚀 POST DROPDOWN: Position calculation - FIXED POSITIONING
+  // 🚀 POST DROPDOWN: Position calculation - FIXED POSITIONING (mobile-aware)
   const updateDropdownPosition = useCallback(() => {
     const inputElement = postInputRef.current;
     console.log('🚀 updateDropdownPosition called, input element:', inputElement);
@@ -571,30 +599,34 @@ const PlatformDashboard: React.FC = memo(() => {
     const inputPreferredWidth = Math.round(Math.min(480, Math.max(280, rect.width + 32)));
     const dropdownWidth = Math.min(measuredDropdownWidth || 480, inputPreferredWidth);
 
-    // ✅ FIXED POSITIONING: Force dropdown to appear at top of viewport with safe margin
-    const viewportTopMargin = 100; // Safe margin from viewport top
-    
-    // 🎯 CRITICAL FIX: Position dropdown at top of viewport, not relative to input
-    // This ensures it never overlaps with any input fields or bars
-    let top = viewportTopMargin; // Always at top of viewport with safe margin
-    
-    // ✅ ENSURE NO OVERLAP: Since we're positioning at viewport top, this check is not needed
-    // The dropdown will always be at a safe position from the top
-    
-    // ✅ ADDED: Extra safety check - ensure dropdown is never overlapping with input
-    const inputBottom = rect.bottom;
-    const dropdownBottom = top + dropdownHeight;
-    
-    if (dropdownBottom >= inputBottom - 10) {
-      // If dropdown would overlap, move it even higher
-      top = Math.max(50, top - 100); // Move 100px higher, minimum 50px from viewport top
-      console.log('🚀 Preventing overlap - moved dropdown higher to viewport top');
-    }
-    
-    // ✅ ADDED: Final safety check - ensure dropdown is always visible
-    if (top < 50) {
-      top = 50; // Minimum 50px from viewport top
-      console.log('🚀 Ensuring minimum viewport margin - set to 50px');
+    // Positioning strategy:
+    // - Mobile (<=767px): position NEAR the input field (just below it),
+    //   clamped to viewport so it remains visible and clickable.
+    // - Desktop: keep existing fixed-viewport strategy near top for separation.
+    let top: number;
+    const isMobile = window.innerWidth <= 767;
+    if (isMobile) {
+      const desiredTop = Math.round(rect.bottom + 8); // just under the input
+      const maxTop = Math.max(50, window.innerHeight - dropdownHeight - 12);
+      top = Math.min(desiredTop, maxTop);
+      // If the input is too close to the top, ensure a safe margin
+      if (top < 50) top = 50;
+      console.log('📱 Mobile dropdown positioning - desiredTop:', desiredTop, 'finalTop:', top);
+    } else {
+      // Desktop: fixed near top of viewport
+      const viewportTopMargin = 100; // Safe margin from viewport top
+      top = viewportTopMargin;
+      // Ensure it never overlaps with the input
+      const inputBottom = rect.bottom;
+      const dropdownBottom = top + dropdownHeight;
+      if (dropdownBottom >= inputBottom - 10) {
+        top = Math.max(50, top - 100);
+        console.log('🚀 Preventing overlap - moved dropdown higher to viewport top');
+      }
+      if (top < 50) {
+        top = 50;
+        console.log('🚀 Ensuring minimum viewport margin - set to 50px');
+      }
     }
     
     // Horizontal centering over the input field
@@ -603,7 +635,7 @@ const PlatformDashboard: React.FC = memo(() => {
     console.log('🚀 Input field positioning for dropdown:', rect);
     console.log('🚀 Input field top position:', rect.top);
     console.log('🚀 Dropdown height:', dropdownHeight);
-    console.log('🚀 Viewport top margin used:', viewportTopMargin);
+    // Viewport margin log only meaningful for desktop; omit on mobile
     console.log('🚀 Final position - top:', top, 'left:', left);
 
     // ✅ HORIZONTAL POSITIONING: Ensure dropdown stays within viewport bounds
@@ -630,33 +662,38 @@ const PlatformDashboard: React.FC = memo(() => {
     setPostDropdownPosition(position);
   }, []);
 
+  // 🚀 POST DROPDOWN: Move callback handlers to top level (Rules of Hooks)
+  const handleDropdownResize = useCallback(() => {
+    // Wait for DOM to settle, then measure and position
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        updateDropdownPosition();
+        // ✅ ADDED: Double-check position after a short delay for mobile
+        setTimeout(() => updateDropdownPosition(), 100);
+        // ✅ ADDED: Triple-check position for extra reliability
+        setTimeout(() => updateDropdownPosition(), 300);
+      }, 16);
+    });
+  }, [updateDropdownPosition]);
+
+  const handleDropdownScroll = useCallback(() => {
+    // Wait for DOM to settle, then measure and position
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        updateDropdownPosition();
+        // ✅ ADDED: Double-check position after a short delay for mobile
+        setTimeout(() => updateDropdownPosition(), 100);
+        // ✅ ADDED: Triple-check position for extra reliability
+        setTimeout(() => updateDropdownPosition(), 300);
+      }, 16);
+    });
+  }, [updateDropdownPosition]);
+
   // 🚀 POST DROPDOWN: Click outside and positioning logic - IMPROVED
   useEffect(() => {
     if (isPostDropdownOpen) {
-      // ✅ IMPROVED: More responsive positioning with better timing
-      const updatePosition = () => {
-        // Wait for DOM to settle, then measure and position
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            updateDropdownPosition();
-            // ✅ ADDED: Double-check position after a short delay for mobile
-            setTimeout(() => updateDropdownPosition(), 100);
-            // ✅ ADDED: Triple-check position for extra reliability
-            setTimeout(() => updateDropdownPosition(), 300);
-          }, 16);
-        });
-      };
-      
       // Initial positioning
-      updatePosition();
-      
-      const handleResize = useCallback(() => {
-        updatePosition();
-      }, []);
-
-      const handleScroll = useCallback(() => {
-        updatePosition();
-      }, []);
+      handleDropdownResize();
       
       const handleClickOutside = (e: MouseEvent) => {
         const inputElement = postInputRef.current;
@@ -672,17 +709,17 @@ const PlatformDashboard: React.FC = memo(() => {
 
       // ✅ IMPROVED: Add orientation change handler for mobile
       const handleOrientationChange = () => {
-        setTimeout(updatePosition, 300); // Wait for orientation change to complete
+        setTimeout(handleDropdownResize, 300); // Wait for orientation change to complete
       };
 
-      window.addEventListener('resize', handleResize, { passive: true });
-      window.addEventListener('scroll', handleScroll, { passive: true });
+      window.addEventListener('resize', handleDropdownResize, { passive: true });
+      window.addEventListener('scroll', handleDropdownScroll, { passive: true });
       window.addEventListener('orientationchange', handleOrientationChange);
       document.addEventListener('click', handleClickOutside, { passive: true });
 
       return () => {
-        window.removeEventListener('resize', handleResize);
-        window.removeEventListener('scroll', handleScroll);
+        window.removeEventListener('resize', handleDropdownResize);
+        window.removeEventListener('scroll', handleDropdownScroll);
         window.removeEventListener('orientationchange', handleOrientationChange);
         document.removeEventListener('click', handleClickOutside);
         // Clean up timeouts
@@ -690,7 +727,7 @@ const PlatformDashboard: React.FC = memo(() => {
         clearTimeout((window as any).scrollTimeout);
       };
     }
-  }, [isPostDropdownOpen, updateDropdownPosition]);
+  }, [isPostDropdownOpen, handleDropdownResize, handleDropdownScroll]);
 
   // 🚀 POST DROPDOWN: Handle prompt selection
   const handlePromptSelect = useCallback((prompt: string) => {
@@ -817,7 +854,22 @@ const PlatformDashboard: React.FC = memo(() => {
         throw new Error(`Failed to fetch ${platform} notifications: ${response.status} ${response.statusText}`);
       }
       
-      let data = await response.json();
+      const raw = await response.json();
+      let data: any[] = Array.isArray(raw)
+        ? raw
+        : Array.isArray((raw as any)?.notifications)
+          ? (raw as any).notifications
+          : Array.isArray((raw as any)?.data)
+            ? (raw as any).data
+            : [];
+      if (!Array.isArray(raw)) {
+        console.log(`[${new Date().toISOString()}] ${platform} notifications response normalized`, {
+          type: typeof raw,
+          hasNotifications: Array.isArray((raw as any)?.notifications),
+          hasData: Array.isArray((raw as any)?.data),
+          finalLength: data.length
+        });
+      }
       console.log(`[${new Date().toISOString()}] Received ${data.length} ${platform} notifications`);
 
       // CRITICAL FIX: Add defensive checks for Facebook notifications
@@ -1007,7 +1059,7 @@ const PlatformDashboard: React.FC = memo(() => {
         }
         
         if (prefix.startsWith(`ready_post/${platform}/${accountHolder}/`)) {
-          axios.get(`/api/posts/${accountHolder}${platformParam}`).then(res => {
+          axios.get(`/api/posts/${accountHolder}${platformParam}&limit=12`).then(res => {
             setPosts(Array.isArray(res.data) ? res.data : []);
             setToast(`New ${platform} post cooked!`);
           }).catch(err => {
@@ -2805,6 +2857,16 @@ Image Description: ${response.post.image_prompt}
                     >
                       <FaRobot className="btn-icon" />
                       <span>Autopilot</span>
+                    </button>
+                    
+                    {/* AI Chat button (desktop) */}
+                    <button
+                      onClick={() => setIsChatModalOpen(true)}
+                      className={`dashboard-btn chat-btn ${platform === 'twitter' ? 'twitter' : platform === 'facebook' ? 'facebook' : platform === 'instagram' ? 'instagram' : ''}`}
+                      title="AI Discussion Chat"
+                    >
+                      <FaRobot className="btn-icon" />
+                      <span>AI Chat</span>
                     </button>
                     
 

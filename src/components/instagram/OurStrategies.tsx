@@ -20,6 +20,7 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
   // NOTE: _accountType temporarily ignored - using strategies endpoint for all accounts until engagement strategies data is available
   const [showPopup, setShowPopup] = useState(false);
   const [currentStrategyIndex, setCurrentStrategyIndex] = useState(0);
+  const overlayRef = React.useRef<HTMLDivElement | null>(null);
 
   // Debug logging to track component instances
   const componentId = React.useRef(Math.random().toString(36).substr(2, 9));
@@ -152,6 +153,33 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
     }
   };
 
+  // Lock background scroll and reset overlay scroll when popup toggles
+  React.useEffect(() => {
+    const html = document.documentElement;
+    if (showPopup) {
+      document.body.classList.add('modal-open');
+      html.classList.add('modal-open');
+      // Defer to next frame to ensure node is mounted
+      requestAnimationFrame(() => {
+        try {
+          overlayRef.current?.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+        } catch {
+          if (overlayRef.current) {
+            overlayRef.current.scrollTop = 0;
+            overlayRef.current.scrollLeft = 0;
+          }
+        }
+      });
+    } else {
+      document.body.classList.remove('modal-open');
+      html.classList.remove('modal-open');
+    }
+    return () => {
+      document.body.classList.remove('modal-open');
+      html.classList.remove('modal-open');
+    };
+  }, [showPopup]);
+
   const handlePrevStrategy = () => {
     if (currentStrategyIndex > 0) {
       setCurrentStrategyIndex(currentStrategyIndex - 1);
@@ -259,6 +287,7 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
       {showPopup && createPortal(
         <motion.div
           className="popup-overlay"
+          ref={overlayRef}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

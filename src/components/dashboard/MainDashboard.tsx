@@ -3143,9 +3143,12 @@ const MainDashboard: React.FC = () => {
               </button>
               
               {showWishlistConfirmation && (
-                <div className="wishlist-confirmation">
-                  <p>Thank you for your interest! You'll be notified when the Autonomous Account Manager launches.</p>
-                </div>
+                ReactDOM.createPortal(
+                  <div className="wishlist-confirmation">
+                    <p>Thank you for your interest! You'll be notified when the Autonomous Account Manager launches.</p>
+                  </div>,
+                  document.body
+                )
               )}
             </div>
           </div>
@@ -3377,9 +3380,9 @@ const MainDashboard: React.FC = () => {
       )}
       
       {/* Coming Soon Platform Modal */}
-      {showComingSoonModal && (
-        <div className="coming-soon-modal">
-          <div className="coming-soon-content">
+      {showComingSoonModal && ReactDOM.createPortal(
+        <div className="coming-soon-modal" onClick={() => setShowComingSoonModal(false)}>
+          <div className="coming-soon-content" onClick={(e) => e.stopPropagation()}>
             <div className="coming-soon-header">
               <h3>{platforms.find(p => p.id === currentComingSoonPlatform)?.name} Integration</h3>
               <button 
@@ -3431,11 +3434,12 @@ const MainDashboard: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
       
       {/* Platform Wishlist Confirmation */}
-      {showPlatformWishlistConfirmation && (
+      {showPlatformWishlistConfirmation && ReactDOM.createPortal(
         <div className="wishlist-confirmation">
           <div className="wishlist-confirmation-content">
             <div className="wishlist-confirmation-icon">
@@ -3445,7 +3449,8 @@ const MainDashboard: React.FC = () => {
             </div>
             <p>Great! We'll notify you when {platforms.find(p => p.id === currentComingSoonPlatform)?.name} becomes available.</p>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
       
       {/* Privacy Policy Footer */}

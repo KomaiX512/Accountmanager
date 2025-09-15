@@ -83,6 +83,9 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
   const [accountType, setAccountType] = useState<string>('branding');
   const [postingStyle, setPostingStyle] = useState<string>('I post about NewYork lives');
   
+  // Overlay ref for scroll reset on popup open
+  const overlayRef = React.useRef<HTMLDivElement | null>(null);
+  
   // Facebook-specific primary account data and competitor data map: name -> { url, status? } (status is UI-only)
   const [primaryAccountData, setPrimaryAccountData] = useState<AccountData | null>(null);
   const [facebookCompetitorsMap, setFacebookCompetitorsMap] = useState<Record<string, { url: string; status?: string }>>({});
@@ -298,9 +301,10 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
   }, [normalizedAccountHolder, platform]);
 
   const competitorsQuery = localCompetitors.length > 0 ? localCompetitors.join(',') : '';
-  // Build endpoint: rely on CacheManager in useR2Fetch to decide cache bypass; keep URL stable during background refreshes
+  // Build endpoint: keep URL stable to avoid runaway re-fetches.
+  // Use a one-time stable toggle (forceRefresh=true) when refreshKey > 0 instead of increasing _t.
   const baseCompetitorEndpoint = competitorsQuery 
-    ? `/api/retrieve-multiple/${normalizedAccountHolder}?competitors=${encodeURIComponent(competitorsQuery)}&platform=${platform}${refreshKey ? `&_t=${refreshKey}` : ''}`
+    ? `/api/retrieve-multiple/${normalizedAccountHolder}?competitors=${encodeURIComponent(competitorsQuery)}&platform=${platform}${refreshKey > 0 ? '&forceRefresh=true' : ''}`
     : '';
   const competitorEndpoint = baseCompetitorEndpoint || '';
   
@@ -516,6 +520,40 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
       return () => clearTimeout(timer);
     }
   }, [toast]);
+
+  // Lock background scroll and reset overlay scroll when any popup opens
+  React.useEffect(() => {
+    const htmlElement = document.documentElement;
+    const anyPopupOpen = Boolean(selectedCompetitor || showAddModal || showEditModal);
+    if (anyPopupOpen) {
+      document.body.classList.add('modal-open');
+      htmlElement.classList.add('modal-open');
+      // Ensure viewport jumps to top so popup is immediately visible on mobile
+      try {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+      } catch {
+        window.scrollTo(0, 0);
+      }
+      // Reset overlay scroll position after mount
+      requestAnimationFrame(() => {
+        try {
+          overlayRef.current?.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+        } catch {
+          if (overlayRef.current) {
+            overlayRef.current.scrollTop = 0;
+            overlayRef.current.scrollLeft = 0;
+          }
+        }
+      });
+    } else {
+      document.body.classList.remove('modal-open');
+      htmlElement.classList.remove('modal-open');
+    }
+    return () => {
+      document.body.classList.remove('modal-open');
+      htmlElement.classList.remove('modal-open');
+    };
+  }, [selectedCompetitor, showAddModal, showEditModal]);
 
   // ✅ NEW: Cleanup expired competitor loading states every minute
   useEffect(() => {
@@ -1249,6 +1287,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
       {showAddModal && createPortal(
         <motion.div
           className="popup-overlay"
+          ref={overlayRef}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -1316,6 +1355,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
       {showEditModal && createPortal(
         <motion.div
           className="popup-overlay"
+          ref={overlayRef}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -1385,6 +1425,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
       {selectedCompetitor && createPortal(
         <motion.div
           className="popup-overlay"
+          ref={overlayRef}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

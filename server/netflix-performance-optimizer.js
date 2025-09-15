@@ -94,18 +94,19 @@ class NetflixPerformanceOptimizer {
    */
   async getCached(key) {
     try {
-      if (this.redis && typeof this.redis.get === 'function') {
-        // Production Redis
-        const cached = await this.redis.get(key);
-        return cached ? JSON.parse(cached) : null;
-      } else if (this.redis instanceof Map) {
-        // Local memory cache
+      // IMPORTANT: Check Map fallback FIRST. Map also has a .get function,
+      // so we must distinguish types explicitly to avoid JSON.parse on objects.
+      if (this.redis instanceof Map) {
         const cached = this.redis.get(key);
         if (cached && cached.expires > Date.now()) {
           return cached.data;
         } else if (cached) {
           this.redis.delete(key); // Cleanup expired
         }
+      } else if (this.redis && typeof this.redis.get === 'function') {
+        // Production Redis/Cluster client returns strings
+        const cached = await this.redis.get(key);
+        return cached ? JSON.parse(cached) : null;
       }
     } catch (error) {
       console.warn('Cache read failed:', error.message);

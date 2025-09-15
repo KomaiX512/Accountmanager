@@ -429,10 +429,7 @@
     </script>
   </head>
   <body>
-    <!-- JAVASCRIPT-BASED: Bypass all CSS conflicts with DOM manipulation -->
-    <div id="splash-screen" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#0a0a0a;display:flex;align-items:center;justify-content:center;z-index:999999;font-family:system-ui;">
-      <h1 id="lcp-hero" style="font-size:96px;font-weight:700;color:#00ff88;margin:0;text-align:center;">Sentient Marketing</h1>
-    </div>
+    
         
         <!-- PWA Manifest -->
         <link rel="manifest" href="/manifest.json" />
@@ -598,106 +595,9 @@
         </script>
       </head>
       <body>
-        <!-- JAVASCRIPT-BASED: Bypass all CSS conflicts with DOM manipulation -->
-        <div id="splash-screen" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#0a0a0a;display:flex;align-items:center;justify-content:center;z-index:999999;font-family:system-ui;">
-          <h1 id="lcp-hero" style="font-size:96px;font-weight:700;color:#00ff88;margin:0;text-align:center;">Sentient Marketing</h1>
-        </div>
         
-        <!-- React root - hidden until ready -->
-        <div id="root" style="display:none;min-height:100vh;"></div>
-        
-        <script>
-      // ULTRA-OPTIMIZED: Immediate paint bypass React entirely
-      (function() {
-        function initSplash() {
-          // Ensure splash renders immediately without waiting for React
-          const splash = document.getElementById('splash-screen');
-          const hero = document.getElementById('lcp-hero');
-          if (splash && hero) {
-            // FORCE DIMENSIONS: Bypass all CSS conflicts with direct DOM manipulation
-            hero.style.cssText = `
-              position: fixed !important;
-              top: 0px !important;
-              left: 0px !important;
-              width: ${window.innerWidth}px !important;
-              height: ${window.innerHeight}px !important;
-              margin: 0px !important;
-              padding: 100px 50px !important;
-              font-size: 96px !important;
-              font-weight: 700 !important;
-              color: rgb(0, 255, 136) !important;
-              line-height: 0.9 !important;
-              letter-spacing: -3px !important;
-              text-shadow: rgba(0, 255, 136, 1) 0px 0px 30px !important;
-              box-sizing: border-box !important;
-              display: flex !important;
-              align-items: center !important;
-              justify-content: center !important;
-              text-align: center !important;
-              background: linear-gradient(135deg, rgba(0, 255, 136, 0.15), rgba(0, 136, 255, 0.1)) !important;
-              border: 3px solid rgba(0, 255, 136, 0.3) !important;
-              z-index: 1000 !important;
-              overflow: hidden !important;
-              visibility: visible !important;
-              opacity: 1 !important;
-              min-width: ${window.innerWidth}px !important;
-              min-height: ${window.innerHeight}px !important;
-              max-width: ${window.innerWidth}px !important;
-              max-height: ${window.innerHeight}px !important;
-            `;
-            
-            // OPTIMIZED: Trigger immediate paint and force LCP measurement ASAP
-            // Use multiple approaches to ensure fastest possible paint
-            hero.offsetHeight; // Force layout sync
-            hero.offsetWidth;  // Force layout sync
-            splash.offsetHeight; // Force layout sync
-            
-            // Force immediate repaint using multiple techniques
-            requestAnimationFrame(() => {
-              hero.style.transform = 'translateZ(0)'; // Force hardware acceleration
-              requestAnimationFrame(() => {
-                hero.style.willChange = 'transform'; // Optimize for animations
-                // Fire LCP as early as possible
-                const now = performance.now();
-                console.log('LCP Hero rendered at:', now + 'ms, dimensions:', hero.offsetWidth, 'x', hero.offsetHeight);
-              });
-            });
-          }
-        }
-        
-        // Force immediate paint after DOM ready (not load event)
-        if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', initSplash);
-        } else {
-          initSplash();
-        }
-        
-        // Ensure removal on DOMContentLoaded (with 1s fallback)
-        function removeAllSplashes() {
-          try {
-            const root = document.getElementById('root');
-            if (root) root.style.display = 'block';
-            const splashes = document.querySelectorAll('#splash-screen');
-            splashes.forEach(function(el) {
-              el.style.opacity = '0';
-              el.style.transition = 'opacity 0.3s ease-out';
-              setTimeout(function() { el.remove(); }, 300);
-            });
-          } catch (_) {
-            // no-op
-          }
-        }
-        if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', () => {
-            setTimeout(removeAllSplashes, 200); // allow initial paint
-          });
-        } else {
-          setTimeout(removeAllSplashes, 200);
-        }
-        // Fallback in case DOMContentLoaded missed
-        setTimeout(removeAllSplashes, 1200);
-      })();
-    </script>
+        <!-- React root -->
+        <div id="root" style="min-height:100vh;"></div>
     
     <!-- 🚀 NETFLIX/GOOGLE-SCALE CRITICAL RENDERING PATH -->
     <style>

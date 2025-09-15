@@ -651,7 +651,25 @@ const AppContent: React.FC = () => {
       console.log(`[App] 🔄 Triggering account reload #${reloadCountRef.current}: accountHolder=${accountHolder}, urlPlatform=${currentUrlPlatform}, accountPlatform=${accountPlatform}`);
       reloadInProgressRef.current = true;
       lastReloadTimeRef.current = now;
-      setIsLoadingUserData(true);
+
+      // 🚀 NON-BLOCKING NAVIGATION: Only block UI if we truly have no local username
+      const uidLocal = currentUser?.uid;
+      const localUsernameKey = uidLocal ? `${currentUrlPlatform}_username_${uidLocal}` : '';
+      const localUsernameVal = uidLocal ? (localStorage.getItem(localUsernameKey) || '') : '';
+      const hasLocalUsername = !!localUsernameVal && localUsernameVal.trim() !== '';
+      const shouldBlockUI = needsAccountReload && !hasLocalUsername;
+      setIsLoadingUserData(shouldBlockUI);
+
+      // ⏱️ SAFETY: Auto-clear overlay if backend is slow to respond
+      let forceClearTimer: ReturnType<typeof setTimeout> | null = null;
+      if (shouldBlockUI) {
+        forceClearTimer = setTimeout(() => {
+          if (reloadInProgressRef.current) {
+            console.warn('[App] ⏱️ Account reload timed out; rendering dashboard while syncing in background');
+            setIsLoadingUserData(false);
+          }
+        }, 5000); // 5s cap on blocking overlay
+      }
       
       const fetchUserStatus = async () => {
         try {
@@ -671,7 +689,8 @@ const AppContent: React.FC = () => {
           
           console.log(`[App] 🔄 Loading account info for platform: ${isTwitterDashboard ? 'Twitter' : isFacebookDashboard ? 'Facebook' : isLinkedInDashboard ? 'LinkedIn' : 'Instagram'}`);
           
-          const response = await axios.get(tsEndpoint, { headers: { 'Accept': 'application/json' } });
+          // ⏱️ Add timeout to prevent long hangs
+          const response = await axios.get(tsEndpoint, { headers: { 'Accept': 'application/json' }, timeout: 4000 });
           
           // Defensive check for valid response data
           if (!response.data || typeof response.data !== 'object') {
@@ -716,7 +735,7 @@ const AppContent: React.FC = () => {
             try {
               const platform = isTwitterDashboard ? 'twitter' : isFacebookDashboard ? 'facebook' : isLinkedInDashboard ? 'linkedin' : 'instagram';
               const accountInfoUrl = `/api/retrieve-account-info/${savedUsername}?platform=${platform}`;
-              const accountInfoResponse = await axios.get(`${accountInfoUrl}&ts=${Date.now()}`, { headers: { 'Accept': 'application/json' } });
+              const accountInfoResponse = await axios.get(`${accountInfoUrl}&ts=${Date.now()}`, { headers: { 'Accept': 'application/json' }, timeout: 5000 });
               savedCompetitors = accountInfoResponse.data.competitors || [];
               console.log(`[App] ✅ Retrieved competitors for ${savedUsername} on ${platform}:`, savedCompetitors);
               
@@ -897,6 +916,7 @@ const AppContent: React.FC = () => {
           console.log(`[App] 🚫 Platform ${platformKey} not set up in local cache - redirecting to setup`);
           safeNavigate(navigate, location.pathname.includes('twitter') ? '/twitter' : location.pathname.includes('facebook') ? '/facebook' : location.pathname.includes('linkedin') ? '/linkedin' : '/instagram', {}, 5);
         } finally {
+          if (forceClearTimer) clearTimeout(forceClearTimer);
           setIsLoadingUserData(false);
           reloadInProgressRef.current = false; // Reset the flag
           console.log(`[App] ✅ Account reload #${reloadCountRef.current} completed`);

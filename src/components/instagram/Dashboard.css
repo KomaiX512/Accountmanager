@@ -1,6 +1,7 @@
 /* CRITICAL FIX: Force overlays to always be viewport-relative regardless of parent containers */
 .popup-overlay,
-.modal-overlay {
+.modal-overlay,
+.chat-modal-overlay {
   position: fixed !important;
   inset: 0 !important;
   z-index: 2147483647 !important;
@@ -2476,15 +2477,18 @@ h2 {
   }
 
   .welcome-text {
-    font-size: 1.5rem;
-    font-weight: 700;
-    margin: 0;
-    line-height: 1.2;
-    letter-spacing: -0.3px;
+    font-size: clamp(1rem, 5.5vw, 1.25rem) !important;
+    font-weight: 700 !important;
+    margin: 0 !important;
+    line-height: 1.15 !important;
+    letter-spacing: -0.3px !important;
+    max-width: 88vw !important;
+    word-break: break-word !important;
+    hyphens: auto !important;
   }
 
   .welcome-subtext {
-    font-size: 0.9rem;
+    font-size: clamp(0.75rem, 3.5vw, 0.9rem);
     opacity: 0.7;
   }
 
@@ -3262,6 +3266,17 @@ h2 {
     margin-right: 0 !important;
     width: calc(100vw - 16px) !important;
   }
+  /* Ensure hero scales further down on ultra-small phones */
+  .welcome-text {
+    font-size: clamp(0.9rem, 6vw, 1.05rem) !important;
+    max-width: 90vw !important;
+    line-height: 1.15 !important;
+  }
+
+  .bio-text {
+    font-size: clamp(0.7rem, 3.6vw, 0.8rem) !important;
+    max-width: 92vw;
+  }
 
   .modules-container {
     padding: 12px;
@@ -3859,6 +3874,20 @@ h2 {
 @media (max-width: 767px) and (orientation: portrait) {
   .dashboard-wrapper {
     margin-left: 0 !important; /* No left bar on mobile, no margin needed */
+  }
+}
+
+/* 🔧 General mobile fallback (works in landscape or emulators) */
+@media (max-width: 767px) {
+  .welcome-header {
+    padding: 10px 12px 6px !important;
+  }
+  .welcome-text {
+    font-size: clamp(1rem, 5.3vw, 1.2rem) !important;
+    line-height: 1.15 !important;
+    max-width: 90vw !important;
+    word-break: break-word !important;
+    hyphens: auto !important;
   }
 }
 

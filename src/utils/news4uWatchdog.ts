@@ -204,7 +204,7 @@ class News4UWatchdog {
    * Fetch R2 bucket data with LastModified timestamps
    */
   private async fetchR2BucketData(config: WatchdogConfig): Promise<R2BucketItem[]> {
-    const url = `/api/news-for-you/${config.accountHolder}?platform=${config.platform}&includeMetadata=true&_cb=${Date.now()}`;
+    const url = `/api/news-for-you/${config.accountHolder}?platform=${config.platform}&limit=4&includeMetadata=true&_cb=${Date.now()}`;
     
     console.log(`[News4U Watchdog] 🌐 Fetching R2 bucket data: ${url}`);
     

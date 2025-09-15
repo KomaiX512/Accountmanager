@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import UserService from '../../services/UserService';
@@ -31,7 +32,31 @@ const AccessControlPopup: React.FC<AccessControlPopupProps> = ({
 }) => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
+  const overlayRef = useRef<HTMLDivElement | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  useEffect(() => {
+    const html = document.documentElement;
+    if (isOpen) {
+      document.body.classList.add('modal-open');
+      html.classList.add('modal-open');
+      // Ensure overlay starts at top
+      requestAnimationFrame(() => {
+        if (overlayRef.current) {
+          try {
+            overlayRef.current.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+          } catch {
+            overlayRef.current.scrollTop = 0;
+            overlayRef.current.scrollLeft = 0;
+          }
+        }
+      });
+    }
+    return () => {
+      document.body.classList.remove('modal-open');
+      html.classList.remove('modal-open');
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -120,8 +145,9 @@ const AccessControlPopup: React.FC<AccessControlPopupProps> = ({
   };
 
   return (
-    <div className="access-control-overlay" onClick={onClose}>
-      <div className="access-control-popup" onClick={(e) => e.stopPropagation()}>
+    createPortal(
+      <div className="access-control-overlay" onClick={onClose} ref={overlayRef}>
+        <div className="access-control-popup" onClick={(e) => e.stopPropagation()}>
         <button className="popup-close" onClick={onClose}>
           ✕
         </button>
@@ -199,11 +225,13 @@ const AccessControlPopup: React.FC<AccessControlPopupProps> = ({
           </button>
         </div>
 
-        <div className="popup-footer">
-          <p>💰 30-day money-back guarantee</p>
+          <div className="popup-footer">
+            <p>💰 30-day money-back guarantee</p>
+          </div>
         </div>
-      </div>
-    </div>
+      </div>,
+      document.body
+    )
   );
 };
 

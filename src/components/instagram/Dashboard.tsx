@@ -24,9 +24,9 @@ import AutopilotPopup from '../common/AutopilotPopup';
 import ProfilePopup from '../common/ProfilePopup';
 import ManualGuidance from '../common/ManualGuidance';
 
-import ChatModal from './ChatModal';
+import ChatModal from '../common/ChatModal';
 import RagService from '../../services/RagService';
-import type { ChatMessage as ChatModalMessage } from './ChatModal';
+import type { ChatMessage as ChatModalMessage } from '../common/ChatModal';
 import type { Notification, ProfileInfo, LinkedAccount } from '../../types/notifications';
 import { safeFilter, safeLength } from '../../utils/safeArrayUtils';
 // Import icons from react-icons
@@ -163,10 +163,7 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const [aiProcessingNotifications, setAiProcessingNotifications] = useState<Record<string, boolean>>({});
   const [linkedAccounts] = useState<LinkedAccount[]>([]);
 
-  const [showInitialText, setShowInitialText] = useState(true);
-  const [showBio, setShowBio] = useState(false);
-  const [typedBio, setTypedBio] = useState('');
-  const [bioAnimationComplete, setBioAnimationComplete] = useState(false);
+  // Simple bio expand/collapse (no animations)
   const [isBioExpanded, setIsBioExpanded] = useState(false);
 
   // 🍎 Mobile expandable modules state
@@ -1388,7 +1385,7 @@ Image Description: ${response.post.image_prompt}
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
-        axios.get(`/api/posts/${accountHolder}`).catch(err => {
+        axios.get(`/api/posts/${accountHolder}?limit=12`).catch(err => {
           if (err.response?.status === 404) return { data: [] };
           throw err;
         }),
@@ -1488,7 +1485,7 @@ Image Description: ${response.post.image_prompt}
           });
         }
         if (prefix.startsWith(`ready_post/${accountHolder}/`)) {
-          axios.get(`/api/posts/${accountHolder}`).then(res => {
+          axios.get(`/api/posts/${accountHolder}?limit=12`).then(res => {
             setPosts(res.data);
             setToast('New post cooked!');
           }).catch(err => {
@@ -1655,9 +1652,7 @@ Image Description: ${response.post.image_prompt}
     setIsResetConfirmOpen(false);
   };
 
-  const handleBioClick = () => {
-    setIsBioExpanded(!isBioExpanded);
-  };
+  // Removed old bio click handler; inline toggle is used where rendered
 
   const handleConfirmReset = async () => {
     if (!currentUser) {
@@ -2036,53 +2031,7 @@ Image Description: ${response.post.image_prompt}
     }
   }, [accountHolder]);
 
-  // Bio typing animation effect
-  useEffect(() => {
-    if (!profileInfo?.biography || !profileInfo.biography.trim()) {
-      return;
-    }
-
-    // Start the initial animation sequence
-    const timer1 = setTimeout(() => {
-      // Fade out initial text after 5 seconds
-      setShowInitialText(false);
-      
-      // Start showing bio with typing effect after fade out completes
-      setTimeout(() => {
-        setShowBio(true);
-        
-        // Start typing animation
-        const bio = profileInfo.biography!;
-        let currentIndex = 0;
-        
-        const typeNextChar = () => {
-          if (currentIndex < bio.length) {
-            setTypedBio(bio.substring(0, currentIndex + 1));
-            currentIndex++;
-            
-            // Fast typing speed - 50ms per character
-            setTimeout(typeNextChar, 50);
-          } else {
-            setBioAnimationComplete(true);
-          }
-        };
-        
-        typeNextChar();
-      }, 500); // Wait for fade out to complete
-    }, 5000); // Initial 5 second delay
-
-    return () => clearTimeout(timer1);
-  }, [profileInfo?.biography]);
-
-  // Reset animation states when profile info changes
-  useEffect(() => {
-    if (profileInfo?.biography && profileInfo.biography.trim()) {
-      setShowInitialText(true);
-      setShowBio(false);
-      setTypedBio('');
-      setBioAnimationComplete(false);
-    }
-  }, [profileInfo]);
+  // Remove typing/fade animations: no-op hooks
 
   // Check campaign status when component mounts or accountHolder changes
   useEffect(() => {
@@ -2128,17 +2077,25 @@ Image Description: ${response.post.image_prompt}
         <h1 className="welcome-text">
           Welcome {profileInfo?.fullName || accountHolder}!
         </h1>
-        <div className="welcome-subtext-container">
-          {profileInfo?.biography && profileInfo.biography.trim() && (
-            <div
-              className={`bio-text ${isBioExpanded ? 'expanded' : 'collapsed'}`}
-              onClick={() => setIsBioExpanded(!isBioExpanded)}
-              style={{ cursor: 'pointer' }}
-            >
-              {typedBio || profileInfo.biography}
-            </div>
-          )}
-        </div>
+        {profileInfo?.biography && profileInfo.biography.trim() && (
+          <div
+            onClick={() => setIsBioExpanded(!isBioExpanded)}
+            style={{
+              cursor: 'pointer',
+              marginTop: '4px',
+              color: 'inherit',
+              fontWeight: 400,
+              fontSize: '0.95rem',
+              whiteSpace: isBioExpanded ? 'pre-wrap' : 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }}
+            aria-label="Account bio"
+            title={isBioExpanded ? 'Click to collapse' : 'Click to expand'}
+          >
+            {profileInfo.biography}
+          </div>
+        )}
       </div>
       <div className="modules-container">
         <div className="dashboard-grid">
@@ -2240,6 +2197,15 @@ Image Description: ${response.post.image_prompt}
                     </button>
                     
                     {/* 🚀 AUTOPILOT: Autopilot button with glassmorphism style */}
+                    <button
+                      onClick={() => setIsChatModalOpen(true)}
+                      className="dashboard-btn chat-btn instagram"
+                      title="AI Discussion Chat"
+                    >
+                      <FaRobot className="btn-icon" />
+                      <span>AI Chat</span>
+                    </button>
+                    
                     <button
                       onClick={handleOpenAutopilotPopup}
                       className="dashboard-btn autopilot-btn instagram"

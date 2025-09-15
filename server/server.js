@@ -268,6 +268,10 @@ const CACHE_CONFIG = {
   POST_COOKED: {
     TTL: 3 * 60 * 60 * 1000, // 3 hours for PostCooked module
     ENABLED: true
+  },
+  NEWS: {
+    TTL: 4 * 60 * 60 * 1000, // 4 hours for News4U (stale-while-revalidate acceptable window)
+    ENABLED: true
   }
 };
 
@@ -278,9 +282,9 @@ const MODULE_CACHE_CONFIG = {
   'competitor_analysis': CACHE_CONFIG.STANDARD,
   'recommendations': CACHE_CONFIG.STANDARD,
   'engagement_strategies': CACHE_CONFIG.STANDARD,
-  'NewForYou': CACHE_CONFIG.REALTIME, // No caching for news - always fresh
-  'news_for_you': CACHE_CONFIG.REALTIME, // No caching for news - always fresh
-  'news-for-you': CACHE_CONFIG.REALTIME, // No caching for news - always fresh
+  'NewForYou': CACHE_CONFIG.NEWS, // Cache news for fast reloads
+  'news_for_you': CACHE_CONFIG.NEWS, // Cache news for fast reloads
+  'news-for-you': CACHE_CONFIG.NEWS, // Cache news for fast reloads
   'ProfileInfo': CACHE_CONFIG.REALTIME, // Disable caching for ProfileInfo to always get fresh data
   'queries': CACHE_CONFIG.STANDARD,
   'rules': CACHE_CONFIG.STANDARD,
@@ -2505,7 +2509,7 @@ app.get('/api/health', async (req, res) => {
 // REMOVED: Duplicate SSE endpoint - using the enhanced version below
 
 // Enhanced data fetching with centralized schema management and performance optimization
-async function fetchDataForModule(username, prefixTemplate, forceRefresh = false, platform = 'instagram') {
+async function fetchDataForModule(username, prefixTemplate, forceRefresh = false, platform = 'instagram', limit) {
   if (!username) {
     console.error('No username provided, cannot fetch data');
     return [];
@@ -2615,7 +2619,7 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
       maxItems = 3; // Return top 3
       maxStorageItems = 8; // Keep 8 in storage
     } else if (module === 'news_for_you') {
-      maxItems = 4; // Return top 4 
+      maxItems = typeof limit === 'number' && limit > 0 ? Math.min(limit, 10) : 4; // Return top 4 by default (limit override supported)
       maxStorageItems = 8; // Keep only 8 in R2 bucket for performance
     } else {
       maxItems = sortedFiles.length; // Other modules: all items
@@ -2743,7 +2747,7 @@ async function fetchDataForModule(username, prefixTemplate, forceRefresh = false
 }
 
 // 🎯 WATCHDOG METADATA FUNCTION: Returns R2 bucket data with LastModified timestamps
-async function fetchDataForModuleWithMetadata(username, prefixTemplate, forceRefresh = false, platform = 'instagram') {
+async function fetchDataForModuleWithMetadata(username, prefixTemplate, forceRefresh = false, platform = 'instagram', limit) {
   if (!username) {
     console.error('No username provided, cannot fetch metadata');
     return [];
@@ -2815,7 +2819,7 @@ async function fetchDataForModuleWithMetadata(username, prefixTemplate, forceRef
     const bucketDataWithMetadata = [];
     
     // Limit to top items for performance
-    const maxItems = module === 'news_for_you' ? 4 : sortedMetadata.length;
+    const maxItems = module === 'news_for_you' ? (typeof limit === 'number' && limit > 0 ? Math.min(limit, 10) : 4) : sortedMetadata.length;
     const topFiles = sortedMetadata.slice(0, maxItems);
     
     for (const fileMeta of topFiles) {
@@ -3832,17 +3836,19 @@ app.get(['/news-for-you/:accountHolder', '/api/news-for-you/:accountHolder'], as
     const { platform, username } = PlatformSchemaManager.parseRequestParams(req);
     const forceRefresh = req.query.forceRefresh === 'true';
     const includeMetadata = req.query.includeMetadata === 'true';
+    const parsedLimit = parseInt(String(req.query.limit));
+    const limit = Number.isNaN(parsedLimit) ? undefined : parsedLimit;
 
     console.log(`[News4U API] 📡 Request for ${username} on ${platform}, forceRefresh: ${forceRefresh}, includeMetadata: ${includeMetadata}`);
 
     if (includeMetadata) {
       // 🎯 WATCHDOG MODE: Return R2 bucket metadata with LastModified timestamps
-      const bucketData = await fetchDataForModuleWithMetadata(username, 'news_for_you/{username}', forceRefresh, platform);
+      const bucketData = await fetchDataForModuleWithMetadata(username, 'news_for_you/{username}', forceRefresh, platform, limit);
       console.log(`[News4U API] 🎯 Watchdog mode: returning ${bucketData.length} items with metadata`);
       res.json(bucketData);
     } else {
       // 🔄 NORMAL MODE: Return processed news items as before
-      const data = await fetchDataForModule(username, 'news_for_you/{username}', forceRefresh, platform);
+      const data = await fetchDataForModule(username, 'news_for_you/{username}', forceRefresh, platform, limit);
       if (data.length === 0) {
         res.status(404).json({ error: `No ${platform} news files found` });
       } else {
@@ -4054,22 +4060,61 @@ app.post(['/api/rag/discussion', '/api/discussion'], async (req, res) => {
   }
 });
 
+// Simple in-memory idempotency for post generation to prevent duplicates
+// Keyed by sha256(username|platform|query). Holds in-flight promises and recent results.
+const postGenInFlight = new Map();
+const postGenRecent = new Map(); // key -> { data, ts }
+const POST_GEN_RECENT_TTL_MS = 120000; // 2 minutes
+
 // Proxy POST /api/rag/post-generator to RAG server
 app.post(['/api/rag/post-generator', '/api/post-generator'], async (req, res) => {
   setCorsHeaders(res, req.headers.origin || '*');
   const username = req.body.username;
   const platform = req.body.platform || 'instagram';
+  const query = req.body.query || '';
+  const dedupeKey = crypto
+    .createHash('sha256')
+    .update(`${String(platform)}|${String(username)}|${String(query)}`)
+    .digest('hex');
   
   try {
     console.log(`[POST-GENERATOR] 🚀 Creating ${platform} post for ${username}`);
-    
-    const response = await axios.post('http://localhost:3001/api/post-generator', req.body, {
-      headers: { 'Content-Type': 'application/json' },
-      timeout: 180000 // 3 minute timeout for image generation
-    });
+
+    // If an identical request was very recently completed, return cached result
+    const recent = postGenRecent.get(dedupeKey);
+    if (recent && (Date.now() - recent.ts) < POST_GEN_RECENT_TTL_MS) {
+      console.log(`[POST-GENERATOR] ♻️ Returning recent result (deduped) for ${platform}/${username}`);
+      return res.json({ ...recent.data, deduped: true });
+    }
+
+    // If an identical request is already in-flight, await it
+    if (postGenInFlight.has(dedupeKey)) {
+      console.log(`[POST-GENERATOR] ⏳ Duplicate request detected, awaiting in-flight result for ${platform}/${username}`);
+      try {
+        const data = await postGenInFlight.get(dedupeKey);
+        return res.json({ ...data, deduped: true });
+      } catch (e) {
+        console.warn(`[POST-GENERATOR] ⚠️ In-flight request failed for ${platform}/${username}:`, e?.message || e);
+        // fall through to try fresh request
+      }
+    }
+
+    // Start new upstream request and register it as in-flight
+    const upstreamPromise = (async () => {
+      const response = await axios.post('http://localhost:3001/api/post-generator', req.body, {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 180000 // 3 minute timeout for image generation
+      });
+      return response.data;
+    })();
+
+    postGenInFlight.set(dedupeKey, upstreamPromise);
+    const data = await upstreamPromise;
+    postGenInFlight.delete(dedupeKey);
+    postGenRecent.set(dedupeKey, { data, ts: Date.now() });
     
     // ✅ SUCCESS: Post created, now increment usage directly in backend
-    if (response.data && response.data.post) {
+    if (data && data.post && !data.deduped) {
       console.log(`[POST-GENERATOR] ✅ Post created successfully, incrementing usage for ${platform}/${username}`);
       
       try {
@@ -4130,8 +4175,8 @@ app.post(['/api/rag/post-generator', '/api/post-generator'], async (req, res) =>
         // Don't fail the entire request if usage tracking fails
       }
     }
-    
-    res.json(response.data);
+
+    res.json(data);
   } catch (error) {
     console.error(`[POST-GENERATOR] Proxy error:`, error?.response?.data || error.message);
     res.status(500).json({ error: 'Failed to generate post', details: error.message });
@@ -4468,10 +4513,13 @@ app.get(['/posts/:username', '/api/posts/:username'], async (req, res) => {
     
     // Create platform-specific prefix using centralized schema manager
     const prefix = PlatformSchemaManager.buildPath('ready_post', platform, username);
-
-    // 🔥 FIX: Remove posts cache to ensure fresh data on refresh
-    // The posts cache was preventing refresh from working properly
-    // Now every request will fetch fresh data from R2
+    
+    // ⚡ Serve from in-memory cache when valid (stale-while-revalidate behavior)
+    if (!forceRefresh && !isRealTime && shouldUseCache(prefix)) {
+      console.log(`[${new Date().toISOString()}] [API-POSTS] Cache HIT for ${prefix}`);
+      const cached = cache.get(prefix) || [];
+      return res.json(cached);
+    }
     
     // Set real-time headers if requested
     if (isRealTime) {
@@ -4499,11 +4547,15 @@ app.get(['/posts/:username', '/api/posts/:username'], async (req, res) => {
       return key.endsWith('.jpg') || key.endsWith('.jpeg') || key.endsWith('.png') || key.endsWith('.webp');
     });
     
-    console.log(`[${new Date().toISOString()}] Found ${jsonFiles.length} JSON files and ${imageFiles.length} image files in ${prefix}/ for ${platform}`);
+    // Sort JSON files by LastModified (newest first) and limit to reduce R2 round-trips
+    const sortedJsonFiles = jsonFiles.sort((a, b) => new Date(b.LastModified).getTime() - new Date(a.LastModified).getTime());
+    const limit = Math.min(parseInt(req.query.limit) || 24, sortedJsonFiles.length);
+    const jsonFilesToProcess = sortedJsonFiles.slice(0, limit);
+    console.log(`[${new Date().toISOString()}] Found ${jsonFiles.length} JSON and ${imageFiles.length} images in ${prefix}/. Processing top ${limit} by LastModified for ${platform}`);
     
     // Store the post data
     const posts = await Promise.all(
-      jsonFiles.map(async (file) => {
+      jsonFilesToProcess.map(async (file) => {
         try {
           const getCommand = new GetObjectCommand({
             Bucket: 'tasks',
@@ -4680,8 +4732,13 @@ app.get(['/posts/:username', '/api/posts/:username'], async (req, res) => {
     // Filter out null results from skipped posts
     const validPosts = posts.filter(post => post !== null);
 
-    // 🔥 FIX: Don't cache posts to ensure fresh data on every request
-    console.log(`[${new Date().toISOString()}] Returning ${validPosts.length} fresh posts for ${username} (no cache)`);
+    // 🧠 Cache posts for fast subsequent loads unless explicitly bypassed
+    if (!isRealTime && !forceRefresh) {
+      cache.set(prefix, validPosts);
+      cacheTimestamps.set(prefix, Date.now());
+      console.log(`[${new Date().toISOString()}] [API-POSTS] Cached ${validPosts.length} posts for ${prefix}`);
+    }
+    console.log(`[${new Date().toISOString()}] Returning ${validPosts.length} posts for ${username}`);
     res.json(validPosts);
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Retrieve posts error for ${username}:`, error);

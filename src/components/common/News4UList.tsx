@@ -320,15 +320,15 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
         throw new Error('Account holder or platform missing');
       }
       
-      // Force fresh news every time - no caching
-      const baseUrl = `/api/news-for-you/${effectiveAccountHolder}?platform=${effectivePlatform}`;
-      const url = `${baseUrl}&forceRefresh=true&_cb=${Date.now()}&_key=${forceRefreshKey}`;
+      // Cache-first, then background revalidate
+      // Explicitly request only top 4 items from backend for speed (logic unchanged on frontend)
+      const baseUrl = `/api/news-for-you/${effectiveAccountHolder}?platform=${effectivePlatform}&limit=4`;
+      const cachedUrl = `${baseUrl}&_key=${forceRefreshKey}`;
+      const freshUrl = `${baseUrl}&forceRefresh=true&_cb=${Date.now()}&_key=${forceRefreshKey}`;
       
-      console.log(`[News4U] 🔍 Fetching news for ${effectiveAccountHolder} on ${effectivePlatform} (key: ${forceRefreshKey})`);
-      console.log(`[News4U] 🔍 API URL: ${url}`);
-      console.log(`[News4U] 🔍 Force refresh: true, Cache busting: ${Date.now()}`);
-      
-      const res = await axios.get(url);
+      console.log(`[News4U] 🔍 Fetching news (cache-first) for ${effectiveAccountHolder} on ${effectivePlatform} (key: ${forceRefreshKey})`);
+      console.log(`[News4U] 🔍 Cached URL: ${cachedUrl}`);
+      const res = await axios.get(cachedUrl, { timeout: 7000 });
       console.log(`[News4U] Raw response status:`, res.status);
       console.log(`[News4U] Raw response headers:`, res.headers);
       console.log(`[News4U] Raw response data:`, res.data);
@@ -485,6 +485,62 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       console.log(`[News4U] Total items processed: ${normalized.length}, Selected: ${selectedItems.length}, Platform: ${effectivePlatform}`);
       console.log(`[News4U] Latest item timestamp tracked:`, latestItemTimestamp);
       setLastFetchTime(Date.now());
+
+      // 🔄 Background revalidate without blocking UI
+      void (async () => {
+        try {
+          const freshRes = await axios.get(freshUrl, { timeout: 7000 });
+          if (freshRes?.data) {
+            // Repeat normalization for fresh data
+            const itemsOrArraysFresh: any[] = (freshRes.data ?? [])
+              .map((r: any) => (r && typeof r === 'object' && 'data' in r ? r.data : r))
+              .filter(Boolean);
+            const rawItemsFresh: any[] = [];
+            for (const entry of itemsOrArraysFresh) {
+              if (!entry) continue;
+              if (Array.isArray(entry)) rawItemsFresh.push(...entry);
+              else if (Array.isArray(entry.items)) rawItemsFresh.push(...entry.items);
+              else if (Array.isArray(entry.articles)) rawItemsFresh.push(...entry.articles);
+              else if (Array.isArray(entry.news_items)) rawItemsFresh.push(...entry.news_items);
+              else if (entry.news_item && typeof entry.news_item === 'object') rawItemsFresh.push(entry.news_item);
+              else rawItemsFresh.push(entry);
+            }
+            const expandedFresh: any[] = [];
+            for (const it of rawItemsFresh) {
+              if (it && Array.isArray(it.news_data)) {
+                for (const nd of it.news_data) expandedFresh.push({ ...it, news_data: nd });
+              } else {
+                expandedFresh.push(it);
+              }
+            }
+            const normalizedFresh: NewsItem[] = expandedFresh.map((n: any) => {
+              let base = n;
+              if (n && typeof n === 'object' && n.news_data) base = n.news_data;
+              else if (n && typeof n === 'object' && n.data) base = n.data;
+              else if (n && typeof n === 'object' && n.content) base = n.content;
+              else if (n && typeof n === 'object' && n.news_item) base = n.news_item;
+              const title: string = base?.title || base?.headline || base?.name || base?.subject || '';
+              const description: string = base?.description || base?.summary || base?.breaking_news_summary || base?.body || base?.text || '';
+              const image_url: string = base?.image_url || base?.image || base?.thumbnail || base?.picture || '';
+              const source_url: string = base?.source_url || base?.url || base?.link || base?.source || '';
+              const timestamp: string = base?.timestamp || base?.fetched_at || base?.published_at || base?.created_at || n?.export_timestamp;
+              const source: string | undefined = base?.source || base?.publisher || base?.author || undefined;
+              const iteration: number | undefined = n?.iteration || base?.export_iteration;
+              const fetched_at: string | undefined = base?.fetched_at || base?.created_at;
+              const id: string | undefined = n?.export_metadata?.export_path || n?.key || (source_url && fetched_at ? `${source_url}::${fetched_at}` : undefined) || (source_url && timestamp ? `${source_url}::${timestamp}` : undefined) || (title ? `${title}::${timestamp}` : undefined);
+              return { id, title, description, image_url, source_url, timestamp, source, fetched_at, iteration } as NewsItem;
+            });
+            const freshTop3 = normalizedFresh.slice(0, 3);
+            // Update UI if changed
+            if (JSON.stringify(freshTop3) !== JSON.stringify(selectedItems)) {
+              console.log('[News4U] 🔄 Background revalidation updated items');
+              setItems(freshTop3);
+            }
+          }
+        } catch (revalErr) {
+          console.warn('[News4U] Background revalidate failed:', (revalErr as any)?.message);
+        }
+      })();
 
     } catch (err: any) {
       console.error(`[News4U] ❌ Error fetching news:`, err);

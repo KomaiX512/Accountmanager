@@ -409,6 +409,10 @@ class RagService {
     platform: string = 'instagram'
   ): Promise<PostGenerationResponse> {
     let lastError: any = null;
+
+    // Client-side deduplication: avoid sending identical request more than once in a short window
+    // Uses existing deduplicatedRequest helper with a conservative TTL
+    const cacheKey = `postgen_${platform}_${username}_${query.slice(0, 120)}`;
     
     try {
       if (this.VERBOSE_LOGGING) {
@@ -416,20 +420,22 @@ class RagService {
       console.log(`[RagService] Step 1/4: Initiating request to RAG server`);
       }
       
-      const response = await this.tryServerUrls(`/api/rag/post-generator`, (url) => 
-        axios.post(url, {
-          username,
-          query,
-          platform,
-          firebaseUID: (JSON.parse(localStorage.getItem('currentUser') || 'null') || {})?.uid
-        }, {
-          timeout: 180000, // 3 minute timeout for image generation + queueing
-          withCredentials: false, // Disable sending cookies
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        }), this.RAG_SERVER_URLS
-      );
+      const response = await this.deduplicatedRequest(cacheKey, async () => {
+        return await this.tryServerUrls(`/api/rag/post-generator`, (url) => 
+          axios.post(url, {
+            username,
+            query,
+            platform,
+            firebaseUID: (JSON.parse(localStorage.getItem('currentUser') || 'null') || {})?.uid
+          }, {
+            timeout: 180000, // 3 minute timeout for image generation + queueing
+            withCredentials: false, // Disable sending cookies
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }), this.RAG_SERVER_URLS
+        );
+      }, true);
       
       // Process the result
       if (this.VERBOSE_LOGGING) {

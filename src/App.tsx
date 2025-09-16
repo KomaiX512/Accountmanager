@@ -131,7 +131,7 @@ const AppContent: React.FC = () => {
         
         // Check proxy server health through proxy endpoints
         // Try to fetch a simple test endpoint that exercises the proxy functionality
-        const response = await fetch('/health', { 
+        const response = await fetch('/api/proxy-health', { 
           method: 'GET',
           signal: controller.signal,
           cache: 'no-cache' // Prevent caching of health checks

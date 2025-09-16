@@ -12,12 +12,23 @@ import multer from 'multer';
 import sharp from 'sharp';
 import * as net from 'net';
 import { exec } from 'child_process';
+import os from 'os';
 
 // Add at the top of the file
 const DEBUG_LOGS = process.env.DEBUG_LOGS === 'true';
 
 const app = express();
 const port = process.env.PROXY_SERVER_PORT || 3002;
+
+// Optimize sharp concurrency for VPS to smooth out CPU spikes
+try {
+  const cores = (os.cpus && os.cpus()) ? os.cpus().length : 2;
+  const target = Math.max(1, Math.min(cores, 2)); // cap at 2 for small VPS
+  sharp.concurrency(target);
+  if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [SHARP] Concurrency set to ${target} (cores=${cores})`);
+} catch (e) {
+  if (DEBUG_LOGS) console.warn(`[${new Date().toISOString()}] [SHARP] Failed to set concurrency:`, e.message);
+}
 
 if (DEBUG_LOGS) console.log('Setting up server with proxy endpoints...');
 
@@ -401,6 +412,7 @@ app.use((req, res, next) => {
   const allowedPaths = [
     '/health',
     '/api/health',  // Added for production monitoring
+    '/api/proxy-health', // Fast proxy-only health endpoint
     // '/fix-image', // disabled
     '/r2-images',
     '/proxy-image',
@@ -688,7 +700,16 @@ app.get('/health', async (req, res) => {
         Bucket: 'tasks',
         MaxKeys: 1
       });
-      testResult = await s3Client.send(listCommand);
+      
+      // Add timeout to S3 operation to prevent health check hangs
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('S3 health check timeout after 5 seconds')), 5000);
+      });
+      
+      testResult = await Promise.race([
+        s3Client.send(listCommand),
+        timeoutPromise
+      ]);
     } catch (err) {
       testResult = { error: err.message };
     }
@@ -717,6 +738,34 @@ app.get('/health', async (req, res) => {
       error: error.message,
       timestamp: new Date().toISOString()
     });
+  }
+});
+
+// Fast health check endpoint without S3 test for load balancers
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    status: 'healthy',
+    service: 'proxy-server',
+    timestamp: new Date().toISOString(),
+    port: port,
+    pid: process.pid,
+    uptime: process.uptime()
+  });
+});
+
+// Fast, proxy-only health endpoint that never touches S3
+app.get('/api/proxy-health', (req, res) => {
+  try {
+    res.status(200).json({
+      status: 'ok',
+      service: 'proxy-server',
+      timestamp: new Date().toISOString(),
+      pid: process.pid,
+      port,
+      uptime: process.uptime()
+    });
+  } catch (e) {
+    res.status(500).json({ status: 'error', error: e.message });
   }
 });
 
@@ -1713,7 +1762,9 @@ app.get('/r2-images/:username/:filename', async (req, res) => {
     const localFallbackPath = path.join(process.cwd(), 'ready_post', platform, username, filename);
     
     // Fetch image with all our fallbacks
+    const fetchStart = Date.now();
     const { data, source } = await fetchImageWithFallbacks(key, localFallbackPath, username, filename);
+    const fetchDuration = Date.now() - fetchStart;
     
     // Detect actual image format from the data
     let contentType = 'image/jpeg'; // Default
@@ -1747,10 +1798,13 @@ app.get('/r2-images/:username/:filename', async (req, res) => {
     }
     
     let dataForResponse = data;
+    let convertDuration = 0;
     // Check if the image is WebP and convert it to JPEG
     if (contentType === 'image/webp') {
       if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGES] Converting WebP to JPEG.`);
+      const convertStart = Date.now();
       dataForResponse = await convertWebPToJPEG(data);
+      convertDuration = Date.now() - convertStart;
       contentType = 'image/jpeg'; // Update content type after conversion
     }
     
@@ -1761,14 +1815,19 @@ app.get('/r2-images/:username/:filename', async (req, res) => {
     res.setHeader('X-Image-Source', source); // For debugging
     res.setHeader('X-Image-Format', contentType.split('/')[1]); // For debugging
     res.setHeader('Access-Control-Expose-Headers', 'X-Image-Source, X-Image-Format');
+    // Performance breakdown headers
+    const totalDuration = Date.now() - startTime;
+    res.setHeader('X-Stage-Fetch-ms', String(fetchDuration));
+    res.setHeader('X-Stage-Convert-ms', String(convertDuration));
+    res.setHeader('X-Total-Duration-ms', String(totalDuration));
+    res.setHeader('Server-Timing', `fetch;dur=${fetchDuration}, convert;dur=${convertDuration}, total;dur=${totalDuration}`);
     
     // Send the image
     res.send(dataForResponse);
     
     // Log performance
-    const duration = Date.now() - startTime;
-    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGES] Served ${platform}/${username}/${filename} from ${source} in ${duration}ms`);
-    
+    if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGES] Served ${platform}/${username}/${filename} from ${source} | fetch=${fetchDuration}ms convert=${convertDuration}ms total=${totalDuration}ms`);
+  
   } catch (error) {
     if (DEBUG_LOGS) console.error(`[${new Date().toISOString()}] [R2-IMAGES] Error:`, error);
     

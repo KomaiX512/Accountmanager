@@ -1,5 +1,9 @@
 // ✅ SMART BACKEND SELECTION: Use VPS only for specific cross-device features
 function getBaseUrl(): string {
+  // If we're on production domain, always use VPS backend
+  if (typeof window !== 'undefined' && window.location.hostname.includes('sentientm.com')) {
+    return 'https://sentientm.com';
+  }
   // Default: use local backend for module data (recommendations, strategies, etc.)
   return '';
 }
@@ -15,7 +19,12 @@ function getVpsBaseUrl(): string {
     
     if (isLocal && !forceLocal) {
       console.log('[API CONFIG] 🔗 Using VPS backend for cross-device sync features');
-      return 'https://www.sentientm.com';
+      return 'https://sentientm.com';
+    }
+    
+    // If on production domain, use same domain
+    if (hostname.includes('sentientm.com')) {
+      return 'https://sentientm.com';
     }
   }
   

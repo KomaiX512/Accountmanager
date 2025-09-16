@@ -56,39 +56,15 @@ export default defineConfig({
     outDir: 'dist',
     target: 'es2020',
     sourcemap: false,
-    minify: 'terser',
+    minify: 'esbuild',
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       external: [],
       output: {
         manualChunks: (id) => {
-          // Keep React and ReactDOM together to prevent version mismatches
-          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
-            return 'react-vendor';
-          }
-          if (id.includes('node_modules/react-router')) {
-            return 'router';
-          }
-          if (id.includes('node_modules/')) {
-            return 'vendor';
-          }
+          // Put all third-party deps into a single vendor chunk
+          if (id.includes('node_modules/')) return 'vendor';
         }
-      }
-    },
-    terserOptions: {
-      compress: {
-        drop_console: false,
-        drop_debugger: true,
-        pure_funcs: [],
-        keep_fargs: false,
-        passes: 1
-      },
-      mangle: {
-        safari10: true,
-        keep_fnames: false
-      },
-      format: {
-        comments: false
       }
     }
   },

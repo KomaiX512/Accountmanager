@@ -77,7 +77,7 @@ class ChromaDBService {
 
   async initialize() {
     try {
-      this.chromaURL = process.env.CHROMADB_URL || 'http://127.0.0.1:8000';
+      this.chromaURL = process.env.CHROMADB_URL || 'http://127.0.0.1:8001';
       console.log(`[ChromaDB] Connecting to ChromaDB at ${this.chromaURL}...`);
       
       // Test connection with v2 API heartbeat

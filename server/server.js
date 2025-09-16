@@ -228,6 +228,39 @@ if (netflixOptimizer.responseTimeTracker) {
 // Serve temporary images for Instagram access
 app.use('/temp-images', express.static(path.join(process.cwd(), 'server', 'temp-images')));
 
+// End-to-end latency tracing: correlation ID and precise server timing
+app.use((req, res, next) => {
+  try {
+    const reqId = (req.headers['x-req-id'] && req.headers['x-req-id'].toString()) || randomUUID();
+    res.setHeader('X-Request-Id', reqId);
+    res.setHeader('X-Request-Start', String(Date.now()));
+
+    const startHr = process.hrtime.bigint();
+    const originalEnd = res.end;
+
+    // Override res.end to set timing headers just before sending the response
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    res.end = function (chunk, encoding, cb) {
+      try {
+        const endHr = process.hrtime.bigint();
+        const durMs = Number(endHr - startHr) / 1e6;
+        // Standard Server-Timing header and custom duration header
+        res.setHeader('Server-Timing', `app;dur=${durMs.toFixed(1)}`);
+        res.setHeader('X-Server-Duration', durMs.toFixed(1));
+        // Structured timing log to correlate with frontend
+        console.log(`[TIMING] ${req.method} ${req.originalUrl} id=${reqId} status=${res.statusCode} ${durMs.toFixed(1)}ms`);
+      } catch (e) {
+        // ignore logging errors
+      }
+      // @ts-ignore
+      return originalEnd.call(this, chunk, encoding, cb);
+    };
+  } catch (e) {
+    // ignore setup errors
+  }
+  next();
+});
+
 /**
  * ============= R2 SCHEMA DOCUMENTATION =============
  * 

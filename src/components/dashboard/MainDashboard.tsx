@@ -24,6 +24,7 @@ import GlobalUpgradeHandler from '../common/GlobalUpgradeHandler';
 import { useProcessing } from '../../context/ProcessingContext';
 import { safeFilter, safeMap, safeLength } from '../../utils/safeArrayUtils';
 import PrivacyPolicyFooter from '../common/PrivacyPolicyFooter';
+import { useMainDashboardRefresh } from '../../hooks/useNavigationRefresh';
 
 interface PlatformLoadingState {
   startTime: number;
@@ -66,6 +67,9 @@ const MainDashboard: React.FC = () => {
   const { processingState } = useProcessing();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'overview' | 'usage' | 'agent' | 'leaderboard'>('overview');
+  
+  // 🚀 NAVIGATION REFRESH: Initialize silent refresh system for instant platform loading
+  const { navigateWithRefresh } = useMainDashboardRefresh();
   
   // ✅ PERFORMANCE FIX: Production-ready logging system
   const isDevelopment = process.env.NODE_ENV === 'development';
@@ -2330,19 +2334,52 @@ const MainDashboard: React.FC = () => {
     // ✅ NAVIGATION FLEXIBILITY: Allow access to all other areas normally
     console.log(`🔥 NAVIGATION: Allowing access to ${platform.id} (no active processing)`);
     
-    // ✅ CRITICAL FIX: Improved navigation logic for claimed platforms
+    // 🚀 SILENT REFRESH NAVIGATION: Navigate with automatic refresh for instant loading
     if (platform.claimed) {
-      // Platform is claimed - navigate to appropriate dashboard
-      if (platform.id === 'instagram') {
-        safeNavigate(navigate, '/dashboard', {}, 6); // Instagram dashboard
-      } else if (platform.id === 'twitter') {
-        safeNavigate(navigate, '/twitter-dashboard', {}, 6); // Twitter dashboard - explicit path
-      } else if (platform.id === 'facebook') {
-        safeNavigate(navigate, '/facebook-dashboard', {}, 6); // Facebook dashboard - explicit path
-      } else if (platform.id === 'linkedin') {
-        safeNavigate(navigate, '/linkedin-dashboard', {}, 6); // LinkedIn dashboard - explicit path
+      // Get the username for the platform to enable silent refresh
+      const platformUsername = currentUser?.uid 
+        ? localStorage.getItem(`${platform.id}_username_${currentUser.uid}`) || ''
+        : '';
+      
+      if (platformUsername) {
+        console.log(`[MainDashboard] 🚀 Navigating to ${platform.id} with silent refresh for instant loading`);
+        
+        // Use navigateWithRefresh for claimed platforms with username
+        if (platform.id === 'instagram') {
+          navigateWithRefresh('instagram', platformUsername, (_path, options) => 
+            safeNavigate(navigate, '/dashboard', options, 6)
+          );
+        } else if (platform.id === 'twitter') {
+          navigateWithRefresh('twitter', platformUsername, (_path, options) => 
+            safeNavigate(navigate, '/twitter-dashboard', options, 6)
+          );
+        } else if (platform.id === 'facebook') {
+          navigateWithRefresh('facebook', platformUsername, (_path, options) => 
+            safeNavigate(navigate, '/facebook-dashboard', options, 6)
+          );
+        } else if (platform.id === 'linkedin') {
+          navigateWithRefresh('linkedin', platformUsername, (_path, options) => 
+            safeNavigate(navigate, '/linkedin-dashboard', options, 6)
+          );
+        } else {
+          navigateWithRefresh(platform.id, platformUsername, (_path, options) => 
+            safeNavigate(navigate, `/${platform.route}`, options, 6)
+          );
+        }
       } else {
-        safeNavigate(navigate, `/${platform.route}`, {}, 6);
+        // Fallback to normal navigation if no username found
+        console.log(`[MainDashboard] ⚠️ No username found for ${platform.id}, using normal navigation`);
+        if (platform.id === 'instagram') {
+          safeNavigate(navigate, '/dashboard', {}, 6);
+        } else if (platform.id === 'twitter') {
+          safeNavigate(navigate, '/twitter-dashboard', {}, 6);
+        } else if (platform.id === 'facebook') {
+          safeNavigate(navigate, '/facebook-dashboard', {}, 6);
+        } else if (platform.id === 'linkedin') {
+          safeNavigate(navigate, '/linkedin-dashboard', {}, 6);
+        } else {
+          safeNavigate(navigate, `/${platform.route}`, {}, 6);
+        }
       }
       return;
     }

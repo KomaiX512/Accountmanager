@@ -9,6 +9,20 @@
   will-change: transform !important;
   contain: layout style !important;
   isolation: isolate !important;
+  /* Center the modal content regardless of scroll position */
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  justify-items: center !important;
+  align-content: center !important;
+  padding: 20px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  min-height: 100vh !important;
+  min-width: 100vw !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  overflow: auto !important;
 }
 
 /* Ensure body and html don't interfere with fixed positioned overlays */
@@ -2295,13 +2309,16 @@ h2 {
   position: fixed !important;
 }
 
-.modal-content {
+.modal-content,
+.popup-content {
   background: rgba(26, 26, 46, 0.95);
   border: 1px solid rgba(0, 255, 204, 0.3);
   border-radius: 16px;
   padding: 24px;
   max-width: 500px;
   width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
   position: relative;
   z-index: 100000;
   animation: modalAppear 0.2s ease-out;
@@ -2309,6 +2326,11 @@ h2 {
   transform: none;
   color: #e0e0ff;
   box-shadow: 0 8px 30px rgba(0, 255, 204, 0.2);
+}
+
+/* Guarantee centering of content even if child or module styles try to push it */
+.popup-overlay > * {
+  margin: auto !important;
 }
 
 @keyframes modalAppear {

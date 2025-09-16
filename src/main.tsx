@@ -44,10 +44,10 @@ rootElement.style.transform = 'translate3d(0,0,0)';
 rootElement.style.backfaceVisibility = 'hidden';
 rootElement.style.willChange = 'transform';
 
-// IMMEDIATE CRITICAL RESOURCE PRELOADING (DEV ONLY)
-// In production, Vite bundles and hashes these assets. The raw /src/* paths
-// do not exist on the server and would cause 404/MIME errors if requested.
-if (import.meta.env.DEV) {
+// CRITICAL RESOURCE PRELOADING (DEVELOPMENT ONLY)
+// Note: In production, Vite automatically handles modulepreload optimization.
+// Raw /src/* paths don't exist in production builds and cause 404/MIME errors.
+if (process.env.NODE_ENV === 'development') {
   const criticalResources = [
     '/src/components/dashboard/PlatformDashboard.tsx',
     '/src/components/instagram/Dashboard.css',

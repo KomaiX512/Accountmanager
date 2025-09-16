@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>VPS Latency Diagnostic</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #00ff00; }
+        .test { margin: 10px 0; padding: 10px; border: 1px solid #333; }
+        .success { color: #00ff00; }
+        .error { color: #ff0000; }
+        .timing { color: #ffff00; }
+    </style>
+</head>
+<body>
+    <h1>VPS API Latency Diagnostic</h1>
+    <div id="results"></div>
+    
+    <script>
+        const results = document.getElementById('results');
+        
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test ${type}`;
+            div.innerHTML = `[${new Date().toISOString()}] ${message}`;
+            results.appendChild(div);
+            console.log(message);
+        }
+        
+        async function testEndpoint(name, url, timeout = 10000) {
+            log(`Testing ${name}: ${url}`);
+            const start = performance.now();
+            
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), timeout);
+                
+                const response = await fetch(url, {
+                    signal: controller.signal,
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                clearTimeout(timeoutId);
+                const end = performance.now();
+                const duration = end - start;
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`✅ ${name}: ${duration.toFixed(1)}ms - ${data.length || 'N/A'} items`, 'success timing');
+                } else {
+                    log(`❌ ${name}: ${duration.toFixed(1)}ms - HTTP ${response.status}`, 'error timing');
+                }
+            } catch (error) {
+                const end = performance.now();
+                const duration = end - start;
+                
+                if (error.name === 'AbortError') {
+                    log(`⏱️ ${name}: TIMEOUT after ${duration.toFixed(1)}ms`, 'error timing');
+                } else {
+                    log(`❌ ${name}: ERROR after ${duration.toFixed(1)}ms - ${error.message}`, 'error timing');
+                }
+            }
+        }
+        
+        async function testDNS() {
+            log('Testing DNS resolution...');
+            const start = performance.now();
+            
+            try {
+                // Test DNS resolution speed
+                await fetch('https://sentientm.com/favicon.ico', { method: 'HEAD' });
+                const end = performance.now();
+                log(`✅ DNS Resolution: ${(end - start).toFixed(1)}ms`, 'success timing');
+            } catch (error) {
+                const end = performance.now();
+                log(`❌ DNS Resolution: ${(end - start).toFixed(1)}ms - ${error.message}`, 'error timing');
+            }
+        }
+        
+        async function runDiagnostics() {
+            log('🚀 Starting VPS Latency Diagnostics...');
+            
+            // Test DNS first
+            await testDNS();
+            
+            // Test the exact endpoints that were timing out in console logs
+            await testEndpoint('Posts API', 'https://sentientm.com/api/posts/Jack?platform=twitter&limit=3');
+            await testEndpoint('News API', 'https://sentientm.com/api/news-for-you/Jack?platform=twitter&limit=2');
+            await testEndpoint('Profile Info', 'https://sentientm.com/api/profile-info/Jack?platform=twitter');
+            
+            // Test health endpoint for comparison
+            await testEndpoint('Health Check', 'https://sentientm.com/api/health');
+            
+            log('🏁 Diagnostics complete!');
+        }
+        
+        // Run diagnostics when page loads
+        runDiagnostics();
+    </script>
+</body>
+</html>

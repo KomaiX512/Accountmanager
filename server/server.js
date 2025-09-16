@@ -18924,7 +18924,7 @@ app.get('/api/r2-image/:username/:imageKey', netflixOptimizer.cacheMiddleware(36
       s3Client.send(getCommand),
       timeoutPromise
     ]);
-    const imageBuffer = await streamToString(response.Body);
+    const imageBuffer = await streamToBuffer(response.Body);
     
     // Validate that we actually have image data
     if (!imageBuffer || imageBuffer.length === 0) {

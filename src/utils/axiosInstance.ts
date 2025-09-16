@@ -8,7 +8,12 @@ const axiosInstance = axios.create({
   timeout: 60000, // 60 second timeout
   headers: {
     'Content-Type': 'application/json',
+    'Connection': 'keep-alive',
+    'Keep-Alive': 'timeout=30, max=100',
   },
+  // Enable HTTP connection pooling to reduce TLS handshake overhead
+  maxRedirects: 3,
+  maxContentLength: 50 * 1000 * 1000, // 50MB
 });
 
 // Add request interceptor for performance optimization

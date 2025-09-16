@@ -13,7 +13,7 @@ import { fileTypeFromBuffer } from 'file-type';
 // Conditional Sharp import for CPU compatibility
 let sharp;
 try {
-  sharp = require('sharp');
+  sharp = (await import('sharp')).default;
   console.log('✅ Sharp library loaded successfully');
 } catch (error) {
   console.warn('⚠️ Sharp library not available:', error.message);
@@ -224,6 +224,13 @@ netflixOptimizer.initialize().then(() => {
 if (netflixOptimizer.responseTimeTracker) {
   app.use(netflixOptimizer.responseTimeTracker);
 }
+
+// HTTP connection optimization to reduce TLS handshake overhead
+app.use((req, res, next) => {
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Keep-Alive', 'timeout=30, max=100');
+  next();
+});
 
 // Serve temporary images for Instagram access
 app.use('/temp-images', express.static(path.join(process.cwd(), 'server', 'temp-images')));

@@ -74,6 +74,22 @@ export default defineConfig({
           }
         }
       }
+    },
+    terserOptions: {
+      compress: {
+        drop_console: false,
+        drop_debugger: true,
+        pure_funcs: [],
+        keep_fargs: false,
+        passes: 1
+      },
+      mangle: {
+        safari10: true,
+        keep_fnames: false
+      },
+      format: {
+        comments: false
+      }
     }
   },
 });

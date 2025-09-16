@@ -40,7 +40,7 @@ import GlobalProcessingGuard from './components/guards/GlobalProcessingGuard';
 import LoadingStateGuard from './components/guards/LoadingStateGuard';
 import RagService from './services/RagService';
 import ErrorBoundary from './components/common/ErrorBoundary';
-import { setupPlatformUsernameInterceptor } from './utils/platformUsernameInterceptor';
+import { setupPlatformUsernameInterceptor, setupAxiosInterceptor } from './utils/platformUsernameInterceptor';
 import PerformanceOptimizer from './components/seo/PerformanceOptimizer';
 import GoogleAnalytics from './components/seo/GoogleAnalytics';
 
@@ -116,6 +116,8 @@ const AppContent: React.FC = () => {
     
     // ✅ CRITICAL: Setup platform username interceptor to block wrong API calls
     setupPlatformUsernameInterceptor();
+    // ✅ Also enforce username-platform correctness at request time
+    setupAxiosInterceptor();
     
     return () => {
       document.removeEventListener('error', handleImageError, true);

@@ -4,6 +4,7 @@ import axios from 'axios';
 import { FaTimes, FaRocket, FaCalendarAlt, FaReply, FaExclamationTriangle } from 'react-icons/fa';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
 import './AutopilotPopup.css';
+import { createPortal } from 'react-dom';
 
 // 🚀 AUTOPILOT: Interface definitions matching CampaignModal
 interface AutopilotSettings {
@@ -206,7 +207,7 @@ const AutopilotPopup: React.FC<AutopilotPopupProps> = ({
   const platformColor = platformColors[platform] || '#8a2be2';
 
   if (loading) {
-    return (
+    return createPortal(
       <div className="autopilot-popup-overlay" onClick={handleOverlayClick}>
         <motion.div
           className="autopilot-popup"
@@ -224,19 +225,21 @@ const AutopilotPopup: React.FC<AutopilotPopupProps> = ({
             </button>
           </div>
         </motion.div>
-      </div>
+      </div>,
+      document.body
     );
   }
 
   return (
-    <div className="autopilot-popup-overlay" onClick={handleOverlayClick}>
-      <motion.div
-        className="autopilot-popup"
-        initial={{ scale: 0.8, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.8, opacity: 0 }}
-        transition={{ type: "spring", duration: 0.3 }}
-      >
+    createPortal(
+      <div className="autopilot-popup-overlay" onClick={handleOverlayClick}>
+        <motion.div
+          className="autopilot-popup"
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.8, opacity: 0 }}
+          transition={{ type: "spring", duration: 0.3 }}
+        >
         {/* Header */}
         <div className="autopilot-popup-header">
           <div className="autopilot-popup-title">
@@ -368,8 +371,10 @@ const AutopilotPopup: React.FC<AutopilotPopupProps> = ({
             </p>
           </div>
         )}
-      </motion.div>
-    </div>
+        </motion.div>
+      </div>,
+      document.body
+    )
   );
 };
 

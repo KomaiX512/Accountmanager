@@ -24,9 +24,9 @@ import AutopilotPopup from '../common/AutopilotPopup';
 import ProfilePopup from '../common/ProfilePopup';
 import ManualGuidance from '../common/ManualGuidance';
 
-import ChatModal from '../common/ChatModal';
+import ChatModal from './ChatModal';
 import RagService from '../../services/RagService';
-import type { ChatMessage as ChatModalMessage } from '../common/ChatModal';
+import type { ChatMessage as ChatModalMessage } from './ChatModal';
 import type { Notification, ProfileInfo, LinkedAccount } from '../../types/notifications';
 import { safeFilter, safeLength } from '../../utils/safeArrayUtils';
 // Import icons from react-icons
@@ -44,7 +44,7 @@ interface DashboardProps {
   competitors: string[];
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => {
+const Dashboard: React.FC<DashboardProps> = ({ accountHolder: accountHolderProp, competitors }) => {
 
   useEffect(() => {
     document.body.classList.add('instagram-dashboard-active');
@@ -55,6 +55,11 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   }, []); // Empty dependency array ensures this runs only once on mount and cleanup on unmount
 
   const { currentUser } = useAuth();
+  // ✅ Always prefer platform-scoped username from localStorage to avoid cross-platform contamination
+  const localUsername = currentUser?.uid 
+    ? localStorage.getItem(`instagram_username_${currentUser.uid}`) || ''
+    : '';
+  const accountHolder = localUsername || accountHolderProp;
   const { isFeatureBlocked, trackRealAIReply, trackRealPostCreation, canUseFeature } = useFeatureTracking();
   const { showUpgradePopup, blockedFeature, handleFeatureAttempt, closeUpgradePopup, currentUsage } = useUpgradeHandler();
   const { resetAndAllowReconnection } = useResetPlatformState();
@@ -1411,13 +1416,13 @@ Image Description: ${response.post.image_prompt}
       setCompetitorData(flatData);
 
       if (firstLoadRef.current) {
-        firstLoadRef.current = false;
-      }
-    } catch (error: any) {
-      console.error('Error refreshing data:', error);
-      setToast('Failed to load dashboard data.');
+      firstLoadRef.current = false;
     }
-  };
+  } catch (error: any) {
+    console.warn('[Dashboard] Non-fatal refresh error, preserving existing data:', error?.message || error);
+    // Do not surface a user-facing toast on transient errors (e.g., timeouts)
+  }
+};
 
   const setupSSE = (userId: string, attempt = 1) => {
     if (eventSourceRef.current) {

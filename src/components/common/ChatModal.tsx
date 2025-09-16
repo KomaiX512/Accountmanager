@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle, Send, X, Loader2 } from 'lucide-react';
 import './ChatModal.css';
@@ -227,7 +228,7 @@ const ChatModal: React.FC<ChatModalProps> = ({
 
   // Model variables removed
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
@@ -372,8 +373,10 @@ const ChatModal: React.FC<ChatModalProps> = ({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
+
 };
 
-export default ChatModal; 
+export default ChatModal;

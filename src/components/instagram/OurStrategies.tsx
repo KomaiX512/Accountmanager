@@ -147,6 +147,44 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
     ));
   };
 
+  // 🍏 Apple-like persuasive hooks for strategy cards (persistent per strategy)
+  const STRATEGY_HOOKS: string[] = [
+    'Lift engagement by {pct}% with creator-first storytelling — See How',
+    'Win +{pct}% saves using carousels that teach fast — See How',
+    'Drive {pct}% more reach with trend-aligned reels this week — See How',
+    'Unlock {pct}% CTR by front-loading the payoff in 1s — See How',
+    'Add {pct}% profile visits with value hooks and clear CTAs — See How'
+  ];
+
+  const seededPercent = (seedKey: string, min: number, max: number): number => {
+    let h = 2166136261;
+    for (let i = 0; i < seedKey.length; i++) {
+      h ^= seedKey.charCodeAt(i);
+      h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
+    }
+    const v = Math.abs(h);
+    return Math.floor(min + (v % (max - min + 1)));
+  };
+
+  const getStrategyHook = (index: number): string => {
+    const key = `strategyHook:${platform}:${normalizedAccountHolder}:${index}`;
+    try {
+      const cached = localStorage.getItem(key);
+      if (cached) {
+        const { phraseIndex } = JSON.parse(cached);
+        const pct = seededPercent(`${key}:pct`, 8, 27);
+        return STRATEGY_HOOKS[phraseIndex % STRATEGY_HOOKS.length].replace('{pct}', String(pct));
+      }
+    } catch {}
+
+    // Assign a unique, deterministic phrase per card avoiding duplicates within the first page
+    const base = seededPercent(`${key}:base`, 0, 1000);
+    const phraseIndex = (base + index) % STRATEGY_HOOKS.length;
+    try { localStorage.setItem(key, JSON.stringify({ phraseIndex })); } catch {}
+    const pct = seededPercent(`${key}:pct`, 8, 27);
+    return STRATEGY_HOOKS[phraseIndex].replace('{pct}', String(pct));
+  };
+
   const handleNextStrategy = () => {
     if (currentStrategyIndex < (data?.length || 0) - 1) {
       setCurrentStrategyIndex(currentStrategyIndex + 1);
@@ -238,21 +276,15 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
                 >
                   {/* ✅ SIMPLIFIED: Just preview text and button */}
                   <div className="strategy-simple-content">
-                    {previewText ? (
-                      <div className="preview-text">
-                        {previewText}
-                      </div>
-                    ) : (
-                      <div className="preview-text">
-                        {smartContentExtraction({})} {/* Use dynamic fallback */}
-                      </div>
-                    )}
+                    <div className="preview-text">
+                      {getStrategyHook(index)}
+                    </div>
                     
                     <button 
                       className="see-more-btn"
                       onClick={handleOpenPopup}
                     >
-                      see more
+                      See How
                     </button>
                   </div>
                 </motion.div>
@@ -268,15 +300,8 @@ const OurStrategies: React.FC<OurStrategiesProps> = ({ accountHolder, accountTyp
               whileHover={{ scale: 1.02 }}
             >
               <div className="strategy-simple-content">
-                <div className="preview-text">
-                  {smartContentExtraction({})} {/* Use dynamic fallback */}
-                </div>
-                <button 
-                  className="see-more-btn"
-                  onClick={handleOpenPopup}
-                >
-                  see more
-                </button>
+                <div className="preview-text">{getStrategyHook(0)}</div>
+                <button className="see-more-btn" onClick={handleOpenPopup}>See How</button>
               </div>
             </motion.div>
           )}

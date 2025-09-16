@@ -216,20 +216,25 @@
 }
 
 .preview-text {
-  color: #e0e0ff;
-  font-size: 0.85rem;
-  line-height: 1.4;
+  font-weight: 700;
+  color: #e0fff6;
+  font-size: 0.95rem;
+  line-height: 1.25;
   margin: 0;
-  opacity: 0.95;
-  font-weight: 400;
+  opacity: 0.98;
   display: -webkit-box;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-height: 3.92em; /* Exactly 3 lines with new line-height */
-  flex: 1; /* Take available space */
+  max-height: 2.6em;
+  flex: 1;
+  background: linear-gradient(180deg, #e6fff8 0%, #aaf7e8 45%, #64ffda 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.25);
 }
 
 .see-more-btn {

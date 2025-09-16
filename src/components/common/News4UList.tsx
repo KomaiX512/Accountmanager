@@ -328,7 +328,7 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       
       console.log(`[News4U] 🔍 Fetching news (cache-first) for ${effectiveAccountHolder} on ${effectivePlatform} (key: ${forceRefreshKey})`);
       console.log(`[News4U] 🔍 Cached URL: ${cachedUrl}`);
-      const res = await axios.get(cachedUrl, { timeout: 7000 });
+      const res = await axios.get(cachedUrl, { timeout: 0 });
       console.log(`[News4U] Raw response status:`, res.status);
       console.log(`[News4U] Raw response headers:`, res.headers);
       console.log(`[News4U] Raw response data:`, res.data);
@@ -485,11 +485,13 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       console.log(`[News4U] Total items processed: ${normalized.length}, Selected: ${selectedItems.length}, Platform: ${effectivePlatform}`);
       console.log(`[News4U] Latest item timestamp tracked:`, latestItemTimestamp);
       setLastFetchTime(Date.now());
+      // ✅ Stop loading after initial fetch completes successfully
+      setLoading(false);
 
       // 🔄 Background revalidate without blocking UI
       void (async () => {
         try {
-          const freshRes = await axios.get(freshUrl, { timeout: 7000 });
+          const freshRes = await axios.get(freshUrl, { timeout: 0 });
           if (freshRes?.data) {
             // Repeat normalization for fresh data
             const itemsOrArraysFresh: any[] = (freshRes.data ?? [])
@@ -551,11 +553,17 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
         // Strict: no fallback, just show empty
         setItems([]);
         setError('');
+        setLoading(false);
       } else {
-        setError('Failed to load news');
+        console.warn(`[News4U] ⏳ Temporary fetch issue, will retry in 5s...`);
+        // Keep loading and retry instead of showing failure UI
+        if (fetchTimeoutRef.current) {
+          clearTimeout(fetchTimeoutRef.current);
+        }
+        fetchTimeoutRef.current = setTimeout(() => {
+          fetchNews();
+        }, 5000) as any;
       }
-    } finally {
-      setLoading(false);
     }
   }, [effectiveAccountHolder, effectivePlatform, forceRefreshKey]);
 

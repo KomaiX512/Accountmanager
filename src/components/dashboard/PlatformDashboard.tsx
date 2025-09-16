@@ -89,12 +89,13 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = memo(({
   const competitors: string[] = useMemo(() => competitorsProp || [], [competitorsProp]);
   const showWelcome = true;
   
-  // ✅ CRITICAL FIX: Use prop accountHolder if available, otherwise read from localStorage
-  const accountHolder = accountHolderProp || (currentUser?.uid 
+  // ✅ CRITICAL FIX: Always prefer platform-scoped username from localStorage to avoid cross-platform contamination
+  const localUsername = currentUser?.uid 
     ? localStorage.getItem(`${platform}_username_${currentUser.uid}`) || ''
-    : '');
-  
-  console.log(`[PlatformDashboard] 🔄 Platform=${platform}, Username=${accountHolder} (from localStorage)`);
+    : '';
+  const accountHolder = localUsername; // 🚫 Never fallback to prop to avoid cross-platform contamination
+
+  console.log(`[PlatformDashboard] 🔄 Platform=${platform}, Username=${accountHolder || '(none)'}`);
   
   // Early return if no username found for this platform
   if (!accountHolder) {

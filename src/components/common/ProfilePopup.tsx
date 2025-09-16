@@ -1,6 +1,8 @@
 // @ts-ignore
 import React, { useState, useEffect } from 'react';
 // @ts-ignore
+import { createPortal } from 'react-dom';
+// @ts-ignore
 import './ProfilePopup.css';
 // @ts-ignore
 import { motion } from 'framer-motion';
@@ -318,22 +320,23 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose, platform
   return (
     // @ts-ignore - JSX runtime issue due to missing dependencies
     <ErrorBoundary>
-      <motion.div
-        className="profile-popup-overlay"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.2 }}
-        onClick={onClose}
-      >
+      {createPortal(
         <motion.div
-          className="profile-popup-content"
-          initial={{ scale: 0.8, y: 50 }}
-          animate={{ scale: 1, y: 0 }}
-          exit={{ scale: 0.8, y: 50 }}
-          transition={{ duration: 0.3 }}
-          onClick={(e: React.MouseEvent) => e.stopPropagation()}
+          className="profile-popup-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          onClick={onClose}
         >
+          <motion.div
+            className="profile-popup-content"
+            initial={{ scale: 0.8, y: 50 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.8, y: 50 }}
+            transition={{ duration: 0.3 }}
+            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+          >
           <div className="popup-sidebar">
             <motion.button
               className={`sidebar-button ${activeTab === 'Rules' ? 'active' : ''}`}
@@ -714,8 +717,10 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose, platform
               {toastMessage}
             </motion.div>
           )}
-        </motion.div>
-      </motion.div>
+          </motion.div>
+        </motion.div>,
+        document.body
+      )}
     </ErrorBoundary>
   );
 };

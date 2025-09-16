@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import './InsightsModal.css';
 import axios from 'axios';
 import { motion } from 'framer-motion';
@@ -477,22 +478,23 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
   };
 
   return (
-    <motion.div
-      className="insights-modal-overlay"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.3 }}
-      onClick={onClose}
-    >
+    createPortal(
       <motion.div
-        className="insights-modal"
-        initial={{ scale: 0.8, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.8, opacity: 0 }}
+        className="insights-modal-overlay"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
         transition={{ duration: 0.3 }}
-        onClick={(e) => e.stopPropagation()}
+        onClick={onClose}
       >
+        <motion.div
+          className="insights-modal"
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.8, opacity: 0 }}
+          transition={{ duration: 0.3 }}
+          onClick={(e) => e.stopPropagation()}
+        >
         <button className="insights-close-btn" onClick={onClose}>×</button>
   <h2>{normalizedPlatform === 'instagram' ? 'Instagram' : normalizedPlatform === 'twitter' ? 'Twitter' : normalizedPlatform === 'linkedin' ? 'LinkedIn' : 'Facebook'} Stats</h2>
         
@@ -608,8 +610,10 @@ const InsightsModal: React.FC<InsightsModalProps> = ({ userId, onClose, platform
             </>
           )}
         </div>
-      </motion.div>
-    </motion.div>
+        </motion.div>
+      </motion.div>,
+      document.body
+    )
   );
 };
 

@@ -352,6 +352,42 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     };
   });
 
+  // 🍏 Hook phrases for competitor items with 2-day rotation
+  const COMPETITOR_HOOKS: string[] = [
+    'Grew followers by {num} today — See How',
+    'Hit {pct}% engagement on last post — See How',
+    'Added {num} profile visits this week — See How',
+    'Reached {num} accounts from one reel — See How',
+    'Drove {pct}% more saves with carousels — See How',
+    'Won {pct}% higher CTR using stronger hooks — See How',
+    'Converted {pct}% of viewers to followers — See How',
+    'Boosted comments by {pct}% with questions — See How',
+    'Cut bounce by {pct}% via tighter captions — See How',
+    'Achieved {num} shares on a single post — See How'
+  ];
+
+  const dayBucket = (): number => Math.floor(Date.now() / (1000 * 60 * 60 * 24));
+  const rotationBucket = (): number => Math.floor(dayBucket() / 2); // rotate every 2 days
+  const seededInt = (seed: string): number => {
+    let h = 1469598103934665603n;
+    for (let i = 0; i < seed.length; i++) h = (h ^ BigInt(seed.charCodeAt(i))) * 1099511628211n;
+    return Number((h >> 32n) & 0xffffffffn);
+  };
+  const seededBetween = (seed: string, min: number, max: number): number => {
+    const v = Math.abs(seededInt(seed));
+    return Math.floor(min + (v % (max - min + 1)));
+  };
+  const getCompetitorHook = (name: string, index: number): string => {
+    const bucket = rotationBucket();
+    const base = seededBetween(`${platform}:${normalizedAccountHolder}:${name}:${bucket}`, 0, 100000);
+    const phraseIndex = (base + index) % COMPETITOR_HOOKS.length;
+    const pct = seededBetween(`${name}:pct:${bucket}`, 7, 26);
+    const num = seededBetween(`${name}:num:${bucket}`, 48, 1900);
+    return COMPETITOR_HOOKS[phraseIndex]
+      .replace('{pct}', String(pct))
+      .replace('{num}', String(num));
+  };
+
   const selectedData = selectedCompetitor
     ? competitorData.find(data => data.competitor === selectedCompetitor)?.fetch.data
     : null;
@@ -1093,8 +1129,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
               const remainingTime = getRemainingLoadingTime(competitor);
               
               // Get counter strategies preview
-              const counterStrategiesPreview = getCounterStrategiesPreview(fetch);
-              const previewText = counterStrategiesPreview ? getPreviewText(counterStrategiesPreview) : '';
+              const previewText = getCompetitorHook(competitor, index);
               
               return (
                 <motion.div
@@ -1204,7 +1239,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
                           setSelectedCompetitor(competitor);
                         }}
                       >
-                        see more
+                        See How
                       </button>
                     </>
                   ) : (
@@ -1224,7 +1259,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
                           setSelectedCompetitor(competitor);
                         }}
                       >
-                        see more
+                        See How
                       </button>
                     </>
                   ))}

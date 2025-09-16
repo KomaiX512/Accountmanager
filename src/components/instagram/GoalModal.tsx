@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
@@ -292,23 +293,24 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform, onClose, onSu
   // Campaign status validation happens seamlessly without blocking the user interface
 
   return (
-    <motion.div
-      className="popup-overlay"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.2 }}
-      onClick={onClose}
-    >
+    createPortal(
       <motion.div
-        className="popup-content"
-        initial={{ scale: 0.8, y: 50 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.8, y: 50 }}
-        transition={{ duration: 0.3, ease: 'easeOut' }}
-        onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: 500, width: '100%' }}
+        className="popup-overlay"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        onClick={onClose}
       >
+        <motion.div
+          className="popup-content"
+          initial={{ scale: 0.8, y: 50 }}
+          animate={{ scale: 1, y: 0 }}
+          exit={{ scale: 0.8, y: 50 }}
+          transition={{ duration: 0.3, ease: 'easeOut' }}
+          onClick={(e) => e.stopPropagation()}
+          style={{ maxWidth: 500, width: '100%' }}
+        >
         <h2 style={{ color: '#00ffcc', textAlign: 'center', marginBottom: 10 }}>Set Your Goal</h2>
         
         {/* Debug Platform Info */}
@@ -504,8 +506,10 @@ const GoalModal: React.FC<GoalModalProps> = ({ username, platform, onClose, onSu
             </button>
           </div>
         )}
-      </motion.div>
-    </motion.div>
+        </motion.div>
+      </motion.div>,
+      document.body
+    )
   );
 };
 

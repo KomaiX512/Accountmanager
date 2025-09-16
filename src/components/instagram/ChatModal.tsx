@@ -241,25 +241,26 @@ const ChatModal: React.FC<ChatModalProps> = ({
   console.log('[ChatModal] Modal should be visible with classes: instagram-chat-overlay, instagram-chat-content');
 
   return (
-    <AnimatePresence>
-      {open && createPortal(
-        <motion.div
-          className="instagram-chat-overlay"
-          ref={overlayRef}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-        >
-          
+    createPortal(
+      <AnimatePresence>
+        {open && (
           <motion.div
-            className="instagram-chat-content"
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            onClick={(e) => e.stopPropagation()}
+            className="instagram-chat-overlay"
+            ref={overlayRef}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
           >
+            
+            <motion.div
+              className="instagram-chat-content"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              onClick={(e) => e.stopPropagation()}
+            >
             <div className="chat-modal-header">
               <div className="chat-modal-title">
                 <h2>AI Discussion with {username}</h2>
@@ -383,11 +384,12 @@ const ChatModal: React.FC<ChatModalProps> = ({
                 </button>
               </form>
             )}
+            </motion.div>
           </motion.div>
-        </motion.div>,
-        document.body
-      )}
-    </AnimatePresence>
+        )}
+      </AnimatePresence>,
+      document.body
+    )
   );
 };
 

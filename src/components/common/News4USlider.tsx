@@ -262,7 +262,7 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       console.log(`[News4U-Slider] 🔍 API URL: ${url}`);
       console.log(`[News4U-Slider] 🔍 Force refresh: true, Cache busting: ${Date.now()}`);
       
-      const res = await axios.get(url);
+      const res = await axios.get(url, { timeout: 0 });
       
       // 🔍 ENHANCED DEBUGGING: Show backend response structure
       console.log(`[News4U-Slider] 🔍 Backend response:`, {
@@ -375,17 +375,25 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       // Successful fetch
       setLastFetchTime(Date.now());
       setCurrent(0);
+      // ✅ Stop loading after initial fetch completes successfully
+      setLoading(false);
       
     } catch (err: any) {
       console.error(`[News4U-Slider] ❌ Error fetching news:`, err);
       if (err.response?.status === 404) {
         setItems([]);
         setError('');
+        setLoading(false);
       } else {
-        setError('Failed to load news');
+        console.warn(`[News4U-Slider] ⏳ Temporary fetch issue, will retry in 5s...`);
+        // Keep loading and retry instead of showing failure UI
+        if (fetchTimeoutRef.current) {
+          clearTimeout(fetchTimeoutRef.current);
+        }
+        fetchTimeoutRef.current = setTimeout(() => {
+          fetchNews();
+        }, 5000) as any;
       }
-    } finally {
-      setLoading(false);
     }
   }, [effectiveAccountHolder, effectivePlatform, forceRefreshKey]);
 

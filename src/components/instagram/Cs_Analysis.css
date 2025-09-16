@@ -1067,19 +1067,24 @@
 }
 
 .preview-text {
-  color: #e0e0ff;
-  font-size: 0.85rem;
-  line-height: 1.3;
+  font-weight: 700;
+  color: #e8fff9;
+  font-size: 0.95rem;
+  line-height: 1.25;
   margin: 0;
-  opacity: 0.95;
-  font-weight: 400;
+  opacity: 0.98;
   display: -webkit-box;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-height: 3.315em; /* Exactly 3 lines with new line-height */
+  max-height: 2.6em;
+  background: linear-gradient(180deg, #e6fff8 0%, #baf7ec 45%, #64ffda 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.25);
 }
 
 .see-more-btn {
@@ -1160,7 +1165,6 @@
     font-size: 0.7rem;
     line-height: 1.15;
     margin: 0;
-    color: rgba(255, 255, 255, 0.95);
     display: -webkit-box;
     -webkit-line-clamp: 3;
   line-clamp: 3;

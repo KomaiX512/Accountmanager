@@ -9,7 +9,15 @@ import { pipeline } from 'stream';
 import path from 'path';
 import jpeg from 'jpeg-js';
 import multer from 'multer';
-import sharp from 'sharp';
+// Conditional Sharp import for CPU compatibility
+let sharp;
+try {
+  sharp = (await import('sharp')).default;
+  console.log('✅ Sharp library loaded successfully');
+} catch (error) {
+  console.warn('⚠️ Sharp library not available:', error.message);
+  sharp = null;
+}
 import * as net from 'net';
 import { exec } from 'child_process';
 import os from 'os';
@@ -1114,6 +1122,10 @@ async function convertWebPToJPEG(webpBuffer, imageKey = null) {
       
       // Strategy 1: Standard high-quality conversion 
       try {
+        if (!sharp) {
+          console.warn('[IMAGE] Sharp not available, skipping conversion');
+          return buffer; // Return original buffer if Sharp unavailable
+        }
         jpegBuffer = await sharp(buffer)
         .jpeg({ 
           quality: 90,
@@ -1149,6 +1161,10 @@ async function convertWebPToJPEG(webpBuffer, imageKey = null) {
       
       // Strategy 3: Try to clean the buffer first
       try {
+        if (!sharp) {
+          console.warn('[IMAGE] Sharp not available for strategy 2, returning original');
+          return buffer;
+        }
         // Remove potential corruption by creating a clean buffer
         const cleanBuffer = Buffer.from(buffer);
         jpegBuffer = await sharp(cleanBuffer, { failOnError: false })
@@ -2264,6 +2280,10 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
     try {
       if (shouldTransform) {
         if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] ▶ Transforming image ${imageKey} (w=${requestedWidth||'-'}, h=${requestedHeight||'-'}, q=${requestedQuality||'-'}, fmt=${requestedFormat||'-'})`);
+        if (!sharp) {
+          console.warn('[R2-IMAGE] Sharp not available, serving original image');
+          return res.set(headers).send(data);
+        }
         let transformer = sharp(data, { failOnError: false }).rotate();
         if (requestedWidth || requestedHeight) {
           transformer = transformer.resize({
@@ -2302,6 +2322,10 @@ app.get('/api/r2-image/:username/:imageKey', async (req, res) => {
         // Backward-compat: convert WebP to JPEG for clients expecting JPEG
         try {
           if (DEBUG_LOGS) console.log(`[${new Date().toISOString()}] [R2-IMAGE] Attempting WebP→JPEG conversion: ${imageKey}`);
+          if (!sharp) {
+            console.warn('[R2-IMAGE] Sharp not available, serving WebP as-is');
+            return res.set(headers).send(data);
+          }
           const jpegBuffer = await sharp(data, { failOnError: false })
             .jpeg({ quality: 90 })
             .toBuffer();

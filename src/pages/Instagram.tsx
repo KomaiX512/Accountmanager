@@ -4,7 +4,7 @@ import IG_EntryUsernames from '../components/instagram/IG_EntryUsernames';
 import { useAuth } from '../context/AuthContext';
 import { useAcquiredPlatforms } from '../context/AcquiredPlatformsContext';
 import axios from 'axios';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import { safeNavigate } from '../utils/navigationGuard';
 import PlatformSEO from '../components/seo/PlatformSEO';
 
@@ -34,24 +34,32 @@ const Instagram: React.FC = () => {
         const savedCompetitors = JSON.parse(localStorage.getItem(`instagram_competitors_${currentUser.uid}`) || '[]');
         
         if (savedUsername) {
-          if (savedAccountType === 'branding') {
-            safeNavigate(navigate, '/dashboard', { 
-              state: { 
-                accountHolder: savedUsername, 
-                competitors: savedCompetitors,
-                accountType: 'branding'
-              },
-              replace: true 
-            }, 5);
-          } else {
-            safeNavigate(navigate, '/non-branding-dashboard', { 
-              state: { 
-                accountHolder: savedUsername,
-                competitors: savedCompetitors,
-                accountType: 'non-branding' 
-              },
-              replace: true
-            }, 5);
+          try {
+            if (savedAccountType === 'branding') {
+              window.location.assign('/dashboard');
+            } else {
+              window.location.assign('/non-branding-dashboard');
+            }
+          } catch {
+            if (savedAccountType === 'branding') {
+              safeNavigate(navigate, '/dashboard', { 
+                state: { 
+                  accountHolder: savedUsername, 
+                  competitors: savedCompetitors,
+                  accountType: 'branding'
+                },
+                replace: true 
+              }, 5);
+            } else {
+              safeNavigate(navigate, '/non-branding-dashboard', { 
+                state: { 
+                  accountHolder: savedUsername,
+                  competitors: savedCompetitors,
+                  accountType: 'non-branding' 
+                },
+                replace: true
+              }, 5);
+            }
           }
           return;
         }
@@ -109,24 +117,32 @@ const Instagram: React.FC = () => {
   }, [currentUser?.uid, hasChecked]); // Removed navigate from dependencies
 
   const handleSubmitSuccess = (username: string, competitors: string[], accountType: 'branding' | 'non-branding') => {
-    if (accountType === 'branding') {
-      navigate('/dashboard', { 
-        state: { 
-          accountHolder: username, 
-          competitors: competitors,
-          accountType: 'branding'
-        },
-        replace: true
-      });
-    } else {
-      navigate('/non-branding-dashboard', { 
-        state: { 
-          accountHolder: username,
-          competitors: competitors,
-          accountType: 'non-branding'
-        },
-        replace: true
-      });
+    try {
+      if (accountType === 'branding') {
+        window.location.assign('/dashboard');
+      } else {
+        window.location.assign('/non-branding-dashboard');
+      }
+    } catch {
+      if (accountType === 'branding') {
+        navigate('/dashboard', { 
+          state: { 
+            accountHolder: username, 
+            competitors: competitors,
+            accountType: 'branding'
+          },
+          replace: true
+        });
+      } else {
+        navigate('/non-branding-dashboard', { 
+          state: { 
+            accountHolder: username,
+            competitors: competitors,
+            accountType: 'non-branding'
+          },
+          replace: true
+        });
+      }
     }
   };
 

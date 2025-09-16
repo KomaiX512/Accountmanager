@@ -43,7 +43,6 @@ import ErrorBoundary from './components/common/ErrorBoundary';
 import { setupPlatformUsernameInterceptor, setupAxiosInterceptor } from './utils/platformUsernameInterceptor';
 import PerformanceOptimizer from './components/seo/PerformanceOptimizer';
 import GoogleAnalytics from './components/seo/GoogleAnalytics';
-import navigationRefreshManager from './utils/navigationRefresh';
 
 // Extend Window interface for proxy server status and optimization tester
 declare global {
@@ -184,19 +183,6 @@ const AppContent: React.FC = () => {
     let username = currentUser?.uid 
       ? localStorage.getItem(`${currentUrlPlatform}_username_${currentUser.uid}`) || ''
       : '';
-
-    // 🚀 SILENT INTERNAL REFRESH: Trigger automatic refresh equivalent to manual browser refresh
-    if (username) {
-      navigationRefreshManager.performSilentRefresh(currentUrlPlatform, username, {
-        clearContexts: true,
-        clearComponentState: true,
-        clearApiCaches: true,
-        clearBrowserCaches: false, // Keep browser cache, only clear API caches
-        forceStateSync: true
-      }).catch((error) => {
-        console.warn('[App] ⚠️ Silent refresh failed, continuing with normal navigation:', error);
-      });
-    }
       
     // ✅ MINIMALIST AUTO-REPAIR: Detect and fix corrupted dashboard username
     if (currentUser?.uid && username) {

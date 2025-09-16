@@ -1,20 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import TW_EntryUsernames from '../components/twitter/TW_EntryUsernames';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import PlatformSEO from '../components/seo/PlatformSEO';
 
 const Twitter: React.FC = () => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const [isLoading, setIsLoading] = useState(true);
   const [hasChecked, setHasChecked] = useState(false);
 
-  // Get platformId from navigation state (instead of markPlatformAccessed function)
-  const platformId = location.state?.platformId;
+  // Get platformId from navigation state (unused)
 
   // Create a markPlatformAccessed function that uses localStorage
   const markPlatformAccessed = (platformId: string) => {
@@ -42,26 +40,34 @@ const Twitter: React.FC = () => {
         const savedCompetitors = JSON.parse(localStorage.getItem(`twitter_competitors_${currentUser.uid}`) || '[]');
         
         if (savedUsername) {
-          if (savedAccountType === 'branding') {
-            navigate('/twitter-dashboard', { 
-              state: { 
-                accountHolder: savedUsername, 
-                competitors: savedCompetitors,
-                accountType: 'branding',
-                platform: 'twitter'
-              },
-              replace: true 
-            });
-          } else {
-            navigate('/twitter-non-branding-dashboard', { 
-              state: { 
-                accountHolder: savedUsername,
-                competitors: savedCompetitors,
-                accountType: 'non-branding',
-                platform: 'twitter'
-              },
-              replace: true
-            });
+          try {
+            if (savedAccountType === 'branding') {
+              window.location.assign('/twitter-dashboard');
+            } else {
+              window.location.assign('/twitter-non-branding-dashboard');
+            }
+          } catch {
+            if (savedAccountType === 'branding') {
+              navigate('/twitter-dashboard', { 
+                state: { 
+                  accountHolder: savedUsername, 
+                  competitors: savedCompetitors,
+                  accountType: 'branding',
+                  platform: 'twitter'
+                },
+                replace: true 
+              });
+            } else {
+              navigate('/twitter-non-branding-dashboard', { 
+                state: { 
+                  accountHolder: savedUsername,
+                  competitors: savedCompetitors,
+                  accountType: 'non-branding',
+                  platform: 'twitter'
+                },
+                replace: true
+              });
+            }
           }
           return;
         }
@@ -121,26 +127,34 @@ const Twitter: React.FC = () => {
   }, [currentUser?.uid, hasChecked]); // Removed navigate from dependencies
 
   const handleSubmitSuccess = (username: string, competitors: string[], accountType: 'branding' | 'non-branding') => {
-    if (accountType === 'branding') {
-      navigate('/twitter-dashboard', { 
-        state: { 
-          accountHolder: username, 
-          competitors: competitors,
-          accountType: 'branding',
-          platform: 'twitter'
-        },
-        replace: true
-      });
-    } else {
-      navigate('/twitter-non-branding-dashboard', { 
-        state: { 
-          accountHolder: username,
-          competitors: competitors,
-          accountType: 'non-branding',
-          platform: 'twitter'
-        },
-        replace: true
-      });
+    try {
+      if (accountType === 'branding') {
+        window.location.assign('/twitter-dashboard');
+      } else {
+        window.location.assign('/twitter-non-branding-dashboard');
+      }
+    } catch {
+      if (accountType === 'branding') {
+        navigate('/twitter-dashboard', { 
+          state: { 
+            accountHolder: username, 
+            competitors: competitors,
+            accountType: 'branding',
+            platform: 'twitter'
+          },
+          replace: true
+        });
+      } else {
+        navigate('/twitter-non-branding-dashboard', { 
+          state: { 
+            accountHolder: username,
+            competitors: competitors,
+            accountType: 'non-branding',
+            platform: 'twitter'
+          },
+          replace: true
+        });
+      }
     }
   };
 

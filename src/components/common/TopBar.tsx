@@ -50,6 +50,16 @@ const TopBar: React.FC = () => {
   };
 
   const handleMobileNavClick = (route: string) => {
+    // Use hard reload for dashboard routes to ensure full refresh
+    if (
+      route === '/dashboard' ||
+      route === '/twitter-dashboard' ||
+      route === '/facebook-dashboard' ||
+      route === '/linkedin-dashboard'
+    ) {
+      window.location.assign(route);
+      return;
+    }
     navigate(route);
     setIsMobileMenuOpen(false);
   };
@@ -250,7 +260,9 @@ const TopBar: React.FC = () => {
                             (platform.id === 'linkedin' && location.pathname === '/linkedin-dashboard')
                               ? 'active' : ''
                           }`}
-                          onClick={() => handleMobileNavClick(`/${platform.route}`)}
+                          onClick={() => handleMobileNavClick(
+                            platform.id === 'instagram' ? '/dashboard' : `/${platform.route}`
+                          )}
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
                         >

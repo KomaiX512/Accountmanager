@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import FB_EntryUsernames from '../components/facebook/FB_EntryUsernames';
 import { useAuth } from '../context/AuthContext';
 import { useAcquiredPlatforms } from '../context/AcquiredPlatformsContext';
@@ -11,12 +11,10 @@ const Facebook: React.FC = () => {
   const { currentUser } = useAuth();
   const { markPlatformAsAcquired } = useAcquiredPlatforms();
   const navigate = useNavigate();
-  const location = useLocation();
   const [isLoading, setIsLoading] = useState(true);
   const [hasChecked, setHasChecked] = useState(false);
 
-  // Get platformId from navigation state (instead of markPlatformAccessed function)
-  const platformId = location.state?.platformId;
+  // Get platformId from navigation state (unused)
 
   // ✅ CROSS-DEVICE SYNC FIX: Real-time localStorage monitoring for Facebook access
   useEffect(() => {
@@ -55,26 +53,34 @@ const Facebook: React.FC = () => {
             
             clearInterval(intervalId); // Stop checking once we navigate
             
-            if (savedAccountType === 'branding') {
-              navigate('/facebook-dashboard', { 
-                state: { 
-                  accountHolder: savedUsername, 
-                  competitors: savedCompetitors,
-                  accountType: 'branding',
-                  platform: 'facebook'
-                },
-                replace: true 
-              });
-            } else {
-              navigate('/facebook-non-branding-dashboard', { 
-                state: { 
-                  accountHolder: savedUsername,
-                  competitors: savedCompetitors,
-                  accountType: 'non-branding',
-                  platform: 'facebook'
-                },
-                replace: true
-              });
+            try {
+              if (savedAccountType === 'branding') {
+                window.location.assign('/facebook-dashboard');
+              } else {
+                window.location.assign('/facebook-non-branding-dashboard');
+              }
+            } catch {
+              if (savedAccountType === 'branding') {
+                navigate('/facebook-dashboard', { 
+                  state: { 
+                    accountHolder: savedUsername, 
+                    competitors: savedCompetitors,
+                    accountType: 'branding',
+                    platform: 'facebook'
+                  },
+                  replace: true 
+                });
+              } else {
+                navigate('/facebook-non-branding-dashboard', { 
+                  state: { 
+                    accountHolder: savedUsername,
+                    competitors: savedCompetitors,
+                    accountType: 'non-branding',
+                    platform: 'facebook'
+                  },
+                  replace: true
+                });
+              }
             }
             return;
           }
@@ -103,26 +109,34 @@ const Facebook: React.FC = () => {
               
               clearInterval(intervalId); // Stop checking once we navigate
               
-              if (savedAccountType === 'branding') {
-                navigate('/facebook-dashboard', { 
-                  state: { 
-                    accountHolder: savedUsername, 
-                    competitors: savedCompetitors,
-                    accountType: 'branding',
-                    platform: 'facebook'
-                  },
-                  replace: true 
-                });
-              } else {
-                navigate('/facebook-non-branding-dashboard', { 
-                  state: { 
-                    accountHolder: savedUsername,
-                    competitors: savedCompetitors,
-                    accountType: 'non-branding',
-                    platform: 'facebook'
-                  },
-                  replace: true
-                });
+              try {
+                if (savedAccountType === 'branding') {
+                  window.location.assign('/facebook-dashboard');
+                } else {
+                  window.location.assign('/facebook-non-branding-dashboard');
+                }
+              } catch {
+                if (savedAccountType === 'branding') {
+                  navigate('/facebook-dashboard', { 
+                    state: { 
+                      accountHolder: savedUsername, 
+                      competitors: savedCompetitors,
+                      accountType: 'branding',
+                      platform: 'facebook'
+                    },
+                    replace: true 
+                  });
+                } else {
+                  navigate('/facebook-non-branding-dashboard', { 
+                    state: { 
+                      accountHolder: savedUsername,
+                      competitors: savedCompetitors,
+                      accountType: 'non-branding',
+                      platform: 'facebook'
+                    },
+                    replace: true
+                  });
+                }
               }
               return;
             } else {
@@ -192,26 +206,34 @@ const Facebook: React.FC = () => {
       } catch {}
     }
 
-    if (accountType === 'branding') {
-      navigate('/facebook-dashboard', { 
-        state: { 
-          accountHolder: username, 
-          competitors: competitors,
-          accountType: 'branding',
-          platform: 'facebook'
-        },
-        replace: true
-      });
-    } else {
-      navigate('/facebook-non-branding-dashboard', { 
-        state: { 
-          accountHolder: username,
-          competitors: competitors,
-          accountType: 'non-branding',
-          platform: 'facebook'
-        },
-        replace: true
-      });
+    try {
+      if (accountType === 'branding') {
+        window.location.assign('/facebook-dashboard');
+      } else {
+        window.location.assign('/facebook-non-branding-dashboard');
+      }
+    } catch {
+      if (accountType === 'branding') {
+        navigate('/facebook-dashboard', { 
+          state: { 
+            accountHolder: username, 
+            competitors: competitors,
+            accountType: 'branding',
+            platform: 'facebook'
+          },
+          replace: true
+        });
+      } else {
+        navigate('/facebook-non-branding-dashboard', { 
+          state: { 
+            accountHolder: username,
+            competitors: competitors,
+            accountType: 'non-branding',
+            platform: 'facebook'
+          },
+          replace: true
+        });
+      }
     }
   };
 

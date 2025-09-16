@@ -2872,6 +2872,18 @@ h2 {
     border-radius: 999px !important;
   }
 
+  /* Ensure top breathing space even if component state differs */
+  .strategies > *:first-child,
+  .competitor-analysis > *:first-child {
+    margin-top: 10px !important;
+    padding-top: 8px !important;
+  }
+
+  .strategies .module-content,
+  .competitor-analysis .module-content {
+    padding-top: 10px !important;
+  }
+
   /* 🍎 COLLAPSED STATE BY DEFAULT - HIDE CONTENT COMPLETELY */
   /* Universal hiding for ALL content when collapsed - no wrapper styling needed */
   .notifications:not(.mobile-expanded) > *,

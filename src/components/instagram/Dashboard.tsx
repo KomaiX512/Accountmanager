@@ -233,41 +233,38 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder, competitors }) => 
   const processedNotificationIds = useRef<Set<string>>(new Set());
     
 
-  // 🚀 POST DROPDOWN: Update dropdown position - FIXED VIEWPORT POSITIONING
+  // 🚀 POST DROPDOWN: Update dropdown position - NEAR INPUT FIELD (desktop and mobile)
   const updateDropdownPosition = useCallback(() => {
-    if (!postInputRef.current) return;
-    
-    const inputRect = postInputRef.current.getBoundingClientRect();
-    const dropdownHeight = 280; // Approximate dropdown height
-    
-    // ✅ FIXED POSITIONING: Force dropdown to appear at top of viewport with safe margin
-    const viewportTopMargin = 100; // Safe margin from viewport top
-    let top = viewportTopMargin; // Always at top of viewport
-    
-    // ✅ SAFETY CHECKS: Ensure dropdown never overlaps with input
-    const inputBottom = inputRect.bottom;
-    const dropdownBottom = top + dropdownHeight;
-    
-    if (dropdownBottom >= inputBottom - 10) {
-      // If dropdown would overlap, move it even higher
-      top = Math.max(50, top - 100); // Move 100px higher, minimum 50px from viewport top
-      console.log('🚀 [Instagram] Preventing overlap - moved dropdown higher to viewport top');
+    const inputEl = postInputRef.current;
+    if (!inputEl) return;
+
+    const rect = inputEl.getBoundingClientRect();
+    // Estimate dropdown height; if already rendered, measure it
+    const existing = document.getElementById('post-dropdown-portal') as HTMLElement | null;
+    const measuredHeight = existing ? existing.getBoundingClientRect().height : 320;
+    const measuredWidth = existing ? existing.getBoundingClientRect().width : 0;
+
+    // Width: follow input width (with a little padding), clamped
+    const dropdownWidth = Math.min(480, Math.max(280, rect.width + 32));
+
+    // Prefer placing below the input; if not enough space, place above
+    const spaceBelow = window.innerHeight - rect.bottom - 12;
+    const placeBelow = spaceBelow >= measuredHeight;
+    let topPx = placeBelow ? rect.bottom + 8 : Math.max(12, rect.top - measuredHeight - 8);
+
+    // Horizontal: center over input, with viewport clamping
+    let leftPx = rect.left + rect.width / 2 - (measuredWidth > 0 ? Math.min(measuredWidth, dropdownWidth) : dropdownWidth) / 2;
+    const margin = 8;
+    const effectiveWidth = Math.min(dropdownWidth, window.innerWidth - margin * 2);
+    if (leftPx < margin) leftPx = margin;
+    if (leftPx + effectiveWidth > window.innerWidth - margin) {
+      leftPx = Math.max(margin, window.innerWidth - effectiveWidth - margin);
     }
-    
-    // ✅ FINAL SAFETY CHECK: Ensure dropdown is always visible
-    if (top < 50) {
-      top = 50; // Minimum 50px from viewport top
-      console.log('🚀 [Instagram] Ensuring minimum viewport margin - set to 50px');
-    }
-    
-    // Horizontal centering over the input field
-    const dropdownWidth = Math.min(480, Math.max(280, inputRect.width + 32));
-    const left = inputRect.left + (inputRect.width / 2) - (dropdownWidth / 2);
-    
+
     setPostDropdownPosition({
-      top: `${top}px`,
-      left: `${left}px`,
-      width: `${dropdownWidth}px`
+      top: `${Math.round(topPx)}px`,
+      left: `${Math.round(leftPx)}px`,
+      width: `${Math.round(effectiveWidth)}px`
     });
   }, []);
 
@@ -2444,6 +2441,12 @@ Image Description: ${response.post.image_prompt}
                   value={query}
                   onChange={(e) => handleInputChange(e.target.value)}
                   onFocus={handleInputFocus}
+                  onClick={() => {
+                    // Recalculate immediately on click to keep dropdown next to input
+                    if (!isProcessing) {
+                      requestAnimationFrame(() => updateDropdownPosition());
+                    }
+                  }}
                   placeholder="What would you like to post on Instagram?"
                   className="post-input-field"
                   disabled={isProcessing}

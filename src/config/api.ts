@@ -1,23 +1,24 @@
-// ✅ CROSS-DEVICE SYNC: Smart backend selection for processing status synchronization
+// ✅ SMART BACKEND SELECTION: Use VPS only for specific cross-device features
 function getBaseUrl(): string {
-  // For processing status and cross-device sync, always use the production VPS backend
-  // This ensures Device A (local) and Device B (VPS) share the same processing states
+  // Default: use local backend for module data (recommendations, strategies, etc.)
+  return '';
+}
+
+// ✅ VPS BACKEND: Only for specific cross-device sync features
+function getVpsBaseUrl(): string {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
     const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
     
-    // For critical cross-device features (processing status), always use VPS backend
     const urlParams = new URLSearchParams(window.location.search);
     const forceLocal = urlParams.get('localBackend') === 'true';
     
     if (isLocal && !forceLocal) {
-      // Local frontend connecting to VPS backend for cross-device sync
-      console.log('[API CONFIG] 🔗 Local frontend using VPS backend for cross-device sync');
+      console.log('[API CONFIG] 🔗 Using VPS backend for cross-device sync features');
       return 'https://www.sentientm.com';
     }
   }
   
-  // Default: relative URLs for same-environment requests
   return '';
 }
 
@@ -72,28 +73,35 @@ export const API_CONFIG = {
 // Helper function to get full URL with enhanced error handling
 export const getApiUrl = (endpoint: string, params?: string): string => {
   try {
-    // Use VPS backend only for cross-device run-status endpoint; otherwise stay relative
+    // ✅ SMART ROUTING: Use VPS backend only for specific cross-device sync features
     const isRunStatus = endpoint.startsWith(API_CONFIG.ENDPOINTS.RUN_STATUS);
     const isHealth = endpoint.startsWith('/api/health');
-    const useRemote = isRunStatus || isHealth;
-    const baseUrl = useRemote ? API_CONFIG.BASE_URL : '';
+    const isProcessingStatus = endpoint.includes('/api/processing-status');
+    const isPlatformConnection = endpoint.includes('-connection') || endpoint.includes('-status');
+    
+    // Use VPS backend for cross-device sync features, local for module data
+    const useVpsBackend = isRunStatus || isHealth || isProcessingStatus || isPlatformConnection;
+    const baseUrl = useVpsBackend ? getVpsBaseUrl() : '';
+    
     const fullEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     const url = `${baseUrl}${fullEndpoint}`;
     const finalUrl = params ? `${url}${params}` : url;
+    
     // Validate the URL
     if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://') && !finalUrl.startsWith('/')) {
       console.error('[getApiUrl] Invalid URL generated:', finalUrl);
-      // Fallback to production URL
       return `/api${fullEndpoint}`;
     }
-    // Log URL for debugging in development
+    
+    // Log URL routing for debugging in development
     if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
-      console.log(`[getApiUrl] Generated URL: ${finalUrl}`);
+      const backend = useVpsBackend ? 'VPS' : 'LOCAL';
+      console.log(`[getApiUrl] ${backend} backend: ${finalUrl}`);
     }
+    
     return finalUrl;
   } catch (error) {
     console.error('[getApiUrl] Error generating URL:', error);
-    // Fallback to production URL
     const fullEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     return `/api${fullEndpoint}`;
   }

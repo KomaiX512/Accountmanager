@@ -17,6 +17,14 @@
   padding: 0 !important;
   margin: 0 !important;
   box-sizing: border-box !important;
+  /* CRITICAL: Ensure modal is always viewport-relative */
+  transform: none !important;
+  will-change: auto !important;
+  contain: none !important;
+  isolation: isolate !important;
+  /* Force new stacking context to override parent transforms */
+  transform-style: flat !important;
+  backface-visibility: visible !important;
 }
 
 .chat-modal-content {
@@ -37,7 +45,15 @@
   z-index: 2147483647 !important;
   animation: modalAppear 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
   box-sizing: border-box !important;
-  margin: 0 !important;
+  margin: 20px !important;
+  /* CRITICAL: Ensure content is always centered and visible */
+  transform: none !important;
+  contain: none !important;
+  will-change: auto !important;
+  /* Ensure minimum spacing from viewport edges */
+  min-height: 0 !important;
+  align-self: center !important;
+  justify-self: center !important;
 }
 
 @keyframes modalAppear {
@@ -619,11 +635,22 @@
 
 /* Responsive Design - OPTIMIZED */
 @media (max-width: 768px) {
+  .chat-modal-overlay {
+    /* Ensure perfect centering on mobile */
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 10px !important;
+  }
+  
   .chat-modal-content {
     width: 98% !important;
     height: 70vh !important; /* Reduced from 94vh to prevent keyboard overlap */
     max-height: calc(100vh - 120px) !important; /* Ensure space for keyboard */
     border-radius: 16px !important;
+    margin: 10px !important;
+    /* Ensure mobile centering */
+    align-self: center !important;
+    justify-self: center !important;
   }
   
   .chat-modal-header {
@@ -651,11 +678,22 @@
 }
 
 @media (max-width: 480px) {
+  .chat-modal-overlay {
+    /* Ensure perfect centering on small mobile */
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 5px !important;
+  }
+  
   .chat-modal-content {
     width: 100% !important;
     height: 75vh !important; /* Reduced from 100vh to prevent keyboard overlap */
     max-height: calc(100vh - 100px) !important; /* Ensure space for keyboard */
     border-radius: 0 !important;
+    margin: 5px !important;
+    /* Ensure small mobile centering */
+    align-self: center !important;
+    justify-self: center !important;
   }
   
   .chat-modal-header {

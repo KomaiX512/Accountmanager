@@ -5,7 +5,7 @@ import axios from 'axios';
 const axiosInstance = axios.create({
   // Use relative URLs for better performance
   baseURL: '/api',
-  timeout: 15000, // 15 second timeout
+  timeout: 60000, // 60 second timeout
   headers: {
     'Content-Type': 'application/json',
   },

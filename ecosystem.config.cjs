@@ -18,13 +18,17 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 3000,
         MAIN_SERVER_PORT: 3000,
-        SERVER_TYPE: 'main'
+        SERVER_TYPE: 'main',
+        REDIS_URL: 'redis://127.0.0.1:6379',
+        VPS_MODE: 'true'
       },
       env_production: {
         NODE_ENV: 'production',
         PORT: 3000,
         MAIN_SERVER_PORT: 3000,
-        SERVER_TYPE: 'main'
+        SERVER_TYPE: 'main',
+        REDIS_URL: 'redis://127.0.0.1:6379',
+        VPS_MODE: 'true'
       },
       out_file: './logs/main-api.out.log',
       error_file: './logs/main-api.err.log',
@@ -47,13 +51,17 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 3001,
         RAG_SERVER_PORT: 3001,
-        SERVER_TYPE: 'rag'
+        SERVER_TYPE: 'rag',
+        REDIS_URL: 'redis://127.0.0.1:6379/1',
+        VPS_MODE: 'true'
       },
       env_production: {
         NODE_ENV: 'production',
         PORT: 3001,
         RAG_SERVER_PORT: 3001,
-        SERVER_TYPE: 'rag'
+        SERVER_TYPE: 'rag',
+        REDIS_URL: 'redis://127.0.0.1:6379/1',
+        VPS_MODE: 'true'
       },
       out_file: './logs/rag-server.out.log',
       error_file: './logs/rag-server.err.log',
@@ -76,13 +84,17 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 3002,
         PROXY_SERVER_PORT: 3002,
-        SERVER_TYPE: 'proxy'
+        SERVER_TYPE: 'proxy',
+        REDIS_URL: 'redis://127.0.0.1:6379/2',
+        VPS_MODE: 'true'
       },
       env_production: {
         NODE_ENV: 'production',
         PORT: 3002,
         PROXY_SERVER_PORT: 3002,
-        SERVER_TYPE: 'proxy'
+        SERVER_TYPE: 'proxy',
+        REDIS_URL: 'redis://127.0.0.1:6379/2',
+        VPS_MODE: 'true'
       },
       out_file: './logs/proxy-server.out.log',
       error_file: './logs/proxy-server.err.log',

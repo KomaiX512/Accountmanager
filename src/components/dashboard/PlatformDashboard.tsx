@@ -559,106 +559,37 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = memo(({
     }
   }, [isPostDropdownOpen]);
 
-  // 🚀 POST DROPDOWN: Position calculation - FIXED POSITIONING (mobile-aware)
+  // 🚀 POST DROPDOWN: Position calculation - ALWAYS NEAR INPUT (desktop + mobile)
   const updateDropdownPosition = useCallback(() => {
     const inputElement = postInputRef.current;
-    console.log('🚀 updateDropdownPosition called, input element:', inputElement);
     if (!inputElement) {
       setPostDropdownPosition(null);
       return;
     }
 
     const rect = inputElement.getBoundingClientRect();
-    console.log('🚀 Input field rect:', rect);
-    
-    // ✅ CRITICAL: Use ONLY the input field position, not the creation bar container
-    // This ensures dropdown appears directly above the input field
-    console.log('🚀 Positioning dropdown relative to input field only');
-    
-    // ✅ ADDED: Double-check that we're getting the right input element
-    console.log('🚀 Input element:', inputElement);
-    console.log('🚀 Input element classList:', inputElement.className);
-    
-    // ✅ ADDED: Check if input element is actually visible and positioned correctly
-    const computedStyle = window.getComputedStyle(inputElement);
-    console.log('🚀 Input element computed styles:', {
-      position: computedStyle.position,
-      top: computedStyle.top,
-      left: computedStyle.left,
-      transform: computedStyle.transform,
-      zIndex: computedStyle.zIndex
-    });
-    
-    // Try to measure the actual rendered dropdown to compute an exact top position
     const portalEl = document.getElementById('post-dropdown-portal') as HTMLElement | null;
     const measuredDropdownRect = portalEl ? portalEl.getBoundingClientRect() : null;
     const dropdownHeight = measuredDropdownRect ? Math.round(measuredDropdownRect.height) : 340; // Fallback
-    const measuredDropdownWidth = measuredDropdownRect ? Math.round(measuredDropdownRect.width) : 480; // Fallback
+    const measuredDropdownWidth = measuredDropdownRect ? Math.round(measuredDropdownRect.width) : 0; // Fallback
 
-    // Determine desired width: match input width (with padding), clamped to sensible min/max
-    const inputPreferredWidth = Math.round(Math.min(480, Math.max(280, rect.width + 32)));
-    const dropdownWidth = Math.min(measuredDropdownWidth || 480, inputPreferredWidth);
+    const dropdownWidth = Math.round(Math.min(480, Math.max(280, rect.width + 32)));
 
-    // Positioning strategy:
-    // - Mobile (<=767px): position NEAR the input field (just below it),
-    //   clamped to viewport so it remains visible and clickable.
-    // - Desktop: keep existing fixed-viewport strategy near top for separation.
-    let top: number;
-    const isMobile = window.innerWidth <= 767;
-    if (isMobile) {
-      const desiredTop = Math.round(rect.bottom + 8); // just under the input
-      const maxTop = Math.max(50, window.innerHeight - dropdownHeight - 12);
-      top = Math.min(desiredTop, maxTop);
-      // If the input is too close to the top, ensure a safe margin
-      if (top < 50) top = 50;
-      console.log('📱 Mobile dropdown positioning - desiredTop:', desiredTop, 'finalTop:', top);
-    } else {
-      // Desktop: fixed near top of viewport
-      const viewportTopMargin = 100; // Safe margin from viewport top
-      top = viewportTopMargin;
-      // Ensure it never overlaps with the input
-      const inputBottom = rect.bottom;
-      const dropdownBottom = top + dropdownHeight;
-      if (dropdownBottom >= inputBottom - 10) {
-        top = Math.max(50, top - 100);
-        console.log('🚀 Preventing overlap - moved dropdown higher to viewport top');
-      }
-      if (top < 50) {
-        top = 50;
-        console.log('🚀 Ensuring minimum viewport margin - set to 50px');
-      }
-    }
-    
-    // Horizontal centering over the input field
-    let left = rect.left + (rect.width / 2) - (dropdownWidth / 2);
+    // Prefer below; if not enough space, place above
+    const spaceBelow = window.innerHeight - rect.bottom - 12;
+    const placeBelow = spaceBelow >= dropdownHeight;
+    let top = placeBelow ? Math.round(rect.bottom + 8) : Math.max(12, Math.round(rect.top - dropdownHeight - 8));
 
-    console.log('🚀 Input field positioning for dropdown:', rect);
-    console.log('🚀 Input field top position:', rect.top);
-    console.log('🚀 Dropdown height:', dropdownHeight);
-    // Viewport margin log only meaningful for desktop; omit on mobile
-    console.log('🚀 Final position - top:', top, 'left:', left);
-
-    // ✅ HORIZONTAL POSITIONING: Ensure dropdown stays within viewport bounds
-    const safeMargin = 16;
-    if (left + dropdownWidth > window.innerWidth - safeMargin) {
-      left = window.innerWidth - dropdownWidth - safeMargin;
-    }
-    if (left < safeMargin) {
-      left = safeMargin;
+    // Horizontal centering with viewport clamping
+    let left = rect.left + (rect.width / 2) - ((measuredDropdownWidth || dropdownWidth) / 2);
+    const safeMargin = 12;
+    const effectiveWidth = Math.min(dropdownWidth, window.innerWidth - safeMargin * 2);
+    if (left < safeMargin) left = safeMargin;
+    if (left + effectiveWidth > window.innerWidth - safeMargin) {
+      left = Math.max(safeMargin, window.innerWidth - effectiveWidth - safeMargin);
     }
 
-    // ✅ MOBILE RESPONSIVENESS: Better mobile positioning
-    if (window.innerWidth <= 767) {
-      // For mobile, ensure dropdown is properly aligned with input
-      const mobileLeft = Math.max(12, Math.min(left, window.innerWidth - dropdownWidth - 12));
-      left = mobileLeft;
-    } else if (window.innerWidth <= 480) {
-      // For very small screens, use safe margins
-      left = Math.max(8, Math.min(left, window.innerWidth - dropdownWidth - 8));
-    }
-
-    const position = { top, left, width: dropdownWidth };
-    console.log('🚀 Setting dropdown position:', position);
+    const position = { top, left, width: effectiveWidth };
     setPostDropdownPosition(position);
   }, []);
 
@@ -3116,7 +3047,7 @@ Image Description: ${response.post.image_prompt}
                 <News4U accountHolder={accountHolder} platform={platform} />
               </div>
 
-            {config.supportsNotifications && (
+            {config.supportsNotifications && ((typeof window === 'undefined' || window.innerWidth > 767) || isConnected) && (
               <div 
                 className={`notifications ${expandedModules.notifications ? 'mobile-expanded' : ''}`}
                 onClick={(e) => handleMobileModuleClick('notifications', e)}

@@ -42,33 +42,65 @@ class NetflixPerformanceOptimizer {
   async setupRedisCluster() {
     // Check if Redis is available on VPS
     const isProduction = process.env.NODE_ENV === 'production' || process.env.VPS_MODE === 'true';
-    
-    if (isProduction) {
-      try {
-        // Production: Connect to Redis cluster
-        this.redis = new Redis.Cluster([
-          { host: 'localhost', port: 6379 },
-        ], {
+
+    // Local development: Use memory cache to preserve speed
+    if (!isProduction) {
+      this.redis = new Map();
+      this.redisType = 'memory';
+      console.log('🏠 Local development: Using memory cache (preserving speed)');
+      return;
+    }
+
+    // Production: prefer explicit cluster nodes if provided, else single-instance URL
+    const clusterNodesEnv = process.env.REDIS_CLUSTER_NODES; // e.g. "127.0.0.1:7000,127.0.0.1:7001,127.0.0.1:7002"
+    const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
+
+    try {
+      if (clusterNodesEnv && clusterNodesEnv.trim().length > 0) {
+        const nodes = clusterNodesEnv.split(',').map((s) => {
+          const [host, port] = s.trim().split(':');
+          return { host: host || '127.0.0.1', port: Number(port || 6379) };
+        });
+
+        this.redis = new Redis.Cluster(nodes, {
           redisOptions: {
             password: process.env.REDIS_PASSWORD,
-            connectTimeout: 1000,
-            commandTimeout: 500,
-            retryDelayOnFailover: 100,
+            connectTimeout: 1500,
+            commandTimeout: 750,
+            maxRetriesPerRequest: 1,
+            enableReadyCheck: true,
           },
           enableOfflineQueue: false,
           maxRetriesPerRequest: 1,
+          retryDelayOnFailover: 100,
         });
 
         await this.redis.ping();
-        console.log('🔥 Redis cluster connected for Netflix-scale caching');
-      } catch (error) {
-        console.log('⚠️ Redis not available, using memory cache fallback');
-        this.redis = new Map(); // Fallback to memory cache
+        this.redisType = 'cluster';
+        console.log(`🔥 Redis CLUSTER connected for caching: ${nodes.map(n => `${n.host}:${n.port}`).join(', ')}`);
+      } else {
+        this.redis = new Redis(redisUrl, {
+          lazyConnect: false,
+          enableReadyCheck: true,
+          maxRetriesPerRequest: 1,
+          connectTimeout: 1500,
+          commandTimeout: 750,
+          retryStrategy: (times) => Math.min(times * 100, 1000),
+          reconnectOnError: (err) => {
+            const msg = err?.message || '';
+            return msg.includes('READONLY') || msg.includes('ETIMEDOUT') || msg.includes('ECONNRESET');
+          },
+        });
+
+        await this.redis.ping();
+        this.redisType = 'single';
+        console.log(`🔥 Redis SINGLE connected for caching at ${redisUrl}`);
       }
-    } else {
-      // Local development: Use memory cache to preserve speed
-      this.redis = new Map();
-      console.log('🏠 Local development: Using memory cache (preserving speed)');
+    } catch (error) {
+      console.log(`⚠️ Redis not available (${error?.message || error}), using memory cache fallback`);
+      try { if (this.redis && typeof this.redis.quit === 'function') await this.redis.quit(); } catch {}
+      this.redis = new Map(); // Fallback to memory cache
+      this.redisType = 'memory';
     }
   }
 

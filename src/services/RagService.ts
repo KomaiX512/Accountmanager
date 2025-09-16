@@ -35,7 +35,7 @@ interface PostGenerationResponse {
 
 // Configure axios for CORS requests
 axios.defaults.headers.common['Accept'] = 'application/json';
-axios.defaults.timeout = 90000; // Increased to 90 seconds to handle request queuing
+axios.defaults.timeout = 60000; // 60 seconds timeout
 
 // Extend axios config type to include metadata
 declare module 'axios' {
@@ -308,7 +308,7 @@ class RagService {
             // Use getApiUrl for proper URL construction instead of empty baseUrl
             const url = serverUrl || getApiUrl('/api/rag/discussion');
             const response = await axios.post(url, requestData, {
-              timeout: 120000, // 2 minute timeout for complex queries
+              timeout: 60000, // 60 second timeout for complex queries
               headers: {
                 'Content-Type': 'application/json'
               }
@@ -428,7 +428,7 @@ class RagService {
             platform,
             firebaseUID: (JSON.parse(localStorage.getItem('currentUser') || 'null') || {})?.uid
           }, {
-            timeout: 180000, // 3 minute timeout for image generation + queueing
+            timeout: 60000, // 60 second timeout for image generation + queueing
             withCredentials: false, // Disable sending cookies
             headers: {
               'Content-Type': 'application/json'
@@ -531,7 +531,7 @@ class RagService {
     try {
       const response = await this.tryServerUrls(`/api/conversations/${username}?platform=${platform}`, (url) => 
         axios.get(url, {
-          timeout: 10000, // 10 second timeout
+          timeout: 60000, // 60 second timeout
           withCredentials: false, // Disable sending cookies
         }), this.RAG_SERVER_URLS
       );
@@ -592,7 +592,7 @@ class RagService {
           return await this.tryServerUrls(`/api/ai-replies/${username}?platform=${platform}`, (url) => {
             console.log(`[RagService] Trying URL: ${url}`);
             return axios.get(url, {
-              timeout: 10000,
+              timeout: 60000,
               withCredentials: false,
               headers: {
                 'Accept': 'application/json'
@@ -679,7 +679,7 @@ class RagService {
             'Pragma': 'no-cache'
           },
           withCredentials: false, // Important for CORS
-          timeout: 30000, // 30 second timeout
+          timeout: 60000, // 60 second timeout
         }
       );
 

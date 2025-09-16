@@ -1932,7 +1932,7 @@ h2 {
   border: 1px solid rgba(100, 255, 218, 0.15);
   border-radius: 24px;
   padding: 0;
-  z-index: 99999; /* ensure dropdown floats above dashboard grid */
+  z-index: 1000001; /* above welcome header (900000) and module chrome */
   overflow: hidden;
   /* ✅ IMPROVED: Better shadow and positioning */
   box-shadow: 
@@ -2823,15 +2823,65 @@ h2 {
     background-image: none;
   }
 
-  /* 🍎 COLLAPSED STATE BY DEFAULT - Only for expandable modules */
-  /* Universal hiding for ALL content when collapsed */
+  /* ——— Apple breathing space for Strategies & Competitor Analysis (mobile only) ——— */
+  .strategies,
+  .competitor-analysis {
+    border-radius: 18px;
+    height: 56px; /* larger tap target; prevents title crowding */
+  }
+
+  .strategies::before,
+  .competitor-analysis::before {
+    padding: 12px 16px; /* generous header padding */
+  }
+
+  .strategies::after,
+  .competitor-analysis::after {
+    top: 12px;   /* align with increased header padding */
+    left: 16px;
+    font-size: 1.05rem;
+    letter-spacing: 0.2px;
+  }
+
+  /* Create space under header when expanded */
+  .strategies.mobile-expanded,
+  .competitor-analysis.mobile-expanded {
+    padding-top: 10px;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .strategies.mobile-expanded > *:first-child,
+  .competitor-analysis.mobile-expanded > *:first-child {
+    margin-top: 6px !important;
+    padding-top: 6px !important;
+  }
+
+  /* Improve item rhythm and controls spacing */
+  .strategies.mobile-expanded .content-item,
+  .competitor-analysis.mobile-expanded .content-item {
+    padding: 10px 12px !important;
+    margin: 8px 0 !important;
+    border-radius: 10px !important;
+  }
+
+  .strategies .see-more,
+  .competitor-analysis .see-more {
+    padding: 6px 12px !important;
+    margin-top: 8px !important;
+    border-radius: 999px !important;
+  }
+
+  /* 🍎 COLLAPSED STATE BY DEFAULT - HIDE CONTENT COMPLETELY */
+  /* Universal hiding for ALL content when collapsed - no wrapper styling needed */
   .notifications:not(.mobile-expanded) > *,
   .strategies:not(.mobile-expanded) > *, 
   .competitor-analysis:not(.mobile-expanded) > *,
   .news4u:not(.mobile-expanded) > * {
+    display: none !important; /* Completely hide content to save space */
     max-height: 0 !important;
-    height: 0 !important; /* ensure wrapper collapses fully */
-    min-height: 0 !important; /* override any min-heights in child components */
+    height: 0 !important;
+    min-height: 0 !important;
     overflow: hidden !important;
     opacity: 0 !important;
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -2908,6 +2958,13 @@ h2 {
     padding: 0 4px 4px !important; /* tighter inner padding */
     border: none !important;
     animation: mobileFadeUp 160ms cubic-bezier(0.22, 1, 0.36, 1) both; /* Delightful, minimal entrance */
+  }
+
+  /* Reduce notifications drawer height on mobile and make scrollable */
+  .notifications.mobile-expanded {
+    max-height: min(60vh, 420px) !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
   }
 
   @keyframes mobileFadeUp {

@@ -10,7 +10,15 @@ const upload = multer({ storage: multer.memoryStorage() });
 import puppeteer from 'puppeteer';
 import * as fileType from 'file-type';
 import { fileTypeFromBuffer } from 'file-type';
-import sharp from 'sharp';
+// Conditional Sharp import for CPU compatibility
+let sharp;
+try {
+  sharp = require('sharp');
+  console.log('✅ Sharp library loaded successfully');
+} catch (error) {
+  console.warn('⚠️ Sharp library not available:', error.message);
+  sharp = null;
+}
 import { randomUUID } from 'crypto';
 import crypto from 'crypto';
 import schedule from 'node-schedule';

@@ -13260,14 +13260,17 @@ async function processScheduledInstagramPosts() {
   try {
     console.log(`[${new Date().toISOString()}] [SCHEDULER] processScheduledInstagramPosts started.`);
     // List all scheduled posts
+    const now = new Date();
+    // 🚀 PERFORMANCE OPTIMIZATION: Only check posts due within next 10 minutes
+    // This reduces 130+ post checks to ~5-10 relevant posts per run
+    const tenMinutesFromNow = new Date(now.getTime() + 10 * 60 * 1000);
     const listCommand = new ListObjectsV2Command({
       Bucket: 'tasks',
       Prefix: 'scheduled_posts/instagram/',
-      MaxKeys: 1000 // Increased from 100 to 1000 to process more posts
+      MaxKeys: 50 // Reduced from 1000 - we only need upcoming posts
     });
     
     const response = await s3Client.send(listCommand);
-    const now = new Date();
     
     console.log(`[${new Date().toISOString()}] [SCHEDULER] Found ${response.Contents?.length || 0} scheduled posts to check`);
     
@@ -13303,6 +13306,11 @@ async function processScheduledInstagramPosts() {
 
           // Check if it's time to post
           const scheduleTime = new Date(scheduleData.scheduleDate);
+          
+          // 🚀 PERFORMANCE OPTIMIZATION: Skip posts not due within next 10 minutes
+          if (scheduleTime > tenMinutesFromNow) {
+            continue; // Skip future posts to reduce processing load
+          }
           
           // 🚫 CRITICAL FIX: Skip posts already being processed
           if (scheduleData.status === 'processing') {

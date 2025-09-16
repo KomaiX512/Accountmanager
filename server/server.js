@@ -18994,16 +18994,28 @@ app.get('/api/r2-image/:username/:imageKey', netflixOptimizer.cacheMiddleware(36
     console.error(`[${new Date().toISOString()}] [R2-IMAGE] Error serving ${imageKey}:`, error.message);
     
     // CLS FIX: Return 600x600 transparent image to prevent layout shifts
-    const transparent600x600 = await sharp({
-      create: {
-        width: 600,
-        height: 600,
-        channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 0 }
+    let transparent600x600;
+    if (sharp) {
+      try {
+        transparent600x600 = await sharp({
+          create: {
+            width: 600,
+            height: 600,
+            channels: 4,
+            background: { r: 0, g: 0, b: 0, alpha: 0 }
+          }
+        })
+        .png()
+        .toBuffer();
+      } catch (sharpError) {
+        console.warn(`[${new Date().toISOString()}] [R2-IMAGE] Sharp fallback failed:`, sharpError.message);
+        // Use base64 transparent PNG fallback
+        transparent600x600 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAI9jU77yAAAAABJRU5ErkJggg==', 'base64');
       }
-    })
-    .png()
-    .toBuffer();
+    } else {
+      // Sharp not available, use base64 transparent PNG fallback
+      transparent600x600 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAI9jU77yAAAAABJRU5ErkJggg==', 'base64');
+    }
     
     res.setHeader('Content-Type', 'image/png');
     res.setHeader('Cache-Control', 'public, max-age=300'); // Cache missing images for 5 min

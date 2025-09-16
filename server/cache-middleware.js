@@ -85,8 +85,10 @@ class CacheManager {
     
     this.stats.sets++;
     
-    // Implement LRU if cache gets too large (>1000 entries)
-    if (this.cache.size > 1000) {
+    // Implement LRU if cache gets too large (>5000 entries)
+    // 🚀 PERFORMANCE FIX: Increased from 1000 to 5000 to reduce cache thrashing
+    // Previous setting caused 99% cache turnover (90 evictions vs 91 sets)
+    if (this.cache.size > 5000) {
       this.evictOldest();
     }
   }

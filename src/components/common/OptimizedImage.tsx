@@ -28,6 +28,7 @@ interface OptimizedImageProps {
   isLCP?: boolean; // Mark as LCP element to skip heavy optimization
   // Responsive delivery
   sizes?: string; // e.g. "(max-width: 768px) 100vw, 600px"
+  forceEagerLoading?: boolean; // Force eager loading (overrides native lazy)
 }
 
 const OptimizedImage: React.FC<OptimizedImageProps> = ({
@@ -51,6 +52,7 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
   aspectRatio,
   isLCP = false,
   sizes,
+  forceEagerLoading = false,
   ...props
 }) => {
   const [optimizedSrc, setOptimizedSrc] = useState<string>(src);
@@ -455,7 +457,7 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         data-original-src={preserveOriginalForActions ? originalSrc : undefined}
         {...(isLCP && { fetchpriority: 'high' })}
         decoding={isLCP ? 'sync' : 'async'}
-        loading={isLCP ? 'eager' : 'lazy'}
+        loading={(isLCP || forceEagerLoading) ? 'eager' : 'lazy'}
         {...(() => {
           const r = buildResponsiveSources(optimizedSrc);
           const dynProps: any = {};

@@ -168,6 +168,44 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ username, onClose, platform
     }
   }, [toastMessage]);
 
+  // Handle mobile keypad appearance and scrolling
+  useEffect(() => {
+    const handleResize = () => {
+      // Force scroll to top when viewport changes (keypad appears/disappears)
+      const overlay = document.querySelector('.profile-popup-overlay');
+      if (overlay) {
+        overlay.scrollTop = 0;
+      }
+    };
+
+    const handleOrientationChange = () => {
+      // Handle orientation changes on mobile
+      setTimeout(() => {
+        const overlay = document.querySelector('.profile-popup-overlay');
+        if (overlay) {
+          overlay.scrollTop = 0;
+        }
+      }, 100);
+    };
+
+    // Listen for viewport changes
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleOrientationChange);
+    
+    // Listen for visual viewport changes (mobile keypad)
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleResize);
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleOrientationChange);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleResize);
+      }
+    };
+  }, []);
+
   // Check platform-specific connection status using session managers for consistency
   useEffect(() => {
     if (currentUser?.uid) {

@@ -399,7 +399,6 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = memo(({
 
     } catch (error: any) {
       console.error(`Error refreshing ${platform} data:`, error);
-      setToast(`Failed to load ${platform} dashboard data.`);
     } finally {
       isRefreshingRef.current = false;
     }

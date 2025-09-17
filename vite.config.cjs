@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react-swc';
 export default defineConfig({
   plugins: [react()],
   server: {
+    allowedHosts: ['d96311065ee1.ngrok-free.app'],
     proxy: {
       // Image endpoints live on proxy server (3002)
       '/api/r2-image': {

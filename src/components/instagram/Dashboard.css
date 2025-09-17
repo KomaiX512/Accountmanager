@@ -10,7 +10,9 @@
   contain: layout style !important;
   isolation: isolate !important;
   /* Center the modal content regardless of scroll position */
-  display: flex !important;
+  display: grid !important;
+  place-items: center !important;
+  /* Keep flex alignment as a fallback for older engines */
   justify-content: center !important;
   align-items: center !important;
   justify-items: center !important;
@@ -21,15 +23,38 @@
   min-height: 100vh !important;
   min-width: 100vw !important;
   width: 100vw !important;
-  height: 100vh !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
   overflow: auto !important;
 }
 
 /* Ensure body and html don't interfere with fixed positioned overlays */
-body:has(.dashboard-wrapper) {
+body:has(.dashboard-wrapper),
+html:has(.dashboard-wrapper) {
   transform: none !important;
   perspective: none !important;
   contain: none !important;
+}
+
+/* When any portal overlay is open, completely neutralize transforms on ancestors */
+html:has(.chat-modal-overlay),
+body:has(.chat-modal-overlay),
+html:has(.instagram-chat-overlay),
+body:has(.instagram-chat-overlay),
+html:has(.popup-overlay),
+body:has(.popup-overlay) {
+  transform: none !important;
+  perspective: none !important;
+  filter: none !important;
+}
+
+/* Also neutralize on wrappers while a modal is open (body gets .modal-open) */
+body.modal-open #root,
+body.modal-open .dashboard-wrapper,
+body.modal-open .platform-dashboard-wrapper {
+  transform: none !important;
+  perspective: none !important;
+  filter: none !important;
 }
 
 /* Ensure dashboard wrapper doesn't interfere with fixed positioned overlays */
@@ -2331,6 +2356,17 @@ h2 {
 /* Guarantee centering of content even if child or module styles try to push it */
 .popup-overlay > * {
   margin: auto !important;
+}
+
+/* Absolute centering fallback to defeat any layout interference */
+.chat-modal-overlay .chat-modal-content,
+.instagram-chat-overlay .instagram-chat-content,
+.popup-overlay .popup-content {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  margin: 0 !important;
 }
 
 @keyframes modalAppear {

@@ -2856,18 +2856,22 @@ const MainDashboard: React.FC = () => {
                     <div className="status-indicators">
                       <div 
                         className={`status-indicator ${
-                          isPlatformLoading(platform.id) 
-                            ? 'acquiring' 
-                            : platform.claimed 
-                              ? 'claimed' 
-                              : 'unclaimed'
+                          isPlatformLoading(platform.id)
+                            ? 'acquiring'
+                            : platform.comingSoon
+                              ? 'coming-soon'
+                              : platform.claimed
+                                ? 'claimed'
+                                : 'unclaimed'
                         }`}
                       >
-                        {isPlatformLoading(platform.id) 
-                          ? 'Acquiring' 
-                          : platform.claimed 
-                            ? 'Acquired' 
-                            : 'Not Acquired'}
+                        {isPlatformLoading(platform.id)
+                          ? 'Acquiring'
+                          : platform.comingSoon
+                            ? 'Add to Wishlist'
+                            : platform.claimed
+                              ? 'Acquired'
+                              : 'Not Acquired'}
                       </div>
                       
                       <div 
@@ -2909,7 +2913,7 @@ const MainDashboard: React.FC = () => {
                         style={{ cursor: (platform.comingSoon || (platform.claimed && !platform.connected && platform.id !== 'linkedin')) ? 'pointer' : 'default' }}
                       >
                         {platform.comingSoon || (platform.id === 'linkedin' && !platform.connected)
-                          ? 'Coming Soon' 
+                          ? 'Add to Wishlist' 
                           : !platform.claimed 
                             ? 'Not Applicable'
                             : platform.connected 

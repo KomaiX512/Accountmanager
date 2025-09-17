@@ -1007,7 +1007,7 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
   cursor: pointer;
   flex: 1;
   transition: transform 0.2s ease;
-  gap: clamp(0.8rem, 2vw, 1rem);
+  gap: clamp(0.4rem, 1.2vw, 0.6rem);
   text-align: center;
   width: 100%;
   /* ENHANCED CLICKABLE AREA - Clear button indication */
@@ -1153,10 +1153,10 @@ body.instagram-dashboard-active .main-dashboard-wrapper {
 }
 
 .status-indicator.coming-soon {
-  background: rgba(138, 43, 226, 0.15);
-  color: #8a2be2;
-  border: 1px solid rgba(138, 43, 226, 0.3);
-  font-weight: 500;
+  background: rgba(255, 193, 7, 0.15);
+  color: #ffc107;
+  border: 1px solid rgba(255, 193, 7, 0.35);
+  font-weight: 600;
 }
 
 .status-indicator.coming-soon:hover {

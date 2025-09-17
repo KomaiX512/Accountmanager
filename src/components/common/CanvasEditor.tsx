@@ -5,6 +5,8 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 // TUI Image Editor CSS is bundled by Vite so production builds include it correctly
 import 'tui-image-editor/dist/tui-image-editor.css';
+// Include TUI Color Picker base CSS (used by tui-image-editor)
+import 'tui-color-picker/dist/tui-color-picker.css';
 // Axios removed - not needed in this component
 import InstagramRequiredButton from './InstagramRequiredButton';
 import TwitterRequiredButton from './TwitterRequiredButton';

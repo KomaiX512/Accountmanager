@@ -47,7 +47,8 @@ rootElement.style.willChange = 'transform';
 // CRITICAL RESOURCE PRELOADING (DEVELOPMENT ONLY)
 // Note: In production, Vite automatically handles modulepreload optimization.
 // Raw /src/* paths don't exist in production builds and cause 404/MIME errors.
-if (process.env.NODE_ENV === 'development') {
+// Use Vite's compile-time flag so this block is tree-shaken in production builds.
+if (import.meta.env.DEV) {
   const criticalResources = [
     '/src/components/dashboard/PlatformDashboard.tsx',
     '/src/components/instagram/Dashboard.css',

@@ -59,11 +59,11 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
         return;
       }
 
-      // Pass the latest messages (including the one we just added) with selected model
+      // Single-turn: do not send prior context
       const response = await RagService.sendDiscussionQuery(
         accountHolder,
         message,
-        nextMessages,
+        [],
         platform || 'instagram',
         model || 'gemini-2.5-flash'
       );
@@ -183,6 +183,11 @@ const LeftBar: React.FC<LeftBarProps> = ({ accountHolder, userId, platform = 'in
           onSendMessage={handleSendMessage}
           platform={platform}
           isProcessing={isProcessing}
+          onClearConversation={() => {
+            setChatMessages([]);
+            // Persist clear to backend as empty conversation
+            RagService.saveConversation(accountHolder, [], platform).catch(err => console.error('[LeftBar] Error clearing conversation:', err));
+          }}
         />
       )}
       

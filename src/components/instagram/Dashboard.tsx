@@ -27,7 +27,7 @@ import ManualGuidance from '../common/ManualGuidance';
 import ChatModal from './ChatModal';
 import RagService from '../../services/RagService';
 import type { ChatMessage as ChatModalMessage } from './ChatModal';
-import type { Notification, ProfileInfo, LinkedAccount } from '../../types/notifications';
+import type { Notification, ProfileInfo } from '../../types/notifications';
 import { safeFilter, safeLength } from '../../utils/safeArrayUtils';
 // Import icons from react-icons
 import { FaChartLine, FaCalendarAlt, FaBullhorn, FaUndo, FaPencilAlt, FaRobot } from 'react-icons/fa';
@@ -166,7 +166,6 @@ const Dashboard: React.FC<DashboardProps> = ({ accountHolder: accountHolderProp,
   const baseReconnectDelay = 1000;
   const lastProfilePicRenderTimeRef = useRef<number>(0);
   const [aiProcessingNotifications, setAiProcessingNotifications] = useState<Record<string, boolean>>({});
-  const [linkedAccounts] = useState<LinkedAccount[]>([]);
 
   // Simple bio expand/collapse (no animations)
   const [isBioExpanded, setIsBioExpanded] = useState(false);
@@ -2639,7 +2638,8 @@ Image Description: ${response.post.image_prompt}
             // Handle sending additional messages in the chat modal
             if (!message.trim() || !accountHolder) return;
             setIsProcessing(true);
-            RagService.sendDiscussionQuery(accountHolder, message, chatMessages as RagChatMessage[], 'instagram', model)
+            // Single-turn mode: do NOT send prior context
+            RagService.sendDiscussionQuery(accountHolder, message, [] as RagChatMessage[], 'instagram', model)
               .then(response => {
                 const updatedMessages = [
                   ...chatMessages,
@@ -2661,8 +2661,12 @@ Image Description: ${response.post.image_prompt}
               });
           }}
           isProcessing={isProcessing}
-          linkedAccounts={linkedAccounts}
           platform="instagram"
+          onClearConversation={() => {
+            setChatMessages([]);
+            RagService.saveConversation(accountHolder, [], 'instagram')
+              .catch(err => console.error('Error clearing conversation:', err));
+          }}
         />
       )}
 
@@ -2730,7 +2734,8 @@ Image Description: ${response.post.image_prompt}
           onSendMessage={(message: string, model?: string) => {
             if (!message.trim() || !accountHolder) return;
             setIsProcessing(true);
-            RagService.sendDiscussionQuery(accountHolder, message, chatMessages as RagChatMessage[], 'instagram', model)
+            // Single-turn mode: do NOT send prior context
+            RagService.sendDiscussionQuery(accountHolder, message, [] as RagChatMessage[], 'instagram', model)
               .then(response => {
                 const updatedMessages = [
                   ...chatMessages,
@@ -2751,8 +2756,12 @@ Image Description: ${response.post.image_prompt}
               });
           }}
           isProcessing={isProcessing}
-          linkedAccounts={linkedAccounts}
           platform="instagram"
+          onClearConversation={() => {
+            setChatMessages([]);
+            RagService.saveConversation(accountHolder, [], 'instagram')
+              .catch(err => console.error('Error clearing conversation:', err));
+          }}
         />
       )}
 

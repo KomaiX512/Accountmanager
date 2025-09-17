@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageCircle, Send, X, Loader2 } from 'lucide-react';
+import { MessageCircle, Send, X, Loader2, Trash2 } from 'lucide-react';
 import './ChatModal.css';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
 
@@ -19,6 +19,7 @@ interface ChatModalProps {
   isProcessing?: boolean;
   platform?: string;
   suggestedQuestions?: string[];
+  onClearConversation?: () => void;
 }
 
 const ChatModal: React.FC<ChatModalProps> = ({
@@ -29,10 +30,14 @@ const ChatModal: React.FC<ChatModalProps> = ({
   onSendMessage,
   isProcessing = false,
   platform = 'instagram',
-  suggestedQuestions
+  suggestedQuestions,
+  onClearConversation
 }) => {
   const [message, setMessage] = useState('');
   const [conversationTracked, setConversationTracked] = useState(false);
+  const [lastSentMessage, setLastSentMessage] = useState<string | null>(null);
+  const [thinkingSeconds, setThinkingSeconds] = useState(0);
+  const [thinkingTextIndex, setThinkingTextIndex] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -97,6 +102,9 @@ const ChatModal: React.FC<ChatModalProps> = ({
 
     // Clear input immediately for snappy UX
     setMessage('');
+    setLastSentMessage(trimmed);
+    setThinkingSeconds(0);
+    setThinkingTextIndex(0);
 
     try {
       // ✅ TRACK ONLY ONCE PER CONVERSATION: Prevent multiple discussion increments for same chat session
@@ -141,13 +149,12 @@ const ChatModal: React.FC<ChatModalProps> = ({
 
   // Model toggle removed
 
-  // Format message content for better display and JSON handling
-  const formatMessageContent = (content: string) => {
+  // Format message content for better display and JSON/Markdown handling
+  const formatMessageContent = (content: string): string => {
     try {
-      // Clean the content first
-      let cleanContent = content.trim();
-      
-      // Try to detect and format JSON responses
+      let cleanContent = (content || '').trim();
+
+      // Try to detect and format full JSON responses
       if (cleanContent.startsWith('{') || cleanContent.startsWith('[')) {
         try {
           const parsed = JSON.parse(cleanContent);
@@ -155,40 +162,69 @@ const ChatModal: React.FC<ChatModalProps> = ({
             <div style="color: #00ffcc; font-size: 12px; font-weight: 600; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">JSON Response</div>
             <pre style="white-space: pre-wrap; font-family: 'SF Mono', 'Monaco', 'Consolas', monospace; font-size: 13px; line-height: 1.4; margin: 0; color: #e8e8ff;">${JSON.stringify(parsed, null, 2)}</pre>
           </div>`;
-        } catch {
-          // If not valid JSON, continue with normal formatting
+        } catch (e) {
+          // Not valid JSON; continue to Markdown formatting
         }
       }
-      
-      // Format lists and bullet points
+
       let formattedContent = cleanContent;
-      
-      // Convert numbered lists
+
+      // Code blocks ``` ```
+      formattedContent = formattedContent.replace(/```([\s\S]*?)```/g, (_m, code) => {
+        const escaped = String(code)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+        return `<pre style="background: #0f162a; border: 1px solid rgba(0,255,204,0.15); padding: 12px; border-radius: 8px; overflow-x: auto; color: #eaeaff;">${escaped}</pre>`;
+      });
+
+      // Headings
+      formattedContent = formattedContent.replace(/^\s*\*\*(.+?)\*\*\s*$/gm, '<div style="font-size: 15px; font-weight: 700; color: #ffffff; margin: 8px 0;">$1</div>');
+      formattedContent = formattedContent.replace(/^###\s+(.+)$/gm, '<div style="font-size: 14px; font-weight: 700; color: #ffffff; margin: 6px 0;">$1</div>');
+      formattedContent = formattedContent.replace(/^##\s+(.+)$/gm, '<div style="font-size: 15px; font-weight: 700; color: #ffffff; margin: 8px 0;">$1</div>');
+      formattedContent = formattedContent.replace(/^#\s+(.+)$/gm, '<div style="font-size: 16px; font-weight: 800; color: #ffffff; margin: 10px 0;">$1</div>');
+
+      // Numbered and bullet lists
       formattedContent = formattedContent.replace(/^\d+\.\s+(.+)$/gm, '<div style="margin: 6px 0; padding-left: 20px; position: relative;"><span style="position: absolute; left: 0; color: #00ffcc; font-weight: 600;">•</span>$1</div>');
-      
-      // Convert bullet points
       formattedContent = formattedContent.replace(/^[-*]\s+(.+)$/gm, '<div style="margin: 6px 0; padding-left: 20px; position: relative;"><span style="position: absolute; left: 0; color: #00ffcc; font-weight: 600;">•</span>$1</div>');
-      
-      // Convert URLs to clickable links
+
+      // URLs to clickable links
       const urlRegex = /(https?:\/\/[^\s]+)/g;
-      formattedContent = formattedContent.replace(urlRegex, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color: #00ffcc; text-decoration: underline; font-weight: 500;">$1</a>');
-      
-      // Convert **bold** text
-      formattedContent = formattedContent.replace(/\*\*(.*?)\*\*/g, '<strong style="font-weight: 600; color: #ffffff;">$1</strong>');
-      
-      // Convert *italic* text (but use emphasis color instead of italic)
-      formattedContent = formattedContent.replace(/\*(.*?)\*/g, '<span style="color: #00ffcc; font-weight: 500;">$1</span>');
-      
-      // Convert line breaks to proper HTML
+      formattedContent = formattedContent.replace(urlRegex, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color: #00ffcc; text-decoration: underline; font-weight: 500;">$1<\/a>');
+
+      // Bold and italic
+      formattedContent = formattedContent.replace(/\*\*(.*?)\*\*/g, '<strong style="font-weight: 700; color: #ffffff;">$1<\/strong>');
+      formattedContent = formattedContent.replace(/(^|\s)\*(.*?)\*(?=\s|$)/g, '$1<span style="color: #00ffcc; font-weight: 500;">$2<\/span>');
+
+      // Line breaks
       formattedContent = formattedContent.replace(/\n\n/g, '<br><br>');
       formattedContent = formattedContent.replace(/\n/g, '<br>');
-      
+
       return formattedContent;
     } catch (error) {
       console.error('Error formatting message content:', error);
-      return content.replace(/\n/g, '<br>');
+      return String(content || '').replace(/\n/g, '<br>');
     }
   };
+
+  // Thinking animation with elapsed seconds
+  useEffect(() => {
+    let intervalId: any = null;
+    if (isProcessing) {
+      const startedAt = Date.now();
+      intervalId = setInterval(() => {
+        setThinkingSeconds(Math.floor((Date.now() - startedAt) / 1000));
+        setThinkingTextIndex(prev => (prev + 1) % 4);
+      }, 1000);
+    } else {
+      setThinkingSeconds(0);
+      setThinkingTextIndex(0);
+      setLastSentMessage(null);
+    }
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [isProcessing]);
 
   if (!open) return null;
 
@@ -257,6 +293,26 @@ const ChatModal: React.FC<ChatModalProps> = ({
                 </div>
                 <div className="header-controls">
                   <span className="platform-badge">{platform}</span>
+                  {/* Clear conversation button */}
+                  <button
+                    type="button"
+                    className="chat-clear-btn"
+                    onClick={() => onClearConversation && onClearConversation()}
+                    disabled={!!isProcessing}
+                    aria-label="Clear conversation"
+                    title="Clear conversation"
+                    style={{
+                      marginLeft: 8,
+                      padding: '6px 8px',
+                      background: 'transparent',
+                      color: '#ff7676',
+                      border: '1px solid rgba(255, 118, 118, 0.4)',
+                      borderRadius: 8,
+                      cursor: isProcessing ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               </div>
               <button 
@@ -306,6 +362,20 @@ const ChatModal: React.FC<ChatModalProps> = ({
                   </motion.div>
                 ))
               )}
+              {/* Show pending user message while waiting */}
+              {isProcessing && lastSentMessage && (
+                <motion.div
+                  className="message user"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div
+                    className="message-content"
+                    dangerouslySetInnerHTML={{ __html: formatMessageContent(lastSentMessage) }}
+                  />
+                </motion.div>
+              )}
               {isProcessing && (
                 <motion.div
                   className="message assistant processing"
@@ -319,7 +389,9 @@ const ChatModal: React.FC<ChatModalProps> = ({
                       <span></span>
                       <span></span>
                     </div>
-                    {/* Processing model indicator removed */}
+                    <div style={{ fontSize: 12, color: '#a8b0cc' }}>
+                      Thinking… {thinkingSeconds}s · {['Analyzing context', 'Searching insights', 'Formulating answer', 'Almost ready'][thinkingTextIndex]}
+                    </div>
                   </div>
                 </motion.div>
               )}

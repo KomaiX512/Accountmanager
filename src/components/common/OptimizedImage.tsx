@@ -352,6 +352,8 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         u.searchParams.set('w', String(w));
         u.searchParams.set('q', String(q));
         u.searchParams.set('format', format);
+        // Mark as UI-render request so backend transforms only for rendering path
+        u.searchParams.set('render', '1');
         return `${u.toString()} ${w}w`;
       });
 

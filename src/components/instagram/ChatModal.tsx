@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Trash2 } from 'lucide-react';
 import './ChatModal.css';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
 
@@ -23,6 +24,7 @@ export interface ChatModalProps {
   isProcessing?: boolean;
   linkedAccounts?: LinkedAccount[];
   platform?: 'instagram' | 'twitter' | 'facebook' | 'linkedin';
+  onClearConversation?: () => void;
 }
 
 const ChatModal: React.FC<ChatModalProps> = ({
@@ -33,9 +35,13 @@ const ChatModal: React.FC<ChatModalProps> = ({
   username = 'Chat',
   isProcessing = false,
   linkedAccounts = [],
-  platform = 'instagram'
+  platform = 'instagram',
+  onClearConversation
 }) => {
   const [newMessage, setNewMessage] = useState('');
+  const [lastSentMessage, setLastSentMessage] = useState<string | null>(null);
+  const [thinkingSeconds, setThinkingSeconds] = useState(0);
+  const [thinkingTextIndex, setThinkingTextIndex] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -160,6 +166,25 @@ const ChatModal: React.FC<ChatModalProps> = ({
     }
   }, [open]);
 
+  // Thinking animation with elapsed seconds
+  useEffect(() => {
+    let intervalId: any = null;
+    if (isProcessing) {
+      const startedAt = Date.now();
+      intervalId = setInterval(() => {
+        setThinkingSeconds(Math.floor((Date.now() - startedAt) / 1000));
+        setThinkingTextIndex(prev => (prev + 1) % 4);
+      }, 1000);
+    } else {
+      setThinkingSeconds(0);
+      setThinkingTextIndex(0);
+      setLastSentMessage(null);
+    }
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [isProcessing]);
+
   // Unified send handler with access checks and one-time discussion tracking
   const sendMessage = async (text: string) => {
     const trimmed = text.trim();
@@ -194,6 +219,9 @@ const ChatModal: React.FC<ChatModalProps> = ({
       onSendMessage(trimmed);
     }
     setNewMessage('');
+    setLastSentMessage(trimmed);
+    setThinkingSeconds(0);
+    setThinkingTextIndex(0);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -217,21 +245,59 @@ const ChatModal: React.FC<ChatModalProps> = ({
     return [];
   };
 
-  // Function to format message content with clickable links
-  const formatMessageContent = (content: string) => {
-    // Replace platform-specific URLs with clickable links
-    let formattedContent = content.replace(
-      platformConfig.urlPattern,
-      '<a href="$&" target="_blank" rel="noopener noreferrer">$&</a>'
-    );
-    
-    // Replace other URLs
-    formattedContent = formattedContent.replace(
-      /(https?:\/\/[^\s]+)/g,
-      '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
-    );
-    
-    return formattedContent;
+  // Format message content with Markdown/JSON decoding and links
+  const formatMessageContent = (content: string): string => {
+    try {
+      let clean = (content || '').trim();
+
+      // JSON block
+      if (clean.startsWith('{') || clean.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(clean);
+          return `<div style="background: rgba(0,0,0,0.35); padding: 12px; border-radius: 10px; overflow-x: auto; margin: 8px 0; border-left: 4px solid #00ffcc;">
+            <div style="color: #00ffcc; font-size: 12px; font-weight: 600; margin-bottom: 6px;">JSON Response</div>
+            <pre style="white-space: pre-wrap; font-family: 'SF Mono','Consolas',monospace; font-size: 13px; line-height: 1.4; margin: 0; color: #e8f0ff;">${JSON.stringify(parsed, null, 2)}</pre>
+          </div>`;
+        } catch {}
+      }
+
+      let out = clean;
+
+      // Code blocks
+      out = out.replace(/```([\s\S]*?)```/g, (_m, code) => {
+        const escaped = String(code).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return `<pre style="background:#0f162a;border:1px solid rgba(0,255,204,0.15);padding:12px;border-radius:8px;overflow-x:auto;color:#eaeaff;">${escaped}</pre>`;
+      });
+
+      // Headings
+      out = out.replace(/^\s*\*\*(.+?)\*\*\s*$/gm, '<div style="font-size: 15px; font-weight: 700; color: #ffffff; margin: 8px 0;">$1</div>');
+      out = out.replace(/^###\s+(.+)$/gm, '<div style="font-size: 14px; font-weight: 700; color: #ffffff; margin: 6px 0;">$1</div>');
+      out = out.replace(/^##\s+(.+)$/gm, '<div style="font-size: 15px; font-weight: 700; color: #ffffff; margin: 8px 0;">$1</div>');
+      out = out.replace(/^#\s+(.+)$/gm, '<div style="font-size: 16px; font-weight: 800; color: #ffffff; margin: 10px 0;">$1</div>');
+
+      // Lists and links
+      out = out.replace(/^\d+\.\s+(.+)$/gm, '<div style="margin:6px 0;padding-left:20px;position:relative;"><span style="position:absolute;left:0;color:#00ffcc;font-weight:600;">•</span>$1</div>');
+      out = out.replace(/^[-*]\s+(.+)$/gm, '<div style="margin:6px 0;padding-left:20px;position:relative;"><span style="position:absolute;left:0;color:#00ffcc;font-weight:600;">•</span>$1</div>');
+      
+      // Platform URLs
+      out = out.replace(platformConfig.urlPattern, '<a href="$&" target="_blank" rel="noopener noreferrer" style="color:#00ffcc;text-decoration:underline;">$&</a>');
+      // Other URLs
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      out = out.replace(urlRegex, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:#00ffcc;text-decoration:underline;">$1</a>');
+
+      // Bold and italic
+      out = out.replace(/\*\*(.*?)\*\*/g, '<strong style="font-weight: 700; color: #ffffff;">$1</strong>');
+      out = out.replace(/(^|\s)\*(.*?)\*(?=\s|$)/g, '$1<span style="color: #00ffcc; font-weight: 500;">$2</span>');
+
+      // Line breaks
+      out = out.replace(/\n\n/g, '<br><br>');
+      out = out.replace(/\n/g, '<br>');
+
+      return out;
+    } catch (error) {
+      console.error('Error formatting message content:', error);
+      return String(content || '').replace(/\n/g, '<br>');
+    }
   };
 
   if (!open) return null;
@@ -266,9 +332,27 @@ const ChatModal: React.FC<ChatModalProps> = ({
                 <h2>AI Discussion with {username}</h2>
                 <span className="platform-indicator">{platformConfig.name}</span>
               </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button
+                  className="chat-clear-btn"
+                  onClick={() => onClearConversation && onClearConversation()}
+                  disabled={isProcessing}
+                  title="Clear conversation"
+                  style={{
+                    padding: '6px 8px',
+                    background: 'transparent',
+                    color: '#ff7676',
+                    border: '1px solid rgba(255, 118, 118, 0.4)',
+                    borderRadius: 8,
+                    cursor: isProcessing ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  <Trash2 size={14} />
+                </button>
               <button className="chat-modal-close" onClick={onClose}>
                 ✕
               </button>
+              </div>
             </div>
 
             <div className="chat-messages-container">
@@ -334,6 +418,44 @@ const ChatModal: React.FC<ChatModalProps> = ({
                     </motion.div>
                   );
                 })
+              )}
+              {/* Show pending user message while waiting */}
+              {isProcessing && lastSentMessage && (
+                <motion.div
+                  className="chat-message user-message"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <div className="message-bubble">
+                    <div 
+                      className="message-content"
+                      dangerouslySetInnerHTML={{ __html: formatMessageContent(lastSentMessage) }}
+                    />
+                  </div>
+                </motion.div>
+              )}
+              {/* AI thinking animation */}
+              {isProcessing && (
+                <motion.div
+                  className="chat-message assistant-message processing"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <div className="message-bubble">
+                    <div className="message-content">
+                      <div className="typing-indicator">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                      </div>
+                      <div style={{ fontSize: 12, color: '#a8b0cc', marginTop: 8 }}>
+                        Thinking… {thinkingSeconds}s · {['Analyzing context', 'Searching insights', 'Formulating answer', 'Almost ready'][thinkingTextIndex]}
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
               )}
               <div ref={messagesEndRef} />
             </div>

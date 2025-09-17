@@ -21,6 +21,7 @@ import { FaBell, FaPalette, FaDownload } from 'react-icons/fa';
 import useFeatureTracking from '../../hooks/useFeatureTracking';
 import { getApiUrl } from '../../config/api';
 import CacheManager from '../../utils/cacheManager';
+import { BatchImageLoader } from '../common/ProgressiveImage';
 // Missing modules - comment out until they're available
 
 // Extend Window interface for proxy server status
@@ -643,6 +644,36 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     console.log(`[ImageURL] Final URL: ${reliableUrl}`);
     return reliableUrl;
   }, [username, platform, imageRefreshKey.current]);
+
+  // Prefetch next-batch images (beyond initially eager-loaded ones) to eliminate “stuck bluish” tiles
+  useEffect(() => {
+    try {
+      // Eager-load first 12 via the component; prefetch the next 12 here
+      const PREFETCH_START = 12;
+      const PREFETCH_COUNT = 12;
+
+      const preloader = new BatchImageLoader();
+      const filtered = getFilteredPosts();
+      if (!filtered || filtered.length <= PREFETCH_START) return;
+
+      const candidates = filtered
+        .slice(PREFETCH_START, PREFETCH_START + PREFETCH_COUNT)
+        .map(p => getReliableImageUrl(p))
+        .filter((u): u is string => Boolean(u));
+
+      if (candidates.length) {
+        // Run outside main thread when browser is idle to avoid contention
+        const run = () => preloader.loadImages(candidates).catch(() => {});
+        if ('requestIdleCallback' in window) {
+          (window as any).requestIdleCallback(run, { timeout: 1500 });
+        } else {
+          setTimeout(run, 300);
+        }
+      }
+    } catch {
+      // best-effort prefetch; ignore errors
+    }
+  }, [localPosts, username, platform, getReliableImageUrl, getFilteredPosts]);
 
   // Helper to ensure preview/download use original quality
   const toOriginalQualityUrl = useCallback((url: string) => {
@@ -2626,10 +2657,14 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
                         aggressiveMobileOptimization={true}
                         enableProgressiveLoading={true}
                         preserveOriginalForActions={true}
+                        enableOptimization={false}
                         maxWidth={600}
                         quality={0.5}
+                        width={600}
+                        height={600}
+                        aspectRatio="1 / 1"
                         isLCP={index === 0}
-                        forceEagerLoading={index < 6}
+                        forceEagerLoading={index < 12}
                         sizes="(max-width: 768px) 100vw, 600px"
                         onLoadStart={() => {
                           console.log(`[PostCooked] Image load started for ${post.key}: ${imageUrl}`);

@@ -1271,7 +1271,8 @@ const AppContent: React.FC = () => {
               }));
 
               // Send the message to RAG service
-              RagService.sendDiscussionQuery(accountHolder, message, chatModalData.messages as any[], chatModalData.platform)
+              // Single-turn mode: send no prior context
+              RagService.sendDiscussionQuery(accountHolder, message, [], chatModalData.platform)
                 .then(response => {
                   const assistantMessage: ChatModalMessage = { 
                     role: 'assistant', 
@@ -1297,6 +1298,14 @@ const AppContent: React.FC = () => {
                     isProcessing: false
                   }));
                 });
+            }}
+            onClearConversation={() => {
+              setChatModalData(prev => ({
+                ...prev,
+                messages: []
+              }));
+              RagService.saveConversation(accountHolder, [], chatModalData.platform)
+                .catch(err => console.error('Error clearing conversation:', err));
             }}
           />
         )}

@@ -9,8 +9,8 @@
   width: 100vw !important;
   height: 100dvh !important; /* dynamic viewport height for mobile */
   min-height: 100dvh !important;
-  background: rgba(0, 0, 0, 0.2) !important;
-  backdrop-filter: blur(8px) !important;
+  background: rgba(0, 0, 0, 0.55) !important; /* Less transparent for better readability */
+  backdrop-filter: blur(15px) !important; /* Enhanced glass effect */
   z-index: 2147483647 !important;
   display: flex !important;
   justify-content: center !important;
@@ -29,7 +29,7 @@
 }
 
 .chat-modal-content {
-  background: #0d1120 !important; /* solid for maximum readability */
+  background: rgba(13, 17, 32, 0.9) !important; /* More opaque glass for better readability */
   border-radius: 16px !important;
   width: min(95vw, 900px) !important;
   max-width: 900px !important;
@@ -37,10 +37,11 @@
   max-height: 88dvh !important; /* allow internal scroll and keep centered */
   display: flex !important;
   flex-direction: column !important;
-  border: 1px solid rgba(0, 255, 204, 0.15) !important;
+  border: 1px solid rgba(0, 255, 204, 0.25) !important; /* More visible border */
+  backdrop-filter: blur(25px) !important; /* Enhanced glass effect */
   box-shadow:
-    0 12px 40px rgba(0, 0, 0, 0.45),
-    0 0 0 1px rgba(0, 255, 204, 0.06) inset !important;
+    0 12px 40px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(0, 255, 204, 0.1) inset !important;
   position: relative !important;
   overflow: hidden !important;
   z-index: 2147483647 !important;
@@ -262,11 +263,11 @@
 }
 
 .message.assistant .message-content {
-  background: #121a2b !important; /* solid contrast bubble */
+  background: rgba(18, 26, 43, 0.85) !important; /* Semi-transparent glass for better integration */
   color: #e8f0ff !important;
-  border: 1px solid rgba(0, 255, 204, 0.12) !important;
+  border: 1px solid rgba(0, 255, 204, 0.2) !important; /* More visible border */
   border-bottom-left-radius: 4px !important;
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.2) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
   margin-right: auto !important;
   margin-left: 0 !important;
   white-space: pre-line !important; /* collapse extra spaces, preserve newlines */

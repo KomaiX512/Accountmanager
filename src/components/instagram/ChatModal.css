@@ -9,8 +9,8 @@
   width: 100vw;
   height: 100dvh; /* Use dynamic viewport height for mobile */
   min-height: 100dvh;
-  background: rgba(0, 0, 0, 0.2);
-  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.5); /* Less transparent for better readability */
+  backdrop-filter: blur(12px); /* More blur for glass effect */
   z-index: 2147483647;
   display: flex;
   justify-content: center;
@@ -21,7 +21,7 @@
 }
 
 .instagram-chat-content {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(12, 16, 32, 0.85); /* Darker, more opaque for readability */
   border-radius: 20px;
   width: min(95vw, 900px);
   max-width: 900px;
@@ -29,11 +29,11 @@
   max-height: 88dvh; /* allow internal scroll */
   display: flex;
   flex-direction: column;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(25px);
+  border: 1px solid rgba(0, 255, 204, 0.25); /* More visible border */
+  backdrop-filter: blur(30px); /* Enhanced glass effect */
   box-shadow: 
-    0 12px 40px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+    0 12px 40px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(0, 255, 204, 0.1) inset;
   position: relative;
   overflow: hidden;
   z-index: 2147483647;
@@ -252,16 +252,16 @@
 }
 
 .assistant-message .message-bubble {
-  background: rgba(255, 255, 255, 0.06);
-  color: #e8e8ff;
-  border: 1px solid rgba(0, 255, 204, 0.15);
+  background: rgba(15, 20, 40, 0.8); /* More opaque for better text contrast */
+  color: #e8f0ff;
+  border: 1px solid rgba(0, 255, 204, 0.2);
   border-bottom-left-radius: 4px;
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
   margin-right: auto;
   margin-left: 0;
   white-space: pre-wrap;
   overflow-wrap: break-word;
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Consolas', monospace;
+  font-family: 'Inter', 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
 }
 
 /* CHAT INPUT */
@@ -542,4 +542,42 @@
     height: 52px;
     font-size: 20px;
   }
+}
+
+/* Typing indicator animation */
+.typing-indicator {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.typing-indicator span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #00ffcc;
+  animation: typing 1.4s infinite ease-in-out;
+}
+
+.typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+.typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+.typing-indicator span:nth-child(3) { animation-delay: 0s; }
+
+@keyframes typing {
+  0%, 80%, 100% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+}
+
+.processing .message-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #b0b0d0;
+  font-style: normal;
 }

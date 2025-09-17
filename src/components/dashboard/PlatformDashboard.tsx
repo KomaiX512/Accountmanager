@@ -29,7 +29,7 @@ import { useFacebook } from '../../context/FacebookContext';
 import { useLinkedIn } from '../../context/LinkedInContext';
 import ChatModal from '../common/ChatModal';
 import RagService from '../../services/RagService';
-import type { ChatMessage as ChatModalMessage, LinkedAccount } from '../common/ChatModal';
+import type { ChatMessage as ChatModalMessage } from '../common/ChatModal';
 import { Notification } from '../../types/notifications';
 // Import icons from react-icons
 import { FaChartLine, FaCalendarAlt, FaBullhorn, FaPen, FaBell, FaUndo, FaInfoCircle, FaPencilAlt, FaRobot, FaRss } from 'react-icons/fa';
@@ -135,7 +135,7 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = memo(({
   const [chatMessages, setChatMessages] = useState<ChatModalMessage[]>([]);
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const [, setResult] = useState('');
-  const [linkedAccounts] = useState<LinkedAccount[]>([]);
+  // linkedAccounts not used with common ChatModal
   const [refreshKey, setRefreshKey] = useState(0);
   const [aiProcessingNotifications] = useState<Record<string, boolean>>({});
   
@@ -3290,7 +3290,8 @@ Image Description: ${response.post.image_prompt}
           onSendMessage={(message: string, model?: string) => {
             if (!message.trim() || !accountHolder) return;
             setIsProcessing(true);
-            RagService.sendDiscussionQuery(accountHolder, message, chatMessages as RagChatMessage[], platform, model)
+            // Single-turn mode: do NOT send prior context
+            RagService.sendDiscussionQuery(accountHolder, message, [] as RagChatMessage[], platform, model)
               .then(response => {
                 const updatedMessages = [
                   ...chatMessages,
@@ -3311,7 +3312,10 @@ Image Description: ${response.post.image_prompt}
               });
           }}
           isProcessing={isProcessing}
-          linkedAccounts={linkedAccounts}
+          onClearConversation={() => {
+            setChatMessages([]);
+            RagService.saveConversation(accountHolder, [], platform).catch(err => console.error('Error clearing conversation:', err));
+          }}
         />
       )}
       {isTwitterSchedulerOpen && (
@@ -3515,7 +3519,8 @@ Image Description: ${response.post.image_prompt}
           onSendMessage={(message: string, model?: string) => {
             if (!message.trim() || !accountHolder) return;
             setIsProcessing(true);
-            RagService.sendDiscussionQuery(accountHolder, message, chatMessages as RagChatMessage[], platform, model)
+            // Single-turn mode: do NOT send prior context
+            RagService.sendDiscussionQuery(accountHolder, message, [] as RagChatMessage[], platform, model)
               .then(response => {
                 const updatedMessages = [
                   ...chatMessages,
@@ -3536,8 +3541,11 @@ Image Description: ${response.post.image_prompt}
               });
           }}
           isProcessing={isProcessing}
-          linkedAccounts={linkedAccounts}
           platform={platform}
+          onClearConversation={() => {
+            setChatMessages([]);
+            RagService.saveConversation(accountHolder, [], platform).catch(err => console.error('Error clearing conversation:', err));
+          }}
         />
       )}
 

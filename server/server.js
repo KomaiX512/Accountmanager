@@ -18972,6 +18972,34 @@ app.get('/api/r2-image/:username/:imageKey', netflixOptimizer.cacheMiddleware(36
       s3Client.send(getCommand),
       timeoutPromise
     ]);
+
+    // Pre-compute variant ETag to allow 304 without reading the body
+    const r2EtagRaw = (response && response.ETag) ? String(response.ETag) : '';
+    const r2LastMod = (response && response.LastModified) ? new Date(response.LastModified).getTime() : 0;
+    const wParamStr = String(req.query.w || '');
+    const qParamStr = String(req.query.q || '');
+    const fmtParamRawForEtag = (req.query.format || req.query.fmt || req.query.f);
+    const fmtParamForEtag = (fmtParamRawForEtag ? String(fmtParamRawForEtag) : '').toLowerCase();
+    const renderParamStr = (req.query.render ? String(req.query.render) : '').toLowerCase();
+    const variantSig = `${r2EtagRaw}|${r2LastMod}|${imageKey}|w=${wParamStr}|q=${qParamStr}|fmt=${fmtParamForEtag}|render=${renderParamStr}`;
+    const variantEtag = '"v1-' + crypto.createHash('md5').update(variantSig).digest('hex') + '"';
+
+    const ifNoneMatch = req.headers['if-none-match'];
+    if (ifNoneMatch && ifNoneMatch === variantEtag) {
+      // Respect cache-busting flags even on 304
+      if (req.query.nuclear || req.query.immediate || req.query.final || req.query.preload || req.query.emergency || req.query.bypass || req.query.fresh || req.query.destroy) {
+        res.set({
+          'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0, private, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': 'Thu, 01 Jan 1970 00:00:00 GMT'
+        });
+      } else {
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+      }
+      res.setHeader('ETag', variantEtag);
+      return res.status(304).end();
+    }
+
     const imageBuffer = await streamToBuffer(response.Body);
     
     // Validate that we actually have image data
@@ -18980,8 +19008,19 @@ app.get('/api/r2-image/:username/:imageKey', netflixOptimizer.cacheMiddleware(36
       throw new Error('Empty image data');
     }
     
-    // Detect content type from file extension
-    let contentType = 'image/jpeg'; // Default
+    // Optional server-side transforms: width (w), quality (q), format (webp|avif|jpeg|png)
+    // This enables real responsive images when the client requests srcset variants.
+    let outputBuffer = imageBuffer;
+    let transformed = false;
+    const wParam = parseInt(String(req.query.w || ''), 10);
+    const qParam = parseInt(String(req.query.q || ''), 10);
+    const fmtParamRaw = (req.query.format || req.query.fmt || req.query.f);
+    const fmtParam = (fmtParamRaw ? String(fmtParamRaw) : '').toLowerCase();
+    const requestOriginal = String(req.query.quality || '').toLowerCase() === 'original' || String(req.query.original || '') === '1' || String(req.query.original || '').toLowerCase() === 'true';
+    const isRenderRequest = String(req.query.render || '') === '1' || String(req.query.render || '').toLowerCase() === 'true';
+
+    // Detect content type from file extension (fallback)
+    let contentType = 'image/jpeg';
     if (imageKey.endsWith('.png')) {
       contentType = 'image/png';
     } else if (imageKey.endsWith('.webp')) {
@@ -18989,9 +19028,57 @@ app.get('/api/r2-image/:username/:imageKey', netflixOptimizer.cacheMiddleware(36
     } else if (imageKey.endsWith('.gif')) {
       contentType = 'image/gif';
     }
+
+    // Apply Sharp transforms when available and requested (skip if original requested)
+    if (!requestOriginal && isRenderRequest && sharp && (Number.isFinite(wParam) || fmtParam || Number.isFinite(qParam))) {
+      try {
+        const targetW = Number.isFinite(wParam) ? Math.max(64, Math.min(2000, wParam)) : undefined;
+        const quality = Number.isFinite(qParam) ? Math.max(30, Math.min(95, qParam)) : 82;
+        const image = sharp(imageBuffer, { failOnError: false, limitInputPixels: false });
+        if (targetW) {
+          image.resize({ width: targetW, withoutEnlargement: true, fit: 'inside' });
+        }
+        let outFormat = fmtParam;
+        if (!outFormat) {
+          // Default to original type; if unknown, prefer webp for smaller size
+          outFormat = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : contentType.includes('gif') ? 'gif' : 'jpeg';
+        }
+        switch (outFormat) {
+          case 'webp':
+            image.webp({ quality, effort: 4 });
+            contentType = 'image/webp';
+            break;
+          case 'avif':
+            image.avif({ quality, effort: 4 });
+            contentType = 'image/avif';
+            break;
+          case 'png':
+            image.png({ compressionLevel: 8 });
+            contentType = 'image/png';
+            break;
+          case 'jpg':
+          case 'jpeg':
+          default:
+            image.jpeg({ quality, progressive: true, mozjpeg: true });
+            contentType = 'image/jpeg';
+            break;
+        }
+        outputBuffer = await image.toBuffer();
+        transformed = true;
+      } catch (transformError) {
+        const msg = transformError && transformError.message ? transformError.message : String(transformError);
+        console.warn(`[${new Date().toISOString()}] [R2-IMAGE] Transform failed, serving original:`, msg);
+        outputBuffer = imageBuffer; // fall back to original
+      }
+    }
     
     // Set appropriate headers - NO CACHE for fresh AI edited images
     res.setHeader('Content-Type', contentType);
+    res.setHeader('ETag', variantEtag);
+    if (transformed) {
+      // Vary on Accept when doing content negotiation-ish format changes
+      res.setHeader('Vary', 'Accept');
+    }
     
     // LOG WHAT IMAGE WE'RE SERVING FROM R2
   console.log(`🔍 [R2-IMAGE-DEBUG] Request for image:`, {
@@ -19028,13 +19115,13 @@ app.get('/api/r2-image/:username/:imageKey', netflixOptimizer.cacheMiddleware(36
     console.log(`🔍 [R2-IMAGE-DEBUG] Serving image:`, {
       r2Key: r2Key,
       contentType: contentType,
-      imageSize: imageBuffer.length,
+      imageSize: outputBuffer.length,
       timestamp: new Date().toISOString(),
       cacheHeaders: res.getHeaders()['cache-control']
     });
 
-    // Send the image (imageBuffer is already a Buffer from S3Client)
-    res.send(imageBuffer);
+    // Send the (possibly transformed) image
+    res.send(outputBuffer);
     
     console.log(`[${new Date().toISOString()}] [R2-IMAGE] ✅ Served ${r2Key} successfully`);
     

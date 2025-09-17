@@ -3,7 +3,8 @@ import './CanvasEditor.css';
 import { motion } from 'framer-motion';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-// TUI Image Editor CSS will be loaded dynamically to prevent render blocking
+// TUI Image Editor CSS is bundled by Vite so production builds include it correctly
+import 'tui-image-editor/dist/tui-image-editor.css';
 // Axios removed - not needed in this component
 import InstagramRequiredButton from './InstagramRequiredButton';
 import TwitterRequiredButton from './TwitterRequiredButton';
@@ -309,11 +310,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
   useEffect(() => {
     const loadEditor = async () => {
       try {
-        // Dynamically load TUI Image Editor CSS to prevent render blocking
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = '/node_modules/tui-image-editor/dist/tui-image-editor.css';
-        document.head.appendChild(link);
+        // CSS is already included via import for production builds (see top of file)
         
         // Dynamically import tui-image-editor to avoid SSR issues
         const ImageEditor = (await import('tui-image-editor')).default;

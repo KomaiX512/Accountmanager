@@ -43,14 +43,42 @@ function logLatency(kind: 'axios' | 'fetch', method: string, url: string, totalM
 
   axios.interceptors.request.use((config: any) => {
     const start = now();
+    // Determine request URL and origin
+    let urlString: string = config.url || '';
+    // If baseURL is set and url is relative, combine for origin check
+    if (config.baseURL && urlString && !/^https?:\/\//i.test(urlString)) {
+      try {
+        urlString = new URL(urlString, config.baseURL).toString();
+      } catch (_) {}
+    }
+    let isSameOrigin = true;
+    try {
+      if (/^https?:\/\//i.test(urlString)) {
+        const target = new URL(urlString);
+        isSameOrigin = target.origin === window.location.origin;
+      } else {
+        // Relative paths are same-origin
+        isSameOrigin = true;
+      }
+    } catch (_) {
+      isSameOrigin = true;
+    }
+
     const reqId = (config.headers?.['X-Req-Id'] as string) || makeReqId();
-    config.headers = {
-      ...config.headers,
-      'X-Req-Id': reqId,
-      'X-Client-Start': String(Date.now()),
-    };
-    (config as any).metadata = { start };
-    reqIds.set(config, reqId);
+
+    // Only attach custom headers for same-origin (our API) to avoid CORS issues with third-parties (e.g., Firebase)
+    if (isSameOrigin) {
+      config.headers = {
+        ...config.headers,
+        'X-Req-Id': reqId,
+        'X-Client-Start': String(Date.now()),
+      };
+      (config as any).metadata = { start };
+      reqIds.set(config, reqId);
+    } else {
+      (config as any).metadata = { start };
+    }
+
     return config;
   });
 
@@ -91,9 +119,26 @@ function logLatency(kind: 'axios' | 'fetch', method: string, url: string, totalM
     let method = 'GET';
     let urlStr = typeof input === 'string' ? input : (input instanceof URL ? input.toString() : ('url' in input ? (input as Request).url : ''));
 
+    // Determine if request is same-origin; only instrument same-origin to avoid CORS preflights to third-parties (e.g., Firebase/Google)
+    let isSameOrigin = true;
+    try {
+      if (/^https?:\/\//i.test(urlStr)) {
+        const target = new URL(urlStr);
+        isSameOrigin = target.origin === window.location.origin;
+      } else {
+        // Relative paths are same-origin
+        isSameOrigin = true;
+      }
+    } catch (_) {
+      isSameOrigin = true;
+    }
+
     const headers = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined) || {});
-    headers.set('X-Req-Id', reqId);
-    headers.set('X-Client-Start', String(Date.now()));
+    // Only add custom headers for same-origin requests
+    if (isSameOrigin) {
+      headers.set('X-Req-Id', reqId);
+      headers.set('X-Client-Start', String(Date.now()));
+    }
     if (init?.method) method = init.method.toUpperCase();
 
     return originalFetch(input instanceof Request ? new Request(input, { headers }) : urlStr, {

@@ -153,8 +153,8 @@ export class CacheManager {
       if (section && ALWAYS_BYPASS_SECTIONS.includes(section)) {
         const separator = url.includes('?') ? '&' : '?';
         const timestamp = Date.now();
-        // Include server-recognized param
-        return `${url}${separator}forceRefresh=true&_cb=${timestamp}`;
+        // Do NOT force server cache bypass; only add a client-side cache buster
+        return `${url}${separator}_cb=${timestamp}`;
       }
 
       // Idempotency: if bypass params already exist, don't add again
@@ -170,7 +170,8 @@ export class CacheManager {
       }
 
       const separator = url.includes('?') ? '&' : '?';
-      const stamped = `${url}${separator}bypass_cache=true&_cb=${Date.now()}`;
+      // Only add a timestamp to avoid browser cache; keep server cache eligible
+      const stamped = `${url}${separator}_cb=${Date.now()}`;
       // Mark cache time post-bypass to start fresh window
       this.markCacheTime(platform, accountHolder, section);
       return stamped;

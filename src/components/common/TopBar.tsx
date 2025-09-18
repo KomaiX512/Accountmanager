@@ -12,7 +12,7 @@ import { useMobileDetection } from '../../hooks/useMobileDetection';
 const TopBar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentUser } = useAuth();
+  const { currentUser, signOut } = useAuth();
   const { getAcquiredPlatforms } = usePlatformStatus();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const isMobile = useMobileDetection();
@@ -189,9 +189,26 @@ const TopBar: React.FC = () => {
             <div style={{ 
               /* 🔒 VPS COMPATIBILITY: Inline styles as backup for circular profile image */
               display: 'flex',
-              alignItems: 'center'
+              alignItems: 'center',
+              gap: 8
             }}>
               <UserDropdown />
+              {/* Temporary fallback logout for immediate access */}
+              <motion.button
+                className="logout-fallback-button"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={async () => {
+                  try {
+                    await signOut();
+                    navigate('/login');
+                  } catch (e) {
+                    console.error('Logout error:', e);
+                  }
+                }}
+              >
+                Logout
+              </motion.button>
             </div>
           ) : (
             <motion.button

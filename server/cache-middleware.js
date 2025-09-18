@@ -27,16 +27,17 @@ class CacheManager {
     // TTL configurations (in milliseconds)
     this.ttlConfig = {
       profileInfo: 5 * 60 * 1000,        // 5 minutes - Profile data changes infrequently
-      processingStatus: 10 * 1000,       // 10 seconds - Needs fresh data during processing
+      processingStatus: 45 * 1000,       // 45 seconds - Matches/Exceeds poll interval to increase hit rate
       notifications: 30 * 1000,           // 30 seconds - Balance between freshness and performance
       usage: 60 * 1000,                   // 1 minute - Usage data updates frequently
       strategies: 5 * 60 * 1000,          // 5 minutes - Strategy data is relatively stable
       posts: 2 * 60 * 1000,               // 2 minutes - Posts update moderately
       competitors: 10 * 60 * 1000,        // 10 minutes - Competitor data changes slowly
+      platformAccess: 60 * 1000,          // 60 seconds - Claimed state changes infrequently; invalidate on write
       default: 60 * 1000                  // 1 minute default TTL
     };
     
-    // Start cleanup interval (every 30 seconds)
+    // Start cleanup interval (every 90 seconds - less aggressive)
     this.startCleanupInterval();
     
     // Monitor memory usage
@@ -168,7 +169,7 @@ class CacheManager {
   startCleanupInterval() {
     setInterval(() => {
       this.cleanup();
-    }, 30000); // Every 30 seconds
+    }, 90000); // Every 90 seconds - aligned with longer TTLs
   }
   
   // Monitor memory usage

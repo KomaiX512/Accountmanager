@@ -302,9 +302,9 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
 
   const competitorsQuery = localCompetitors.length > 0 ? localCompetitors.join(',') : '';
   // Build endpoint: keep URL stable to avoid runaway re-fetches.
-  // Use a one-time stable toggle (forceRefresh=true) when refreshKey > 0 instead of increasing _t.
+  // Do not force server cache bypass; use client-side cache busting handled by useR2Fetch when needed.
   const baseCompetitorEndpoint = competitorsQuery 
-    ? `/api/retrieve-multiple/${normalizedAccountHolder}?competitors=${encodeURIComponent(competitorsQuery)}&platform=${platform}${refreshKey > 0 ? '&forceRefresh=true' : ''}`
+    ? `/api/retrieve-multiple/${normalizedAccountHolder}?competitors=${encodeURIComponent(competitorsQuery)}&platform=${platform}${refreshKey > 0 ? `&_cb=${refreshKey}` : ''}`
     : '';
   const competitorEndpoint = baseCompetitorEndpoint || '';
   

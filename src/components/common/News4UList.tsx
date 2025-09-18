@@ -324,7 +324,8 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
       // Explicitly request only top 4 items from backend for speed (logic unchanged on frontend)
       const baseUrl = `/api/news-for-you/${effectiveAccountHolder}?platform=${effectivePlatform}&limit=4`;
       const cachedUrl = `${baseUrl}&_key=${forceRefreshKey}`;
-      const freshUrl = `${baseUrl}&forceRefresh=true&_cb=${Date.now()}&_key=${forceRefreshKey}`;
+      // Do not force server bypass; only add client-side cache buster
+      const freshUrl = `${baseUrl}&_cb=${Date.now()}&_key=${forceRefreshKey}`;
       
       console.log(`[News4U] 🔍 Fetching news (cache-first) for ${effectiveAccountHolder} on ${effectivePlatform} (key: ${forceRefreshKey})`);
       console.log(`[News4U] 🔍 Cached URL: ${cachedUrl}`);
@@ -753,7 +754,7 @@ const News4UList: React.FC<News4UProps> = ({ accountHolder, platform }) => {
               onClick={async () => {
                 try {
                   console.log(`[News4U] 🧪 Manual API test for ${effectiveAccountHolder} on ${effectivePlatform}`);
-                  const testUrl = `/api/news-for-you/${effectiveAccountHolder}?platform=${effectivePlatform}&forceRefresh=true&_cb=${Date.now()}`;
+                  const testUrl = `/api/news-for-you/${effectiveAccountHolder}?platform=${effectivePlatform}&_cb=${Date.now()}`;
                   console.log(`[News4U] 🧪 Test URL:`, testUrl);
                   
                   const testRes = await axios.get(testUrl);

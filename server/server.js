@@ -18177,7 +18177,9 @@ app.options(['/platform-access/:userId', '/api/platform-access/:userId'], (req, 
   res.status(204).send();
 });
 
-app.get(['/platform-access/:userId', '/api/platform-access/:userId'], async (req, res) => {
+app.get(['/platform-access/:userId', '/api/platform-access/:userId'], 
+  cacheMiddleware('platformAccess', (req) => [req.params.userId, (req.query.platform || 'all').toString()]),
+  async (req, res) => {
   setCorsHeaders(res);
   try {
     const { userId } = req.params;
@@ -18268,6 +18270,10 @@ app.post(['/platform-access/:userId', '/api/platform-access/:userId'], async (re
     const key = `PlatformAccessStatus/${userId}/${platform}.json`;
     await s3Client.send(new PutObjectCommand({ Bucket: 'tasks', Key: key, Body: JSON.stringify(payload), ContentType: 'application/json' }));
     console.log(`[${new Date().toISOString()}] Saved platform access for ${platform}/${userId}: claimed=${claimed}`);
+    // Invalidate only the specific platform cache - 'all' will expire naturally
+    try {
+      cacheManager.invalidate('platformAccess', userId, platform);
+    } catch {}
     return res.json({ success: true, data: payload });
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Error saving platform access status:`, error);
@@ -18292,6 +18298,10 @@ app.delete(['/platform-access/:userId', '/api/platform-access/:userId'], async (
       if (err.name !== 'NoSuchKey' && err.$metadata?.httpStatusCode !== 404) throw err;
     }
     console.log(`[${new Date().toISOString()}] Deleted platform access for ${platform}/${userId}`);
+    // Invalidate only the specific platform cache - 'all' will expire naturally
+    try {
+      cacheManager.invalidate('platformAccess', userId, platform);
+    } catch {}
     return res.json({ success: true });
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Error deleting platform access status:`, error);
@@ -18386,8 +18396,8 @@ app.post(['/processing-status/:userId', '/api/processing-status/:userId'], async
     const { userId } = req.params;
     const { platform, startTime, endTime, totalDuration, username } = req.body || {};
     
-    // 🚀 CACHE INVALIDATION: Clear cache when processing status changes
-    cacheManager.invalidate('processingStatus', userId, platform || 'all');
+    // 🚀 TARGETED CACHE INVALIDATION: Only invalidate specific platform, keep 'all' cached longer
+    cacheManager.invalidate('processingStatus', userId, platform);
 
     const allowed = ['instagram', 'twitter', 'facebook', 'linkedin', 'linkedin'];
     if (!platform || !allowed.includes(platform)) {
@@ -18419,8 +18429,7 @@ app.post(['/processing-status/:userId', '/api/processing-status/:userId'], async
 
     console.log(`[${new Date().toISOString()}] Saved processing status for ${platform}/${userId} (ends ${endTime})`);
     
-    // Invalidate related caches that depend on processing status
-    cacheManager.invalidateRelated('processingStatus', userId, platform);
+    // 🚀 MINIMAL INVALIDATION: Don't cascade invalidate - let other caches expire naturally
     return res.json({ success: true, data: payload });
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Error saving processing status:`, error);

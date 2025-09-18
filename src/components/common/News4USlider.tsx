@@ -254,9 +254,9 @@ const News4USlider: React.FC<News4UProps> = ({ accountHolder, platform }) => {
         throw new Error('Account holder or platform missing');
       }
       
-      // Force fresh news every time - no caching
+      // Prefer server cache; only add client-side cache buster timestamp
       const baseUrl = `/api/news-for-you/${effectiveAccountHolder}?platform=${effectivePlatform}`;
-      const url = `${baseUrl}&forceRefresh=true&_cb=${Date.now()}&_key=${forceRefreshKey}`;
+      const url = `${baseUrl}&_cb=${Date.now()}&_key=${forceRefreshKey}`;
       
       console.log(`[News4U-Slider] 🔍 Fetching news for ${effectiveAccountHolder} on ${effectivePlatform} (key: ${forceRefreshKey})`);
       console.log(`[News4U-Slider] 🔍 API URL: ${url}`);

@@ -14,6 +14,37 @@ class NetflixPerformanceOptimizer {
   }
 
   /**
+   * Build a normalized cache key that ignores volatile cache-buster params
+   * such as ts, _cb, cb, r, t, v, nocache, bypass_cache, forceRefresh.
+   */
+  buildCacheKey(req) {
+    try {
+      // Use full URL relative to host to parse query safely
+      const url = new URL(req.originalUrl, 'http://localhost');
+      const params = url.searchParams;
+      // Remove common cache-busting params
+      const volatile = new Set(['ts', '_cb', 'cb', 'r', 't', 'v', 'nocache', 'bypass_cache', 'forceRefresh']);
+      for (const key of Array.from(params.keys())) {
+        if (volatile.has(key)) {
+          params.delete(key);
+        }
+      }
+      // Sort params for determinism
+      const sorted = new URLSearchParams();
+      Array.from(params.keys()).sort().forEach(k => {
+        // preserve multi-values
+        const values = params.getAll(k);
+        values.forEach(val => sorted.append(k, val));
+      });
+      const normalized = `${url.pathname}${sorted.toString() ? `?${sorted.toString()}` : ''}`;
+      return `api:${normalized}`;
+    } catch {
+      // Fallback to original URL if parsing fails
+      return `api:${req.originalUrl}`;
+    }
+  }
+
+  /**
    * 🔥 INITIALIZE NETFLIX-SCALE INFRASTRUCTURE
    */
   async initialize() {
@@ -157,7 +188,7 @@ class NetflixPerformanceOptimizer {
       }
 
       // Create cache key from URL and query params
-      const cacheKey = `api:${req.originalUrl}`;
+      const cacheKey = this.buildCacheKey(req);
       
       try {
         // Try to get from cache first
@@ -279,11 +310,12 @@ class NetflixPerformanceOptimizer {
     
     return async (req, res, next) => {
       const startTime = Date.now();
+      const cacheKey = this.buildCacheKey(req);
       
       try {
         // Apply caching if enabled
         if (!skipCache && req.method === 'GET') {
-          const cached = await this.getCached(`api:${req.originalUrl}`);
+          const cached = await this.getCached(cacheKey);
           if (cached) {
             res.set('X-Cache', 'HIT');
             const responseTime = Date.now() - startTime;
@@ -297,7 +329,7 @@ class NetflixPerformanceOptimizer {
         
         // Cache successful GET responses
         if (!skipCache && req.method === 'GET' && res.statusCode === 200) {
-          await this.cacheResponse(`api:${req.originalUrl}`, result, ttl);
+          await this.cacheResponse(cacheKey, result, ttl);
         }
         
         const responseTime = Date.now() - startTime;

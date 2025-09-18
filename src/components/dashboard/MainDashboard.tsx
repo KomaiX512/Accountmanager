@@ -364,8 +364,8 @@ const MainDashboard: React.FC = () => {
       mirrorFromServer();
     }, 2000); // 2 second delay for initial sync
     
-    // ✅ PERFORMANCE FIX: Increased from 5s to 30s to reduce excessive function calls
-    const id = setInterval(mirrorFromServer, 30000);
+    // ✅ CACHE OPTIMIZATION: Increased from 30s to 45s to align with server cache TTL
+    const id = setInterval(mirrorFromServer, 45000);
     return () => { 
       clearTimeout(initialSyncDelay);
       clearInterval(id); 

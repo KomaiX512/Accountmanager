@@ -37,7 +37,7 @@
   justify-content: space-between !important;
   padding-left: 90px !important;
   padding-right: 36px !important;
-  z-index: 999999 !important;
+  z-index: 2147483647 !important;
   transition: background 0.3s, border 0.3s, color 0.3s !important;
   backdrop-filter: blur(var(--glass-blur)) !important;
   -webkit-backdrop-filter: blur(var(--glass-blur)) !important;
@@ -46,6 +46,7 @@
   max-height: 70px !important;
   box-shadow: var(--glass-shadow);
   overflow: visible;
+  isolation: isolate; /* Ensure TopBar forms its own stacking context */
 }
 
 .top-bar::before {
@@ -258,6 +259,9 @@
   display: flex;
   align-items: center;
   gap: clamp(15px, 3vw, 20px);
+  position: relative; /* Allow absolutely-positioned children to anchor here if needed */
+  overflow: visible; /* Do not clip dropdowns */
+  z-index: 3; /* Above decorative ::before layer within TopBar */
 }
 
 /* PWA Install Button Integration */
@@ -1008,7 +1012,7 @@
   position: relative;
   margin-left: auto;
   margin-right: 15px;
-  z-index: 2;
+  z-index: 2147483646; /* Ensure avatar sits above any TopBar decorations */
 }
 
 .user-avatar {
@@ -1184,9 +1188,9 @@ div.user-profile div.user-avatar img {
 
 .user-dropdown {
   position: absolute;
-  top: 100%;
+  top: calc(100% + 8px); /* Drop below avatar with clear offset */
   right: 0;
-  margin-top: 12px;
+  margin-top: 0; /* Use explicit top offset instead of margin */
   background: rgba(0, 0, 0, 0.95);
   backdrop-filter: blur(20px);
   border-radius: 12px;
@@ -1194,7 +1198,10 @@ div.user-profile div.user-avatar img {
   border: 1px solid rgba(255, 255, 255, 0.1);
   padding: 16px 0;
   min-width: 200px;
-  z-index: 1000;
+  z-index: 2147483647 !important; /* Absolute top priority above all UI */
+  pointer-events: auto !important; /* Ensure it can be interacted with */
+  display: block !important; /* Prevent accidental display:none overrides */
+  transform: translateZ(0); /* Avoid GPU artifacts */
 }
 
 .dropdown-menu-item {

@@ -108,6 +108,6 @@ const UserDropdown: React.FC = () => {
       </AnimatePresence>
     </div>
   );
-};
+}
 
 export default UserDropdown; 

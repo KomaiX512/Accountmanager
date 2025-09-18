@@ -28,7 +28,7 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
   const lastRedirectRef = useRef<string | null>(null);
   const backgroundCheckRef = useRef<NodeJS.Timeout | null>(null);
   const lastValidationRef = useRef<number>(0);
-  const validationCooldownRef = useRef<number>(10000); // 10 second cooldown between validations
+  const validationCooldownRef = useRef<number>(20000); // 20 second cooldown to match server cache TTLs
 
   // Platform route mappings
   const platformRoutes: Record<string, string> = {
@@ -419,7 +419,7 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
             backgroundCheck();
           }
         }
-      }, 5000); // ✅ OPTIMIZED: Increased from 3 seconds to 5 seconds for better performance
+      }, 15000); // ✅ CACHE OPTIMIZATION: Increased from 5s to 15s to reduce server cache misses
     };
     
     startBackgroundMonitoring();

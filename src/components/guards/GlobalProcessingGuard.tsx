@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { safeNavigate, safeHistoryManipulation } from '../../utils/navigationGuard';
+import { isBypassActive } from '../../utils/bypassChecker';
 
 interface GlobalProcessingGuardProps {
   children: React.ReactNode;
@@ -28,6 +29,12 @@ const getPlatformFromRoute = (pathname: string): string | null => {
 // BULLETPROOF timer check with multiple fallbacks
 const hasActiveTimer = (platform: string): { active: boolean; remainingMs: number } => {
   try {
+    // 🚀 CRITICAL: Check bypass flag FIRST using universal checker
+    const currentUserId = localStorage.getItem('currentUserId');
+    if (currentUserId && isBypassActive(platform, currentUserId)) {
+      return { active: false, remainingMs: 0 }; // Bypass active = no timer blocking
+    }
+    
     const raw = localStorage.getItem(`${platform}_processing_countdown`);
     if (!raw) return { active: false, remainingMs: 0 };
 

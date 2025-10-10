@@ -1261,6 +1261,110 @@
 }
 
 /* ====================================
+   BYPASS BUTTON SECTION
+   ==================================== */
+
+.bypass-section {
+  margin-top: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.bypass-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1.75rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(10px);
+  letter-spacing: 0.01em;
+}
+
+/* Low glow state (initial 15 minutes) */
+.bypass-button.low {
+  box-shadow: 
+    0 0 10px rgba(var(--bypass-glow-color-rgb, 100, 100, 255), 0.15),
+    0 0 20px rgba(var(--bypass-glow-color-rgb, 100, 100, 255), 0.08);
+  animation: glow-pulse-low 3s ease-in-out infinite;
+}
+
+/* High glow state (extension period) */
+.bypass-button.high {
+  box-shadow: 
+    0 0 20px rgba(var(--bypass-glow-color-rgb, 100, 100, 255), 0.4),
+    0 0 40px rgba(var(--bypass-glow-color-rgb, 100, 100, 255), 0.2),
+    0 0 60px rgba(var(--bypass-glow-color-rgb, 100, 100, 255), 0.1);
+  animation: glow-pulse-high 2s ease-in-out infinite;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+@keyframes glow-pulse-low {
+  0%, 100% {
+    box-shadow: 
+      0 0 10px rgba(var(--bypass-glow-color-rgb, 100, 100, 255), 0.15),
+      0 0 20px rgba(var(--bypass-glow-color-rgb, 100, 100, 255), 0.08);
+  }
+  50% {
+    box-shadow: 
+      0 0 15px rgba(var(--bypass-glow-color-rgb, 100, 100, 255), 0.2),
+      0 0 30px rgba(var(--bypass-glow-color-rgb, 100, 100, 255), 0.12);
+  }
+}
+
+@keyframes glow-pulse-high {
+  0%, 100% {
+    box-shadow: 
+      0 0 20px rgba(var(--bypass-glow-color-rgb, 100, 100, 255), 0.4),
+      0 0 40px rgba(var(--bypass-glow-color-rgb, 100, 100, 255), 0.2),
+      0 0 60px rgba(var(--bypass-glow-color-rgb, 100, 100, 255), 0.1);
+  }
+  50% {
+    box-shadow: 
+      0 0 30px rgba(var(--bypass-glow-color-rgb, 100, 100, 255), 0.5),
+      0 0 50px rgba(var(--bypass-glow-color-rgb, 100, 100, 255), 0.3),
+      0 0 70px rgba(var(--bypass-glow-color-rgb, 100, 100, 255), 0.15);
+  }
+}
+
+.bypass-button:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.bypass-button:active {
+  transform: translateY(0);
+}
+
+.bypass-warning {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  color: rgba(255, 193, 7, 0.8);
+  font-weight: 400;
+  margin: 0;
+}
+
+.bypass-warning svg {
+  flex-shrink: 0;
+}
+
+.bypass-warning span {
+  opacity: 0.9;
+}
+
+/* ====================================
    RESPONSIVE DESIGN
    ==================================== */
 

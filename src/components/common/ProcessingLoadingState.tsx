@@ -140,6 +140,9 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
   const [isExitModalOpen, setIsExitModalOpen] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
   
+  // Add bypass state
+  const [bypassGlowIntensity, setBypassGlowIntensity] = useState<'low' | 'high'>('low');
+  
   // Get platform configuration with fallback
   const platformConfig = PLATFORM_CONFIGS[platform] || DEFAULT_PLATFORM_CONFIG;
 
@@ -235,6 +238,7 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
     const completionCheckDelay = setTimeout(checkPlatformCompletion, 1000);
     return () => clearTimeout(completionCheckDelay);
   }, [platform, currentUser?.uid, username]);
+
 
   // ✅ PLATFORM-SPECIFIC TIMING LOGIC
   // Determine the appropriate countdown duration based on platform and context
@@ -348,6 +352,121 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
           return null;
         }
   }, [platform, finalCountdownMinutes, cachedTimerData]);
+
+  // ✅ BYPASS GLOW CONTROL: Adjust glow intensity based on timer state (AFTER getTimerData)
+  useEffect(() => {
+    const timerData = getTimerData();
+    if (!timerData) {
+      setBypassGlowIntensity('low');
+      return;
+    }
+    
+    const remainingMs = timerData.endTime - Date.now();
+    const initialDurationMs = platformConfig.initialMinutes * 60 * 1000;
+    const elapsedMs = Date.now() - timerData.startTime;
+    
+    // Debug logging
+    console.log(`🎨 BYPASS GLOW: ${platform} - elapsed: ${Math.floor(elapsedMs/60000)}min, initial: ${platformConfig.initialMinutes}min`);
+    
+    // If we've passed initial duration (extension territory), increase glow
+    if (elapsedMs > initialDurationMs && remainingMs > 0) {
+      console.log(`🎨 BYPASS GLOW: ${platform} - HIGH GLOW (extension period)`);
+      setBypassGlowIntensity('high');
+    } else {
+      console.log(`🎨 BYPASS GLOW: ${platform} - LOW GLOW (initial period)`);
+      setBypassGlowIntensity('low');
+    }
+  }, [currentTime, platform, platformConfig.initialMinutes, getTimerData]);
+
+  // ✅ BYPASS MECHANISM: Handle direct dashboard access (AFTER getTimerData)
+  const handleBypassAndAccess = useCallback(() => {
+    console.log(`\n🚀🚀🚀 BYPASS BUTTON CLICKED 🚀🚀🚀`);
+    console.log(`Platform: ${platform}`);
+    console.log(`User ID: ${currentUser?.uid}`);
+    console.log(`Username: ${username}`);
+    
+    if (!currentUser?.uid) {
+      console.error('❌ FATAL: No user ID found!');
+      alert('Error: No user ID found. Please login again.');
+      return;
+    }
+    
+    try {
+      const bypassTimestamp = Date.now();
+      const bypassKey = `${platform}_bypass_active_${currentUser.uid}`;
+      const timerKey = `${platform}_bypass_timer_${currentUser.uid}`;
+      
+      console.log(`🔑 Setting bypass key: ${bypassKey}`);
+      localStorage.setItem(bypassKey, bypassTimestamp.toString());
+      
+      // Store timer for TopBar
+      const processingCountdownKey = `${platform}_processing_countdown`;
+      const processingInfoKey = `${platform}_processing_info`;
+      const originalCountdown = localStorage.getItem(processingCountdownKey);
+      const originalInfo = localStorage.getItem(processingInfoKey);
+      
+      let endTime = Date.now() + (15 * 60 * 1000);
+      let startTime = Date.now();
+      
+      if (originalCountdown) {
+        endTime = parseInt(originalCountdown, 10);
+      }
+      if (originalInfo) {
+        try {
+          const info = JSON.parse(originalInfo);
+          startTime = info.startTime || Date.now();
+        } catch {}
+      }
+      
+      const timerData = {
+        endTime,
+        startTime,
+        bypassedAt: bypassTimestamp,
+        platform,
+        username: username || 'user'
+      };
+      
+      console.log(`💾 Saving timer data:`, timerData);
+      localStorage.setItem(timerKey, JSON.stringify(timerData));
+      
+      // CRITICAL: Clear processing keys
+      console.log(`🗑️ Clearing processing keys...`);
+      localStorage.removeItem(processingCountdownKey);
+      localStorage.removeItem(processingInfoKey);
+      
+      // Also store currentUserId if not present (for guards)
+      if (!localStorage.getItem('currentUserId')) {
+        localStorage.setItem('currentUserId', currentUser.uid);
+        console.log(`💾 Set currentUserId: ${currentUser.uid}`);
+      }
+      
+      console.log(`✅ Bypass setup complete!`);
+      console.log(`📊 LocalStorage state:`);
+      console.log(`  - Bypass flag: ${localStorage.getItem(bypassKey)}`);
+      console.log(`  - Timer data: ${localStorage.getItem(timerKey) ? 'SET' : 'MISSING'}`);
+      console.log(`  - Processing countdown: ${localStorage.getItem(processingCountdownKey)}`);
+      console.log(`  - Processing info: ${localStorage.getItem(processingInfoKey)}`);
+      
+      // Determine dashboard path
+      const dashboardPath = platform === 'instagram' ? '/dashboard' : 
+                            platform === 'twitter' ? '/twitter-dashboard' :
+                            platform === 'facebook' ? '/facebook-dashboard' :
+                            '/linkedin-dashboard';
+      
+      console.log(`🚀 NAVIGATING TO: ${dashboardPath}`);
+      console.log(`🚀 Using window.location.href for immediate navigation`);
+      
+      // Use href for immediate, hard navigation
+      window.location.href = dashboardPath;
+      
+    } catch (error) {
+      console.error('❌❌❌ BYPASS ERROR ❌❌❌');
+      console.error('Error:', error);
+      console.error('Stack:', error instanceof Error ? error.stack : 'No stack');
+      
+      alert(`Bypass failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }, [platform, currentUser, username]);
 
   // ✅ CRITICAL FIX: Initialize timer data if not exists (first time setup)
   useEffect(() => {
@@ -553,6 +672,19 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
             }
           } catch {}
 
+          // ✅ CLEANUP BYPASS FLAGS when processing completes naturally
+          try {
+            const bypassKey = `${platform}_bypass_active_${currentUser?.uid}`;
+            const timerKey = `${platform}_bypass_timer_${currentUser?.uid}`;
+            if (localStorage.getItem(bypassKey)) {
+              console.log(`🧹 CLEANUP: Removing bypass flags for ${platform} (processing completed)`);
+              localStorage.removeItem(bypassKey);
+              localStorage.removeItem(timerKey);
+            }
+          } catch (e) {
+            console.warn('Error cleaning up bypass flags:', e);
+          }
+          
           // ✅ CRITICAL: Mark platform as claimed in backend when processing completes
           try {
             if (currentUser?.uid) {
@@ -1491,6 +1623,31 @@ const ProcessingLoadingState: React.FC<ProcessingLoadingStateProps> = ({
                     {extensionMessage || getExtensionMessage()}
                   </span>
                 </div>
+                
+                {/* ✅ BYPASS BUTTON: Access dashboard without waiting */}
+                <motion.div
+                  className="bypass-section"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5, duration: 0.4 }}
+                >
+                  <motion.button
+                    className={`bypass-button ${bypassGlowIntensity}`}
+                    onClick={handleBypassAndAccess}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    style={{
+                      '--bypass-glow-color': platformConfig.primaryColor,
+                    } as React.CSSProperties}
+                  >
+                    <FiZap size={16} />
+                    <span>Access Dashboard</span>
+                  </motion.button>
+                  <p className="bypass-warning">
+                    <FiAlertTriangle size={12} />
+                    <span>Without context arrival · Not recommended</span>
+                  </p>
+                </motion.div>
               </motion.div>
             )}
           </AnimatePresence>

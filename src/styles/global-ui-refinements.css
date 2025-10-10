@@ -550,4 +550,32 @@ body, #root, .app-container, .content-wrapper, .main-content {
 .popup-content::-webkit-scrollbar-thumb:hover,
 .modal-content::-webkit-scrollbar-thumb:hover {
   background: rgba(128, 128, 128, 0.8) !important;
+}
+
+/* ========================================
+   AI MANAGER VIEWPORT LOCK OVERRIDE
+   ======================================== */
+/* CRITICAL: Ensure AI Manager always sticks to viewport, not page wrapper */
+.ai-manager-button-container,
+.ai-manager-window,
+.ai-manager-greeting-bubble {
+  position: fixed !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+  -moz-transform: none !important;
+  -ms-transform: none !important;
+  -o-transform: none !important;
+  will-change: auto !important;
+  backface-visibility: visible !important;
+  -webkit-backface-visibility: visible !important;
+  perspective: none !important;
+  -webkit-perspective: none !important;
+}
+
+/* Ensure body and #root never break position:fixed for portaled elements */
+body, #root {
+  transform: none !important;
+  -webkit-transform: none !important;
+  perspective: none !important;
+  -webkit-perspective: none !important;
 } 

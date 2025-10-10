@@ -43,6 +43,8 @@ import ErrorBoundary from './components/common/ErrorBoundary';
 import { setupPlatformUsernameInterceptor, setupAxiosInterceptor } from './utils/platformUsernameInterceptor';
 import PerformanceOptimizer from './components/seo/PerformanceOptimizer';
 import GoogleAnalytics from './components/seo/GoogleAnalytics';
+import { AIManagerChat } from './components/AIManager/AIManagerChat';
+import { initializeGeminiService } from './services/AIManager/geminiService';
 
 // Extend Window interface for proxy server status and optimization tester
 declare global {
@@ -98,6 +100,7 @@ const AppContent: React.FC = () => {
   const [competitors, setCompetitors] = useState<string[]>(location.state?.competitors || []);
   const [accountType, setAccountType] = useState<'branding' | 'non-branding'>(location.state?.accountType || 'branding');
   const [userId, setUserId] = useState<string | undefined>(undefined);
+  const [isAIManagerReady, setIsAIManagerReady] = useState(false);
   const [isLoadingUserData, setIsLoadingUserData] = useState(false);
 
   // Global image error handling and platform username interceptor setup
@@ -167,6 +170,35 @@ const AppContent: React.FC = () => {
     
     return () => clearInterval(interval);
   }, []);
+
+  // Initialize AI Manager with Gemini API key
+  useEffect(() => {
+    const initializeAIManager = async () => {
+      try {
+        // Get Gemini API key from backend (secure)
+        const response = await axios.get('/api/config/gemini-key');
+        if (response.data?.apiKey) {
+          initializeGeminiService(response.data.apiKey);
+          setIsAIManagerReady(true);
+          console.log('🤖 AI Manager initialized successfully');
+        }
+      } catch (error) {
+        // Fallback: use environment variable for development
+        const devApiKey = import.meta.env.VITE_GEMINI_API_KEY;
+        if (devApiKey) {
+          initializeGeminiService(devApiKey);
+          setIsAIManagerReady(true);
+          console.log('🤖 AI Manager initialized with dev key');
+        } else {
+          console.warn('⚠️ AI Manager could not be initialized: No API key available');
+        }
+      }
+    };
+
+    if (currentUser) {
+      initializeAIManager();
+    }
+  }, [currentUser]);
 
   // 🔄 Keep platform-specific user data in sync on route change
   useEffect(() => {
@@ -822,27 +854,20 @@ const AppContent: React.FC = () => {
                 }
                 
                 // Use cached data to navigate to dashboard
-                if (cachedAccountType === 'branding') {
-                  safeNavigate(navigate, `/${platformKey}-dashboard`, {
-                    state: {
-                      accountHolder: cachedUsername,
-                      competitors: cachedCompetitors,
-                      accountType: cachedAccountType,
-                      platform: platformKey
-                    },
-                    replace: true
-                  }, 5);
-                } else {
-                  safeNavigate(navigate, `/${platformKey}-non-branding-dashboard`, {
-                    state: {
-                      accountHolder: cachedUsername,
-                      competitors: cachedCompetitors,
-                      accountType: cachedAccountType,
-                      platform: platformKey
-                    },
-                    replace: true
-                  }, 5);
-                }
+                // ✅ CRITICAL FIX: Instagram uses /dashboard, other platforms use /{platform}-dashboard
+                const dashboardRoute = platformKey === 'instagram' 
+                  ? (cachedAccountType === 'branding' ? '/dashboard' : '/non-branding-dashboard')
+                  : (cachedAccountType === 'branding' ? `/${platformKey}-dashboard` : `/${platformKey}-non-branding-dashboard`);
+                
+                safeNavigate(navigate, dashboardRoute, {
+                  state: {
+                    accountHolder: cachedUsername,
+                    competitors: cachedCompetitors,
+                    accountType: cachedAccountType,
+                    platform: platformKey
+                  },
+                  replace: true
+                }, 5);
                 return; // Exit early to prevent further processing
               }
             } catch {}
@@ -1057,10 +1082,29 @@ const AppContent: React.FC = () => {
     );
   }
 
+  // Debug AI Manager rendering
+  console.log('🤖 AI Manager Render Check:', {
+    currentUser: !!currentUser,
+    userId: currentUser?.uid,
+    accountHolder,
+    path: location.pathname
+  });
+
   return (
-    <div className="App">
-      <GoogleAnalytics />
-      <PerformanceOptimizer />
+    <>
+      {/* AI Manager - ALWAYS RENDER FOR TESTING */}
+      <AIManagerChat
+        initialContext={{
+          userId: currentUser?.uid || 'test-user',
+          username: accountHolder || 'test-user',
+          platform: getCurrentPlatform() as any,
+          currentPage: location.pathname
+        }}
+      />
+      
+      <div className="App">
+        <GoogleAnalytics />
+        <PerformanceOptimizer />
       <TopBar />
       <UpdateNotification />
       <div className="main-content">
@@ -1329,7 +1373,8 @@ const AppContent: React.FC = () => {
             onClose={() => setShowAdminPanel(false)}
           />
         )}
-    </div>
+      </div>
+    </>
   );
 };
 

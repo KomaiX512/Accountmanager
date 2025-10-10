@@ -95,7 +95,8 @@ export function useMainDashboardRefresh() {
     await triggerSilentRefresh(platform, username);
     
     // Navigate to platform dashboard
-    const platformRoute = `/${platform}-dashboard`;
+    // ✅ CRITICAL FIX: Instagram uses /dashboard, other platforms use /{platform}-dashboard
+    const platformRoute = platform === 'instagram' ? '/dashboard' : `/${platform}-dashboard`;
     navigate(platformRoute, {
       state: {
         accountHolder: username,

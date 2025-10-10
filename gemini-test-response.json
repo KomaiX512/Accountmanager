@@ -1,0 +1,39 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "The image features a close-up of four women with diverse skin tones, arranged in a way that their faces are the main focus. The background is a blend of pink and blue hues, creating a vibrant and modern aesthetic.\n\nThe woman in the bottom center has a medium skin tone and is adorned with small, shimmering silver accents around her eyes and on her lips, giving her a glamorous and playful look. Her lips are glossy and full.\n\nTo the left of her, another woman with fair skin and blonde hair gazes directly at the viewer. Her lips are painted with a soft, rosy color, and her expression is serene.\n\nAbove these two, a woman with a deeper skin tone looks slightly off to the side. Her makeup is subtle, emphasizing her natural beauty.\n\nTo the right, the fourth woman, with a dark complexion, also looks towards the viewer. She has shimmering accents around her eyes, similar to the woman in the bottom center, but with a slightly different pattern.\n\nThe image also includes two rectangular boxes with text and product images. On the left, there are two lip gloss tubes next to a box with text, which appears to be promoting a lip product. On the right, there are two more boxes with text, likely providing details about the makeup or products used on the models.\n\nOverall, the image has a polished and professional feel, suggesting it is part of a beauty or cosmetics campaign. The focus on diversity and the use of shimmering accents create a sense of modernity and sophistication."
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.47838560222414495
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 1295,
+    "candidatesTokenCount": 307,
+    "totalTokenCount": 1602,
+    "promptTokensDetails": [
+      {
+        "modality": "IMAGE",
+        "tokenCount": 1290
+      },
+      {
+        "modality": "TEXT",
+        "tokenCount": 5
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 307
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash-exp",
+  "responseId": "5KLoaOnvO9Wq28oPl9PoiAs"
+}

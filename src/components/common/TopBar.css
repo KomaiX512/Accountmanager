@@ -1186,10 +1186,10 @@ div.user-profile div.user-avatar img {
   box-shadow: 0 8px 20px rgba(0, 255, 204, 0.2);
 }
 
-.user-dropdown {
-  position: absolute;
-  top: calc(100% + 8px); /* Drop below avatar with clear offset */
-  right: 0;
+.top-bar .user-profile .user-dropdown {
+  position: fixed !important; /* Render outside TopBar stacking context */
+  top: calc(var(--topbar-height) + 8px) !important; /* Below fixed TopBar */
+  right: 16px !important;
   margin-top: 0; /* Use explicit top offset instead of margin */
   background: rgba(0, 0, 0, 0.95);
   backdrop-filter: blur(20px);
@@ -1201,7 +1201,7 @@ div.user-profile div.user-avatar img {
   z-index: 2147483647 !important; /* Absolute top priority above all UI */
   pointer-events: auto !important; /* Ensure it can be interacted with */
   display: block !important; /* Prevent accidental display:none overrides */
-  transform: translateZ(0); /* Avoid GPU artifacts */
+  transform: none !important; /* Prevent unintended offsets */
 }
 
 .dropdown-menu-item {

@@ -12,10 +12,11 @@ import { useMobileDetection } from '../../hooks/useMobileDetection';
 const TopBar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentUser, signOut } = useAuth();
+  const { currentUser } = useAuth();
   const { getAcquiredPlatforms } = usePlatformStatus();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const isMobile = useMobileDetection();
+  const [bypassTimers, setBypassTimers] = useState<Record<string, { endTime: number; startTime: number }>>({});
 
   // ✅ SIMPLE LOGIC: Get acquired platforms directly from MainDashboard logic
   const acquiredPlatforms = getAcquiredPlatforms();
@@ -27,7 +28,48 @@ const TopBar: React.FC = () => {
     const syncInterval = setInterval(() => {
       // Force re-render to catch any platform status changes by updating acquired platforms
       getAcquiredPlatforms();
-    }, 5000);
+      
+      // Check for bypass timers (improved with better debugging)
+      const newTimers: Record<string, { endTime: number; startTime: number }> = {};
+      let hasActiveBypass = false;
+      
+      ['instagram', 'twitter', 'facebook', 'linkedin'].forEach(platform => {
+        const bypassKey = `${platform}_bypass_active_${currentUser.uid}`;
+        const timerKey = `${platform}_bypass_timer_${currentUser.uid}`;
+        const bypassActive = localStorage.getItem(bypassKey);
+        const timerData = localStorage.getItem(timerKey);
+        
+        if (bypassActive && timerData) {
+          try {
+            const timer = JSON.parse(timerData);
+            const now = Date.now();
+            
+            if (timer.endTime > now) {
+              newTimers[platform] = timer;
+              hasActiveBypass = true;
+              const remaining = Math.ceil((timer.endTime - now) / 60000);
+              console.log(`⏱️ TOPBAR TIMER: ${platform} - ${remaining}min remaining`);
+            } else {
+              // Timer expired, clear bypass
+              console.log(`🧹 TOPBAR CLEANUP: ${platform} bypass timer expired, removing`);
+              localStorage.removeItem(bypassKey);
+              localStorage.removeItem(timerKey);
+            }
+          } catch (e) {
+            console.error(`❌ TOPBAR ERROR: Failed to parse ${platform} bypass timer:`, e);
+            // Clear corrupted data
+            localStorage.removeItem(bypassKey);
+            localStorage.removeItem(timerKey);
+          }
+        }
+      });
+      
+      if (hasActiveBypass) {
+        console.log(`📊 TOPBAR STATUS: Active bypasses:`, Object.keys(newTimers));
+      }
+      
+      setBypassTimers(newTimers);
+    }, 1000); // Changed from 5000ms to 1000ms for real-time updates
 
     return () => clearInterval(syncInterval);
   }, [currentUser?.uid, getAcquiredPlatforms]);
@@ -68,9 +110,6 @@ const TopBar: React.FC = () => {
     <>
       <motion.div
         className="top-bar"
-        initial={{ y: -80 }}
-        animate={{ y: 0 }}
-        transition={{ duration: 0.5 }}
         style={{
           // 🔒 BULLETPROOF STATIC POSITIONING - Always visible, highest priority
           position: 'fixed',
@@ -83,8 +122,6 @@ const TopBar: React.FC = () => {
           borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
           backdropFilter: 'blur(10px)',
           WebkitBackdropFilter: 'blur(10px)',
-          transform: 'translateZ(0)',
-          willChange: 'transform',
           boxSizing: 'border-box',
           // FIXED: Additional bulletproof properties
           display: 'flex',
@@ -137,6 +174,7 @@ const TopBar: React.FC = () => {
                       (platform.id === 'linkedin' && location.pathname === '/linkedin-dashboard')
                     }
                     showIcon={false}
+                    bypassTimer={bypassTimers[platform.id] || null}
                   />
                 ))}
               </>
@@ -189,26 +227,9 @@ const TopBar: React.FC = () => {
             <div style={{ 
               /* 🔒 VPS COMPATIBILITY: Inline styles as backup for circular profile image */
               display: 'flex',
-              alignItems: 'center',
-              gap: 8
+              alignItems: 'center'
             }}>
               <UserDropdown />
-              {/* Temporary fallback logout for immediate access */}
-              <motion.button
-                className="logout-fallback-button"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={async () => {
-                  try {
-                    await signOut();
-                    navigate('/login');
-                  } catch (e) {
-                    console.error('Logout error:', e);
-                  }
-                }}
-              >
-                Logout
-              </motion.button>
             </div>
           ) : (
             <motion.button

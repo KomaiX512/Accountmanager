@@ -3853,8 +3853,8 @@ app.post('/api/reimagine-image', async (req, res) => {
       imageFilename: newImageFilename,
       image_prompt: enhancedImagePrompt,
       imagePrompt: enhancedImagePrompt,
-      image_url: `https://570f213f1410829ee9a733a77a5f40e3.r2.cloudflarestorage.com/structuredb/ready_post/${platform}/${username}/${newImageFilename}`,
-      r2_image_url: `https://570f213f1410829ee9a733a77a5f40e3.r2.cloudflarestorage.com/structuredb/ready_post/${platform}/${username}/${newImageFilename}`,
+      image_url: `https://f049515e642b0c91e7679c3d80962686.r2.cloudflarestorage.com/structuredb/ready_post/${platform}/${username}/${newImageFilename}`,
+      r2_image_url: `https://f049515e642b0c91e7679c3d80962686.r2.cloudflarestorage.com/structuredb/ready_post/${platform}/${username}/${newImageFilename}`,
       reimagined_at: new Date().toISOString(),
       reimagined_from: originalPostData.image_filename || originalPostData.imageFilename,
       extra_prompt_used: extraPrompt || null

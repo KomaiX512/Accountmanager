@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { isBypassActive } from '../utils/bypassChecker';
 
 export interface ProcessingGuardResult {
   active: boolean;              // true if processing is still running
@@ -12,6 +13,14 @@ const getInfoKey = (platformId: string) => `${platformId}_processing_info`;
 // BULLETPROOF timer validation with multiple checks
 const getRemainingMs = (platformId: string): number => {
   try {
+    // 🚀 BYPASS CHECK FIRST: If user has activated bypass, treat as no active timer
+    try {
+      const currentUserId = localStorage.getItem('currentUserId');
+      if (currentUserId && isBypassActive(platformId, currentUserId)) {
+        return 0;
+      }
+    } catch {}
+
     const raw = localStorage.getItem(getCountdownKey(platformId));
     if (!raw) return 0;
     
@@ -121,6 +130,17 @@ export default function useProcessingGuard(platformId: string, username?: string
   const enforceGuard = useCallback((ms: number) => {
     if (enforcingRef.current) return; // Prevent double enforcement
     
+    // 🚀 BYPASS CHECK: Never enforce guard when bypass is active
+    try {
+      const currentUserId = localStorage.getItem('currentUserId');
+      if (currentUserId && isBypassActive(platformId, currentUserId)) {
+        // Ensure state reflects no active timer
+        setRemainingMs(0);
+        setLastKnownMs(0);
+        return;
+      }
+    } catch {}
+
     if (ms > 0) {
       // Detect timer manipulation before enforcing
       if (detectTimerManipulation(platformId)) {

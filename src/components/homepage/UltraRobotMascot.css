@@ -1,0 +1,535 @@
+/* Robot Chest Form Overlay - Positioned in Abdominal Region */
+.robot-chest-form-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1000;
+  width: 280px;
+  max-width: 90vw;
+  pointer-events: none;
+}
+
+.robot-chest-form {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 2px solid rgba(0, 255, 204, 0.5);
+  border-radius: 16px;
+  padding: 12px;
+  box-shadow: 
+    0 0 30px rgba(0, 255, 204, 0.3),
+    inset 0 0 20px rgba(0, 255, 204, 0.1);
+  display: flex;
+  gap: 8px;
+  animation: chest-pulse 2s ease-in-out infinite;
+  pointer-events: auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@keyframes chest-pulse {
+  0%, 100% { 
+    box-shadow: 
+      0 0 30px rgba(0, 255, 204, 0.3),
+      inset 0 0 20px rgba(0, 255, 204, 0.1);
+  }
+  50% { 
+    box-shadow: 
+      0 0 50px rgba(0, 255, 204, 0.5),
+      inset 0 0 30px rgba(0, 255, 204, 0.2);
+  }
+}
+
+.robot-chest-input {
+  flex: 1;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(0, 255, 204, 0.3);
+  border-radius: 10px;
+  color: #00ffcc;
+  font-size: 0.95rem;
+  font-weight: 500;
+  outline: none;
+  transition: all 0.3s ease;
+  text-align: center;
+  pointer-events: auto;
+}
+
+.robot-chest-input::placeholder {
+  color: rgba(0, 255, 204, 0.5);
+  font-size: 0.9rem;
+}
+
+.robot-chest-input:focus {
+  background: rgba(0, 0, 0, 0.8);
+  border-color: #00ffcc;
+  box-shadow: 
+    0 0 20px rgba(0, 255, 204, 0.4),
+    inset 0 0 10px rgba(0, 255, 204, 0.1);
+  color: #ffffff;
+}
+
+.robot-chest-submit-btn {
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #00ffcc, #00ccff);
+  border: none;
+  border-radius: 10px;
+  color: #000000;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 15px rgba(0, 255, 204, 0.4);
+  pointer-events: auto;
+  min-width: 45px;
+}
+
+.robot-chest-submit-btn:hover {
+  background: linear-gradient(135deg, #00ccff, #00ffcc);
+  box-shadow: 0 0 25px rgba(0, 255, 204, 0.6);
+  transform: scale(1.05);
+}
+
+.robot-chest-submit-btn:active {
+  transform: scale(0.95);
+}
+
+/* Celebration Message */
+.celebration-message {
+  position: absolute;
+  top: 20%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1001;
+  text-align: center;
+  pointer-events: none;
+  width: 90%;
+  max-width: 600px;
+}
+
+.celebration-text {
+  font-size: 3rem;
+  font-weight: 900;
+  background: linear-gradient(135deg, #ffff00, #ff00ff, #00ffcc);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradient-shift 2s ease infinite;
+  text-shadow: 
+    0 0 40px rgba(255, 255, 0, 0.8),
+    0 0 80px rgba(255, 0, 255, 0.6);
+  filter: drop-shadow(0 0 20px rgba(0, 255, 204, 0.8));
+}
+
+.celebration-subtext {
+  margin-top: 20px;
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #00ffcc;
+  text-shadow: 0 0 20px rgba(0, 255, 204, 0.8);
+  animation: pulse-glow 1s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { 
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+}
+
+/* Robot Chest Input Container (inside 3D scene - Abdominal Region) */
+.robot-chest-input-container {
+  pointer-events: none;
+  width: 280px;
+  max-width: 90vw;
+  text-align: center;
+}
+
+.chest-input-wrapper {
+  background: rgba(0, 0, 0, 0.7);
+  border: 2px solid rgba(0, 255, 204, 0.6);
+  border-radius: 16px;
+  padding: 12px 16px;
+  backdrop-filter: blur(10px);
+  box-shadow: 
+    0 0 30px rgba(0, 255, 204, 0.4),
+    inset 0 0 20px rgba(0, 255, 204, 0.1);
+  animation: pulse-chest 2s ease-in-out infinite;
+}
+
+.chest-prompt-text {
+  color: #00ffcc;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-shadow: 0 0 15px rgba(0, 255, 204, 0.8);
+  letter-spacing: 0.5px;
+  animation: text-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-chest {
+  0%, 100% {
+    box-shadow: 
+      0 0 30px rgba(0, 255, 204, 0.4),
+      inset 0 0 20px rgba(0, 255, 204, 0.1);
+    border-color: rgba(0, 255, 204, 0.6);
+  }
+  50% {
+    box-shadow: 
+      0 0 50px rgba(0, 255, 204, 0.6),
+      inset 0 0 30px rgba(0, 255, 204, 0.2);
+    border-color: rgba(0, 255, 204, 0.9);
+  }
+}
+
+@keyframes text-glow {
+  0%, 100% {
+    text-shadow: 0 0 15px rgba(0, 255, 204, 0.8);
+  }
+  50% {
+    text-shadow: 0 0 25px rgba(0, 255, 204, 1);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 20px currentColor;
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow: 0 0 30px currentColor;
+  }
+}
+
+/* Working Message - Shows BENEATH robot */
+.working-message {
+  position: absolute;
+  bottom: 5%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
+  text-align: center;
+  width: 90%;
+  max-width: 600px;
+}
+
+.working-content {
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(20px);
+  border: 2px solid rgba(0, 255, 204, 0.5);
+  border-radius: 24px;
+  padding: 32px;
+  box-shadow: 
+    0 8px 40px rgba(0, 255, 204, 0.3),
+    inset 0 0 30px rgba(0, 255, 204, 0.1);
+}
+
+.working-icon {
+  font-size: 4rem;
+  margin-bottom: 16px;
+  filter: drop-shadow(0 0 20px rgba(255, 255, 0, 0.8));
+}
+
+.working-text {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 12px;
+  line-height: 1.4;
+  text-shadow: 0 0 20px rgba(0, 255, 204, 0.6);
+}
+
+.manager-name {
+  background: linear-gradient(135deg, #00ffcc, #00ccff, #ff00ff);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradient-shift 3s ease infinite;
+  font-size: 2rem;
+  font-weight: 900;
+  filter: drop-shadow(0 0 15px rgba(0, 255, 204, 0.8));
+}
+
+.working-subtext {
+  font-size: 1.1rem;
+  color: #00ffcc;
+  font-weight: 600;
+  margin-top: 16px;
+  text-shadow: 0 0 15px rgba(0, 255, 204, 0.5);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .robot-chest-form-overlay {
+    width: 90%;
+    max-width: 320px;
+  }
+
+  .robot-chest-form {
+    padding: 10px;
+    gap: 6px;
+  }
+
+  .robot-chest-input {
+    padding: 8px 10px;
+    font-size: 0.85rem;
+  }
+
+  .robot-chest-submit-btn {
+    padding: 8px 10px;
+    font-size: 1rem;
+    min-width: 40px;
+  }
+
+  .robot-chest-input-container {
+    width: 90%;
+    max-width: 260px;
+  }
+
+  .chest-input-wrapper {
+    padding: 10px 12px;
+  }
+
+  .chest-prompt-text {
+    font-size: 0.75rem;
+  }
+
+  .robot-name-form-overlay {
+    width: 95%;
+    bottom: 8%;
+  }
+
+  .robot-name-form {
+    padding: 24px;
+  }
+
+  .prompt-text {
+    font-size: 1.2rem;
+  }
+
+  .robot-name-input {
+    font-size: 1rem;
+    padding: 14px 18px;
+  }
+
+  .robot-submit-btn {
+    font-size: 1.1rem;
+    padding: 14px;
+  }
+
+  .celebration-text {
+    font-size: clamp(1.5rem, 5vw, 2rem);
+  }
+
+  .celebration-subtext {
+    font-size: clamp(0.9rem, 2.5vw, 1.1rem);
+    margin-top: 10px;
+  }
+
+  .working-message {
+    width: 95%;
+    bottom: 3%;
+    max-width: 500px;
+  }
+
+  .working-content {
+    padding: clamp(16px, 4vw, 24px);
+  }
+
+  .working-icon {
+    font-size: clamp(2rem, 6vw, 3rem);
+    margin-bottom: 12px;
+  }
+
+  .working-text {
+    font-size: clamp(1.1rem, 3vw, 1.4rem);
+    line-height: 1.3;
+  }
+
+  .manager-name {
+    font-size: clamp(1.3rem, 4vw, 1.6rem);
+  }
+
+  .working-subtext {
+    font-size: clamp(0.85rem, 2vw, 0.95rem);
+    margin-top: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .robot-chest-form-overlay {
+    width: 92%;
+    max-width: 280px;
+  }
+
+  .robot-chest-form {
+    padding: 8px;
+    gap: 4px;
+    flex-direction: column;
+  }
+
+  .robot-chest-input {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 0.9rem;
+  }
+
+  .robot-chest-submit-btn {
+    width: 100%;
+    padding: 10px;
+    font-size: 1rem;
+  }
+
+  .robot-chest-input-container {
+    width: 92%;
+    max-width: 240px;
+  }
+
+  .chest-input-wrapper {
+    padding: 8px 10px;
+  }
+
+  .chest-prompt-text {
+    font-size: 0.7rem;
+  }
+
+  .prompt-text {
+    font-size: 1rem;
+  }
+
+  .robot-name-input {
+    font-size: 0.95rem;
+    padding: 12px 16px;
+  }
+
+  .robot-submit-btn {
+    font-size: 1rem;
+    padding: 12px;
+  }
+
+  .celebration-text {
+    font-size: clamp(1.2rem, 4vw, 1.5rem);
+  }
+
+  .celebration-subtext {
+    font-size: clamp(0.85rem, 2vw, 1rem);
+  }
+
+  .working-message {
+    width: 98%;
+    bottom: 2%;
+  }
+
+  .working-content {
+    padding: clamp(12px, 3vw, 20px);
+  }
+
+  .working-icon {
+    font-size: clamp(1.8rem, 5vw, 2.5rem);
+    margin-bottom: 8px;
+  }
+
+  .working-text {
+    font-size: clamp(1rem, 2.5vw, 1.2rem);
+  }
+
+  .manager-name {
+    font-size: clamp(1.1rem, 3vw, 1.3rem);
+  }
+
+  .working-subtext {
+    font-size: clamp(0.8rem, 1.8vw, 0.9rem);
+  }
+}
+
+/* Extra small screens */
+@media (max-width: 360px) {
+  .robot-chest-form-overlay {
+    width: 95%;
+    max-width: 260px;
+  }
+
+  .robot-chest-form {
+    padding: 6px;
+    gap: 3px;
+  }
+
+  .robot-chest-input {
+    padding: 8px 10px;
+    font-size: 0.85rem;
+  }
+
+  .robot-chest-submit-btn {
+    padding: 8px;
+    font-size: 0.95rem;
+  }
+
+  .robot-chest-input-container {
+    width: 95%;
+    max-width: 220px;
+  }
+
+  .chest-input-wrapper {
+    padding: 6px 8px;
+  }
+
+  .chest-prompt-text {
+    font-size: 0.65rem;
+  }
+
+  .celebration-text {
+    font-size: clamp(1rem, 3.5vw, 1.3rem);
+  }
+
+  .celebration-subtext {
+    font-size: clamp(0.75rem, 1.8vw, 0.9rem);
+    margin-top: 8px;
+  }
+
+  .working-message {
+    width: 100%;
+    bottom: 1%;
+    padding: 0 5px;
+  }
+
+  .working-content {
+    padding: clamp(10px, 2.5vw, 16px);
+    border-radius: 16px;
+  }
+
+  .working-icon {
+    font-size: clamp(1.5rem, 4vw, 2rem);
+    margin-bottom: 6px;
+  }
+
+  .working-text {
+    font-size: clamp(0.9rem, 2vw, 1.1rem);
+    margin-bottom: 8px;
+  }
+
+  .manager-name {
+    font-size: clamp(1rem, 2.5vw, 1.2rem);
+  }
+
+  .working-subtext {
+    font-size: clamp(0.75rem, 1.5vw, 0.85rem);
+    margin-top: 8px;
+  }
+}
+
+/* Ensure no horizontal scroll */
+@media (max-width: 768px) {
+  * {
+    max-width: 100vw;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+}

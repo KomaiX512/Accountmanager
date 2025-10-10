@@ -35,7 +35,7 @@ interface PostGenerationResponse {
 
 // Configure axios for CORS requests
 axios.defaults.headers.common['Accept'] = 'application/json';
-axios.defaults.timeout = 60000; // 60 seconds timeout
+axios.defaults.timeout = 180000; // 180 seconds timeout for long AI operations
 
 // Extend axios config type to include metadata
 declare module 'axios' {

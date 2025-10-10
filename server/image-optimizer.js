@@ -14,10 +14,10 @@ import crypto from 'crypto';
 dotenv.config();
 
 const s3Client = new S3Client({
-  endpoint: process.env.R2_ENDPOINT || 'https://3e59de744ba8e99e9e99f5e662a96498.r2.cloudflarestorage.com',
+  endpoint: process.env.R2_ENDPOINT || 'https://f049515e642b0c91e7679c3d80962686.r2.cloudflarestorage.com',
   credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID,
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+    accessKeyId: process.env.R2_ACCESS_KEY_ID || '7e15d4a51abb43fff3a7da4a8813044f',
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '8fccd5540c85304347cbbd25d8e1f67776a8473c73c4a8811e83d0970bd461e2',
   },
   region: 'auto',
 });

@@ -399,13 +399,19 @@ const Processing: React.FC = () => {
 
     try {
       console.log(`🔍 BACKEND VALIDATION: Validating processing state for ${targetPlatform} with backend`);
+      
+      // Check if bypass is active
+      const bypassKey = `${targetPlatform}_bypass_active_${currentUser.uid}`;
+      const bypassActive = localStorage.getItem(bypassKey) !== null;
+      
       const response = await fetch(`/api/validate-dashboard-access/${currentUser.uid}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          platform: targetPlatform
+          platform: targetPlatform,
+          bypassActive
         })
       });
 

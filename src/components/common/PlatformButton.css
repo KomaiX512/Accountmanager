@@ -134,3 +134,71 @@
     padding: clamp(0px, 0.2vw, 0px) clamp(0px, 0.3vw, 1px);
   }
 }
+
+/* Bypass Timer and Tooltip Styles */
+.platform-button-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.platform-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: 0.5rem;
+  padding: 0.125rem 0.375rem;
+  background: rgba(255, 193, 7, 0.15);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: rgba(255, 193, 7, 0.95);
+  animation: timer-pulse 2s ease-in-out infinite;
+}
+
+@keyframes timer-pulse {
+  0%, 100% {
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.bypass-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  background: rgba(26, 26, 46, 0.98);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  border-radius: 8px;
+  box-shadow: 
+    0 4px 20px rgba(0, 0, 0, 0.3),
+    0 0 20px rgba(255, 193, 7, 0.15);
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.95);
+  white-space: nowrap;
+  pointer-events: none;
+  backdrop-filter: blur(12px);
+}
+
+.bypass-tooltip svg {
+  color: rgba(255, 193, 7, 0.9);
+  flex-shrink: 0;
+}
+
+.bypass-tooltip::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-bottom-color: rgba(26, 26, 46, 0.98);
+}

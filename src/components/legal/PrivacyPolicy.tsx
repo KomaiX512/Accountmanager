@@ -134,7 +134,7 @@ const PrivacyPolicy: React.FC = () => {
                   <li>Required by law.</li>
                 </ul>
               </li>
-              <li><strong>Deletion Process:</strong> To request deletion of your Platform Data, contact us at tech.nucleus25@gmail.com. We will delete or anonymize data within 30 days, except where retention is required by law (proof of which will be retained).</li>
+              <li><strong>Deletion Process:</strong> We will delete or anonymize data within 30 days, except where retention is required by law (proof of which will be retained).</li>
             </ul>
           </section>
 
@@ -149,7 +149,7 @@ const PrivacyPolicy: React.FC = () => {
               <li><strong>Portability:</strong> Obtain your data in a portable format.</li>
               <li><strong>Objection:</strong> Object to certain data processing.</li>
             </ul>
-            <p>To exercise these rights, contact us at privacy@sentientai.com. We will respond within 30 days. As a Tech Provider, we notify clients of user data rights requests, as required by Meta's Platform Terms.</p>
+            <p>To exercise these rights, please use the contact methods provided in our application interface. We will respond within 30 days. As a Tech Provider, we notify clients of user data rights requests, as required by Meta's Platform Terms.</p>
           </section>
 
           <section className="privacy-section">
@@ -179,30 +179,19 @@ const PrivacyPolicy: React.FC = () => {
           </section>
 
           <section className="privacy-section">
-            <h2>12. Contact Us</h2>
-            <p>For questions, data rights requests, or to report security vulnerabilities, contact:</p>
-            <ul>
-              <li><strong>Email:</strong> tech.nucleus25@gmail.com</li>
-              <li><strong>Address:</strong> Ghulam Ishaq Khan Institute of Science and Technology, Tarbela Road, District Swabi, Khyber Pakhtoon Khwa, Topi, 23640</li>
-              <li><strong>Phone:</strong> +92 303 5233321</li>
-            </ul>
-            <p>We will respond within 30 days. Report security vulnerabilities to the above email for prompt resolution.</p>
-          </section>
-
-          <section className="privacy-section">
-            <h2>13. Changes to This Privacy Policy</h2>
+            <h2>12. Changes to This Privacy Policy</h2>
             <p>We may update this Privacy Policy to reflect changes in our practices or legal requirements. We will notify you of material changes via email or in-app notifications. Your continued use of our Platform after changes indicates acceptance of the updated policy.</p>
           </section>
 
           <section className="privacy-section">
-            <h2>14. Children's Privacy</h2>
+            <h2>13. Children's Privacy</h2>
             <p>
               Our services are not intended for children under the age of 13. We do not knowingly collect personal information from children under 13. If we become aware that we have collected personal information from a child under 13, we will take steps to delete such information promptly.
             </p>
           </section>
 
           <section className="privacy-section">
-            <h2>15. Changes to This Privacy Policy</h2>
+            <h2>14. Changes to This Privacy Policy</h2>
             <p>
               We may update this Privacy Policy from time to time to reflect changes in our practices, technology, legal requirements, or other factors. We will notify you of any material changes by:
             </p>

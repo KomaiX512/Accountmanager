@@ -198,7 +198,7 @@ const InstagramPermissionModal: React.FC<InstagramPermissionModalProps> = ({
                       <li>Required by law.</li>
                     </ul>
                   </li>
-                  <li><strong>Deletion Process:</strong> To request deletion of your Platform Data, contact us at tech.nucleus25@gmail.com. We will delete or anonymize data within 30 days, except where retention is required by law (proof of which will be retained).</li>
+                  <li><strong>Deletion Process:</strong> To request deletion of your Platform Data, please use the contact methods provided in our application interface. We will delete or anonymize data within 30 days, except where retention is required by law (proof of which will be retained).</li>
                 </ul>
                 
                 <p><strong>8. Your Data Rights</strong></p>
@@ -236,7 +236,6 @@ const InstagramPermissionModal: React.FC<InstagramPermissionModalProps> = ({
                 <p><strong>12. Contact Us</strong></p>
                 <p>For questions, data rights requests, or to report security vulnerabilities, contact:</p>
                 <ul>
-                  <li><strong>Email:</strong> tech.nucleus25@gmail.com</li>
                   <li><strong>Address:</strong> Ghulam Ishaq Khan Institute of Science and Technology, Tarbela Road, District Swabi, Khyber Pakhtoon Khwa, Topi, 23640</li>
                   <li><strong>Phone:</strong> +92 303 5233321</li>
                 </ul>

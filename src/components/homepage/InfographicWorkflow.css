@@ -1,0 +1,397 @@
+/* Apple-style Minimalist Infographic Workflow */
+
+.infographic-workflow-container {
+  position: relative;
+  min-height: 120vh;
+  padding: 4rem 2rem;
+  background: radial-gradient(ellipse at center, rgba(0, 20, 40, 0.3) 0%, transparent 70%);
+}
+
+.workflow-wrapper {
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+/* Sticky Header with Zoom In Effect */
+.sticky-header {
+  position: sticky;
+  top: 2rem;
+  z-index: 100;
+  text-align: center;
+  margin-bottom: 4rem;
+  backdrop-filter: blur(20px);
+  padding: 2rem;
+  border-radius: 30px;
+  background: rgba(10, 10, 15, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.workflow-header h2 {
+  font-size: clamp(2.5rem, 6vw, 4.5rem);
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 1rem;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.gradient-text-workflow {
+  background: linear-gradient(135deg, #00ffcc 0%, #00ccff 50%, #0099ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  background-size: 200% 200%;
+  animation: gradient-flow 4s ease infinite;
+}
+
+@keyframes gradient-flow {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.workflow-subtitle {
+  font-size: 1.2rem;
+  color: rgba(255, 255, 255, 0.6);
+  max-width: 700px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+/* Workflow Steps Container */
+.workflow-steps-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 3rem;
+  position: relative;
+  padding: 2rem 0;
+}
+
+/* Individual Workflow Step */
+.workflow-step {
+  position: relative;
+  padding: 3rem;
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(30px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 30px;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+/* Minimalist Hover Effect with Border Glow */
+.workflow-step::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 30px;
+  padding: 2px;
+  background: linear-gradient(135deg, transparent, rgba(0, 255, 204, 0.5), transparent);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.workflow-step:hover::before,
+.workflow-step.active::before {
+  opacity: 1;
+}
+
+.workflow-step:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(0, 255, 204, 0.2);
+  transform: translateY(-10px) scale(1.02);
+  box-shadow: 
+    0 30px 60px rgba(0, 0, 0, 0.3),
+    0 0 40px rgba(0, 255, 204, 0.1);
+}
+
+.workflow-step.active {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(0, 255, 204, 0.3);
+  box-shadow: 
+    0 20px 50px rgba(0, 0, 0, 0.2),
+    0 0 30px rgba(0, 255, 204, 0.15);
+}
+
+/* Step Number Badge */
+.step-number {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #ffffff;
+  border: 2px solid;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+/* Icon Container with Glow Effect */
+.step-icon-container {
+  width: 100px;
+  height: 100px;
+  margin: 0 auto 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid;
+  border-radius: 50%;
+  position: relative;
+  transition: all 0.4s ease;
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(10px);
+}
+
+.workflow-step:hover .step-icon-container {
+  transform: scale(1.1) rotateZ(5deg);
+}
+
+.step-icon {
+  font-size: 3rem;
+  transition: all 0.3s ease;
+}
+
+.workflow-step:hover .step-icon {
+  transform: scale(1.2);
+}
+
+/* Step Content */
+.step-content {
+  text-align: center;
+}
+
+.step-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.01em;
+}
+
+.step-subtitle {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+.step-description {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+}
+
+/* Expandable Details */
+.step-details {
+  overflow: hidden;
+  margin-top: 1.5rem;
+}
+
+.step-details ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.step-details li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.95rem;
+  text-align: left;
+}
+
+.detail-bullet {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 10px currentColor;
+}
+
+/* Connection Line Between Steps with Animated Arrows */
+.connection-line {
+  position: absolute;
+  top: 50%;
+  right: -3rem;
+  width: 3rem;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(0, 255, 204, 0.3), transparent);
+  transform-origin: left center;
+  display: none;
+  overflow: visible;
+}
+
+@media (min-width: 1200px) {
+  .connection-line {
+    display: block;
+  }
+}
+
+.connection-arrow {
+  position: absolute;
+  right: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(0, 255, 204, 0.6);
+  font-size: 1.2rem;
+  animation: arrow-pulse 2s ease-in-out infinite;
+}
+
+@keyframes arrow-pulse {
+  0%, 100% { 
+    transform: translateY(-50%) translateX(0);
+    opacity: 1;
+  }
+  50% { 
+    transform: translateY(-50%) translateX(10px);
+    opacity: 0.5;
+  }
+}
+
+/* Animated Data Particles - 3 Styles */
+.data-particle {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  background: radial-gradient(circle, #00ffcc, transparent);
+  border-radius: 50%;
+  transform: translateY(-50%);
+  box-shadow: 0 0 10px #00ffcc;
+}
+
+/* Add multiple fast-moving arrows */
+.connection-line::before,
+.connection-line::after {
+  content: '→';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  color: #00ffcc;
+  font-size: 1.5rem;
+  animation: fast-arrow 2s linear infinite;
+}
+
+.connection-line::after {
+  animation-delay: 1s;
+  color: #00ccff;
+}
+
+@keyframes fast-arrow {
+  0% {
+    left: 0;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    left: 100%;
+    opacity: 0;
+  }
+}
+
+/* Bottom Stats */
+.workflow-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 2rem;
+  margin-top: 4rem;
+  padding-top: 3rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.stat-card {
+  padding: 2rem;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 20px;
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(0, 255, 204, 0.2);
+  transform: translateY(-5px);
+  box-shadow: 0 15px 30px rgba(0, 255, 204, 0.1);
+}
+
+.stat-card h4 {
+  font-size: 2.5rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #00ffcc, #00ccff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 0.5rem;
+}
+
+.stat-card p {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .workflow-steps-container {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+  
+  .workflow-step {
+    padding: 2rem;
+  }
+  
+  .sticky-header {
+    position: relative;
+    top: 0;
+  }
+  
+  .workflow-header h2 {
+    font-size: 2rem;
+  }
+}
+
+/* Zoom In Viewport Animation */
+@keyframes zoom-in-fade {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Smooth scrolling for the entire section */
+.infographic-workflow-container {
+  scroll-behavior: smooth;
+}

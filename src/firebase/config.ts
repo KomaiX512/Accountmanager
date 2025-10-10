@@ -18,15 +18,15 @@ import {
 } from "firebase/auth";
 import { getAnalytics, logEvent } from "firebase/analytics";
 
-// Use environment variables with fallbacks
+// Use environment variables with fallbacks - Updated to sentient-marketing project
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyCzH-GLiwr5fu2WhKXJ4Z2DjI9H63m67_o",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "komx-512.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "komx-512",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "komx-512.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "1066228175404",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:1066228175404:web:9c63b8d0712b8f52a63789",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-TYSSNS8HTM"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDRbWjU7Y4GivCtMp8eWHcxTKRkLDt-oxs",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "sentient-marketing.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "sentient-marketing",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "sentient-marketing.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "826334050343",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:826334050343:web:38aeb564c393a9e6eaf602",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-Y6XV4XFFBP"
 };
 
 // Initialize Firebase

@@ -773,12 +773,18 @@
         unicode-range: U+0000-00FF;
       }
 
-      /* Force hardware acceleration globally */
-      body, #root, .dashboard-wrapper {
+      /* Force hardware acceleration globally - REMOVED body/#root transforms to fix position:fixed */
+      .dashboard-wrapper {
         transform: translate3d(0,0,0) !important;
         -webkit-transform: translate3d(0,0,0) !important;
         backface-visibility: hidden !important;
         -webkit-backface-visibility: hidden !important;
+      }
+      
+      /* Ensure body and #root allow position:fixed to work correctly */
+      body, #root {
+        transform: none !important;
+        -webkit-transform: none !important;
       }
 
       /* CRITICAL: Immediate visibility for first paint */

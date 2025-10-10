@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { isBypassActive } from '../../utils/bypassChecker';
 
 interface LoadingStateGuardProps {
   children: React.ReactNode;
@@ -88,10 +89,13 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
   const backendValidate = async (platform: string) => {
     if (!currentUser?.uid) return { ok: false } as const;
     try {
+      // Check if bypass is active
+      const bypassActive = isBypassActive(platform, currentUser.uid);
+      
       const res = await fetch(`/api/validate-dashboard-access/${currentUser.uid}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platform })
+        body: JSON.stringify({ platform, bypassActive })
       });
       if (!res.ok) return { ok: false } as const;
       const data = await res.json();
@@ -105,8 +109,18 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
   const backgroundCheck = async () => {
     if (inFlightRef.current) return; // prevent overlap
     
-    // ✅ SMART VALIDATION: Only validate if enough time has passed since last validation
     const now = Date.now();
+    const platform = getCurrentPlatform();
+    
+    // 🚀 ULTRA-CRITICAL: BYPASS CHECK FIRST - If bypass active, STOP ALL VALIDATION IMMEDIATELY
+    if (platform && currentUser?.uid && isBypassActive(platform, currentUser.uid)) {
+      // BYPASS IS ACTIVE - COMPLETELY SKIP ALL VALIDATION
+      return; // Exit immediately - no validation needed
+    }
+    
+    // Only proceed with validation if bypass is NOT active
+    
+    // ✅ SMART VALIDATION: Only validate if enough time has passed since last validation
     if (now - lastValidationRef.current < validationCooldownRef.current) {
       return; // Skip validation if too soon
     }
@@ -114,7 +128,6 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
     inFlightRef.current = true;
     try {
       if (!currentUser?.uid || !isProtectedRoute()) return;
-      const platform = getCurrentPlatform();
       
       // ✅ ENHANCED GLOBAL PROCESSING VALIDATION - More aggressive checking
       if (currentUser?.uid) {
@@ -333,6 +346,8 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
       } catch (e) {
         console.warn('🔍 BACKGROUND VALIDATION: Error during localStorage validation:', e);
       }
+      
+      // NOTE: Bypass check moved to top of function (line 119) for early return
       
       // If override flag set very recently (<15s), note it but DO NOT skip backend validation
       try {

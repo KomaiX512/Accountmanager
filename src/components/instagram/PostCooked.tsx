@@ -22,6 +22,7 @@ import useFeatureTracking from '../../hooks/useFeatureTracking';
 import { getApiUrl } from '../../config/api';
 import CacheManager from '../../utils/cacheManager';
 import { BatchImageLoader } from '../common/ProgressiveImage';
+import GeminiImageEditService from '../../services/GeminiImageEditService';
 // Missing modules - comment out until they're available
 
 // Extend Window interface for proxy server status
@@ -118,15 +119,28 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   // NEW: Reference for scrollable container
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   
-  // ✨ NEW: Reimagine Image Feature State
+  // ✨ GEMINI AI EDIT: Context menu state
   const [showContextMenu, setShowContextMenu] = useState<{ x: number; y: number; postKey: string } | null>(null);
-  const [showReimagineModal, setShowReimagineModal] = useState(false);
-  const [reimaginePostKey, setReimaginePostKey] = useState<string | null>(null);
-  const [reimagineExtraPrompt, setReimagineExtraPrompt] = useState('');
-  const [isReimagining, setIsReimagining] = useState(false);
-  const [reimagineToastMessage, setReimagineToastMessage] = useState<string | null>(null);
   // Add preview modal state
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  
+  // ✨ GEMINI AI EDIT STATE
+  const [showAiEditModal, setShowAiEditModal] = useState(false);
+  const [aiEditPostKey, setAiEditPostKey] = useState<string | null>(null);
+  const [aiEditPrompt, setAiEditPrompt] = useState('');
+  const [isAiEditing, setIsAiEditing] = useState(false);
+  const [aiEditProgress, setAiEditProgress] = useState<string>('Processing your image...');
+  const [showComparisonModal, setShowComparisonModal] = useState(false);
+  const [comparisonData, setComparisonData] = useState<{
+    originalUrl: string;
+    editedUrl: string;
+    postKey: string;
+    imageKey: string;
+  } | null>(null);
+
+  // ✅ Approval progress overlay state
+  const [isApproving, setIsApproving] = useState(false);
+  const [approveProgress, setApproveProgress] = useState<string>('Approving edited image...');
 
   // Handle scroll events to show/hide scroll-to-top button
   const handleScroll = () => {
@@ -1275,6 +1289,183 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     }
   };
 
+  // ✨ GEMINI AI EDIT HANDLERS
+  const handleImageRightClick = (e: React.MouseEvent, postKey: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    console.log(`[AI-Edit] Right-click on image for post ${postKey}`);
+    
+    setShowContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      postKey
+    });
+  };
+
+  const handleAiEditClick = (postKey: string) => {
+    console.log(`[AI-Edit] AI Edit clicked for post ${postKey}`);
+    setShowContextMenu(null);
+    setAiEditPostKey(postKey);
+    setAiEditPrompt('');
+    setShowAiEditModal(true);
+  };
+
+  const handleAiEditSubmit = async () => {
+    if (!aiEditPostKey || !aiEditPrompt.trim()) {
+      setToastMessage('Please enter a prompt for AI editing');
+      return;
+    }
+
+    const post = localPosts.find(p => p.key === aiEditPostKey);
+    if (!post) {
+      setToastMessage('Post not found');
+      return;
+    }
+
+    // Extract image key from post key
+    const imageKey = extractImageKey(post);
+    if (!imageKey) {
+      setToastMessage('Could not determine image key for this post');
+      return;
+    }
+
+    setIsAiEditing(true);
+    setShowAiEditModal(false);
+    setAiEditProgress('✨ AI is editing your image...');
+
+    try {
+      console.log(`[AI-Edit] Starting AI edit for ${aiEditPostKey} with prompt: "${aiEditPrompt}"`);
+      
+      // Show progress update after 10 seconds
+      const progressTimer = setTimeout(() => {
+        setAiEditProgress('🎨 Applying AI transformations (this may take up to 60s)...');
+      }, 10000);
+
+      // Show network recovery message after 30 seconds
+      const recoveryTimer = setTimeout(() => {
+        setAiEditProgress('🔄 Connection interrupted, checking if backend completed...');
+      }, 30000);
+
+      const response = await GeminiImageEditService.editImage({
+        imageKey,
+        username,
+        platform,
+        prompt: aiEditPrompt
+      });
+
+      clearTimeout(progressTimer);
+      clearTimeout(recoveryTimer);
+
+      if (response.success) {
+        console.log(`[AI-Edit] ✅ AI edit completed successfully`);
+        setAiEditProgress('✅ Edit completed successfully!');
+        
+        // Show comparison modal
+        setComparisonData({
+          originalUrl: response.originalImageUrl,
+          editedUrl: response.editedImageUrl,
+          postKey: aiEditPostKey,
+          imageKey
+        });
+        setShowComparisonModal(true);
+      } else {
+        setToastMessage(`AI Edit failed: ${response.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error(`[AI-Edit] Error during AI editing:`, error);
+      setToastMessage(`AI Edit error: ${error.message || 'Unknown error'}`);
+    } finally {
+      setIsAiEditing(false);
+      setAiEditProgress('Processing your image...');
+    }
+  };
+
+  const handleApproveEdit = async () => {
+    if (!comparisonData) return;
+
+    try {
+      setIsApproving(true);
+      setApproveProgress('Approving edited image...');
+
+      // Progress updates while backend processes approval
+      const approveProgressTimer = setTimeout(() => {
+        setApproveProgress('Finalizing changes and updating image...');
+      }, 10000);
+      const approveRecoveryTimer = setTimeout(() => {
+        setApproveProgress('Connection interrupted during approval, verifying result...');
+      }, 20000);
+
+      console.log(`[AI-Edit] Approving edited image for ${comparisonData.postKey}`);
+      
+      const response = await GeminiImageEditService.approveOrReject({
+        imageKey: comparisonData.imageKey,
+        username,
+        platform,
+        action: 'approve'
+      });
+
+      if (response.success) {
+        clearTimeout(approveProgressTimer);
+        clearTimeout(approveRecoveryTimer);
+        setToastMessage('✅ Edited image approved and replaced!');
+        setShowComparisonModal(false);
+        setComparisonData(null);
+        
+        // Immediate UI refresh: bump refresh key and broadcast update
+        try { imageRefreshKey.current = Date.now(); } catch {}
+        window.dispatchEvent(new CustomEvent('postUpdated', {
+          detail: {
+            postKey: comparisonData.postKey,
+            platform,
+            imageKey: comparisonData.imageKey,
+            serverTimestamp: Date.now()
+          }
+        }));
+        
+        // Force refresh to show updated image
+        setTimeout(() => {
+          handleRefreshPosts();
+        }, 1000);
+      } else {
+        clearTimeout(approveProgressTimer);
+        clearTimeout(approveRecoveryTimer);
+        setToastMessage(`Failed to approve: ${response.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error(`[AI-Edit] Error approving edit:`, error);
+      setToastMessage(`Approve error: ${error.message || 'Unknown error'}`);
+    } finally {
+      setIsApproving(false);
+    }
+  };
+
+  const handleRejectEdit = async () => {
+    if (!comparisonData) return;
+
+    try {
+      console.log(`[AI-Edit] Rejecting edited image for ${comparisonData.postKey}`);
+      
+      const response = await GeminiImageEditService.approveOrReject({
+        imageKey: comparisonData.imageKey,
+        username,
+        platform,
+        action: 'reject'
+      });
+
+      if (response.success) {
+        setToastMessage('Edited image discarded, original preserved');
+        setShowComparisonModal(false);
+        setComparisonData(null);
+      } else {
+        setToastMessage(`Failed to reject: ${response.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error(`[AI-Edit] Error rejecting edit:`, error);
+      setToastMessage(`Reject error: ${error.message || 'Unknown error'}`);
+    }
+  };
+
   const fetchTimeDelay = async (userDefinedInterval?: number): Promise<number> => {
     // Priority 1: User-defined interval
     if (typeof userDefinedInterval === 'number' && !isNaN(userDefinedInterval) && userDefinedInterval > 0) {
@@ -1574,6 +1765,23 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       setIsRefreshing(false);
     }
   }, [username, platform, isRefreshing, localPosts, imageRefreshKey]);
+
+  // Helper to clear hidden/processed posts if filter became too aggressive
+  const clearHiddenPosts = useCallback(() => {
+    try {
+      const key = getProcessedStorageKey();
+      localStorage.removeItem(key);
+      setProcessedPosts(new Set());
+      console.log(`[PostCooked] ✅ Cleared processed/hidden posts for ${platform}/${username}`);
+      setToastMessage('Hidden posts reset. Refreshing...');
+      setTimeout(() => {
+        setToastMessage(null);
+        handleRefreshPosts();
+      }, 600);
+    } catch (e) {
+      console.warn('[PostCooked] Failed clearing hidden posts:', (e as any)?.message || e);
+    }
+  }, [getProcessedStorageKey, platform, username, handleRefreshPosts]);
 
   const handleAutoSchedule = async (intervalOverride?: number) => {
     if (!userId || !localPosts.length) {
@@ -1925,18 +2133,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     });
   };
 
-  // ✨ NEW: Reimagine Image Feature Handlers
-  const handleImageRightClick = useCallback((e: React.MouseEvent, postKey: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    setShowContextMenu({
-      x: e.clientX,
-      y: e.clientY,
-      postKey
-    });
-  }, []);
-  
+  // ✨ Download Image Handler  
   const handleDownloadImage = useCallback(async (postKey: string) => {
     try {
       const post = localPosts.find(p => p.key === postKey);
@@ -1981,89 +2178,6 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     }
     setShowContextMenu(null);
   }, [localPosts, username, getReliableImageUrl, toOriginalQualityUrl]);
-  
-  const handleReimagineSubmit = useCallback(async () => {
-    if (!reimaginePostKey) return;
-    
-    setIsReimagining(true);
-    setReimagineToastMessage('🎨 Reimagining your image...');
-    
-    try {
-      console.log('[Reimagine] Sending request with data:', {
-        username,
-        postKey: reimaginePostKey,
-        extraPrompt: reimagineExtraPrompt.trim(),
-        platform
-      });
-      
-      const response = await axios.post(`/api/reimagine-image`, {
-        username,
-        postKey: reimaginePostKey,
-        extraPrompt: reimagineExtraPrompt.trim(),
-        platform
-      });
-      
-      console.log('[Reimagine] Response received:', response.data);
-      
-      if (response.data.success) {
-        setReimagineToastMessage('🎉 Image reimagined successfully! Refreshing...');
-        
-        // Update the local post with new image information
-        setLocalPosts(prev => 
-          prev.map(post => 
-            post.key === reimaginePostKey 
-              ? {
-                  ...post,
-                  data: {
-                    ...post.data,
-                    image_url: response.data.newImageUrl,
-                    r2_image_url: response.data.newImageUrl,
-                    image_filename: response.data.newImageFilename,
-                    image_path: response.data.newImageFilename
-                  }
-                }
-              : post
-          )
-        );
-        
-        // Clear image cache to force reload
-        setImageErrors(prev => {
-          const newErrors = { ...prev };
-          delete newErrors[reimaginePostKey];
-          return newErrors;
-        });
-        
-        // Force image refresh
-        imageRefreshKey.current = Date.now();
-        
-        setTimeout(() => {
-          setReimagineToastMessage(null);
-          setShowReimagineModal(false);
-          setReimaginePostKey(null);
-          setReimagineExtraPrompt('');
-        }, 2000);
-      } else {
-        throw new Error(response.data.error || 'Failed to reimagine image');
-      }
-    } catch (error: any) {
-      console.error('Failed to reimagine image:', error);
-      console.error('Error details:', {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        message: error.message
-      });
-      
-      const errorMessage = error.response?.data?.error || error.message || 'Failed to reimagine image';
-      setReimagineToastMessage(`❌ ${errorMessage}`);
-      
-      setTimeout(() => {
-        setReimagineToastMessage(null);
-      }, 4000);
-    } finally {
-      setIsReimagining(false);
-    }
-  }, [reimaginePostKey, reimagineExtraPrompt, username, platform, imageRefreshKey]);
   
   // Close context menu when clicking outside
   useEffect(() => {
@@ -2356,6 +2470,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
 
   // ✨ BULLETPROOF: Use comprehensive filtering for final display
   const filteredPosts = getFilteredPosts();
+  // Safety fallback: if everything got filtered but we have posts, show them to avoid blank UI
+  const visiblePosts = (filteredPosts && filteredPosts.length > 0) ? filteredPosts : localPosts;
 
   return (
     <>
@@ -2402,6 +2518,18 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
               </svg>
             )}
           </button>
+          {/* Quick recovery: clear hidden posts if filter removed everything */}
+          {filteredPosts.length === 0 && localPosts.length > 0 && (
+            <button
+              className="refresh-button minimal-refresh"
+              onClick={clearHiddenPosts}
+              aria-label="Reset hidden posts"
+              title="Reset hidden posts"
+              style={{ marginLeft: 8 }}
+            >
+              Reset hidden
+            </button>
+          )}
         </div>
         <div className="auto-schedule-row">
           {platform === 'twitter' ? (
@@ -2409,7 +2537,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
               isConnected={isConnected}
               onClick={() => setShowIntervalModal(true)}
               className="minimal-auto-schedule-btn twitter"
-              disabled={!filteredPosts.length || autoScheduling}
+              disabled={!visiblePosts.length || autoScheduling}
             >
               {autoScheduling ? 'Auto-Scheduling...' : 'Auto-Schedule All'}
             </TwitterRequiredButton>
@@ -2418,7 +2546,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
               isConnected={isConnected}
               onClick={() => setShowIntervalModal(true)}
               className="minimal-auto-schedule-btn facebook"
-              disabled={!filteredPosts.length || autoScheduling}
+              disabled={!visiblePosts.length || autoScheduling}
             >
               {autoScheduling ? 'Auto-Scheduling...' : 'Auto-Schedule All'}
             </FacebookRequiredButton>
@@ -2427,7 +2555,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
               isConnected={isConnected}
               onClick={() => setShowIntervalModal(true)}
               className="minimal-auto-schedule-btn instagram"
-              disabled={!filteredPosts.length || autoScheduling}
+              disabled={!visiblePosts.length || autoScheduling}
             >
               {autoScheduling ? 'Auto-Scheduling...' : 'Auto-Schedule All'}
             </InstagramRequiredButton>
@@ -2590,7 +2718,7 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             </div>
           </motion.div>
         )}
-        {filteredPosts.length === 0 ? (
+        {visiblePosts.length === 0 ? (
           <p className="no-posts">Start by creating your first post with your Account Manager with one prompt!</p>
         ) : (
           
@@ -2600,15 +2728,15 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             onScroll={handleScroll}
           >
             <div className="post-list">
-              {filteredPosts.map((post, index) => (
-              <motion.div
-                key={post.key}
-                className="post-card"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                <div className="post-content">
+              {visiblePosts.map((post, index) => (
+                <motion.div
+                  key={post.key}
+                  className="post-card"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <div className="post-content">
                   <div className="post-header">
                     {profilePicUrl && !profileImageError ? (
                       <OptimizedImage
@@ -3103,6 +3231,69 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         </motion.div>,
         document.body
       )}
+
+      {/* Approve Loading Overlay */}
+      {isApproving && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.9)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
+            backdropFilter: 'blur(15px)'
+          }}
+        >
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            style={{
+              background: 'rgba(20, 20, 40, 0.95)',
+              border: '1px solid rgba(0, 255, 204, 0.3)',
+              borderRadius: '16px',
+              padding: '40px',
+              textAlign: 'center',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.7)'
+            }}
+          >
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+              style={{
+                width: '60px',
+                height: '60px',
+                border: '4px solid rgba(0, 255, 204, 0.2)',
+                borderTop: '4px solid #00ffcc',
+                borderRadius: '50%',
+                margin: '0 auto 20px'
+              }}
+            />
+            <h3 style={{ 
+              color: '#00ffcc', 
+              fontSize: '20px', 
+              fontWeight: 'bold', 
+              margin: '0 0 10px 0'
+            }}>
+              {approveProgress}
+            </h3>
+            <p style={{ 
+              color: 'rgba(255, 255, 255, 0.7)', 
+              fontSize: '14px', 
+              margin: 0
+            }}>
+              {approveProgress.includes('interrupted')
+                ? 'Verifying that the backend completed approval and cleaned up temporary files...'
+                : 'Please wait while we finalize and update your image.'}
+            </p>
+          </motion.div>
+        </div>,
+        document.body
+      )}
       
       {/* ✨ NEW: Context Menu for Image Right-Click */}
       {showContextMenu && createPortal(
@@ -3422,6 +3613,451 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
               objectFit: 'contain'
             }}
           />
+        </div>,
+        document.body
+      )}
+
+      {/* ✨ GEMINI AI EDIT: Context Menu */}
+      {showContextMenu && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            top: showContextMenu.y,
+            left: showContextMenu.x,
+            background: 'rgba(20, 20, 40, 0.98)',
+            border: '1px solid rgba(0, 255, 204, 0.2)',
+            borderRadius: '8px',
+            padding: '8px',
+            zIndex: 99999,
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
+            backdropFilter: 'blur(20px)'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => handleAiEditClick(showContextMenu.postKey)}
+            style={{
+              width: '100%',
+              padding: '10px 16px',
+              background: 'rgba(0, 255, 204, 0.1)',
+              border: 'none',
+              borderRadius: '6px',
+              color: '#00ffcc',
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 255, 204, 0.2)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 255, 204, 0.1)';
+            }}
+          >
+            <span>✨</span>
+            AI Edit Image
+          </button>
+        </div>,
+        document.body
+      )}
+
+      {/* ✨ GEMINI AI EDIT: Prompt Modal */}
+      {showAiEditModal && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.85)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99998,
+            backdropFilter: 'blur(10px)'
+          }}
+          onClick={() => !isAiEditing && setShowAiEditModal(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'rgba(20, 20, 40, 0.98)',
+              border: '1px solid rgba(0, 255, 204, 0.2)',
+              borderRadius: '16px',
+              padding: '32px',
+              maxWidth: '600px',
+              width: '90%',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.6)',
+              backdropFilter: 'blur(30px)'
+            }}
+          >
+            <h3 style={{ 
+              color: '#00ffcc', 
+              fontSize: '24px', 
+              fontWeight: 'bold', 
+              margin: '0 0 8px 0',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
+              <span>✨</span>
+              Gemini AI Image Editor
+            </h3>
+            <p style={{ 
+              color: 'rgba(255, 255, 255, 0.7)', 
+              fontSize: '14px', 
+              margin: '0 0 24px 0',
+              lineHeight: '1.5'
+            }}>
+              Describe how you want to edit this image using Google Gemini AI.
+            </p>
+            
+            {/* Predefined Prompts */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ 
+                color: '#ffffff', 
+                fontSize: '13px', 
+                fontWeight: '500',
+                display: 'block',
+                marginBottom: '10px',
+                opacity: 0.8
+              }}>
+                Quick Suggestions:
+              </label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {GeminiImageEditService.getPredefinedPrompts().map((prompt, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setAiEditPrompt(prompt)}
+                    style={{
+                      padding: '8px 14px',
+                      background: 'rgba(0, 255, 204, 0.08)',
+                      border: '1px solid rgba(0, 255, 204, 0.2)',
+                      borderRadius: '20px',
+                      color: '#00ffcc',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(0, 255, 204, 0.15)';
+                      e.currentTarget.style.borderColor = 'rgba(0, 255, 204, 0.4)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(0, 255, 204, 0.08)';
+                      e.currentTarget.style.borderColor = 'rgba(0, 255, 204, 0.2)';
+                    }}
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ 
+                color: '#ffffff', 
+                fontSize: '14px', 
+                fontWeight: '500',
+                display: 'block',
+                marginBottom: '10px'
+              }}>
+                Your Edit Instructions:
+              </label>
+              <textarea
+                value={aiEditPrompt}
+                onChange={(e) => setAiEditPrompt(e.target.value)}
+                placeholder="E.g., Change background to sunset, make colors vibrant, add modern typography..."
+                style={{
+                  width: '100%',
+                  height: '120px',
+                  padding: '14px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  borderRadius: '10px',
+                  color: '#ffffff',
+                  fontSize: '14px',
+                  resize: 'vertical',
+                  fontFamily: 'inherit',
+                  outline: 'none',
+                  transition: 'all 0.2s ease'
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = 'rgba(0, 255, 204, 0.4)';
+                  e.target.style.background = 'rgba(255, 255, 255, 0.08)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                  e.target.style.background = 'rgba(255, 255, 255, 0.05)';
+                }}
+              />
+            </div>
+            
+            <div style={{ 
+              display: 'flex', 
+              gap: '12px', 
+              justifyContent: 'flex-end' 
+            }}>
+              <button
+                onClick={() => setShowAiEditModal(false)}
+                style={{
+                  padding: '12px 24px',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  borderRadius: '8px',
+                  color: '#ffffff',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAiEditSubmit}
+                disabled={!aiEditPrompt.trim()}
+                style={{
+                  padding: '12px 28px',
+                  background: aiEditPrompt.trim() ? 'linear-gradient(135deg, #00ffcc, #00cc99)' : 'rgba(0, 255, 204, 0.2)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: aiEditPrompt.trim() ? '#000000' : 'rgba(255, 255, 255, 0.4)',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: aiEditPrompt.trim() ? 'pointer' : 'not-allowed',
+                  transition: 'all 0.2s ease',
+                  opacity: aiEditPrompt.trim() ? 1 : 0.5
+                }}
+              >
+                Generate AI Edit
+              </button>
+            </div>
+          </motion.div>
+        </div>,
+        document.body
+      )}
+
+      {/* ✨ GEMINI AI EDIT: Comparison Modal */}
+      {showComparisonModal && comparisonData && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.92)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99997,
+            backdropFilter: 'blur(15px)'
+          }}
+        >
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            style={{
+              background: 'rgba(20, 20, 40, 0.98)',
+              border: '1px solid rgba(0, 255, 204, 0.2)',
+              borderRadius: '20px',
+              padding: '32px',
+              maxWidth: '1100px',
+              width: '95%',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              boxShadow: '0 25px 70px rgba(0, 0, 0, 0.7)'
+            }}
+          >
+            <h2 style={{ 
+              color: '#00ffcc', 
+              fontSize: '28px', 
+              fontWeight: 'bold', 
+              margin: '0 0 12px 0',
+              textAlign: 'center'
+            }}>
+              Compare: Original vs AI Edited
+            </h2>
+            <p style={{ 
+              color: 'rgba(255, 255, 255, 0.7)', 
+              fontSize: '15px', 
+              margin: '0 0 32px 0',
+              textAlign: 'center'
+            }}>
+              Review the AI-generated edit. Accept to replace or reject to keep original.
+            </p>
+            
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+              gap: '24px',
+              marginBottom: '32px'
+            }}>
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.03)',
+                borderRadius: '12px',
+                padding: '16px',
+                border: '1px solid rgba(255, 255, 255, 0.1)'
+              }}>
+                <h3 style={{ 
+                  color: '#ffffff', 
+                  fontSize: '16px', 
+                  margin: '0 0 12px 0',
+                  textAlign: 'center'
+                }}>
+                  📸 Original
+                </h3>
+                <img
+                  src={toOriginalQualityUrl(comparisonData.originalUrl)}
+                  alt="Original"
+                  style={{
+                    width: '100%',
+                    height: 'auto',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(255, 255, 255, 0.1)'
+                  }}
+                />
+              </div>
+              
+              <div style={{
+                background: 'rgba(0, 255, 204, 0.05)',
+                borderRadius: '12px',
+                padding: '16px',
+                border: '1px solid rgba(0, 255, 204, 0.2)'
+              }}>
+                <h3 style={{ 
+                  color: '#00ffcc', 
+                  fontSize: '16px', 
+                  margin: '0 0 12px 0',
+                  textAlign: 'center'
+                }}>
+                  ✨ AI Edited
+                </h3>
+                <img
+                  src={toOriginalQualityUrl(comparisonData.editedUrl)}
+                  alt="AI Edited"
+                  style={{
+                    width: '100%',
+                    height: 'auto',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(0, 255, 204, 0.3)'
+                  }}
+                />
+              </div>
+            </div>
+            
+            <div style={{ 
+              display: 'flex', 
+              gap: '16px', 
+              justifyContent: 'center'
+            }}>
+              <button
+                onClick={handleRejectEdit}
+                style={{
+                  padding: '14px 32px',
+                  background: 'rgba(255, 70, 70, 0.1)',
+                  border: '1px solid rgba(255, 70, 70, 0.3)',
+                  borderRadius: '10px',
+                  color: '#ff6b6b',
+                  fontSize: '15px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  minWidth: '160px'
+                }}
+              >
+                ❌ Reject Edit
+              </button>
+              <button
+                onClick={handleApproveEdit}
+                style={{
+                  padding: '14px 32px',
+                  background: 'linear-gradient(135deg, #00ffcc, #00cc99)',
+                  border: 'none',
+                  borderRadius: '10px',
+                  color: '#000000',
+                  fontSize: '15px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  minWidth: '160px'
+                }}
+              >
+                ✅ Approve & Replace
+              </button>
+            </div>
+          </motion.div>
+        </div>,
+        document.body
+      )}
+
+      {/* AI Edit Loading Overlay */}
+      {isAiEditing && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.9)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
+            backdropFilter: 'blur(15px)'
+          }}
+        >
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            style={{
+              background: 'rgba(20, 20, 40, 0.95)',
+              border: '1px solid rgba(0, 255, 204, 0.3)',
+              borderRadius: '16px',
+              padding: '40px',
+              textAlign: 'center',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.7)'
+            }}
+          >
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+              style={{
+                width: '60px',
+                height: '60px',
+                border: '4px solid rgba(0, 255, 204, 0.2)',
+                borderTop: '4px solid #00ffcc',
+                borderRadius: '50%',
+                margin: '0 auto 20px'
+              }}
+            />
+            <h3 style={{ 
+              color: '#00ffcc', 
+              fontSize: '20px', 
+              fontWeight: 'bold', 
+              margin: '0 0 10px 0'
+            }}>
+              {aiEditProgress}
+            </h3>
+            <p style={{ 
+              color: 'rgba(255, 255, 255, 0.7)', 
+              fontSize: '14px', 
+              margin: 0
+            }}>
+              {aiEditProgress.includes('interrupted') 
+                ? 'Verifying backend completion and retrieving result...'
+                : 'Gemini AI is working on your image. This process may take 30-60 seconds.'}
+            </p>
+          </motion.div>
         </div>,
         document.body
       )}
